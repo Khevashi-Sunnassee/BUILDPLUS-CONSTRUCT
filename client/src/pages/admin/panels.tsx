@@ -304,6 +304,8 @@ export default function AdminPanelsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      // Also invalidate jobs cache since Production Report uses it to get panel data
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       toast({ title: "Panel approved for production" });
       closeBuildDialog();
     },
@@ -319,6 +321,8 @@ export default function AdminPanelsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      // Also invalidate jobs cache since Production Report uses it to get panel data
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       toast({ title: "Production approval revoked" });
     },
     onError: (error: any) => {
