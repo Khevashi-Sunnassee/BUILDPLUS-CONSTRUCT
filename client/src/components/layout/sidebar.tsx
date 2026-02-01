@@ -19,6 +19,7 @@ import {
   Factory,
   Layers,
 } from "lucide-react";
+import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import {
   Sidebar,
   SidebarContent,
@@ -84,14 +85,13 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <BarChart3 className="h-5 w-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">LTE Performance</span>
-            <span className="text-xs text-muted-foreground">KPI & Reporting</span>
-          </div>
+        <div className="flex items-center justify-center">
+          <img 
+            src={lteLogo} 
+            alt="LTE Precast Concrete Structures" 
+            className="h-10"
+            data-testid="img-sidebar-logo"
+          />
         </div>
       </SidebarHeader>
 

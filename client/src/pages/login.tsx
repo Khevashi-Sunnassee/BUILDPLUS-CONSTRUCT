@@ -5,7 +5,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "@shared/schema";
 import { z } from "zod";
-import { BarChart3, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
+import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,10 +54,13 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary text-primary-foreground mb-4 shadow-lg">
-            <BarChart3 className="h-7 w-7" />
-          </div>
-          <h1 className="text-2xl font-bold text-foreground">LTE Performance Management</h1>
+          <img 
+            src={lteLogo} 
+            alt="LTE Precast Concrete Structures" 
+            className="h-16 mb-4"
+            data-testid="img-lte-logo"
+          />
+          <h1 className="text-2xl font-bold text-foreground">Performance Management</h1>
           <p className="text-muted-foreground mt-1">KPI Tracking & Daily Reporting</p>
         </div>
 
