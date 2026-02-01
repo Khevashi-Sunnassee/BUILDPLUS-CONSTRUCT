@@ -24,6 +24,7 @@ import AdminJobsPage from "@/pages/admin/jobs";
 import AdminPanelsPage from "@/pages/admin/panels";
 import DownloadsPage from "@/pages/downloads";
 import ManualEntryPage from "@/pages/manual-entry";
+import ProductionReportPage from "@/pages/production-report";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -140,6 +141,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <DownloadsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/production-report">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ProductionReportPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

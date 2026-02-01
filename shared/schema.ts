@@ -8,6 +8,7 @@ export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPR
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
 export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
+export const panelTypeEnum = pgEnum("panel_type", ["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -74,6 +75,7 @@ export const panelRegister = pgTable("panel_register", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   panelMark: text("panel_mark").notNull(),
+  panelType: panelTypeEnum("panel_type").default("WALL").notNull(),
   description: text("description"),
   drawingCode: text("drawing_code"),
   sheetNumber: text("sheet_number"),
@@ -86,6 +88,7 @@ export const panelRegister = pgTable("panel_register", {
 }, (table) => ({
   jobIdIdx: index("panel_register_job_id_idx").on(table.jobId),
   panelMarkIdx: index("panel_register_panel_mark_idx").on(table.panelMark),
+  panelTypeIdx: index("panel_register_panel_type_idx").on(table.panelType),
   statusIdx: index("panel_register_status_idx").on(table.status),
   jobPanelIdx: uniqueIndex("panel_register_job_panel_idx").on(table.jobId, table.panelMark),
 }));
@@ -179,6 +182,24 @@ export const auditEvents = pgTable("audit_events", {
   eventTypeIdx: index("audit_events_event_type_idx").on(table.eventType),
 }));
 
+export const productionEntries = pgTable("production_entries", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  productionDate: text("production_date").notNull(),
+  volumeM3: text("volume_m3"),
+  areaM2: text("area_m2"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  panelIdIdx: index("production_entries_panel_id_idx").on(table.panelId),
+  jobIdIdx: index("production_entries_job_id_idx").on(table.jobId),
+  userIdIdx: index("production_entries_user_id_idx").on(table.userId),
+  productionDateIdx: index("production_entries_production_date_idx").on(table.productionDate),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -234,6 +255,12 @@ export const insertApprovalEventSchema = createInsertSchema(approvalEvents).omit
 });
 
 export const insertGlobalSettingsSchema = createInsertSchema(globalSettings).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProductionEntrySchema = createInsertSchema(productionEntries).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -298,7 +325,10 @@ export type ApprovalEvent = typeof approvalEvents.$inferSelect;
 export type InsertGlobalSettings = z.infer<typeof insertGlobalSettingsSchema>;
 export type GlobalSettings = typeof globalSettings.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
+export type InsertProductionEntry = z.infer<typeof insertProductionEntrySchema>;
+export type ProductionEntry = typeof productionEntries.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
 export type PanelStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD";
+export type PanelType = "WALL" | "COLUMN" | "CUBE_BASE" | "CUBE_RING" | "LANDING_WALL" | "OTHER";

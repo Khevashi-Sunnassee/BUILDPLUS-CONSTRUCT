@@ -77,6 +77,7 @@ import type { Job, PanelRegister } from "@shared/schema";
 const panelSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
   panelMark: z.string().min(1, "Panel mark is required"),
+  panelType: z.enum(["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"]),
   description: z.string().optional(),
   drawingCode: z.string().optional(),
   sheetNumber: z.string().optional(),
@@ -128,6 +129,7 @@ export default function AdminPanelsPage() {
     defaultValues: {
       jobId: filterJobId || "",
       panelMark: "",
+      panelType: "WALL",
       description: "",
       drawingCode: "",
       sheetNumber: "",
@@ -230,7 +232,7 @@ export default function AdminPanelsPage() {
 
   const downloadTemplate = () => {
     const template = [
-      { "Panel Mark": "PM-001", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
+      { "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
     ];
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
@@ -243,6 +245,7 @@ export default function AdminPanelsPage() {
     panelForm.reset({
       jobId: filterJobId || "",
       panelMark: "",
+      panelType: "WALL",
       description: "",
       drawingCode: "",
       sheetNumber: "",
@@ -257,6 +260,7 @@ export default function AdminPanelsPage() {
     panelForm.reset({
       jobId: panel.jobId,
       panelMark: panel.panelMark,
+      panelType: panel.panelType || "WALL",
       description: panel.description || "",
       drawingCode: panel.drawingCode || "",
       sheetNumber: panel.sheetNumber || "",
@@ -424,6 +428,7 @@ export default function AdminPanelsPage() {
               <TableRow>
                 {!filterJobId && <TableHead>Job</TableHead>}
                 <TableHead>Panel Mark</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Drawing / Sheet</TableHead>
                 <TableHead>Status</TableHead>
@@ -444,6 +449,9 @@ export default function AdminPanelsPage() {
                       <Hash className="h-4 w-4 text-muted-foreground" />
                       <span className="font-mono font-medium">{panel.panelMark}</span>
                     </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                   </TableCell>
                   <TableCell>{panel.description || "-"}</TableCell>
                   <TableCell>
@@ -495,7 +503,7 @@ export default function AdminPanelsPage() {
               ))}
               {(!filteredPanels || filteredPanels.length === 0) && (
                 <TableRow>
-                  <TableCell colSpan={filterJobId ? 6 : 7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={filterJobId ? 7 : 8} className="text-center py-8 text-muted-foreground">
                     No panels found. Add a panel or import from Excel.
                   </TableCell>
                 </TableRow>
@@ -577,6 +585,31 @@ export default function AdminPanelsPage() {
                   )}
                 />
               </div>
+              <FormField
+                control={panelForm.control}
+                name="panelType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Panel Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-panel-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="WALL">Wall</SelectItem>
+                        <SelectItem value="COLUMN">Column</SelectItem>
+                        <SelectItem value="CUBE_BASE">Cube Base</SelectItem>
+                        <SelectItem value="CUBE_RING">Cube Ring</SelectItem>
+                        <SelectItem value="LANDING_WALL">Landing Wall</SelectItem>
+                        <SelectItem value="OTHER">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={panelForm.control}
                 name="description"

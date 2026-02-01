@@ -2,12 +2,13 @@ import { eq, and, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, devices, projects, mappingRules, dailyLogs, logRows,
-  approvalEvents, auditEvents, globalSettings, jobs, panelRegister,
+  approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertProject, type Project, type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
   type InsertApprovalEvent, type ApprovalEvent, type GlobalSettings,
   type InsertJob, type Job, type InsertPanelRegister, type PanelRegister,
+  type InsertProductionEntry, type ProductionEntry,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -80,6 +81,14 @@ export interface IStorage {
   getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
   importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }>;
   updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
+
+  getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
+  getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry>;
+  updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined>;
+  deleteProductionEntry(id: string): Promise<void>;
+  getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -650,6 +659,65 @@ export class DatabaseStorage implements IStorage {
         status: newActualHours > 0 ? "IN_PROGRESS" : panel.status,
       }).where(eq(panelRegister.id, panelId));
     }
+  }
+
+  async getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined> {
+    const result = await db.select().from(productionEntries)
+      .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
+      .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
+      .where(eq(productionEntries.id, id));
+    if (!result.length) return undefined;
+    return { ...result[0].production_entries, panel: result[0].panel_register, job: result[0].jobs };
+  }
+
+  async getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const result = await db.select().from(productionEntries)
+      .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
+      .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
+      .innerJoin(users, eq(productionEntries.userId, users.id))
+      .where(eq(productionEntries.productionDate, date))
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
+  }
+
+  async createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry> {
+    const [entry] = await db.insert(productionEntries).values(data).returning();
+    return entry;
+  }
+
+  async updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined> {
+    const [entry] = await db.update(productionEntries).set({ ...data, updatedAt: new Date() }).where(eq(productionEntries.id, id)).returning();
+    return entry;
+  }
+
+  async deleteProductionEntry(id: string): Promise<void> {
+    await db.delete(productionEntries).where(eq(productionEntries.id, id));
+  }
+
+  async getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const result = await db.select().from(productionEntries)
+      .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
+      .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
+      .innerJoin(users, eq(productionEntries.userId, users.id))
+      .orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
+  }
+
+  async getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]> {
+    const entries = await this.getProductionEntriesByDate(date);
+    const summary: Record<string, { count: number; totalVolumeM3: number; totalAreaM2: number }> = {};
+    
+    for (const entry of entries) {
+      const panelType = entry.panel.panelType || "OTHER";
+      if (!summary[panelType]) {
+        summary[panelType] = { count: 0, totalVolumeM3: 0, totalAreaM2: 0 };
+      }
+      summary[panelType].count++;
+      summary[panelType].totalVolumeM3 += parseFloat(entry.volumeM3 || "0");
+      summary[panelType].totalAreaM2 += parseFloat(entry.areaM2 || "0");
+    }
+    
+    return Object.entries(summary).map(([panelType, data]) => ({ panelType, ...data }));
   }
 }
 

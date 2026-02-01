@@ -529,15 +529,21 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Job not found" });
       }
       
-      const panelsToImport = data.map((row: any) => ({
-        jobId,
-        panelMark: String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim(),
-        description: row.description || row["Description"] || null,
-        drawingCode: row.drawingCode || row["Drawing Code"] || row.drawing_code || null,
-        sheetNumber: row.sheetNumber || row["Sheet Number"] || row.sheet_number || null,
-        estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
-        status: "NOT_STARTED" as const,
-      })).filter((p: any) => p.panelMark);
+      const panelsToImport = data.map((row: any) => {
+        const typeRaw = (row.panelType || row["Panel Type"] || row.panel_type || row["Type"] || "WALL").toUpperCase().replace(/ /g, "_");
+        const validTypes = ["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"];
+        const panelType = validTypes.includes(typeRaw) ? typeRaw as any : "OTHER";
+        return {
+          jobId,
+          panelMark: String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim(),
+          panelType,
+          description: row.description || row["Description"] || null,
+          drawingCode: row.drawingCode || row["Drawing Code"] || row.drawing_code || null,
+          sheetNumber: row.sheetNumber || row["Sheet Number"] || row.sheet_number || null,
+          estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
+          status: "NOT_STARTED" as const,
+        };
+      }).filter((p: any) => p.panelMark);
       
       const result = await storage.importPanelRegister(panelsToImport);
       res.json(result);
@@ -554,6 +560,53 @@ export async function registerRoutes(
   app.get("/api/panels/by-job/:jobId", requireAuth, async (req, res) => {
     const panels = await storage.getPanelsByJob(req.params.jobId);
     res.json(panels);
+  });
+
+  app.get("/api/production-entries", requireAuth, async (req, res) => {
+    const date = req.query.date as string;
+    if (date) {
+      const entries = await storage.getProductionEntriesByDate(date);
+      res.json(entries);
+    } else {
+      const entries = await storage.getAllProductionEntries();
+      res.json(entries);
+    }
+  });
+
+  app.get("/api/production-entries/:id", requireAuth, async (req, res) => {
+    const entry = await storage.getProductionEntry(req.params.id);
+    if (!entry) return res.status(404).json({ error: "Entry not found" });
+    res.json(entry);
+  });
+
+  app.post("/api/production-entries", requireAuth, async (req, res) => {
+    try {
+      const entryData = {
+        ...req.body,
+        userId: req.session.userId!,
+      };
+      const entry = await storage.createProductionEntry(entryData);
+      res.json(entry);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create production entry" });
+    }
+  });
+
+  app.put("/api/production-entries/:id", requireAuth, async (req, res) => {
+    const entry = await storage.updateProductionEntry(req.params.id, req.body);
+    res.json(entry);
+  });
+
+  app.delete("/api/production-entries/:id", requireAuth, async (req, res) => {
+    await storage.deleteProductionEntry(req.params.id);
+    res.json({ ok: true });
+  });
+
+  app.get("/api/production-summary", requireAuth, async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) return res.status(400).json({ error: "Date required" });
+    const summary = await storage.getProductionSummaryByDate(date);
+    res.json(summary);
   });
 
   app.post("/api/agent/ingest", async (req, res) => {
