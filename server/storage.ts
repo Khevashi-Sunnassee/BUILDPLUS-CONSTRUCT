@@ -2,11 +2,12 @@ import { eq, and, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, devices, projects, mappingRules, dailyLogs, logRows,
-  approvalEvents, auditEvents, globalSettings,
+  approvalEvents, auditEvents, globalSettings, jobs, panelRegister,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertProject, type Project, type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
   type InsertApprovalEvent, type ApprovalEvent, type GlobalSettings,
+  type InsertJob, type Job, type InsertPanelRegister, type PanelRegister,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -62,6 +63,23 @@ export interface IStorage {
 
   getDashboardStats(userId: string): Promise<any>;
   getReports(period: string): Promise<any>;
+
+  getJob(id: string): Promise<(Job & { panels: PanelRegister[] }) | undefined>;
+  getJobByNumber(jobNumber: string): Promise<Job | undefined>;
+  createJob(data: InsertJob): Promise<Job>;
+  updateJob(id: string, data: Partial<InsertJob>): Promise<Job | undefined>;
+  deleteJob(id: string): Promise<void>;
+  getAllJobs(): Promise<(Job & { panels: PanelRegister[]; project?: Project })[]>;
+  importJobs(data: InsertJob[]): Promise<{ imported: number; skipped: number }>;
+
+  getPanelRegisterItem(id: string): Promise<(PanelRegister & { job: Job }) | undefined>;
+  getPanelsByJob(jobId: string): Promise<PanelRegister[]>;
+  createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister>;
+  updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined>;
+  deletePanelRegisterItem(id: string): Promise<void>;
+  getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
+  importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }>;
+  updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -492,6 +510,146 @@ export class DatabaseStorage implements IStorage {
       dailyTrend,
       resourceDaily,
     };
+  }
+
+  async getJob(id: string): Promise<(Job & { panels: PanelRegister[] }) | undefined> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, id));
+    if (!job) return undefined;
+    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, id)).orderBy(asc(panelRegister.panelMark));
+    return { ...job, panels };
+  }
+
+  async getJobByNumber(jobNumber: string): Promise<Job | undefined> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.jobNumber, jobNumber));
+    return job;
+  }
+
+  async createJob(data: InsertJob): Promise<Job> {
+    const [job] = await db.insert(jobs).values(data).returning();
+    return job;
+  }
+
+  async updateJob(id: string, data: Partial<InsertJob>): Promise<Job | undefined> {
+    const [job] = await db.update(jobs).set({ ...data, updatedAt: new Date() }).where(eq(jobs.id, id)).returning();
+    return job;
+  }
+
+  async deleteJob(id: string): Promise<void> {
+    await db.delete(panelRegister).where(eq(panelRegister.jobId, id));
+    await db.delete(jobs).where(eq(jobs.id, id));
+  }
+
+  async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; project?: Project })[]> {
+    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
+    const allPanels = await db.select().from(panelRegister);
+    const allProjects = await db.select().from(projects);
+    
+    const panelsByJob = new Map<string, PanelRegister[]>();
+    for (const panel of allPanels) {
+      if (!panelsByJob.has(panel.jobId)) {
+        panelsByJob.set(panel.jobId, []);
+      }
+      panelsByJob.get(panel.jobId)!.push(panel);
+    }
+    
+    const projectsById = new Map(allProjects.map(p => [p.id, p]));
+    
+    return allJobs.map(job => ({
+      ...job,
+      panels: panelsByJob.get(job.id) || [],
+      project: job.projectId ? projectsById.get(job.projectId) : undefined,
+    }));
+  }
+
+  async importJobs(data: InsertJob[]): Promise<{ imported: number; skipped: number }> {
+    let imported = 0;
+    let skipped = 0;
+    
+    for (const jobData of data) {
+      try {
+        const existing = await this.getJobByNumber(jobData.jobNumber);
+        if (existing) {
+          skipped++;
+          continue;
+        }
+        await this.createJob(jobData);
+        imported++;
+      } catch (error) {
+        skipped++;
+      }
+    }
+    
+    return { imported, skipped };
+  }
+
+  async getPanelRegisterItem(id: string): Promise<(PanelRegister & { job: Job }) | undefined> {
+    const result = await db.select().from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(eq(panelRegister.id, id));
+    if (result.length === 0) return undefined;
+    return { ...result[0].panel_register, job: result[0].jobs };
+  }
+
+  async getPanelsByJob(jobId: string): Promise<PanelRegister[]> {
+    return db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId)).orderBy(asc(panelRegister.panelMark));
+  }
+
+  async createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister> {
+    const [panel] = await db.insert(panelRegister).values(data).returning();
+    return panel;
+  }
+
+  async updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined> {
+    const [panel] = await db.update(panelRegister).set({ ...data, updatedAt: new Date() }).where(eq(panelRegister.id, id)).returning();
+    return panel;
+  }
+
+  async deletePanelRegisterItem(id: string): Promise<void> {
+    await db.delete(panelRegister).where(eq(panelRegister.id, id));
+  }
+
+  async getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]> {
+    const result = await db.select().from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.panel_register, job: r.jobs }));
+  }
+
+  async importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }> {
+    let imported = 0;
+    let skipped = 0;
+    
+    for (const panelData of data) {
+      try {
+        const existing = await db.select().from(panelRegister)
+          .where(and(
+            eq(panelRegister.jobId, panelData.jobId),
+            eq(panelRegister.panelMark, panelData.panelMark)
+          ));
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
+        await this.createPanelRegisterItem(panelData);
+        imported++;
+      } catch (error) {
+        skipped++;
+      }
+    }
+    
+    return { imported, skipped };
+  }
+
+  async updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void> {
+    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, panelId));
+    if (panel) {
+      const newActualHours = (panel.actualHours || 0) + Math.round(additionalMinutes / 60);
+      await db.update(panelRegister).set({ 
+        actualHours: newActualHours, 
+        updatedAt: new Date(),
+        status: newActualHours > 0 ? "IN_PROGRESS" : panel.status,
+      }).where(eq(panelRegister.id, panelId));
+    }
   }
 }
 
