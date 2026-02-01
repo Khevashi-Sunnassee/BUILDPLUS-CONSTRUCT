@@ -3,12 +3,14 @@ import { db } from "./db";
 import {
   users, devices, projects, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
+  panelTypes, projectPanelRates,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertProject, type Project, type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
   type InsertApprovalEvent, type ApprovalEvent, type GlobalSettings,
   type InsertJob, type Job, type InsertPanelRegister, type PanelRegister,
   type InsertProductionEntry, type ProductionEntry,
+  type InsertPanelType, type PanelTypeConfig, type InsertProjectPanelRate, type ProjectPanelRate,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -89,6 +91,19 @@ export interface IStorage {
   deleteProductionEntry(id: string): Promise<void>;
   getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
+
+  getPanelType(id: string): Promise<PanelTypeConfig | undefined>;
+  getPanelTypeByCode(code: string): Promise<PanelTypeConfig | undefined>;
+  createPanelType(data: InsertPanelType): Promise<PanelTypeConfig>;
+  updatePanelType(id: string, data: Partial<InsertPanelType>): Promise<PanelTypeConfig | undefined>;
+  deletePanelType(id: string): Promise<void>;
+  getAllPanelTypes(): Promise<PanelTypeConfig[]>;
+
+  getProjectPanelRate(id: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig }) | undefined>;
+  getProjectPanelRates(projectId: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig })[]>;
+  upsertProjectPanelRate(projectId: string, panelTypeId: string, data: Partial<InsertProjectPanelRate>): Promise<ProjectPanelRate>;
+  deleteProjectPanelRate(id: string): Promise<void>;
+  getEffectiveRates(projectId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; projectRate?: ProjectPanelRate })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -718,6 +733,83 @@ export class DatabaseStorage implements IStorage {
     }
     
     return Object.entries(summary).map(([panelType, data]) => ({ panelType, ...data }));
+  }
+
+  async getPanelType(id: string): Promise<PanelTypeConfig | undefined> {
+    const [pt] = await db.select().from(panelTypes).where(eq(panelTypes.id, id));
+    return pt;
+  }
+
+  async getPanelTypeByCode(code: string): Promise<PanelTypeConfig | undefined> {
+    const [pt] = await db.select().from(panelTypes).where(eq(panelTypes.code, code));
+    return pt;
+  }
+
+  async createPanelType(data: InsertPanelType): Promise<PanelTypeConfig> {
+    const [pt] = await db.insert(panelTypes).values(data).returning();
+    return pt;
+  }
+
+  async updatePanelType(id: string, data: Partial<InsertPanelType>): Promise<PanelTypeConfig | undefined> {
+    const [pt] = await db.update(panelTypes).set({ ...data, updatedAt: new Date() }).where(eq(panelTypes.id, id)).returning();
+    return pt;
+  }
+
+  async deletePanelType(id: string): Promise<void> {
+    await db.delete(panelTypes).where(eq(panelTypes.id, id));
+  }
+
+  async getAllPanelTypes(): Promise<PanelTypeConfig[]> {
+    return await db.select().from(panelTypes).orderBy(asc(panelTypes.name));
+  }
+
+  async getProjectPanelRate(id: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig }) | undefined> {
+    const result = await db.select().from(projectPanelRates)
+      .innerJoin(panelTypes, eq(projectPanelRates.panelTypeId, panelTypes.id))
+      .where(eq(projectPanelRates.id, id));
+    if (!result.length) return undefined;
+    return { ...result[0].project_panel_rates, panelType: result[0].panel_types };
+  }
+
+  async getProjectPanelRates(projectId: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig })[]> {
+    const result = await db.select().from(projectPanelRates)
+      .innerJoin(panelTypes, eq(projectPanelRates.panelTypeId, panelTypes.id))
+      .where(eq(projectPanelRates.projectId, projectId));
+    return result.map(r => ({ ...r.project_panel_rates, panelType: r.panel_types }));
+  }
+
+  async upsertProjectPanelRate(projectId: string, panelTypeId: string, data: Partial<InsertProjectPanelRate>): Promise<ProjectPanelRate> {
+    const existing = await db.select().from(projectPanelRates)
+      .where(and(eq(projectPanelRates.projectId, projectId), eq(projectPanelRates.panelTypeId, panelTypeId)));
+    
+    if (existing.length > 0) {
+      const [updated] = await db.update(projectPanelRates)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(projectPanelRates.id, existing[0].id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(projectPanelRates)
+        .values({ projectId, panelTypeId, ...data })
+        .returning();
+      return created;
+    }
+  }
+
+  async deleteProjectPanelRate(id: string): Promise<void> {
+    await db.delete(projectPanelRates).where(eq(projectPanelRates.id, id));
+  }
+
+  async getEffectiveRates(projectId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; projectRate?: ProjectPanelRate })[]> {
+    const allTypes = await this.getAllPanelTypes();
+    const projectRates = await this.getProjectPanelRates(projectId);
+    const ratesMap = new Map(projectRates.map(r => [r.panelTypeId, r]));
+    
+    return allTypes.map(pt => ({
+      ...pt,
+      isOverridden: ratesMap.has(pt.id),
+      projectRate: ratesMap.get(pt.id),
+    }));
   }
 }
 

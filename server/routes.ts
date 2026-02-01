@@ -609,6 +609,61 @@ export async function registerRoutes(
     res.json(summary);
   });
 
+  app.get("/api/admin/panel-types", requireRole("ADMIN"), async (req, res) => {
+    const types = await storage.getAllPanelTypes();
+    res.json(types);
+  });
+
+  app.get("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
+    const type = await storage.getPanelType(req.params.id);
+    if (!type) return res.status(404).json({ error: "Panel type not found" });
+    res.json(type);
+  });
+
+  app.post("/api/admin/panel-types", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const type = await storage.createPanelType(req.body);
+      res.json(type);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create panel type" });
+    }
+  });
+
+  app.put("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
+    const type = await storage.updatePanelType(req.params.id, req.body);
+    if (!type) return res.status(404).json({ error: "Panel type not found" });
+    res.json(type);
+  });
+
+  app.delete("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
+    await storage.deletePanelType(req.params.id);
+    res.json({ ok: true });
+  });
+
+  app.get("/api/panel-types", requireAuth, async (req, res) => {
+    const types = await storage.getAllPanelTypes();
+    res.json(types.filter(t => t.isActive));
+  });
+
+  app.get("/api/projects/:projectId/panel-rates", requireAuth, async (req, res) => {
+    const rates = await storage.getEffectiveRates(req.params.projectId);
+    res.json(rates);
+  });
+
+  app.put("/api/projects/:projectId/panel-rates/:panelTypeId", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const rate = await storage.upsertProjectPanelRate(req.params.projectId, req.params.panelTypeId, req.body);
+      res.json(rate);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update project rate" });
+    }
+  });
+
+  app.delete("/api/projects/:projectId/panel-rates/:rateId", requireRole("ADMIN"), async (req, res) => {
+    await storage.deleteProjectPanelRate(req.params.rateId);
+    res.json({ ok: true });
+  });
+
   app.post("/api/agent/ingest", async (req, res) => {
     try {
       const rawKey = req.headers["x-device-key"] as string;

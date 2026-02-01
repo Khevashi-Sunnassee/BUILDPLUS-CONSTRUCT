@@ -182,6 +182,44 @@ export const auditEvents = pgTable("audit_events", {
   eventTypeIdx: index("audit_events_event_type_idx").on(table.eventType),
 }));
 
+export const panelTypes = pgTable("panel_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  labourCostPerM2: text("labour_cost_per_m2"),
+  labourCostPerM3: text("labour_cost_per_m3"),
+  supplyCostPerM2: text("supply_cost_per_m2"),
+  supplyCostPerM3: text("supply_cost_per_m3"),
+  totalRatePerM2: text("total_rate_per_m2"),
+  totalRatePerM3: text("total_rate_per_m3"),
+  sellRatePerM2: text("sell_rate_per_m2"),
+  sellRatePerM3: text("sell_rate_per_m3"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: uniqueIndex("panel_types_code_idx").on(table.code),
+}));
+
+export const projectPanelRates = pgTable("project_panel_rates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  projectId: varchar("project_id", { length: 36 }).notNull().references(() => projects.id),
+  panelTypeId: varchar("panel_type_id", { length: 36 }).notNull().references(() => panelTypes.id),
+  labourCostPerM2: text("labour_cost_per_m2"),
+  labourCostPerM3: text("labour_cost_per_m3"),
+  supplyCostPerM2: text("supply_cost_per_m2"),
+  supplyCostPerM3: text("supply_cost_per_m3"),
+  totalRatePerM2: text("total_rate_per_m2"),
+  totalRatePerM3: text("total_rate_per_m3"),
+  sellRatePerM2: text("sell_rate_per_m2"),
+  sellRatePerM3: text("sell_rate_per_m3"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectPanelTypeIdx: uniqueIndex("project_panel_rates_project_panel_type_idx").on(table.projectId, table.panelTypeId),
+}));
+
 export const productionEntries = pgTable("production_entries", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id),
@@ -266,6 +304,18 @@ export const insertProductionEntrySchema = createInsertSchema(productionEntries)
   updatedAt: true,
 });
 
+export const insertPanelTypeSchema = createInsertSchema(panelTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProjectPanelRateSchema = createInsertSchema(projectPanelRates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -327,6 +377,10 @@ export type GlobalSettings = typeof globalSettings.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type InsertProductionEntry = z.infer<typeof insertProductionEntrySchema>;
 export type ProductionEntry = typeof productionEntries.$inferSelect;
+export type InsertPanelType = z.infer<typeof insertPanelTypeSchema>;
+export type PanelTypeConfig = typeof panelTypes.$inferSelect;
+export type InsertProjectPanelRate = z.infer<typeof insertProjectPanelRateSchema>;
+export type ProjectPanelRate = typeof projectPanelRates.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
