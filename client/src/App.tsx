@@ -20,6 +20,7 @@ import AdminSettingsPage from "@/pages/admin/settings";
 import AdminProjectsPage from "@/pages/admin/projects";
 import AdminDevicesPage from "@/pages/admin/devices";
 import AdminUsersPage from "@/pages/admin/users";
+import DownloadsPage from "@/pages/downloads";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -120,6 +121,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ReportsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/downloads">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <DownloadsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

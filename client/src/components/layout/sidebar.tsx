@@ -12,6 +12,7 @@ import {
   LogOut,
   Clock,
   ChevronDown,
+  Download,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Daily Reports", url: "/daily-reports", icon: FileText },
   { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Downloads", url: "/downloads", icon: Download },
 ];
 
 const managerNavItems = [
