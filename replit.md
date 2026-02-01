@@ -27,6 +27,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
 - **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
 - **Logistics System**: Create load lists by selecting approved panels, assign trailer types (Layover, A-Frame), track delivery records with truck rego, driver name, and departure/arrival times. Load lists auto-complete when delivery is recorded.
+- **Logistics Reporting**: Reports page includes Logistics tab showing panels shipped per day, total deliveries, and average delivery phase timings (Depot to LTE, Pickup Time, Holding Time, Unload Time).
 
 ## Tech Stack
 - **Frontend**: React + Vite, TanStack Query, Wouter, shadcn/ui, Tailwind CSS
@@ -192,6 +193,9 @@ shared/
 - GET /api/load-lists/:id/delivery - Get delivery record for load list
 - POST /api/load-lists/:id/delivery - Create delivery record (auto-completes load list)
 - PUT /api/delivery-records/:id - Update delivery record
+- GET /api/reports/logistics - Logistics reporting with panels shipped per day and phase timings
+  - Query params: startDate, endDate (YYYY-MM-DD format)
+  - Returns: dailyData (date, panelCount, loadListCount), totals (totalPanels, totalLoadLists, avgPanelsPerDay), phaseAverages (depotToLte, pickupTime, holdingTime, unloadTime)
 
 ### Agent API
 - POST /api/agent/ingest - Windows Agent time block ingestion

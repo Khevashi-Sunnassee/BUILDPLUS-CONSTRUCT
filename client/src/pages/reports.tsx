@@ -11,6 +11,9 @@ import {
   TrendingUp,
   FileSpreadsheet,
   Layers,
+  Truck,
+  Package,
+  Timer,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -87,6 +90,28 @@ interface ReportData {
   };
 }
 
+interface PhaseAverage {
+  avgMinutes: number | null;
+  formatted: string;
+  count: number;
+}
+
+interface LogisticsData {
+  period: { startDate: string; endDate: string };
+  dailyData: Array<{ date: string; panelCount: number; loadListCount: number }>;
+  totals: {
+    totalPanels: number;
+    totalLoadLists: number;
+    avgPanelsPerDay: number;
+  };
+  phaseAverages: {
+    depotToLte: PhaseAverage;
+    pickupTime: PhaseAverage;
+    holdingTime: PhaseAverage;
+    unloadTime: PhaseAverage;
+  };
+}
+
 const COLORS = [
   "hsl(217, 91%, 50%)",
   "hsl(142, 76%, 40%)",
@@ -104,6 +129,47 @@ export default function ReportsPage() {
 
   const { data: report, isLoading } = useQuery<ReportData>({
     queryKey: ["/api/reports", { period }],
+  });
+
+  // Calculate date range for logistics based on period
+  const getDateRange = () => {
+    const now = new Date();
+    const endDate = format(now, "yyyy-MM-dd");
+    let startDate: string;
+    
+    switch (period) {
+      case "week":
+        const weekAgo = new Date(now);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        startDate = format(weekAgo, "yyyy-MM-dd");
+        break;
+      case "month":
+        const monthAgo = new Date(now);
+        monthAgo.setMonth(monthAgo.getMonth() - 1);
+        startDate = format(monthAgo, "yyyy-MM-dd");
+        break;
+      case "quarter":
+        const quarterAgo = new Date(now);
+        quarterAgo.setMonth(quarterAgo.getMonth() - 3);
+        startDate = format(quarterAgo, "yyyy-MM-dd");
+        break;
+      case "year":
+        const yearAgo = new Date(now);
+        yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+        startDate = format(yearAgo, "yyyy-MM-dd");
+        break;
+      default:
+        const defaultWeekAgo = new Date(now);
+        defaultWeekAgo.setDate(defaultWeekAgo.getDate() - 7);
+        startDate = format(defaultWeekAgo, "yyyy-MM-dd");
+    }
+    return { startDate, endDate };
+  };
+
+  const { startDate, endDate } = getDateRange();
+
+  const { data: logistics, isLoading: logisticsLoading } = useQuery<LogisticsData>({
+    queryKey: [`/api/reports/logistics?startDate=${startDate}&endDate=${endDate}`],
   });
 
   const formatMinutes = (minutes: number) => {
@@ -277,11 +343,12 @@ export default function ReportsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="resources" data-testid="tab-resources">By Resource</TabsTrigger>
           <TabsTrigger value="sheets" data-testid="tab-sheets">By Sheet</TabsTrigger>
           <TabsTrigger value="daily" data-testid="tab-daily">Daily Trend</TabsTrigger>
+          <TabsTrigger value="logistics" data-testid="tab-logistics">Logistics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
@@ -634,6 +701,226 @@ export default function ReportsPage() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="logistics" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
+                <CardTitle className="text-sm font-medium">Panels Shipped</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {logisticsLoading ? (
+                  <Skeleton className="h-8 w-20" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold" data-testid="text-total-panels">
+                      {logistics?.totals.totalPanels || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Across {logistics?.totals.totalLoadLists || 0} deliveries
+                    </p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
+                <CardTitle className="text-sm font-medium">Avg Panels/Day</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {logisticsLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold" data-testid="text-avg-panels">
+                      {logistics?.totals.avgPanelsPerDay || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Per delivery day</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
+                <CardTitle className="text-sm font-medium">Deliveries</CardTitle>
+                <Truck className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {logisticsLoading ? (
+                  <Skeleton className="h-8 w-12" />
+                ) : (
+                  <>
+                    <div className="text-2xl font-bold" data-testid="text-total-deliveries">
+                      {logistics?.totals.totalLoadLists || 0}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Completed load lists</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Panels Shipped per Day
+                </CardTitle>
+                <CardDescription>Daily panel delivery counts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {logisticsLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : logistics?.dailyData && logistics.dailyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={logistics.dailyData.map(d => ({
+                      date: formatDate(d.date),
+                      panels: d.panelCount,
+                      loads: d.loadListCount,
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="date" tick={{ fontSize: 12 }} />
+                      <YAxis tick={{ fontSize: 12 }} />
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [
+                          value, 
+                          name === "panels" ? "Panels" : "Load Lists"
+                        ]}
+                        contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))" }}
+                      />
+                      <Legend />
+                      <Bar dataKey="panels" name="Panels" fill={COLORS[0]} radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="loads" name="Load Lists" fill={COLORS[1]} radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    No delivery data available for this period
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Timer className="h-5 w-5" />
+                  Delivery Phase Timings
+                </CardTitle>
+                <CardDescription>Average time spent in each delivery phase</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {logisticsLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : logistics?.phaseAverages ? (
+                  <div className="space-y-4">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[0] }} />
+                          <div>
+                            <p className="font-medium">Depot to LTE</p>
+                            <p className="text-xs text-muted-foreground">Leave depot → Arrive LTE</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold" data-testid="text-depot-to-lte">{logistics.phaseAverages.depotToLte.formatted}</p>
+                          <p className="text-xs text-muted-foreground">{logistics.phaseAverages.depotToLte.count} records</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[1] }} />
+                          <div>
+                            <p className="font-medium">Pickup Time</p>
+                            <p className="text-xs text-muted-foreground">Arrive pickup → Leave pickup</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold" data-testid="text-pickup-time">{logistics.phaseAverages.pickupTime.formatted}</p>
+                          <p className="text-xs text-muted-foreground">{logistics.phaseAverages.pickupTime.count} records</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[2] }} />
+                          <div>
+                            <p className="font-medium">Holding Time</p>
+                            <p className="text-xs text-muted-foreground">Arrive holding → Leave holding</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold" data-testid="text-holding-time">{logistics.phaseAverages.holdingTime.formatted}</p>
+                          <p className="text-xs text-muted-foreground">{logistics.phaseAverages.holdingTime.count} records</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-md bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[3] }} />
+                          <div>
+                            <p className="font-medium">Unload Time</p>
+                            <p className="text-xs text-muted-foreground">First lift → Last lift</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold" data-testid="text-unload-time">{logistics.phaseAverages.unloadTime.formatted}</p>
+                          <p className="text-xs text-muted-foreground">{logistics.phaseAverages.unloadTime.count} records</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    No timing data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Delivery Breakdown</CardTitle>
+              <CardDescription>Panels and load lists delivered each day</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {logisticsLoading ? (
+                <Skeleton className="h-[200px] w-full" />
+              ) : logistics?.dailyData && logistics.dailyData.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Panels</TableHead>
+                      <TableHead className="text-right">Load Lists</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {logistics.dailyData.map((day, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="font-medium">{day.date}</TableCell>
+                        <TableCell className="text-right">{day.panelCount}</TableCell>
+                        <TableCell className="text-right">{day.loadListCount}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="flex items-center justify-center h-[100px] text-muted-foreground">
+                  No delivery data for this period
+                </div>
               )}
             </CardContent>
           </Card>

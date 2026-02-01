@@ -1700,6 +1700,155 @@ export async function registerRoutes(
     });
   });
 
+  // Logistics reporting - panels shipped per day and delivery phase timing
+  app.get("/api/reports/logistics", requireAuth, async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate required" });
+      }
+      
+      // Get all completed load lists with delivery records in the date range
+      const allLoadLists = await storage.getAllLoadLists();
+      const completedLoadLists = allLoadLists.filter(ll => 
+        ll.status === 'COMPLETE' && 
+        ll.deliveryRecord?.deliveryDate &&
+        ll.deliveryRecord.deliveryDate >= startDate &&
+        ll.deliveryRecord.deliveryDate <= endDate
+      );
+      
+      // Group by delivery date
+      const byDate = new Map<string, { 
+        panelCount: number; 
+        loadListCount: number;
+        deliveries: any[];
+      }>();
+      
+      for (const loadList of completedLoadLists) {
+        const date = loadList.deliveryRecord!.deliveryDate!;
+        const panelCount = loadList.panels?.length || 0;
+        
+        if (!byDate.has(date)) {
+          byDate.set(date, { panelCount: 0, loadListCount: 0, deliveries: [] });
+        }
+        
+        const data = byDate.get(date)!;
+        data.panelCount += panelCount;
+        data.loadListCount += 1;
+        data.deliveries.push(loadList.deliveryRecord);
+      }
+      
+      // Calculate phase timings from delivery records
+      const parseTimeToMinutes = (timeStr: string | null): number | null => {
+        if (!timeStr) return null;
+        const match = timeStr.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+        return parseInt(match[1]) * 60 + parseInt(match[2]);
+      };
+      
+      const calculateDuration = (start: string | null, end: string | null): number | null => {
+        const startMins = parseTimeToMinutes(start);
+        const endMins = parseTimeToMinutes(end);
+        if (startMins === null || endMins === null) return null;
+        let diff = endMins - startMins;
+        if (diff < 0) diff += 24 * 60; // Handle overnight
+        return diff;
+      };
+      
+      // Aggregate all delivery timings for phase analysis
+      const phaseTimings = {
+        depotToLte: [] as number[],        // leaveDepotTime -> arriveLteTime
+        pickupTime: [] as number[],         // pickupArriveTime -> pickupLeaveTime
+        holdingTime: [] as number[],        // arriveHoldingTime -> leaveHoldingTime
+        unloadTime: [] as number[],         // siteFirstLiftTime -> siteLastLiftTime
+        totalOnsite: [] as number[],        // siteFirstLiftTime -> returnDepotArriveTime (or siteLastLiftTime as proxy)
+      };
+      
+      for (const loadList of completedLoadLists) {
+        const dr = loadList.deliveryRecord!;
+        
+        const depotToLte = calculateDuration(dr.leaveDepotTime, dr.arriveLteTime);
+        if (depotToLte !== null) phaseTimings.depotToLte.push(depotToLte);
+        
+        const pickupTime = calculateDuration(dr.pickupArriveTime, dr.pickupLeaveTime);
+        if (pickupTime !== null) phaseTimings.pickupTime.push(pickupTime);
+        
+        const holdingTime = calculateDuration(dr.arriveHoldingTime, dr.leaveHoldingTime);
+        if (holdingTime !== null) phaseTimings.holdingTime.push(holdingTime);
+        
+        const unloadTime = calculateDuration(dr.siteFirstLiftTime, dr.siteLastLiftTime);
+        if (unloadTime !== null) phaseTimings.unloadTime.push(unloadTime);
+      }
+      
+      const average = (arr: number[]): number | null => {
+        if (arr.length === 0) return null;
+        return Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
+      };
+      
+      const formatMinutes = (mins: number | null): string => {
+        if (mins === null) return "N/A";
+        const hours = Math.floor(mins / 60);
+        const minutes = mins % 60;
+        if (hours === 0) return `${minutes}m`;
+        return `${hours}h ${minutes}m`;
+      };
+      
+      // Build daily data array
+      const dailyData = Array.from(byDate.entries())
+        .map(([date, data]) => ({
+          date,
+          panelCount: data.panelCount,
+          loadListCount: data.loadListCount,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      
+      // Calculate totals
+      const totals = {
+        totalPanels: dailyData.reduce((sum, d) => sum + d.panelCount, 0),
+        totalLoadLists: dailyData.reduce((sum, d) => sum + d.loadListCount, 0),
+        avgPanelsPerDay: dailyData.length > 0 
+          ? Math.round(dailyData.reduce((sum, d) => sum + d.panelCount, 0) / dailyData.length * 10) / 10
+          : 0,
+      };
+      
+      // Phase averages
+      const phaseAverages = {
+        depotToLte: {
+          avgMinutes: average(phaseTimings.depotToLte),
+          formatted: formatMinutes(average(phaseTimings.depotToLte)),
+          count: phaseTimings.depotToLte.length,
+        },
+        pickupTime: {
+          avgMinutes: average(phaseTimings.pickupTime),
+          formatted: formatMinutes(average(phaseTimings.pickupTime)),
+          count: phaseTimings.pickupTime.length,
+        },
+        holdingTime: {
+          avgMinutes: average(phaseTimings.holdingTime),
+          formatted: formatMinutes(average(phaseTimings.holdingTime)),
+          count: phaseTimings.holdingTime.length,
+        },
+        unloadTime: {
+          avgMinutes: average(phaseTimings.unloadTime),
+          formatted: formatMinutes(average(phaseTimings.unloadTime)),
+          count: phaseTimings.unloadTime.length,
+        },
+      };
+      
+      res.json({
+        period: { startDate, endDate },
+        dailyData,
+        totals,
+        phaseAverages,
+      });
+    } catch (error: any) {
+      console.error("Logistics report error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate logistics report" });
+    }
+  });
+
   // Panel production approval - Analyze PDF using OpenAI
   app.post("/api/admin/panels/:id/analyze-pdf", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
