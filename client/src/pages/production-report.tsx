@@ -75,8 +75,8 @@ const productionEntrySchema = z.object({
   panelId: z.string().min(1, "Panel is required"),
   jobId: z.string().min(1, "Job is required"),
   productionDate: z.string().min(1, "Date is required"),
-  volumeM3: z.string().optional(),
-  areaM2: z.string().optional(),
+  volumeM3: z.string().min(1, "Volume (m³) is required"),
+  areaM2: z.string().min(1, "Area (m²) is required"),
   notes: z.string().optional(),
 });
 
