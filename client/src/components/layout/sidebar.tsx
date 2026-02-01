@@ -85,11 +85,11 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Clock className="h-5 w-5" />
+            <BarChart3 className="h-5 w-5" />
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold text-sidebar-foreground">LTE Time Tracking</span>
-            <span className="text-xs text-muted-foreground">CAD + Revit</span>
+            <span className="text-sm font-semibold text-sidebar-foreground">LTE Performance</span>
+            <span className="text-xs text-muted-foreground">KPI & Reporting</span>
           </div>
         </div>
       </SidebarHeader>
