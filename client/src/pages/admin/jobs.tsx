@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +18,7 @@ import {
   MapPin,
   Hash,
   ChevronRight,
+  DollarSign,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -88,6 +89,22 @@ interface JobWithPanels extends Job {
   project?: Project;
 }
 
+interface CostOverride {
+  id: string;
+  jobId: string;
+  panelTypeId: string;
+  componentName: string;
+  defaultPercentage: string;
+  revisedPercentage: string | null;
+  notes: string | null;
+}
+
+interface PanelTypeInfo {
+  id: string;
+  code: string;
+  name: string;
+}
+
 export default function AdminJobsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -98,6 +115,9 @@ export default function AdminJobsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [costOverridesDialogOpen, setCostOverridesDialogOpen] = useState(false);
+  const [costOverridesJob, setCostOverridesJob] = useState<JobWithPanels | null>(null);
+  const [localOverrides, setLocalOverrides] = useState<CostOverride[]>([]);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -167,6 +187,84 @@ export default function AdminJobsPage() {
       toast({ title: "Failed to delete job", variant: "destructive" });
     },
   });
+
+  const { data: panelTypes } = useQuery<PanelTypeInfo[]>({
+    queryKey: ["/api/panel-types"],
+  });
+
+  const { data: costOverrides, refetch: refetchCostOverrides } = useQuery<CostOverride[]>({
+    queryKey: ["/api/jobs", costOverridesJob?.id, "cost-overrides"],
+    queryFn: async () => {
+      if (!costOverridesJob?.id) return [];
+      const res = await fetch(`/api/jobs/${costOverridesJob.id}/cost-overrides`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch cost overrides");
+      return res.json();
+    },
+    enabled: !!costOverridesJob?.id && costOverridesDialogOpen,
+  });
+
+  useEffect(() => {
+    if (costOverrides) {
+      setLocalOverrides(costOverrides);
+    }
+  }, [costOverrides]);
+
+  const initializeCostOverridesMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest("POST", `/api/jobs/${jobId}/cost-overrides/initialize`, {});
+    },
+    onSuccess: () => {
+      refetchCostOverrides();
+      toast({ title: "Cost overrides initialized from panel type defaults" });
+    },
+    onError: () => {
+      toast({ title: "Failed to initialize cost overrides", variant: "destructive" });
+    },
+  });
+
+  const updateCostOverrideMutation = useMutation({
+    mutationFn: async ({ jobId, id, data }: { jobId: string; id: string; data: { revisedPercentage: string | null; notes: string | null } }) => {
+      return apiRequest("PUT", `/api/jobs/${jobId}/cost-overrides/${id}`, data);
+    },
+    onSuccess: () => {
+      refetchCostOverrides();
+      toast({ title: "Cost override updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update cost override", variant: "destructive" });
+    },
+  });
+
+  const handleOpenCostOverrides = (job: JobWithPanels) => {
+    setCostOverridesJob(job);
+    setLocalOverrides([]);
+    setCostOverridesDialogOpen(true);
+  };
+
+  const handleUpdateOverride = (id: string, field: "revisedPercentage" | "notes", value: string | null) => {
+    setLocalOverrides(prev => prev.map(o => o.id === id ? { ...o, [field]: value } : o));
+  };
+
+  const handleSaveOverride = (override: CostOverride) => {
+    if (!costOverridesJob) return;
+    updateCostOverrideMutation.mutate({
+      jobId: costOverridesJob.id,
+      id: override.id,
+      data: { revisedPercentage: override.revisedPercentage, notes: override.notes },
+    });
+  };
+
+  const getPanelTypeName = (panelTypeId: string) => {
+    return panelTypes?.find(pt => pt.id === panelTypeId)?.name || "Unknown";
+  };
+
+  const groupedOverrides = localOverrides.reduce((acc, override) => {
+    if (!acc[override.panelTypeId]) {
+      acc[override.panelTypeId] = [];
+    }
+    acc[override.panelTypeId].push(override);
+    return acc;
+  }, {} as Record<string, CostOverride[]>);
 
   const importJobsMutation = useMutation({
     mutationFn: async (data: any[]) => {
@@ -362,6 +460,15 @@ export default function AdminJobsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleOpenCostOverrides(job)}
+                        title="Cost Overrides"
+                        data-testid={`button-cost-overrides-${job.id}`}
+                      >
+                        <DollarSign className="h-4 w-4 text-green-600" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -620,6 +727,108 @@ export default function AdminJobsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={costOverridesDialogOpen} onOpenChange={setCostOverridesDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Cost Overrides - {costOverridesJob?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Modify cost ratios for this job. Default values come from panel type settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {Object.keys(groupedOverrides).length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">
+                  No cost overrides initialized for this job yet.
+                </p>
+                <Button
+                  onClick={() => costOverridesJob && initializeCostOverridesMutation.mutate(costOverridesJob.id)}
+                  disabled={initializeCostOverridesMutation.isPending}
+                  data-testid="button-initialize-overrides"
+                >
+                  {initializeCostOverridesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Initialize from Panel Type Defaults
+                </Button>
+              </div>
+            ) : (
+              Object.entries(groupedOverrides).map(([panelTypeId, overrides]) => (
+                <Card key={panelTypeId}>
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-base">{getPanelTypeName(panelTypeId)}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Component</TableHead>
+                          <TableHead className="text-right w-24">Default %</TableHead>
+                          <TableHead className="text-right w-32">Revised %</TableHead>
+                          <TableHead className="w-48">Notes</TableHead>
+                          <TableHead className="w-20">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {overrides.map((override) => (
+                          <TableRow key={override.id}>
+                            <TableCell className="font-medium">{override.componentName}</TableCell>
+                            <TableCell className="text-right font-mono">
+                              {parseFloat(override.defaultPercentage).toFixed(1)}%
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="relative">
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                  placeholder={override.defaultPercentage}
+                                  value={override.revisedPercentage || ""}
+                                  onChange={(e) => handleUpdateOverride(override.id, "revisedPercentage", e.target.value || null)}
+                                  className="w-20 text-right pr-5"
+                                  data-testid={`input-revised-${override.id}`}
+                                />
+                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                placeholder="Reason for change..."
+                                value={override.notes || ""}
+                                onChange={(e) => handleUpdateOverride(override.id, "notes", e.target.value || null)}
+                                className="text-sm"
+                                data-testid={`input-notes-${override.id}`}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSaveOverride(override)}
+                                disabled={updateCostOverrideMutation.isPending}
+                                data-testid={`button-save-override-${override.id}`}
+                              >
+                                <Save className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCostOverridesDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { db } from "./db";
 import {
   users, devices, projects, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
-  panelTypes, projectPanelRates, workTypes,
+  panelTypes, projectPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertProject, type Project, type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -12,6 +12,8 @@ import {
   type InsertProductionEntry, type ProductionEntry,
   type InsertPanelType, type PanelTypeConfig, type InsertProjectPanelRate, type ProjectPanelRate,
   type InsertWorkType, type WorkType,
+  type InsertPanelTypeCostComponent, type PanelTypeCostComponent,
+  type InsertJobCostOverride, type JobCostOverride,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -120,6 +122,19 @@ export interface IStorage {
   deleteWorkType(id: number): Promise<void>;
   getAllWorkTypes(): Promise<WorkType[]>;
   getActiveWorkTypes(): Promise<WorkType[]>;
+
+  getCostComponentsByPanelType(panelTypeId: string): Promise<PanelTypeCostComponent[]>;
+  createCostComponent(data: InsertPanelTypeCostComponent): Promise<PanelTypeCostComponent>;
+  updateCostComponent(id: string, data: Partial<InsertPanelTypeCostComponent>): Promise<PanelTypeCostComponent | undefined>;
+  deleteCostComponent(id: string): Promise<void>;
+  replaceCostComponents(panelTypeId: string, components: InsertPanelTypeCostComponent[]): Promise<PanelTypeCostComponent[]>;
+
+  getJobCostOverrides(jobId: string): Promise<JobCostOverride[]>;
+  getJobCostOverridesByPanelType(jobId: string, panelTypeId: string): Promise<JobCostOverride[]>;
+  createJobCostOverride(data: InsertJobCostOverride): Promise<JobCostOverride>;
+  updateJobCostOverride(id: string, data: Partial<InsertJobCostOverride>): Promise<JobCostOverride | undefined>;
+  deleteJobCostOverride(id: string): Promise<void>;
+  initializeJobCostOverrides(jobId: string): Promise<JobCostOverride[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -920,6 +935,98 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(workTypes)
       .where(eq(workTypes.isActive, true))
       .orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+  }
+
+  async getCostComponentsByPanelType(panelTypeId: string): Promise<PanelTypeCostComponent[]> {
+    return db.select().from(panelTypeCostComponents)
+      .where(eq(panelTypeCostComponents.panelTypeId, panelTypeId))
+      .orderBy(asc(panelTypeCostComponents.sortOrder));
+  }
+
+  async createCostComponent(data: InsertPanelTypeCostComponent): Promise<PanelTypeCostComponent> {
+    const [component] = await db.insert(panelTypeCostComponents).values(data).returning();
+    return component;
+  }
+
+  async updateCostComponent(id: string, data: Partial<InsertPanelTypeCostComponent>): Promise<PanelTypeCostComponent | undefined> {
+    const [component] = await db.update(panelTypeCostComponents)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(panelTypeCostComponents.id, id))
+      .returning();
+    return component;
+  }
+
+  async deleteCostComponent(id: string): Promise<void> {
+    await db.delete(panelTypeCostComponents).where(eq(panelTypeCostComponents.id, id));
+  }
+
+  async replaceCostComponents(panelTypeId: string, components: InsertPanelTypeCostComponent[]): Promise<PanelTypeCostComponent[]> {
+    await db.delete(panelTypeCostComponents).where(eq(panelTypeCostComponents.panelTypeId, panelTypeId));
+    if (components.length === 0) return [];
+    const inserted = await db.insert(panelTypeCostComponents).values(components).returning();
+    return inserted;
+  }
+
+  async getJobCostOverrides(jobId: string): Promise<JobCostOverride[]> {
+    return db.select().from(jobCostOverrides)
+      .where(eq(jobCostOverrides.jobId, jobId))
+      .orderBy(asc(jobCostOverrides.panelTypeId), asc(jobCostOverrides.componentName));
+  }
+
+  async getJobCostOverridesByPanelType(jobId: string, panelTypeId: string): Promise<JobCostOverride[]> {
+    return db.select().from(jobCostOverrides)
+      .where(and(
+        eq(jobCostOverrides.jobId, jobId),
+        eq(jobCostOverrides.panelTypeId, panelTypeId)
+      ))
+      .orderBy(asc(jobCostOverrides.componentName));
+  }
+
+  async createJobCostOverride(data: InsertJobCostOverride): Promise<JobCostOverride> {
+    const [override] = await db.insert(jobCostOverrides).values(data).returning();
+    return override;
+  }
+
+  async updateJobCostOverride(id: string, data: Partial<InsertJobCostOverride>): Promise<JobCostOverride | undefined> {
+    const [override] = await db.update(jobCostOverrides)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(jobCostOverrides.id, id))
+      .returning();
+    return override;
+  }
+
+  async deleteJobCostOverride(id: string): Promise<void> {
+    await db.delete(jobCostOverrides).where(eq(jobCostOverrides.id, id));
+  }
+
+  async initializeJobCostOverrides(jobId: string): Promise<JobCostOverride[]> {
+    const allPanelTypes = await this.getAllPanelTypes();
+    const existingOverrides = await this.getJobCostOverrides(jobId);
+    const existingKeys = new Set(existingOverrides.map(o => `${o.panelTypeId}:${o.componentName}`));
+    
+    const newOverrides: InsertJobCostOverride[] = [];
+    for (const pt of allPanelTypes) {
+      const components = await this.getCostComponentsByPanelType(pt.id);
+      for (const comp of components) {
+        const key = `${pt.id}:${comp.name}`;
+        if (!existingKeys.has(key)) {
+          newOverrides.push({
+            jobId,
+            panelTypeId: pt.id,
+            componentName: comp.name,
+            defaultPercentage: comp.percentageOfRevenue,
+            revisedPercentage: null,
+            notes: null,
+          });
+        }
+      }
+    }
+    
+    if (newOverrides.length > 0) {
+      await db.insert(jobCostOverrides).values(newOverrides);
+    }
+    
+    return this.getJobCostOverrides(jobId);
   }
 }
 

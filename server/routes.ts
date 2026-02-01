@@ -481,6 +481,40 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/jobs/:id/cost-overrides", requireAuth, async (req, res) => {
+    const overrides = await storage.getJobCostOverrides(req.params.id);
+    res.json(overrides);
+  });
+
+  app.post("/api/jobs/:id/cost-overrides/initialize", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const overrides = await storage.initializeJobCostOverrides(req.params.id);
+      res.json(overrides);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to initialize cost overrides" });
+    }
+  });
+
+  app.put("/api/jobs/:jobId/cost-overrides/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { revisedPercentage, notes } = req.body;
+      if (revisedPercentage !== null && revisedPercentage !== undefined) {
+        const pct = parseFloat(revisedPercentage);
+        if (isNaN(pct) || pct < 0 || pct > 100) {
+          return res.status(400).json({ error: "Revised percentage must be between 0 and 100" });
+        }
+      }
+      const override = await storage.updateJobCostOverride(req.params.id, {
+        revisedPercentage: revisedPercentage !== null && revisedPercentage !== undefined ? String(revisedPercentage) : null,
+        notes: notes || null,
+      });
+      if (!override) return res.status(404).json({ error: "Cost override not found" });
+      res.json(override);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update cost override" });
+    }
+  });
+
   app.get("/api/admin/panels", requireRole("ADMIN"), async (req, res) => {
     const panels = await storage.getAllPanelRegisterItems();
     res.json(panels);
@@ -726,6 +760,35 @@ export async function registerRoutes(
   app.delete("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
     await storage.deletePanelType(req.params.id);
     res.json({ ok: true });
+  });
+
+  app.get("/api/panel-types/:id/cost-components", requireAuth, async (req, res) => {
+    const components = await storage.getCostComponentsByPanelType(req.params.id);
+    res.json(components);
+  });
+
+  app.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { components } = req.body;
+      if (!Array.isArray(components)) {
+        return res.status(400).json({ error: "components array required" });
+      }
+      const total = components.reduce((sum: number, c: any) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
+      if (total > 100) {
+        return res.status(400).json({ error: "Total percentage cannot exceed 100%" });
+      }
+      const inserted = await storage.replaceCostComponents(req.params.id, 
+        components.map((c: any, i: number) => ({
+          panelTypeId: req.params.id,
+          name: c.name,
+          percentageOfRevenue: String(c.percentageOfRevenue),
+          sortOrder: i,
+        }))
+      );
+      res.json(inserted);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update cost components" });
+    }
   });
 
   app.get("/api/panel-types", requireAuth, async (req, res) => {
@@ -1332,6 +1395,130 @@ export async function registerRoutes(
       totals,
       panelTypes: panelTypesUsed,
       period: { startDate, endDate },
+    });
+  });
+
+  app.get("/api/reports/cost-analysis", requireAuth, async (req, res) => {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const jobId = req.query.jobId as string | undefined;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate required" });
+    }
+    
+    const entries = await storage.getProductionEntriesInRange(startDate, endDate);
+    const filteredEntries = jobId ? entries.filter(e => e.jobId === jobId) : entries;
+    const allPanelTypes = await storage.getAllPanelTypes();
+    const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
+    const panelTypesById = new Map(allPanelTypes.map(pt => [pt.id, pt]));
+    
+    const normalizePanelType = (code: string | null): string => {
+      if (!code) return "OTHER";
+      if (panelTypesByCode.has(code)) return code;
+      for (const [configuredCode] of panelTypesByCode) {
+        if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
+      }
+      return code;
+    };
+    
+    const jobCostOverridesCache = new Map<string, any[]>();
+    const panelTypeCostComponentsCache = new Map<string, any[]>();
+    const projectRatesCache = new Map<string, Map<string, any>>();
+    
+    const getCostComponents = async (jobId: string, panelTypeCode: string) => {
+      const normalizedCode = normalizePanelType(panelTypeCode);
+      const panelType = panelTypesByCode.get(normalizedCode);
+      if (!panelType) return [];
+      
+      if (!jobCostOverridesCache.has(jobId)) {
+        jobCostOverridesCache.set(jobId, await storage.getJobCostOverrides(jobId));
+      }
+      const overrides = jobCostOverridesCache.get(jobId)!;
+      const jobOverrides = overrides.filter(o => o.panelTypeId === panelType.id);
+      
+      if (jobOverrides.length > 0) {
+        return jobOverrides.map(o => ({
+          name: o.componentName,
+          percentage: parseFloat(o.revisedPercentage || o.defaultPercentage),
+          isRevised: !!o.revisedPercentage,
+        }));
+      }
+      
+      if (!panelTypeCostComponentsCache.has(panelType.id)) {
+        panelTypeCostComponentsCache.set(panelType.id, await storage.getCostComponentsByPanelType(panelType.id));
+      }
+      const components = panelTypeCostComponentsCache.get(panelType.id)!;
+      return components.map(c => ({
+        name: c.name,
+        percentage: parseFloat(c.percentageOfRevenue),
+        isRevised: false,
+      }));
+    };
+    
+    const getRates = async (jobId: string, panelTypeCode: string) => {
+      const normalizedCode = normalizePanelType(panelTypeCode);
+      if (!projectRatesCache.has(jobId)) {
+        const job = await storage.getJob(jobId);
+        if (job?.projectId) {
+          const rates = await storage.getProjectPanelRates(job.projectId);
+          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
+        } else {
+          projectRatesCache.set(jobId, new Map());
+        }
+      }
+      const projectRates = projectRatesCache.get(jobId);
+      const projectRate = projectRates?.get(normalizedCode);
+      const defaultRate = panelTypesByCode.get(normalizedCode);
+      
+      return {
+        sellRatePerM2: parseFloat(projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
+        sellRatePerM3: parseFloat(projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
+      };
+    };
+    
+    const componentTotals = new Map<string, { name: string; expectedCost: number; count: number }>();
+    let totalRevenue = 0;
+    
+    for (const entry of filteredEntries) {
+      const panelType = normalizePanelType(entry.panel.panelType);
+      const rates = await getRates(entry.jobId, panelType);
+      const components = await getCostComponents(entry.jobId, panelType);
+      
+      const volumeM3 = parseFloat(entry.volumeM3 || "0");
+      const areaM2 = parseFloat(entry.areaM2 || "0");
+      const revenue = (volumeM3 * rates.sellRatePerM3) + (areaM2 * rates.sellRatePerM2);
+      totalRevenue += revenue;
+      
+      for (const comp of components) {
+        const expectedCost = revenue * (comp.percentage / 100);
+        if (!componentTotals.has(comp.name)) {
+          componentTotals.set(comp.name, { name: comp.name, expectedCost: 0, count: 0 });
+        }
+        const ct = componentTotals.get(comp.name)!;
+        ct.expectedCost += expectedCost;
+        ct.count += 1;
+      }
+    }
+    
+    const componentBreakdown = Array.from(componentTotals.values())
+      .map(c => ({
+        name: c.name,
+        expectedCost: Math.round(c.expectedCost * 100) / 100,
+        percentageOfRevenue: totalRevenue > 0 ? Math.round((c.expectedCost / totalRevenue) * 100 * 10) / 10 : 0,
+      }))
+      .sort((a, b) => b.expectedCost - a.expectedCost);
+    
+    const totalExpectedCost = componentBreakdown.reduce((sum, c) => sum + c.expectedCost, 0);
+    
+    res.json({
+      period: { startDate, endDate },
+      totalRevenue: Math.round(totalRevenue * 100) / 100,
+      totalExpectedCost: Math.round(totalExpectedCost * 100) / 100,
+      expectedProfit: Math.round((totalRevenue - totalExpectedCost) * 100) / 100,
+      profitMargin: totalRevenue > 0 ? Math.round(((totalRevenue - totalExpectedCost) / totalRevenue) * 100 * 10) / 10 : 0,
+      componentBreakdown,
+      entryCount: filteredEntries.length,
     });
   });
 

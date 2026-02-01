@@ -128,6 +128,20 @@ interface DraftingReportResponse {
   period: { startDate: string; endDate: string };
 }
 
+interface CostAnalysisResponse {
+  period: { startDate: string; endDate: string };
+  totalRevenue: number;
+  totalExpectedCost: number;
+  expectedProfit: number;
+  profitMargin: number;
+  componentBreakdown: Array<{
+    name: string;
+    expectedCost: number;
+    percentageOfRevenue: number;
+  }>;
+  entryCount: number;
+}
+
 const CHART_COLORS = [
   "hsl(217, 91%, 50%)",
   "hsl(142, 76%, 40%)",
@@ -217,6 +231,11 @@ export default function KPIDashboardPage() {
 
   const { data: draftingData, isLoading: draftingLoading } = useQuery<DraftingReportResponse>({
     queryKey: ["/api/reports/drafting-daily", { startDate, endDate }],
+    enabled: !!startDate && !!endDate,
+  });
+
+  const { data: costAnalysisData, isLoading: costAnalysisLoading } = useQuery<CostAnalysisResponse>({
+    queryKey: ["/api/reports/cost-analysis", { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
@@ -512,7 +531,7 @@ export default function KPIDashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="production" data-testid="tab-production">
               <Factory className="h-4 w-4 mr-2" />
               Production
@@ -524,6 +543,10 @@ export default function KPIDashboardPage() {
             <TabsTrigger value="drafting" data-testid="tab-drafting">
               <Clock className="h-4 w-4 mr-2" />
               Drafting
+            </TabsTrigger>
+            <TabsTrigger value="cost-analysis" data-testid="tab-cost-analysis">
+              <Layers className="h-4 w-4 mr-2" />
+              Cost Breakup
             </TabsTrigger>
           </TabsList>
 
@@ -930,6 +953,203 @@ export default function KPIDashboardPage() {
                 ) : (
                   <div className="h-[400px] flex items-center justify-center text-muted-foreground">
                     No drafting data for this period
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="cost-analysis" className="space-y-6 mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {costAnalysisLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold" data-testid="text-cost-total-revenue">
+                      ${costAnalysisData?.totalRevenue?.toLocaleString() ?? 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Expected Costs</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {costAnalysisLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold text-destructive" data-testid="text-cost-expected-cost">
+                      ${costAnalysisData?.totalExpectedCost?.toLocaleString() ?? 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Expected Profit</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {costAnalysisLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className={`text-2xl font-bold ${(costAnalysisData?.expectedProfit ?? 0) >= 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-cost-expected-profit">
+                      ${costAnalysisData?.expectedProfit?.toLocaleString() ?? 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit Margin</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {costAnalysisLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className={`text-2xl font-bold ${(costAnalysisData?.profitMargin ?? 0) >= 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-cost-profit-margin">
+                      {costAnalysisData?.profitMargin ?? 0}%
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Cost Component Breakdown</CardTitle>
+                  <CardDescription>
+                    Expected costs by component as percentage of revenue
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {costAnalysisLoading ? (
+                    <Skeleton className="h-[300px] w-full" />
+                  ) : costAnalysisData?.componentBreakdown && costAnalysisData.componentBreakdown.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={costAnalysisData.componentBreakdown}
+                          dataKey="expectedCost"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={100}
+                          label={({ name, percentageOfRevenue }) => `${name}: ${percentageOfRevenue}%`}
+                        >
+                          {costAnalysisData.componentBreakdown.map((entry, index) => (
+                            <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Expected Cost"]} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No cost component data available. Add cost components to panel types first.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Cost Component Table</CardTitle>
+                  <CardDescription>
+                    Detailed breakdown of expected costs
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {costAnalysisLoading ? (
+                    <Skeleton className="h-[300px] w-full" />
+                  ) : costAnalysisData?.componentBreakdown && costAnalysisData.componentBreakdown.length > 0 ? (
+                    <div className="overflow-auto max-h-[300px]">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-background">
+                          <tr className="border-b">
+                            <th className="text-left py-2 px-2">Component</th>
+                            <th className="text-right py-2 px-2">Expected Cost</th>
+                            <th className="text-right py-2 px-2">% of Revenue</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {costAnalysisData.componentBreakdown.map((comp, idx) => (
+                            <tr key={comp.name} className="border-b hover:bg-muted/50" data-testid={`row-cost-component-${idx}`}>
+                              <td className="py-2 px-2 flex items-center gap-2">
+                                <div 
+                                  className="w-3 h-3 rounded-full" 
+                                  style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                                />
+                                {comp.name}
+                              </td>
+                              <td className="text-right py-2 px-2 font-mono">
+                                ${comp.expectedCost.toLocaleString()}
+                              </td>
+                              <td className="text-right py-2 px-2 font-mono">
+                                {comp.percentageOfRevenue}%
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="font-bold border-t-2">
+                            <td className="py-2 px-2">Total</td>
+                            <td className="text-right py-2 px-2 font-mono">
+                              ${costAnalysisData.totalExpectedCost.toLocaleString()}
+                            </td>
+                            <td className="text-right py-2 px-2 font-mono">
+                              {costAnalysisData.totalRevenue > 0 
+                                ? Math.round((costAnalysisData.totalExpectedCost / costAnalysisData.totalRevenue) * 100 * 10) / 10 
+                                : 0}%
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No cost component data available
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Cost Component Bar Chart</CardTitle>
+                <CardDescription>
+                  Comparison of expected costs by component
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {costAnalysisLoading ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : costAnalysisData?.componentBreakdown && costAnalysisData.componentBreakdown.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart 
+                      data={costAnalysisData.componentBreakdown} 
+                      layout="vertical"
+                      margin={{ left: 100 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} />
+                      <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Expected Cost"]} />
+                      <Bar dataKey="expectedCost" fill="#4e79a7" name="Expected Cost">
+                        {costAnalysisData.componentBreakdown.map((entry, index) => (
+                          <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                    No cost component data for this period
                   </div>
                 )}
               </CardContent>

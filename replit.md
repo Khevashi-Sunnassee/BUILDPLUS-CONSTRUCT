@@ -17,8 +17,9 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Reports & Analytics**: Time by user, project, app with charts
 - **Admin Provisioning**: Manage users, projects, devices, global settings
 - **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available
-- **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
-- **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED)
+- **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting/cost-breakup charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
+- **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides and notes
+- **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED), with cost overrides dialog for customized job-specific cost ratios
 - **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (labour cost, supply cost, sell rate per m²/m³)
 - **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
@@ -82,6 +83,8 @@ shared/
 - **productionEntries**: Production work entries (panelId, jobId, userId, productionDate, volumeM3, areaM2)
 - **panelTypes**: Configurable panel types with rates (code, name, labourCostPerM2/M3, supplyCostPerM2/M3, sellRatePerM2/M3)
 - **projectPanelRates**: Project-level rate overrides for specific panel types
+- **panelTypeCostComponents**: Cost component percentages per panel type (name, percentageOfRevenue)
+- **jobCostOverrides**: Job-level cost component overrides (defaultPercentage, revisedPercentage, notes)
 - **workTypes**: Work type categorization (code, name, description, sortOrder) - GENERAL, CLIENT_CHANGE, ERROR_REWORK
 
 ## API Endpoints
@@ -139,6 +142,18 @@ shared/
 - GET /api/reports/production-with-costs - Production data with cost/revenue/profit calculations
   - Query params: startDate, endDate
   - Returns: dailyData with financial metrics, totals, panelTypes
+
+### Cost Breakup Routes
+- GET /api/panel-types/:panelTypeId/cost-components - Get cost components for a panel type
+- POST /api/panel-types/:panelTypeId/cost-components - Add cost component (validates sum <= 100%)
+- PUT /api/cost-components/:id - Update cost component
+- DELETE /api/cost-components/:id - Delete cost component
+- GET /api/jobs/:jobId/cost-overrides - Get job cost overrides
+- POST /api/jobs/:jobId/cost-overrides/initialize - Initialize overrides from panel type defaults
+- PUT /api/cost-overrides/:id - Update job cost override
+- GET /api/reports/cost-analysis - Calculate expected costs by component
+  - Query params: startDate, endDate, jobId (optional)
+  - Returns: totalRevenue, totalExpectedCost, expectedProfit, profitMargin, componentBreakdown
 
 ### Work Types Routes
 - GET /api/work-types - List active work types (for dropdowns)

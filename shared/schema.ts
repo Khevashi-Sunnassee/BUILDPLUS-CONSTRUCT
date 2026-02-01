@@ -252,6 +252,35 @@ export const productionEntries = pgTable("production_entries", {
   productionDateIdx: index("production_entries_production_date_idx").on(table.productionDate),
 }));
 
+export const panelTypeCostComponents = pgTable("panel_type_cost_components", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  panelTypeId: varchar("panel_type_id", { length: 36 }).notNull().references(() => panelTypes.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  percentageOfRevenue: text("percentage_of_revenue").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  panelTypeIdIdx: index("cost_components_panel_type_id_idx").on(table.panelTypeId),
+  panelTypeNameIdx: uniqueIndex("cost_components_panel_type_name_idx").on(table.panelTypeId, table.name),
+}));
+
+export const jobCostOverrides = pgTable("job_cost_overrides", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  panelTypeId: varchar("panel_type_id", { length: 36 }).notNull().references(() => panelTypes.id, { onDelete: "cascade" }),
+  componentName: text("component_name").notNull(),
+  defaultPercentage: text("default_percentage").notNull(),
+  revisedPercentage: text("revised_percentage"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("job_cost_overrides_job_id_idx").on(table.jobId),
+  panelTypeIdIdx: index("job_cost_overrides_panel_type_id_idx").on(table.panelTypeId),
+  jobPanelTypeComponentIdx: uniqueIndex("job_cost_overrides_unique_idx").on(table.jobId, table.panelTypeId, table.componentName),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -330,6 +359,18 @@ export const insertPanelTypeSchema = createInsertSchema(panelTypes).omit({
   updatedAt: true,
 });
 
+export const insertPanelTypeCostComponentSchema = createInsertSchema(panelTypeCostComponents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertJobCostOverrideSchema = createInsertSchema(jobCostOverrides).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertProjectPanelRateSchema = createInsertSchema(projectPanelRates).omit({
   id: true,
   createdAt: true,
@@ -403,6 +444,10 @@ export type InsertProjectPanelRate = z.infer<typeof insertProjectPanelRateSchema
 export type ProjectPanelRate = typeof projectPanelRates.$inferSelect;
 export type InsertWorkType = z.infer<typeof insertWorkTypeSchema>;
 export type WorkType = typeof workTypes.$inferSelect;
+export type InsertPanelTypeCostComponent = z.infer<typeof insertPanelTypeCostComponentSchema>;
+export type PanelTypeCostComponent = typeof panelTypeCostComponents.$inferSelect;
+export type InsertJobCostOverride = z.infer<typeof insertJobCostOverrideSchema>;
+export type JobCostOverride = typeof jobCostOverrides.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,8 @@ import {
   DollarSign,
   CheckCircle,
   XCircle,
+  PieChart,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,16 +79,46 @@ const panelTypeSchema = z.object({
 
 type PanelTypeFormData = z.infer<typeof panelTypeSchema>;
 
+interface CostComponent {
+  id?: string;
+  name: string;
+  percentageOfRevenue: string;
+}
+
 export default function AdminPanelTypesPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<PanelTypeConfig | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingTypeId, setDeletingTypeId] = useState<string | null>(null);
+  const [costBreakupDialogOpen, setCostBreakupDialogOpen] = useState(false);
+  const [costBreakupType, setCostBreakupType] = useState<PanelTypeConfig | null>(null);
+  const [costComponents, setCostComponents] = useState<CostComponent[]>([]);
 
   const { data: panelTypes, isLoading } = useQuery<PanelTypeConfig[]>({
     queryKey: ["/api/admin/panel-types"],
   });
+
+  const { data: currentCostComponents, refetch: refetchCostComponents } = useQuery<CostComponent[]>({
+    queryKey: ["/api/panel-types", costBreakupType?.id, "cost-components"],
+    queryFn: async () => {
+      if (!costBreakupType?.id) return [];
+      const res = await fetch(`/api/panel-types/${costBreakupType.id}/cost-components`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch cost components");
+      return res.json();
+    },
+    enabled: !!costBreakupType?.id && costBreakupDialogOpen,
+  });
+
+  useEffect(() => {
+    if (currentCostComponents) {
+      setCostComponents(currentCostComponents.map(c => ({
+        id: c.id,
+        name: c.name,
+        percentageOfRevenue: c.percentageOfRevenue,
+      })));
+    }
+  }, [currentCostComponents]);
 
   const form = useForm<PanelTypeFormData>({
     resolver: zodResolver(panelTypeSchema),
@@ -154,6 +186,51 @@ export default function AdminPanelTypesPage() {
       toast({ title: "Failed to delete panel type", variant: "destructive" });
     },
   });
+
+  const saveCostComponentsMutation = useMutation({
+    mutationFn: async ({ panelTypeId, components }: { panelTypeId: string; components: CostComponent[] }) => {
+      return apiRequest("PUT", `/api/panel-types/${panelTypeId}/cost-components`, { components });
+    },
+    onSuccess: () => {
+      toast({ title: "Cost breakup saved successfully" });
+      refetchCostComponents();
+    },
+    onError: (error: any) => {
+      toast({ title: error.message || "Failed to save cost breakup", variant: "destructive" });
+    },
+  });
+
+  const handleOpenCostBreakup = (type: PanelTypeConfig) => {
+    setCostBreakupType(type);
+    setCostComponents([]);
+    setCostBreakupDialogOpen(true);
+  };
+
+  const handleAddComponent = () => {
+    setCostComponents([...costComponents, { name: "", percentageOfRevenue: "" }]);
+  };
+
+  const handleRemoveComponent = (index: number) => {
+    setCostComponents(costComponents.filter((_, i) => i !== index));
+  };
+
+  const handleComponentChange = (index: number, field: keyof CostComponent, value: string) => {
+    const updated = [...costComponents];
+    updated[index] = { ...updated[index], [field]: value };
+    setCostComponents(updated);
+  };
+
+  const handleSaveCostComponents = () => {
+    if (!costBreakupType) return;
+    const total = costComponents.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
+    if (total > 100) {
+      toast({ title: "Total percentage cannot exceed 100%", variant: "destructive" });
+      return;
+    }
+    saveCostComponentsMutation.mutate({ panelTypeId: costBreakupType.id, components: costComponents });
+  };
+
+  const totalPercentage = costComponents.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
 
   const handleOpenCreate = () => {
     setEditingType(null);
@@ -318,6 +395,15 @@ export default function AdminPanelTypesPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenCostBreakup(type)}
+                            title="Cost Breakup"
+                            data-testid={`button-cost-breakup-${type.id}`}
+                          >
+                            <PieChart className="h-4 w-4 text-blue-600" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -687,6 +773,91 @@ export default function AdminPanelTypesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={costBreakupDialogOpen} onOpenChange={setCostBreakupDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Cost Breakup - {costBreakupType?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Define cost components as percentages of revenue. Total must not exceed 100%.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-3">
+              {costComponents.map((component, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <Input
+                    placeholder="Component name (e.g., Labour)"
+                    value={component.name}
+                    onChange={(e) => handleComponentChange(index, "name", e.target.value)}
+                    className="flex-1"
+                    data-testid={`input-component-name-${index}`}
+                  />
+                  <div className="relative w-24">
+                    <Input
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                      placeholder="0"
+                      value={component.percentageOfRevenue}
+                      onChange={(e) => handleComponentChange(index, "percentageOfRevenue", e.target.value)}
+                      className="pr-6"
+                      data-testid={`input-component-percentage-${index}`}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleRemoveComponent(index)}
+                    data-testid={`button-remove-component-${index}`}
+                  >
+                    <X className="h-4 w-4 text-destructive" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAddComponent}
+              data-testid="button-add-component"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Component
+            </Button>
+            <div className="flex justify-between items-center p-3 rounded-lg bg-muted">
+              <span className="font-medium">Total:</span>
+              <span className={`font-bold ${totalPercentage > 100 ? "text-destructive" : "text-green-600"}`}>
+                {totalPercentage.toFixed(1)}%
+              </span>
+            </div>
+            {totalPercentage > 100 && (
+              <p className="text-sm text-destructive">Total percentage cannot exceed 100%</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCostBreakupDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveCostComponents}
+              disabled={saveCostComponentsMutation.isPending || totalPercentage > 100}
+              data-testid="button-save-cost-breakup"
+            >
+              {saveCostComponentsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Save className="h-4 w-4 mr-2" />
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
