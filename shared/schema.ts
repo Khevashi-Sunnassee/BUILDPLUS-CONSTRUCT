@@ -205,6 +205,8 @@ export const panelTypes = pgTable("panel_types", {
   labourCostPerM3: text("labour_cost_per_m3"),
   supplyCostPerM2: text("supply_cost_per_m2"),
   supplyCostPerM3: text("supply_cost_per_m3"),
+  installCostPerM2: text("install_cost_per_m2"),
+  installCostPerM3: text("install_cost_per_m3"),
   totalRatePerM2: text("total_rate_per_m2"),
   totalRatePerM3: text("total_rate_per_m3"),
   sellRatePerM2: text("sell_rate_per_m2"),

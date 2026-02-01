@@ -66,10 +66,10 @@ const panelTypeSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  labourCostPerM2: z.string().optional(),
-  labourCostPerM3: z.string().optional(),
   supplyCostPerM2: z.string().optional(),
   supplyCostPerM3: z.string().optional(),
+  installCostPerM2: z.string().optional(),
+  installCostPerM3: z.string().optional(),
   totalRatePerM2: z.string().optional(),
   totalRatePerM3: z.string().optional(),
   sellRatePerM2: z.string().optional(),
@@ -126,10 +126,10 @@ export default function AdminPanelTypesPage() {
       code: "",
       name: "",
       description: "",
-      labourCostPerM2: "",
-      labourCostPerM3: "",
       supplyCostPerM2: "",
       supplyCostPerM3: "",
+      installCostPerM2: "",
+      installCostPerM3: "",
       totalRatePerM2: "",
       totalRatePerM3: "",
       sellRatePerM2: "",
@@ -238,10 +238,10 @@ export default function AdminPanelTypesPage() {
       code: "",
       name: "",
       description: "",
-      labourCostPerM2: "",
-      labourCostPerM3: "",
       supplyCostPerM2: "",
       supplyCostPerM3: "",
+      installCostPerM2: "",
+      installCostPerM3: "",
       totalRatePerM2: "",
       totalRatePerM3: "",
       sellRatePerM2: "",
@@ -257,10 +257,10 @@ export default function AdminPanelTypesPage() {
       code: type.code,
       name: type.name,
       description: type.description || "",
-      labourCostPerM2: type.labourCostPerM2 || "",
-      labourCostPerM3: type.labourCostPerM3 || "",
       supplyCostPerM2: type.supplyCostPerM2 || "",
       supplyCostPerM3: type.supplyCostPerM3 || "",
+      installCostPerM2: type.installCostPerM2 || "",
+      installCostPerM3: type.installCostPerM3 || "",
       totalRatePerM2: type.totalRatePerM2 || "",
       totalRatePerM3: type.totalRatePerM3 || "",
       sellRatePerM2: type.sellRatePerM2 || "",
@@ -331,10 +331,10 @@ export default function AdminPanelTypesPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Labour/m²</TableHead>
-                  <TableHead className="text-right">Labour/m³</TableHead>
                   <TableHead className="text-right">Supply/m²</TableHead>
                   <TableHead className="text-right">Supply/m³</TableHead>
+                  <TableHead className="text-right">Install/m²</TableHead>
+                  <TableHead className="text-right">Install/m³</TableHead>
                   <TableHead className="text-right">Total/m²</TableHead>
                   <TableHead className="text-right">Total/m³</TableHead>
                   <TableHead className="text-right">Sell/m²</TableHead>
@@ -370,16 +370,16 @@ export default function AdminPanelTypesPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(type.labourCostPerM2)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(type.labourCostPerM3)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
                         {formatCurrency(type.supplyCostPerM2)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatCurrency(type.supplyCostPerM3)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatCurrency(type.installCostPerM2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {formatCurrency(type.installCostPerM3)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatCurrency(type.totalRatePerM2)}
@@ -507,52 +507,6 @@ export default function AdminPanelTypesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="labourCostPerM2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Labour Cost per m²</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7"
-                              {...field}
-                              data-testid="input-labour-cost-m2"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="labourCostPerM3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Labour Cost per m³</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7"
-                              {...field}
-                              data-testid="input-labour-cost-m3"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
                     name="supplyCostPerM2"
                     render={({ field }) => (
                       <FormItem>
@@ -590,6 +544,52 @@ export default function AdminPanelTypesPage() {
                               className="pl-7"
                               {...field}
                               data-testid="input-supply-cost-m3"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="installCostPerM2"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Install Cost per m²</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              className="pl-7"
+                              {...field}
+                              data-testid="input-install-cost-m2"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="installCostPerM3"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Install Cost per m³</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              className="pl-7"
+                              {...field}
+                              data-testid="input-install-cost-m3"
                             />
                           </div>
                         </FormControl>
