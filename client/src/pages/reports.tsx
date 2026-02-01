@@ -176,7 +176,7 @@ export default function ReportsPage() {
   const { startDate, endDate } = getDateRange();
 
   const { data: logistics, isLoading: logisticsLoading } = useQuery<LogisticsData>({
-    queryKey: [`/api/reports/logistics?startDate=${startDate}&endDate=${endDate}`],
+    queryKey: ["/api/reports/logistics", { startDate, endDate }],
   });
 
   const formatMinutes = (minutes: number) => {
