@@ -20,7 +20,8 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting/cost-breakup charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
 - **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides, component filter dropdown for detailed daily breakdown, and interactive summary tables with click-to-filter functionality
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED), with cost overrides dialog for customized job-specific cost ratios
-- **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
+- **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export, and panel production approval workflow
+- **Panel Production Approval**: "Build" dialog for entering panel specifications (load dimensions, volume, mass, area, concrete strength), AI-powered PDF analysis using OpenAI to extract specs from shop drawings, and approval workflow - only approved panels can have production entries
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (supply cost, install cost, sell rate per m²/m³) and expected weight per m³ (default 2500kg) for load list calculations
 - **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
@@ -79,7 +80,7 @@ shared/
 - **approvalEvents**: Approval history trail
 - **globalSettings**: System-wide config (timezone, capture interval)
 - **jobs**: Job metadata (jobNumber, name, client, address, status)
-- **panelRegister**: Panel tracking (jobId, panelMark, panelType, estimatedHours, actualHours, status)
+- **panelRegister**: Panel tracking (jobId, panelMark, panelType, estimatedHours, actualHours, status, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelArea, day28Fc, liftFcm, productionPdfUrl, approvedForProduction, approvedAt, approvedById)
 - **productionEntries**: Production work entries (panelId, jobId, userId, productionDate, volumeM3, areaM2)
 - **panelTypes**: Configurable panel types with rates (code, name, labourCostPerM2/M3, supplyCostPerM2/M3, sellRatePerM2/M3)
 - **projectPanelRates**: Project-level rate overrides for specific panel types
@@ -110,6 +111,10 @@ shared/
 - CRUD /api/admin/projects - Project management
 - CRUD /api/admin/jobs - Jobs management (with Excel import)
 - CRUD /api/admin/panels - Panel register management (with Excel import)
+- POST /api/admin/panels/:id/analyze-pdf - AI-powered PDF analysis for panel specs
+- POST /api/admin/panels/:id/approve-production - Approve panel for production
+- POST /api/admin/panels/:id/revoke-production - Revoke production approval
+- GET /api/panels/approved-for-production - Get approved panels (optional ?jobId filter)
 - CRUD /api/admin/devices - Device provisioning
 - CRUD /api/admin/users - User management
 
