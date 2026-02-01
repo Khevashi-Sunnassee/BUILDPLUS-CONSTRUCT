@@ -96,6 +96,19 @@ export const panelRegister = pgTable("panel_register", {
   estimatedHours: integer("estimated_hours"),
   actualHours: integer("actual_hours").default(0),
   notes: text("notes"),
+  // Production approval fields
+  loadWidth: text("load_width"),
+  loadHeight: text("load_height"),
+  panelThickness: text("panel_thickness"),
+  panelVolume: text("panel_volume"),
+  panelMass: text("panel_mass"),
+  panelArea: text("panel_area"),
+  day28Fc: text("day_28_fc"),
+  liftFcm: text("lift_fcm"),
+  productionPdfUrl: text("production_pdf_url"),
+  approvedForProduction: boolean("approved_for_production").default(false).notNull(),
+  approvedAt: timestamp("approved_at"),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -104,6 +117,7 @@ export const panelRegister = pgTable("panel_register", {
   panelTypeIdx: index("panel_register_panel_type_idx").on(table.panelType),
   statusIdx: index("panel_register_status_idx").on(table.status),
   jobPanelIdx: uniqueIndex("panel_register_job_panel_idx").on(table.jobId, table.panelMark),
+  approvedForProductionIdx: index("panel_register_approved_for_production_idx").on(table.approvedForProduction),
 }));
 
 export const mappingRules = pgTable("mapping_rules", {
