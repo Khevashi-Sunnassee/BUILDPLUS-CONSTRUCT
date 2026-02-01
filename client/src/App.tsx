@@ -27,6 +27,7 @@ import DownloadsPage from "@/pages/downloads";
 import ManualEntryPage from "@/pages/manual-entry";
 import ProductionReportPage from "@/pages/production-report";
 import KPIDashboardPage from "@/pages/kpi-dashboard";
+import LogisticsPage from "@/pages/logistics";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -159,6 +160,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <KPIDashboardPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/logistics">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <LogisticsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

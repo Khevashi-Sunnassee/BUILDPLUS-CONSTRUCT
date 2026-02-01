@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, projects, dailyLogs, logRows, globalSettings, workTypes } from "@shared/schema";
+import { users, projects, dailyLogs, logRows, globalSettings, workTypes, trailerTypes } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
@@ -33,6 +33,28 @@ export async function seedDatabase() {
       },
     ]);
     console.log("Work types seeded");
+  }
+
+  // Always seed trailer types (idempotent)
+  const existingTrailerTypes = await db.select().from(trailerTypes);
+  if (existingTrailerTypes.length === 0) {
+    await db.insert(trailerTypes).values([
+      {
+        code: "LAYOVER",
+        name: "Layover",
+        description: "Flat deck trailer with panels laying flat",
+        sortOrder: 1,
+        isActive: true,
+      },
+      {
+        code: "A_FRAME",
+        name: "A-Frame",
+        description: "A-frame trailer with panels standing upright",
+        sortOrder: 2,
+        isActive: true,
+      },
+    ]);
+    console.log("Trailer types seeded");
   }
 
   const existingUsers = await db.select().from(users);

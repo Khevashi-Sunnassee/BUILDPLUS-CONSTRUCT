@@ -19,6 +19,8 @@ import {
   Hash,
   ChevronRight,
   DollarSign,
+  User,
+  Phone,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -78,6 +80,8 @@ const jobSchema = z.object({
   client: z.string().optional(),
   address: z.string().optional(),
   description: z.string().optional(),
+  siteContact: z.string().optional(),
+  siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
   projectId: z.string().optional(),
 });
@@ -135,6 +139,8 @@ export default function AdminJobsPage() {
       client: "",
       address: "",
       description: "",
+      siteContact: "",
+      siteContactPhone: "",
       status: "ACTIVE",
       projectId: "",
     },
@@ -318,6 +324,8 @@ export default function AdminJobsPage() {
       client: "",
       address: "",
       description: "",
+      siteContact: "",
+      siteContactPhone: "",
       status: "ACTIVE",
       projectId: "",
     });
@@ -332,6 +340,8 @@ export default function AdminJobsPage() {
       client: job.client || "",
       address: job.address || "",
       description: job.description || "",
+      siteContact: job.siteContact || "",
+      siteContactPhone: job.siteContactPhone || "",
       status: job.status,
       projectId: job.projectId || "none",
     });
@@ -591,6 +601,34 @@ export default function AdminJobsPage() {
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={jobForm.control}
+                  name="siteContact"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Site Contact</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Contact name" {...field} data-testid="input-job-site-contact" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobForm.control}
+                  name="siteContactPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Site Contact Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Phone number" {...field} data-testid="input-job-site-contact-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={jobForm.control}
                 name="projectId"
