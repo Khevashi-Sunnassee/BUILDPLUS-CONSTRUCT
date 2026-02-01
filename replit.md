@@ -1,7 +1,7 @@
-# LTE Time Tracking Portal
+# LTE Performance Management System
 
 ## Overview
-A comprehensive time tracking portal for CAD + Revit time management with standalone authentication (email/password), RBAC roles (USER, MANAGER, ADMIN), Windows Agent API ingestion, daily log management, manager approval workflow, reporting/analytics, complete admin provisioning system, Jobs/Panel Register management for tracking work against specific panels, and Production Report tracking with unified panel IDs across drafting and production workflows.
+A comprehensive performance management system (formerly time tracking portal) for CAD + Revit time management with standalone authentication (email/password), RBAC roles (USER, MANAGER, ADMIN), Windows Agent API ingestion, daily log management, manager approval workflow, reporting/analytics, complete admin provisioning system, Jobs/Panel Register management for tracking work against specific panels, Production Report tracking with unified panel IDs, and a KPI Dashboard with selectable date periods, visual charts, and PDF export for daily performance reporting.
 
 ## Demo Accounts
 - **Admin**: admin@lte.com.au / admin123
@@ -17,6 +17,7 @@ A comprehensive time tracking portal for CAD + Revit time management with standa
 - **Reports & Analytics**: Time by user, project, app with charts
 - **Admin Provisioning**: Manage users, projects, devices, global settings
 - **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available
+- **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting charts, and PDF export
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED)
 - **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (labour cost, supply cost, sell rate per m²/m³)
@@ -49,6 +50,7 @@ client/
         users.tsx         - User management
       manual-entry.tsx    - Manual time entry form
       production-report.tsx - Production tracking with volume/area and cost calculations
+      kpi-dashboard.tsx   - KPI Dashboard with charts and PDF export
     components/
       layout/sidebar.tsx  - App sidebar
       theme-toggle.tsx    - Dark mode toggle
@@ -123,6 +125,18 @@ shared/
 - DELETE /api/admin/panel-types/:id - Delete panel type
 - GET /api/projects/:projectId/panel-rates - Get effective rates for project
 - PUT /api/projects/:projectId/panel-rates/:panelTypeId - Set project rate override
+
+### KPI Dashboard Routes
+- GET /api/reports/production-daily - Daily production data with panel counts and volumes
+  - Query params: startDate, endDate (YYYY-MM-DD format)
+  - Returns: dailyData array, totals, panelTypes used, period
+- GET /api/reports/drafting-daily - Daily drafting time breakdown
+  - Query params: startDate, endDate
+  - Uses batch query optimization (2 DB queries for all data)
+  - Returns: dailyData with byUser/byApp/byProject breakdowns
+- GET /api/reports/production-with-costs - Production data with cost/revenue/profit calculations
+  - Query params: startDate, endDate
+  - Returns: dailyData with financial metrics, totals, panelTypes
 
 ### Agent API
 - POST /api/agent/ingest - Windows Agent time block ingestion

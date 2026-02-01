@@ -86,11 +86,18 @@ export interface IStorage {
 
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
   getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry>;
   updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined>;
   deleteProductionEntry(id: string): Promise<void>;
   getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
+  getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]>;
+  getDailyLogsWithRowsInRange(startDate: string, endDate: string): Promise<Array<{
+    log: DailyLog;
+    user: User;
+    rows: LogRow[];
+  }>>;
 
   getPanelType(id: string): Promise<PanelTypeConfig | undefined>;
   getPanelTypeByCode(code: string): Promise<PanelTypeConfig | undefined>;
@@ -693,6 +700,63 @@ export class DatabaseStorage implements IStorage {
       .where(eq(productionEntries.productionDate, date))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
+  }
+
+  async getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const result = await db.select().from(productionEntries)
+      .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
+      .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
+      .innerJoin(users, eq(productionEntries.userId, users.id))
+      .where(and(
+        gte(productionEntries.productionDate, startDate),
+        lte(productionEntries.productionDate, endDate)
+      ))
+      .orderBy(asc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
+  }
+
+  async getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]> {
+    return await db.select().from(dailyLogs)
+      .where(and(
+        gte(dailyLogs.logDay, startDate),
+        lte(dailyLogs.logDay, endDate)
+      ))
+      .orderBy(asc(dailyLogs.logDay));
+  }
+
+  async getDailyLogsWithRowsInRange(startDate: string, endDate: string): Promise<Array<{
+    log: DailyLog;
+    user: User;
+    rows: LogRow[];
+  }>> {
+    const logs = await db.select().from(dailyLogs)
+      .innerJoin(users, eq(dailyLogs.userId, users.id))
+      .where(and(
+        gte(dailyLogs.logDay, startDate),
+        lte(dailyLogs.logDay, endDate)
+      ))
+      .orderBy(asc(dailyLogs.logDay));
+    
+    if (logs.length === 0) return [];
+    
+    const logIds = logs.map(l => l.daily_logs.id);
+    const allRows = await db.select().from(logRows)
+      .where(inArray(logRows.dailyLogId, logIds))
+      .orderBy(asc(logRows.startAt));
+    
+    const rowsByLogId = new Map<string, LogRow[]>();
+    for (const row of allRows) {
+      if (!rowsByLogId.has(row.dailyLogId)) {
+        rowsByLogId.set(row.dailyLogId, []);
+      }
+      rowsByLogId.get(row.dailyLogId)!.push(row);
+    }
+    
+    return logs.map(l => ({
+      log: l.daily_logs,
+      user: l.users,
+      rows: rowsByLogId.get(l.daily_logs.id) || [],
+    }));
   }
 
   async createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry> {

@@ -26,6 +26,7 @@ import AdminPanelTypesPage from "@/pages/admin/panel-types";
 import DownloadsPage from "@/pages/downloads";
 import ManualEntryPage from "@/pages/manual-entry";
 import ProductionReportPage from "@/pages/production-report";
+import KPIDashboardPage from "@/pages/kpi-dashboard";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -150,6 +151,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ProductionReportPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/kpi-dashboard">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <KPIDashboardPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

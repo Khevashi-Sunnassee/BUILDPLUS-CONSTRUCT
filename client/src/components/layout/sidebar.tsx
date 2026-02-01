@@ -43,10 +43,11 @@ import {
 
 const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Daily Reports", url: "/daily-reports", icon: FileText },
   { title: "Manual Entry", url: "/manual-entry", icon: PlusCircle },
   { title: "Production Report", url: "/production-report", icon: Factory },
-  { title: "Reports", url: "/reports", icon: BarChart3 },
+  { title: "Reports", url: "/reports", icon: Clock },
   { title: "Downloads", url: "/downloads", icon: Download },
 ];
 
