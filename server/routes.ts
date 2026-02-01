@@ -1905,9 +1905,22 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/load-lists", requireAuth, async (req, res) => {
     try {
-      const { panelIds, ...data } = req.body;
+      const { panelIds, docketNumber, scheduledDate, ...data } = req.body;
+      
+      // Generate a sequential load number
+      const existingLoadLists = await storage.getAllLoadLists();
+      const loadNumber = `LL-${String(existingLoadLists.length + 1).padStart(4, '0')}`;
+      
+      // Parse the scheduled date or use today
+      const date = scheduledDate ? new Date(scheduledDate) : new Date();
+      const loadDate = date.toISOString().split('T')[0];
+      const loadTime = date.toTimeString().split(' ')[0].substring(0, 5);
+      
       const loadList = await storage.createLoadList({
         ...data,
+        loadNumber,
+        loadDate,
+        loadTime,
         createdById: req.session.userId!,
       }, panelIds || []);
       res.json(loadList);
