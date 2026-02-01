@@ -14,11 +14,14 @@ import {
   ArrowLeft,
   ClipboardList,
   Briefcase,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -77,6 +80,8 @@ export default function ManualEntryPage() {
   const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [addNewPanel, setAddNewPanel] = useState(false);
+  const [newPanelMark, setNewPanelMark] = useState("");
 
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
@@ -137,8 +142,15 @@ export default function ManualEntryPage() {
       const res = await apiRequest("POST", "/api/manual-entry", data);
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: "Time entry created successfully" });
+    onSuccess: (data) => {
+      if (data.newPanelCreated) {
+        toast({ 
+          title: "Time entry created", 
+          description: `Panel "${newPanelMark}" has been added to the Panel Register.`
+        });
+      } else {
+        toast({ title: "Time entry created successfully" });
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
@@ -154,8 +166,10 @@ export default function ManualEntryPage() {
       ...data,
       projectId: data.projectId === "none" ? undefined : data.projectId,
       jobId: data.jobId === "none" ? undefined : data.jobId,
-      panelRegisterId: data.panelRegisterId === "none" ? undefined : data.panelRegisterId,
+      panelRegisterId: addNewPanel ? undefined : (data.panelRegisterId === "none" ? undefined : data.panelRegisterId),
       workTypeId: data.workTypeId && data.workTypeId !== "none" ? parseInt(data.workTypeId) : undefined,
+      createNewPanel: addNewPanel && newPanelMark ? true : undefined,
+      newPanelMark: addNewPanel && newPanelMark ? newPanelMark : undefined,
     };
     createEntryMutation.mutate(submitData as ManualEntryForm);
   };
@@ -311,7 +325,39 @@ export default function ManualEntryPage() {
                     Link this entry to a panel from the register for automatic tracking
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox 
+                      id="add-new-panel" 
+                      checked={addNewPanel}
+                      onCheckedChange={(checked) => {
+                        setAddNewPanel(checked === true);
+                        if (checked) {
+                          form.setValue("panelRegisterId", "");
+                        } else {
+                          setNewPanelMark("");
+                        }
+                      }}
+                      disabled={!selectedJobId || selectedJobId === "none"}
+                      data-testid="checkbox-add-new-panel"
+                    />
+                    <label 
+                      htmlFor="add-new-panel" 
+                      className={`text-sm font-medium leading-none ${(!selectedJobId || selectedJobId === "none") ? 'text-muted-foreground' : 'cursor-pointer'}`}
+                    >
+                      Add new panel to register
+                    </label>
+                  </div>
+
+                  {addNewPanel && newPanelMark && (
+                    <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                      <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <AlertDescription className="text-blue-800 dark:text-blue-200">
+                        Panel "<strong>{newPanelMark}</strong>" will be automatically added to the Panel Register for this job when you save this entry.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <div className="grid gap-4 md:grid-cols-2">
                     <FormField
                       control={form.control}
@@ -343,43 +389,60 @@ export default function ManualEntryPage() {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="panelRegisterId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-1">
-                            <ClipboardList className="h-3 w-3" />
-                            Panel
-                          </FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value || ""}
-                            disabled={!selectedJobId || selectedJobId === "none"}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-panel">
-                                <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No panel selected</SelectItem>
-                              {filteredPanels?.filter(p => p.status !== "COMPLETED").map((panel) => (
-                                <SelectItem key={panel.id} value={panel.id}>
-                                  <div className="flex items-center">
-                                    {panel.panelMark}
-                                    {panel.description && <span className="text-muted-foreground ml-1">- {panel.description}</span>}
-                                    {getStatusBadge(panel.status)}
-                                  </div>
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription className="text-xs">Auto-fills panel mark and drawing code</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {!addNewPanel ? (
+                      <FormField
+                        control={form.control}
+                        name="panelRegisterId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="flex items-center gap-1">
+                              <ClipboardList className="h-3 w-3" />
+                              Panel
+                            </FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              value={field.value || ""}
+                              disabled={!selectedJobId || selectedJobId === "none"}
+                            >
+                              <FormControl>
+                                <SelectTrigger data-testid="select-panel">
+                                  <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="none">No panel selected</SelectItem>
+                                {filteredPanels?.filter(p => p.status !== "COMPLETED").map((panel) => (
+                                  <SelectItem key={panel.id} value={panel.id}>
+                                    <div className="flex items-center">
+                                      {panel.panelMark}
+                                      {panel.description && <span className="text-muted-foreground ml-1">- {panel.description}</span>}
+                                      {getStatusBadge(panel.status)}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-xs">Auto-fills drawing code when selected</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    ) : (
+                      <div className="space-y-2">
+                        <FormLabel className="flex items-center gap-1">
+                          <ClipboardList className="h-3 w-3" />
+                          New Panel Mark
+                        </FormLabel>
+                        <Input 
+                          placeholder="e.g., PM-001" 
+                          value={newPanelMark}
+                          onChange={(e) => setNewPanelMark(e.target.value)}
+                          disabled={!selectedJobId || selectedJobId === "none"}
+                          data-testid="input-new-panel-mark"
+                        />
+                        <p className="text-xs text-muted-foreground">Enter the panel mark for the new panel</p>
+                      </div>
+                    )}
 
                     <FormField
                       control={form.control}

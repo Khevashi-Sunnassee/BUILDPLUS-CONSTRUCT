@@ -223,7 +223,7 @@ export async function registerRoutes(
 
       const { logDay, projectId, jobId, panelRegisterId, workTypeId, app, startTime, endTime, fileName, filePath,
               revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
-              panelMark, drawingCode, notes } = req.body;
+              panelMark, drawingCode, notes, createNewPanel, newPanelMark } = req.body;
 
       if (!logDay || !app || !startTime || !endTime) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -238,6 +238,24 @@ export async function registerRoutes(
 
       if (durationMin <= 0) {
         return res.status(400).json({ error: "End time must be after start time" });
+      }
+
+      // Handle creating a new panel if requested
+      let actualPanelRegisterId = panelRegisterId;
+      let actualPanelMark = panelMark;
+      
+      if (createNewPanel && newPanelMark && jobId) {
+        // Create new panel in register
+        const newPanel = await storage.createPanelRegisterItem({
+          jobId,
+          panelMark: newPanelMark,
+          panelType: "OTHER",
+          status: "IN_PROGRESS",
+          estimatedHours: "0",
+          actualHours: "0",
+        });
+        actualPanelRegisterId = newPanel.id;
+        actualPanelMark = newPanelMark;
       }
 
       // Create or get daily log
@@ -258,7 +276,7 @@ export async function registerRoutes(
         dailyLogId: dailyLog.id,
         projectId: projectId || undefined,
         jobId: jobId || undefined,
-        panelRegisterId: panelRegisterId || undefined,
+        panelRegisterId: actualPanelRegisterId || undefined,
         workTypeId: workTypeId || undefined,
         startAt,
         endAt,
@@ -273,20 +291,20 @@ export async function registerRoutes(
         revitSheetNumber: revitSheetNumber || undefined,
         revitSheetName: revitSheetName || undefined,
         acadLayoutName: acadLayoutName || undefined,
-        rawPanelMark: panelMark || undefined,
+        rawPanelMark: actualPanelMark || undefined,
         rawDrawingCode: drawingCode || undefined,
-        panelMark: panelMark || undefined,
+        panelMark: actualPanelMark || undefined,
         drawingCode: drawingCode || undefined,
         notes: notes || undefined,
         isUserEdited: true,
       });
 
       // Update panel's actualHours if linked to a panel register
-      if (panelRegisterId) {
-        await storage.updatePanelActualHours(panelRegisterId, durationMin);
+      if (actualPanelRegisterId) {
+        await storage.updatePanelActualHours(actualPanelRegisterId, durationMin);
       }
 
-      res.json({ ok: true, dailyLogId: dailyLog.id });
+      res.json({ ok: true, dailyLogId: dailyLog.id, newPanelCreated: createNewPanel && newPanelMark ? true : false });
     } catch (error) {
       console.error("Manual entry error:", error);
       res.status(500).json({ error: "Failed to create time entry" });
