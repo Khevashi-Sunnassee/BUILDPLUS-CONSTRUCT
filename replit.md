@@ -17,7 +17,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Reports & Analytics**: Time by user, project, app with charts
 - **Admin Provisioning**: Manage users, projects, devices, global settings
 - **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available
-- **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting charts, and PDF export
+- **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED)
 - **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (labour cost, supply cost, sell rate per m²/m³)
