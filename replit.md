@@ -1,7 +1,7 @@
 # LTE Time Tracking Portal
 
 ## Overview
-A comprehensive time tracking portal for CAD + Revit time management with standalone authentication (email/password), RBAC roles (USER, MANAGER, ADMIN), Windows Agent API ingestion, daily log management, manager approval workflow, reporting/analytics, and complete admin provisioning system.
+A comprehensive time tracking portal for CAD + Revit time management with standalone authentication (email/password), RBAC roles (USER, MANAGER, ADMIN), Windows Agent API ingestion, daily log management, manager approval workflow, reporting/analytics, complete admin provisioning system, and Jobs/Panel Register management for tracking work against specific panels.
 
 ## Demo Accounts
 - **Admin**: admin@lte.com.au / admin123
@@ -16,6 +16,9 @@ A comprehensive time tracking portal for CAD + Revit time management with standa
 - **Manager Approval**: Review submitted logs, approve/reject with comments
 - **Reports & Analytics**: Time by user, project, app with charts
 - **Admin Provisioning**: Manage users, projects, devices, global settings
+- **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available
+- **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED)
+- **Panel Register**: Track panels with status, estimated hours, actual hours logged, Excel import/export
 
 ## Tech Stack
 - **Frontend**: React + Vite, TanStack Query, Wouter, shadcn/ui, Tailwind CSS
@@ -36,8 +39,11 @@ client/
       admin/
         settings.tsx      - Global settings
         projects.tsx      - Project management
+        jobs.tsx          - Jobs management
+        panels.tsx        - Panel register
         devices.tsx       - Device provisioning
         users.tsx         - User management
+      manual-entry.tsx    - Manual time entry form
     components/
       layout/sidebar.tsx  - App sidebar
       theme-toggle.tsx    - Dark mode toggle
@@ -60,9 +66,11 @@ shared/
 - **projects**: Project metadata (name, code, client, address)
 - **mappingRules**: File path to project auto-mapping
 - **dailyLogs**: Per-user per-day log containers
-- **logRows**: Individual time blocks with CAD/Revit metadata
+- **logRows**: Individual time blocks with CAD/Revit metadata, linked to jobs/panels
 - **approvalEvents**: Approval history trail
 - **globalSettings**: System-wide config (timezone, capture interval)
+- **jobs**: Job metadata (jobNumber, name, client, address, status)
+- **panelRegister**: Panel tracking (jobId, panelMark, estimatedHours, actualHours, status)
 
 ## API Endpoints
 ### Auth
@@ -85,6 +93,8 @@ shared/
 ### Admin Routes
 - GET/PUT /api/admin/settings - Global settings
 - CRUD /api/admin/projects - Project management
+- CRUD /api/admin/jobs - Jobs management (with Excel import)
+- CRUD /api/admin/panels - Panel register management (with Excel import)
 - CRUD /api/admin/devices - Device provisioning
 - CRUD /api/admin/users - User management
 
