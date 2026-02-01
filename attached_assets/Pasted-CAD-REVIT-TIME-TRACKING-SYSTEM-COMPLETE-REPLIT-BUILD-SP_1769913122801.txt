@@ -1,0 +1,994 @@
+CAD + REVIT TIME TRACKING SYSTEM — COMPLETE REPLIT BUILD SPEC
+1) Goal (non-negotiables)
+
+Build a standalone time tracking portal (not Replit authentication) that:
+
+Tracks drafting time in Revit + AutoCAD with high accuracy (add-ins are primary truth).
+
+Uses a Windows Agent for idle detection + active process + batching/retry.
+
+Captures work in time blocks → shows Daily Logs → user reviews/edits → submits → manager approves → reporting.
+
+Is consented and visible (not stealth/spyware). Tracks ONLY Autodesk apps (Revit, AutoCAD).
+
+Handles Melbourne timezone/DST correctly using logDay + tz (no “local midnight ISO” parsing bugs).
+
+Prevents duplicates via idempotent ingestion (sourceEventId unique and upsert).
+
+2) Architecture (three deliverables)
+A) Replit Portal (Next.js App Router)
+
+Next.js + TypeScript + Tailwind + shadcn/ui
+
+NextAuth (Credentials login or email magic link), RBAC roles: USER, MANAGER, ADMIN
+
+Prisma + Postgres (Replit DB/Neon/Supabase)
+
+APIs:
+
+Agent ingest
+
+Daily logs retrieval
+
+Row edits
+
+Submit/approve/reject
+
+Merge rows
+
+Admin provisioning (devices/keys, projects/mapping rules, global settings)
+
+UI:
+
+Clean dashboard
+
+Daily reports list + detail editor
+
+Manager review
+
+Reporting pages
+
+B) Windows Agent (C# Worker Service)
+
+Runs on each drafter PC
+
+Tracks:
+
+Foreground process (Revit.exe / acad.exe only)
+
+Idle time (GetLastInputInfo)
+
+Receives add-in context on http://127.0.0.1:48123/context
+
+Stores blocks in local queue (SQLite or JSON lines)
+
+Batches POST to portal /api/agent/ingest
+
+Uses deterministic sourceEventId for retries
+
+C) Autodesk Add-ins (C#)
+
+Revit add-in
+
+Hooks ViewActivated, DocumentOpened, DocumentActivated
+
+Extracts doc.PathName, active view name
+
+If view is ViewSheet: sheet number + sheet name
+
+Optional: panel mark inference via parameters if your content supports it
+
+POSTs to agent local endpoint
+
+AutoCAD add-in
+
+Hooks document activation + layout change
+
+Extracts DWG full path + layout/tab
+
+POSTs to agent local endpoint
+
+3) Authentication (Standalone portal, NOT Replit auth)
+Requirements
+
+Use NextAuth with Credentials Provider (email + password) OR email magic link.
+
+Passwords hashed with bcrypt.
+
+Sessions stored via JWT or database session (prefer JWT for simplicity).
+
+RBAC enforced server-side for ADMIN/MANAGER endpoints.
+
+User Tracking / Auditing
+
+Track:
+
+Login events
+
+Device provisioning events
+
+Submit/approve/reject events
+
+Row edit events (who edited, when)
+
+Minimal must-have:
+
+ApprovalEvent table
+
+AuditEvent table (optional but recommended)
+
+4) Database (Prisma schema — COPY/PASTE)
+
+Create prisma/schema.prisma:
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MANAGER
+  ADMIN
+}
+
+enum LogStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum Discipline {
+  DRAFTING
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String?  // for credentials auth
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  devices      Device[]
+  dailyLogs    DailyLog[]
+  auditEvents  AuditEvent[]
+}
+
+model Device {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  deviceName   String
+  os           String   // "Windows"
+  agentVersion String?
+
+  apiKeyHash   String   @unique // sha256 hash of device key
+  lastSeenAt   DateTime?
+  isActive     Boolean  @default(true)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model GlobalSetting {
+  id               String   @id @default(cuid())
+  tz               String   @default("Australia/Melbourne")
+
+  captureIntervalS Int      @default(300)
+  idleThresholdS   Int      @default(300)
+  trackedApps      String   @default("revit,acad")
+  requireAddins    Boolean  @default(true)
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Project {
+  id           String   @id @default(cuid())
+  name         String
+  code         String?  @unique
+  client       String?
+  address      String?
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  mappingRules MappingRule[]
+  logRows      LogRow[]
+}
+
+model MappingRule {
+  id           String   @id @default(cuid())
+  projectId    String
+  project      Project  @relation(fields: [projectId], references: [id])
+
+  pathContains String
+  priority     Int      @default(100)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([priority])
+}
+
+model DailyLog {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id])
+
+  // DST-safe: store local day string + tz
+  logDay      String     // "YYYY-MM-DD"
+  tz          String     @default("Australia/Melbourne")
+
+  discipline  Discipline @default(DRAFTING)
+  status      LogStatus  @default(PENDING)
+
+  submittedAt DateTime?
+  approvedAt  DateTime?
+  approvedBy  String?
+  managerComment String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  rows        LogRow[]
+  approvalEvents ApprovalEvent[]
+
+  @@unique([userId, logDay, discipline])
+  @@index([logDay])
+}
+
+model LogRow {
+  id           String   @id @default(cuid())
+  dailyLogId   String
+  dailyLog     DailyLog @relation(fields: [dailyLogId], references: [id])
+
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id])
+
+  startAt      DateTime
+  endAt        DateTime
+
+  durationMin  Int
+  idleMin      Int
+  source       String   // "agent+addins", "agent-only"
+
+  // Idempotency:
+  sourceEventId String  @unique
+  capturedAt    DateTime @default(now())
+  tz            String   @default("Australia/Melbourne")
+
+  app          String   // "revit" | "acad"
+  filePath     String?
+  fileName     String?
+
+  // Revit details
+  revitViewName    String?
+  revitSheetNumber String?
+  revitSheetName   String?
+
+  // AutoCAD details
+  acadLayoutName   String?
+
+  // Raw vs editable:
+  rawPanelMark     String?
+  rawDrawingCode   String?
+  panelMark        String?
+  drawingCode      String?
+
+  notes        String?
+  isUserEdited Boolean  @default(false)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([dailyLogId])
+  @@index([projectId])
+  @@index([startAt])
+  @@index([app])
+  @@index([fileName])
+}
+
+model ApprovalEvent {
+  id        String   @id @default(cuid())
+  dailyLogId String
+  dailyLog   DailyLog @relation(fields: [dailyLogId], references: [id])
+
+  action    String   // "SUBMIT" | "APPROVE" | "REJECT"
+  actorId   String
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@index([dailyLogId])
+}
+
+model AuditEvent {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  eventType String   // "LOGIN", "DEVICE_PROVISIONED", "ROW_EDIT", etc
+  metaJson  String?  // JSON string
+  createdAt DateTime @default(now())
+
+  @@index([eventType])
+}
+
+5) Server utilities (Prisma client + hashing)
+
+Create src/lib/prisma.ts:
+
+import { PrismaClient } from "@prisma/client";
+
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined };
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: ["error", "warn"],
+  });
+
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+
+Create src/lib/crypto.ts:
+
+import crypto from "crypto";
+
+export function sha256Hex(raw: string) {
+  return crypto.createHash("sha256").update(raw).digest("hex");
+}
+
+export function randomKey(bytes = 32) {
+  return crypto.randomBytes(bytes).toString("base64url"); // good for device keys
+}
+
+6) Zod validation for ingestion (MANDATORY)
+
+Create src/lib/validation/agent.ts:
+
+import { z } from "zod";
+
+const RevItSchema = z.object({
+  viewName: z.string().optional().nullable(),
+  sheetNumber: z.string().optional().nullable(),
+  sheetName: z.string().optional().nullable(),
+}).optional().nullable();
+
+const AcadSchema = z.object({
+  layoutName: z.string().optional().nullable(),
+}).optional().nullable();
+
+export const AgentBlockSchema = z.object({
+  sourceEventId: z.string().min(10),
+  userEmail: z.string().email(),
+  logDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startedAt: z.string().datetime(),
+  endedAt: z.string().datetime(),
+  durationMin: z.number().int().min(0).max(240),
+  idleMin: z.number().int().min(0).max(240),
+  app: z.enum(["revit", "acad"]),
+  filePath: z.string().optional().nullable(),
+  fileName: z.string().optional().nullable(),
+  revit: RevItSchema,
+  acad: AcadSchema,
+  rawPanelMark: z.string().optional().nullable(),
+  rawDrawingCode: z.string().optional().nullable(),
+  source: z.string().optional().nullable(),
+  projectId: z.string().optional().nullable(),
+});
+
+export const AgentIngestSchema = z.object({
+  deviceName: z.string().min(1),
+  os: z.string().min(1),
+  agentVersion: z.string().optional().nullable(),
+  tz: z.string().default("Australia/Melbourne"),
+  blocks: z.array(AgentBlockSchema).min(1).max(200),
+});
+
+7) API Endpoints (Next.js App Router)
+7.1 POST /api/agent/ingest (idempotent upsert)
+
+Create app/api/agent/ingest/route.ts:
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { sha256Hex } from "@/lib/crypto";
+import { AgentIngestSchema } from "@/lib/validation/agent";
+
+export async function POST(req: NextRequest) {
+  const rawKey = req.headers.get("x-device-key") || "";
+  if (!rawKey) return NextResponse.json({ error: "Missing device key" }, { status: 401 });
+
+  const deviceKeyHash = sha256Hex(rawKey);
+  const device = await prisma.device.findFirst({
+    where: { apiKeyHash: deviceKeyHash, isActive: true },
+    include: { user: true },
+  });
+  if (!device) return NextResponse.json({ error: "Invalid device key" }, { status: 401 });
+
+  const json = await req.json().catch(() => null);
+  const parsed = AgentIngestSchema.safeParse(json);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid payload", issues: parsed.error.issues },
+      { status: 400 }
+    );
+  }
+
+  const body = parsed.data;
+
+  await prisma.device.update({
+    where: { id: device.id },
+    data: {
+      lastSeenAt: new Date(),
+      deviceName: body.deviceName,
+      os: body.os,
+      agentVersion: body.agentVersion ?? device.agentVersion,
+    },
+  });
+
+  // Optional: ensure blocks userEmail matches device.user.email
+  // If you want multi-user on one device, remove this and map by userEmail.
+  const createdOrUpdated: string[] = [];
+
+  for (const b of body.blocks) {
+    // Enforce user match (recommended):
+    if (b.userEmail.toLowerCase() !== device.user.email.toLowerCase()) continue;
+
+    const dailyLog = await prisma.dailyLog.upsert({
+      where: {
+        userId_logDay_discipline: {
+          userId: device.user.id,
+          logDay: b.logDay,
+          discipline: "DRAFTING",
+        },
+      },
+      update: {},
+      create: {
+        userId: device.user.id,
+        logDay: b.logDay,
+        tz: body.tz,
+        discipline: "DRAFTING",
+        status: "PENDING",
+      },
+    });
+
+    // Map project by pathContains if none provided
+    let mappedProjectId: string | null = null;
+    if (!b.projectId && b.filePath) {
+      const rules = await prisma.mappingRule.findMany({ orderBy: { priority: "asc" } });
+      const match = rules.find(r => b.filePath!.toLowerCase().includes(r.pathContains.toLowerCase()));
+      if (match) mappedProjectId = match.projectId;
+    }
+
+    await prisma.logRow.upsert({
+      where: { sourceEventId: b.sourceEventId },
+      update: {
+        endAt: new Date(b.endedAt),
+        durationMin: b.durationMin,
+        idleMin: b.idleMin,
+        source: b.source ?? "agent",
+        tz: body.tz,
+
+        filePath: b.filePath ?? null,
+        fileName: b.fileName ?? null,
+
+        revitViewName: b.revit?.viewName ?? null,
+        revitSheetNumber: b.revit?.sheetNumber ?? null,
+        revitSheetName: b.revit?.sheetName ?? null,
+        acadLayoutName: b.acad?.layoutName ?? null,
+
+        rawPanelMark: b.rawPanelMark ?? null,
+        rawDrawingCode: b.rawDrawingCode ?? null,
+
+        // only set projectId if currently null (don’t overwrite user edits)
+        projectId: undefined,
+      },
+      create: {
+        dailyLogId: dailyLog.id,
+        projectId: b.projectId ?? mappedProjectId,
+        startAt: new Date(b.startedAt),
+        endAt: new Date(b.endedAt),
+        durationMin: b.durationMin,
+        idleMin: b.idleMin,
+        source: b.source ?? "agent",
+        sourceEventId: b.sourceEventId,
+        tz: body.tz,
+
+        app: b.app,
+        filePath: b.filePath ?? null,
+        fileName: b.fileName ?? null,
+
+        revitViewName: b.revit?.viewName ?? null,
+        revitSheetNumber: b.revit?.sheetNumber ?? null,
+        revitSheetName: b.revit?.sheetName ?? null,
+        acadLayoutName: b.acad?.layoutName ?? null,
+
+        rawPanelMark: b.rawPanelMark ?? null,
+        rawDrawingCode: b.rawDrawingCode ?? null,
+        panelMark: b.rawPanelMark ?? null,
+        drawingCode: b.rawDrawingCode ?? null,
+      },
+    });
+
+    createdOrUpdated.push(b.sourceEventId);
+  }
+
+  return NextResponse.json({ ok: true, count: createdOrUpdated.length });
+}
+
+7.2 GET /api/daily-logs
+
+app/api/daily-logs/route.ts:
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function GET(req: NextRequest) {
+  const userId = req.nextUrl.searchParams.get("userId");
+  const logDay = req.nextUrl.searchParams.get("logDay"); // YYYY-MM-DD
+  const discipline = (req.nextUrl.searchParams.get("discipline") || "DRAFTING") as any;
+
+  if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
+
+  const where: any = { userId, discipline };
+  if (logDay) where.logDay = logDay;
+
+  const logs = await prisma.dailyLog.findMany({
+    where,
+    orderBy: { logDay: "desc" },
+    include: {
+      rows: { orderBy: { startAt: "asc" }, include: { project: true } },
+      user: true,
+    },
+  });
+
+  return NextResponse.json({ logs });
+}
+
+7.3 PATCH /api/log-rows/[id]
+
+app/api/log-rows/[id]/route.ts:
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+
+  const row = await prisma.logRow.update({
+    where: { id: params.id },
+    data: {
+      panelMark: body.panelMark ?? undefined,
+      drawingCode: body.drawingCode ?? undefined,
+      notes: body.notes ?? undefined,
+      projectId: body.projectId ?? undefined,
+      isUserEdited: true,
+    },
+  });
+
+  return NextResponse.json({ row });
+}
+
+7.4 Submit / Approve / Reject (and write ApprovalEvents)
+
+Submit: app/api/daily-logs/[id]/submit/route.ts
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function POST(_: Request, { params }: { params: { id: string } }) {
+  const log = await prisma.dailyLog.update({
+    where: { id: params.id },
+    data: { status: "SUBMITTED", submittedAt: new Date() },
+  });
+
+  // TODO: fill actorId from session user
+  await prisma.approvalEvent.create({
+    data: { dailyLogId: log.id, action: "SUBMIT", actorId: "SESSION_USER_ID" },
+  });
+
+  return NextResponse.json({ log });
+}
+
+
+Approve/Reject: app/api/daily-logs/[id]/approve/route.ts
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json(); // { approve: boolean, comment?: string }
+
+  const status = body.approve ? "APPROVED" : "REJECTED";
+
+  const log = await prisma.dailyLog.update({
+    where: { id: params.id },
+    data: {
+      status,
+      approvedAt: body.approve ? new Date() : null,
+      approvedBy: body.approve ? "SESSION_USER_ID" : null,
+      managerComment: body.comment ?? null,
+    },
+  });
+
+  await prisma.approvalEvent.create({
+    data: {
+      dailyLogId: log.id,
+      action: body.approve ? "APPROVE" : "REJECT",
+      actorId: "SESSION_USER_ID",
+      comment: body.comment ?? null,
+    },
+  });
+
+  return NextResponse.json({ log });
+}
+
+7.5 POST /api/daily-logs/[id]/merge (server-side merge)
+
+app/api/daily-logs/[id]/merge/route.ts:
+
+Merge adjacent rows when:
+
+same projectId + app + filePath + drawingCode + panelMark
+
+gap <= 2 minutes
+
+Implementation approach:
+
+fetch rows ordered by startAt
+
+combine contiguous groups
+
+delete originals, create merged replacements (keep a note: “merged by system”)
+
+8) Admin provisioning (Devices + Keys) — REQUIRED
+8.1 POST /api/admin/devices (create device + return key once)
+
+Admin selects a user, enters deviceName
+
+Server generates deviceKey (randomKey), stores hash only.
+
+Returns deviceKey ONCE for installer.
+
+Route: app/api/admin/devices/route.ts:
+
+RBAC: ADMIN only
+
+Request: { userId, deviceName }
+
+Response: { deviceId, deviceKey }
+
+8.2 Admin pages
+
+Global settings (interval, idle threshold, requireAddins)
+
+Projects + mapping rules (pathContains)
+
+Device list (last seen, active toggle, revoke)
+
+9) UI (clean look) — exact pages to build
+
+Use shadcn/ui + Tailwind. Layout:
+
+Left sidebar
+
+Top bar with user menu
+
+Simple white/grey neutral theme
+
+Pages
+
+/login
+
+/dashboard (cards: Today minutes, Pending days, Submitted awaiting approval)
+
+/daily-reports/drafting
+
+filters: date range, status, project, user (manager/admin)
+
+show columns: logDay, total minutes, idle minutes, missing panel mark minutes, missing project minutes, status
+
+/daily-reports/drafting/[logId]
+
+table rows with inline edit:
+
+start/end, app, fileName, sheet/layout, panelMark, drawingCode, project dropdown, minutes, notes
+
+actions:
+
+Merge Similar
+
+Submit Day
+
+/manager/review
+
+list submitted logs
+
+detail view shows diffs raw→edited and approve/reject comment
+
+/reports
+
+weekly/monthly totals by user/project/drawingCode/panelMark
+
+/admin
+
+settings
+
+projects/mapping
+
+device provisioning
+
+users (roles)
+
+10) Windows Agent (C#) — full behavior spec
+10.1 Agent config
+
+PORTAL_INGEST_URL
+
+DEVICE_KEY
+
+CAPTURE_INTERVAL_S (pull from server later)
+
+IDLE_THRESHOLD_S
+
+TZ "Australia/Melbourne"
+
+10.2 Agent must do
+
+Every interval:
+
+Get foreground process (only Revit.exe or acad.exe count)
+
+Get idle seconds (GetLastInputInfo)
+
+Read latest context state from add-ins
+
+Determine:
+
+durationMin = intervalMin if not idle else 0
+
+idleMin = intervalMin if idle else 0
+
+Create a block with deterministic sourceEventId
+
+Save to queue
+
+Periodically flush batch to server (15–30 mins or when batch size >= 20)
+
+10.3 Local listener
+
+Agent runs local HTTP server:
+
+POST http://127.0.0.1:48123/context
+
+Body is JSON context (doc path, sheet/view/layout, raw panel mark inference, userEmail)
+
+Agent stores last known context per app
+
+10.4 Deterministic sourceEventId (C#)
+
+Use SHA1 or SHA256 of:
+userEmail|logDay|startedAt|endedAt|app|filePath|sheetOrLayout|rawPanelMark|rawDrawingCode
+
+11) Autodesk Add-ins — BUILD INSTRUCTIONS (extremely explicit)
+11.1 Shared “Context POST” contract (Addins → Agent)
+
+Endpoint: http://127.0.0.1:48123/context
+
+Payload:
+
+{
+  "app": "revit",
+  "userEmail": "drafter@company.com",
+  "filePath": "C:\\Projects\\X\\Model.rvt",
+  "fileName": "Model.rvt",
+  "revitViewName": "Level 10 - GA",
+  "revitSheetNumber": "A101",
+  "revitSheetName": "General Arrangement",
+  "acadLayoutName": null,
+  "rawPanelMark": "P12",
+  "rawDrawingCode": "A101",
+  "source": "addins",
+  "sentAtUtc": "2026-02-01T01:23:45Z"
+}
+
+
+Agent responds 200 OK.
+
+Security note
+
+Localhost only. No remote listening. No screen capture.
+
+11.2 Revit Add-in (C# .NET) — skeleton + required hooks
+Target
+
+Revit versions you use (e.g., 2022/2023/2024). Build per version if required.
+
+.NET Framework version depends on Revit version (commonly .NET Framework 4.8 for modern Revit).
+
+Required events
+
+UIApplication.ViewActivated
+
+UIApplication.DocumentOpened
+
+UIApplication.DocumentActivated
+
+Required extraction
+
+Document full path: doc.PathName
+
+Active view: uiapp.ActiveUIDocument.ActiveView
+
+If ActiveView is ViewSheet:
+
+((ViewSheet)ActiveView).SheetNumber
+
+((ViewSheet)ActiveView).Name
+
+Send to agent
+
+HTTP POST to http://127.0.0.1:48123/context
+
+Deployment files
+
+Addin DLL compiled
+
+.addin manifest placed in:
+
+%AppData%\Autodesk\Revit\Addins\20XX\YourAddin.addin
+
+Example .addin manifest:
+
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>LTE Time Tracker</Name>
+    <Assembly>C:\LTE\Addins\Revit\LTETwitterTracker.dll</Assembly>
+    <AddInId>8D83C886-B739-4ACD-A9DB-2B5A9E0F1234</AddInId>
+    <FullClassName>LTETwitterTracker.App</FullClassName>
+    <VendorId>LTE</VendorId>
+    <VendorDescription>LTE Drafting Time Capture</VendorDescription>
+  </AddIn>
+</RevitAddIns>
+
+UI (consent/visibility)
+
+Add a small ribbon panel:
+
+Shows status: “Connected to Agent ✅ / Not Connected ❌”
+
+Button: “Open Tracker Settings” (shows user email and portal URL)
+
+11.3 AutoCAD Add-in (C#) — skeleton + required hooks
+Target
+
+AutoCAD .NET API version matching your AutoCAD release.
+
+Required events
+
+Document activated:
+
+Application.DocumentManager.DocumentActivated
+
+Layout switched:
+
+subscribe to layout manager events (or detect active layout in a timer if event handling is messy)
+
+Required extraction
+
+DWG full path:
+
+doc.Name (often full path)
+
+Active layout/tab name:
+
+LayoutManager.Current.CurrentLayout
+
+Deployment
+
+Either:
+
+Bundle + autoload via AutoCAD startup suite, or
+
+Install with .bundle (recommended)
+
+Basic bundle structure:
+
+LTETwitterTracker.bundle/
+  PackageContents.xml
+  Contents/
+    LTETwitterTracker.dll
+
+
+PackageContents.xml references supported AutoCAD versions and loads the DLL.
+
+UI (consent/visibility)
+
+Provide an AutoCAD command:
+
+LTETRACKERSTATUS
+
+shows “Connected to Agent” and current file/layout
+
+12) Reporting definitions (what must be possible)
+
+Must be able to report:
+
+By Project
+
+By DrawingCode (sheet number / layout)
+
+By PanelMark
+
+By User
+
+Week/Month totals
+
+Excluding idle minutes
+
+Show confidence/coverage:
+
+minutes missing panel mark
+
+minutes missing project
+
+13) Implementation order (so it actually works fast)
+
+Prisma schema + migrations
+
+NextAuth login + RBAC
+
+Admin: users + roles + device provisioning (generate keys)
+
+Agent ingest endpoint with Zod + upsert idempotency
+
+Daily reports UI (list + detail edit + submit)
+
+Manager review UI (approve/reject)
+
+Windows agent skeleton + local listener + POST batching
+
+Revit add-in (view/sheet detection) → verify portal receives context
+
+AutoCAD add-in (doc/layout detection)
+
+Merge endpoint + reporting screens
+
+14) What “done” looks like (acceptance tests)
+
+Agent posts same block twice → portal creates one row only (sourceEventId unique).
+
+Revit switching sheets creates rows showing correct SheetNumber/SheetName.
+
+AutoCAD switching layouts shows correct layoutName.
+
+Idle > threshold produces idle blocks (durationMin 0, idleMin interval) and totals exclude them.
+
+User edits panelMark; rawPanelMark remains unchanged; diff visible to manager.
+
+Submit → status SUBMITTED; manager approves → APPROVED; reports reflect totals.
+
+If you want the final polish that makes this “feel premium”
+
+Add:
+
+A timeline view per day (like a calendar strip)
+
+“Missing data” pill badges (Project missing / PanelMark missing)
+
+Keyboard-first editing (tab to next cell)
+
+Bulk apply: “Set Project for selected rows”
