@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -14,7 +14,12 @@ import {
   Truck,
   Package,
   Timer,
+  FileDown,
+  Loader2,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import lteLogo from "@/assets/lte-logo.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -126,6 +131,8 @@ const COLORS = [
 export default function ReportsPage() {
   const [period, setPeriod] = useState("week");
   const [activeTab, setActiveTab] = useState("overview");
+  const [isExporting, setIsExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: report, isLoading } = useQuery<ReportData>({
     queryKey: ["/api/reports", { period }],
@@ -182,6 +189,111 @@ export default function ReportsPage() {
 
   const formatHours = (minutes: number) => {
     return (minutes / 60).toFixed(1);
+  };
+
+  const getPeriodLabel = () => {
+    switch (period) {
+      case "week": return "Last 7 Days";
+      case "month": return "Last 30 Days";
+      case "quarter": return "Last 90 Days";
+      default: return period;
+    }
+  };
+
+  const exportToPDF = async () => {
+    if (!reportRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 1200,
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const headerHeight = 35;
+      const margin = 10;
+      const footerHeight = 12;
+      const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
+      const usableWidth = pdfWidth - (margin * 2);
+      
+      // Draw header background
+      pdf.setFillColor(30, 64, 175);
+      pdf.rect(0, 0, pdfWidth, 28, "F");
+      
+      // Add logo
+      const logoSize = 18;
+      try {
+        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+      } catch (e) {
+        // Logo load failed, continue without it
+      }
+      
+      // Header text
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      const reportTitle = activeTab === "logistics" ? "LTE Logistics Report" : "LTE Analytics Report";
+      pdf.text(reportTitle, margin + logoSize + 8, 14);
+      
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`${getPeriodLabel()}`, margin + logoSize + 8, 21);
+      
+      // Generated date on right
+      pdf.setFontSize(9);
+      pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      
+      // Reset text color for content
+      pdf.setTextColor(0, 0, 0);
+      
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      const imgRatio = imgWidth / imgHeight;
+      let scaledWidth = usableWidth;
+      let scaledHeight = scaledWidth / imgRatio;
+      
+      if (scaledHeight > usableHeight) {
+        scaledHeight = usableHeight;
+        scaledWidth = scaledHeight * imgRatio;
+      }
+      
+      // Center the content
+      const imgX = (pdfWidth - scaledWidth) / 2;
+      pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
+      
+      // Footer
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
+      
+      const fileName = activeTab === "logistics" 
+        ? `LTE-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`
+        : `LTE-Analytics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      pdf.save(fileName);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const formatDate = (dateStr: string) => {
@@ -242,9 +354,17 @@ export default function ReportsPage() {
               <SelectItem value="year">This Year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" data-testid="button-export">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+          <Button 
+            onClick={exportToPDF} 
+            disabled={isExporting || isLoading}
+            data-testid="button-export-pdf"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4 mr-2" />
+            )}
+            Export PDF
           </Button>
         </div>
       </div>
@@ -342,8 +462,9 @@ export default function ReportsPage() {
         </Card>
       </div>
 
+      <div ref={reportRef}>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex">
+        <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-flex print:hidden">
           <TabsTrigger value="overview" data-testid="tab-overview">Overview</TabsTrigger>
           <TabsTrigger value="resources" data-testid="tab-resources">By Resource</TabsTrigger>
           <TabsTrigger value="sheets" data-testid="tab-sheets">By Sheet</TabsTrigger>
@@ -926,6 +1047,7 @@ export default function ReportsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

@@ -44,6 +44,7 @@ import {
 } from "recharts";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
+import lteLogo from "@/assets/lte-logo.png";
 
 interface ProductionDailyData {
   date: string;
@@ -357,7 +358,7 @@ export default function KPIDashboardPage() {
     setIsExporting(true);
     try {
       const canvas = await html2canvas(reportRef.current, {
-        scale: 1.5,
+        scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
@@ -373,10 +374,40 @@ export default function KPIDashboardPage() {
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const headerHeight = 25;
-      const margin = 5;
-      const usableHeight = pdfHeight - headerHeight - margin;
+      const headerHeight = 35;
+      const margin = 10;
+      const footerHeight = 12;
+      const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
       const usableWidth = pdfWidth - (margin * 2);
+      
+      // Draw header background
+      pdf.setFillColor(30, 64, 175); // Blue header
+      pdf.rect(0, 0, pdfWidth, 28, "F");
+      
+      // Add logo
+      const logoSize = 18;
+      try {
+        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+      } catch (e) {
+        // Logo load failed, continue without it
+      }
+      
+      // Header text
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("LTE Performance Report", margin + logoSize + 8, 14);
+      
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`${getPeriodLabel()}`, margin + logoSize + 8, 21);
+      
+      // Generated date on right
+      pdf.setFontSize(9);
+      pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      
+      // Reset text color for content
+      pdf.setTextColor(0, 0, 0);
       
       const imgWidth = canvas.width;
       const imgHeight = canvas.height;
@@ -390,32 +421,20 @@ export default function KPIDashboardPage() {
         scaledWidth = scaledHeight * imgRatio;
       }
       
-      const totalPages = Math.ceil((scaledHeight * imgHeight / canvas.height) / usableHeight);
-      const pageImgHeight = (usableHeight / scaledHeight) * imgHeight;
+      // Center the content
+      const imgX = (pdfWidth - scaledWidth) / 2;
+      pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
       
-      pdf.setFontSize(14);
-      pdf.text("LTE Performance Report", pdfWidth / 2, 8, { align: "center" });
-      pdf.setFontSize(9);
-      pdf.text(`Period: ${getPeriodLabel()} | Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth / 2, 14, { align: "center" });
+      // Footer
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
       
-      if (scaledHeight <= usableHeight) {
-        const imgX = (pdfWidth - scaledWidth) / 2;
-        pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
-      } else {
-        const fitToPageRatio = usableWidth / imgWidth;
-        const fitHeight = imgHeight * fitToPageRatio;
-        
-        if (fitHeight > usableHeight) {
-          const finalRatio = Math.min(usableWidth / imgWidth, usableHeight / imgHeight);
-          const finalWidth = imgWidth * finalRatio;
-          const finalHeight = imgHeight * finalRatio;
-          const imgX = (pdfWidth - finalWidth) / 2;
-          pdf.addImage(imgData, "PNG", imgX, headerHeight, finalWidth, finalHeight);
-        } else {
-          const imgX = (pdfWidth - imgWidth * fitToPageRatio) / 2;
-          pdf.addImage(imgData, "PNG", imgX, headerHeight, usableWidth, fitHeight);
-        }
-      }
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
       pdf.save(`LTE-Performance-Report-${startDate}-${endDate}.pdf`);
     } catch (error) {
