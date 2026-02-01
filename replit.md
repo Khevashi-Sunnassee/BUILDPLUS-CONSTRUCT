@@ -1,7 +1,7 @@
 # LTE Performance Management System
 
 ## Overview
-A comprehensive performance management system (formerly time tracking portal) for CAD + Revit time management with standalone authentication (email/password), RBAC roles (USER, MANAGER, ADMIN), Windows Agent API ingestion, daily log management, manager approval workflow, reporting/analytics, complete admin provisioning system, Jobs/Panel Register management for tracking work against specific panels, Production Report tracking with unified panel IDs, and a KPI Dashboard with selectable date periods, visual charts, and PDF export for daily performance reporting.
+A comprehensive performance management system (formerly time tracking portal) for CAD + Revit time management with standalone authentication (email/password), RBAC roles (USER, MANAGER, ADMIN), Windows Agent API ingestion, daily log management, manager approval workflow, reporting/analytics, complete admin provisioning system, Jobs/Panel Register management for tracking work against specific panels, Production Report tracking with unified panel IDs, KPI Dashboard with selectable date periods, visual charts, and PDF export for daily performance reporting, and a complete Logistics system for load list creation, panel selection, and delivery tracking with driver times and truck information.
 
 ## Demo Accounts
 - **Admin**: admin@lte.com.au / admin123
@@ -26,6 +26,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
 - **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
+- **Logistics System**: Create load lists by selecting approved panels, assign trailer types (Layover, A-Frame), track delivery records with truck rego, driver name, and departure/arrival times. Load lists auto-complete when delivery is recorded.
 
 ## Tech Stack
 - **Frontend**: React + Vite, TanStack Query, Wouter, shadcn/ui, Tailwind CSS
@@ -54,6 +55,7 @@ client/
       manual-entry.tsx    - Manual time entry form
       production-report.tsx - Production tracking with volume/area and cost calculations
       kpi-dashboard.tsx   - KPI Dashboard with charts and PDF export
+      logistics.tsx       - Load list management and delivery tracking
     components/
       layout/sidebar.tsx  - App sidebar
       theme-toggle.tsx    - Dark mode toggle
@@ -79,8 +81,12 @@ shared/
 - **logRows**: Individual time blocks with CAD/Revit metadata, linked to jobs/panels
 - **approvalEvents**: Approval history trail
 - **globalSettings**: System-wide config (timezone, capture interval)
-- **jobs**: Job metadata (jobNumber, name, client, address, status)
-- **panelRegister**: Panel tracking (jobId, panelMark, panelType, estimatedHours, actualHours, status, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelArea, day28Fc, liftFcm, productionPdfUrl, approvedForProduction, approvedAt, approvedById)
+- **jobs**: Job metadata (jobNumber, name, client, address, status, siteContact, siteContactPhone)
+- **panelRegister**: Panel tracking (jobId, panelMark, panelType, estimatedHours, actualHours, status, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelArea, day28Fc, liftFcm, rotationalLifters, primaryLifters, productionPdfUrl, approvedForProduction, approvedAt, approvedById)
+- **trailerTypes**: Trailer type configuration (code, name, description, sortOrder, isActive) - LAYOVER, A_FRAME
+- **loadLists**: Load list containers (jobId, trailerTypeId, docketNumber, scheduledDate, notes, status, createdById)
+- **loadListPanels**: Junction table linking panels to load lists with sequence ordering
+- **deliveryRecords**: Delivery tracking (loadListId, truckRego, driverName, departedFactoryAt, arrivedSiteAt, departedSiteAt, notes, enteredById)
 - **productionEntries**: Production work entries (panelId, jobId, userId, productionDate, volumeM3, areaM2)
 - **panelTypes**: Configurable panel types with rates (code, name, labourCostPerM2/M3, supplyCostPerM2/M3, sellRatePerM2/M3)
 - **projectPanelRates**: Project-level rate overrides for specific panel types
@@ -169,6 +175,23 @@ shared/
 - POST /api/admin/work-types - Create work type
 - PUT /api/admin/work-types/:id - Update work type
 - DELETE /api/admin/work-types/:id - Delete work type
+
+### Logistics Routes
+- GET /api/trailer-types - List active trailer types (for dropdowns)
+- GET /api/admin/trailer-types - List all trailer types (admin)
+- POST /api/admin/trailer-types - Create trailer type
+- PUT /api/admin/trailer-types/:id - Update trailer type
+- DELETE /api/admin/trailer-types/:id - Delete trailer type
+- GET /api/load-lists - List all load lists with full details
+- GET /api/load-lists/:id - Get load list with panels and delivery record
+- POST /api/load-lists - Create load list with panel assignments
+- PUT /api/load-lists/:id - Update load list
+- DELETE /api/load-lists/:id - Delete load list (ADMIN/MANAGER only)
+- POST /api/load-lists/:id/panels - Add panel to load list
+- DELETE /api/load-lists/:id/panels/:panelId - Remove panel from load list
+- GET /api/load-lists/:id/delivery - Get delivery record for load list
+- POST /api/load-lists/:id/delivery - Create delivery record (auto-completes load list)
+- PUT /api/delivery-records/:id - Update delivery record
 
 ### Agent API
 - POST /api/agent/ingest - Windows Agent time block ingestion
