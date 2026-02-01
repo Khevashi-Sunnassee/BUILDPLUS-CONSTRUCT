@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,6 +21,9 @@ import {
   Clock as ClockIcon,
   AlertCircle,
   Pause,
+  Layers,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +31,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -106,6 +111,9 @@ export default function AdminPanelsPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [selectedJobForImport, setSelectedJobForImport] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [jobFilter, setJobFilter] = useState<string>("all");
+  const [groupByJob, setGroupByJob] = useState<boolean>(true);
+  const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: panels, isLoading: panelsLoading } = useQuery<PanelWithJob[]>({
@@ -122,9 +130,32 @@ export default function AdminPanelsPage() {
 
   const filteredPanels = panels?.filter(panel => {
     if (filterJobId && panel.jobId !== filterJobId) return false;
+    if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
     return true;
   });
+
+  // Group panels by job for grouped view
+  const panelsByJob = filteredPanels?.reduce((acc, panel) => {
+    const jobId = panel.jobId;
+    if (!acc[jobId]) {
+      acc[jobId] = { job: panel.job, panels: [] };
+    }
+    acc[jobId].panels.push(panel);
+    return acc;
+  }, {} as Record<string, { job: Job; panels: PanelWithJob[] }>) || {};
+
+  const toggleJobCollapse = (jobId: string) => {
+    setCollapsedJobs(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) {
+        next.delete(jobId);
+      } else {
+        next.add(jobId);
+      }
+      return next;
+    });
+  };
 
   const currentJob = jobs?.find(j => j.id === filterJobId);
 
@@ -409,20 +440,48 @@ export default function AdminPanelsPage() {
                 {filteredPanels?.length || 0} panels {statusFilter !== "all" && `(${statusFilter.replace("_", " ")})`}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="NOT_STARTED">Not Started</SelectItem>
-                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                  <SelectItem value="ON_HOLD">On Hold</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Switch 
+                  id="group-by-job" 
+                  checked={groupByJob} 
+                  onCheckedChange={setGroupByJob}
+                  data-testid="switch-group-by-job"
+                />
+                <Label htmlFor="group-by-job" className="text-sm cursor-pointer">
+                  Group by Job
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                {!filterJobId && (
+                  <Select value={jobFilter} onValueChange={setJobFilter}>
+                    <SelectTrigger className="w-[180px]" data-testid="select-job-filter">
+                      <SelectValue placeholder="All Jobs" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Jobs</SelectItem>
+                      {jobs?.filter(j => j.status === "ACTIVE").map(job => (
+                        <SelectItem key={job.id} value={job.id}>
+                          {job.jobNumber} - {job.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="NOT_STARTED">Not Started</SelectItem>
+                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                    <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -430,7 +489,7 @@ export default function AdminPanelsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                {!filterJobId && <TableHead>Job</TableHead>}
+                {!filterJobId && !groupByJob && <TableHead>Job</TableHead>}
                 <TableHead>Panel Mark</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
@@ -441,76 +500,179 @@ export default function AdminPanelsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPanels?.map((panel) => (
-                <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
-                  {!filterJobId && (
-                    <TableCell>
-                      <span className="font-mono text-sm">{panel.job.jobNumber}</span>
+              {groupByJob && !filterJobId ? (
+                // Grouped by job view
+                Object.entries(panelsByJob).length > 0 ? (
+                  Object.entries(panelsByJob).map(([jobId, { job, panels: jobPanels }]) => {
+                    const isCollapsed = collapsedJobs.has(jobId);
+                    return (
+                      <Fragment key={jobId}>
+                        <TableRow 
+                          className="bg-muted/50 hover:bg-muted cursor-pointer"
+                          onClick={() => toggleJobCollapse(jobId)}
+                          data-testid={`row-job-group-${jobId}`}
+                        >
+                          <TableCell colSpan={7}>
+                            <div className="flex items-center gap-2">
+                              {isCollapsed ? (
+                                <ChevronRight className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                              <Layers className="h-4 w-4 text-primary" />
+                              <span className="font-semibold">{job.jobNumber}</span>
+                              <span className="text-muted-foreground">- {job.name}</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {jobPanels.length} panel{jobPanels.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {!isCollapsed && jobPanels.map((panel) => (
+                          <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-2 pl-6">
+                                <Hash className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-mono font-medium">{panel.panelMark}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
+                            </TableCell>
+                            <TableCell>{panel.description || "-"}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
+                                {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
+                                {!panel.drawingCode && !panel.sheetNumber && "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(panel.status)}</TableCell>
+                            <TableCell>
+                              {panel.estimatedHours ? (
+                                <div className="space-y-1 w-24">
+                                  <Progress value={getProgress(panel) || 0} className="h-2" />
+                                  <div className="text-xs text-muted-foreground">
+                                    {panel.actualHours || 0} / {panel.estimatedHours}h
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {panel.actualHours || 0}h logged
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); openEditDialog(panel); }}
+                                  data-testid={`button-edit-panel-${panel.id}`}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingPanelId(panel.id);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  data-testid={`button-delete-panel-${panel.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </Fragment>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      No panels found. Add a panel or import from Excel.
                     </TableCell>
-                  )}
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Hash className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-mono font-medium">{panel.panelMark}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
-                  </TableCell>
-                  <TableCell>{panel.description || "-"}</TableCell>
-                  <TableCell>
-                    <div className="text-sm">
-                      {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
-                      {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
-                      {!panel.drawingCode && !panel.sheetNumber && "-"}
-                    </div>
-                  </TableCell>
-                  <TableCell>{getStatusBadge(panel.status)}</TableCell>
-                  <TableCell>
-                    {panel.estimatedHours ? (
-                      <div className="space-y-1 w-24">
-                        <Progress value={getProgress(panel) || 0} className="h-2" />
-                        <div className="text-xs text-muted-foreground">
-                          {panel.actualHours || 0} / {panel.estimatedHours}h
+                  </TableRow>
+                )
+              ) : (
+                // Flat list view
+                <>
+                  {filteredPanels?.map((panel) => (
+                    <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                      {!filterJobId && (
+                        <TableCell>
+                          <span className="font-mono text-sm">{panel.job.jobNumber}</span>
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Hash className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-mono font-medium">{panel.panelMark}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">
-                        {panel.actualHours || 0}h logged
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(panel)}
-                        data-testid={`button-edit-panel-${panel.id}`}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setDeletingPanelId(panel.id);
-                          setDeleteDialogOpen(true);
-                        }}
-                        data-testid={`button-delete-panel-${panel.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {(!filteredPanels || filteredPanels.length === 0) && (
-                <TableRow>
-                  <TableCell colSpan={filterJobId ? 7 : 8} className="text-center py-8 text-muted-foreground">
-                    No panels found. Add a panel or import from Excel.
-                  </TableCell>
-                </TableRow>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
+                      </TableCell>
+                      <TableCell>{panel.description || "-"}</TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
+                          {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
+                          {!panel.drawingCode && !panel.sheetNumber && "-"}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(panel.status)}</TableCell>
+                      <TableCell>
+                        {panel.estimatedHours ? (
+                          <div className="space-y-1 w-24">
+                            <Progress value={getProgress(panel) || 0} className="h-2" />
+                            <div className="text-xs text-muted-foreground">
+                              {panel.actualHours || 0} / {panel.estimatedHours}h
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">
+                            {panel.actualHours || 0}h logged
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(panel)}
+                            data-testid={`button-edit-panel-${panel.id}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setDeletingPanelId(panel.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-panel-${panel.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {(!filteredPanels || filteredPanels.length === 0) && (
+                    <TableRow>
+                      <TableCell colSpan={filterJobId ? 7 : 8} className="text-center py-8 text-muted-foreground">
+                        No panels found. Add a panel or import from Excel.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               )}
             </TableBody>
           </Table>
