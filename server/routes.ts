@@ -995,6 +995,10 @@ export async function registerRoutes(
     const allProjects = await storage.getAllProjects();
     const projectsMap = new Map(allProjects.filter(p => projectIds.has(p.id)).map(p => [p.id, p]));
     
+    // Fetch work types for mapping
+    const allWorkTypes = await storage.getActiveWorkTypes();
+    const workTypesMap = new Map(allWorkTypes.map(wt => [wt.id, wt]));
+    
     // Aggregate by date
     const dailyData = new Map<string, {
       date: string;
@@ -1004,6 +1008,8 @@ export async function registerRoutes(
       byUser: Map<string, { name: string; minutes: number; idle: number }>;
       byApp: Map<string, number>;
       byProject: Map<string, { name: string; minutes: number }>;
+      byWorkType: Map<number | string, { name: string; code: string; minutes: number }>;
+      byPanel: Map<string, { panelMark: string; minutes: number; projectName: string }>;
     }>();
     
     for (const { log, user, rows } of logsWithRows) {
@@ -1017,6 +1023,8 @@ export async function registerRoutes(
           byUser: new Map(),
           byApp: new Map(),
           byProject: new Map(),
+          byWorkType: new Map(),
+          byPanel: new Map(),
         });
       }
       const day = dailyData.get(date)!;
@@ -1049,6 +1057,32 @@ export async function registerRoutes(
             day.byProject.get(project.id)!.minutes += row.durationMin;
           }
         }
+        
+        // By work type
+        const workTypeKey = row.workTypeId || "unassigned";
+        if (!day.byWorkType.has(workTypeKey)) {
+          const wt = row.workTypeId ? workTypesMap.get(row.workTypeId) : null;
+          day.byWorkType.set(workTypeKey, {
+            name: wt?.name || "Unassigned",
+            code: wt?.code || "UNASSIGNED",
+            minutes: 0,
+          });
+        }
+        day.byWorkType.get(workTypeKey)!.minutes += row.durationMin;
+        
+        // By panel mark
+        if (row.panelMark) {
+          const panelKey = row.panelMark;
+          if (!day.byPanel.has(panelKey)) {
+            const project = row.projectId ? projectsMap.get(row.projectId) : null;
+            day.byPanel.set(panelKey, {
+              panelMark: row.panelMark,
+              minutes: 0,
+              projectName: project?.name || "Unknown",
+            });
+          }
+          day.byPanel.get(panelKey)!.minutes += row.durationMin;
+        }
       }
     }
     
@@ -1064,16 +1098,71 @@ export async function registerRoutes(
         byUser: Object.fromEntries(d.byUser),
         byApp: Object.fromEntries(d.byApp),
         byProject: Object.fromEntries(d.byProject),
+        byWorkType: Object.fromEntries(d.byWorkType),
+        byPanel: Object.fromEntries(d.byPanel),
       }))
       .sort((a, b) => a.date.localeCompare(b.date));
     
+    // Aggregate work type totals across all days
+    const workTypeTotals = new Map<string, { name: string; code: string; minutes: number }>();
+    const panelTotals = new Map<string, { panelMark: string; minutes: number; projectName: string }>();
+    
+    for (const day of result) {
+      for (const [key, wt] of Object.entries(day.byWorkType) as [string, any][]) {
+        if (!workTypeTotals.has(key)) {
+          workTypeTotals.set(key, { name: wt.name, code: wt.code, minutes: 0 });
+        }
+        workTypeTotals.get(key)!.minutes += wt.minutes;
+      }
+      for (const [key, panel] of Object.entries(day.byPanel) as [string, any][]) {
+        if (!panelTotals.has(key)) {
+          panelTotals.set(key, { panelMark: panel.panelMark, minutes: 0, projectName: panel.projectName });
+        }
+        panelTotals.get(key)!.minutes += panel.minutes;
+      }
+    }
+    
+    // Calculate rework metrics
+    const reworkMinutes = Array.from(workTypeTotals.values())
+      .filter(wt => wt.code === "ERROR_REWORK")
+      .reduce((sum, wt) => sum + wt.minutes, 0);
+    const clientChangeMinutes = Array.from(workTypeTotals.values())
+      .filter(wt => wt.code === "CLIENT_CHANGE")
+      .reduce((sum, wt) => sum + wt.minutes, 0);
+    const generalMinutes = Array.from(workTypeTotals.values())
+      .filter(wt => wt.code === "GENERAL")
+      .reduce((sum, wt) => sum + wt.minutes, 0);
+    const unassignedMinutes = Array.from(workTypeTotals.values())
+      .filter(wt => wt.code === "UNASSIGNED")
+      .reduce((sum, wt) => sum + wt.minutes, 0);
+    
+    const totalMinutesAll = result.reduce((sum, d) => sum + d.totalMinutes, 0);
+    const assignedMinutes = totalMinutesAll - unassignedMinutes;
+    
     // Calculate totals
     const totals = {
-      totalMinutes: result.reduce((sum, d) => sum + d.totalMinutes, 0),
+      totalMinutes: totalMinutesAll,
       idleMinutes: result.reduce((sum, d) => sum + d.idleMinutes, 0),
       activeMinutes: result.reduce((sum, d) => sum + d.activeMinutes, 0),
-      totalHours: Math.round(result.reduce((sum, d) => sum + d.totalMinutes, 0) / 60 * 100) / 100,
+      totalHours: Math.round(totalMinutesAll / 60 * 100) / 100,
       activeHours: Math.round(result.reduce((sum, d) => sum + d.activeMinutes, 0) / 60 * 100) / 100,
+      reworkHours: Math.round(reworkMinutes / 60 * 100) / 100,
+      reworkPercentage: assignedMinutes > 0 ? Math.round((reworkMinutes / assignedMinutes) * 100 * 10) / 10 : 0,
+      clientChangeHours: Math.round(clientChangeMinutes / 60 * 100) / 100,
+      clientChangePercentage: assignedMinutes > 0 ? Math.round((clientChangeMinutes / assignedMinutes) * 100 * 10) / 10 : 0,
+      generalHours: Math.round(generalMinutes / 60 * 100) / 100,
+      generalPercentage: assignedMinutes > 0 ? Math.round((generalMinutes / assignedMinutes) * 100 * 10) / 10 : 0,
+      unassignedHours: Math.round(unassignedMinutes / 60 * 100) / 100,
+      byWorkType: Array.from(workTypeTotals.values()).map(wt => ({
+        ...wt,
+        hours: Math.round(wt.minutes / 60 * 100) / 100,
+        percentage: wt.code === 'UNASSIGNED' 
+          ? (totalMinutesAll > 0 ? Math.round((wt.minutes / totalMinutesAll) * 100 * 10) / 10 : 0)
+          : (assignedMinutes > 0 ? Math.round((wt.minutes / assignedMinutes) * 100 * 10) / 10 : 0),
+      })),
+      byPanel: Array.from(panelTotals.values())
+        .map(p => ({ ...p, hours: Math.round(p.minutes / 60 * 100) / 100 }))
+        .sort((a, b) => b.minutes - a.minutes),
     };
     
     res.json({

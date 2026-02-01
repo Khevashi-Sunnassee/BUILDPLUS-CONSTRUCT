@@ -38,6 +38,9 @@ import {
   Legend,
   ComposedChart,
   Line,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -73,6 +76,8 @@ interface DraftingDailyData {
   byUser: Record<string, { name: string; minutes: number; idle: number }>;
   byApp: Record<string, number>;
   byProject: Record<string, { name: string; minutes: number }>;
+  byWorkType: Record<string, { name: string; code: string; minutes: number }>;
+  byPanel: Record<string, { panelMark: string; minutes: number; projectName: string }>;
 }
 
 interface ProductionReportResponse {
@@ -110,6 +115,15 @@ interface DraftingReportResponse {
     activeMinutes: number;
     totalHours: number;
     activeHours: number;
+    reworkHours: number;
+    reworkPercentage: number;
+    clientChangeHours: number;
+    clientChangePercentage: number;
+    generalHours: number;
+    generalPercentage: number;
+    unassignedHours: number;
+    byWorkType: Array<{ name: string; code: string; minutes: number; hours: number; percentage: number }>;
+    byPanel: Array<{ panelMark: string; minutes: number; hours: number; projectName: string }>;
   };
   period: { startDate: string; endDate: string };
 }
@@ -132,6 +146,13 @@ const PANEL_TYPE_COLORS: Record<string, string> = {
   "WALL": "#76b7b2",
   "COLUMN": "#59a14f",
   "OTHER": "#9c755f",
+};
+
+const WORK_TYPE_COLORS: Record<string, string> = {
+  "GENERAL": "#4e79a7",
+  "CLIENT_CHANGE": "#f28e2c",
+  "ERROR_REWORK": "#e15759",
+  "UNASSIGNED": "#bab0ab",
 };
 
 export default function KPIDashboardPage() {
@@ -744,6 +765,144 @@ export default function KPIDashboardPage() {
                       ? ((draftingData.totals.activeMinutes / draftingData.totals.totalMinutes) * 100).toFixed(1)
                       : "0"}%
                   </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Work Type Analysis Section */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">General Drafting</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold text-blue-600" data-testid="text-general-hours">
+                    {draftingData?.totals?.generalHours?.toFixed(1) || "0"} hrs
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {draftingData?.totals?.generalPercentage || 0}% of assigned
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Client Changes</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold text-orange-500" data-testid="text-client-change-hours">
+                    {draftingData?.totals?.clientChangeHours?.toFixed(1) || "0"} hrs
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {draftingData?.totals?.clientChangePercentage || 0}% of assigned
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-red-200 dark:border-red-900">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    Rework/Errors
+                    <Badge variant="destructive" className="text-xs">Track This</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold text-red-600" data-testid="text-rework-hours">
+                    {draftingData?.totals?.reworkHours?.toFixed(1) || "0"} hrs
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {draftingData?.totals?.reworkPercentage || 0}% of assigned
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Unassigned</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-xl font-bold text-gray-500" data-testid="text-unassigned-hours">
+                    {draftingData?.totals?.unassignedHours?.toFixed(1) || "0"} hrs
+                  </div>
+                  <p className="text-xs text-muted-foreground">Not categorized</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Work Type Distribution and Panel Time */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Work Type Distribution</CardTitle>
+                  <CardDescription>Time breakdown by drafting activity type</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {draftingData?.totals?.byWorkType && draftingData.totals.byWorkType.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={draftingData.totals.byWorkType
+                            .filter(wt => wt.code !== 'UNASSIGNED')
+                            .map(wt => ({
+                              name: wt.name,
+                              value: wt.hours,
+                              code: wt.code,
+                            }))}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                          outerRadius={100}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {draftingData.totals.byWorkType
+                            .filter(wt => wt.code !== 'UNASSIGNED')
+                            .map((wt, index) => (
+                              <Cell key={`cell-${index}`} fill={WORK_TYPE_COLORS[wt.code] || CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <Tooltip formatter={(value: number) => [`${value.toFixed(1)} hrs`, "Hours"]} />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No work type data available
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Time by Panel</CardTitle>
+                  <CardDescription>Hours spent on each panel mark (top 10)</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {draftingData?.totals?.byPanel && draftingData.totals.byPanel.length > 0 ? (
+                    <div className="overflow-auto max-h-[300px]">
+                      <table className="w-full text-sm">
+                        <thead className="sticky top-0 bg-background">
+                          <tr className="border-b">
+                            <th className="text-left py-2 font-medium">Panel Mark</th>
+                            <th className="text-left py-2 font-medium">Project</th>
+                            <th className="text-right py-2 font-medium">Hours</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {draftingData.totals.byPanel.slice(0, 10).map((panel, index) => (
+                            <tr key={index} className="border-b">
+                              <td className="py-2 font-mono">{panel.panelMark}</td>
+                              <td className="py-2 text-muted-foreground">{panel.projectName}</td>
+                              <td className="py-2 text-right font-medium">{panel.hours.toFixed(1)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                      No panel data available
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
