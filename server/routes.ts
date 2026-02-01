@@ -2,8 +2,9 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage, sha256Hex } from "./storage";
-import { loginSchema, agentIngestSchema } from "@shared/schema";
+import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema } from "@shared/schema";
 import { z } from "zod";
+import * as XLSX from "xlsx";
 
 declare module "express-session" {
   interface SessionData {
@@ -394,6 +395,140 @@ export async function registerRoutes(
   app.delete("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     await storage.deleteUser(req.params.id);
     res.json({ ok: true });
+  });
+
+  app.get("/api/admin/jobs", requireRole("ADMIN"), async (req, res) => {
+    const allJobs = await storage.getAllJobs();
+    res.json(allJobs);
+  });
+
+  app.get("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
+    const job = await storage.getJob(req.params.id);
+    if (!job) return res.status(404).json({ error: "Job not found" });
+    res.json(job);
+  });
+
+  app.post("/api/admin/jobs", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const existing = await storage.getJobByNumber(req.body.jobNumber);
+      if (existing) {
+        return res.status(400).json({ error: "Job with this number already exists" });
+      }
+      const job = await storage.createJob(req.body);
+      res.json(job);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create job" });
+    }
+  });
+
+  app.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
+    const job = await storage.updateJob(req.params.id, req.body);
+    res.json(job);
+  });
+
+  app.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
+    await storage.deleteJob(req.params.id);
+    res.json({ ok: true });
+  });
+
+  app.post("/api/admin/jobs/import", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { data } = req.body;
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ error: "Invalid import data" });
+      }
+      
+      const jobsToImport = data.map((row: any) => ({
+        jobNumber: String(row.jobNumber || row["Job Number"] || row.job_number || "").trim(),
+        name: String(row.name || row["Name"] || row["Job Name"] || "").trim(),
+        client: row.client || row["Client"] || null,
+        address: row.address || row["Address"] || null,
+        description: row.description || row["Description"] || null,
+        status: "ACTIVE" as const,
+      })).filter((j: any) => j.jobNumber && j.name);
+      
+      const result = await storage.importJobs(jobsToImport);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Import failed" });
+    }
+  });
+
+  app.get("/api/admin/panels", requireRole("ADMIN"), async (req, res) => {
+    const panels = await storage.getAllPanelRegisterItems();
+    res.json(panels);
+  });
+
+  app.get("/api/admin/panels/by-job/:jobId", requireRole("ADMIN"), async (req, res) => {
+    const panels = await storage.getPanelsByJob(req.params.jobId);
+    res.json(panels);
+  });
+
+  app.get("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
+    const panel = await storage.getPanelRegisterItem(req.params.id);
+    if (!panel) return res.status(404).json({ error: "Panel not found" });
+    res.json(panel);
+  });
+
+  app.post("/api/admin/panels", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const panel = await storage.createPanelRegisterItem(req.body);
+      res.json(panel);
+    } catch (error: any) {
+      if (error.message?.includes("duplicate")) {
+        return res.status(400).json({ error: "Panel with this mark already exists for this job" });
+      }
+      res.status(400).json({ error: error.message || "Failed to create panel" });
+    }
+  });
+
+  app.put("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
+    const panel = await storage.updatePanelRegisterItem(req.params.id, req.body);
+    res.json(panel);
+  });
+
+  app.delete("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
+    await storage.deletePanelRegisterItem(req.params.id);
+    res.json({ ok: true });
+  });
+
+  app.post("/api/admin/panels/import", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { data, jobId } = req.body;
+      if (!data || !Array.isArray(data) || !jobId) {
+        return res.status(400).json({ error: "Invalid import data or missing job ID" });
+      }
+      
+      const job = await storage.getJob(jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const panelsToImport = data.map((row: any) => ({
+        jobId,
+        panelMark: String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim(),
+        description: row.description || row["Description"] || null,
+        drawingCode: row.drawingCode || row["Drawing Code"] || row.drawing_code || null,
+        sheetNumber: row.sheetNumber || row["Sheet Number"] || row.sheet_number || null,
+        estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
+        status: "NOT_STARTED" as const,
+      })).filter((p: any) => p.panelMark);
+      
+      const result = await storage.importPanelRegister(panelsToImport);
+      res.json(result);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Import failed" });
+    }
+  });
+
+  app.get("/api/jobs", requireAuth, async (req, res) => {
+    const allJobs = await storage.getAllJobs();
+    res.json(allJobs.filter(j => j.status === "ACTIVE"));
+  });
+
+  app.get("/api/panels/by-job/:jobId", requireAuth, async (req, res) => {
+    const panels = await storage.getPanelsByJob(req.params.jobId);
+    res.json(panels);
   });
 
   app.post("/api/agent/ingest", async (req, res) => {
