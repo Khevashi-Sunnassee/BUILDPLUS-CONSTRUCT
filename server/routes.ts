@@ -1522,5 +1522,153 @@ export async function registerRoutes(
     });
   });
 
+  app.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const componentFilter = req.query.component as string | undefined;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate required" });
+    }
+    
+    const entries = await storage.getProductionEntriesInRange(startDate, endDate);
+    const allPanelTypes = await storage.getAllPanelTypes();
+    const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
+    
+    const normalizePanelType = (code: string | null): string => {
+      if (!code) return "OTHER";
+      if (panelTypesByCode.has(code)) return code;
+      for (const [configuredCode] of panelTypesByCode) {
+        if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
+      }
+      return code;
+    };
+    
+    const jobCostOverridesCache = new Map<string, any[]>();
+    const panelTypeCostComponentsCache = new Map<string, any[]>();
+    const projectRatesCache = new Map<string, Map<string, any>>();
+    
+    const getCostComponents = async (jobId: string, panelTypeCode: string) => {
+      const normalizedCode = normalizePanelType(panelTypeCode);
+      const panelType = panelTypesByCode.get(normalizedCode);
+      if (!panelType) return [];
+      
+      if (!jobCostOverridesCache.has(jobId)) {
+        jobCostOverridesCache.set(jobId, await storage.getJobCostOverrides(jobId));
+      }
+      const overrides = jobCostOverridesCache.get(jobId)!;
+      const jobOverrides = overrides.filter(o => o.panelTypeId === panelType.id);
+      
+      if (jobOverrides.length > 0) {
+        return jobOverrides.map(o => ({
+          name: o.componentName,
+          percentage: parseFloat(o.revisedPercentage || o.defaultPercentage),
+        }));
+      }
+      
+      if (!panelTypeCostComponentsCache.has(panelType.id)) {
+        panelTypeCostComponentsCache.set(panelType.id, await storage.getCostComponentsByPanelType(panelType.id));
+      }
+      const components = panelTypeCostComponentsCache.get(panelType.id)!;
+      return components.map(c => ({
+        name: c.name,
+        percentage: parseFloat(c.percentageOfRevenue),
+      }));
+    };
+    
+    const getRates = async (jobId: string, panelTypeCode: string) => {
+      const normalizedCode = normalizePanelType(panelTypeCode);
+      if (!projectRatesCache.has(jobId)) {
+        const job = await storage.getJob(jobId);
+        if (job?.projectId) {
+          const rates = await storage.getProjectPanelRates(job.projectId);
+          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
+        } else {
+          projectRatesCache.set(jobId, new Map());
+        }
+      }
+      const projectRates = projectRatesCache.get(jobId);
+      const projectRate = projectRates?.get(normalizedCode);
+      const defaultRate = panelTypesByCode.get(normalizedCode);
+      
+      return {
+        sellRatePerM2: parseFloat(projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
+        sellRatePerM3: parseFloat(projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
+      };
+    };
+    
+    const allComponentNames = new Set<string>();
+    const dailyData = new Map<string, { 
+      date: string; 
+      revenue: number; 
+      byComponent: Map<string, number>;
+      entryCount: number;
+    }>();
+    
+    for (const entry of entries) {
+      const date = entry.productionDate;
+      const panelType = normalizePanelType(entry.panel.panelType);
+      const rates = await getRates(entry.jobId, panelType);
+      const components = await getCostComponents(entry.jobId, panelType);
+      
+      const volumeM3 = parseFloat(entry.volumeM3 || "0");
+      const areaM2 = parseFloat(entry.areaM2 || "0");
+      const revenue = (volumeM3 * rates.sellRatePerM3) + (areaM2 * rates.sellRatePerM2);
+      
+      if (!dailyData.has(date)) {
+        dailyData.set(date, { date, revenue: 0, byComponent: new Map(), entryCount: 0 });
+      }
+      const day = dailyData.get(date)!;
+      day.revenue += revenue;
+      day.entryCount += 1;
+      
+      for (const comp of components) {
+        allComponentNames.add(comp.name);
+        const expectedCost = revenue * (comp.percentage / 100);
+        day.byComponent.set(comp.name, (day.byComponent.get(comp.name) || 0) + expectedCost);
+      }
+    }
+    
+    const componentNames = Array.from(allComponentNames).sort();
+    const result = Array.from(dailyData.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(d => {
+        const components: Record<string, number> = {};
+        let totalCost = 0;
+        for (const name of componentNames) {
+          const cost = Math.round((d.byComponent.get(name) || 0) * 100) / 100;
+          components[name] = cost;
+          totalCost += cost;
+        }
+        return {
+          date: d.date,
+          revenue: Math.round(d.revenue * 100) / 100,
+          totalCost: Math.round(totalCost * 100) / 100,
+          profit: Math.round((d.revenue - totalCost) * 100) / 100,
+          entryCount: d.entryCount,
+          ...components,
+        };
+      });
+    
+    const totals = {
+      revenue: Math.round(result.reduce((s, d) => s + d.revenue, 0) * 100) / 100,
+      totalCost: Math.round(result.reduce((s, d) => s + d.totalCost, 0) * 100) / 100,
+      profit: Math.round(result.reduce((s, d) => s + d.profit, 0) * 100) / 100,
+      entryCount: result.reduce((s, d) => s + d.entryCount, 0),
+      byComponent: componentNames.reduce((acc, name) => {
+        acc[name] = Math.round(result.reduce((s, d) => s + ((d as any)[name] || 0), 0) * 100) / 100;
+        return acc;
+      }, {} as Record<string, number>),
+    };
+    
+    res.json({
+      period: { startDate, endDate },
+      dailyData: result,
+      componentNames,
+      totals,
+      selectedComponent: componentFilter || null,
+    });
+  });
+
   return httpServer;
 }

@@ -142,6 +142,26 @@ interface CostAnalysisResponse {
   entryCount: number;
 }
 
+interface CostAnalysisDailyResponse {
+  period: { startDate: string; endDate: string };
+  dailyData: Array<{
+    date: string;
+    revenue: number;
+    totalCost: number;
+    profit: number;
+    entryCount: number;
+    [key: string]: number | string;
+  }>;
+  componentNames: string[];
+  totals: {
+    revenue: number;
+    totalCost: number;
+    profit: number;
+    entryCount: number;
+    byComponent: Record<string, number>;
+  };
+}
+
 const CHART_COLORS = [
   "hsl(217, 91%, 50%)",
   "hsl(142, 76%, 40%)",
@@ -175,6 +195,7 @@ export default function KPIDashboardPage() {
   const [customEndDate, setCustomEndDate] = useState("");
   const [activeTab, setActiveTab] = useState("production");
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedComponent, setSelectedComponent] = useState<string>("all");
   const reportRef = useRef<HTMLDivElement>(null);
 
   const getDateRange = () => {
@@ -236,6 +257,11 @@ export default function KPIDashboardPage() {
 
   const { data: costAnalysisData, isLoading: costAnalysisLoading } = useQuery<CostAnalysisResponse>({
     queryKey: ["/api/reports/cost-analysis", { startDate, endDate }],
+    enabled: !!startDate && !!endDate,
+  });
+
+  const { data: costDailyData, isLoading: costDailyLoading } = useQuery<CostAnalysisDailyResponse>({
+    queryKey: ["/api/reports/cost-analysis-daily", { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
@@ -960,58 +986,94 @@ export default function KPIDashboardPage() {
           </TabsContent>
 
           <TabsContent value="cost-analysis" className="space-y-6 mt-6">
+            <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
+              <CardHeader className="pb-2">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-xl flex items-center gap-2">
+                      <Layers className="h-5 w-5" />
+                      Cost Analysis Report
+                    </CardTitle>
+                    <CardDescription className="mt-1">
+                      Filter by cost component to see detailed daily breakdown
+                    </CardDescription>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Label htmlFor="component-filter" className="text-sm font-medium whitespace-nowrap">
+                      Filter by Component:
+                    </Label>
+                    <Select value={selectedComponent} onValueChange={setSelectedComponent}>
+                      <SelectTrigger className="w-[200px]" id="component-filter" data-testid="select-component-filter">
+                        <SelectValue placeholder="All Components" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Components</SelectItem>
+                        {costDailyData?.componentNames?.map(name => (
+                          <SelectItem key={name} value={name}>{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Revenue</CardTitle>
+                  <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Revenue</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {costAnalysisLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className="text-2xl font-bold" data-testid="text-cost-total-revenue">
+                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100" data-testid="text-cost-total-revenue">
                       ${costAnalysisData?.totalRevenue?.toLocaleString() ?? 0}
                     </div>
                   )}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200 dark:border-orange-800">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Expected Costs</CardTitle>
+                  <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                    {selectedComponent === "all" ? "Total Expected Costs" : `${selectedComponent} Costs`}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {costAnalysisLoading ? (
+                  {costAnalysisLoading || costDailyLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className="text-2xl font-bold text-destructive" data-testid="text-cost-expected-cost">
-                      ${costAnalysisData?.totalExpectedCost?.toLocaleString() ?? 0}
+                    <div className="text-2xl font-bold text-orange-900 dark:text-orange-100" data-testid="text-cost-expected-cost">
+                      ${selectedComponent === "all" 
+                        ? (costAnalysisData?.totalExpectedCost?.toLocaleString() ?? 0)
+                        : (costDailyData?.totals?.byComponent?.[selectedComponent]?.toLocaleString() ?? 0)}
                     </div>
                   )}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Expected Profit</CardTitle>
+                  <CardTitle className="text-sm font-medium text-green-700 dark:text-green-300">Expected Profit</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {costAnalysisLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className={`text-2xl font-bold ${(costAnalysisData?.expectedProfit ?? 0) >= 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-cost-expected-profit">
+                    <div className={`text-2xl font-bold ${(costAnalysisData?.expectedProfit ?? 0) >= 0 ? "text-green-700 dark:text-green-300" : "text-red-700 dark:text-red-300"}`} data-testid="text-cost-expected-profit">
                       ${costAnalysisData?.expectedProfit?.toLocaleString() ?? 0}
                     </div>
                   )}
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 border-purple-200 dark:border-purple-800">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">Profit Margin</CardTitle>
+                  <CardTitle className="text-sm font-medium text-purple-700 dark:text-purple-300">Profit Margin</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {costAnalysisLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <div className={`text-2xl font-bold ${(costAnalysisData?.profitMargin ?? 0) >= 0 ? "text-green-600" : "text-destructive"}`} data-testid="text-cost-profit-margin">
+                    <div className={`text-2xl font-bold ${(costAnalysisData?.profitMargin ?? 0) >= 0 ? "text-purple-700 dark:text-purple-300" : "text-red-700 dark:text-red-300"}`} data-testid="text-cost-profit-margin">
                       {costAnalysisData?.profitMargin ?? 0}%
                     </div>
                   )}
@@ -1019,10 +1081,58 @@ export default function KPIDashboardPage() {
               </Card>
             </div>
 
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Daily Cost Breakdown - {selectedComponent === "all" ? "All Components" : selectedComponent}
+                </CardTitle>
+                <CardDescription>
+                  {selectedComponent === "all" 
+                    ? "Daily breakdown of all cost components with revenue and profit"
+                    : `Daily ${selectedComponent} costs as a percentage of revenue`}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {costDailyLoading ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : costDailyData?.dailyData && costDailyData.dailyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    {selectedComponent === "all" ? (
+                      <ComposedChart data={costDailyData.dailyData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} tickFormatter={(d) => formatDate(d)} />
+                        <YAxis yAxisId="left" tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                        <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(value: number, name: string) => [`$${value.toLocaleString()}`, name]} />
+                        <Legend />
+                        <Bar yAxisId="left" dataKey="totalCost" fill="#e15759" name="Total Cost" />
+                        <Bar yAxisId="left" dataKey="revenue" fill="#4e79a7" name="Revenue" />
+                        <Line yAxisId="right" type="monotone" dataKey="profit" stroke="#59a14f" strokeWidth={2} name="Profit" dot={false} />
+                      </ComposedChart>
+                    ) : (
+                      <BarChart data={costDailyData.dailyData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" tick={{ fontSize: 10 }} interval={0} angle={-45} textAnchor="end" height={60} tickFormatter={(d) => formatDate(d)} />
+                        <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                        <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, selectedComponent]} />
+                        <Legend />
+                        <Bar dataKey={selectedComponent} fill={CHART_COLORS[costDailyData.componentNames.indexOf(selectedComponent) % CHART_COLORS.length]} name={selectedComponent} />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                    No daily cost data available for this period
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Cost Component Breakdown</CardTitle>
+                  <CardTitle>Cost Component Distribution</CardTitle>
                   <CardDescription>
                     Expected costs by component as percentage of revenue
                   </CardDescription>
@@ -1060,9 +1170,9 @@ export default function KPIDashboardPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Cost Component Table</CardTitle>
+                  <CardTitle>Component Summary</CardTitle>
                   <CardDescription>
-                    Detailed breakdown of expected costs
+                    Total costs per component for the period
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1073,35 +1183,43 @@ export default function KPIDashboardPage() {
                       <table className="w-full text-sm">
                         <thead className="sticky top-0 bg-background">
                           <tr className="border-b">
-                            <th className="text-left py-2 px-2">Component</th>
-                            <th className="text-right py-2 px-2">Expected Cost</th>
-                            <th className="text-right py-2 px-2">% of Revenue</th>
+                            <th className="text-left py-3 px-3 font-semibold">Component</th>
+                            <th className="text-right py-3 px-3 font-semibold">Expected Cost</th>
+                            <th className="text-right py-3 px-3 font-semibold">% of Revenue</th>
                           </tr>
                         </thead>
                         <tbody>
                           {costAnalysisData.componentBreakdown.map((comp, idx) => (
-                            <tr key={comp.name} className="border-b hover:bg-muted/50" data-testid={`row-cost-component-${idx}`}>
-                              <td className="py-2 px-2 flex items-center gap-2">
+                            <tr 
+                              key={comp.name} 
+                              className={`border-b hover:bg-muted/50 cursor-pointer transition-colors ${selectedComponent === comp.name ? 'bg-primary/10' : ''}`}
+                              onClick={() => setSelectedComponent(comp.name)}
+                              data-testid={`row-cost-component-${idx}`}
+                            >
+                              <td className="py-3 px-3 flex items-center gap-2">
                                 <div 
-                                  className="w-3 h-3 rounded-full" 
+                                  className="w-3 h-3 rounded-full flex-shrink-0" 
                                   style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
                                 />
-                                {comp.name}
+                                <span className="font-medium">{comp.name}</span>
+                                {selectedComponent === comp.name && (
+                                  <Badge variant="secondary" className="ml-2 text-xs">Selected</Badge>
+                                )}
                               </td>
-                              <td className="text-right py-2 px-2 font-mono">
+                              <td className="text-right py-3 px-3 font-mono font-medium">
                                 ${comp.expectedCost.toLocaleString()}
                               </td>
-                              <td className="text-right py-2 px-2 font-mono">
+                              <td className="text-right py-3 px-3 font-mono">
                                 {comp.percentageOfRevenue}%
                               </td>
                             </tr>
                           ))}
-                          <tr className="font-bold border-t-2">
-                            <td className="py-2 px-2">Total</td>
-                            <td className="text-right py-2 px-2 font-mono">
+                          <tr className="font-bold border-t-2 bg-muted/30">
+                            <td className="py-3 px-3">Total</td>
+                            <td className="text-right py-3 px-3 font-mono">
                               ${costAnalysisData.totalExpectedCost.toLocaleString()}
                             </td>
-                            <td className="text-right py-2 px-2 font-mono">
+                            <td className="text-right py-3 px-3 font-mono">
                               {costAnalysisData.totalRevenue > 0 
                                 ? Math.round((costAnalysisData.totalExpectedCost / costAnalysisData.totalRevenue) * 100 * 10) / 10 
                                 : 0}%
@@ -1121,35 +1239,100 @@ export default function KPIDashboardPage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Cost Component Bar Chart</CardTitle>
+                <CardTitle>Daily Breakdown Table</CardTitle>
                 <CardDescription>
-                  Comparison of expected costs by component
+                  Detailed daily data for {selectedComponent === "all" ? "all components" : selectedComponent}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {costAnalysisLoading ? (
-                  <Skeleton className="h-[400px] w-full" />
-                ) : costAnalysisData?.componentBreakdown && costAnalysisData.componentBreakdown.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <BarChart 
-                      data={costAnalysisData.componentBreakdown} 
-                      layout="vertical"
-                      margin={{ left: 100 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis type="number" tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`} />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} />
-                      <Tooltip formatter={(value: number) => [`$${value.toLocaleString()}`, "Expected Cost"]} />
-                      <Bar dataKey="expectedCost" fill="#4e79a7" name="Expected Cost">
-                        {costAnalysisData.componentBreakdown.map((entry, index) => (
-                          <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                {costDailyLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : costDailyData?.dailyData && costDailyData.dailyData.length > 0 ? (
+                  <div className="overflow-auto max-h-[400px] border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-semibold">Date</th>
+                          <th className="text-right py-3 px-4 font-semibold">Revenue</th>
+                          {selectedComponent === "all" ? (
+                            <>
+                              {costDailyData.componentNames.map(name => (
+                                <th key={name} className="text-right py-3 px-4 font-semibold">{name}</th>
+                              ))}
+                              <th className="text-right py-3 px-4 font-semibold">Total Cost</th>
+                            </>
+                          ) : (
+                            <th className="text-right py-3 px-4 font-semibold">{selectedComponent}</th>
+                          )}
+                          <th className="text-right py-3 px-4 font-semibold">Profit</th>
+                          <th className="text-right py-3 px-4 font-semibold">Entries</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {costDailyData.dailyData.map((day, idx) => (
+                          <tr key={day.date} className="border-b hover:bg-muted/50" data-testid={`row-daily-cost-${idx}`}>
+                            <td className="py-3 px-4 font-medium">{formatDate(day.date)}</td>
+                            <td className="text-right py-3 px-4 font-mono text-blue-600 dark:text-blue-400">
+                              ${day.revenue.toLocaleString()}
+                            </td>
+                            {selectedComponent === "all" ? (
+                              <>
+                                {costDailyData.componentNames.map((name, i) => (
+                                  <td key={name} className="text-right py-3 px-4 font-mono" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                                    ${((day[name] as number) || 0).toLocaleString()}
+                                  </td>
+                                ))}
+                                <td className="text-right py-3 px-4 font-mono font-semibold text-orange-600 dark:text-orange-400">
+                                  ${day.totalCost.toLocaleString()}
+                                </td>
+                              </>
+                            ) : (
+                              <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
+                                ${((day[selectedComponent] as number) || 0).toLocaleString()}
+                              </td>
+                            )}
+                            <td className={`text-right py-3 px-4 font-mono font-semibold ${day.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                              ${day.profit.toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 text-muted-foreground">
+                              {day.entryCount}
+                            </td>
+                          </tr>
                         ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                        <tr className="font-bold bg-muted/50 border-t-2">
+                          <td className="py-3 px-4">Total</td>
+                          <td className="text-right py-3 px-4 font-mono text-blue-600 dark:text-blue-400">
+                            ${costDailyData.totals.revenue.toLocaleString()}
+                          </td>
+                          {selectedComponent === "all" ? (
+                            <>
+                              {costDailyData.componentNames.map((name, i) => (
+                                <td key={name} className="text-right py-3 px-4 font-mono" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>
+                                  ${(costDailyData.totals.byComponent[name] || 0).toLocaleString()}
+                                </td>
+                              ))}
+                              <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
+                                ${costDailyData.totals.totalCost.toLocaleString()}
+                              </td>
+                            </>
+                          ) : (
+                            <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
+                              ${(costDailyData.totals.byComponent[selectedComponent] || 0).toLocaleString()}
+                            </td>
+                          )}
+                          <td className={`text-right py-3 px-4 font-mono ${costDailyData.totals.profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                            ${costDailyData.totals.profit.toLocaleString()}
+                          </td>
+                          <td className="text-right py-3 px-4 text-muted-foreground">
+                            {costDailyData.totals.entryCount}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 ) : (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    No cost component data for this period
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No daily cost data for this period
                   </div>
                 )}
               </CardContent>
