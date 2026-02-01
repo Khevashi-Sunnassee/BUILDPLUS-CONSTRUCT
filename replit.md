@@ -18,7 +18,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Admin Provisioning**: Manage users, projects, devices, global settings
 - **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available
 - **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting/cost-breakup charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
-- **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides and notes
+- **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides, component filter dropdown for detailed daily breakdown, and interactive summary tables with click-to-filter functionality
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED), with cost overrides dialog for customized job-specific cost ratios
 - **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (labour cost, supply cost, sell rate per m²/m³)
@@ -154,6 +154,9 @@ shared/
 - GET /api/reports/cost-analysis - Calculate expected costs by component
   - Query params: startDate, endDate, jobId (optional)
   - Returns: totalRevenue, totalExpectedCost, expectedProfit, profitMargin, componentBreakdown
+- GET /api/reports/cost-analysis-daily - Daily cost breakdown by component
+  - Query params: startDate, endDate
+  - Returns: dailyData array with date, revenue, totalCost, profit, entryCount, and per-component costs; componentNames array; totals with byComponent breakdown
 
 ### Work Types Routes
 - GET /api/work-types - List active work types (for dropdowns)
