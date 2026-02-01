@@ -121,20 +121,13 @@ export default function ManualEntryPage() {
     },
   });
 
-  const appType = form.watch("app");
   const watchedPanelRegisterId = form.watch("panelRegisterId");
 
   useEffect(() => {
     if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
       const panel = panels?.find(p => p.id === watchedPanelRegisterId);
-      if (panel) {
-        form.setValue("panelMark", panel.panelMark);
-        if (panel.drawingCode) {
-          form.setValue("drawingCode", panel.drawingCode);
-        }
-        if (panel.sheetNumber) {
-          form.setValue("revitSheetNumber", panel.sheetNumber);
-        }
+      if (panel && panel.drawingCode) {
+        form.setValue("drawingCode", panel.drawingCode);
       }
     }
   }, [watchedPanelRegisterId, panels, form]);
@@ -424,131 +417,20 @@ export default function ManualEntryPage() {
                 </CardContent>
               </Card>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="fileName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>File Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Model.rvt" {...field} data-testid="input-file-name" />
-                      </FormControl>
-                      <FormDescription>Name of the file you worked on</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="filePath"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>File Path</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., C:\Projects\Job123\Model.rvt" {...field} data-testid="input-file-path" />
-                      </FormControl>
-                      <FormDescription>Full path to the file</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {appType === "revit" && (
-                <div className="grid gap-4 md:grid-cols-3">
-                  <FormField
-                    control={form.control}
-                    name="revitViewName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>View Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Level 1 - Floor Plan" {...field} data-testid="input-view-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="revitSheetNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sheet Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., A101" {...field} data-testid="input-sheet-number" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="revitSheetName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sheet Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Ground Floor Plan" {...field} data-testid="input-sheet-name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              {appType === "acad" && (
-                <FormField
-                  control={form.control}
-                  name="acadLayoutName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Layout Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Layout1" {...field} data-testid="input-layout-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="panelMark"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Panel Mark</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., PM-001" {...field} data-testid="input-panel-mark" />
-                      </FormControl>
-                      <FormDescription>Panel identifier for the work (auto-filled when panel selected)</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="drawingCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Drawing Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
-                      </FormControl>
-                      <FormDescription>Drawing reference code (auto-filled when panel selected)</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+              <FormField
+                control={form.control}
+                name="drawingCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Drawing Code</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
+                    </FormControl>
+                    <FormDescription>Drawing reference code (auto-filled when panel selected)</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
