@@ -431,7 +431,11 @@ export async function registerRoutes(
       if (existing) {
         return res.status(400).json({ error: "Job with this number already exists" });
       }
-      const job = await storage.createJob(req.body);
+      const jobData = {
+        ...req.body,
+        projectId: req.body.projectId && req.body.projectId !== "none" ? req.body.projectId : null,
+      };
+      const job = await storage.createJob(jobData);
       res.json(job);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to create job" });
@@ -439,7 +443,11 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    const job = await storage.updateJob(req.params.id, req.body);
+    const jobData = {
+      ...req.body,
+      projectId: req.body.projectId && req.body.projectId !== "none" ? req.body.projectId : null,
+    };
+    const job = await storage.updateJob(req.params.id, jobData);
     res.json(job);
   });
 
