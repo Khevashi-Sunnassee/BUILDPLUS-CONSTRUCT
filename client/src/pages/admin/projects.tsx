@@ -14,6 +14,7 @@ import {
   MapPin,
   Building,
   Hash,
+  DollarSign,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Project, MappingRule } from "@shared/schema";
+import type { Project, MappingRule, PanelTypeConfig, ProjectPanelRate } from "@shared/schema";
 
 const projectSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -77,12 +78,20 @@ interface ProjectWithRules extends Project {
   mappingRules?: MappingRule[];
 }
 
+interface EffectiveRate extends PanelTypeConfig {
+  isOverridden: boolean;
+  projectRate?: ProjectPanelRate;
+}
+
 export default function AdminProjectsPage() {
   const { toast } = useToast();
   const [projectDialogOpen, setProjectDialogOpen] = useState(false);
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const [ratesDialogOpen, setRatesDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectForRates, setSelectedProjectForRates] = useState<Project | null>(null);
+  const [editingRates, setEditingRates] = useState<Record<string, Partial<ProjectPanelRate>>>({});
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
@@ -182,6 +191,55 @@ export default function AdminProjectsPage() {
     },
   });
 
+  const { data: effectiveRates, isLoading: ratesLoading, refetch: refetchRates } = useQuery<EffectiveRate[]>({
+    queryKey: ["/api/projects", selectedProjectForRates?.id, "panel-rates"],
+    queryFn: async () => {
+      if (!selectedProjectForRates) return [];
+      const res = await fetch(`/api/projects/${selectedProjectForRates.id}/panel-rates`);
+      if (!res.ok) throw new Error("Failed to fetch rates");
+      return res.json();
+    },
+    enabled: !!selectedProjectForRates,
+  });
+
+  const updateRateMutation = useMutation({
+    mutationFn: async ({ projectId, panelTypeId, data }: { projectId: string; panelTypeId: string; data: Partial<ProjectPanelRate> }) => {
+      return apiRequest("PUT", `/api/projects/${projectId}/panel-rates/${panelTypeId}`, data);
+    },
+    onSuccess: () => {
+      refetchRates();
+      toast({ title: "Rate updated successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update rate", variant: "destructive" });
+    },
+  });
+
+  const openRatesDialog = (project: Project) => {
+    setSelectedProjectForRates(project);
+    setEditingRates({});
+    setRatesDialogOpen(true);
+  };
+
+  const handleRateChange = (panelTypeId: string, field: string, value: string) => {
+    setEditingRates(prev => ({
+      ...prev,
+      [panelTypeId]: { ...prev[panelTypeId], [field]: value },
+    }));
+  };
+
+  const saveRate = (panelTypeId: string) => {
+    if (!selectedProjectForRates) return;
+    const data = editingRates[panelTypeId];
+    if (!data || Object.keys(data).length === 0) return;
+    updateRateMutation.mutate({ projectId: selectedProjectForRates.id, panelTypeId, data });
+    setEditingRates(prev => {
+      const updated = { ...prev };
+      delete updated[panelTypeId];
+      return updated;
+    });
+  };
+
   const openEditProject = (project: Project) => {
     setEditingProject(project);
     projectForm.reset({
@@ -275,6 +333,15 @@ export default function AdminProjectsPage() {
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openRatesDialog(project)}
+                      data-testid={`button-panel-rates-${project.id}`}
+                    >
+                      <DollarSign className="h-4 w-4 mr-1" />
+                      Panel Rates
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -539,6 +606,157 @@ export default function AdminProjectsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={ratesDialogOpen} onOpenChange={setRatesDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Panel Rates - {selectedProjectForRates?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Configure project-specific rates. Leave blank to use default rates from panel type settings.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-x-auto">
+            {ratesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : effectiveRates && effectiveRates.length > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Panel Type</TableHead>
+                    <TableHead className="text-right">Labour/m²</TableHead>
+                    <TableHead className="text-right">Labour/m³</TableHead>
+                    <TableHead className="text-right">Supply/m²</TableHead>
+                    <TableHead className="text-right">Supply/m³</TableHead>
+                    <TableHead className="text-right">Sell/m²</TableHead>
+                    <TableHead className="text-right">Sell/m³</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {effectiveRates.map((rate) => {
+                    const editing = editingRates[rate.id] || {};
+                    const getValue = (field: string, defaultField: keyof PanelTypeConfig): string => {
+                      if (field in editing) return String(editing[field as keyof typeof editing] || "");
+                      if (rate.projectRate && (rate.projectRate as any)[field]) return String((rate.projectRate as any)[field]);
+                      return String(rate[defaultField] || "");
+                    };
+                    return (
+                      <TableRow key={rate.id} data-testid={`row-rate-${rate.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{rate.code}</Badge>
+                            <span className="font-medium">{rate.name}</span>
+                            {rate.isOverridden && (
+                              <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs">
+                                Custom
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={rate.labourCostPerM2 || "0.00"}
+                            value={getValue("labourCostPerM2", "labourCostPerM2")}
+                            onChange={(e) => handleRateChange(rate.id, "labourCostPerM2", e.target.value)}
+                            className="w-24 text-right"
+                            data-testid={`input-labour-m2-${rate.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={rate.labourCostPerM3 || "0.00"}
+                            value={getValue("labourCostPerM3", "labourCostPerM3")}
+                            onChange={(e) => handleRateChange(rate.id, "labourCostPerM3", e.target.value)}
+                            className="w-24 text-right"
+                            data-testid={`input-labour-m3-${rate.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={rate.supplyCostPerM2 || "0.00"}
+                            value={getValue("supplyCostPerM2", "supplyCostPerM2")}
+                            onChange={(e) => handleRateChange(rate.id, "supplyCostPerM2", e.target.value)}
+                            className="w-24 text-right"
+                            data-testid={`input-supply-m2-${rate.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={rate.supplyCostPerM3 || "0.00"}
+                            value={getValue("supplyCostPerM3", "supplyCostPerM3")}
+                            onChange={(e) => handleRateChange(rate.id, "supplyCostPerM3", e.target.value)}
+                            className="w-24 text-right"
+                            data-testid={`input-supply-m3-${rate.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={rate.sellRatePerM2 || "0.00"}
+                            value={getValue("sellRatePerM2", "sellRatePerM2")}
+                            onChange={(e) => handleRateChange(rate.id, "sellRatePerM2", e.target.value)}
+                            className="w-24 text-right"
+                            data-testid={`input-sell-m2-${rate.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={rate.sellRatePerM3 || "0.00"}
+                            value={getValue("sellRatePerM3", "sellRatePerM3")}
+                            onChange={(e) => handleRateChange(rate.id, "sellRatePerM3", e.target.value)}
+                            className="w-24 text-right"
+                            data-testid={`input-sell-m3-${rate.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => saveRate(rate.id)}
+                            disabled={!editingRates[rate.id] || Object.keys(editingRates[rate.id]).length === 0 || updateRateMutation.isPending}
+                            data-testid={`button-save-rate-${rate.id}`}
+                          >
+                            {updateRateMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Save className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No panel types configured. Add panel types in Panel Types settings first.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRatesDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

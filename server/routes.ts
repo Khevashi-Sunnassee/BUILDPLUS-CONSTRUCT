@@ -609,6 +609,92 @@ export async function registerRoutes(
     res.json(summary);
   });
 
+  app.get("/api/production-summary-with-costs", requireAuth, async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) return res.status(400).json({ error: "Date required" });
+    
+    const entries = await storage.getProductionEntriesByDate(date);
+    const allPanelTypes = await storage.getAllPanelTypes();
+    const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
+    
+    const projectRatesCache = new Map<string, Map<string, any>>();
+    
+    const getRatesForEntry = async (jobId: string, panelTypeCode: string) => {
+      if (!projectRatesCache.has(jobId)) {
+        const job = await storage.getJob(jobId);
+        if (job?.projectId) {
+          const rates = await storage.getProjectPanelRates(job.projectId);
+          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
+        } else {
+          projectRatesCache.set(jobId, new Map());
+        }
+      }
+      
+      const projectRates = projectRatesCache.get(jobId);
+      const projectRate = projectRates?.get(panelTypeCode);
+      const defaultRate = panelTypesByCode.get(panelTypeCode);
+      
+      return {
+        labourCostPerM2: projectRate?.labourCostPerM2 || defaultRate?.labourCostPerM2 || "0",
+        labourCostPerM3: projectRate?.labourCostPerM3 || defaultRate?.labourCostPerM3 || "0",
+        supplyCostPerM2: projectRate?.supplyCostPerM2 || defaultRate?.supplyCostPerM2 || "0",
+        supplyCostPerM3: projectRate?.supplyCostPerM3 || defaultRate?.supplyCostPerM3 || "0",
+        totalRatePerM2: projectRate?.totalRatePerM2 || defaultRate?.totalRatePerM2 || "0",
+        totalRatePerM3: projectRate?.totalRatePerM3 || defaultRate?.totalRatePerM3 || "0",
+        sellRatePerM2: projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0",
+        sellRatePerM3: projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0",
+      };
+    };
+    
+    const entriesWithCosts = await Promise.all(entries.map(async (entry) => {
+      const panelTypeCode = entry.panel.panelType || "OTHER";
+      const rates = await getRatesForEntry(entry.jobId, panelTypeCode);
+      
+      const volumeM3 = parseFloat(entry.volumeM3 || "0");
+      const areaM2 = parseFloat(entry.areaM2 || "0");
+      
+      const labourCost = (volumeM3 * parseFloat(rates.labourCostPerM3)) + (areaM2 * parseFloat(rates.labourCostPerM2));
+      const supplyCost = (volumeM3 * parseFloat(rates.supplyCostPerM3)) + (areaM2 * parseFloat(rates.supplyCostPerM2));
+      const totalCost = labourCost + supplyCost;
+      const revenue = (volumeM3 * parseFloat(rates.sellRatePerM3)) + (areaM2 * parseFloat(rates.sellRatePerM2));
+      const profit = revenue - totalCost;
+      
+      return {
+        ...entry,
+        rates,
+        labourCost: Math.round(labourCost * 100) / 100,
+        supplyCost: Math.round(supplyCost * 100) / 100,
+        totalCost: Math.round(totalCost * 100) / 100,
+        revenue: Math.round(revenue * 100) / 100,
+        profit: Math.round(profit * 100) / 100,
+      };
+    }));
+    
+    const totals = entriesWithCosts.reduce((acc, e) => ({
+      labourCost: acc.labourCost + e.labourCost,
+      supplyCost: acc.supplyCost + e.supplyCost,
+      totalCost: acc.totalCost + e.totalCost,
+      revenue: acc.revenue + e.revenue,
+      profit: acc.profit + e.profit,
+      volumeM3: acc.volumeM3 + parseFloat(e.volumeM3 || "0"),
+      areaM2: acc.areaM2 + parseFloat(e.areaM2 || "0"),
+    }), { labourCost: 0, supplyCost: 0, totalCost: 0, revenue: 0, profit: 0, volumeM3: 0, areaM2: 0 });
+    
+    res.json({
+      entries: entriesWithCosts,
+      totals: {
+        labourCost: Math.round(totals.labourCost * 100) / 100,
+        supplyCost: Math.round(totals.supplyCost * 100) / 100,
+        totalCost: Math.round(totals.totalCost * 100) / 100,
+        revenue: Math.round(totals.revenue * 100) / 100,
+        profit: Math.round(totals.profit * 100) / 100,
+        volumeM3: Math.round(totals.volumeM3 * 100) / 100,
+        areaM2: Math.round(totals.areaM2 * 100) / 100,
+        panelCount: entriesWithCosts.length,
+      },
+    });
+  });
+
   app.get("/api/admin/panel-types", requireRole("ADMIN"), async (req, res) => {
     const types = await storage.getAllPanelTypes();
     res.json(types);

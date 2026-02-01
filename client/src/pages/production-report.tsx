@@ -17,6 +17,9 @@ import {
   Circle,
   Square,
   LayoutGrid,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -83,6 +86,25 @@ interface ProductionEntryWithDetails extends ProductionEntry {
   panel: PanelRegister;
   job: Job;
   user: User;
+  labourCost?: number;
+  supplyCost?: number;
+  totalCost?: number;
+  revenue?: number;
+  profit?: number;
+}
+
+interface ProductionSummaryWithCosts {
+  entries: ProductionEntryWithDetails[];
+  totals: {
+    labourCost: number;
+    supplyCost: number;
+    totalCost: number;
+    revenue: number;
+    profit: number;
+    volumeM3: number;
+    areaM2: number;
+    panelCount: number;
+  };
 }
 
 export default function ProductionReportPage() {
@@ -95,14 +117,17 @@ export default function ProductionReportPage() {
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
 
-  const { data: entries, isLoading: entriesLoading } = useQuery<ProductionEntryWithDetails[]>({
-    queryKey: ["/api/production-entries", selectedDate],
+  const { data: summaryData, isLoading: entriesLoading } = useQuery<ProductionSummaryWithCosts>({
+    queryKey: ["/api/production-summary-with-costs", selectedDate],
     queryFn: async () => {
-      const res = await fetch(`/api/production-entries?date=${selectedDate}`);
+      const res = await fetch(`/api/production-summary-with-costs?date=${selectedDate}`);
       if (!res.ok) throw new Error("Failed to fetch entries");
       return res.json();
     },
   });
+
+  const entries = summaryData?.entries;
+  const totals = summaryData?.totals;
 
   const { data: jobs } = useQuery<(Job & { panels: PanelRegister[] })[]>({
     queryKey: ["/api/admin/jobs"],
@@ -133,7 +158,7 @@ export default function ProductionReportPage() {
       return apiRequest("POST", "/api/production-entries", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs"] });
       toast({ title: "Production entry created successfully" });
       setEntryDialogOpen(false);
       entryForm.reset();
@@ -149,7 +174,7 @@ export default function ProductionReportPage() {
       return apiRequest("PUT", `/api/production-entries/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs"] });
       toast({ title: "Production entry updated successfully" });
       setEntryDialogOpen(false);
       setEditingEntry(null);
@@ -166,7 +191,7 @@ export default function ProductionReportPage() {
       return apiRequest("DELETE", `/api/production-entries/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs"] });
       toast({ title: "Entry deleted" });
       setDeleteDialogOpen(false);
       setDeletingEntryId(null);
@@ -218,35 +243,31 @@ export default function ProductionReportPage() {
     entryForm.setValue("panelId", "");
   };
 
-  const summary = useMemo(() => {
-    if (!entries) return { totalPanels: 0, walls: 0, columns: 0, cubeBases: 0, cubeRings: 0, landingWalls: 0, totalVolumeM3: 0, totalAreaM2: 0 };
+  const panelTypeCounts = useMemo(() => {
+    if (!entries) return { walls: 0, columns: 0, cubeBases: 0, cubeRings: 0, landingWalls: 0, other: 0 };
     
-    let walls = 0, columns = 0, cubeBases = 0, cubeRings = 0, landingWalls = 0;
-    let totalVolumeM3 = 0, totalAreaM2 = 0;
+    let walls = 0, columns = 0, cubeBases = 0, cubeRings = 0, landingWalls = 0, other = 0;
     
     for (const entry of entries) {
-      const type = entry.panel.panelType || "WALL";
+      const type = entry.panel.panelType || "OTHER";
       if (type === "WALL") walls++;
       else if (type === "COLUMN") columns++;
       else if (type === "CUBE_BASE") cubeBases++;
       else if (type === "CUBE_RING") cubeRings++;
       else if (type === "LANDING_WALL") landingWalls++;
-      
-      totalVolumeM3 += parseFloat(entry.volumeM3 || "0");
-      totalAreaM2 += parseFloat(entry.areaM2 || "0");
+      else other++;
     }
     
-    return {
-      totalPanels: entries.length,
-      walls,
-      columns,
-      cubeBases,
-      cubeRings,
-      landingWalls,
-      totalVolumeM3: Math.round(totalVolumeM3 * 100) / 100,
-      totalAreaM2: Math.round(totalAreaM2 * 100) / 100,
-    };
+    return { walls, columns, cubeBases, cubeRings, landingWalls, other };
   }, [entries]);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("en-AU", {
+      style: "currency",
+      currency: "AUD",
+      minimumFractionDigits: 2,
+    }).format(value);
+  };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -300,46 +321,78 @@ export default function ProductionReportPage() {
           <CardDescription>{formatDate(selectedDate)}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-6 gap-4 mb-6">
+          <div className="grid grid-cols-4 gap-4 mb-4">
             <Card>
               <CardContent className="p-4 text-center">
                 <Layers className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
-                <div className="text-2xl font-bold">{summary.totalPanels}</div>
+                <div className="text-2xl font-bold">{totals?.panelCount || 0}</div>
                 <div className="text-xs text-muted-foreground">Total Panels</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
-                <Square className="h-5 w-5 mx-auto mb-1 text-blue-500" />
-                <div className="text-2xl font-bold">{summary.walls}</div>
-                <div className="text-xs text-muted-foreground">Walls</div>
+                <Box className="h-5 w-5 mx-auto mb-1 text-blue-500" />
+                <div className="text-2xl font-bold">{totals?.volumeM3?.toFixed(2) || "0.00"}</div>
+                <div className="text-xs text-muted-foreground">Total m³</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
-                <Box className="h-5 w-5 mx-auto mb-1 text-purple-500" />
-                <div className="text-2xl font-bold">{summary.columns}</div>
-                <div className="text-xs text-muted-foreground">Columns</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="p-4 text-center">
-                <Circle className="h-5 w-5 mx-auto mb-1 text-orange-500" />
-                <div className="text-2xl font-bold">{summary.cubeBases + summary.cubeRings}</div>
-                <div className="text-xs text-muted-foreground">Cube Base/Ring</div>
+                <Square className="h-5 w-5 mx-auto mb-1 text-purple-500" />
+                <div className="text-2xl font-bold">{totals?.areaM2?.toFixed(2) || "0.00"}</div>
+                <div className="text-xs text-muted-foreground">Total m²</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
                 <LayoutGrid className="h-5 w-5 mx-auto mb-1 text-green-500" />
-                <div className="text-2xl font-bold">{summary.landingWalls}</div>
-                <div className="text-xs text-muted-foreground">Landing Walls</div>
+                <div className="text-sm">
+                  <span className="text-muted-foreground">W:</span> {panelTypeCounts.walls} {" "}
+                  <span className="text-muted-foreground">C:</span> {panelTypeCounts.columns} {" "}
+                  <span className="text-muted-foreground">CB:</span> {panelTypeCounts.cubeBases}
+                </div>
+                <div className="text-xs text-muted-foreground">Panel Types</div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <Card className="border-red-200 dark:border-red-900">
+              <CardContent className="p-4 text-center">
+                <DollarSign className="h-5 w-5 mx-auto mb-1 text-red-500" />
+                <div className="text-xl font-bold text-red-600 dark:text-red-400">{formatCurrency(totals?.totalCost || 0)}</div>
+                <div className="text-xs text-muted-foreground">Total Cost</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Labour: {formatCurrency(totals?.labourCost || 0)} | Supply: {formatCurrency(totals?.supplyCost || 0)}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-green-200 dark:border-green-900">
+              <CardContent className="p-4 text-center">
+                <TrendingUp className="h-5 w-5 mx-auto mb-1 text-green-500" />
+                <div className="text-xl font-bold text-green-600 dark:text-green-400">{formatCurrency(totals?.revenue || 0)}</div>
+                <div className="text-xs text-muted-foreground">Revenue</div>
+              </CardContent>
+            </Card>
+            <Card className={`${(totals?.profit || 0) >= 0 ? "border-green-200 dark:border-green-900" : "border-red-200 dark:border-red-900"}`}>
+              <CardContent className="p-4 text-center">
+                {(totals?.profit || 0) >= 0 ? (
+                  <TrendingUp className="h-5 w-5 mx-auto mb-1 text-green-500" />
+                ) : (
+                  <TrendingDown className="h-5 w-5 mx-auto mb-1 text-red-500" />
+                )}
+                <div className={`text-xl font-bold ${(totals?.profit || 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                  {formatCurrency(totals?.profit || 0)}
+                </div>
+                <div className="text-xs text-muted-foreground">Profit</div>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold">{summary.totalVolumeM3}</div>
-                <div className="text-xs text-muted-foreground">Total m³</div>
+                <div className="text-xl font-bold">
+                  {totals && totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(1) : "0.0"}%
+                </div>
+                <div className="text-xs text-muted-foreground">Margin</div>
               </CardContent>
             </Card>
           </div>
@@ -354,8 +407,11 @@ export default function ProductionReportPage() {
                   <TableHead>Project ID</TableHead>
                   <TableHead>Panel ID</TableHead>
                   <TableHead>Panel Type</TableHead>
-                  <TableHead className="text-right">Volume (m³)</TableHead>
-                  <TableHead className="text-right">Area (m²)</TableHead>
+                  <TableHead className="text-right">m³</TableHead>
+                  <TableHead className="text-right">m²</TableHead>
+                  <TableHead className="text-right">Cost</TableHead>
+                  <TableHead className="text-right">Revenue</TableHead>
+                  <TableHead className="text-right">Profit</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -376,6 +432,15 @@ export default function ProductionReportPage() {
                     </TableCell>
                     <TableCell className="text-right font-mono">
                       {entry.areaM2 ? parseFloat(entry.areaM2).toFixed(2) : "-"}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-red-600 dark:text-red-400">
+                      {formatCurrency(entry.totalCost || 0)}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-green-600 dark:text-green-400">
+                      {formatCurrency(entry.revenue || 0)}
+                    </TableCell>
+                    <TableCell className={`text-right font-mono ${(entry.profit || 0) >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                      {formatCurrency(entry.profit || 0)}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -404,7 +469,7 @@ export default function ProductionReportPage() {
                 ))}
                 {(!entries || entries.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No production entries for this date. Click "Add Entry" to record production.
                     </TableCell>
                   </TableRow>

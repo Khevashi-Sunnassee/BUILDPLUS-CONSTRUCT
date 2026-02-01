@@ -8,7 +8,6 @@ export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPR
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
 export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
-export const panelTypeEnum = pgEnum("panel_type", ["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -75,7 +74,7 @@ export const panelRegister = pgTable("panel_register", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   panelMark: text("panel_mark").notNull(),
-  panelType: panelTypeEnum("panel_type").default("WALL").notNull(),
+  panelType: text("panel_type").default("WALL").notNull(),
   description: text("description"),
   drawingCode: text("drawing_code"),
   sheetNumber: text("sheet_number"),

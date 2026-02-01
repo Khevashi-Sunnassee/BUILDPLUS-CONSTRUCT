@@ -18,8 +18,10 @@ A comprehensive time tracking portal for CAD + Revit time management with standa
 - **Admin Provisioning**: Manage users, projects, devices, global settings
 - **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED)
-- **Panel Register**: Track panels with status, panel type (WALL/COLUMN/CUBE_BASE/CUBE_RING/LANDING_WALL/OTHER), estimated hours, actual hours logged, Excel import/export
-- **Production Report**: Track production work with volume (m³) and area (m²), daily summaries by panel type, unified panel IDs across drafting and production
+- **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
+- **Configurable Panel Types**: Admin-managed panel types with configurable rates (labour cost, supply cost, sell rate per m²/m³)
+- **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
+- **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
 
 ## Tech Stack
 - **Frontend**: React + Vite, TanStack Query, Wouter, shadcn/ui, Tailwind CSS
@@ -39,13 +41,14 @@ client/
       reports.tsx         - Analytics & charts
       admin/
         settings.tsx      - Global settings
-        projects.tsx      - Project management
+        projects.tsx      - Project management (with panel rates dialog)
         jobs.tsx          - Jobs management
         panels.tsx        - Panel register
+        panel-types.tsx   - Panel type configuration with rates
         devices.tsx       - Device provisioning
         users.tsx         - User management
       manual-entry.tsx    - Manual time entry form
-      production-report.tsx - Production tracking with volume/area
+      production-report.tsx - Production tracking with volume/area and cost calculations
     components/
       layout/sidebar.tsx  - App sidebar
       theme-toggle.tsx    - Dark mode toggle
@@ -74,6 +77,8 @@ shared/
 - **jobs**: Job metadata (jobNumber, name, client, address, status)
 - **panelRegister**: Panel tracking (jobId, panelMark, panelType, estimatedHours, actualHours, status)
 - **productionEntries**: Production work entries (panelId, jobId, userId, productionDate, volumeM3, areaM2)
+- **panelTypes**: Configurable panel types with rates (code, name, labourCostPerM2/M3, supplyCostPerM2/M3, sellRatePerM2/M3)
+- **projectPanelRates**: Project-level rate overrides for specific panel types
 
 ## API Endpoints
 ### Auth
@@ -108,6 +113,16 @@ shared/
 - PUT /api/production-entries/:id - Update production entry
 - DELETE /api/production-entries/:id - Delete production entry
 - GET /api/production-summary - Get summary by panel type for a date
+- GET /api/production-summary-with-costs - Get entries with calculated costs/revenue/profit
+
+### Panel Types Routes
+- GET /api/panel-types - List active panel types (for dropdowns)
+- GET /api/admin/panel-types - List all panel types (admin)
+- POST /api/admin/panel-types - Create panel type
+- PUT /api/admin/panel-types/:id - Update panel type
+- DELETE /api/admin/panel-types/:id - Delete panel type
+- GET /api/projects/:projectId/panel-rates - Get effective rates for project
+- PUT /api/projects/:projectId/panel-rates/:panelTypeId - Set project rate override
 
 ### Agent API
 - POST /api/agent/ingest - Windows Agent time block ingestion

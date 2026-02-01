@@ -17,6 +17,7 @@ import {
   Briefcase,
   ClipboardList,
   Factory,
+  Layers,
 } from "lucide-react";
 import {
   Sidebar,
@@ -58,6 +59,7 @@ const adminNavItems = [
   { title: "Projects", url: "/admin/projects", icon: FolderOpen },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
+  { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
 ];

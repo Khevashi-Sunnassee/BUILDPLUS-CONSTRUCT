@@ -72,12 +72,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation, useSearch } from "wouter";
-import type { Job, PanelRegister } from "@shared/schema";
+import type { Job, PanelRegister, PanelTypeConfig } from "@shared/schema";
 
 const panelSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
   panelMark: z.string().min(1, "Panel mark is required"),
-  panelType: z.enum(["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"]),
+  panelType: z.string().min(1, "Panel type is required"),
   description: z.string().optional(),
   drawingCode: z.string().optional(),
   sheetNumber: z.string().optional(),
@@ -114,6 +114,10 @@ export default function AdminPanelsPage() {
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/admin/jobs"],
+  });
+
+  const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
+    queryKey: ["/api/panel-types"],
   });
 
   const filteredPanels = panels?.filter(panel => {
@@ -598,12 +602,20 @@ export default function AdminPanelsPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="WALL">Wall</SelectItem>
-                        <SelectItem value="COLUMN">Column</SelectItem>
-                        <SelectItem value="CUBE_BASE">Cube Base</SelectItem>
-                        <SelectItem value="CUBE_RING">Cube Ring</SelectItem>
-                        <SelectItem value="LANDING_WALL">Landing Wall</SelectItem>
-                        <SelectItem value="OTHER">Other</SelectItem>
+                        {panelTypes && panelTypes.length > 0 ? (
+                          panelTypes.map((pt) => (
+                            <SelectItem key={pt.id} value={pt.code}>{pt.name}</SelectItem>
+                          ))
+                        ) : (
+                          <>
+                            <SelectItem value="WALL">Wall</SelectItem>
+                            <SelectItem value="COLUMN">Column</SelectItem>
+                            <SelectItem value="CUBE_BASE">Cube Base</SelectItem>
+                            <SelectItem value="CUBE_RING">Cube Ring</SelectItem>
+                            <SelectItem value="LANDING_WALL">Landing Wall</SelectItem>
+                            <SelectItem value="OTHER">Other</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
