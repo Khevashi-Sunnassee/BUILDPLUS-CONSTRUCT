@@ -9,6 +9,8 @@ import {
   FolderArchive,
   Github,
   ExternalLink,
+  BookOpen,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +42,39 @@ export default function DownloadsPage() {
           Download and configure the LTE Time Tracking tools for your workstation
         </p>
       </div>
+
+      <Card className="border-2 border-green-500/50 bg-green-50/50 dark:bg-green-950/20">
+        <CardHeader className="pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-500/20">
+              <BookOpen className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <CardTitle className="text-green-800 dark:text-green-200">Complete Setup Guide for Beginners</CardTitle>
+              <CardDescription className="text-green-700 dark:text-green-300">
+                Step-by-step instructions with screenshots - no experience required!
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <p className="text-sm text-green-700 dark:text-green-300 mb-4">
+            New to Visual Studio? Follow our beginner-friendly guide that walks you through every step:
+            installing Visual Studio, building the add-ins, and setting up your workstation.
+          </p>
+          <Button 
+            className="bg-green-600 hover:bg-green-700" 
+            data-testid="button-setup-guide"
+            asChild
+          >
+            <a href="/downloads/SETUP-GUIDE.md" target="_blank">
+              <FileText className="h-4 w-4 mr-2" />
+              Open Complete Setup Guide
+              <ExternalLink className="h-3 w-3 ml-2" />
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
         <FolderArchive className="h-4 w-4 text-blue-600" />
