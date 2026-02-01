@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 import {
@@ -264,6 +264,15 @@ export default function KPIDashboardPage() {
     queryKey: ["/api/reports/cost-analysis-daily", { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
+
+  // Reset component filter when component names change (e.g., date range changes)
+  useEffect(() => {
+    if (costDailyData?.componentNames && selectedComponent !== "all") {
+      if (!costDailyData.componentNames.includes(selectedComponent)) {
+        setSelectedComponent("all");
+      }
+    }
+  }, [costDailyData?.componentNames, selectedComponent]);
 
   const formatDate = (dateStr: string) => {
     const [year, month, day] = dateStr.split("-");
