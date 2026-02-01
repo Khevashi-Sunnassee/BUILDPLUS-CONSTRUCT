@@ -6,6 +6,8 @@ import { z } from "zod";
 export const roleEnum = pgEnum("role", ["USER", "MANAGER", "ADMIN"]);
 export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
+export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
+export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -52,6 +54,42 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const jobs = pgTable("jobs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobNumber: text("job_number").notNull().unique(),
+  name: text("name").notNull(),
+  client: text("client"),
+  address: text("address"),
+  description: text("description"),
+  status: jobStatusEnum("status").default("ACTIVE").notNull(),
+  projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobNumberIdx: index("jobs_job_number_idx").on(table.jobNumber),
+  statusIdx: index("jobs_status_idx").on(table.status),
+}));
+
+export const panelRegister = pgTable("panel_register", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  panelMark: text("panel_mark").notNull(),
+  description: text("description"),
+  drawingCode: text("drawing_code"),
+  sheetNumber: text("sheet_number"),
+  status: panelStatusEnum("status").default("NOT_STARTED").notNull(),
+  estimatedHours: integer("estimated_hours"),
+  actualHours: integer("actual_hours").default(0),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("panel_register_job_id_idx").on(table.jobId),
+  panelMarkIdx: index("panel_register_panel_mark_idx").on(table.panelMark),
+  statusIdx: index("panel_register_status_idx").on(table.status),
+  jobPanelIdx: uniqueIndex("panel_register_job_panel_idx").on(table.jobId, table.panelMark),
+}));
+
 export const mappingRules = pgTable("mapping_rules", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   projectId: varchar("project_id", { length: 36 }).notNull().references(() => projects.id),
@@ -85,6 +123,8 @@ export const logRows = pgTable("log_rows", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   dailyLogId: varchar("daily_log_id", { length: 36 }).notNull().references(() => dailyLogs.id),
   projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  panelRegisterId: varchar("panel_register_id", { length: 36 }).references(() => panelRegister.id),
   startAt: timestamp("start_at").notNull(),
   endAt: timestamp("end_at").notNull(),
   durationMin: integer("duration_min").notNull(),
@@ -111,6 +151,8 @@ export const logRows = pgTable("log_rows", {
 }, (table) => ({
   dailyLogIdIdx: index("log_rows_daily_log_id_idx").on(table.dailyLogId),
   projectIdIdx: index("log_rows_project_id_idx").on(table.projectId),
+  jobIdIdx: index("log_rows_job_id_idx").on(table.jobId),
+  panelRegisterIdIdx: index("log_rows_panel_register_id_idx").on(table.panelRegisterId),
   startAtIdx: index("log_rows_start_at_idx").on(table.startAt),
   appIdx: index("log_rows_app_idx").on(table.app),
   fileNameIdx: index("log_rows_file_name_idx").on(table.fileName),
@@ -156,6 +198,18 @@ export const insertProjectSchema = createInsertSchema(projects).omit({
 });
 
 export const insertMappingRuleSchema = createInsertSchema(mappingRules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertJobSchema = createInsertSchema(jobs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPanelRegisterSchema = createInsertSchema(panelRegister).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -231,6 +285,10 @@ export type InsertProject = z.infer<typeof insertProjectSchema>;
 export type Project = typeof projects.$inferSelect;
 export type InsertMappingRule = z.infer<typeof insertMappingRuleSchema>;
 export type MappingRule = typeof mappingRules.$inferSelect;
+export type InsertJob = z.infer<typeof insertJobSchema>;
+export type Job = typeof jobs.$inferSelect;
+export type InsertPanelRegister = z.infer<typeof insertPanelRegisterSchema>;
+export type PanelRegister = typeof panelRegister.$inferSelect;
 export type InsertDailyLog = z.infer<typeof insertDailyLogSchema>;
 export type DailyLog = typeof dailyLogs.$inferSelect;
 export type InsertLogRow = z.infer<typeof insertLogRowSchema>;
@@ -242,3 +300,5 @@ export type GlobalSettings = typeof globalSettings.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
+export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
+export type PanelStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD";
