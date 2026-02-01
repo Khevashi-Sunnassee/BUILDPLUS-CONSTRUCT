@@ -220,7 +220,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-      const { logDay, projectId, app, startTime, endTime, fileName, filePath,
+      const { logDay, projectId, jobId, panelRegisterId, app, startTime, endTime, fileName, filePath,
               revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
               panelMark, drawingCode, notes } = req.body;
 
@@ -256,6 +256,8 @@ export async function registerRoutes(
       await storage.upsertLogRow(sourceEventId, {
         dailyLogId: dailyLog.id,
         projectId: projectId || undefined,
+        jobId: jobId || undefined,
+        panelRegisterId: panelRegisterId || undefined,
         startAt,
         endAt,
         durationMin,
@@ -277,6 +279,11 @@ export async function registerRoutes(
         isUserEdited: true,
       });
 
+      // Update panel's actualHours if linked to a panel register
+      if (panelRegisterId) {
+        await storage.updatePanelActualHours(panelRegisterId, durationMin);
+      }
+
       res.json({ ok: true, dailyLogId: dailyLog.id });
     } catch (error) {
       console.error("Manual entry error:", error);
@@ -287,6 +294,16 @@ export async function registerRoutes(
   app.get("/api/projects", requireAuth, async (req, res) => {
     const projects = await storage.getAllProjects();
     res.json(projects.map(p => ({ id: p.id, name: p.name, code: p.code })));
+  });
+
+  app.get("/api/jobs", requireAuth, async (req, res) => {
+    const jobs = await storage.getAllJobs();
+    res.json(jobs);
+  });
+
+  app.get("/api/panels", requireAuth, async (req, res) => {
+    const panels = await storage.getAllPanels();
+    res.json(panels);
   });
 
   app.get("/api/reports", requireAuth, async (req, res) => {

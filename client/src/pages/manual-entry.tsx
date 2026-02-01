@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,6 +12,8 @@ import {
   FileText,
   Save,
   ArrowLeft,
+  ClipboardList,
+  Briefcase,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,10 +37,14 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { Badge } from "@/components/ui/badge";
+import type { Job, PanelRegister } from "@shared/schema";
 
 const manualEntrySchema = z.object({
   logDay: z.string().min(1, "Date is required"),
   projectId: z.string().optional(),
+  jobId: z.string().optional(),
+  panelRegisterId: z.string().optional(),
   app: z.enum(["revit", "acad"]),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
@@ -61,14 +67,31 @@ interface Project {
   code: string | null;
 }
 
+interface PanelWithJob extends PanelRegister {
+  job: Job;
+}
+
 export default function ManualEntryPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
 
-  const { data: projects } = useQuery<{ id: string; name: string; code: string | null }[]>({
+  const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
   });
+
+  const { data: jobs } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
+  });
+
+  const { data: panels } = useQuery<PanelWithJob[]>({
+    queryKey: ["/api/panels"],
+  });
+
+  const filteredPanels = panels?.filter(p => 
+    !selectedJobId || selectedJobId === "none" || p.jobId === selectedJobId
+  );
 
   const form = useForm<ManualEntryForm>({
     resolver: zodResolver(manualEntrySchema),
@@ -77,6 +100,9 @@ export default function ManualEntryPage() {
       app: "revit",
       startTime: "09:00",
       endTime: "09:30",
+      projectId: "",
+      jobId: "",
+      panelRegisterId: "",
       fileName: "",
       filePath: "",
       revitViewName: "",
@@ -90,6 +116,22 @@ export default function ManualEntryPage() {
   });
 
   const appType = form.watch("app");
+  const watchedPanelRegisterId = form.watch("panelRegisterId");
+
+  useEffect(() => {
+    if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
+      const panel = panels?.find(p => p.id === watchedPanelRegisterId);
+      if (panel) {
+        form.setValue("panelMark", panel.panelMark);
+        if (panel.drawingCode) {
+          form.setValue("drawingCode", panel.drawingCode);
+        }
+        if (panel.sheetNumber) {
+          form.setValue("revitSheetNumber", panel.sheetNumber);
+        }
+      }
+    }
+  }, [watchedPanelRegisterId, panels, form]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: ManualEntryForm) => {
@@ -99,6 +141,8 @@ export default function ManualEntryPage() {
     onSuccess: () => {
       toast({ title: "Time entry created successfully" });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
       navigate("/daily-reports");
     },
     onError: (error: Error) => {
@@ -110,8 +154,28 @@ export default function ManualEntryPage() {
     const submitData = {
       ...data,
       projectId: data.projectId === "none" ? undefined : data.projectId,
+      jobId: data.jobId === "none" ? undefined : data.jobId,
+      panelRegisterId: data.panelRegisterId === "none" ? undefined : data.panelRegisterId,
     };
     createEntryMutation.mutate(submitData as ManualEntryForm);
+  };
+
+  const handleJobChange = (jobId: string) => {
+    setSelectedJobId(jobId === "none" ? null : jobId);
+    form.setValue("jobId", jobId);
+    form.setValue("panelRegisterId", "");
+    form.setValue("panelMark", "");
+    form.setValue("drawingCode", "");
+  };
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
+      NOT_STARTED: "outline",
+      IN_PROGRESS: "default",
+      COMPLETED: "secondary",
+      ON_HOLD: "destructive",
+    };
+    return <Badge variant={variants[status] || "default"} className="ml-2 text-xs">{status.replace("_", " ")}</Badge>;
   };
 
   return (
@@ -237,6 +301,89 @@ export default function ManualEntryPage() {
                 />
               </div>
 
+              <Card className="bg-muted/30">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ClipboardList className="h-4 w-4" />
+                    Panel Register Selection
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    Link this entry to a panel from the register for automatic tracking
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="jobId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <Briefcase className="h-3 w-3" />
+                            Job
+                          </FormLabel>
+                          <Select onValueChange={handleJobChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job">
+                                <SelectValue placeholder="Select job (optional)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No job selected</SelectItem>
+                              {jobs?.filter(j => j.status === "ACTIVE").map((job) => (
+                                <SelectItem key={job.id} value={job.id}>
+                                  {job.jobNumber} - {job.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs">Select job to filter panels</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="panelRegisterId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <ClipboardList className="h-3 w-3" />
+                            Panel
+                          </FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                            disabled={!selectedJobId || selectedJobId === "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-panel">
+                                <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No panel selected</SelectItem>
+                              {filteredPanels?.filter(p => p.status !== "COMPLETED").map((panel) => (
+                                <SelectItem key={panel.id} value={panel.id}>
+                                  <div className="flex items-center">
+                                    {panel.panelMark}
+                                    {panel.description && <span className="text-muted-foreground ml-1">- {panel.description}</span>}
+                                    {getStatusBadge(panel.status)}
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs">Auto-fills panel mark and drawing code</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
               <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -341,7 +488,7 @@ export default function ManualEntryPage() {
                       <FormControl>
                         <Input placeholder="e.g., PM-001" {...field} data-testid="input-panel-mark" />
                       </FormControl>
-                      <FormDescription>Panel identifier for the work</FormDescription>
+                      <FormDescription>Panel identifier for the work (auto-filled when panel selected)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -356,7 +503,7 @@ export default function ManualEntryPage() {
                       <FormControl>
                         <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
                       </FormControl>
-                      <FormDescription>Drawing reference code</FormDescription>
+                      <FormDescription>Drawing reference code (auto-filled when panel selected)</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
