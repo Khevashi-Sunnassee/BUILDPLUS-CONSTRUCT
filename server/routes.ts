@@ -1801,6 +1801,8 @@ Return ONLY valid JSON, no explanation text.`
         panelArea, 
         day28Fc, 
         liftFcm,
+        rotationalLifters,
+        primaryLifters,
         productionPdfUrl 
       } = req.body;
       
@@ -1818,6 +1820,8 @@ Return ONLY valid JSON, no explanation text.`
         panelArea,
         day28Fc,
         liftFcm,
+        rotationalLifters,
+        primaryLifters,
         productionPdfUrl,
       });
       
@@ -1857,6 +1861,104 @@ Return ONLY valid JSON, no explanation text.`
       console.error("Error fetching approved panels:", error);
       res.status(500).json({ error: "Failed to fetch approved panels" });
     }
+  });
+
+  // =============== LOGISTICS ROUTES ===============
+
+  // Trailer Types
+  app.get("/api/trailer-types", requireAuth, async (req, res) => {
+    const trailerTypes = await storage.getActiveTrailerTypes();
+    res.json(trailerTypes);
+  });
+
+  app.get("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) => {
+    const trailerTypes = await storage.getAllTrailerTypes();
+    res.json(trailerTypes);
+  });
+
+  app.post("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) => {
+    const trailerType = await storage.createTrailerType(req.body);
+    res.json(trailerType);
+  });
+
+  app.put("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
+    const trailerType = await storage.updateTrailerType(req.params.id, req.body);
+    res.json(trailerType);
+  });
+
+  app.delete("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
+    await storage.deleteTrailerType(req.params.id);
+    res.json({ success: true });
+  });
+
+  // Load Lists
+  app.get("/api/load-lists", requireAuth, async (req, res) => {
+    const loadLists = await storage.getAllLoadLists();
+    res.json(loadLists);
+  });
+
+  app.get("/api/load-lists/:id", requireAuth, async (req, res) => {
+    const loadList = await storage.getLoadList(req.params.id);
+    if (!loadList) return res.status(404).json({ error: "Load list not found" });
+    res.json(loadList);
+  });
+
+  app.post("/api/load-lists", requireAuth, async (req, res) => {
+    try {
+      const { panelIds, ...data } = req.body;
+      const loadList = await storage.createLoadList({
+        ...data,
+        createdById: req.session.userId!,
+      }, panelIds || []);
+      res.json(loadList);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create load list" });
+    }
+  });
+
+  app.put("/api/load-lists/:id", requireAuth, async (req, res) => {
+    const loadList = await storage.updateLoadList(req.params.id, req.body);
+    res.json(loadList);
+  });
+
+  app.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    await storage.deleteLoadList(req.params.id);
+    res.json({ success: true });
+  });
+
+  app.post("/api/load-lists/:id/panels", requireAuth, async (req, res) => {
+    const { panelId, sequence } = req.body;
+    const panel = await storage.addPanelToLoadList(req.params.id, panelId, sequence);
+    res.json(panel);
+  });
+
+  app.delete("/api/load-lists/:id/panels/:panelId", requireAuth, async (req, res) => {
+    await storage.removePanelFromLoadList(req.params.id, req.params.panelId);
+    res.json({ success: true });
+  });
+
+  // Delivery Records
+  app.get("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
+    const record = await storage.getDeliveryRecord(req.params.id);
+    res.json(record || null);
+  });
+
+  app.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
+    try {
+      const record = await storage.createDeliveryRecord({
+        ...req.body,
+        loadListId: req.params.id,
+        enteredById: req.session.userId!,
+      });
+      res.json(record);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create delivery record" });
+    }
+  });
+
+  app.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
+    const record = await storage.updateDeliveryRecord(req.params.id, req.body);
+    res.json(record);
   });
 
   return httpServer;

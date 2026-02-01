@@ -4,6 +4,7 @@ import {
   users, devices, projects, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   panelTypes, projectPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
+  trailerTypes, loadLists, loadListPanels, deliveryRecords,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertProject, type Project, type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -14,7 +15,18 @@ import {
   type InsertWorkType, type WorkType,
   type InsertPanelTypeCostComponent, type PanelTypeCostComponent,
   type InsertJobCostOverride, type JobCostOverride,
+  type InsertTrailerType, type TrailerType,
+  type InsertLoadList, type LoadList, type InsertLoadListPanel, type LoadListPanel,
+  type InsertDeliveryRecord, type DeliveryRecord,
 } from "@shared/schema";
+
+export interface LoadListWithDetails extends LoadList {
+  job: Job;
+  trailerType?: TrailerType | null;
+  panels: (LoadListPanel & { panel: PanelRegister })[];
+  deliveryRecord?: DeliveryRecord | null;
+  createdBy?: User | null;
+}
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 
@@ -147,10 +159,35 @@ export interface IStorage {
     panelArea?: string | null;
     day28Fc?: string | null;
     liftFcm?: string | null;
+    rotationalLifters?: string | null;
+    primaryLifters?: string | null;
     productionPdfUrl?: string | null;
   }): Promise<PanelRegister | undefined>;
   revokePanelProductionApproval(id: string): Promise<PanelRegister | undefined>;
   getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]>;
+
+  // Logistics - Trailer Types
+  getAllTrailerTypes(): Promise<TrailerType[]>;
+  getActiveTrailerTypes(): Promise<TrailerType[]>;
+  getTrailerType(id: string): Promise<TrailerType | undefined>;
+  createTrailerType(data: InsertTrailerType): Promise<TrailerType>;
+  updateTrailerType(id: string, data: Partial<InsertTrailerType>): Promise<TrailerType | undefined>;
+  deleteTrailerType(id: string): Promise<void>;
+
+  // Logistics - Load Lists
+  getAllLoadLists(): Promise<LoadListWithDetails[]>;
+  getLoadList(id: string): Promise<LoadListWithDetails | undefined>;
+  createLoadList(data: InsertLoadList, panelIds: string[]): Promise<LoadListWithDetails>;
+  updateLoadList(id: string, data: Partial<InsertLoadList>): Promise<LoadList | undefined>;
+  deleteLoadList(id: string): Promise<void>;
+  addPanelToLoadList(loadListId: string, panelId: string, sequence?: number): Promise<LoadListPanel>;
+  removePanelFromLoadList(loadListId: string, panelId: string): Promise<void>;
+  getLoadListPanels(loadListId: string): Promise<(LoadListPanel & { panel: PanelRegister })[]>;
+
+  // Logistics - Delivery Records
+  getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined>;
+  createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord>;
+  updateDeliveryRecord(id: string, data: Partial<InsertDeliveryRecord>): Promise<DeliveryRecord | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1060,6 +1097,8 @@ export class DatabaseStorage implements IStorage {
     panelArea?: string | null;
     day28Fc?: string | null;
     liftFcm?: string | null;
+    rotationalLifters?: string | null;
+    primaryLifters?: string | null;
     productionPdfUrl?: string | null;
   }): Promise<PanelRegister | undefined> {
     const [updated] = await db.update(panelRegister)
@@ -1106,6 +1145,179 @@ export class DatabaseStorage implements IStorage {
     
     const results = await query;
     return results.map(r => ({ ...r.panel_register, job: r.jobs }));
+  }
+
+  // Logistics - Trailer Types
+  async getAllTrailerTypes(): Promise<TrailerType[]> {
+    return db.select().from(trailerTypes).orderBy(asc(trailerTypes.sortOrder));
+  }
+
+  async getActiveTrailerTypes(): Promise<TrailerType[]> {
+    return db.select().from(trailerTypes)
+      .where(eq(trailerTypes.isActive, true))
+      .orderBy(asc(trailerTypes.sortOrder));
+  }
+
+  async getTrailerType(id: string): Promise<TrailerType | undefined> {
+    const [trailerType] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, id));
+    return trailerType;
+  }
+
+  async createTrailerType(data: InsertTrailerType): Promise<TrailerType> {
+    const [trailerType] = await db.insert(trailerTypes).values(data).returning();
+    return trailerType;
+  }
+
+  async updateTrailerType(id: string, data: Partial<InsertTrailerType>): Promise<TrailerType | undefined> {
+    const [updated] = await db.update(trailerTypes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(trailerTypes.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteTrailerType(id: string): Promise<void> {
+    await db.delete(trailerTypes).where(eq(trailerTypes.id, id));
+  }
+
+  // Logistics - Load Lists
+  async getAllLoadLists(): Promise<LoadListWithDetails[]> {
+    const allLoadLists = await db.select().from(loadLists).orderBy(desc(loadLists.createdAt));
+    
+    const results: LoadListWithDetails[] = [];
+    for (const loadList of allLoadLists) {
+      const details = await this.getLoadList(loadList.id);
+      if (details) results.push(details);
+    }
+    return results;
+  }
+
+  async getLoadList(id: string): Promise<LoadListWithDetails | undefined> {
+    const [loadList] = await db.select().from(loadLists).where(eq(loadLists.id, id));
+    if (!loadList) return undefined;
+
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, loadList.jobId));
+    if (!job) return undefined;
+
+    let trailerType: TrailerType | null = null;
+    if (loadList.trailerTypeId) {
+      const [tt] = await db.select().from(trailerTypes).where(eq(trailerTypes.id, loadList.trailerTypeId));
+      trailerType = tt || null;
+    }
+
+    const panelResults = await db.select()
+      .from(loadListPanels)
+      .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
+      .where(eq(loadListPanels.loadListId, id))
+      .orderBy(asc(loadListPanels.sequence));
+
+    const panels = panelResults.map(r => ({ ...r.load_list_panels, panel: r.panel_register }));
+
+    const [deliveryRecord] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, id));
+
+    let createdBy: User | null = null;
+    if (loadList.createdById) {
+      const [user] = await db.select().from(users).where(eq(users.id, loadList.createdById));
+      createdBy = user || null;
+    }
+
+    return {
+      ...loadList,
+      job,
+      trailerType,
+      panels,
+      deliveryRecord: deliveryRecord || null,
+      createdBy,
+    };
+  }
+
+  async createLoadList(data: InsertLoadList, panelIds: string[]): Promise<LoadListWithDetails> {
+    const [loadList] = await db.insert(loadLists).values(data).returning();
+
+    // Add panels to the load list
+    if (panelIds.length > 0) {
+      const panelData = panelIds.map((panelId, index) => ({
+        loadListId: loadList.id,
+        panelId,
+        sequence: index + 1,
+      }));
+      await db.insert(loadListPanels).values(panelData);
+    }
+
+    const details = await this.getLoadList(loadList.id);
+    return details!;
+  }
+
+  async updateLoadList(id: string, data: Partial<InsertLoadList>): Promise<LoadList | undefined> {
+    const [updated] = await db.update(loadLists)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(loadLists.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteLoadList(id: string): Promise<void> {
+    await db.delete(loadLists).where(eq(loadLists.id, id));
+  }
+
+  async addPanelToLoadList(loadListId: string, panelId: string, sequence?: number): Promise<LoadListPanel> {
+    // Get the max sequence if not provided
+    if (!sequence) {
+      const existingPanels = await db.select()
+        .from(loadListPanels)
+        .where(eq(loadListPanels.loadListId, loadListId));
+      sequence = existingPanels.length + 1;
+    }
+
+    const [panel] = await db.insert(loadListPanels).values({
+      loadListId,
+      panelId,
+      sequence,
+    }).returning();
+    return panel;
+  }
+
+  async removePanelFromLoadList(loadListId: string, panelId: string): Promise<void> {
+    await db.delete(loadListPanels)
+      .where(and(
+        eq(loadListPanels.loadListId, loadListId),
+        eq(loadListPanels.panelId, panelId)
+      ));
+  }
+
+  async getLoadListPanels(loadListId: string): Promise<(LoadListPanel & { panel: PanelRegister })[]> {
+    const results = await db.select()
+      .from(loadListPanels)
+      .innerJoin(panelRegister, eq(loadListPanels.panelId, panelRegister.id))
+      .where(eq(loadListPanels.loadListId, loadListId))
+      .orderBy(asc(loadListPanels.sequence));
+
+    return results.map(r => ({ ...r.load_list_panels, panel: r.panel_register }));
+  }
+
+  // Logistics - Delivery Records
+  async getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined> {
+    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, loadListId));
+    return record;
+  }
+
+  async createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord> {
+    const [record] = await db.insert(deliveryRecords).values(data).returning();
+    
+    // Update load list status to COMPLETE
+    await db.update(loadLists)
+      .set({ status: "COMPLETE", updatedAt: new Date() })
+      .where(eq(loadLists.id, data.loadListId));
+    
+    return record;
+  }
+
+  async updateDeliveryRecord(id: string, data: Partial<InsertDeliveryRecord>): Promise<DeliveryRecord | undefined> {
+    const [updated] = await db.update(deliveryRecords)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(deliveryRecords.id, id))
+      .returning();
+    return updated;
   }
 }
 

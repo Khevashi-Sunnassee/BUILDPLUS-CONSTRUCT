@@ -8,6 +8,7 @@ export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPR
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
 export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
+export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -60,6 +61,8 @@ export const jobs = pgTable("jobs", {
   name: text("name").notNull(),
   client: text("client"),
   address: text("address"),
+  siteContact: text("site_contact"),
+  siteContactPhone: text("site_contact_phone"),
   description: text("description"),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
@@ -105,6 +108,8 @@ export const panelRegister = pgTable("panel_register", {
   panelArea: text("panel_area"),
   day28Fc: text("day_28_fc"),
   liftFcm: text("lift_fcm"),
+  rotationalLifters: text("rotational_lifters"),
+  primaryLifters: text("primary_lifters"),
   productionPdfUrl: text("production_pdf_url"),
   approvedForProduction: boolean("approved_for_production").default(false).notNull(),
   approvedAt: timestamp("approved_at"),
@@ -298,6 +303,81 @@ export const jobCostOverrides = pgTable("job_cost_overrides", {
   jobPanelTypeComponentIdx: uniqueIndex("job_cost_overrides_unique_idx").on(table.jobId, table.panelTypeId, table.componentName),
 }));
 
+// Logistics tables
+export const trailerTypes = pgTable("trailer_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const loadLists = pgTable("load_lists", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  loadNumber: text("load_number").notNull(),
+  loadDate: text("load_date").notNull(),
+  loadTime: text("load_time").notNull(),
+  trailerTypeId: varchar("trailer_type_id", { length: 36 }).references(() => trailerTypes.id),
+  uhf: text("uhf"),
+  status: loadListStatusEnum("status").default("PENDING").notNull(),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("load_lists_job_id_idx").on(table.jobId),
+  loadDateIdx: index("load_lists_load_date_idx").on(table.loadDate),
+  statusIdx: index("load_lists_status_idx").on(table.status),
+}));
+
+export const loadListPanels = pgTable("load_list_panels", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  loadListId: varchar("load_list_id", { length: 36 }).notNull().references(() => loadLists.id, { onDelete: "cascade" }),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id),
+  sequence: integer("sequence").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  loadListIdIdx: index("load_list_panels_load_list_id_idx").on(table.loadListId),
+  panelIdIdx: index("load_list_panels_panel_id_idx").on(table.panelId),
+  loadListPanelIdx: uniqueIndex("load_list_panels_unique_idx").on(table.loadListId, table.panelId),
+}));
+
+export const deliveryRecords = pgTable("delivery_records", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  loadListId: varchar("load_list_id", { length: 36 }).notNull().references(() => loadLists.id, { onDelete: "cascade" }).unique(),
+  docketNumber: text("docket_number"),
+  loadDocumentNumber: text("load_document_number"),
+  truckRego: text("truck_rego"),
+  trailerRego: text("trailer_rego"),
+  deliveryDate: text("delivery_date"),
+  preload: text("preload"),
+  loadNumber: text("load_number"),
+  numberPanels: integer("number_panels"),
+  comment: text("comment"),
+  startTime: text("start_time"),
+  leaveDepotTime: text("leave_depot_time"),
+  arriveLteTime: text("arrive_lte_time"),
+  pickupLocation: text("pickup_location"),
+  pickupArriveTime: text("pickup_arrive_time"),
+  pickupLeaveTime: text("pickup_leave_time"),
+  deliveryLocation: text("delivery_location"),
+  arriveHoldingTime: text("arrive_holding_time"),
+  leaveHoldingTime: text("leave_holding_time"),
+  siteFirstLiftTime: text("site_first_lift_time"),
+  siteLastLiftTime: text("site_last_lift_time"),
+  returnDepotArriveTime: text("return_depot_arrive_time"),
+  totalHours: text("total_hours"),
+  enteredById: varchar("entered_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  loadListIdIdx: index("delivery_records_load_list_id_idx").on(table.loadListId),
+  deliveryDateIdx: index("delivery_records_delivery_date_idx").on(table.deliveryDate),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -394,6 +474,29 @@ export const insertProjectPanelRateSchema = createInsertSchema(projectPanelRates
   updatedAt: true,
 });
 
+export const insertTrailerTypeSchema = createInsertSchema(trailerTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoadListSchema = createInsertSchema(loadLists).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoadListPanelSchema = createInsertSchema(loadListPanels).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertDeliveryRecordSchema = createInsertSchema(deliveryRecords).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -465,8 +568,17 @@ export type InsertPanelTypeCostComponent = z.infer<typeof insertPanelTypeCostCom
 export type PanelTypeCostComponent = typeof panelTypeCostComponents.$inferSelect;
 export type InsertJobCostOverride = z.infer<typeof insertJobCostOverrideSchema>;
 export type JobCostOverride = typeof jobCostOverrides.$inferSelect;
+export type InsertTrailerType = z.infer<typeof insertTrailerTypeSchema>;
+export type TrailerType = typeof trailerTypes.$inferSelect;
+export type InsertLoadList = z.infer<typeof insertLoadListSchema>;
+export type LoadList = typeof loadLists.$inferSelect;
+export type InsertLoadListPanel = z.infer<typeof insertLoadListPanelSchema>;
+export type LoadListPanel = typeof loadListPanels.$inferSelect;
+export type InsertDeliveryRecord = z.infer<typeof insertDeliveryRecordSchema>;
+export type DeliveryRecord = typeof deliveryRecords.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
 export type PanelStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD";
 export type PanelType = "WALL" | "COLUMN" | "CUBE_BASE" | "CUBE_RING" | "LANDING_WALL" | "OTHER";
+export type LoadListStatus = "PENDING" | "COMPLETE";

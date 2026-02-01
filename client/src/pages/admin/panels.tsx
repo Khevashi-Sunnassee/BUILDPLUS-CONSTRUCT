@@ -136,6 +136,8 @@ export default function AdminPanelsPage() {
     panelArea: "",
     day28Fc: "",
     liftFcm: "",
+    rotationalLifters: "",
+    primaryLifters: "",
   });
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
@@ -286,6 +288,8 @@ export default function AdminPanelsPage() {
           panelArea: result.extracted.panelArea || "",
           day28Fc: result.extracted.day28Fc || "",
           liftFcm: result.extracted.liftFcm || "",
+          rotationalLifters: result.extracted.rotationalLifters || "",
+          primaryLifters: result.extracted.primaryLifters || "",
         });
         toast({ title: "PDF analyzed successfully" });
       }
@@ -342,6 +346,8 @@ export default function AdminPanelsPage() {
       panelArea: panel.panelArea || "",
       day28Fc: panel.day28Fc || "",
       liftFcm: panel.liftFcm || "",
+      rotationalLifters: panel.rotationalLifters || "",
+      primaryLifters: panel.primaryLifters || "",
     });
     setPdfFile(null);
     setBuildDialogOpen(true);
@@ -360,6 +366,8 @@ export default function AdminPanelsPage() {
       panelArea: "",
       day28Fc: "",
       liftFcm: "",
+      rotationalLifters: "",
+      primaryLifters: "",
     });
   };
 
@@ -1321,6 +1329,29 @@ export default function AdminPanelsPage() {
                   onChange={(e) => setBuildFormData({ ...buildFormData, liftFcm: e.target.value })}
                   placeholder="e.g., 25"
                   data-testid="input-lift-fcm"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rotationalLifters">Rotational Lifters</Label>
+                <Input
+                  id="rotationalLifters"
+                  value={buildFormData.rotationalLifters}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, rotationalLifters: e.target.value })}
+                  placeholder="e.g., 2x ERH-2.5T"
+                  data-testid="input-rotational-lifters"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="primaryLifters">Primary Lifters</Label>
+                <Input
+                  id="primaryLifters"
+                  value={buildFormData.primaryLifters}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, primaryLifters: e.target.value })}
+                  placeholder="e.g., 4x Anchor Point"
+                  data-testid="input-primary-lifters"
                 />
               </div>
             </div>
