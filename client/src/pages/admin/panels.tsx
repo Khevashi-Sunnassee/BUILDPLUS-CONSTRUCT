@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, Fragment } from "react";
+import { useState, useRef, useEffect, Fragment, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -24,6 +24,11 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  Hammer,
+  FileText,
+  CheckCircle2,
+  XCircle,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -115,6 +120,24 @@ export default function AdminPanelsPage() {
   const [groupByJob, setGroupByJob] = useState<boolean>(true);
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Build dialog state
+  const [buildDialogOpen, setBuildDialogOpen] = useState(false);
+  const [buildingPanel, setBuildingPanel] = useState<PanelRegister | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [buildFormData, setBuildFormData] = useState({
+    loadWidth: "",
+    loadHeight: "",
+    panelThickness: "",
+    panelVolume: "",
+    panelMass: "",
+    panelArea: "",
+    day28Fc: "",
+    liftFcm: "",
+  });
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const { data: panels, isLoading: panelsLoading } = useQuery<PanelWithJob[]>({
     queryKey: ["/api/admin/panels"],
@@ -245,6 +268,133 @@ export default function AdminPanelsPage() {
       toast({ title: "Import failed", variant: "destructive" });
     },
   });
+
+  // PDF analysis mutation
+  const analyzePdfMutation = useMutation({
+    mutationFn: async ({ panelId, pdfBase64 }: { panelId: string; pdfBase64: string }) => {
+      return apiRequest("POST", `/api/admin/panels/${panelId}/analyze-pdf`, { pdfBase64 });
+    },
+    onSuccess: async (response) => {
+      const result = await response.json();
+      if (result.extracted) {
+        setBuildFormData({
+          loadWidth: result.extracted.loadWidth || "",
+          loadHeight: result.extracted.loadHeight || "",
+          panelThickness: result.extracted.panelThickness || "",
+          panelVolume: result.extracted.panelVolume || "",
+          panelMass: result.extracted.panelMass || "",
+          panelArea: result.extracted.panelArea || "",
+          day28Fc: result.extracted.day28Fc || "",
+          liftFcm: result.extracted.liftFcm || "",
+        });
+        toast({ title: "PDF analyzed successfully" });
+      }
+      setIsAnalyzing(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to analyze PDF", description: error.message, variant: "destructive" });
+      setIsAnalyzing(false);
+    },
+  });
+
+  // Approve for production mutation
+  const approveProductionMutation = useMutation({
+    mutationFn: async ({ panelId, data }: { panelId: string; data: typeof buildFormData }) => {
+      return apiRequest("POST", `/api/admin/panels/${panelId}/approve-production`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      toast({ title: "Panel approved for production" });
+      closeBuildDialog();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to approve panel", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Revoke production approval mutation
+  const revokeApprovalMutation = useMutation({
+    mutationFn: async (panelId: string) => {
+      return apiRequest("POST", `/api/admin/panels/${panelId}/revoke-production`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      toast({ title: "Production approval revoked" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to revoke approval", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Build dialog functions
+  const openBuildDialog = (panel: PanelRegister) => {
+    setBuildingPanel(panel);
+    setBuildFormData({
+      loadWidth: panel.loadWidth || "",
+      loadHeight: panel.loadHeight || "",
+      panelThickness: panel.panelThickness || "",
+      panelVolume: panel.panelVolume || "",
+      panelMass: panel.panelMass || "",
+      panelArea: panel.panelArea || "",
+      day28Fc: panel.day28Fc || "",
+      liftFcm: panel.liftFcm || "",
+    });
+    setPdfFile(null);
+    setBuildDialogOpen(true);
+  };
+
+  const closeBuildDialog = () => {
+    setBuildDialogOpen(false);
+    setBuildingPanel(null);
+    setPdfFile(null);
+    setBuildFormData({
+      loadWidth: "",
+      loadHeight: "",
+      panelThickness: "",
+      panelVolume: "",
+      panelMass: "",
+      panelArea: "",
+      day28Fc: "",
+      liftFcm: "",
+    });
+  };
+
+  const handlePdfDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && (file.type === "application/pdf" || file.name.endsWith(".pdf"))) {
+      setPdfFile(file);
+    } else {
+      toast({ title: "Please upload a PDF file", variant: "destructive" });
+    }
+  }, [toast]);
+
+  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPdfFile(file);
+    }
+  };
+
+  const analyzePdf = async () => {
+    if (!pdfFile || !buildingPanel) return;
+    
+    setIsAnalyzing(true);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = (e.target?.result as string)?.split(",")[1];
+      if (base64) {
+        analyzePdfMutation.mutate({ panelId: buildingPanel.id, pdfBase64: base64 });
+      }
+    };
+    reader.readAsDataURL(pdfFile);
+  };
+
+  const handleApproveProduction = () => {
+    if (!buildingPanel) return;
+    approveProductionMutation.mutate({ panelId: buildingPanel.id, data: buildFormData });
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -564,6 +714,21 @@ export default function AdminPanelsPage() {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
+                                {panel.approvedForProduction ? (
+                                  <Badge variant="secondary" className="gap-1 mr-2">
+                                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                    Approved
+                                  </Badge>
+                                ) : null}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); openBuildDialog(panel); }}
+                                  title={panel.approvedForProduction ? "Edit production details" : "Set up for production"}
+                                  data-testid={`button-build-panel-${panel.id}`}
+                                >
+                                  <Hammer className="h-4 w-4 text-primary" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -642,6 +807,21 @@ export default function AdminPanelsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {panel.approvedForProduction ? (
+                            <Badge variant="secondary" className="gap-1 mr-2">
+                              <CheckCircle2 className="h-3 w-3 text-green-500" />
+                              Approved
+                            </Badge>
+                          ) : null}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openBuildDialog(panel)}
+                            title={panel.approvedForProduction ? "Edit production details" : "Set up for production"}
+                            data-testid={`button-build-panel-${panel.id}`}
+                          >
+                            <Hammer className="h-4 w-4 text-primary" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -960,6 +1140,216 @@ export default function AdminPanelsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Build/Production Approval Dialog */}
+      <Dialog open={buildDialogOpen} onOpenChange={(open) => !open && closeBuildDialog()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Hammer className="h-5 w-5" />
+              {buildingPanel?.approvedForProduction ? "Edit Production Details" : "Set Up for Production"}
+            </DialogTitle>
+            <DialogDescription>
+              {buildingPanel && (
+                <span>
+                  Panel: <strong className="font-mono">{buildingPanel.panelMark}</strong>
+                  {buildingPanel.approvedForProduction && (
+                    <Badge variant="secondary" className="ml-2 gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      Currently Approved
+                    </Badge>
+                  )}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* PDF Upload Section */}
+            <div className="space-y-2">
+              <Label>Production Drawing PDF</Label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handlePdfDrop}
+              >
+                {pdfFile ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <FileText className="h-8 w-8 text-primary" />
+                    <div className="text-left">
+                      <p className="font-medium">{pdfFile.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setPdfFile(null)}
+                      data-testid="button-remove-pdf"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <FileText className="h-10 w-10 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Drag and drop a PDF here, or click to browse
+                    </p>
+                    <input
+                      type="file"
+                      ref={pdfInputRef}
+                      accept=".pdf"
+                      onChange={handlePdfSelect}
+                      className="hidden"
+                      data-testid="input-pdf-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => pdfInputRef.current?.click()}
+                      data-testid="button-browse-pdf"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Browse
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {pdfFile && (
+                <Button
+                  onClick={analyzePdf}
+                  disabled={isAnalyzing}
+                  className="w-full"
+                  data-testid="button-analyze-pdf"
+                >
+                  {isAnalyzing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  {isAnalyzing ? "Analyzing PDF..." : "Analyze PDF with AI"}
+                </Button>
+              )}
+            </div>
+
+            {/* Panel Specifications Form */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="loadWidth">Load Width (mm)</Label>
+                <Input
+                  id="loadWidth"
+                  value={buildFormData.loadWidth}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, loadWidth: e.target.value })}
+                  placeholder="e.g., 3000"
+                  data-testid="input-load-width"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="loadHeight">Load Height (mm)</Label>
+                <Input
+                  id="loadHeight"
+                  value={buildFormData.loadHeight}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, loadHeight: e.target.value })}
+                  placeholder="e.g., 2500"
+                  data-testid="input-load-height"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="panelThickness">Panel Thickness (mm)</Label>
+                <Input
+                  id="panelThickness"
+                  value={buildFormData.panelThickness}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, panelThickness: e.target.value })}
+                  placeholder="e.g., 200"
+                  data-testid="input-panel-thickness"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="panelVolume">Panel Volume (m³)</Label>
+                <Input
+                  id="panelVolume"
+                  value={buildFormData.panelVolume}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, panelVolume: e.target.value })}
+                  placeholder="e.g., 1.5"
+                  data-testid="input-panel-volume"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="panelMass">Panel Mass (kg)</Label>
+                <Input
+                  id="panelMass"
+                  value={buildFormData.panelMass}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, panelMass: e.target.value })}
+                  placeholder="e.g., 3750"
+                  data-testid="input-panel-mass"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="panelArea">Panel Area (m²)</Label>
+                <Input
+                  id="panelArea"
+                  value={buildFormData.panelArea}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, panelArea: e.target.value })}
+                  placeholder="e.g., 7.5"
+                  data-testid="input-panel-area"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="day28Fc">28-Day f'c (MPa)</Label>
+                <Input
+                  id="day28Fc"
+                  value={buildFormData.day28Fc}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, day28Fc: e.target.value })}
+                  placeholder="e.g., 40"
+                  data-testid="input-day28-fc"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="liftFcm">Lift f'cm (MPa)</Label>
+                <Input
+                  id="liftFcm"
+                  value={buildFormData.liftFcm}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, liftFcm: e.target.value })}
+                  placeholder="e.g., 25"
+                  data-testid="input-lift-fcm"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            {buildingPanel?.approvedForProduction && (
+              <Button
+                variant="destructive"
+                onClick={() => buildingPanel && revokeApprovalMutation.mutate(buildingPanel.id)}
+                disabled={revokeApprovalMutation.isPending}
+                data-testid="button-revoke-approval"
+              >
+                {revokeApprovalMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                <XCircle className="h-4 w-4 mr-2" />
+                Revoke Approval
+              </Button>
+            )}
+            <Button variant="outline" onClick={closeBuildDialog}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApproveProduction}
+              disabled={approveProductionMutation.isPending}
+              data-testid="button-approve-production"
+            >
+              {approveProductionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              {buildingPanel?.approvedForProduction ? "Update & Keep Approved" : "Approve for Production"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

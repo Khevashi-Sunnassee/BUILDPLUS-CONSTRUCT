@@ -135,6 +135,22 @@ export interface IStorage {
   updateJobCostOverride(id: string, data: Partial<InsertJobCostOverride>): Promise<JobCostOverride | undefined>;
   deleteJobCostOverride(id: string): Promise<void>;
   initializeJobCostOverrides(jobId: string): Promise<JobCostOverride[]>;
+
+  // Panel production approval
+  getPanelById(id: string): Promise<PanelRegister | undefined>;
+  approvePanelForProduction(id: string, approvedById: string, data: {
+    loadWidth?: string | null;
+    loadHeight?: string | null;
+    panelThickness?: string | null;
+    panelVolume?: string | null;
+    panelMass?: string | null;
+    panelArea?: string | null;
+    day28Fc?: string | null;
+    liftFcm?: string | null;
+    productionPdfUrl?: string | null;
+  }): Promise<PanelRegister | undefined>;
+  revokePanelProductionApproval(id: string): Promise<PanelRegister | undefined>;
+  getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1027,6 +1043,69 @@ export class DatabaseStorage implements IStorage {
     }
     
     return this.getJobCostOverrides(jobId);
+  }
+
+  // Panel production approval methods
+  async getPanelById(id: string): Promise<PanelRegister | undefined> {
+    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, id));
+    return panel;
+  }
+
+  async approvePanelForProduction(id: string, approvedById: string, data: {
+    loadWidth?: string | null;
+    loadHeight?: string | null;
+    panelThickness?: string | null;
+    panelVolume?: string | null;
+    panelMass?: string | null;
+    panelArea?: string | null;
+    day28Fc?: string | null;
+    liftFcm?: string | null;
+    productionPdfUrl?: string | null;
+  }): Promise<PanelRegister | undefined> {
+    const [updated] = await db.update(panelRegister)
+      .set({
+        ...data,
+        approvedForProduction: true,
+        approvedAt: new Date(),
+        approvedById,
+        updatedAt: new Date(),
+      })
+      .where(eq(panelRegister.id, id))
+      .returning();
+    return updated;
+  }
+
+  async revokePanelProductionApproval(id: string): Promise<PanelRegister | undefined> {
+    const [updated] = await db.update(panelRegister)
+      .set({
+        approvedForProduction: false,
+        approvedAt: null,
+        approvedById: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(panelRegister.id, id))
+      .returning();
+    return updated;
+  }
+
+  async getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]> {
+    let query = db.select()
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(eq(panelRegister.approvedForProduction, true));
+    
+    if (jobId) {
+      query = db.select()
+        .from(panelRegister)
+        .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+        .where(and(
+          eq(panelRegister.approvedForProduction, true),
+          eq(panelRegister.jobId, jobId)
+        ));
+    }
+    
+    const results = await query;
+    return results.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 }
 

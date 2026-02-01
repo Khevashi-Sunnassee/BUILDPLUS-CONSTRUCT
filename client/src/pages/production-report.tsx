@@ -138,7 +138,8 @@ export default function ProductionReportPage() {
   const selectedJobPanels = useMemo(() => {
     if (!selectedJobId || !jobs) return [];
     const job = jobs.find(j => j.id === selectedJobId);
-    return job?.panels || [];
+    // Only show panels approved for production
+    return (job?.panels || []).filter(p => p.approvedForProduction);
   }, [selectedJobId, jobs]);
 
   const entryForm = useForm<ProductionEntryFormData>({
@@ -523,23 +524,36 @@ export default function ProductionReportPage() {
                 name="panelId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Panel</FormLabel>
+                    <FormLabel>Panel (Approved for Production)</FormLabel>
                     <Select 
                       onValueChange={field.onChange} 
                       value={field.value}
-                      disabled={!selectedJobId}
+                      disabled={!selectedJobId || selectedJobPanels.length === 0}
                     >
                       <FormControl>
                         <SelectTrigger data-testid="select-entry-panel">
-                          <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
+                          <SelectValue placeholder={
+                            !selectedJobId 
+                              ? "Select job first" 
+                              : selectedJobPanels.length === 0 
+                                ? "No approved panels" 
+                                : "Select panel"
+                          } />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {selectedJobPanels.map((panel) => (
-                          <SelectItem key={panel.id} value={panel.id}>
-                            {panel.panelMark} - {panel.panelType?.replace("_", " ") || "WALL"}
-                          </SelectItem>
-                        ))}
+                        {selectedJobPanels.length === 0 ? (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            No panels approved for production.<br/>
+                            Use the Panel Register to approve panels.
+                          </div>
+                        ) : (
+                          selectedJobPanels.map((panel) => (
+                            <SelectItem key={panel.id} value={panel.id}>
+                              {panel.panelMark} - {panel.panelType?.replace("_", " ") || "WALL"}
+                            </SelectItem>
+                          ))
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />

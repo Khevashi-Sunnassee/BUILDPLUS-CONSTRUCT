@@ -635,6 +635,18 @@ export async function registerRoutes(
 
   app.post("/api/production-entries", requireAuth, async (req, res) => {
     try {
+      // Validate that the panel is approved for production
+      const { panelId } = req.body;
+      if (panelId) {
+        const panel = await storage.getPanelById(panelId);
+        if (!panel) {
+          return res.status(404).json({ error: "Panel not found" });
+        }
+        if (!panel.approvedForProduction) {
+          return res.status(400).json({ error: "Panel is not approved for production. Please approve the panel in the Panel Register first." });
+        }
+      }
+      
       const entryData = {
         ...req.body,
         userId: req.session.userId!,
@@ -1686,6 +1698,165 @@ export async function registerRoutes(
       totals,
       selectedComponent: componentFilter || null,
     });
+  });
+
+  // Panel production approval - Analyze PDF using OpenAI
+  app.post("/api/admin/panels/:id/analyze-pdf", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { pdfBase64 } = req.body;
+      
+      if (!pdfBase64) {
+        return res.status(400).json({ error: "PDF data is required" });
+      }
+      
+      const panel = await storage.getPanelById(id);
+      if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      
+      // Use OpenAI to analyze the PDF and extract panel specifications
+      const OpenAI = (await import("openai")).default;
+      const openai = new OpenAI({
+        apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+      });
+      
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: `You are a technical document analyzer specializing in precast concrete panel specifications.
+Extract the following fields from the provided panel drawing/specification document. Return a JSON object with these fields:
+- loadWidth: Panel load width in mm (string)
+- loadHeight: Panel load height in mm (string)  
+- panelThickness: Panel thickness in mm (string)
+- panelVolume: Panel volume in cubic meters (string)
+- panelMass: Panel mass in kg (string)
+- panelArea: Panel area in square meters (string)
+- day28Fc: 28-day concrete compressive strength in MPa (string)
+- liftFcm: Minimum concrete strength at lift in MPa (string)
+- panelMark: Panel mark/identifier (string)
+
+If a value cannot be determined from the document, use null for that field.
+Return ONLY valid JSON, no explanation text.`
+          },
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: `Analyze this precast panel specification document and extract the panel properties. Panel Mark on file: ${panel.panelMark}`
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:application/pdf;base64,${pdfBase64}`,
+                  detail: "high"
+                }
+              }
+            ]
+          }
+        ],
+        max_tokens: 1000,
+      });
+      
+      const content = response.choices[0]?.message?.content || "{}";
+      let extractedData;
+      try {
+        // Clean the response - remove markdown code blocks if present
+        const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        extractedData = JSON.parse(cleanContent);
+      } catch (e) {
+        console.error("Failed to parse OpenAI response:", content);
+        extractedData = {};
+      }
+      
+      res.json({
+        success: true,
+        extracted: extractedData,
+        panelId: id,
+      });
+    } catch (error: any) {
+      console.error("PDF analysis error:", error);
+      res.status(500).json({ 
+        error: "Failed to analyze PDF", 
+        details: error.message 
+      });
+    }
+  });
+
+  // Panel production approval - Approve panel for production
+  app.post("/api/admin/panels/:id/approve-production", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const userId = req.session.userId!;
+      const { 
+        loadWidth, 
+        loadHeight, 
+        panelThickness, 
+        panelVolume, 
+        panelMass, 
+        panelArea, 
+        day28Fc, 
+        liftFcm,
+        productionPdfUrl 
+      } = req.body;
+      
+      const panel = await storage.getPanelById(id);
+      if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      
+      const updated = await storage.approvePanelForProduction(id, userId, {
+        loadWidth,
+        loadHeight,
+        panelThickness,
+        panelVolume,
+        panelMass,
+        panelArea,
+        day28Fc,
+        liftFcm,
+        productionPdfUrl,
+      });
+      
+      res.json({ success: true, panel: updated });
+    } catch (error: any) {
+      console.error("Approval error:", error);
+      res.status(500).json({ error: "Failed to approve panel", details: error.message });
+    }
+  });
+
+  // Panel production approval - Revoke approval
+  app.post("/api/admin/panels/:id/revoke-production", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const panel = await storage.getPanelById(id);
+      if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      
+      const updated = await storage.revokePanelProductionApproval(id);
+      
+      res.json({ success: true, panel: updated });
+    } catch (error: any) {
+      console.error("Revoke error:", error);
+      res.status(500).json({ error: "Failed to revoke approval", details: error.message });
+    }
+  });
+
+  // Get panels approved for production (for production report)
+  app.get("/api/panels/approved-for-production", requireAuth, async (req, res) => {
+    try {
+      const { jobId } = req.query;
+      const panels = await storage.getPanelsApprovedForProduction(jobId as string | undefined);
+      res.json(panels);
+    } catch (error: any) {
+      console.error("Error fetching approved panels:", error);
+      res.status(500).json({ error: "Failed to fetch approved panels" });
+    }
   });
 
   return httpServer;
