@@ -14,6 +14,8 @@ import {
   ChevronDown,
   Download,
   PlusCircle,
+  Briefcase,
+  ClipboardList,
 } from "lucide-react";
 import {
   Sidebar,
@@ -52,6 +54,8 @@ const managerNavItems = [
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Projects", url: "/admin/projects", icon: FolderOpen },
+  { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
+  { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
 ];
