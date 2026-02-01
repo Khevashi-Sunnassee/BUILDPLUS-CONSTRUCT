@@ -1,10 +1,16 @@
 import express, { type Request, Response, NextFunction } from "express";
+import path from "path";
+import serveIndex from "serve-index";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
 
 const app = express();
+
+// Serve public downloads folder for source code packages with directory listing
+const downloadsPath = path.join(process.cwd(), 'public/downloads');
+app.use('/downloads', express.static(downloadsPath), serveIndex(downloadsPath, { icons: true }));
 const httpServer = createServer(app);
 
 declare module "http" {

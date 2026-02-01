@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ApplicationPackage 
+  SchemaVersion="1.0"
+  ProductType="Application"
+  AutodeskProduct="AutoCAD"
+  Name="LTE Time Tracking"
+  Description="Automatic time tracking for AutoCAD drafting work"
+  AppVersion="1.0.0"
+  Author="LTE Engineering Pty Ltd"
+  ProductCode="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}">
+
+  <CompanyDetails Name="LTE Engineering" 
+                  Url="https://lte.com.au" 
+                  Email="support@lte.com.au"/>
+
+  <Components Description="Main components">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R24.0" SeriesMax="R25.0"/>
+    <ComponentEntry AppName="LTETimeTracking" 
+                    Version="1.0.0" 
+                    ModuleName="./Contents/LTETimeTracking.AutoCAD.dll" 
+                    AppDescription="LTE Time Tracking Add-in" 
+                    LoadOnAutoCADStartup="True"/>
+  </Components>
+</ApplicationPackage>

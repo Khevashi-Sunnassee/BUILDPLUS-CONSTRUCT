@@ -1,18 +1,14 @@
 import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import {
   Download,
   FileCode,
-  Monitor,
   Settings,
-  CheckCircle2,
-  Copy,
-  Check,
-  Loader2,
   AlertCircle,
-  ExternalLink,
   Cpu,
+  FolderArchive,
+  Github,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,24 +20,14 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { useToast } from "@/hooks/use-toast";
-
-interface DeviceInfo {
-  id: string;
-  deviceName: string;
-  deviceKey?: string;
-}
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function DownloadsPage() {
   const { user } = useAuth();
-  const { toast } = useToast();
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  const copyToClipboard = async (text: string, keyId: string) => {
-    await navigator.clipboard.writeText(text);
-    setCopiedKey(keyId);
-    toast({ title: "Copied to clipboard" });
-    setTimeout(() => setCopiedKey(null), 2000);
+  const downloadSourcePackage = (packageName: string) => {
+    const basePath = `/downloads/${packageName}`;
+    window.open(basePath, '_blank');
   };
 
   return (
@@ -54,6 +40,15 @@ export default function DownloadsPage() {
           Download and configure the LTE Time Tracking tools for your workstation
         </p>
       </div>
+
+      <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30">
+        <FolderArchive className="h-4 w-4 text-blue-600" />
+        <AlertDescription className="text-blue-800 dark:text-blue-200">
+          <strong>Source Code Packages:</strong> These downloads contain complete C# source code projects. 
+          You'll need Visual Studio 2019+ and the appropriate Autodesk software installed to build them.
+          See the README.md files in each package for detailed build instructions.
+        </AlertDescription>
+      </Alert>
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="border-2 border-primary/20">
@@ -69,16 +64,34 @@ export default function DownloadsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge variant="outline">Version 1.0.0</Badge>
-              <span>Windows 10/11</span>
+              <Badge variant="outline">C# / .NET 4.8</Badge>
+              <Badge variant="outline">Windows</Badge>
             </div>
             <p className="text-sm">
               Automatically captures active document, view, sheet information, and panel marks from your Revit sessions.
             </p>
-            <Button className="w-full" data-testid="button-download-revit">
-              <Download className="h-4 w-4 mr-2" />
-              Download Revit Add-in
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Files included:</strong></p>
+              <ul className="list-disc list-inside ml-2">
+                <li>App.cs - Main add-in code</li>
+                <li>LTETimeTracking.csproj - Project file</li>
+                <li>LTETimeTracking.addin - Manifest</li>
+                <li>build.bat - Build script</li>
+                <li>README.md - Setup instructions</li>
+              </ul>
+            </div>
+            <Button 
+              className="w-full" 
+              data-testid="button-download-revit"
+              asChild
+            >
+              <a href="/downloads/revit-addin/" target="_blank">
+                <Github className="h-4 w-4 mr-2" />
+                View Source Code
+                <ExternalLink className="h-3 w-3 ml-2" />
+              </a>
             </Button>
           </CardContent>
         </Card>
@@ -96,16 +109,34 @@ export default function DownloadsPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Badge variant="outline">Version 1.0.0</Badge>
-              <span>Windows 10/11</span>
+              <Badge variant="outline">C# / .NET 4.8</Badge>
+              <Badge variant="outline">Windows</Badge>
             </div>
             <p className="text-sm">
               Automatically captures active drawing, layout information, and drawing codes from your AutoCAD sessions.
             </p>
-            <Button className="w-full" data-testid="button-download-acad">
-              <Download className="h-4 w-4 mr-2" />
-              Download AutoCAD Add-in
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Files included:</strong></p>
+              <ul className="list-disc list-inside ml-2">
+                <li>App.cs - Main add-in code</li>
+                <li>LTETimeTracking.AutoCAD.csproj - Project</li>
+                <li>PackageContents.xml - Bundle manifest</li>
+                <li>build.bat - Build script</li>
+                <li>README.md - Setup instructions</li>
+              </ul>
+            </div>
+            <Button 
+              className="w-full" 
+              data-testid="button-download-acad"
+              asChild
+            >
+              <a href="/downloads/acad-addin/" target="_blank">
+                <Github className="h-4 w-4 mr-2" />
+                View Source Code
+                <ExternalLink className="h-3 w-3 ml-2" />
+              </a>
             </Button>
           </CardContent>
         </Card>
@@ -124,17 +155,38 @@ export default function DownloadsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <Badge variant="outline">Version 1.0.0</Badge>
-            <span>Windows 10/11</span>
-            <span>Runs as system service</span>
+            <Badge variant="outline">C# / .NET 6.0</Badge>
+            <Badge variant="outline">Windows Service</Badge>
           </div>
           <p className="text-sm">
-            The Windows Agent runs in the background and communicates with the Revit/AutoCAD add-ins to capture and upload time tracking data to the portal.
+            The Windows Agent runs in the background and communicates with the Revit/AutoCAD add-ins 
+            to capture and upload time tracking data to the portal.
           </p>
-          <Button className="w-full" data-testid="button-download-agent">
-            <Download className="h-4 w-4 mr-2" />
-            Download Windows Agent
+          <div className="text-xs text-muted-foreground space-y-1">
+            <p><strong>Files included:</strong></p>
+            <ul className="list-disc list-inside ml-2">
+              <li>Program.cs - Entry point</li>
+              <li>ConfigManager.cs - Configuration handler</li>
+              <li>PipeListenerService.cs - Named pipe listener</li>
+              <li>UploadService.cs - API upload service</li>
+              <li>TimeBlockQueue.cs - Data queue</li>
+              <li>install-service.ps1 - Installation script</li>
+              <li>build.bat - Build script</li>
+              <li>README.md - Setup instructions</li>
+            </ul>
+          </div>
+          <Button 
+            className="w-full" 
+            data-testid="button-download-agent"
+            asChild
+          >
+            <a href="/downloads/windows-agent/" target="_blank">
+              <Github className="h-4 w-4 mr-2" />
+              View Source Code
+              <ExternalLink className="h-3 w-3 ml-2" />
+            </a>
           </Button>
         </CardContent>
       </Card>
@@ -163,16 +215,17 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">1</Badge>
-                      Download the Revit Add-in
+                      Download and Build
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Click the "Download Revit Add-in" button above to download the installer package.</p>
-                    <p>The download includes:</p>
-                    <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li>LTETimeTracking.addin - Add-in manifest file</li>
-                      <li>LTETimeTracking.dll - Add-in binary</li>
-                    </ul>
+                    <p>Download the Revit Add-in source code and build it with Visual Studio:</p>
+                    <ol className="list-decimal list-inside ml-4 space-y-1">
+                      <li>Open <code className="bg-muted px-1 rounded">LTETimeTracking.csproj</code> in Visual Studio</li>
+                      <li>Set environment variable: <code className="bg-muted px-1 rounded">REVIT_SDK=C:\Program Files\Autodesk\Revit 2024</code></li>
+                      <li>Build in Release configuration</li>
+                      <li>Or run <code className="bg-muted px-1 rounded">build.bat</code></li>
+                    </ol>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -184,7 +237,13 @@ export default function DownloadsPage() {
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Copy the files to your Revit add-ins folder:</p>
+                    <p>Copy the built files to your Revit add-ins folder:</p>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li><code className="bg-muted px-1 rounded">LTETimeTracking.Revit.dll</code></li>
+                      <li><code className="bg-muted px-1 rounded">LTETimeTracking.addin</code></li>
+                      <li><code className="bg-muted px-1 rounded">Newtonsoft.Json.dll</code></li>
+                    </ul>
+                    <p className="mt-2">Destination:</p>
                     <code className="block bg-muted px-3 py-2 rounded text-sm font-mono">
                       %APPDATA%\Autodesk\Revit\Addins\2024\
                     </code>
@@ -200,7 +259,7 @@ export default function DownloadsPage() {
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Close and reopen Revit. You should see the LTE Time Tracking panel in the Add-Ins tab.</p>
+                    <p>Close and reopen Revit. You should see the LTE Time Tracking loaded in the Add-Ins manager.</p>
                     <p>If prompted about loading add-ins from an unknown publisher, click "Always Load".</p>
                   </AccordionContent>
                 </AccordionItem>
@@ -213,8 +272,8 @@ export default function DownloadsPage() {
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>The add-in will show a green indicator when connected to the Windows Agent.</p>
-                    <p>Open a project file and verify that the current document name appears in the add-in panel.</p>
+                    <p>The add-in communicates with the Windows Agent via named pipe.</p>
+                    <p>Ensure the Windows Agent is running and configured before opening Revit projects.</p>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -226,15 +285,17 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">1</Badge>
-                      Download the AutoCAD Add-in
+                      Download and Build
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Click the "Download AutoCAD Add-in" button above to download the installer package.</p>
-                    <p>The download includes:</p>
-                    <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li>LTETimeTracking.bundle - AutoCAD bundle package</li>
-                    </ul>
+                    <p>Download the AutoCAD Add-in source code and build it:</p>
+                    <ol className="list-decimal list-inside ml-4 space-y-1">
+                      <li>Open <code className="bg-muted px-1 rounded">LTETimeTracking.AutoCAD.csproj</code> in Visual Studio</li>
+                      <li>Set environment variable: <code className="bg-muted px-1 rounded">ACAD_SDK=C:\Program Files\Autodesk\AutoCAD 2024</code></li>
+                      <li>Build in Release configuration</li>
+                      <li>Or run <code className="bg-muted px-1 rounded">build.bat</code></li>
+                    </ol>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -242,11 +303,19 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">2</Badge>
-                      Install the Bundle
+                      Install as Bundle
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Copy the bundle folder to AutoCAD's ApplicationPlugins folder:</p>
+                    <p>Create bundle folder structure:</p>
+                    <pre className="bg-muted px-3 py-2 rounded text-sm font-mono overflow-x-auto">
+{`LTETimeTracking.bundle/
+  PackageContents.xml
+  Contents/
+    LTETimeTracking.AutoCAD.dll
+    Newtonsoft.Json.dll`}
+                    </pre>
+                    <p className="mt-2">Copy to:</p>
                     <code className="block bg-muted px-3 py-2 rounded text-sm font-mono">
                       %APPDATA%\Autodesk\ApplicationPlugins\
                     </code>
@@ -262,7 +331,7 @@ export default function DownloadsPage() {
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Close and reopen AutoCAD. The add-in will load automatically.</p>
-                    <p>Type NETLOAD at the command prompt if the add-in doesn't auto-load.</p>
+                    <p>Alternative: Type <code className="bg-muted px-1 rounded">NETLOAD</code> and browse to the DLL.</p>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -270,12 +339,15 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">4</Badge>
-                      Verify Connection
+                      Verify with Commands
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Type LTETRACK at the command prompt to open the tracking panel.</p>
-                    <p>The panel will show connection status and current document information.</p>
+                    <p>Available commands:</p>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li><code className="bg-muted px-1 rounded">LTETRACK</code> - Show tracking status</li>
+                      <li><code className="bg-muted px-1 rounded">LTESEND</code> - Force send current data</li>
+                    </ul>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
@@ -309,12 +381,17 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">2</Badge>
-                      Install the Windows Agent
+                      Build the Agent
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Run the downloaded installer with administrator privileges.</p>
-                    <p>The agent will be installed as a Windows service that starts automatically.</p>
+                    <p>Build the Windows Agent:</p>
+                    <ol className="list-decimal list-inside ml-4 space-y-1">
+                      <li>Install .NET 6.0 SDK or later</li>
+                      <li>Open command prompt in the agent folder</li>
+                      <li>Run <code className="bg-muted px-1 rounded">build.bat</code></li>
+                    </ol>
+                    <p className="mt-2">Output: <code className="bg-muted px-1 rounded">LTETimeTracking.Agent.exe</code></p>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -322,22 +399,20 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">3</Badge>
-                      Configure the Agent
+                      Install as Windows Service
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Open the configuration file at:</p>
-                    <code className="block bg-muted px-3 py-2 rounded text-sm font-mono mb-2">
-                      C:\ProgramData\LTETimeTracking\config.json
+                    <p>Run PowerShell as Administrator:</p>
+                    <code className="block bg-muted px-3 py-2 rounded text-sm font-mono">
+                      .\install-service.ps1
                     </code>
-                    <p>Add your settings:</p>
-                    <pre className="bg-muted px-3 py-2 rounded text-sm font-mono overflow-x-auto">
-{`{
-  "serverUrl": "${window.location.origin}",
-  "deviceKey": "YOUR_DEVICE_KEY_HERE",
-  "userEmail": "${user?.email || "your.email@lte.com.au"}"
-}`}
-                    </pre>
+                    <p className="mt-2">This will:</p>
+                    <ul className="list-disc list-inside ml-4 space-y-1">
+                      <li>Copy files to Program Files</li>
+                      <li>Create the Windows service</li>
+                      <li>Set to start automatically</li>
+                    </ul>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -345,15 +420,24 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">4</Badge>
-                      Start the Service
+                      Configure the Agent
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Start the LTE Time Tracking service:</p>
-                    <code className="block bg-muted px-3 py-2 rounded text-sm font-mono">
-                      net start LTETimeTracking
+                    <p>Edit the configuration file at:</p>
+                    <code className="block bg-muted px-3 py-2 rounded text-sm font-mono mb-2">
+                      C:\ProgramData\LTETimeTracking\config.json
                     </code>
-                    <p>Or restart your computer - the service will start automatically.</p>
+                    <pre className="bg-muted px-3 py-2 rounded text-sm font-mono overflow-x-auto">
+{`{
+  "ServerUrl": "${window.location.origin}",
+  "DeviceKey": "YOUR_DEVICE_KEY_HERE",
+  "UserEmail": "${user?.email || "your.email@lte.com.au"}",
+  "Timezone": "Australia/Melbourne",
+  "UploadIntervalSeconds": 60,
+  "MaxBatchSize": 50
+}`}
+                    </pre>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -361,12 +445,15 @@ export default function DownloadsPage() {
                   <AccordionTrigger>
                     <span className="flex items-center gap-2">
                       <Badge variant="secondary" className="h-6 w-6 rounded-full p-0 justify-center">5</Badge>
-                      Verify Connection
+                      Start and Verify
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Check the agent status in the system tray.</p>
-                    <p>A green icon indicates successful connection to the server.</p>
+                    <p>Start the service:</p>
+                    <code className="block bg-muted px-3 py-2 rounded text-sm font-mono">
+                      net start LTETimeTracking
+                    </code>
+                    <p className="mt-2">Check Windows Event Viewer for logs.</p>
                     <p>Open Revit or AutoCAD and verify time entries appear on your Dashboard.</p>
                   </AccordionContent>
                 </AccordionItem>
@@ -381,7 +468,15 @@ export default function DownloadsPage() {
           <CardTitle>System Requirements</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">Build Requirements</h4>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li>Visual Studio 2019+</li>
+                <li>.NET 6.0 SDK</li>
+                <li>.NET Framework 4.8</li>
+              </ul>
+            </div>
             <div className="space-y-2">
               <h4 className="font-medium">Operating System</h4>
               <ul className="text-sm text-muted-foreground space-y-1">
