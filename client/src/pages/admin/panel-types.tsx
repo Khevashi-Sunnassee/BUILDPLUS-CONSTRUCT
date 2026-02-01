@@ -74,6 +74,7 @@ const panelTypeSchema = z.object({
   totalRatePerM3: z.string().optional(),
   sellRatePerM2: z.string().optional(),
   sellRatePerM3: z.string().optional(),
+  expectedWeightPerM3: z.string().optional(),
   isActive: z.boolean().default(true),
 });
 
@@ -134,6 +135,7 @@ export default function AdminPanelTypesPage() {
       totalRatePerM3: "",
       sellRatePerM2: "",
       sellRatePerM3: "",
+      expectedWeightPerM3: "2500",
       isActive: true,
     },
   });
@@ -246,6 +248,7 @@ export default function AdminPanelTypesPage() {
       totalRatePerM3: "",
       sellRatePerM2: "",
       sellRatePerM3: "",
+      expectedWeightPerM3: "2500",
       isActive: true,
     });
     setDialogOpen(true);
@@ -265,6 +268,7 @@ export default function AdminPanelTypesPage() {
       totalRatePerM3: type.totalRatePerM3 || "",
       sellRatePerM2: type.sellRatePerM2 || "",
       sellRatePerM3: type.sellRatePerM3 || "",
+      expectedWeightPerM3: type.expectedWeightPerM3 || "2500",
       isActive: type.isActive,
     });
     setDialogOpen(true);
@@ -339,13 +343,14 @@ export default function AdminPanelTypesPage() {
                   <TableHead className="text-right">Total/m³</TableHead>
                   <TableHead className="text-right">Sell/m²</TableHead>
                   <TableHead className="text-right">Sell/m³</TableHead>
+                  <TableHead className="text-right">Weight/m³</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {!panelTypes?.length ? (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
                       No panel types configured. Add your first panel type to get started.
                     </TableCell>
                   </TableRow>
@@ -392,6 +397,9 @@ export default function AdminPanelTypesPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-green-600 dark:text-green-400">
                         {formatCurrency(type.sellRatePerM3)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">
+                        {type.expectedWeightPerM3 || "2500"} kg
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -709,6 +717,33 @@ export default function AdminPanelTypesPage() {
                   />
                 </div>
               </div>
+
+              <FormField
+                control={form.control}
+                name="expectedWeightPerM3"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expected Weight per m³</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="1"
+                          placeholder="2500"
+                          className="pr-10"
+                          {...field}
+                          data-testid="input-expected-weight-m3"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">kg</span>
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      Default weight per cubic meter for load calculations
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}

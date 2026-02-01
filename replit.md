@@ -21,7 +21,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides, component filter dropdown for detailed daily breakdown, and interactive summary tables with click-to-filter functionality
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED), with cost overrides dialog for customized job-specific cost ratios
 - **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export
-- **Configurable Panel Types**: Admin-managed panel types with configurable rates (supply cost, install cost, sell rate per m²/m³)
+- **Configurable Panel Types**: Admin-managed panel types with configurable rates (supply cost, install cost, sell rate per m²/m³) and expected weight per m³ (default 2500kg) for load list calculations
 - **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
 - **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
