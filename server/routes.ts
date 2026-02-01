@@ -302,7 +302,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/panels", requireAuth, async (req, res) => {
-    const panels = await storage.getAllPanels();
+    const panels = await storage.getAllPanelRegisterItems();
     res.json(panels);
   });
 
