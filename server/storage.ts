@@ -394,19 +394,25 @@ export class DatabaseStorage implements IStorage {
     const userMap = new Map<string, { name: string; email: string; totalMinutes: number; days: Set<string> }>();
     const projectMap = new Map<string, { name: string; code: string; totalMinutes: number }>();
     const appMap = new Map<string, number>();
+    const sheetMap = new Map<string, { sheetNumber: string; sheetName: string; totalMinutes: number; projectName: string }>();
+    const dailyMap = new Map<string, { date: string; totalMinutes: number; users: Set<string> }>();
+    const userDailyMap = new Map<string, Map<string, number>>(); // userId -> date -> minutes
     let totalMinutes = 0;
 
     for (const row of allRows) {
       totalMinutes += row.log_rows.durationMin;
+      const logDay = row.daily_logs.logDay;
 
+      // By user
       const userId = row.daily_logs.userId;
       if (!userMap.has(userId)) {
         userMap.set(userId, { name: row.users?.name || "", email: row.users?.email || "", totalMinutes: 0, days: new Set() });
       }
       const user = userMap.get(userId)!;
       user.totalMinutes += row.log_rows.durationMin;
-      user.days.add(row.daily_logs.logDay);
+      user.days.add(logDay);
 
+      // By project
       if (row.projects) {
         const projectId = row.projects.id;
         if (!projectMap.has(projectId)) {
@@ -415,21 +421,76 @@ export class DatabaseStorage implements IStorage {
         projectMap.get(projectId)!.totalMinutes += row.log_rows.durationMin;
       }
 
+      // By app
       const app = row.log_rows.app;
       appMap.set(app, (appMap.get(app) || 0) + row.log_rows.durationMin);
+
+      // By sheet (Revit sheets)
+      const sheetNumber = row.log_rows.revitSheetNumber;
+      if (sheetNumber) {
+        const sheetKey = `${sheetNumber}-${row.projects?.name || "Unknown"}`;
+        if (!sheetMap.has(sheetKey)) {
+          sheetMap.set(sheetKey, { 
+            sheetNumber, 
+            sheetName: row.log_rows.revitSheetName || "", 
+            totalMinutes: 0,
+            projectName: row.projects?.name || "Unknown"
+          });
+        }
+        sheetMap.get(sheetKey)!.totalMinutes += row.log_rows.durationMin;
+      }
+
+      // Daily breakdown
+      if (!dailyMap.has(logDay)) {
+        dailyMap.set(logDay, { date: logDay, totalMinutes: 0, users: new Set() });
+      }
+      const dayData = dailyMap.get(logDay)!;
+      dayData.totalMinutes += row.log_rows.durationMin;
+      dayData.users.add(userId);
+
+      // User daily breakdown (for per-resource charts)
+      if (!userDailyMap.has(userId)) {
+        userDailyMap.set(userId, new Map());
+      }
+      const userDays = userDailyMap.get(userId)!;
+      userDays.set(logDay, (userDays.get(logDay) || 0) + row.log_rows.durationMin);
     }
+
+    // Build daily trend data
+    const dailyTrend = Array.from(dailyMap.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(d => ({ date: d.date, totalMinutes: d.totalMinutes, userCount: d.users.size }));
+
+    // Build user daily breakdown for resource chart
+    const resourceDaily = Array.from(userMap.entries()).map(([userId, userData]) => {
+      const userDays = userDailyMap.get(userId) || new Map();
+      const dailyData = Array.from(userDays.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([date, minutes]) => ({ date, minutes }));
+      return {
+        userId,
+        name: userData.name,
+        email: userData.email,
+        totalMinutes: userData.totalMinutes,
+        activeDays: userData.days.size,
+        dailyBreakdown: dailyData,
+      };
+    });
 
     return {
       summary: {
         totalMinutes,
         totalUsers: userMap.size,
         totalProjects: projectMap.size,
+        totalSheets: sheetMap.size,
         avgMinutesPerDay: userMap.size > 0 ? Math.round(totalMinutes / Array.from(userMap.values()).reduce((sum, u) => sum + u.days.size, 0)) : 0,
       },
       byUser: Array.from(userMap.values()).map(u => ({ name: u.name, email: u.email, totalMinutes: u.totalMinutes, activeDays: u.days.size })),
       byProject: Array.from(projectMap.values()),
       byApp: Array.from(appMap.entries()).map(([app, totalMinutes]) => ({ app, totalMinutes })),
-      weeklyTrend: [],
+      bySheet: Array.from(sheetMap.values()).sort((a, b) => b.totalMinutes - a.totalMinutes),
+      dailyTrend,
+      resourceDaily,
     };
   }
 }

@@ -13,6 +13,7 @@ import {
   Clock,
   ChevronDown,
   Download,
+  PlusCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -39,6 +40,7 @@ import {
 const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Daily Reports", url: "/daily-reports", icon: FileText },
+  { title: "Manual Entry", url: "/manual-entry", icon: PlusCircle },
   { title: "Reports", url: "/reports", icon: BarChart3 },
   { title: "Downloads", url: "/downloads", icon: Download },
 ];

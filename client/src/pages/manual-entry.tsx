@@ -1,0 +1,409 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { format } from "date-fns";
+import {
+  Plus,
+  Clock,
+  FolderOpen,
+  FileText,
+  Save,
+  ArrowLeft,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+
+const manualEntrySchema = z.object({
+  logDay: z.string().min(1, "Date is required"),
+  projectId: z.string().optional(),
+  app: z.enum(["revit", "acad"]),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().min(1, "End time is required"),
+  fileName: z.string().optional(),
+  filePath: z.string().optional(),
+  revitViewName: z.string().optional(),
+  revitSheetNumber: z.string().optional(),
+  revitSheetName: z.string().optional(),
+  acadLayoutName: z.string().optional(),
+  panelMark: z.string().optional(),
+  drawingCode: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+type ManualEntryForm = z.infer<typeof manualEntrySchema>;
+
+interface Project {
+  id: string;
+  name: string;
+  code: string | null;
+}
+
+export default function ManualEntryPage() {
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const today = format(new Date(), "yyyy-MM-dd");
+
+  const { data: projects } = useQuery<{ id: string; name: string; code: string | null }[]>({
+    queryKey: ["/api/projects"],
+  });
+
+  const form = useForm<ManualEntryForm>({
+    resolver: zodResolver(manualEntrySchema),
+    defaultValues: {
+      logDay: today,
+      app: "revit",
+      startTime: "09:00",
+      endTime: "09:30",
+      fileName: "",
+      filePath: "",
+      revitViewName: "",
+      revitSheetNumber: "",
+      revitSheetName: "",
+      acadLayoutName: "",
+      panelMark: "",
+      drawingCode: "",
+      notes: "",
+    },
+  });
+
+  const appType = form.watch("app");
+
+  const createEntryMutation = useMutation({
+    mutationFn: async (data: ManualEntryForm) => {
+      const res = await apiRequest("POST", "/api/manual-entry", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Time entry created successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      navigate("/daily-reports");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const onSubmit = (data: ManualEntryForm) => {
+    const submitData = {
+      ...data,
+      projectId: data.projectId === "none" ? undefined : data.projectId,
+    };
+    createEntryMutation.mutate(submitData as ManualEntryForm);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => navigate("/daily-reports")} data-testid="button-back">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
+            Manual Time Entry
+          </h1>
+          <p className="text-muted-foreground">
+            Log time manually when the add-in is not available
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            New Time Entry
+          </CardTitle>
+          <CardDescription>
+            Enter your time worked with the same detail as the automatic tracking
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField
+                  control={form.control}
+                  name="logDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} data-testid="input-log-day" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} data-testid="input-start-time" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} data-testid="input-end-time" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="app"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Application</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-app">
+                            <SelectValue placeholder="Select application" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="revit">Revit</SelectItem>
+                          <SelectItem value="acad">AutoCAD</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="projectId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Project</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-project">
+                            <SelectValue placeholder="Select project (optional)" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No project</SelectItem>
+                          {projects?.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.code ? `${project.code} - ${project.name}` : project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="fileName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>File Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Model.rvt" {...field} data-testid="input-file-name" />
+                      </FormControl>
+                      <FormDescription>Name of the file you worked on</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="filePath"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>File Path</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., C:\Projects\Job123\Model.rvt" {...field} data-testid="input-file-path" />
+                      </FormControl>
+                      <FormDescription>Full path to the file</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {appType === "revit" && (
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="revitViewName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>View Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Level 1 - Floor Plan" {...field} data-testid="input-view-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="revitSheetNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sheet Number</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., A101" {...field} data-testid="input-sheet-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="revitSheetName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sheet Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g., Ground Floor Plan" {...field} data-testid="input-sheet-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+
+              {appType === "acad" && (
+                <FormField
+                  control={form.control}
+                  name="acadLayoutName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Layout Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Layout1" {...field} data-testid="input-layout-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="panelMark"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Panel Mark</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., PM-001" {...field} data-testid="input-panel-mark" />
+                      </FormControl>
+                      <FormDescription>Panel identifier for the work</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="drawingCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Drawing Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
+                      </FormControl>
+                      <FormDescription>Drawing reference code</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Any additional notes about this time entry..." 
+                        className="resize-none"
+                        {...field} 
+                        data-testid="input-notes"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-end gap-3">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => navigate("/daily-reports")}
+                  data-testid="button-cancel"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createEntryMutation.isPending}
+                  data-testid="button-save-entry"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {createEntryMutation.isPending ? "Saving..." : "Save Entry"}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

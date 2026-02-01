@@ -21,6 +21,7 @@ import AdminProjectsPage from "@/pages/admin/projects";
 import AdminDevicesPage from "@/pages/admin/devices";
 import AdminUsersPage from "@/pages/admin/users";
 import DownloadsPage from "@/pages/downloads";
+import ManualEntryPage from "@/pages/manual-entry";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -113,6 +114,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <DailyReportDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/manual-entry">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ManualEntryPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

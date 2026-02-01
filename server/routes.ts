@@ -213,6 +213,76 @@ export async function registerRoutes(
     res.json({ row: updatedRow });
   });
 
+  // Manual time entry - same structure as agent ingestion
+  app.post("/api/manual-entry", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+
+      const { logDay, projectId, app, startTime, endTime, fileName, filePath,
+              revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
+              panelMark, drawingCode, notes } = req.body;
+
+      if (!logDay || !app || !startTime || !endTime) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+
+      // Calculate duration in minutes
+      const [startH, startM] = startTime.split(":").map(Number);
+      const [endH, endM] = endTime.split(":").map(Number);
+      const startMinutes = startH * 60 + startM;
+      const endMinutes = endH * 60 + endM;
+      const durationMin = endMinutes - startMinutes;
+
+      if (durationMin <= 0) {
+        return res.status(400).json({ error: "End time must be after start time" });
+      }
+
+      // Create or get daily log
+      const dailyLog = await storage.upsertDailyLog({
+        userId: user.id,
+        logDay,
+        tz: "Australia/Melbourne",
+      });
+
+      // Create a unique source event ID for manual entries
+      const sourceEventId = `manual-${user.id}-${logDay}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      // Create the log row
+      const startAt = new Date(`${logDay}T${startTime}:00+11:00`);
+      const endAt = new Date(`${logDay}T${endTime}:00+11:00`);
+
+      await storage.upsertLogRow(sourceEventId, {
+        dailyLogId: dailyLog.id,
+        projectId: projectId || undefined,
+        startAt,
+        endAt,
+        durationMin,
+        idleMin: 0,
+        source: "manual",
+        tz: "Australia/Melbourne",
+        app,
+        filePath: filePath || undefined,
+        fileName: fileName || undefined,
+        revitViewName: revitViewName || undefined,
+        revitSheetNumber: revitSheetNumber || undefined,
+        revitSheetName: revitSheetName || undefined,
+        acadLayoutName: acadLayoutName || undefined,
+        rawPanelMark: panelMark || undefined,
+        rawDrawingCode: drawingCode || undefined,
+        panelMark: panelMark || undefined,
+        drawingCode: drawingCode || undefined,
+        notes: notes || undefined,
+        isUserEdited: true,
+      });
+
+      res.json({ ok: true, dailyLogId: dailyLog.id });
+    } catch (error) {
+      console.error("Manual entry error:", error);
+      res.status(500).json({ error: "Failed to create time entry" });
+    }
+  });
+
   app.get("/api/projects", requireAuth, async (req, res) => {
     const projects = await storage.getAllProjects();
     res.json(projects.map(p => ({ id: p.id, name: p.name, code: p.code })));
