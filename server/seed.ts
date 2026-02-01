@@ -1,14 +1,43 @@
 import { db } from "./db";
-import { users, projects, dailyLogs, logRows, globalSettings } from "@shared/schema";
+import { users, projects, dailyLogs, logRows, globalSettings, workTypes } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
 export async function seedDatabase() {
   console.log("Checking if seed data exists...");
 
+  // Always seed work types (idempotent)
+  const existingWorkTypes = await db.select().from(workTypes);
+  if (existingWorkTypes.length === 0) {
+    await db.insert(workTypes).values([
+      {
+        code: "GENERAL",
+        name: "General Drafting",
+        description: "Standard drafting work",
+        sortOrder: 1,
+        isActive: true,
+      },
+      {
+        code: "CLIENT_CHANGE",
+        name: "Client Changes",
+        description: "Modifications requested by client",
+        sortOrder: 2,
+        isActive: true,
+      },
+      {
+        code: "ERROR_REWORK",
+        name: "Errors/Redrafting",
+        description: "Corrections and redrafting of previous work",
+        sortOrder: 3,
+        isActive: true,
+      },
+    ]);
+    console.log("Work types seeded");
+  }
+
   const existingUsers = await db.select().from(users);
   if (existingUsers.length > 0) {
-    console.log("Seed data already exists, skipping...");
+    console.log("User data already exists, skipping user seed...");
     return;
   }
 

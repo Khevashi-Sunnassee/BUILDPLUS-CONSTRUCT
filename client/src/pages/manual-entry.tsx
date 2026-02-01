@@ -38,13 +38,14 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
-import type { Job, PanelRegister } from "@shared/schema";
+import type { Job, PanelRegister, WorkType } from "@shared/schema";
 
 const manualEntrySchema = z.object({
   logDay: z.string().min(1, "Date is required"),
   projectId: z.string().optional(),
   jobId: z.string().optional(),
   panelRegisterId: z.string().optional(),
+  workTypeId: z.string().optional(),
   app: z.enum(["revit", "acad"]),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
@@ -89,6 +90,10 @@ export default function ManualEntryPage() {
     queryKey: ["/api/panels"],
   });
 
+  const { data: workTypes } = useQuery<WorkType[]>({
+    queryKey: ["/api/work-types"],
+  });
+
   const filteredPanels = panels?.filter(p => 
     !selectedJobId || selectedJobId === "none" || p.jobId === selectedJobId
   );
@@ -103,6 +108,7 @@ export default function ManualEntryPage() {
       projectId: "",
       jobId: "",
       panelRegisterId: "",
+      workTypeId: "",
       fileName: "",
       filePath: "",
       revitViewName: "",
@@ -156,6 +162,7 @@ export default function ManualEntryPage() {
       projectId: data.projectId === "none" ? undefined : data.projectId,
       jobId: data.jobId === "none" ? undefined : data.jobId,
       panelRegisterId: data.panelRegisterId === "none" ? undefined : data.panelRegisterId,
+      workTypeId: data.workTypeId && data.workTypeId !== "none" ? parseInt(data.workTypeId) : undefined,
     };
     createEntryMutation.mutate(submitData as ManualEntryForm);
   };
@@ -376,6 +383,39 @@ export default function ManualEntryPage() {
                             </SelectContent>
                           </Select>
                           <FormDescription className="text-xs">Auto-fills panel mark and drawing code</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="workTypeId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1">
+                            <Briefcase className="h-3 w-3" />
+                            Work Type
+                          </FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-work-type">
+                                <SelectValue placeholder="Select work type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No work type</SelectItem>
+                              {workTypes?.map((wt) => (
+                                <SelectItem key={wt.id} value={String(wt.id)}>
+                                  {wt.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormDescription className="text-xs">Categorize the type of drafting work</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}

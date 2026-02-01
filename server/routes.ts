@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage, sha256Hex } from "./storage";
-import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema } from "@shared/schema";
+import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema } from "@shared/schema";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 
@@ -203,12 +203,13 @@ export async function registerRoutes(
     if (log.status !== "PENDING" && log.status !== "REJECTED") {
       return res.status(400).json({ error: "Cannot edit rows in submitted/approved logs" });
     }
-    const { panelMark, drawingCode, notes, projectId } = req.body;
+    const { panelMark, drawingCode, notes, projectId, workTypeId } = req.body;
     const updatedRow = await storage.updateLogRow(req.params.id, {
       panelMark,
       drawingCode,
       notes,
       projectId,
+      workTypeId: workTypeId === null ? null : (workTypeId !== undefined ? workTypeId : undefined),
       isUserEdited: true,
     });
     res.json({ row: updatedRow });
@@ -220,7 +221,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-      const { logDay, projectId, jobId, panelRegisterId, app, startTime, endTime, fileName, filePath,
+      const { logDay, projectId, jobId, panelRegisterId, workTypeId, app, startTime, endTime, fileName, filePath,
               revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
               panelMark, drawingCode, notes } = req.body;
 
@@ -258,6 +259,7 @@ export async function registerRoutes(
         projectId: projectId || undefined,
         jobId: jobId || undefined,
         panelRegisterId: panelRegisterId || undefined,
+        workTypeId: workTypeId || undefined,
         startAt,
         endAt,
         durationMin,
@@ -747,6 +749,51 @@ export async function registerRoutes(
 
   app.delete("/api/projects/:projectId/panel-rates/:rateId", requireRole("ADMIN"), async (req, res) => {
     await storage.deleteProjectPanelRate(req.params.rateId);
+    res.json({ ok: true });
+  });
+
+  // Work Types Routes
+  app.get("/api/work-types", requireAuth, async (req, res) => {
+    const types = await storage.getActiveWorkTypes();
+    res.json(types);
+  });
+
+  app.get("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
+    const types = await storage.getAllWorkTypes();
+    res.json(types);
+  });
+
+  app.post("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const parsed = insertWorkTypeSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
+      }
+      const workType = await storage.createWorkType(parsed.data);
+      res.json(workType);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create work type" });
+    }
+  });
+
+  app.put("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const parsed = insertWorkTypeSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
+      }
+      const workType = await storage.updateWorkType(parseInt(req.params.id), parsed.data);
+      if (!workType) {
+        return res.status(404).json({ error: "Work type not found" });
+      }
+      res.json(workType);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update work type" });
+    }
+  });
+
+  app.delete("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
+    await storage.deleteWorkType(parseInt(req.params.id));
     res.json({ ok: true });
   });
 

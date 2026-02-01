@@ -23,6 +23,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (labour cost, supply cost, sell rate per m²/m³)
 - **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
+- **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
 
 ## Tech Stack
 - **Frontend**: React + Vite, TanStack Query, Wouter, shadcn/ui, Tailwind CSS
@@ -81,6 +82,7 @@ shared/
 - **productionEntries**: Production work entries (panelId, jobId, userId, productionDate, volumeM3, areaM2)
 - **panelTypes**: Configurable panel types with rates (code, name, labourCostPerM2/M3, supplyCostPerM2/M3, sellRatePerM2/M3)
 - **projectPanelRates**: Project-level rate overrides for specific panel types
+- **workTypes**: Work type categorization (code, name, description, sortOrder) - GENERAL, CLIENT_CHANGE, ERROR_REWORK
 
 ## API Endpoints
 ### Auth
@@ -137,6 +139,13 @@ shared/
 - GET /api/reports/production-with-costs - Production data with cost/revenue/profit calculations
   - Query params: startDate, endDate
   - Returns: dailyData with financial metrics, totals, panelTypes
+
+### Work Types Routes
+- GET /api/work-types - List active work types (for dropdowns)
+- GET /api/admin/work-types - List all work types (admin)
+- POST /api/admin/work-types - Create work type
+- PUT /api/admin/work-types/:id - Update work type
+- DELETE /api/admin/work-types/:id - Delete work type
 
 ### Agent API
 - POST /api/agent/ingest - Windows Agent time block ingestion

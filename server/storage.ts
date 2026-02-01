@@ -3,7 +3,7 @@ import { db } from "./db";
 import {
   users, devices, projects, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
-  panelTypes, projectPanelRates,
+  panelTypes, projectPanelRates, workTypes,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertProject, type Project, type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -11,6 +11,7 @@ import {
   type InsertJob, type Job, type InsertPanelRegister, type PanelRegister,
   type InsertProductionEntry, type ProductionEntry,
   type InsertPanelType, type PanelTypeConfig, type InsertProjectPanelRate, type ProjectPanelRate,
+  type InsertWorkType, type WorkType,
 } from "@shared/schema";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -57,7 +58,7 @@ export interface IStorage {
 
   getLogRow(id: string): Promise<LogRow | undefined>;
   upsertLogRow(sourceEventId: string, data: Partial<InsertLogRow> & { dailyLogId: string }): Promise<LogRow>;
-  updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; projectId: string; isUserEdited: boolean }>): Promise<LogRow | undefined>;
+  updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; projectId: string; isUserEdited: boolean; workTypeId: number | null }>): Promise<LogRow | undefined>;
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
@@ -111,6 +112,14 @@ export interface IStorage {
   upsertProjectPanelRate(projectId: string, panelTypeId: string, data: Partial<InsertProjectPanelRate>): Promise<ProjectPanelRate>;
   deleteProjectPanelRate(id: string): Promise<void>;
   getEffectiveRates(projectId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; projectRate?: ProjectPanelRate })[]>;
+
+  getWorkType(id: number): Promise<WorkType | undefined>;
+  getWorkTypeByCode(code: string): Promise<WorkType | undefined>;
+  createWorkType(data: InsertWorkType): Promise<WorkType>;
+  updateWorkType(id: number, data: Partial<InsertWorkType>): Promise<WorkType | undefined>;
+  deleteWorkType(id: number): Promise<void>;
+  getAllWorkTypes(): Promise<WorkType[]>;
+  getActiveWorkTypes(): Promise<WorkType[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -874,6 +883,43 @@ export class DatabaseStorage implements IStorage {
       isOverridden: ratesMap.has(pt.id),
       projectRate: ratesMap.get(pt.id),
     }));
+  }
+
+  async getWorkType(id: number): Promise<WorkType | undefined> {
+    const [workType] = await db.select().from(workTypes).where(eq(workTypes.id, id));
+    return workType;
+  }
+
+  async getWorkTypeByCode(code: string): Promise<WorkType | undefined> {
+    const [workType] = await db.select().from(workTypes).where(eq(workTypes.code, code));
+    return workType;
+  }
+
+  async createWorkType(data: InsertWorkType): Promise<WorkType> {
+    const [workType] = await db.insert(workTypes).values(data).returning();
+    return workType;
+  }
+
+  async updateWorkType(id: number, data: Partial<InsertWorkType>): Promise<WorkType | undefined> {
+    const [workType] = await db.update(workTypes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workTypes.id, id))
+      .returning();
+    return workType;
+  }
+
+  async deleteWorkType(id: number): Promise<void> {
+    await db.delete(workTypes).where(eq(workTypes.id, id));
+  }
+
+  async getAllWorkTypes(): Promise<WorkType[]> {
+    return db.select().from(workTypes).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+  }
+
+  async getActiveWorkTypes(): Promise<WorkType[]> {
+    return db.select().from(workTypes)
+      .where(eq(workTypes.isActive, true))
+      .orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
   }
 }
 

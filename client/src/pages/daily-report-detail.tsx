@@ -49,7 +49,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { DailyLog, LogRow, Project } from "@shared/schema";
+import type { DailyLog, LogRow, Project, WorkType } from "@shared/schema";
 
 interface DailyLogDetail extends DailyLog {
   rows: (LogRow & { project?: Project })[];
@@ -72,6 +72,10 @@ export default function DailyReportDetailPage() {
 
   const { data: projects } = useQuery<Project[]>({
     queryKey: ["/api/projects"],
+  });
+
+  const { data: workTypes } = useQuery<WorkType[]>({
+    queryKey: ["/api/work-types"],
   });
 
   const updateRowMutation = useMutation({
@@ -144,6 +148,7 @@ export default function DailyReportDetailPage() {
       panelMark: row.panelMark || "",
       drawingCode: row.drawingCode || "",
       projectId: row.projectId || "",
+      workTypeId: row.workTypeId ?? null,
       notes: row.notes || "",
     });
   };
@@ -314,6 +319,7 @@ export default function DailyReportDetailPage() {
                   <TableHead>Panel Mark</TableHead>
                   <TableHead>Drawing Code</TableHead>
                   <TableHead>Project</TableHead>
+                  <TableHead>Work Type</TableHead>
                   <TableHead className="text-right w-20">Minutes</TableHead>
                   <TableHead>Notes</TableHead>
                   {canEdit && <TableHead className="w-20"></TableHead>}
@@ -389,6 +395,30 @@ export default function DailyReportDetailPage() {
                       ) : (
                         <span className={!row.project ? "text-muted-foreground" : ""}>
                           {row.project?.code || row.project?.name || "-"}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {editingRowId === row.id ? (
+                        <Select
+                          value={editValues.workTypeId !== undefined ? String(editValues.workTypeId) : "none"}
+                          onValueChange={(v) => setEditValues({ ...editValues, workTypeId: v === "none" ? null : parseInt(v) })}
+                        >
+                          <SelectTrigger className="h-8 w-32" data-testid="select-work-type">
+                            <SelectValue placeholder="Select" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">None</SelectItem>
+                            {workTypes?.map((wt) => (
+                              <SelectItem key={wt.id} value={String(wt.id)}>
+                                {wt.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <span className={!row.workTypeId ? "text-muted-foreground" : ""}>
+                          {row.workTypeId ? workTypes?.find(wt => wt.id === row.workTypeId)?.name || "-" : "-"}
                         </span>
                       )}
                     </TableCell>

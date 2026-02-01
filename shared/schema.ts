@@ -70,6 +70,20 @@ export const jobs = pgTable("jobs", {
   statusIdx: index("jobs_status_idx").on(table.status),
 }));
 
+export const workTypes = pgTable("work_types", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  code: text("code").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: uniqueIndex("work_types_code_idx").on(table.code),
+  sortOrderIdx: index("work_types_sort_order_idx").on(table.sortOrder),
+}));
+
 export const panelRegister = pgTable("panel_register", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
@@ -127,6 +141,7 @@ export const logRows = pgTable("log_rows", {
   projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
   panelRegisterId: varchar("panel_register_id", { length: 36 }).references(() => panelRegister.id),
+  workTypeId: integer("work_type_id").references(() => workTypes.id),
   startAt: timestamp("start_at").notNull(),
   endAt: timestamp("end_at").notNull(),
   durationMin: integer("duration_min").notNull(),
@@ -267,6 +282,12 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   updatedAt: true,
 });
 
+export const insertWorkTypeSchema = createInsertSchema(workTypes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPanelRegisterSchema = createInsertSchema(panelRegister).omit({
   id: true,
   createdAt: true,
@@ -380,6 +401,8 @@ export type InsertPanelType = z.infer<typeof insertPanelTypeSchema>;
 export type PanelTypeConfig = typeof panelTypes.$inferSelect;
 export type InsertProjectPanelRate = z.infer<typeof insertProjectPanelRateSchema>;
 export type ProjectPanelRate = typeof projectPanelRates.$inferSelect;
+export type InsertWorkType = z.infer<typeof insertWorkTypeSchema>;
+export type WorkType = typeof workTypes.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
