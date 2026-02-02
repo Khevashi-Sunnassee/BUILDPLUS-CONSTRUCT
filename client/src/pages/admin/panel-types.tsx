@@ -1038,10 +1038,10 @@ export default function AdminPanelTypesPage() {
                       placeholder="0"
                       value={component.percentageOfRevenue}
                       onChange={(e) => handleComponentChange(index, "percentageOfRevenue", e.target.value)}
-                      className="pr-6"
+                      className="w-full pr-8"
                       data-testid={`input-component-percentage-${index}`}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm pointer-events-none">%</span>
                   </div>
                   <Button
                     type="button"
