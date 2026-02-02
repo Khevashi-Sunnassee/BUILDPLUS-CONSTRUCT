@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -91,6 +91,13 @@ export default function WeeklyJobLogsPage() {
     acc[pmId].reports.push(report);
     return acc;
   }, {} as Record<string, { user: User; reports: WeeklyJobReportWithDetails[] }>) : {};
+
+  // Expand all user groups by default when data loads
+  useEffect(() => {
+    if (Object.keys(reportsByUser).length > 0) {
+      setExpandedUsers(new Set(Object.keys(reportsByUser)));
+    }
+  }, [allReports.length]);
 
   const { data: allJobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
