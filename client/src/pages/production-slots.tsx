@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2 } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays } from "date-fns";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister } from "@shared/schema";
 
@@ -26,6 +27,7 @@ interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
 }
 
 type StatusFilter = "ALL" | "SCHEDULED" | "PENDING_UPDATE" | "BOOKED" | "COMPLETED";
+type GroupBy = "none" | "job" | "client";
 
 export default function ProductionSlotsPage() {
   const { user } = useAuth();
@@ -36,6 +38,8 @@ export default function ProductionSlotsPage() {
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [dateFromFilter, setDateFromFilter] = useState<string>("");
   const [dateToFilter, setDateToFilter] = useState<string>("");
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
@@ -236,6 +240,51 @@ export default function ProductionSlotsPage() {
     return groups;
   };
 
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  };
+
+  const groupedSlots = (() => {
+    if (groupBy === "none") return null;
+    
+    const groups: Record<string, { label: string; slots: ProductionSlotWithDetails[] }> = {};
+    
+    for (const slot of slots) {
+      let key: string;
+      let label: string;
+      
+      if (groupBy === "job") {
+        key = slot.jobId;
+        label = `${slot.job.jobNumber} - ${slot.job.name || ""}`;
+      } else {
+        key = slot.job.client || "No Client";
+        label = slot.job.client || "No Client";
+      }
+      
+      if (!groups[key]) {
+        groups[key] = { label, slots: [] };
+      }
+      groups[key].slots.push(slot);
+    }
+    
+    return groups;
+  })();
+
+  // Expand all groups by default when grouping changes
+  useEffect(() => {
+    if (groupedSlots) {
+      setExpandedGroups(new Set(Object.keys(groupedSlots)));
+    }
+  }, [groupBy, slots.length]);
+
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -256,7 +305,7 @@ export default function ProductionSlotsPage() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
@@ -283,6 +332,19 @@ export default function ProductionSlotsPage() {
                   {allJobs.map((job: any) => (
                     <SelectItem key={job.id} value={job.id}>{job.jobNumber} - {job.name}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Group By</Label>
+              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+                <SelectTrigger data-testid="select-group-by">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Grouping</SelectItem>
+                  <SelectItem value="job">Group by Job</SelectItem>
+                  <SelectItem value="client">Group by Client</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -319,6 +381,118 @@ export default function ProductionSlotsPage() {
           ) : slots.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No production slots found. {jobsWithoutSlots.length > 0 && "Click 'Generate Slots' to create slots for available jobs."}
+            </div>
+          ) : groupBy !== "none" && groupedSlots ? (
+            <div className="space-y-2">
+              {Object.entries(groupedSlots).map(([groupKey, { label, slots: groupSlots }]) => (
+                <Collapsible 
+                  key={groupKey} 
+                  open={expandedGroups.has(groupKey)}
+                  onOpenChange={() => toggleGroup(groupKey)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer hover-elevate" data-testid={`trigger-group-${groupKey}`}>
+                      {expandedGroups.has(groupKey) ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      {groupBy === "job" ? <Briefcase className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                      <span className="font-medium">{label}</span>
+                      <Badge variant="secondary" className="ml-auto">{groupSlots.length} slot{groupSlots.length !== 1 ? "s" : ""}</Badge>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="ml-4 mt-2 border-l-2 pl-4">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Production Date</TableHead>
+                            {groupBy !== "job" && <TableHead>Job</TableHead>}
+                            {groupBy !== "client" && <TableHead>Client</TableHead>}
+                            <TableHead>Building</TableHead>
+                            <TableHead>Level</TableHead>
+                            <TableHead>Panels</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {groupSlots.map((slot) => (
+                            <TableRow key={slot.id} data-testid={`row-slot-${slot.id}`}>
+                              <TableCell className={getDateColorClass(slot)}>
+                                {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
+                                {differenceInDays(new Date(slot.productionSlotDate), new Date()) < 0 && slot.status !== "COMPLETED" && (
+                                  <AlertTriangle className="h-4 w-4 inline ml-1 text-red-600" />
+                                )}
+                              </TableCell>
+                              {groupBy !== "job" && <TableCell>{slot.job.jobNumber}</TableCell>}
+                              {groupBy !== "client" && <TableCell>{slot.job.client || "-"}</TableCell>}
+                              <TableCell>{slot.buildingNumber}</TableCell>
+                              <TableCell>{slot.level}</TableCell>
+                              <TableCell>
+                                <Button 
+                                  variant="ghost" 
+                                  className="p-0 h-auto text-blue-600 underline hover:text-blue-800" 
+                                  onClick={() => openPanelBreakdown(slot)}
+                                  data-testid={`button-panel-count-${slot.id}`}
+                                >
+                                  {slot.panelCount} panels
+                                </Button>
+                              </TableCell>
+                              <TableCell>{getSlotStatusBadge(slot.status)}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  {isManagerOrAdmin && slot.status !== "COMPLETED" && (
+                                    <>
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={() => openAdjustDialog(slot)}
+                                        data-testid={`button-adjust-${slot.id}`}
+                                      >
+                                        <Calendar className="h-4 w-4" />
+                                      </Button>
+                                      {slot.status !== "BOOKED" && (
+                                        <Button 
+                                          size="sm" 
+                                          variant="default"
+                                          onClick={() => bookSlotMutation.mutate(slot.id)}
+                                          disabled={bookSlotMutation.isPending}
+                                          data-testid={`button-book-${slot.id}`}
+                                        >
+                                          <BookOpen className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      <Button 
+                                        size="sm" 
+                                        variant="outline"
+                                        onClick={() => completeSlotMutation.mutate(slot.id)}
+                                        disabled={completeSlotMutation.isPending}
+                                        data-testid={`button-complete-${slot.id}`}
+                                      >
+                                        <Check className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                  <Button 
+                                    size="sm" 
+                                    variant="ghost"
+                                    onClick={() => openHistory(slot)}
+                                    data-testid={`button-history-${slot.id}`}
+                                  >
+                                    <History className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
             </div>
           ) : (
             <Table>

@@ -1489,6 +1489,16 @@ export async function registerRoutes(
         // Update panel status to COMPLETED when production entry is marked as completed
         if (status === "COMPLETED") {
           await storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" });
+          
+          // Check if all panels for this slot are completed and auto-complete the slot
+          const panel = await storage.getPanelRegisterItem(panelId);
+          if (panel && panel.level && panel.building) {
+            await storage.checkAndCompleteSlotByPanelCompletion(
+              panel.jobId, 
+              panel.level, 
+              parseInt(panel.building) || 1
+            );
+          }
         }
       }
       
@@ -1529,12 +1539,35 @@ export async function registerRoutes(
       validEntries.map(e => storage.updateProductionEntry(e.id, { status }))
     );
     
-    // When marking as COMPLETED, also update the panel status to COMPLETED
+    // When marking as COMPLETED, also update the panel status to COMPLETED and check slot completion
     if (status === "COMPLETED") {
       const uniquePanelIds = Array.from(new Set(validEntries.map(e => e.panelId)));
+      
+      // Update all panels to COMPLETED
       await Promise.all(
         uniquePanelIds.map(panelId => storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" }))
       );
+      
+      // Check if slots should be auto-completed for each affected panel's level
+      const slotsToCheck = new Map<string, { jobId: string; level: string; building: number }>();
+      for (const panelId of uniquePanelIds) {
+        const panel = await storage.getPanelRegisterItem(panelId);
+        if (panel && panel.level && panel.building) {
+          const key = `${panel.jobId}-${panel.level}-${panel.building}`;
+          if (!slotsToCheck.has(key)) {
+            slotsToCheck.set(key, {
+              jobId: panel.jobId,
+              level: panel.level,
+              building: parseInt(panel.building) || 1
+            });
+          }
+        }
+      }
+      
+      // Check and complete slots for each unique level
+      for (const { jobId, level, building } of slotsToCheck.values()) {
+        await storage.checkAndCompleteSlotByPanelCompletion(jobId, level, building);
+      }
     }
     
     res.json({ updated: updated.length });
