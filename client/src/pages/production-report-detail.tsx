@@ -299,9 +299,9 @@ export default function ProductionReportDetailPage() {
 
   // Status counts
   const statusCounts = useMemo(() => {
-    if (!entries) return { draft: 0, completed: 0, total: 0 };
+    if (!entries) return { pending: 0, completed: 0, total: 0 };
     return {
-      draft: entries.filter(e => e.status === "DRAFT").length,
+      pending: entries.filter(e => e.status === "PENDING").length,
       completed: entries.filter(e => e.status === "COMPLETED").length,
       total: entries.length,
     };
@@ -686,9 +686,9 @@ export default function ProductionReportDetailPage() {
               <div className="flex items-center gap-4">
                 <span className="font-medium">PRODUCTION SCHEDULE</span>
                 <div className="flex items-center gap-2">
-                  <Badge variant={statusCounts.draft > 0 ? "secondary" : "outline"} className="gap-1">
+                  <Badge variant={statusCounts.pending > 0 ? "secondary" : "outline"} className="gap-1">
                     <Circle className="h-3 w-3" />
-                    Draft: {statusCounts.draft}
+                    Pending: {statusCounts.pending}
                   </Badge>
                   <Badge variant={statusCounts.completed > 0 ? "default" : "outline"} className="gap-1 bg-green-600">
                     <CheckCircle2 className="h-3 w-3" />
@@ -703,17 +703,17 @@ export default function ProductionReportDetailPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="PENDING">Pending</SelectItem>
                     <SelectItem value="COMPLETED">Completed</SelectItem>
                   </SelectContent>
                 </Select>
-                {statusCounts.draft > 0 && (
+                {statusCounts.pending > 0 && (
                   <Button
                     size="sm"
                     onClick={() => {
-                      const draftIds = entries?.filter(e => e.status === "DRAFT").map(e => e.id) || [];
-                      if (draftIds.length > 0) {
-                        markAllCompletedMutation.mutate(draftIds);
+                      const pendingIds = entries?.filter(e => e.status === "PENDING").map(e => e.id) || [];
+                      if (pendingIds.length > 0) {
+                        markAllCompletedMutation.mutate(pendingIds);
                       }
                     }}
                     disabled={markAllCompletedMutation.isPending}
@@ -743,14 +743,18 @@ export default function ProductionReportDetailPage() {
               </TableHeader>
               <TableBody>
                 {filteredEntries?.map((entry) => (
-                  <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                  <TableRow 
+                      key={entry.id} 
+                      data-testid={`row-entry-${entry.id}`}
+                      className={entry.status === "COMPLETED" ? "bg-green-50 dark:bg-green-950/30" : ""}
+                    >
                     <TableCell>
                       <Button
                         variant="ghost"
                         size="sm"
                         className={`gap-1 ${entry.status === "COMPLETED" ? "text-green-600" : "text-muted-foreground"}`}
                         onClick={() => {
-                          const newStatus = entry.status === "COMPLETED" ? "DRAFT" : "COMPLETED";
+                          const newStatus = entry.status === "COMPLETED" ? "PENDING" : "COMPLETED";
                           updateStatusMutation.mutate({ id: entry.id, status: newStatus });
                         }}
                         disabled={updateStatusMutation.isPending}
@@ -759,7 +763,7 @@ export default function ProductionReportDetailPage() {
                         {entry.status === "COMPLETED" ? (
                           <><CheckCircle2 className="h-4 w-4" /> Done</>
                         ) : (
-                          <><Circle className="h-4 w-4" /> Draft</>
+                          <><Circle className="h-4 w-4" /> Pending</>
                         )}
                       </Button>
                     </TableCell>

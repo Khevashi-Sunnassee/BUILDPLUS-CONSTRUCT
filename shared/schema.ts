@@ -310,7 +310,7 @@ export const productionEntries = pgTable("production_entries", {
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   productionDate: text("production_date").notNull(),
   factory: text("factory").default("QLD").notNull(),
-  status: text("status").default("DRAFT").notNull(), // DRAFT = scheduled, COMPLETED = produced
+  status: text("status").default("PENDING").notNull(), // PENDING = scheduled, COMPLETED = produced
   bayNumber: text("bay_number"), // Bay number where the panel was cast
   volumeM3: text("volume_m3"),
   areaM2: text("area_m2"),
