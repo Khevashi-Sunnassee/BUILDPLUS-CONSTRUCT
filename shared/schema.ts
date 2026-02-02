@@ -78,6 +78,8 @@ export const globalSettings = pgTable("global_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const australianStateEnum = pgEnum("australian_state", ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"]);
+
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobNumber: text("job_number").notNull().unique(),
@@ -85,6 +87,7 @@ export const jobs = pgTable("jobs", {
   code: text("code"),
   client: text("client"),
   address: text("address"),
+  state: australianStateEnum("state"),
   siteContact: text("site_contact"),
   siteContactPhone: text("site_contact_phone"),
   description: text("description"),

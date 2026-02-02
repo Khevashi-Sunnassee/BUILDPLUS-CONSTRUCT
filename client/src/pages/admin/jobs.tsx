@@ -79,11 +79,14 @@ import {
 import { useLocation } from "wouter";
 import type { Job, PanelRegister } from "@shared/schema";
 
+const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
+
 const jobSchema = z.object({
   jobNumber: z.string().min(1, "Job number is required"),
   name: z.string().min(1, "Name is required"),
   client: z.string().optional(),
   address: z.string().optional(),
+  state: z.enum(AUSTRALIAN_STATES).optional().nullable(),
   description: z.string().optional(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
@@ -379,6 +382,7 @@ export default function AdminJobsPage() {
         "Name": "Example Job", 
         "Client": "Example Client", 
         "Address": "123 Example St", 
+        "State": "VIC",
         "Site Contact": "John Smith",
         "Site Contact Phone": "0412 345 678",
         "Description": "Description here",
@@ -398,6 +402,7 @@ export default function AdminJobsPage() {
       name: "",
       client: "",
       address: "",
+      state: null,
       description: "",
       siteContact: "",
       siteContactPhone: "",
@@ -413,6 +418,7 @@ export default function AdminJobsPage() {
       name: job.name,
       client: job.client || "",
       address: job.address || "",
+      state: job.state || null,
       description: job.description || "",
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
@@ -728,19 +734,47 @@ export default function AdminJobsPage() {
                   )}
                 />
               </div>
-              <FormField
-                control={jobForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Address</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Job address" {...field} data-testid="input-job-address" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={jobForm.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem className="col-span-2">
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Job address" {...field} data-testid="input-job-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobForm.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <Select 
+                        onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                        value={field.value || "none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-job-state">
+                            <SelectValue placeholder="Select state" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No State</SelectItem>
+                          {AUSTRALIAN_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={jobForm.control}

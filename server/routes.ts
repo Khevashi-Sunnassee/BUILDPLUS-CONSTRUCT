@@ -620,16 +620,21 @@ export async function registerRoutes(
       }
       
       const validStatuses = ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"];
+      const validStates = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"];
       
       const jobsToImport = data.map((row: any) => {
         const statusRaw = String(row.status || row["Status"] || "ACTIVE").toUpperCase().replace(/ /g, "_");
         const status = validStatuses.includes(statusRaw) ? statusRaw as "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED" : "ACTIVE";
+        
+        const stateRaw = String(row.state || row["State"] || "").toUpperCase().trim();
+        const state = validStates.includes(stateRaw) ? stateRaw as "VIC" | "NSW" | "QLD" | "SA" | "WA" | "TAS" | "NT" | "ACT" : null;
         
         return {
           jobNumber: String(row.jobNumber || row["Job Number"] || row.job_number || "").trim(),
           name: String(row.name || row["Name"] || row["Job Name"] || "").trim(),
           client: row.client || row["Client"] || null,
           address: row.address || row["Address"] || null,
+          state,
           siteContact: row.siteContact || row["Site Contact"] || row.site_contact || null,
           siteContactPhone: row.siteContactPhone || row["Site Contact Phone"] || row.site_contact_phone || null,
           description: row.description || row["Description"] || null,
