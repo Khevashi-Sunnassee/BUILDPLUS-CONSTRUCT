@@ -123,8 +123,11 @@ export default function AdminPanelsPage() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
-  const [groupByJob, setGroupByJob] = useState<boolean>(true);
+  const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
+  const [groupByJob, setGroupByJob] = useState<boolean>(false);
+  const [groupByPanelType, setGroupByPanelType] = useState<boolean>(true);
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
+  const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Build dialog state
@@ -224,6 +227,7 @@ export default function AdminPanelsPage() {
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
+    if (panelTypeFilter !== "all" && panel.panelType !== panelTypeFilter) return false;
     return true;
   });
 
@@ -237,6 +241,19 @@ export default function AdminPanelsPage() {
     return acc;
   }, {} as Record<string, { job: Job; panels: PanelWithJob[] }>) || {};
 
+  // Group panels by panel type for grouped view
+  const panelsByType = filteredPanels?.reduce((acc, panel) => {
+    const type = panel.panelType || "UNKNOWN";
+    if (!acc[type]) {
+      acc[type] = [];
+    }
+    acc[type].push(panel);
+    return acc;
+  }, {} as Record<string, PanelWithJob[]>) || {};
+
+  // Get unique panel types from current data for filter dropdown
+  const uniquePanelTypes = Array.from(new Set(panels?.map(p => p.panelType).filter(Boolean) || [])).sort();
+
   const toggleJobCollapse = (jobId: string) => {
     setCollapsedJobs(prev => {
       const next = new Set(prev);
@@ -244,6 +261,18 @@ export default function AdminPanelsPage() {
         next.delete(jobId);
       } else {
         next.add(jobId);
+      }
+      return next;
+    });
+  };
+
+  const togglePanelTypeCollapse = (panelType: string) => {
+    setCollapsedPanelTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(panelType)) {
+        next.delete(panelType);
+      } else {
+        next.add(panelType);
       }
       return next;
     });
@@ -805,6 +834,31 @@ export default function AdminPanelsPage() {
                     <SelectItem value="ON_HOLD">On Hold</SelectItem>
                   </SelectContent>
                 </Select>
+                <Select value={panelTypeFilter} onValueChange={setPanelTypeFilter}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-panel-type-filter">
+                    <SelectValue placeholder="All Types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {uniquePanelTypes.map(type => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex items-center gap-2 ml-2">
+                  <Switch
+                    id="group-by-type"
+                    checked={groupByPanelType}
+                    onCheckedChange={(checked) => {
+                      setGroupByPanelType(checked);
+                      if (checked) setGroupByJob(false);
+                    }}
+                    data-testid="switch-group-by-type"
+                  />
+                  <Label htmlFor="group-by-type" className="text-sm whitespace-nowrap">Group by Type</Label>
+                </div>
               </div>
             </div>
           </div>
@@ -813,9 +867,9 @@ export default function AdminPanelsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                {!filterJobId && !groupByJob && <TableHead>Job</TableHead>}
+                {!filterJobId && !groupByJob && !groupByPanelType && <TableHead>Job</TableHead>}
                 <TableHead>Panel Mark</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead>{groupByPanelType ? "Job" : "Type"}</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Drawing / Sheet</TableHead>
@@ -826,7 +880,125 @@ export default function AdminPanelsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groupByJob && !filterJobId ? (
+              {groupByPanelType ? (
+                // Grouped by panel type view
+                Object.entries(panelsByType).length > 0 ? (
+                  Object.entries(panelsByType).sort(([a], [b]) => a.localeCompare(b)).map(([panelType, typePanels]) => {
+                    const isCollapsed = collapsedPanelTypes.has(panelType);
+                    return (
+                      <Fragment key={panelType}>
+                        <TableRow 
+                          className="bg-muted/50 hover:bg-muted cursor-pointer"
+                          onClick={() => togglePanelTypeCollapse(panelType)}
+                          data-testid={`row-type-group-${panelType}`}
+                        >
+                          <TableCell colSpan={10}>
+                            <div className="flex items-center gap-2">
+                              {isCollapsed ? (
+                                <ChevronRight className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                              <Layers className="h-4 w-4 text-primary" />
+                              <span className="font-semibold">{panelType}</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {typePanels.length} panel{typePanels.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {!isCollapsed && typePanels.map((panel) => (
+                          <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-2 pl-6">
+                                <Hash className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-mono font-medium">{panel.panelMark}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm font-mono">{panel.job.jobNumber}</span>
+                            </TableCell>
+                            <TableCell className="text-center">{panel.qty || 1}</TableCell>
+                            <TableCell>{panel.description || "-"}</TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
+                                {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
+                                {!panel.drawingCode && !panel.sheetNumber && "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {getSourceLabel(panel.source)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(panel.status)}</TableCell>
+                            <TableCell>
+                              {panel.estimatedHours ? (
+                                <div className="space-y-1 w-24">
+                                  <Progress value={getProgress(panel) || 0} className="h-2" />
+                                  <div className="text-xs text-muted-foreground">
+                                    {panel.actualHours || 0} / {panel.estimatedHours}h
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-sm text-muted-foreground">
+                                  {panel.actualHours || 0}h logged
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {panel.approvedForProduction ? (
+                                  <Badge variant="secondary" className="gap-1 mr-2">
+                                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                    Approved
+                                  </Badge>
+                                ) : null}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); openBuildDialog(panel); }}
+                                  title={panel.approvedForProduction ? "Edit production details" : "Set up for production"}
+                                  data-testid={`button-build-panel-${panel.id}`}
+                                >
+                                  <Hammer className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); openEditDialog(panel); }}
+                                  data-testid={`button-edit-panel-${panel.id}`}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeletingPanelId(panel.id);
+                                    setDeleteDialogOpen(true);
+                                  }}
+                                  data-testid={`button-delete-panel-${panel.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </Fragment>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      No panels found. Add a panel or import from Excel.
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : groupByJob && !filterJobId ? (
                 // Grouped by job view
                 Object.entries(panelsByJob).length > 0 ? (
                   Object.entries(panelsByJob).map(([jobId, { job, panels: jobPanels }]) => {
@@ -940,7 +1112,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
