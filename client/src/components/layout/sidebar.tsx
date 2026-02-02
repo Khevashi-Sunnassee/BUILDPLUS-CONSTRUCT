@@ -52,13 +52,13 @@ const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
+  { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Production Schedule", url: "/production-report", icon: Factory },
   { title: "Production Slots", url: "/production-slots", icon: Calendar },
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
-  { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
 ];
 
 const managerNavItems = [
