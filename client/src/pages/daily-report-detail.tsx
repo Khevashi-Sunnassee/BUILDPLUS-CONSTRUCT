@@ -19,6 +19,7 @@ import {
   Loader2,
   Plus,
   FileDown,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -123,6 +124,33 @@ export default function DailyReportDetailPage() {
     },
     onError: () => {
       toast({ title: "Failed to merge rows", variant: "destructive" });
+    },
+  });
+
+  const deleteRowMutation = useMutation({
+    mutationFn: async (rowId: string) => {
+      return apiRequest("DELETE", `/api/log-rows/${rowId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs", logId] });
+      toast({ title: "Entry deleted successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete entry", variant: "destructive" });
+    },
+  });
+
+  const deleteLogMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/daily-logs/${logId}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      toast({ title: "Daily log deleted successfully" });
+      setLocation("/daily-reports");
+    },
+    onError: () => {
+      toast({ title: "Failed to delete daily log", variant: "destructive" });
     },
   });
 
@@ -382,6 +410,32 @@ export default function DailyReportDetailPage() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" disabled={deleteLogMutation.isPending} data-testid="button-delete-day">
+                    {deleteLogMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Delete Day
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Daily Log?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete this daily log and all its entries. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => deleteLogMutation.mutate()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
         </div>
@@ -605,15 +659,46 @@ export default function DailyReportDetailPage() {
                             </Button>
                           </div>
                         ) : (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8"
-                            onClick={() => startEditing(row)}
-                            data-testid={`button-edit-${row.id}`}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => startEditing(row)}
+                              data-testid={`button-edit-${row.id}`}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  data-testid={`button-delete-${row.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete Entry?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will permanently delete this time entry. This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => deleteRowMutation.mutate(row.id)}
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
                         )}
                       </TableCell>
                     )}

@@ -245,6 +245,64 @@ export async function registerRoutes(
     res.json({ row: updatedRow });
   });
 
+  app.delete("/api/log-rows/:id", requireAuth, async (req, res) => {
+    try {
+      const row = await storage.getLogRow(req.params.id as string);
+      if (!row) {
+        return res.status(404).json({ error: "Row not found" });
+      }
+      const log = await storage.getDailyLog(row.dailyLogId);
+      if (!log) {
+        return res.status(404).json({ error: "Log not found" });
+      }
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+      if (log.userId !== currentUser.id && currentUser.role !== "ADMIN") {
+        return res.status(403).json({ error: "You can only delete your own log rows" });
+      }
+      if (log.status !== "PENDING" && log.status !== "REJECTED" && currentUser.role !== "ADMIN") {
+        return res.status(400).json({ error: "Cannot delete rows in submitted/approved logs" });
+      }
+      await storage.deleteLogRow(req.params.id as string);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting log row:", error);
+      res.status(500).json({ error: error.message || "Failed to delete log row" });
+    }
+  });
+
+  app.delete("/api/daily-logs/:id", requireAuth, async (req, res) => {
+    try {
+      const log = await storage.getDailyLog(req.params.id as string);
+      if (!log) {
+        return res.status(404).json({ error: "Log not found" });
+      }
+      const currentUser = await storage.getUser(req.session.userId!);
+      if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
+      if (log.userId !== currentUser.id && currentUser.role !== "ADMIN") {
+        return res.status(403).json({ error: "You can only delete your own daily logs" });
+      }
+      if (log.status === "APPROVED" && currentUser.role !== "ADMIN") {
+        return res.status(400).json({ error: "Cannot delete approved logs" });
+      }
+      await storage.deleteDailyLog(req.params.id as string);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting daily log:", error);
+      res.status(500).json({ error: error.message || "Failed to delete daily log" });
+    }
+  });
+
+  app.delete("/api/production-days/:id", requireRole("MANAGER", "ADMIN"), async (req, res) => {
+    try {
+      await storage.deleteProductionDay(req.params.id as string);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting production day:", error);
+      res.status(500).json({ error: error.message || "Failed to delete production day" });
+    }
+  });
+
   // Manual time entry - same structure as agent ingestion
   app.post("/api/manual-entry", requireAuth, async (req, res) => {
     try {

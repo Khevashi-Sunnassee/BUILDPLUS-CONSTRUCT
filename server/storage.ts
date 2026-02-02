@@ -70,6 +70,9 @@ export interface IStorage {
   getLogRow(id: string): Promise<LogRow | undefined>;
   upsertLogRow(sourceEventId: string, data: Partial<InsertLogRow> & { dailyLogId: string }): Promise<LogRow>;
   updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; jobId: string; isUserEdited: boolean; workTypeId: number | null }>): Promise<LogRow | undefined>;
+  deleteLogRow(id: string): Promise<void>;
+  deleteDailyLog(id: string): Promise<void>;
+  deleteProductionDay(id: string): Promise<void>;
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
@@ -417,6 +420,19 @@ export class DatabaseStorage implements IStorage {
   async updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; jobId: string; isUserEdited: boolean; workTypeId: number | null }>): Promise<LogRow | undefined> {
     const [row] = await db.update(logRows).set({ ...data, updatedAt: new Date() }).where(eq(logRows.id, id)).returning();
     return row;
+  }
+
+  async deleteLogRow(id: string): Promise<void> {
+    await db.delete(logRows).where(eq(logRows.id, id));
+  }
+
+  async deleteDailyLog(id: string): Promise<void> {
+    await db.delete(logRows).where(eq(logRows.dailyLogId, id));
+    await db.delete(dailyLogs).where(eq(dailyLogs.id, id));
+  }
+
+  async deleteProductionDay(id: string): Promise<void> {
+    await db.delete(productionDays).where(eq(productionDays.id, id));
   }
 
   async createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent> {
