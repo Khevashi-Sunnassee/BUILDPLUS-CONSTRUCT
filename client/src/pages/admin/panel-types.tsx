@@ -298,10 +298,11 @@ export default function AdminPanelTypesPage() {
     mutationFn: async ({ panelTypeId, components }: { panelTypeId: string; components: CostComponent[] }) => {
       return apiRequest("PUT", `/api/panel-types/${panelTypeId}/cost-components`, { components });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Cost breakup saved successfully" });
-      refetchCostComponents();
-      refetchCostSummaries(); // Refresh margin validation
+      // Invalidate and refetch to ensure status updates immediately
+      await queryClient.invalidateQueries({ queryKey: ["/api/admin/panel-types/cost-summaries"] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/panel-types", costBreakupType?.id, "cost-components"] });
       setCostBreakupDialogOpen(false);
     },
     onError: (error: any) => {
