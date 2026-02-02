@@ -74,10 +74,7 @@ export default function ProductionReportPage() {
 
   const createProductionDayMutation = useMutation({
     mutationFn: async (data: { productionDate: string; factory: string }) => {
-      return await apiRequest("/api/production-days", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/production-days", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
@@ -145,6 +142,19 @@ export default function ProductionReportPage() {
     }
     return true;
   });
+
+  const getNextAvailableDate = () => {
+    if (!reports || reports.length === 0) {
+      return format(new Date(), "yyyy-MM-dd");
+    }
+    const sortedDates = reports
+      .map(report => new Date(report.date + "T00:00:00"))
+      .sort((a, b) => b.getTime() - a.getTime());
+    const latestDate = sortedDates[0];
+    const nextDate = new Date(latestDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    return format(nextDate, "yyyy-MM-dd");
+  };
 
   const formatDate = (dateStr: string) => {
     try {
@@ -311,7 +321,12 @@ export default function ProductionReportPage() {
             )}
             Export PDF
           </Button>
-          <Dialog open={isNewDayDialogOpen} onOpenChange={setIsNewDayDialogOpen}>
+          <Dialog open={isNewDayDialogOpen} onOpenChange={(open) => {
+              setIsNewDayDialogOpen(open);
+              if (open) {
+                setNewDayDate(getNextAvailableDate());
+              }
+            }}>
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="button-start-new-day">
                 <Plus className="h-4 w-4 mr-2" />
