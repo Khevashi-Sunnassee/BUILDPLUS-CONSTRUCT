@@ -142,7 +142,7 @@ export async function registerRoutes(
       const newLog = await storage.createDailyLog({
         userId: user.id,
         logDay: logDay,
-        status: "DRAFT",
+        status: "PENDING",
       });
       
       res.status(201).json(newLog);

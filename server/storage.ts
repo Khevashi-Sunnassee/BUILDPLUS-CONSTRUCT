@@ -63,7 +63,7 @@ export interface IStorage {
   getDailyLogsByUser(userId: string, filters?: { status?: string; dateRange?: string }): Promise<DailyLog[]>;
   getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]>;
   getDailyLogByUserAndDay(userId: string, logDay: string): Promise<DailyLog | undefined>;
-  createDailyLog(data: { userId: string; logDay: string; status: string }): Promise<DailyLog>;
+  createDailyLog(data: { userId: string; logDay: string; status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" }): Promise<DailyLog>;
   upsertDailyLog(data: { userId: string; logDay: string; tz: string }): Promise<DailyLog>;
   updateDailyLogStatus(id: string, data: { status: string; submittedAt?: Date; approvedAt?: Date; approvedBy?: string; managerComment?: string }): Promise<DailyLog | undefined>;
 
@@ -364,7 +364,7 @@ export class DatabaseStorage implements IStorage {
     return log;
   }
 
-  async createDailyLog(data: { userId: string; logDay: string; status: string }): Promise<DailyLog> {
+  async createDailyLog(data: { userId: string; logDay: string; status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" }): Promise<DailyLog> {
     const [log] = await db.insert(dailyLogs).values({
       userId: data.userId,
       logDay: data.logDay,
