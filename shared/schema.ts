@@ -393,7 +393,6 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
 });
 
 export const insertWorkTypeSchema = createInsertSchema(workTypes).omit({
-  id: true,
   createdAt: true,
   updatedAt: true,
 });
