@@ -80,12 +80,22 @@ export default function DailyReportsPage() {
     queryKey: ["/api/daily-logs", { status: statusFilter, dateRange }],
   });
 
+  const getNextAvailableDate = () => {
+    if (!logs || logs.length === 0) {
+      return format(new Date(), "yyyy-MM-dd");
+    }
+    const sortedDates = logs
+      .map(log => new Date(log.logDay + "T00:00:00"))
+      .sort((a, b) => b.getTime() - a.getTime());
+    const latestDate = sortedDates[0];
+    const nextDate = new Date(latestDate);
+    nextDate.setDate(nextDate.getDate() + 1);
+    return format(nextDate, "yyyy-MM-dd");
+  };
+
   const createDailyLogMutation = useMutation({
     mutationFn: async (data: { logDay: string }) => {
-      return await apiRequest("/api/daily-logs", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/daily-logs", data);
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
@@ -275,7 +285,12 @@ export default function DailyReportsPage() {
             )}
             Export PDF
           </Button>
-          <Dialog open={isNewDayDialogOpen} onOpenChange={setIsNewDayDialogOpen}>
+          <Dialog open={isNewDayDialogOpen} onOpenChange={(open) => {
+              setIsNewDayDialogOpen(open);
+              if (open) {
+                setNewDayDate(getNextAvailableDate());
+              }
+            }}>
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="button-start-new-day">
                 <Plus className="h-4 w-4 mr-2" />
