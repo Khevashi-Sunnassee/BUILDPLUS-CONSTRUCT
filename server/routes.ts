@@ -1272,13 +1272,17 @@ export async function registerRoutes(
             // Default building to "1" if no building and no zone provided
             const buildingValue = rowData.building ? String(rowData.building) : (rowData.zone ? "" : "1");
             
+            // Normalize level by stripping "L" prefix (e.g., "L1" -> "1", "L10" -> "10")
+            const rawLevel = String(rowData.level || "").trim();
+            const normalizedLevel = rawLevel.replace(/^L/i, "");
+            
             panelsToImport.push({
               jobId,
               panelMark,
               panelType,
               building: buildingValue,
               zone: String(rowData.zone || ""),
-              level: String(rowData.level || ""),
+              level: normalizedLevel,
               structuralElevation: String(rowData.structuralElevation || ""),
               reckliDetail: String(rowData.reckliDetail || ""),
               qty,
