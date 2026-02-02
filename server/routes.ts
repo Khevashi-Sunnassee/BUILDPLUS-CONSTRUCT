@@ -3787,7 +3787,7 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
       const { newDate, reason, clientConfirmed, cascadeToLater } = req.body;
-      const changedById = req.session.user!.id;
+      const changedById = req.session.userId!;
       
       const slot = await storage.adjustProductionSlot(req.params.id, {
         newDate: new Date(newDate),
