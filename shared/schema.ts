@@ -95,6 +95,7 @@ export const jobs = pgTable("jobs", {
   siteContactPhone: text("site_contact_phone"),
   description: text("description"),
   craneCapacity: text("crane_capacity"),
+  productionStartDate: timestamp("production_start_date"),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

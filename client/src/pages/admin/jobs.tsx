@@ -94,6 +94,7 @@ const jobSchema = z.object({
   state: z.enum(AUSTRALIAN_STATES).optional().nullable(),
   description: z.string().optional(),
   craneCapacity: z.string().optional(),
+  productionStartDate: z.string().optional(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
@@ -538,6 +539,7 @@ export default function AdminJobsPage() {
       state: null,
       description: "",
       craneCapacity: "",
+      productionStartDate: "",
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -556,6 +558,7 @@ export default function AdminJobsPage() {
       state: job.state || null,
       description: job.description || "",
       craneCapacity: job.craneCapacity || "",
+      productionStartDate: job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : "",
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
@@ -625,7 +628,7 @@ export default function AdminJobsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Briefcase className="h-5 w-5" />
-            Job List
+            Job Register
           </CardTitle>
           <CardDescription>
             {filteredAndSortedJobs.length} of {jobs?.length || 0} jobs
@@ -1024,6 +1027,19 @@ export default function AdminJobsPage() {
                     <FormLabel>Crane Capacity</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobForm.control}
+                name="productionStartDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Production Start Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} data-testid="input-job-production-start-date" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
