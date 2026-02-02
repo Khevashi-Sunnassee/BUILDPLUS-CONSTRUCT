@@ -143,6 +143,30 @@ export default function AdminPanelsPage() {
   });
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
+  // Auto-calculate area, volume, and mass when dimensions change
+  useEffect(() => {
+    const width = parseFloat(buildFormData.loadWidth) || 0;
+    const height = parseFloat(buildFormData.loadHeight) || 0;
+    const thickness = parseFloat(buildFormData.panelThickness) || 0;
+    
+    // Calculate area (m²) = width(mm) × height(mm) / 1,000,000
+    const areaM2 = (width * height) / 1_000_000;
+    
+    // Calculate volume (m³) = width(mm) × height(mm) × thickness(mm) / 1,000,000,000
+    const volumeM3 = (width * height * thickness) / 1_000_000_000;
+    
+    // Calculate mass (kg) = volume(m³) × density(kg/m³), default 2500 kg/m³
+    const density = 2500;
+    const massKg = volumeM3 * density;
+    
+    setBuildFormData(prev => ({
+      ...prev,
+      panelArea: areaM2 > 0 ? areaM2.toFixed(3) : "",
+      panelVolume: volumeM3 > 0 ? volumeM3.toFixed(3) : "",
+      panelMass: massKg > 0 ? Math.round(massKg).toString() : "",
+    }));
+  }, [buildFormData.loadWidth, buildFormData.loadHeight, buildFormData.panelThickness]);
+
   const { data: panels, isLoading: panelsLoading } = useQuery<PanelWithJob[]>({
     queryKey: ["/api/admin/panels"],
   });
@@ -1364,12 +1388,24 @@ export default function AdminPanelsPage() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="panelArea">Panel Area (m²)</Label>
+                <Input
+                  id="panelArea"
+                  value={buildFormData.panelArea}
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-calculated"
+                  data-testid="input-panel-area"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="panelVolume">Panel Volume (m³)</Label>
                 <Input
                   id="panelVolume"
                   value={buildFormData.panelVolume}
-                  onChange={(e) => setBuildFormData({ ...buildFormData, panelVolume: e.target.value })}
-                  placeholder="e.g., 1.5"
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-calculated"
                   data-testid="input-panel-volume"
                 />
               </div>
@@ -1378,19 +1414,10 @@ export default function AdminPanelsPage() {
                 <Input
                   id="panelMass"
                   value={buildFormData.panelMass}
-                  onChange={(e) => setBuildFormData({ ...buildFormData, panelMass: e.target.value })}
-                  placeholder="e.g., 3750"
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-calculated"
                   data-testid="input-panel-mass"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="panelArea">Panel Area (m²)</Label>
-                <Input
-                  id="panelArea"
-                  value={buildFormData.panelArea}
-                  onChange={(e) => setBuildFormData({ ...buildFormData, panelArea: e.target.value })}
-                  placeholder="e.g., 7.5"
-                  data-testid="input-panel-area"
                 />
               </div>
               <div className="space-y-2">
