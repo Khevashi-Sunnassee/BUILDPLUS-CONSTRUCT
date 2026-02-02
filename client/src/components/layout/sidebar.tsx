@@ -22,6 +22,7 @@ import {
   DollarSign,
   Shield,
   MapPin,
+  Calendar,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -54,6 +55,7 @@ const userNavItems = [
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Production Schedule", url: "/production-report", icon: Factory },
+  { title: "Production Slots", url: "/production-slots", icon: Calendar },
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
@@ -77,6 +79,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/daily-reports": "daily_reports",
   "/kpi-dashboard": "kpi_dashboard",
   "/production-report": "production_report",
+  "/production-slots": "production_report",
   "/logistics": "logistics",
   "/weekly-wages": "weekly_wages",
   "/weekly-job-logs": "weekly_job_logs",

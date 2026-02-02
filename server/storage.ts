@@ -6,6 +6,7 @@ import {
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
+  productionSlots, productionSlotAdjustments,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -25,6 +26,8 @@ import {
   type InsertWeeklyJobReport, type WeeklyJobReport,
   type InsertWeeklyJobReportSchedule, type WeeklyJobReportSchedule,
   type InsertZone, type Zone,
+  type InsertProductionSlot, type ProductionSlot,
+  type InsertProductionSlotAdjustment, type ProductionSlotAdjustment,
 } from "@shared/schema";
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -39,6 +42,14 @@ export interface LoadListWithDetails extends LoadList {
   panels: (LoadListPanel & { panel: PanelRegister })[];
   deliveryRecord?: DeliveryRecord | null;
   createdBy?: User | null;
+}
+
+export interface ProductionSlotWithDetails extends ProductionSlot {
+  job: Job;
+}
+
+export interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
+  changedBy: User;
 }
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -251,6 +262,18 @@ export interface IStorage {
   createZone(data: InsertZone): Promise<Zone>;
   updateZone(id: string, data: Partial<InsertZone>): Promise<Zone | undefined>;
   deleteZone(id: string): Promise<void>;
+
+  // Production Slots
+  getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date }): Promise<ProductionSlotWithDetails[]>;
+  getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined>;
+  generateProductionSlotsForJob(jobId: string): Promise<ProductionSlot[]>;
+  adjustProductionSlot(id: string, data: { newDate: Date; reason: string; changedById: string; clientConfirmed?: boolean; cascadeToLater?: boolean }): Promise<ProductionSlot | undefined>;
+  bookProductionSlot(id: string): Promise<ProductionSlot | undefined>;
+  completeProductionSlot(id: string): Promise<ProductionSlot | undefined>;
+  getProductionSlotAdjustments(slotId: string): Promise<ProductionSlotAdjustmentWithDetails[]>;
+  getJobsWithoutProductionSlots(): Promise<Job[]>;
+  deleteProductionSlot(id: string): Promise<void>;
+  checkAndCompleteSlotByPanelCompletion(jobId: string, level: string, buildingNumber: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1887,6 +1910,255 @@ export class DatabaseStorage implements IStorage {
 
   async deleteZone(id: string): Promise<void> {
     await db.delete(zones).where(eq(zones.id, id));
+  }
+
+  // Production Slots
+  async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date }): Promise<ProductionSlotWithDetails[]> {
+    const conditions: any[] = [];
+    if (filters?.jobId) conditions.push(eq(productionSlots.jobId, filters.jobId));
+    if (filters?.status) conditions.push(eq(productionSlots.status, filters.status as any));
+    if (filters?.dateFrom) conditions.push(gte(productionSlots.productionSlotDate, filters.dateFrom));
+    if (filters?.dateTo) conditions.push(lte(productionSlots.productionSlotDate, filters.dateTo));
+    
+    const slots = conditions.length > 0
+      ? await db.select().from(productionSlots).where(and(...conditions)).orderBy(asc(productionSlots.productionSlotDate), asc(productionSlots.levelOrder))
+      : await db.select().from(productionSlots).orderBy(asc(productionSlots.productionSlotDate), asc(productionSlots.levelOrder));
+    
+    const slotsWithDetails: ProductionSlotWithDetails[] = [];
+    for (const slot of slots) {
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, slot.jobId));
+      if (job) {
+        slotsWithDetails.push({ ...slot, job });
+      }
+    }
+    return slotsWithDetails;
+  }
+
+  async getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined> {
+    const [slot] = await db.select().from(productionSlots).where(eq(productionSlots.id, id));
+    if (!slot) return undefined;
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, slot.jobId));
+    if (!job) return undefined;
+    return { ...slot, job };
+  }
+
+  async generateProductionSlotsForJob(jobId: string): Promise<ProductionSlot[]> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
+    if (!job) throw new Error("Job not found");
+    if (!job.productionStartDate || !job.expectedCycleTimePerFloor || !job.levels) {
+      throw new Error("Job missing required fields: productionStartDate, expectedCycleTimePerFloor, or levels");
+    }
+
+    // Delete existing slots for this job
+    await db.delete(productionSlots).where(eq(productionSlots.jobId, jobId));
+
+    // Parse levels and sort them intelligently
+    const levelList = job.levels.split(",").map(l => l.trim()).filter(l => l);
+    const sortedLevels = this.sortLevelsIntelligently(levelList, job.lowestLevel, job.highestLevel);
+
+    // Get panel counts per level
+    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId));
+    const panelCountByLevel: Record<string, number> = {};
+    for (const panel of panels) {
+      const level = panel.level || "Unknown";
+      panelCountByLevel[level] = (panelCountByLevel[level] || 0) + 1;
+    }
+
+    // Calculate base date (productionStartDate - daysInAdvance)
+    const daysInAdvance = job.daysInAdvance || 7;
+    const cycleTime = job.expectedCycleTimePerFloor;
+    const baseDate = new Date(job.productionStartDate);
+    baseDate.setDate(baseDate.getDate() - daysInAdvance);
+
+    const createdSlots: ProductionSlot[] = [];
+    for (let i = 0; i < sortedLevels.length; i++) {
+      const level = sortedLevels[i];
+      const slotDate = new Date(baseDate);
+      slotDate.setDate(slotDate.getDate() + (i * cycleTime));
+
+      const [slot] = await db.insert(productionSlots).values({
+        jobId,
+        buildingNumber: 1,
+        level,
+        levelOrder: i,
+        panelCount: panelCountByLevel[level] || 0,
+        productionSlotDate: slotDate,
+        status: "SCHEDULED",
+        isBooked: false,
+      }).returning();
+      createdSlots.push(slot);
+    }
+    return createdSlots;
+  }
+
+  private sortLevelsIntelligently(levels: string[], lowestLevel?: string | null, highestLevel?: string | null): string[] {
+    const levelOrder: Record<string, number> = {
+      "Basement 2": -2, "B2": -2,
+      "Basement 1": -1, "B1": -1, "Basement": -1,
+      "Ground": 0, "G": 0, "GF": 0,
+      "Mezzanine": 0.5, "Mezz": 0.5,
+    };
+    
+    const parseLevelNumber = (level: string): number => {
+      if (levelOrder[level] !== undefined) return levelOrder[level];
+      const match = level.match(/^L?(\d+)$/i);
+      if (match) return parseInt(match[1], 10);
+      if (level.toLowerCase() === "roof") return 999;
+      return 500; // Unknown levels go in middle
+    };
+
+    return [...levels].sort((a, b) => parseLevelNumber(a) - parseLevelNumber(b));
+  }
+
+  async adjustProductionSlot(id: string, data: { newDate: Date; reason: string; changedById: string; clientConfirmed?: boolean; cascadeToLater?: boolean }): Promise<ProductionSlot | undefined> {
+    const [slot] = await db.select().from(productionSlots).where(eq(productionSlots.id, id));
+    if (!slot) return undefined;
+
+    const previousDate = slot.productionSlotDate;
+    const dateDiff = data.newDate.getTime() - previousDate.getTime();
+    const daysDiff = Math.round(dateDiff / (1000 * 60 * 60 * 24));
+
+    // Record adjustment
+    await db.insert(productionSlotAdjustments).values({
+      productionSlotId: id,
+      previousDate,
+      newDate: data.newDate,
+      reason: data.reason,
+      changedById: data.changedById,
+      clientConfirmed: data.clientConfirmed || false,
+      cascadedToOtherSlots: data.cascadeToLater || false,
+    });
+
+    // Update this slot
+    const [updatedSlot] = await db.update(productionSlots).set({
+      productionSlotDate: data.newDate,
+      status: "PENDING_UPDATE",
+      updatedAt: new Date(),
+    }).where(eq(productionSlots.id, id)).returning();
+
+    // Cascade to later slots if requested
+    if (data.cascadeToLater && daysDiff !== 0) {
+      const laterSlots = await db.select().from(productionSlots)
+        .where(and(
+          eq(productionSlots.jobId, slot.jobId),
+          gte(productionSlots.levelOrder, slot.levelOrder),
+          sql`${productionSlots.id} != ${id}`
+        ));
+      
+      for (const laterSlot of laterSlots) {
+        const newLaterDate = new Date(laterSlot.productionSlotDate);
+        newLaterDate.setTime(newLaterDate.getTime() + dateDiff);
+        
+        await db.insert(productionSlotAdjustments).values({
+          productionSlotId: laterSlot.id,
+          previousDate: laterSlot.productionSlotDate,
+          newDate: newLaterDate,
+          reason: `Cascaded from ${slot.level} adjustment: ${data.reason}`,
+          changedById: data.changedById,
+          clientConfirmed: data.clientConfirmed || false,
+          cascadedToOtherSlots: true,
+        });
+
+        await db.update(productionSlots).set({
+          productionSlotDate: newLaterDate,
+          status: "PENDING_UPDATE",
+          updatedAt: new Date(),
+        }).where(eq(productionSlots.id, laterSlot.id));
+      }
+    }
+
+    return updatedSlot;
+  }
+
+  async bookProductionSlot(id: string): Promise<ProductionSlot | undefined> {
+    const [slot] = await db.update(productionSlots).set({
+      status: "BOOKED",
+      isBooked: true,
+      updatedAt: new Date(),
+    }).where(eq(productionSlots.id, id)).returning();
+    return slot;
+  }
+
+  async completeProductionSlot(id: string): Promise<ProductionSlot | undefined> {
+    const [slot] = await db.update(productionSlots).set({
+      status: "COMPLETED",
+      updatedAt: new Date(),
+    }).where(eq(productionSlots.id, id)).returning();
+    return slot;
+  }
+
+  async getProductionSlotAdjustments(slotId: string): Promise<ProductionSlotAdjustmentWithDetails[]> {
+    const adjustments = await db.select().from(productionSlotAdjustments)
+      .where(eq(productionSlotAdjustments.productionSlotId, slotId))
+      .orderBy(desc(productionSlotAdjustments.createdAt));
+    
+    const adjustmentsWithDetails: ProductionSlotAdjustmentWithDetails[] = [];
+    for (const adj of adjustments) {
+      const [changedBy] = await db.select().from(users).where(eq(users.id, adj.changedById));
+      if (changedBy) {
+        adjustmentsWithDetails.push({ ...adj, changedBy });
+      }
+    }
+    return adjustmentsWithDetails;
+  }
+
+  async getJobsWithoutProductionSlots(): Promise<Job[]> {
+    const jobsWithSlots = await db.selectDistinct({ jobId: productionSlots.jobId }).from(productionSlots);
+    const jobIdsWithSlots = jobsWithSlots.map(j => j.jobId);
+    
+    if (jobIdsWithSlots.length === 0) {
+      return db.select().from(jobs)
+        .where(and(
+          eq(jobs.status, "ACTIVE"),
+          sql`${jobs.productionStartDate} IS NOT NULL`,
+          sql`${jobs.expectedCycleTimePerFloor} IS NOT NULL`,
+          sql`${jobs.levels} IS NOT NULL`
+        ))
+        .orderBy(asc(jobs.jobNumber));
+    }
+    
+    return db.select().from(jobs)
+      .where(and(
+        eq(jobs.status, "ACTIVE"),
+        sql`${jobs.productionStartDate} IS NOT NULL`,
+        sql`${jobs.expectedCycleTimePerFloor} IS NOT NULL`,
+        sql`${jobs.levels} IS NOT NULL`,
+        sql`${jobs.id} NOT IN (${sql.join(jobIdsWithSlots.map(id => sql`${id}`), sql`, `)})`
+      ))
+      .orderBy(asc(jobs.jobNumber));
+  }
+
+  async deleteProductionSlot(id: string): Promise<void> {
+    await db.delete(productionSlotAdjustments).where(eq(productionSlotAdjustments.productionSlotId, id));
+    await db.delete(productionSlots).where(eq(productionSlots.id, id));
+  }
+
+  async checkAndCompleteSlotByPanelCompletion(jobId: string, level: string, buildingNumber: number): Promise<void> {
+    // Get all panels for this job/level/building
+    const panels = await db.select().from(panelRegister).where(and(
+      eq(panelRegister.jobId, jobId),
+      eq(panelRegister.level, level),
+      eq(panelRegister.building, String(buildingNumber))
+    ));
+
+    // Check if all panels are completed
+    const allCompleted = panels.length > 0 && panels.every(p => p.status === "COMPLETED");
+    
+    if (allCompleted) {
+      // Find the corresponding slot
+      const [slot] = await db.select().from(productionSlots).where(and(
+        eq(productionSlots.jobId, jobId),
+        eq(productionSlots.level, level),
+        eq(productionSlots.buildingNumber, buildingNumber)
+      ));
+      
+      if (slot && slot.status !== "COMPLETED") {
+        await db.update(productionSlots).set({
+          status: "COMPLETED",
+          updatedAt: new Date(),
+        }).where(eq(productionSlots.id, slot.id));
+      }
+    }
   }
 }
 

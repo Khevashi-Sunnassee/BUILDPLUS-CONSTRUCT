@@ -30,6 +30,7 @@ interface ScheduleItem {
   levels21Days: string;
   levels28Days: string;
   siteProgress: string | null;
+  currentLevelOnsite: string | null;
 }
 
 export default function WeeklyJobLogsPage() {
@@ -176,6 +177,7 @@ export default function WeeklyJobLogsPage() {
       levels21Days: "",
       levels28Days: "",
       siteProgress: null,
+      currentLevelOnsite: null,
     }]);
   };
 
@@ -224,6 +226,7 @@ export default function WeeklyJobLogsPage() {
       levels21Days: s.levels21Days || "",
       levels28Days: s.levels28Days || "",
       siteProgress: s.siteProgress,
+      currentLevelOnsite: s.currentLevelOnsite,
     })));
     setEditMode(true);
     setShowForm(true);
@@ -421,6 +424,7 @@ export default function WeeklyJobLogsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-[200px]">Job</TableHead>
+                      <TableHead>Current Level Onsite</TableHead>
                       <TableHead>7-Day Level</TableHead>
                       <TableHead>14-Day Level</TableHead>
                       <TableHead>21-Day Level</TableHead>
@@ -445,6 +449,9 @@ export default function WeeklyJobLogsPage() {
                               ))}
                             </SelectContent>
                           </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Input value={schedule.currentLevelOnsite || ""} onChange={(e) => updateSchedule(index, "currentLevelOnsite", e.target.value || null)} placeholder="e.g. L2" data-testid={`input-current-level-${index}`} />
                         </TableCell>
                         <TableCell>
                           <Input value={schedule.levels7Days} onChange={(e) => updateSchedule(index, "levels7Days", e.target.value)} placeholder="Level" data-testid={`input-day7-${index}`} />
@@ -522,6 +529,7 @@ export default function WeeklyJobLogsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Job</TableHead>
+                        <TableHead>Current Level Onsite</TableHead>
                         <TableHead>7-Day</TableHead>
                         <TableHead>14-Day</TableHead>
                         <TableHead>21-Day</TableHead>
@@ -533,6 +541,7 @@ export default function WeeklyJobLogsPage() {
                       {selectedReport.schedules.map((schedule) => (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">{schedule.job?.jobNumber} - {schedule.job?.name}</TableCell>
+                          <TableCell>{schedule.currentLevelOnsite || "-"}</TableCell>
                           <TableCell>{schedule.levels7Days || "-"}</TableCell>
                           <TableCell>{schedule.levels14Days || "-"}</TableCell>
                           <TableCell>{schedule.levels21Days || "-"}</TableCell>
@@ -590,6 +599,7 @@ export default function WeeklyJobLogsPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Job</TableHead>
+                        <TableHead>Current Level Onsite</TableHead>
                         <TableHead>7-Day</TableHead>
                         <TableHead>14-Day</TableHead>
                         <TableHead>21-Day</TableHead>
@@ -601,6 +611,7 @@ export default function WeeklyJobLogsPage() {
                       {selectedReport.schedules.map((schedule) => (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">{schedule.job?.jobNumber} - {schedule.job?.name}</TableCell>
+                          <TableCell>{schedule.currentLevelOnsite || "-"}</TableCell>
                           <TableCell>{schedule.levels7Days || "-"}</TableCell>
                           <TableCell>{schedule.levels14Days || "-"}</TableCell>
                           <TableCell>{schedule.levels21Days || "-"}</TableCell>

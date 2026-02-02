@@ -12,6 +12,7 @@ export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLE
 export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
 export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IFC", "APPROVED"]);
+export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHEDULED", "PENDING_UPDATE", "BOOKED", "COMPLETED"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -118,8 +119,11 @@ export const jobs = pgTable("jobs", {
   craneCapacity: text("crane_capacity"),
   numberOfBuildings: integer("number_of_buildings"),
   levels: text("levels"), // comma-separated list of level names (e.g., "Ground,L1,L2,L3,Roof")
+  lowestLevel: text("lowest_level"), // e.g., "Ground", "Basement", "L1"
+  highestLevel: text("highest_level"), // e.g., "L5", "Roof"
   productionStartDate: timestamp("production_start_date"),
   expectedCycleTimePerFloor: integer("expected_cycle_time_per_floor"), // days per floor for production scheduling
+  daysInAdvance: integer("days_in_advance").default(7), // days before site needs panels to cast
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -129,6 +133,39 @@ export const jobs = pgTable("jobs", {
   statusIdx: index("jobs_status_idx").on(table.status),
   codeIdx: index("jobs_code_idx").on(table.code),
   projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
+}));
+
+export const productionSlots = pgTable("production_slots", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  buildingNumber: integer("building_number").default(1),
+  level: text("level").notNull(),
+  levelOrder: integer("level_order").notNull(),
+  panelCount: integer("panel_count").default(0),
+  productionSlotDate: timestamp("production_slot_date").notNull(),
+  status: productionSlotStatusEnum("status").default("SCHEDULED").notNull(),
+  dateLastReportedOnsite: timestamp("date_last_reported_onsite"),
+  isBooked: boolean("is_booked").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("production_slots_job_id_idx").on(table.jobId),
+  statusIdx: index("production_slots_status_idx").on(table.status),
+  dateIdx: index("production_slots_date_idx").on(table.productionSlotDate),
+}));
+
+export const productionSlotAdjustments = pgTable("production_slot_adjustments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  productionSlotId: varchar("production_slot_id", { length: 36 }).notNull().references(() => productionSlots.id),
+  previousDate: timestamp("previous_date").notNull(),
+  newDate: timestamp("new_date").notNull(),
+  reason: text("reason").notNull(),
+  changedById: varchar("changed_by_id", { length: 36 }).notNull().references(() => users.id),
+  clientConfirmed: boolean("client_confirmed").default(false),
+  cascadedToOtherSlots: boolean("cascaded_to_other_slots").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  slotIdIdx: index("production_slot_adjustments_slot_id_idx").on(table.productionSlotId),
 }));
 
 export const workTypes = pgTable("work_types", {
@@ -651,6 +688,7 @@ export const weeklyJobReportSchedules = pgTable("weekly_job_report_schedules", {
   levels28Days: text("levels_28_days"), // comma-separated levels required in 28 days
   priority: integer("priority").default(0).notNull(), // production priority order
   siteProgress: text("site_progress"), // site progress notes
+  currentLevelOnsite: text("current_level_onsite"), // current level being worked on at site
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   reportIdx: index("weekly_job_report_schedules_report_idx").on(table.reportId),
@@ -770,3 +808,19 @@ export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
 export type PanelStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "ON_HOLD";
 export type PanelType = "WALL" | "COLUMN" | "CUBE_BASE" | "CUBE_RING" | "LANDING_WALL" | "OTHER";
 export type LoadListStatus = "PENDING" | "COMPLETE";
+export type ProductionSlotStatus = "SCHEDULED" | "PENDING_UPDATE" | "BOOKED" | "COMPLETED";
+
+export const insertProductionSlotSchema = createInsertSchema(productionSlots).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertProductionSlot = z.infer<typeof insertProductionSlotSchema>;
+export type ProductionSlot = typeof productionSlots.$inferSelect;
+
+export const insertProductionSlotAdjustmentSchema = createInsertSchema(productionSlotAdjustments).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertProductionSlotAdjustment = z.infer<typeof insertProductionSlotAdjustmentSchema>;
+export type ProductionSlotAdjustment = typeof productionSlotAdjustments.$inferSelect;

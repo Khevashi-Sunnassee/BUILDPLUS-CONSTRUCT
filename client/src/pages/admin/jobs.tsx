@@ -96,8 +96,11 @@ const jobSchema = z.object({
   craneCapacity: z.string().optional(),
   numberOfBuildings: z.number().int().min(0).optional().nullable(),
   levels: z.string().optional(),
+  lowestLevel: z.string().optional(),
+  highestLevel: z.string().optional(),
   productionStartDate: z.string().optional(),
   expectedCycleTimePerFloor: z.number().int().min(1).optional().nullable(),
+  daysInAdvance: z.number().int().min(1).optional().nullable(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
@@ -552,8 +555,11 @@ export default function AdminJobsPage() {
       craneCapacity: "",
       numberOfBuildings: null,
       levels: "",
+      lowestLevel: "",
+      highestLevel: "",
       productionStartDate: "",
       expectedCycleTimePerFloor: null,
+      daysInAdvance: 7,
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -575,8 +581,11 @@ export default function AdminJobsPage() {
       craneCapacity: job.craneCapacity || "",
       numberOfBuildings: job.numberOfBuildings ?? null,
       levels: job.levels || "",
+      lowestLevel: job.lowestLevel || "",
+      highestLevel: job.highestLevel || "",
       productionStartDate: job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : "",
       expectedCycleTimePerFloor: job.expectedCycleTimePerFloor ?? null,
+      daysInAdvance: job.daysInAdvance ?? 7,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
@@ -1090,6 +1099,44 @@ export default function AdminJobsPage() {
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={jobForm.control}
+                  name="lowestLevel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lowest Level</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g. Ground" 
+                          {...field} 
+                          data-testid="input-job-lowest-level" 
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Starting level for production</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobForm.control}
+                  name="highestLevel"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Highest Level</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g. Roof" 
+                          {...field} 
+                          data-testid="input-job-highest-level" 
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Final level for production</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={jobForm.control}
                 name="productionStartDate"
@@ -1103,27 +1150,50 @@ export default function AdminJobsPage() {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={jobForm.control}
-                name="expectedCycleTimePerFloor"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expected Cycle Time per Floor (days)</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min="1"
-                        placeholder="e.g., 5"
-                        value={field.value ?? ""} 
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                        data-testid="input-job-cycle-time-per-floor" 
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">Days required to complete production for each floor</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={jobForm.control}
+                  name="expectedCycleTimePerFloor"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expected Cycle Time per Floor (days)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1"
+                          placeholder="e.g., 5"
+                          value={field.value ?? ""} 
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          data-testid="input-job-cycle-time-per-floor" 
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Days to complete each floor</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobForm.control}
+                  name="daysInAdvance"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Days in Advance</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          min="1"
+                          placeholder="e.g., 7"
+                          value={field.value ?? ""} 
+                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          data-testid="input-job-days-in-advance" 
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">Days before site needs panels</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={jobForm.control}
                 name="projectManagerId"

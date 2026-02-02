@@ -3703,5 +3703,125 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  // Production Slots Routes
+  app.get("/api/production-slots", requireAuth, async (req, res) => {
+    try {
+      const { jobId, status, dateFrom, dateTo } = req.query;
+      const filters: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date } = {};
+      if (jobId) filters.jobId = jobId as string;
+      if (status) filters.status = status as string;
+      if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
+      if (dateTo) filters.dateTo = new Date(dateTo as string);
+      
+      const slots = await storage.getProductionSlots(filters);
+      res.json(slots);
+    } catch (error: any) {
+      console.error("Error fetching production slots:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch production slots" });
+    }
+  });
+
+  app.get("/api/production-slots/jobs-without-slots", requireAuth, async (req, res) => {
+    try {
+      const jobsWithoutSlots = await storage.getJobsWithoutProductionSlots();
+      res.json(jobsWithoutSlots);
+    } catch (error: any) {
+      console.error("Error fetching jobs without slots:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch jobs" });
+    }
+  });
+
+  app.get("/api/production-slots/:id", requireAuth, async (req, res) => {
+    try {
+      const slot = await storage.getProductionSlot(req.params.id);
+      if (!slot) {
+        return res.status(404).json({ error: "Production slot not found" });
+      }
+      res.json(slot);
+    } catch (error: any) {
+      console.error("Error fetching production slot:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch production slot" });
+    }
+  });
+
+  app.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const slots = await storage.generateProductionSlotsForJob(req.params.jobId);
+      res.json(slots);
+    } catch (error: any) {
+      console.error("Error generating production slots:", error);
+      res.status(500).json({ error: error.message || "Failed to generate production slots" });
+    }
+  });
+
+  app.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const { newDate, reason, clientConfirmed, cascadeToLater } = req.body;
+      const changedById = req.session.user!.id;
+      
+      const slot = await storage.adjustProductionSlot(req.params.id, {
+        newDate: new Date(newDate),
+        reason,
+        changedById,
+        clientConfirmed,
+        cascadeToLater,
+      });
+      
+      if (!slot) {
+        return res.status(404).json({ error: "Production slot not found" });
+      }
+      res.json(slot);
+    } catch (error: any) {
+      console.error("Error adjusting production slot:", error);
+      res.status(500).json({ error: error.message || "Failed to adjust production slot" });
+    }
+  });
+
+  app.post("/api/production-slots/:id/book", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const slot = await storage.bookProductionSlot(req.params.id);
+      if (!slot) {
+        return res.status(404).json({ error: "Production slot not found" });
+      }
+      res.json(slot);
+    } catch (error: any) {
+      console.error("Error booking production slot:", error);
+      res.status(500).json({ error: error.message || "Failed to book production slot" });
+    }
+  });
+
+  app.post("/api/production-slots/:id/complete", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const slot = await storage.completeProductionSlot(req.params.id);
+      if (!slot) {
+        return res.status(404).json({ error: "Production slot not found" });
+      }
+      res.json(slot);
+    } catch (error: any) {
+      console.error("Error completing production slot:", error);
+      res.status(500).json({ error: error.message || "Failed to complete production slot" });
+    }
+  });
+
+  app.get("/api/production-slots/:id/adjustments", requireAuth, async (req, res) => {
+    try {
+      const adjustments = await storage.getProductionSlotAdjustments(req.params.id);
+      res.json(adjustments);
+    } catch (error: any) {
+      console.error("Error fetching production slot adjustments:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch adjustments" });
+    }
+  });
+
+  app.delete("/api/production-slots/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      await storage.deleteProductionSlot(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting production slot:", error);
+      res.status(500).json({ error: error.message || "Failed to delete production slot" });
+    }
+  });
+
   return httpServer;
 }
