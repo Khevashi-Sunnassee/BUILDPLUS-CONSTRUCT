@@ -21,6 +21,11 @@ import {
   DollarSign,
   User,
   Phone,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,6 +112,9 @@ interface PanelTypeInfo {
   name: string;
 }
 
+type SortField = "jobNumber" | "client" | "status";
+type SortDirection = "asc" | "desc";
+
 export default function AdminJobsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -114,16 +122,73 @@ export default function AdminJobsPage() {
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+  const [deletingJobPanelCount, setDeletingJobPanelCount] = useState(0);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [costOverridesDialogOpen, setCostOverridesDialogOpen] = useState(false);
   const [costOverridesJob, setCostOverridesJob] = useState<JobWithPanels | null>(null);
   const [localOverrides, setLocalOverrides] = useState<CostOverride[]>([]);
+  
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<SortField>("jobNumber");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
   });
+
+  // Filter and sort jobs
+  const filteredAndSortedJobs = (jobs || [])
+    .filter((job) => {
+      // Status filter
+      if (statusFilter !== "all" && job.status !== statusFilter) return false;
+      
+      // Search filter (job number, name, client, address)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          job.jobNumber.toLowerCase().includes(query) ||
+          job.name.toLowerCase().includes(query) ||
+          (job.client && job.client.toLowerCase().includes(query)) ||
+          (job.address && job.address.toLowerCase().includes(query))
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case "jobNumber":
+          comparison = a.jobNumber.localeCompare(b.jobNumber);
+          break;
+        case "client":
+          comparison = (a.client || "").localeCompare(b.client || "");
+          break;
+        case "status":
+          comparison = a.status.localeCompare(b.status);
+          break;
+      }
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
+    return sortDirection === "asc" 
+      ? <ArrowUp className="h-4 w-4 ml-1" /> 
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
 
   const jobForm = useForm<JobFormData>({
     resolver: zodResolver(jobSchema),
@@ -172,16 +237,26 @@ export default function AdminJobsPage() {
 
   const deleteJobMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/jobs/${id}`, {});
+      const res = await apiRequest("DELETE", `/api/admin/jobs/${id}`, {});
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || data.error || "Failed to delete job");
+      }
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      toast({ title: "Job deleted" });
+      toast({ title: "Job deleted successfully" });
       setDeleteDialogOpen(false);
       setDeletingJobId(null);
+      setDeletingJobPanelCount(0);
     },
-    onError: () => {
-      toast({ title: "Failed to delete job", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ 
+        title: "Cannot delete job", 
+        description: error.message,
+        variant: "destructive" 
+      });
     },
   });
 
@@ -402,23 +477,89 @@ export default function AdminJobsPage() {
             Job List
           </CardTitle>
           <CardDescription>
-            {jobs?.length || 0} jobs in the system
+            {filteredAndSortedJobs.length} of {jobs?.length || 0} jobs
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {/* Search and Filter Controls */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search jobs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-jobs"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="ACTIVE">Active</SelectItem>
+                <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                <SelectItem value="COMPLETED">Completed</SelectItem>
+                <SelectItem value="ARCHIVED">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+            {(searchQuery || statusFilter !== "all") && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}
+                data-testid="button-clear-filters"
+              >
+                Clear Filters
+              </Button>
+            )}
+          </div>
+          
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Job Number</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent"
+                    onClick={() => handleSort("jobNumber")}
+                    data-testid="button-sort-job-number"
+                  >
+                    Job Number {getSortIcon("jobNumber")}
+                  </Button>
+                </TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent"
+                    onClick={() => handleSort("client")}
+                    data-testid="button-sort-client"
+                  >
+                    Client {getSortIcon("client")}
+                  </Button>
+                </TableHead>
+                <TableHead>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 font-medium hover:bg-transparent"
+                    onClick={() => handleSort("status")}
+                    data-testid="button-sort-status"
+                  >
+                    Status {getSortIcon("status")}
+                  </Button>
+                </TableHead>
                 <TableHead>Panels</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {jobs?.map((job) => (
+              {filteredAndSortedJobs.map((job) => (
                 <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -481,6 +622,7 @@ export default function AdminJobsPage() {
                         size="icon"
                         onClick={() => {
                           setDeletingJobId(job.id);
+                          setDeletingJobPanelCount(job.panels.length);
                           setDeleteDialogOpen(true);
                         }}
                         data-testid={`button-delete-job-${job.id}`}
@@ -491,10 +633,10 @@ export default function AdminJobsPage() {
                   </TableCell>
                 </TableRow>
               ))}
-              {(!jobs || jobs.length === 0) && (
+              {filteredAndSortedJobs.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    No jobs found. Add a job or import from Excel.
+                    {jobs?.length ? "No jobs match your filters." : "No jobs found. Add a job or import from Excel."}
                   </TableCell>
                 </TableRow>
               )}
@@ -711,21 +853,34 @@ export default function AdminJobsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Job?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently delete this job and all associated panel register entries.
-              This action cannot be undone.
-            </AlertDialogDescription>
+            {deletingJobPanelCount > 0 ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-md">
+                  <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                  <p className="text-sm text-red-800 dark:text-red-200">
+                    This job has <strong>{deletingJobPanelCount} panel(s)</strong> registered and cannot be deleted.
+                    Please delete or reassign the panels first.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <AlertDialogDescription>
+                This will permanently delete this job. This action cannot be undone.
+              </AlertDialogDescription>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deletingJobId && deleteJobMutation.mutate(deletingJobId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              data-testid="button-confirm-delete"
-            >
-              {deleteJobMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Delete
-            </AlertDialogAction>
+            {deletingJobPanelCount === 0 && (
+              <AlertDialogAction
+                onClick={() => deletingJobId && deleteJobMutation.mutate(deletingJobId)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                data-testid="button-confirm-delete"
+              >
+                {deleteJobMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Delete
+              </AlertDialogAction>
+            )}
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

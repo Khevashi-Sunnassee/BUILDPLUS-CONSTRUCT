@@ -597,7 +597,18 @@ export async function registerRoutes(
   });
 
   app.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteJob(req.params.id as string);
+    const jobId = req.params.id as string;
+    
+    // Check if job has panels
+    const panels = await storage.getPanelsByJob(jobId);
+    if (panels.length > 0) {
+      return res.status(400).json({ 
+        error: "Cannot delete job with panels",
+        message: `This job has ${panels.length} panel(s) registered. Please delete or reassign them first.`
+      });
+    }
+    
+    await storage.deleteJob(jobId);
     res.json({ ok: true });
   });
 
