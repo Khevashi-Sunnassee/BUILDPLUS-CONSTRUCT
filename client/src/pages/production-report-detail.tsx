@@ -168,8 +168,16 @@ export default function ProductionReportDetailPage() {
   const selectedJobPanels = useMemo(() => {
     if (!selectedJobId || !jobs) return [];
     const job = jobs.find(j => j.id === selectedJobId);
-    return (job?.panels || []).filter(p => p.approvedForProduction);
+    const approvedPanels = (job?.panels || []).filter(p => p.approvedForProduction);
+    // Sort by 28-day f'c (concrete strength) ascending - use non-mutating sort
+    return [...approvedPanels].sort((a, b) => {
+      const aFc = parseFloat(a.day28Fc || "0");
+      const bFc = parseFloat(b.day28Fc || "0");
+      return aFc - bFc;
+    });
   }, [selectedJobId, jobs]);
+
+  const [selectedPanelConcreteStrength, setSelectedPanelConcreteStrength] = useState<string>("");
 
   const entryForm = useForm<ProductionEntryFormData>({
     resolver: zodResolver(productionEntrySchema),
@@ -203,6 +211,7 @@ export default function ProductionReportDetailPage() {
       setEntryDialogOpen(false);
       entryForm.reset();
       setSelectedJobId("");
+      setSelectedPanelConcreteStrength("");
     },
     onError: (error: any) => {
       toast({ title: "Failed to create entry", description: error.message, variant: "destructive" });
@@ -223,6 +232,7 @@ export default function ProductionReportDetailPage() {
       setEditingEntry(null);
       entryForm.reset();
       setSelectedJobId("");
+      setSelectedPanelConcreteStrength("");
     },
     onError: () => {
       toast({ title: "Failed to update entry", variant: "destructive" });
@@ -310,6 +320,7 @@ export default function ProductionReportDetailPage() {
   const openCreateDialog = () => {
     setEditingEntry(null);
     setSelectedJobId("");
+    setSelectedPanelConcreteStrength("");
     entryForm.reset({
       panelId: "",
       jobId: "",
@@ -331,6 +342,7 @@ export default function ProductionReportDetailPage() {
   const openEditDialog = (entry: ProductionEntryWithDetails) => {
     setEditingEntry(entry);
     setSelectedJobId(entry.jobId);
+    setSelectedPanelConcreteStrength(entry.panel.day28Fc || "");
     entryForm.reset({
       panelId: entry.panelId,
       jobId: entry.jobId,
@@ -380,11 +392,14 @@ export default function ProductionReportDetailPage() {
       entryForm.setValue("panelVolume", panel.panelVolume || "");
       entryForm.setValue("panelMass", panel.panelMass || "");
       entryForm.setValue("volumeM3", panel.panelVolume || "");
+      setSelectedPanelConcreteStrength(panel.day28Fc || "");
       const width = parseFloat(panel.loadWidth || "0") / 1000;
       const height = parseFloat(panel.loadHeight || "0") / 1000;
       if (width > 0 && height > 0) {
         entryForm.setValue("areaM2", (width * height).toFixed(2));
       }
+    } else {
+      setSelectedPanelConcreteStrength("");
     }
   };
 
@@ -833,7 +848,12 @@ export default function ProductionReportDetailPage() {
       </Card>
       </div>
 
-      <Dialog open={entryDialogOpen} onOpenChange={setEntryDialogOpen}>
+      <Dialog open={entryDialogOpen} onOpenChange={(open) => {
+        setEntryDialogOpen(open);
+        if (!open) {
+          setSelectedPanelConcreteStrength("");
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingEntry ? "Edit Production Entry" : "Add Production Entry"}</DialogTitle>
@@ -902,7 +922,7 @@ export default function ProductionReportDetailPage() {
                         ) : (
                           selectedJobPanels.map((panel) => (
                             <SelectItem key={panel.id} value={panel.id}>
-                              {panel.panelMark} - {panel.panelType?.replace("_", " ") || "WALL"}
+                              {panel.panelMark} - {panel.panelType?.replace("_", " ") || "WALL"} ({panel.day28Fc || "0"} MPa)
                             </SelectItem>
                           ))
                         )}
@@ -927,6 +947,10 @@ export default function ProductionReportDetailPage() {
               />
               <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
                 <h4 className="font-medium text-sm">Panel Dimensions</h4>
+                <div className="flex items-center gap-2 p-2 bg-primary/10 rounded-md border border-primary/20">
+                  <span className="text-sm font-medium">28-Day f'c:</span>
+                  <span className="text-sm font-bold text-primary">{selectedPanelConcreteStrength ? `${selectedPanelConcreteStrength} MPa` : "— MPa"}</span>
+                </div>
                 <div className="grid grid-cols-3 gap-3">
                   <FormField
                     control={entryForm.control}
