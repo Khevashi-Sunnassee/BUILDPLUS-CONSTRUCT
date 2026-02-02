@@ -147,7 +147,7 @@ export default function AdminPanelsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "summary">("list");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(50);
+  const [pageSize, setPageSize] = useState(100);
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
