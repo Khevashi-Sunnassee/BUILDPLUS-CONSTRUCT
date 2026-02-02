@@ -126,6 +126,7 @@ export default function ProductionReportDetailPage() {
   const [editingEntry, setEditingEntry] = useState<ProductionEntryWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+  const [deleteDayDialogOpen, setDeleteDayDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -215,6 +216,21 @@ export default function ProductionReportDetailPage() {
     },
     onError: () => {
       toast({ title: "Failed to delete entry", variant: "destructive" });
+    },
+  });
+
+  const deleteDayMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("DELETE", `/api/production-days/${selectedDate}?factory=${factory}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      toast({ title: "Production day deleted" });
+      setDeleteDayDialogOpen(false);
+      setLocation("/production-report");
+    },
+    onError: () => {
+      toast({ title: "Failed to delete production day", variant: "destructive" });
     },
   });
 
@@ -445,6 +461,19 @@ export default function ProductionReportDetailPage() {
           <Button onClick={openCreateDialog} data-testid="button-add-entry">
             <Plus className="h-4 w-4 mr-2" />
             Add Entry
+          </Button>
+          <Button 
+            variant="destructive" 
+            onClick={() => setDeleteDayDialogOpen(true)}
+            disabled={deleteDayMutation.isPending}
+            data-testid="button-delete-day"
+          >
+            {deleteDayMutation.isPending ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            Delete Day
           </Button>
         </div>
       </div>
@@ -787,6 +816,31 @@ export default function ProductionReportDetailPage() {
               data-testid="button-confirm-delete"
             >
               {deleteEntryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteDayDialogOpen} onOpenChange={setDeleteDayDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Production Day?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the production day for {formatDateDisplay(selectedDate)} ({factory}) and all its entries. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteDayMutation.mutate()}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-day"
+            >
+              {deleteDayMutation.isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 "Delete"
