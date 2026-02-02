@@ -74,7 +74,8 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report created successfully" });
       resetForm();
     },
@@ -89,7 +90,8 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report updated successfully" });
       resetForm();
     },
@@ -104,7 +106,8 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report submitted for approval" });
     },
     onError: (error: Error) => {
@@ -118,7 +121,9 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/approved"] });
       toast({ title: "Report approved" });
       setShowApprovalDialog(false);
       setSelectedReport(null);
@@ -134,7 +139,8 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report rejected" });
       setShowApprovalDialog(false);
       setSelectedReport(null);
@@ -150,7 +156,8 @@ export default function WeeklyJobLogsPage() {
       await apiRequest("DELETE", `/api/weekly-job-reports/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report deleted" });
     },
     onError: (error: Error) => {
