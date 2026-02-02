@@ -1945,15 +1945,29 @@ export class DatabaseStorage implements IStorage {
   async generateProductionSlotsForJob(jobId: string): Promise<ProductionSlot[]> {
     const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
     if (!job) throw new Error("Job not found");
-    if (!job.productionStartDate || !job.expectedCycleTimePerFloor || !job.levels) {
-      throw new Error("Job missing required fields: productionStartDate, expectedCycleTimePerFloor, or levels");
+    if (!job.productionStartDate || !job.expectedCycleTimePerFloor) {
+      throw new Error("Job missing required fields: productionStartDate or expectedCycleTimePerFloor");
+    }
+    
+    // Determine levels - either generate from lowestLevel/highestLevel or parse from levels field
+    let levelList: string[] = [];
+    
+    if (job.lowestLevel && job.highestLevel) {
+      // Generate levels from lowestLevel to highestLevel
+      levelList = this.generateLevelRange(job.lowestLevel, job.highestLevel);
+    } else if (job.levels) {
+      // Fall back to comma-separated levels field
+      levelList = job.levels.split(",").map(l => l.trim()).filter(l => l);
+    }
+    
+    if (levelList.length === 0) {
+      throw new Error("Job must have either lowestLevel/highestLevel or levels defined");
     }
 
     // Delete existing slots for this job
     await db.delete(productionSlots).where(eq(productionSlots.jobId, jobId));
 
-    // Parse levels and sort them intelligently
-    const levelList = job.levels.split(",").map(l => l.trim()).filter(l => l);
+    // Sort levels intelligently
     const sortedLevels = this.sortLevelsIntelligently(levelList, job.lowestLevel, job.highestLevel);
 
     // Get panel counts per level
@@ -1989,6 +2003,42 @@ export class DatabaseStorage implements IStorage {
       createdSlots.push(slot);
     }
     return createdSlots;
+  }
+
+  private generateLevelRange(lowestLevel: string, highestLevel: string): string[] {
+    const levels: string[] = [];
+    
+    // Try to parse as numeric levels first
+    const lowMatch = lowestLevel.match(/^L?(\d+)$/i);
+    const highMatch = highestLevel.match(/^L?(\d+)$/i);
+    
+    if (lowMatch && highMatch) {
+      const lowNum = parseInt(lowMatch[1], 10);
+      const highNum = parseInt(highMatch[1], 10);
+      
+      // Generate levels L1, L2, ..., Ln (or just 1, 2, ..., n based on input format)
+      const useLPrefix = lowestLevel.toLowerCase().startsWith('l') || highestLevel.toLowerCase().startsWith('l');
+      
+      for (let i = lowNum; i <= highNum; i++) {
+        levels.push(useLPrefix ? `L${i}` : String(i));
+      }
+      return levels;
+    }
+    
+    // Handle special named levels
+    const specialLevels = ["Basement 2", "B2", "Basement 1", "B1", "Basement", "Ground", "G", "GF", "Mezzanine", "Mezz"];
+    const lowIdx = specialLevels.findIndex(l => l.toLowerCase() === lowestLevel.toLowerCase());
+    const highIdx = specialLevels.findIndex(l => l.toLowerCase() === highestLevel.toLowerCase());
+    
+    if (lowIdx !== -1 && highIdx !== -1 && lowIdx <= highIdx) {
+      return specialLevels.slice(lowIdx, highIdx + 1);
+    }
+    
+    // If we can't parse, just return both levels
+    if (lowestLevel === highestLevel) {
+      return [lowestLevel];
+    }
+    return [lowestLevel, highestLevel];
   }
 
   private sortLevelsIntelligently(levels: string[], lowestLevel?: string | null, highestLevel?: string | null): string[] {
