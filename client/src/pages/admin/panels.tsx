@@ -109,6 +109,13 @@ const panelSchema = z.object({
 
 type PanelFormData = z.infer<typeof panelSchema>;
 
+const formatNumber = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined || value === "") return "-";
+  const num = typeof value === "string" ? parseFloat(value) : value;
+  if (isNaN(num)) return "-";
+  return num.toLocaleString("en-AU");
+};
+
 interface PanelWithJob extends PanelRegister {
   job: Job;
 }
@@ -967,10 +974,10 @@ export default function AdminPanelsPage() {
                 <TableHead>{groupByPanelType ? "Job" : "Type"}</TableHead>
                 <TableHead>Building</TableHead>
                                 <TableHead>Level</TableHead>
-                <TableHead className="text-center">Qty</TableHead>
-                <TableHead className="text-right">Length (mm)</TableHead>
-                <TableHead className="text-right">Width (mm)</TableHead>
-                <TableHead className="text-right">Vol (m³)</TableHead>
+                <TableHead className="text-center w-12">Qty</TableHead>
+                <TableHead className="text-right w-20">Length (mm)</TableHead>
+                <TableHead className="text-right w-20">Width (mm)</TableHead>
+                <TableHead className="text-right w-24">Vol (m³)</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1018,8 +1025,8 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-sm">{panel.building || "-"}</TableCell>
                             <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadWidth)}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)} m³` : "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
@@ -1120,8 +1127,8 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-sm">{panel.building || "-"}</TableCell>
                             <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadWidth)}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)} m³` : "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
@@ -1202,8 +1209,8 @@ export default function AdminPanelsPage() {
                       <TableCell className="text-sm">{panel.building || "-"}</TableCell>
                       <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                       <TableCell className="text-center">{panel.qty || 1}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadWidth)}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)} m³` : "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
