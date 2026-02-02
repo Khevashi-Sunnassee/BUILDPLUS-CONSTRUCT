@@ -74,6 +74,7 @@ export const globalSettings = pgTable("global_settings", {
   idleThresholdS: integer("idle_threshold_s").default(300).notNull(),
   trackedApps: text("tracked_apps").default("revit,acad").notNull(),
   requireAddins: boolean("require_addins").default(true).notNull(),
+  logoBase64: text("logo_base64"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

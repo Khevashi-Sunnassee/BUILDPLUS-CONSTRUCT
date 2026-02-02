@@ -1,13 +1,15 @@
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -33,10 +35,68 @@ type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export default function AdminSettingsPage() {
   const { toast } = useToast();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   const { data: settings, isLoading } = useQuery<GlobalSettings>({
     queryKey: ["/api/admin/settings"],
   });
+
+
+  const uploadLogoMutation = useMutation({
+    mutationFn: async (logoBase64: string) => {
+      return apiRequest("POST", "/api/admin/settings/logo", { logoBase64 });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      toast({ title: "Logo uploaded successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to upload logo", variant: "destructive" });
+    },
+  });
+
+  const removeLogoMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/settings/logo", { logoBase64: "" });
+    },
+    onSuccess: () => {
+      setLogoPreview(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      toast({ title: "Logo removed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to remove logo", variant: "destructive" });
+    },
+  });
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Please select an image file", variant: "destructive" });
+      return;
+    }
+
+    // Validate file size (max 500KB)
+    if (file.size > 500 * 1024) {
+      toast({ title: "Logo must be less than 500KB", variant: "destructive" });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const base64 = evt.target?.result as string;
+      setLogoPreview(base64);
+      uploadLogoMutation.mutate(base64);
+    };
+    reader.readAsDataURL(file);
+    if (logoInputRef.current) logoInputRef.current.value = "";
+  };
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
@@ -92,6 +152,83 @@ export default function AdminSettingsPage() {
           Configure system-wide time tracking parameters
         </p>
       </div>
+
+      {/* Logo Upload Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Image className="h-5 w-5" />
+            Company Logo
+          </CardTitle>
+          <CardDescription>
+            Upload your company logo to display in the app and reports
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-6">
+            <div className="flex-shrink-0">
+              {(logoPreview || settings?.logoBase64) ? (
+                <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={logoPreview || settings?.logoBase64 || ""} 
+                    alt="Company Logo" 
+                    className="max-w-full max-h-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="w-24 h-24 rounded-lg border-2 border-dashed bg-muted flex items-center justify-center">
+                  <Image className="h-8 w-8 text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  ref={logoInputRef}
+                  accept="image/*"
+                  onChange={handleLogoUpload}
+                  className="hidden"
+                  data-testid="input-logo-file"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={uploadLogoMutation.isPending}
+                  data-testid="button-upload-logo"
+                >
+                  {uploadLogoMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="h-4 w-4 mr-2" />
+                  )}
+                  Upload Logo
+                </Button>
+                {(logoPreview || settings?.logoBase64) && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => removeLogoMutation.mutate()}
+                    disabled={removeLogoMutation.isPending}
+                    data-testid="button-remove-logo"
+                  >
+                    {removeLogoMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                    )}
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                PNG, JPG or SVG. Max 500KB. Displayed in sidebar and reports.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

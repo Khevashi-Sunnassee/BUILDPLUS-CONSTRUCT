@@ -497,6 +497,30 @@ export async function registerRoutes(
     res.json(settings);
   });
 
+  // Logo upload endpoint
+  app.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { logoBase64 } = req.body;
+      if (!logoBase64 || typeof logoBase64 !== "string") {
+        return res.status(400).json({ error: "Logo data is required" });
+      }
+      // Validate it's a data URL
+      if (!logoBase64.startsWith("data:image/")) {
+        return res.status(400).json({ error: "Invalid image format" });
+      }
+      const settings = await storage.updateGlobalSettings({ logoBase64 });
+      res.json({ success: true, logoBase64: settings.logoBase64 });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to upload logo" });
+    }
+  });
+
+  // Public endpoint to get the logo
+  app.get("/api/settings/logo", async (req, res) => {
+    const settings = await storage.getGlobalSettings();
+    res.json({ logoBase64: settings?.logoBase64 || null });
+  });
+
   // Legacy /api/admin/projects endpoints - redirect to jobs for backward compatibility
   app.get("/api/admin/projects", requireRole("ADMIN"), async (req, res) => {
     const jobs = await storage.getAllJobs();

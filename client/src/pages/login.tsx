@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "@shared/schema";
 import { z } from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
-import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
+import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,12 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Fetch dynamic logo from settings
+  const { data: logoData } = useQuery<{ logoBase64: string | null }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const logoSrc = logoData?.logoBase64 || defaultLogo;
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -55,7 +62,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <img 
-            src={lteLogo} 
+            src={logoSrc} 
             alt="LTE Precast Concrete Structures" 
             className="h-16 mb-4"
             data-testid="img-lte-logo"

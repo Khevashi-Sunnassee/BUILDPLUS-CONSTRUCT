@@ -22,7 +22,7 @@ import {
   DollarSign,
   Shield,
 } from "lucide-react";
-import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
+import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
 import {
   Sidebar,
@@ -96,6 +96,12 @@ export function AppSidebar() {
     enabled: !!user,
   });
 
+  // Fetch dynamic logo from settings
+  const { data: logoData } = useQuery<{ logoBase64: string | null }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const logoSrc = logoData?.logoBase64 || defaultLogo;
+
   const isItemHidden = (url: string): boolean => {
     const functionKey = urlToFunctionKey[url];
     if (!functionKey) return false;
@@ -120,7 +126,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center justify-center">
           <img 
-            src={lteLogo} 
+            src={logoSrc} 
             alt="LTE Precast Concrete Structures" 
             className="h-10"
             data-testid="img-sidebar-logo"
