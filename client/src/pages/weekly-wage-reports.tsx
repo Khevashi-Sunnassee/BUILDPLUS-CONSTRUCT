@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -72,6 +72,60 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+
+function CurrencyInput({ 
+  value, 
+  onChange, 
+  ...props 
+}: { 
+  value: string; 
+  onChange: (value: string) => void;
+  [key: string]: any;
+}) {
+  const [displayValue, setDisplayValue] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+  
+  useEffect(() => {
+    if (!isFocused) {
+      const num = parseFloat(value || "0");
+      setDisplayValue(isNaN(num) ? "0" : num.toLocaleString("en-AU"));
+    }
+  }, [value, isFocused]);
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    const num = parseFloat(value || "0");
+    setDisplayValue(num === 0 ? "" : num.toString());
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    const num = parseFloat(value || "0");
+    setDisplayValue(isNaN(num) ? "0" : num.toLocaleString("en-AU"));
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawValue = e.target.value.replace(/[^0-9.]/g, "");
+    setDisplayValue(rawValue);
+    onChange(rawValue || "0");
+  };
+
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+      <Input
+        {...props}
+        type="text"
+        inputMode="decimal"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        className="pl-7"
+      />
+    </div>
+  );
+}
 
 interface WeeklyWageReport {
   id: string;
@@ -578,9 +632,9 @@ export default function WeeklyWageReportsPage() {
                   name="productionWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Production Wages ($)</FormLabel>
+                      <FormLabel>Production Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-production-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="input-production-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -591,9 +645,9 @@ export default function WeeklyWageReportsPage() {
                   name="officeWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Office Wages ($)</FormLabel>
+                      <FormLabel>Office Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-office-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="input-office-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -604,9 +658,9 @@ export default function WeeklyWageReportsPage() {
                   name="estimatingWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Estimating Wages ($)</FormLabel>
+                      <FormLabel>Estimating Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-estimating-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="input-estimating-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -617,9 +671,9 @@ export default function WeeklyWageReportsPage() {
                   name="onsiteWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Onsite Wages ($)</FormLabel>
+                      <FormLabel>Onsite Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-onsite-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="input-onsite-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -630,9 +684,9 @@ export default function WeeklyWageReportsPage() {
                   name="draftingWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Drafting Wages ($)</FormLabel>
+                      <FormLabel>Drafting Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-drafting-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="input-drafting-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -643,9 +697,9 @@ export default function WeeklyWageReportsPage() {
                   name="civilWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Civil Wages ($)</FormLabel>
+                      <FormLabel>Civil Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="input-civil-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="input-civil-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -752,9 +806,9 @@ export default function WeeklyWageReportsPage() {
                   name="productionWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Production Wages ($)</FormLabel>
+                      <FormLabel>Production Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="edit-input-production-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="edit-input-production-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -765,9 +819,9 @@ export default function WeeklyWageReportsPage() {
                   name="officeWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Office Wages ($)</FormLabel>
+                      <FormLabel>Office Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="edit-input-office-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="edit-input-office-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -778,9 +832,9 @@ export default function WeeklyWageReportsPage() {
                   name="estimatingWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Estimating Wages ($)</FormLabel>
+                      <FormLabel>Estimating Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="edit-input-estimating-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="edit-input-estimating-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -791,9 +845,9 @@ export default function WeeklyWageReportsPage() {
                   name="onsiteWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Onsite Wages ($)</FormLabel>
+                      <FormLabel>Onsite Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="edit-input-onsite-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="edit-input-onsite-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -804,9 +858,9 @@ export default function WeeklyWageReportsPage() {
                   name="draftingWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Drafting Wages ($)</FormLabel>
+                      <FormLabel>Drafting Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="edit-input-drafting-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="edit-input-drafting-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -817,9 +871,9 @@ export default function WeeklyWageReportsPage() {
                   name="civilWages"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Civil Wages ($)</FormLabel>
+                      <FormLabel>Civil Wages</FormLabel>
                       <FormControl>
-                        <Input type="number" step="0.01" {...field} data-testid="edit-input-civil-wages" />
+                        <CurrencyInput value={field.value} onChange={field.onChange} data-testid="edit-input-civil-wages" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
