@@ -631,7 +631,12 @@ export async function registerRoutes(
       if (existing) {
         return res.status(400).json({ error: "Job with this number already exists" });
       }
-      const job = await storage.createJob(req.body);
+      const data = { ...req.body };
+      // Convert productionStartDate string to Date if present
+      if (data.productionStartDate && typeof data.productionStartDate === 'string') {
+        data.productionStartDate = new Date(data.productionStartDate);
+      }
+      const job = await storage.createJob(data);
       res.json(job);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to create job" });
@@ -639,8 +644,17 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    const job = await storage.updateJob(req.params.id as string, req.body);
-    res.json(job);
+    try {
+      const data = { ...req.body };
+      // Convert productionStartDate string to Date if present
+      if (data.productionStartDate && typeof data.productionStartDate === 'string') {
+        data.productionStartDate = new Date(data.productionStartDate);
+      }
+      const job = await storage.updateJob(req.params.id as string, data);
+      res.json(job);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update job" });
+    }
   });
 
   app.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {

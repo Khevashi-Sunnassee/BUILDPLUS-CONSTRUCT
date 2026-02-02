@@ -879,7 +879,7 @@ export default function AdminJobsPage() {
       </Card>
 
       <Dialog open={jobDialogOpen} onOpenChange={setJobDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingJob ? "Edit Job" : "Create New Job"}</DialogTitle>
             <DialogDescription>
@@ -888,338 +888,349 @@ export default function AdminJobsPage() {
           </DialogHeader>
           <Form {...jobForm}>
             <form onSubmit={jobForm.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={jobForm.control}
-                name="jobNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Job Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="JOB001" {...field} data-testid="input-job-number" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={jobForm.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Job Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Job name" {...field} data-testid="input-job-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={jobForm.control}
-                  name="client"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Client</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Client name" {...field} data-testid="input-job-client" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={jobForm.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h3 className="font-medium text-sm text-muted-foreground">Basic Information</h3>
+                  <FormField
+                    control={jobForm.control}
+                    name="jobNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Number</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-job-status">
-                            <SelectValue />
-                          </SelectTrigger>
+                          <Input placeholder="JOB001" {...field} data-testid="input-job-number" />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="ACTIVE">Active</SelectItem>
-                          <SelectItem value="ON_HOLD">On Hold</SelectItem>
-                          <SelectItem value="COMPLETED">Completed</SelectItem>
-                          <SelectItem value="ARCHIVED">Archived</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={jobForm.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Address</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Street address" {...field} data-testid="input-job-address" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={jobForm.control}
-                  name="city"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>City</FormLabel>
-                      <FormControl>
-                        <Input placeholder="City" {...field} data-testid="input-job-city" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={jobForm.control}
-                  name="state"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>State</FormLabel>
-                      <Select 
-                        onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
-                        value={field.value || "none"}
-                      >
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={jobForm.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Job Name</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-job-state">
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
+                          <Input placeholder="Job name" {...field} data-testid="input-job-name" />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">-</SelectItem>
-                          {AUSTRALIAN_STATES.map((state) => (
-                            <SelectItem key={state} value={state}>{state}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="client"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Client</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Client name" {...field} data-testid="input-job-client" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job-status">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="ACTIVE">Active</SelectItem>
+                              <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                              <SelectItem value="COMPLETED">Completed</SelectItem>
+                              <SelectItem value="ARCHIVED">Archived</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={jobForm.control}
+                    name="address"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Address</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Street address" {...field} data-testid="input-job-address" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="city"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>City</FormLabel>
+                          <FormControl>
+                            <Input placeholder="City" {...field} data-testid="input-job-city" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="state"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>State</FormLabel>
+                          <Select 
+                            onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                            value={field.value || "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job-state">
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">-</SelectItem>
+                              {AUSTRALIAN_STATES.map((state) => (
+                                <SelectItem key={state} value={state}>{state}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="siteContact"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Site Contact</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Contact name" {...field} data-testid="input-job-site-contact" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="siteContactPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Site Contact Phone</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Phone number" {...field} data-testid="input-job-site-contact-phone" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={jobForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Textarea placeholder="Job description" {...field} data-testid="input-job-description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="font-medium text-sm text-muted-foreground">Production Details</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="craneCapacity"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Crane Capacity</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="numberOfBuildings"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Number of Buildings</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min={0}
+                              placeholder="e.g. 3" 
+                              {...field}
+                              value={field.value ?? ""}
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : null)}
+                              data-testid="input-job-number-of-buildings" 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={jobForm.control}
+                    name="levels"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Levels</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="e.g. Ground,L1,L2,L3,Roof" 
+                            {...field} 
+                            data-testid="input-job-levels" 
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">Comma-separated list of level names</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="lowestLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lowest Level</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g. Ground" 
+                              {...field} 
+                              data-testid="input-job-lowest-level" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Starting level</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="highestLevel"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Highest Level</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g. Roof" 
+                              {...field} 
+                              data-testid="input-job-highest-level" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Final level</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={jobForm.control}
+                    name="productionStartDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Production Start Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-job-production-start-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="expectedCycleTimePerFloor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Cycle Time (days)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              placeholder="e.g., 5"
+                              value={field.value ?? ""} 
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              data-testid="input-job-cycle-time-per-floor" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Days per floor</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="daysInAdvance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Days in Advance</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              placeholder="e.g., 7"
+                              value={field.value ?? ""} 
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              data-testid="input-job-days-in-advance" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Lead time before site</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={jobForm.control}
+                    name="projectManagerId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Manager</FormLabel>
+                        <Select 
+                          onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                          value={field.value || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-job-project-manager">
+                              <SelectValue placeholder="Select project manager" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No Project Manager</SelectItem>
+                            {users?.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={jobForm.control}
-                  name="siteContact"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Site Contact</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Contact name" {...field} data-testid="input-job-site-contact" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={jobForm.control}
-                  name="siteContactPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Site Contact Phone</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Phone number" {...field} data-testid="input-job-site-contact-phone" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={jobForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Job description" {...field} data-testid="input-job-description" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={jobForm.control}
-                name="craneCapacity"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Crane Capacity</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={jobForm.control}
-                name="numberOfBuildings"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Number of Buildings</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        min={0}
-                        placeholder="e.g. 3" 
-                        {...field}
-                        value={field.value ?? ""}
-                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : null)}
-                        data-testid="input-job-number-of-buildings" 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={jobForm.control}
-                name="levels"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Levels</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="e.g. Ground,L1,L2,L3,Roof" 
-                        {...field} 
-                        data-testid="input-job-levels" 
-                      />
-                    </FormControl>
-                    <p className="text-xs text-muted-foreground">Comma-separated list of level names</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={jobForm.control}
-                  name="lowestLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Lowest Level</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g. Ground" 
-                          {...field} 
-                          data-testid="input-job-lowest-level" 
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">Starting level for production</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={jobForm.control}
-                  name="highestLevel"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Highest Level</FormLabel>
-                      <FormControl>
-                        <Input 
-                          placeholder="e.g. Roof" 
-                          {...field} 
-                          data-testid="input-job-highest-level" 
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">Final level for production</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={jobForm.control}
-                name="productionStartDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Production Start Date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} data-testid="input-job-production-start-date" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={jobForm.control}
-                  name="expectedCycleTimePerFloor"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Expected Cycle Time per Floor (days)</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="1"
-                          placeholder="e.g., 5"
-                          value={field.value ?? ""} 
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                          data-testid="input-job-cycle-time-per-floor" 
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">Days to complete each floor</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={jobForm.control}
-                  name="daysInAdvance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Days in Advance</FormLabel>
-                      <FormControl>
-                        <Input 
-                          type="number" 
-                          min="1"
-                          placeholder="e.g., 7"
-                          value={field.value ?? ""} 
-                          onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
-                          data-testid="input-job-days-in-advance" 
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">Days before site needs panels</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={jobForm.control}
-                name="projectManagerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Project Manager</FormLabel>
-                    <Select 
-                      onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
-                      value={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-job-project-manager">
-                          <SelectValue placeholder="Select project manager" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No Project Manager</SelectItem>
-                        {users?.map((user) => (
-                          <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setJobDialogOpen(false)}>
                   Cancel
