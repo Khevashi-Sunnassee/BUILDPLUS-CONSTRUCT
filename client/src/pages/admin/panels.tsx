@@ -909,11 +909,11 @@ export default function AdminPanelsPage() {
                 <TableHead>Panel Mark</TableHead>
                 <TableHead>{groupByPanelType ? "Job" : "Type"}</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Drawing / Sheet</TableHead>
+                <TableHead className="text-right">Length (mm)</TableHead>
+                <TableHead className="text-right">Width (mm)</TableHead>
+                <TableHead className="text-right">Vol (m³)</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Progress</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -957,34 +957,15 @@ export default function AdminPanelsPage() {
                               <span className="text-sm font-mono">{panel.job.jobNumber}</span>
                             </TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
-                            <TableCell>{panel.description || "-"}</TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
-                                {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
-                                {!panel.drawingCode && !panel.sheetNumber && "-"}
-                              </div>
-                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.panelVolume || "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
                               </Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
-                            <TableCell>
-                              {panel.estimatedHours ? (
-                                <div className="space-y-1 w-24">
-                                  <Progress value={getProgress(panel) || 0} className="h-2" />
-                                  <div className="text-xs text-muted-foreground">
-                                    {panel.actualHours || 0} / {panel.estimatedHours}h
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">
-                                  {panel.actualHours || 0}h logged
-                                </span>
-                              )}
-                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {panel.approvedForProduction ? (
@@ -1076,34 +1057,15 @@ export default function AdminPanelsPage() {
                               <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                             </TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
-                            <TableCell>{panel.description || "-"}</TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
-                                {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
-                                {!panel.drawingCode && !panel.sheetNumber && "-"}
-                              </div>
-                            </TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.panelVolume || "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
                               </Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
-                            <TableCell>
-                              {panel.estimatedHours ? (
-                                <div className="space-y-1 w-24">
-                                  <Progress value={getProgress(panel) || 0} className="h-2" />
-                                  <div className="text-xs text-muted-foreground">
-                                    {panel.actualHours || 0} / {panel.estimatedHours}h
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-sm text-muted-foreground">
-                                  {panel.actualHours || 0}h logged
-                                </span>
-                              )}
-                            </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {panel.approvedForProduction ? (
@@ -1175,34 +1137,15 @@ export default function AdminPanelsPage() {
                         <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                       </TableCell>
                       <TableCell className="text-center">{panel.qty || 1}</TableCell>
-                      <TableCell>{panel.description || "-"}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          {panel.drawingCode && <div>Drawing: {panel.drawingCode}</div>}
-                          {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
-                          {!panel.drawingCode && !panel.sheetNumber && "-"}
-                        </div>
-                      </TableCell>
+                      <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{panel.panelVolume || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {getSourceLabel(panel.source)}
                         </Badge>
                       </TableCell>
                       <TableCell>{getStatusBadge(panel.status)}</TableCell>
-                      <TableCell>
-                        {panel.estimatedHours ? (
-                          <div className="space-y-1 w-24">
-                            <Progress value={getProgress(panel) || 0} className="h-2" />
-                            <div className="text-xs text-muted-foreground">
-                              {panel.actualHours || 0} / {panel.estimatedHours}h
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            {panel.actualHours || 0}h logged
-                          </span>
-                        )}
-                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           {panel.approvedForProduction ? (
@@ -1245,7 +1188,7 @@ export default function AdminPanelsPage() {
                   ))}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? 7 : 8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? 9 : 10} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>
