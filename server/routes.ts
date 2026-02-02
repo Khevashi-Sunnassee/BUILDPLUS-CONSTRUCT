@@ -1095,6 +1095,40 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // User Permissions
+  app.get("/api/admin/user-permissions", requireRole("ADMIN"), async (req, res) => {
+    const data = await storage.getAllUserPermissionsForAdmin();
+    res.json(data);
+  });
+
+  app.get("/api/admin/user-permissions/:userId", requireRole("ADMIN"), async (req, res) => {
+    const permissions = await storage.getUserPermissions(req.params.userId);
+    res.json(permissions);
+  });
+
+  app.post("/api/admin/user-permissions/:userId/initialize", requireRole("ADMIN"), async (req, res) => {
+    const permissions = await storage.initializeUserPermissions(req.params.userId);
+    res.json(permissions);
+  });
+
+  app.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMIN"), async (req, res) => {
+    const { permissionLevel } = req.body;
+    if (!permissionLevel || !["HIDDEN", "VIEW", "VIEW_AND_UPDATE"].includes(permissionLevel)) {
+      return res.status(400).json({ error: "Invalid permission level" });
+    }
+    const permission = await storage.setUserPermission(
+      req.params.userId,
+      req.params.functionKey as any,
+      permissionLevel
+    );
+    res.json(permission);
+  });
+
+  app.get("/api/my-permissions", requireAuth, async (req, res) => {
+    const permissions = await storage.getUserPermissions(req.user!.id);
+    res.json(permissions);
+  });
+
   app.post("/api/agent/ingest", async (req, res) => {
     try {
       const rawKey = req.headers["x-device-key"] as string;
