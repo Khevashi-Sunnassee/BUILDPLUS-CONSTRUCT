@@ -689,6 +689,7 @@ export const weeklyJobReportSchedules = pgTable("weekly_job_report_schedules", {
   priority: integer("priority").default(0).notNull(), // production priority order
   siteProgress: text("site_progress"), // site progress notes
   currentLevelOnsite: text("current_level_onsite"), // current level being worked on at site
+  scheduleStatus: text("schedule_status").default("ON_TRACK"), // ON_TRACK, RUNNING_BEHIND, ON_HOLD
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   reportIdx: index("weekly_job_report_schedules_report_idx").on(table.reportId),

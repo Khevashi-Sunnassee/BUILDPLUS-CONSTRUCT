@@ -31,6 +31,7 @@ interface ScheduleItem {
   levels28Days: string;
   siteProgress: string | null;
   currentLevelOnsite: string | null;
+  scheduleStatus: string;
 }
 
 export default function WeeklyJobLogsPage() {
@@ -178,6 +179,7 @@ export default function WeeklyJobLogsPage() {
       levels28Days: "",
       siteProgress: null,
       currentLevelOnsite: null,
+      scheduleStatus: "ON_TRACK",
     }]);
   };
 
@@ -227,6 +229,7 @@ export default function WeeklyJobLogsPage() {
       levels28Days: s.levels28Days || "",
       siteProgress: s.siteProgress,
       currentLevelOnsite: s.currentLevelOnsite,
+      scheduleStatus: s.scheduleStatus || "ON_TRACK",
     })));
     setEditMode(true);
     setShowForm(true);
@@ -383,7 +386,7 @@ export default function WeeklyJobLogsPage() {
       </Card>
 
       <Dialog open={showForm} onOpenChange={(open) => !open && resetForm()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle data-testid="text-form-title">{editMode ? "Edit Weekly Report" : "New Weekly Report"}</DialogTitle>
           </DialogHeader>
@@ -429,7 +432,8 @@ export default function WeeklyJobLogsPage() {
                       <TableHead>14-Day Level</TableHead>
                       <TableHead>21-Day Level</TableHead>
                       <TableHead>28-Day Level</TableHead>
-                      <TableHead>Notes</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="min-w-[200px]">Notes</TableHead>
                       <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -466,7 +470,25 @@ export default function WeeklyJobLogsPage() {
                           <Input value={schedule.levels28Days} onChange={(e) => updateSchedule(index, "levels28Days", e.target.value)} placeholder="Level" data-testid={`input-day28-${index}`} />
                         </TableCell>
                         <TableCell>
-                          <Input value={schedule.siteProgress || ""} onChange={(e) => updateSchedule(index, "siteProgress", e.target.value || null)} placeholder="Progress notes" data-testid={`input-progress-${index}`} />
+                          <Select value={schedule.scheduleStatus} onValueChange={(v) => updateSchedule(index, "scheduleStatus", v)}>
+                            <SelectTrigger data-testid={`select-status-${index}`} className="min-w-[130px]">
+                              <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ON_TRACK">On Track</SelectItem>
+                              <SelectItem value="RUNNING_BEHIND">Running Behind</SelectItem>
+                              <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Textarea 
+                            value={schedule.siteProgress || ""} 
+                            onChange={(e) => updateSchedule(index, "siteProgress", e.target.value || null)} 
+                            placeholder="Progress notes..." 
+                            className="min-h-[60px] min-w-[180px]"
+                            data-testid={`input-progress-${index}`} 
+                          />
                         </TableCell>
                         <TableCell>
                           <Button variant="ghost" size="sm" onClick={() => removeSchedule(index)} data-testid={`button-remove-schedule-${index}`}>
@@ -534,6 +556,7 @@ export default function WeeklyJobLogsPage() {
                         <TableHead>14-Day</TableHead>
                         <TableHead>21-Day</TableHead>
                         <TableHead>28-Day</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Notes</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -546,7 +569,13 @@ export default function WeeklyJobLogsPage() {
                           <TableCell>{schedule.levels14Days || "-"}</TableCell>
                           <TableCell>{schedule.levels21Days || "-"}</TableCell>
                           <TableCell>{schedule.levels28Days || "-"}</TableCell>
-                          <TableCell>{schedule.siteProgress || "-"}</TableCell>
+                          <TableCell>
+                            {schedule.scheduleStatus === "ON_TRACK" && <Badge variant="default" className="bg-green-600">On Track</Badge>}
+                            {schedule.scheduleStatus === "RUNNING_BEHIND" && <Badge variant="default" className="bg-orange-500">Running Behind</Badge>}
+                            {schedule.scheduleStatus === "ON_HOLD" && <Badge variant="secondary">On Hold</Badge>}
+                            {!schedule.scheduleStatus && "-"}
+                          </TableCell>
+                          <TableCell className="max-w-[250px] whitespace-pre-wrap">{schedule.siteProgress || "-"}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -604,6 +633,7 @@ export default function WeeklyJobLogsPage() {
                         <TableHead>14-Day</TableHead>
                         <TableHead>21-Day</TableHead>
                         <TableHead>28-Day</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Notes</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -616,7 +646,13 @@ export default function WeeklyJobLogsPage() {
                           <TableCell>{schedule.levels14Days || "-"}</TableCell>
                           <TableCell>{schedule.levels21Days || "-"}</TableCell>
                           <TableCell>{schedule.levels28Days || "-"}</TableCell>
-                          <TableCell>{schedule.siteProgress || "-"}</TableCell>
+                          <TableCell>
+                            {schedule.scheduleStatus === "ON_TRACK" && <Badge variant="default" className="bg-green-600">On Track</Badge>}
+                            {schedule.scheduleStatus === "RUNNING_BEHIND" && <Badge variant="default" className="bg-orange-500">Running Behind</Badge>}
+                            {schedule.scheduleStatus === "ON_HOLD" && <Badge variant="secondary">On Hold</Badge>}
+                            {!schedule.scheduleStatus && "-"}
+                          </TableCell>
+                          <TableCell className="max-w-[250px] whitespace-pre-wrap">{schedule.siteProgress || "-"}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
