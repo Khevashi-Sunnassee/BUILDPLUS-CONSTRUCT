@@ -29,6 +29,7 @@ import {
   CheckCircle2,
   XCircle,
   Sparkles,
+  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -133,6 +134,7 @@ export default function AdminPanelsPage() {
   const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
   const [groupByPanelType, setGroupByPanelType] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -235,6 +237,8 @@ export default function AdminPanelsPage() {
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
     if (panelTypeFilter !== "all" && panel.panelType !== panelTypeFilter) return false;
+    // Search by panel mark
+    if (searchTerm && !panel.panelMark.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
 
@@ -831,11 +835,24 @@ export default function AdminPanelsPage() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search panel mark..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-[180px]"
+                  data-testid="input-search-panel"
+                />
+              </div>
               <div className="flex items-center gap-2">
                 <Switch 
                   id="group-by-job" 
                   checked={groupByJob} 
-                  onCheckedChange={setGroupByJob}
+                  onCheckedChange={(checked) => {
+                    setGroupByJob(checked);
+                    if (checked) setGroupByPanelType(false);
+                  }}
                   data-testid="switch-group-by-job"
                 />
                 <Label htmlFor="group-by-job" className="text-sm cursor-pointer">
