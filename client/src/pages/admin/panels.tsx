@@ -24,6 +24,7 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Hammer,
   FileText,
   CheckCircle2,
@@ -143,7 +144,10 @@ export default function AdminPanelsPage() {
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
   const [groupByPanelType, setGroupByPanelType] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "summary">("list");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -170,6 +174,15 @@ export default function AdminPanelsPage() {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Auto-calculate area, volume, and mass when dimensions change
   useEffect(() => {
     const width = parseFloat(buildFormData.loadWidth) || 0;
@@ -194,9 +207,35 @@ export default function AdminPanelsPage() {
     }));
   }, [buildFormData.loadWidth, buildFormData.loadHeight, buildFormData.panelThickness]);
 
-  const { data: panels, isLoading: panelsLoading } = useQuery<PanelWithJob[]>({
-    queryKey: ["/api/admin/panels"],
+  // Build query params for pagination
+  const queryParams = new URLSearchParams({
+    page: currentPage.toString(),
+    limit: pageSize.toString(),
   });
+  if (jobFilter !== "all") queryParams.set("jobId", jobFilter);
+  if (debouncedSearch) queryParams.set("search", debouncedSearch);
+  if (statusFilter !== "all") queryParams.set("status", statusFilter);
+
+  interface PaginatedResponse {
+    panels: PanelWithJob[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }
+
+  const { data: panelData, isLoading: panelsLoading } = useQuery<PaginatedResponse>({
+    queryKey: ["/api/admin/panels", currentPage, pageSize, jobFilter, debouncedSearch, statusFilter],
+    queryFn: async () => {
+      const res = await fetch(`/api/admin/panels?${queryParams.toString()}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch panels");
+      return res.json();
+    },
+  });
+
+  const panels = panelData?.panels;
+  const totalPages = panelData?.totalPages || 1;
+  const totalPanels = panelData?.total || 0;
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/admin/jobs"],
@@ -1167,6 +1206,7 @@ export default function AdminPanelsPage() {
               )}
             </div>
           ) : (
+          <>
           <Table>
             <TableHeader>
               <TableRow>
@@ -1470,7 +1510,72 @@ export default function AdminPanelsPage() {
               )}
             </TableBody>
           </Table>
+          
+          {/* Pagination Controls */}
+          {viewMode === "list" && (
+            <div className="flex items-center justify-between mt-4 px-2">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Showing {((currentPage - 1) * pageSize) + 1}-{Math.min(currentPage * pageSize, totalPanels)} of {totalPanels} panels</span>
+                <Select value={pageSize.toString()} onValueChange={(v) => { setPageSize(parseInt(v)); setCurrentPage(1); }}>
+                  <SelectTrigger className="w-[80px] h-8" data-testid="select-page-size">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="25">25</SelectItem>
+                    <SelectItem value="50">50</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span>per page</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  data-testid="button-first-page"
+                >
+                  First
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  data-testid="button-prev-page"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm px-2">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-next-page"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  data-testid="button-last-page"
+                >
+                  Last
+                </Button>
+              </div>
+            </div>
           )}
+          </>
+        )}
         </CardContent>
       </Card>
 

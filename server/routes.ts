@@ -737,8 +737,15 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/panels", requireRole("ADMIN"), async (req, res) => {
-    const panels = await storage.getAllPanelRegisterItems();
-    res.json(panels);
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const jobId = req.query.jobId as string | undefined;
+    const search = req.query.search as string | undefined;
+    const status = req.query.status as string | undefined;
+    const documentStatus = req.query.documentStatus as string | undefined;
+    
+    const result = await storage.getPaginatedPanelRegisterItems({ page, limit, jobId, search, status, documentStatus });
+    res.json(result);
   });
 
   app.get("/api/admin/panels/by-job/:jobId", requireRole("ADMIN"), async (req, res) => {

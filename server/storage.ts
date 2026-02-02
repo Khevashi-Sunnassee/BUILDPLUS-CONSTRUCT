@@ -109,6 +109,7 @@ export interface IStorage {
   updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined>;
   deletePanelRegisterItem(id: string): Promise<void>;
   getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
+  getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }>;
   importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }>;
   updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
   getPanelCountsBySource(): Promise<{ source: number; count: number }[]>;
@@ -807,6 +808,52 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.panel_register, job: r.jobs }));
+  }
+
+  async getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }> {
+    const { page, limit, jobId, search, status, documentStatus } = options;
+    const offset = (page - 1) * limit;
+    
+    // Build conditions array
+    const conditions = [];
+    if (jobId) {
+      conditions.push(eq(panelRegister.jobId, jobId));
+    }
+    if (status) {
+      conditions.push(eq(panelRegister.status, status));
+    }
+    if (documentStatus) {
+      conditions.push(eq(panelRegister.documentStatus, documentStatus));
+    }
+    if (search) {
+      conditions.push(sql`(
+        ${panelRegister.panelMark} ILIKE ${'%' + search + '%'} OR 
+        ${panelRegister.description} ILIKE ${'%' + search + '%'} OR
+        ${jobs.jobNumber} ILIKE ${'%' + search + '%'}
+      )`);
+    }
+    
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    // Get total count
+    const countResult = await db.select({ count: sql<number>`count(*)::int` })
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(whereClause);
+    const total = countResult[0]?.count || 0;
+    
+    // Get paginated data
+    const result = await db.select().from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(whereClause)
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      .limit(limit)
+      .offset(offset);
+    
+    const panels = result.map(r => ({ ...r.panel_register, job: r.jobs }));
+    const totalPages = Math.ceil(total / limit);
+    
+    return { panels, total, page, limit, totalPages };
   }
 
   async importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }> {
