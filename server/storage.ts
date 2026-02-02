@@ -5,7 +5,7 @@ import {
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
-  userPermissions, FUNCTION_KEYS,
+  userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -22,7 +22,15 @@ import {
   type InsertDeliveryRecord, type DeliveryRecord,
   type InsertWeeklyWageReport, type WeeklyWageReport,
   type InsertUserPermission, type UserPermission, type FunctionKey, type PermissionLevel,
+  type InsertWeeklyJobReport, type WeeklyJobReport,
+  type InsertWeeklyJobReportSchedule, type WeeklyJobReportSchedule,
 } from "@shared/schema";
+
+export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
+  projectManager: User;
+  approvedBy?: User | null;
+  schedules: (WeeklyJobReportSchedule & { job: Job })[];
+}
 
 export interface LoadListWithDetails extends LoadList {
   job: Job;
@@ -212,6 +220,19 @@ export interface IStorage {
   createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport>;
   updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined>;
   deleteWeeklyWageReport(id: string): Promise<void>;
+
+  // Weekly Job Reports
+  getWeeklyJobReports(projectManagerId?: string): Promise<WeeklyJobReportWithDetails[]>;
+  getWeeklyJobReport(id: string): Promise<WeeklyJobReportWithDetails | undefined>;
+  getWeeklyJobReportsByStatus(status: string): Promise<WeeklyJobReportWithDetails[]>;
+  createWeeklyJobReport(data: InsertWeeklyJobReport, schedules: Omit<InsertWeeklyJobReportSchedule, "reportId">[]): Promise<WeeklyJobReportWithDetails>;
+  updateWeeklyJobReport(id: string, data: Partial<InsertWeeklyJobReport>, schedules?: Omit<InsertWeeklyJobReportSchedule, "reportId">[]): Promise<WeeklyJobReportWithDetails | undefined>;
+  submitWeeklyJobReport(id: string): Promise<WeeklyJobReport | undefined>;
+  approveWeeklyJobReport(id: string, approvedById: string): Promise<WeeklyJobReport | undefined>;
+  rejectWeeklyJobReport(id: string, approvedById: string, rejectionReason: string): Promise<WeeklyJobReport | undefined>;
+  deleteWeeklyJobReport(id: string): Promise<void>;
+  getJobsForProjectManager(projectManagerId: string): Promise<Job[]>;
+  getApprovedWeeklyJobReports(): Promise<WeeklyJobReportWithDetails[]>;
 
   // User Permissions
   getUserPermissions(userId: string): Promise<UserPermission[]>;
@@ -1587,6 +1608,126 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWeeklyWageReport(id: string): Promise<void> {
     await db.delete(weeklyWageReports).where(eq(weeklyWageReports.id, id));
+  }
+
+  // Weekly Job Reports
+  private async enrichWeeklyJobReport(report: WeeklyJobReport): Promise<WeeklyJobReportWithDetails> {
+    const [projectManager] = await db.select().from(users).where(eq(users.id, report.projectManagerId));
+    let approvedBy = null;
+    if (report.approvedById) {
+      const [approver] = await db.select().from(users).where(eq(users.id, report.approvedById));
+      approvedBy = approver || null;
+    }
+    const schedules = await db.select()
+      .from(weeklyJobReportSchedules)
+      .where(eq(weeklyJobReportSchedules.reportId, report.id))
+      .orderBy(asc(weeklyJobReportSchedules.priority));
+    
+    const schedulesWithJobs = await Promise.all(schedules.map(async (schedule) => {
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, schedule.jobId));
+      return { ...schedule, job };
+    }));
+
+    return { ...report, projectManager, approvedBy, schedules: schedulesWithJobs };
+  }
+
+  async getWeeklyJobReports(projectManagerId?: string): Promise<WeeklyJobReportWithDetails[]> {
+    let query = db.select().from(weeklyJobReports);
+    if (projectManagerId) {
+      query = query.where(eq(weeklyJobReports.projectManagerId, projectManagerId)) as typeof query;
+    }
+    const reports = await query.orderBy(desc(weeklyJobReports.reportDate));
+    return Promise.all(reports.map(r => this.enrichWeeklyJobReport(r)));
+  }
+
+  async getWeeklyJobReport(id: string): Promise<WeeklyJobReportWithDetails | undefined> {
+    const [report] = await db.select().from(weeklyJobReports).where(eq(weeklyJobReports.id, id));
+    if (!report) return undefined;
+    return this.enrichWeeklyJobReport(report);
+  }
+
+  async getWeeklyJobReportsByStatus(status: string): Promise<WeeklyJobReportWithDetails[]> {
+    const reports = await db.select().from(weeklyJobReports)
+      .where(eq(weeklyJobReports.status, status as any))
+      .orderBy(desc(weeklyJobReports.reportDate));
+    return Promise.all(reports.map(r => this.enrichWeeklyJobReport(r)));
+  }
+
+  async createWeeklyJobReport(data: InsertWeeklyJobReport, schedules: Omit<InsertWeeklyJobReportSchedule, "reportId">[]): Promise<WeeklyJobReportWithDetails> {
+    const [report] = await db.insert(weeklyJobReports).values(data).returning();
+    
+    if (schedules.length > 0) {
+      await db.insert(weeklyJobReportSchedules).values(
+        schedules.map(s => ({ ...s, reportId: report.id }))
+      );
+    }
+    
+    return this.enrichWeeklyJobReport(report);
+  }
+
+  async updateWeeklyJobReport(id: string, data: Partial<InsertWeeklyJobReport>, schedules?: Omit<InsertWeeklyJobReportSchedule, "reportId">[]): Promise<WeeklyJobReportWithDetails | undefined> {
+    const [updated] = await db.update(weeklyJobReports)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(weeklyJobReports.id, id))
+      .returning();
+    
+    if (!updated) return undefined;
+
+    if (schedules) {
+      await db.delete(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, id));
+      if (schedules.length > 0) {
+        await db.insert(weeklyJobReportSchedules).values(
+          schedules.map(s => ({ ...s, reportId: id }))
+        );
+      }
+    }
+    
+    return this.enrichWeeklyJobReport(updated);
+  }
+
+  async submitWeeklyJobReport(id: string): Promise<WeeklyJobReport | undefined> {
+    const [updated] = await db.update(weeklyJobReports)
+      .set({ status: "SUBMITTED", submittedAt: new Date(), updatedAt: new Date() })
+      .where(eq(weeklyJobReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async approveWeeklyJobReport(id: string, approvedById: string): Promise<WeeklyJobReport | undefined> {
+    const [updated] = await db.update(weeklyJobReports)
+      .set({ status: "APPROVED", approvedById, approvedAt: new Date(), updatedAt: new Date() })
+      .where(eq(weeklyJobReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async rejectWeeklyJobReport(id: string, approvedById: string, rejectionReason: string): Promise<WeeklyJobReport | undefined> {
+    const [updated] = await db.update(weeklyJobReports)
+      .set({ status: "REJECTED", approvedById, rejectionReason, updatedAt: new Date() })
+      .where(eq(weeklyJobReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWeeklyJobReport(id: string): Promise<void> {
+    await db.delete(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, id));
+    await db.delete(weeklyJobReports).where(eq(weeklyJobReports.id, id));
+  }
+
+  async getJobsForProjectManager(projectManagerId: string): Promise<Job[]> {
+    return db.select().from(jobs)
+      .where(and(
+        eq(jobs.projectManagerId, projectManagerId),
+        eq(jobs.status, "ACTIVE")
+      ))
+      .orderBy(asc(jobs.jobNumber));
+  }
+
+  async getApprovedWeeklyJobReports(): Promise<WeeklyJobReportWithDetails[]> {
+    const reports = await db.select().from(weeklyJobReports)
+      .where(eq(weeklyJobReports.status, "APPROVED"))
+      .orderBy(desc(weeklyJobReports.reportDate));
+    return Promise.all(reports.map(r => this.enrichWeeklyJobReport(r)));
   }
 
   // User Permissions

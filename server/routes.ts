@@ -3454,5 +3454,154 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  // Weekly Job Reports (Project Manager Reports)
+  app.get("/api/weekly-job-reports", requireAuth, requirePermission("weekly_job_logs"), async (req, res) => {
+    try {
+      const projectManagerId = req.query.projectManagerId as string | undefined;
+      const reports = await storage.getWeeklyJobReports(projectManagerId);
+      res.json(reports);
+    } catch (error: any) {
+      console.error("Error fetching weekly job reports:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch weekly job reports" });
+    }
+  });
+
+  app.get("/api/weekly-job-reports/my-reports", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const reports = await storage.getWeeklyJobReports(userId);
+      res.json(reports);
+    } catch (error: any) {
+      console.error("Error fetching my weekly job reports:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch weekly job reports" });
+    }
+  });
+
+  app.get("/api/weekly-job-reports/pending-approval", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const reports = await storage.getWeeklyJobReportsByStatus("SUBMITTED");
+      res.json(reports);
+    } catch (error: any) {
+      console.error("Error fetching pending approval reports:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch pending reports" });
+    }
+  });
+
+  app.get("/api/weekly-job-reports/approved", requireAuth, async (req, res) => {
+    try {
+      const reports = await storage.getApprovedWeeklyJobReports();
+      res.json(reports);
+    } catch (error: any) {
+      console.error("Error fetching approved reports:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch approved reports" });
+    }
+  });
+
+  app.get("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.getWeeklyJobReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error fetching weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch report" });
+    }
+  });
+
+  app.get("/api/my-jobs", requireAuth, async (req, res) => {
+    try {
+      const userId = req.session.user!.id;
+      const myJobs = await storage.getJobsForProjectManager(userId);
+      res.json(myJobs);
+    } catch (error: any) {
+      console.error("Error fetching jobs for project manager:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch jobs" });
+    }
+  });
+
+  app.post("/api/weekly-job-reports", requireAuth, async (req, res) => {
+    try {
+      const { schedules, ...reportData } = req.body;
+      const userId = req.session.user!.id;
+      
+      const report = await storage.createWeeklyJobReport(
+        { ...reportData, projectManagerId: userId },
+        schedules || []
+      );
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error creating weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to create report" });
+    }
+  });
+
+  app.put("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
+    try {
+      const { schedules, ...reportData } = req.body;
+      const report = await storage.updateWeeklyJobReport(req.params.id, reportData, schedules);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error updating weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to update report" });
+    }
+  });
+
+  app.post("/api/weekly-job-reports/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.submitWeeklyJobReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error submitting weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to submit report" });
+    }
+  });
+
+  app.post("/api/weekly-job-reports/:id/approve", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const approvedById = req.session.user!.id;
+      const report = await storage.approveWeeklyJobReport(req.params.id, approvedById);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error approving weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to approve report" });
+    }
+  });
+
+  app.post("/api/weekly-job-reports/:id/reject", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const approvedById = req.session.user!.id;
+      const { rejectionReason } = req.body;
+      const report = await storage.rejectWeeklyJobReport(req.params.id, approvedById, rejectionReason || "No reason provided");
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error rejecting weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to reject report" });
+    }
+  });
+
+  app.delete("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteWeeklyJobReport(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting weekly job report:", error);
+      res.status(500).json({ error: error.message || "Failed to delete report" });
+    }
+  });
+
   return httpServer;
 }
