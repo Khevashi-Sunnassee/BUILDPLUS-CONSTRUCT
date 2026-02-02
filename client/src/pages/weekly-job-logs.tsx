@@ -59,9 +59,12 @@ export default function WeeklyJobLogsPage() {
     enabled: isManagerOrAdmin,
   });
 
-  const { data: myJobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/my-jobs"],
+  const { data: allJobs = [] } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
   });
+  
+  // Filter to only active jobs
+  const activeJobs = allJobs.filter((job) => job.status === "ACTIVE");
 
   const createReportMutation = useMutation({
     mutationFn: async (data: { reportDate: string; weekStartDate: string; weekEndDate: string; notes: string; schedules: ScheduleItem[] }) => {
@@ -435,7 +438,7 @@ export default function WeeklyJobLogsPage() {
                               <SelectValue placeholder="Select job" />
                             </SelectTrigger>
                             <SelectContent>
-                              {myJobs.map((job) => (
+                              {activeJobs.map((job) => (
                                 <SelectItem key={job.id} value={job.id}>
                                   {job.jobNumber} - {job.name}
                                 </SelectItem>
