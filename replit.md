@@ -16,7 +16,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Manager Approval**: Review submitted logs, approve/reject with comments
 - **Reports & Analytics**: Time by user, job, app with charts
 - **Admin Provisioning**: Manage users, jobs, devices, global settings
-- **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available, with option to add new panels to the register on-the-fly. Automatically defaults start time to the latest end time from existing entries for the selected date, enabling seamless continuation of work tracking.
+- **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available, with option to add new panels to the register on-the-fly. Automatically defaults start time to the latest end time from existing entries for the selected date, enabling seamless continuation of work tracking. Manual Entry is accessed via the "Add Entry" button on Daily Report detail pages (not in sidebar).
 - **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting/cost-breakup charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
 - **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides, component filter dropdown for detailed daily breakdown, and interactive summary tables with click-to-filter functionality
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED), with cost overrides dialog for customized job-specific cost ratios
@@ -24,7 +24,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Panel Production Approval**: "Build" dialog for entering panel specifications (load dimensions, volume, mass, area, concrete strength), AI-powered PDF analysis using OpenAI to extract specs from shop drawings, and approval workflow - only approved panels can have production entries
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (supply cost, install cost, sell rate per m²/m³) and expected weight per m³ (default 2500kg) for load list calculations
 - **Job Rate Overrides**: Override default panel type rates at job level for custom pricing
-- **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
+- **Production Report**: List view showing production reports grouped by date with status indicators, click into date to view/add entries. Detail view shows summary cards (panels, volume, area, panel types), financial cards (cost, revenue, profit, margin), and entry table with edit/delete actions. Supports date range filtering (week/month/quarter/all).
 - **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
 - **Logistics System**: Create load lists by selecting approved panels, assign trailer types (Layover, A-Frame), comprehensive delivery recording with: load document #, truck/trailer rego, date, preload info, load number, panel count, full time tracking (depot to LTE, pickup location times, holding times, unloading first/last lift, return depot), and comments. Load lists auto-complete when delivery is recorded.
 - **Logistics Reporting**: Reports page includes Logistics tab showing panels shipped per day, total deliveries, and average delivery phase timings (Depot to LTE, Pickup Time, Holding Time, Unload Time).
@@ -52,8 +52,9 @@ client/
         panel-types.tsx   - Panel type configuration with rates
         devices.tsx       - Device provisioning
         users.tsx         - User management
-      manual-entry.tsx    - Manual time entry form
-      production-report.tsx - Production tracking with volume/area and cost calculations
+      manual-entry.tsx    - Manual time entry form (accessed from Daily Report detail page)
+      production-report.tsx - Production reports list view grouped by date
+      production-report-detail.tsx - Production report detail view for specific date
       kpi-dashboard.tsx   - KPI Dashboard with charts and PDF export
       logistics.tsx       - Load list management and delivery tracking
     components/
