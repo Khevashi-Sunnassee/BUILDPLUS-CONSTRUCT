@@ -15,6 +15,7 @@ import {
   XCircle,
   PieChart,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,27 @@ export default function AdminPanelTypesPage() {
   const { data: panelTypes, isLoading } = useQuery<PanelTypeConfig[]>({
     queryKey: ["/api/admin/panel-types"],
   });
+
+  // Fetch cost summaries for margin validation
+  const { data: costSummaries, refetch: refetchCostSummaries } = useQuery<Record<string, { totalCostPercent: number; profitMargin: number }>>({
+    queryKey: ["/api/admin/panel-types/cost-summaries"],
+  });
+
+  // Helper to check if margin matches breakup
+  const getMarginStatus = (type: PanelTypeConfig) => {
+    const panelMargin = parseFloat(type.sellRatePerM2 || "0") > 0 && parseFloat(type.totalRatePerM2 || "0") > 0
+      ? (((parseFloat(type.sellRatePerM2!) - parseFloat(type.totalRatePerM2!)) / parseFloat(type.sellRatePerM2!)) * 100)
+      : null;
+    
+    const breakupSummary = costSummaries?.[type.id];
+    if (!breakupSummary || panelMargin === null) {
+      return { hasBreakup: !!breakupSummary, matches: false, panelMargin, breakupMargin: breakupSummary?.profitMargin };
+    }
+    
+    // Allow 0.5% tolerance for rounding differences
+    const matches = Math.abs(panelMargin - breakupSummary.profitMargin) < 0.5;
+    return { hasBreakup: true, matches, panelMargin, breakupMargin: breakupSummary.profitMargin };
+  };
 
   const { data: currentCostComponents, refetch: refetchCostComponents } = useQuery<CostComponent[]>({
     queryKey: ["/api/panel-types", costBreakupType?.id, "cost-components"],
@@ -279,6 +301,7 @@ export default function AdminPanelTypesPage() {
     onSuccess: () => {
       toast({ title: "Cost breakup saved successfully" });
       refetchCostComponents();
+      refetchCostSummaries(); // Refresh margin validation
       setCostBreakupDialogOpen(false);
     },
     onError: (error: any) => {
@@ -432,6 +455,7 @@ export default function AdminPanelTypesPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Margin %</TableHead>
                   <TableHead className="text-right">Total/m²</TableHead>
                   <TableHead className="text-right">Total/m³</TableHead>
                   <TableHead className="text-right">Sell/m²</TableHead>
@@ -443,19 +467,32 @@ export default function AdminPanelTypesPage() {
               <TableBody>
                 {!panelTypes?.length ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                       No panel types configured. Add your first panel type to get started.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  panelTypes.map((type) => (
-                    <TableRow key={type.id} data-testid={`row-panel-type-${type.id}`}>
+                  panelTypes.map((type) => {
+                    const marginStatus = getMarginStatus(type);
+                    const hasMismatch = marginStatus.hasBreakup && !marginStatus.matches;
+                    
+                    return (
+                    <TableRow 
+                      key={type.id} 
+                      data-testid={`row-panel-type-${type.id}`}
+                      className={hasMismatch ? "bg-red-50 dark:bg-red-950/30" : ""}
+                    >
                       <TableCell>
                         <Badge variant="outline">{type.code}</Badge>
                       </TableCell>
                       <TableCell className="font-medium">{type.name}</TableCell>
                       <TableCell>
-                        {type.isActive ? (
+                        {hasMismatch ? (
+                          <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Pending
+                          </Badge>
+                        ) : type.isActive ? (
                           <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                             <CheckCircle className="h-3 w-3 mr-1" />
                             Active
@@ -465,6 +502,14 @@ export default function AdminPanelTypesPage() {
                             <XCircle className="h-3 w-3 mr-1" />
                             Inactive
                           </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className={`text-right font-mono text-sm ${hasMismatch ? "text-red-600 dark:text-red-400 font-bold" : ""}`}>
+                        {marginStatus.panelMargin !== null ? `${marginStatus.panelMargin.toFixed(1)}%` : "-"}
+                        {hasMismatch && marginStatus.breakupMargin !== undefined && (
+                          <div className="text-xs text-red-500">
+                            Breakup: {marginStatus.breakupMargin.toFixed(1)}%
+                          </div>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
@@ -512,7 +557,8 @@ export default function AdminPanelTypesPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))
+                  );
+                  })
                 )}
               </TableBody>
             </Table>
@@ -930,6 +976,41 @@ export default function AdminPanelTypesPage() {
               Define cost components as percentages of revenue. Total must not exceed 100%.
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Show Panel Type Margin for Reference */}
+          {costBreakupType && (() => {
+            const marginStatus = getMarginStatus(costBreakupType);
+            return marginStatus.panelMargin !== null ? (
+              <div className={`p-3 rounded-md border ${
+                marginStatus.hasBreakup && !marginStatus.matches 
+                  ? "bg-red-50 dark:bg-red-950/30 border-red-300 dark:border-red-800" 
+                  : "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800"
+              }`}>
+                <div className="flex items-center gap-2">
+                  {marginStatus.hasBreakup && !marginStatus.matches ? (
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  ) : (
+                    <DollarSign className="h-4 w-4 text-blue-600" />
+                  )}
+                  <div className="text-sm">
+                    <span className="font-medium">Panel Type Margin: </span>
+                    <span className="font-bold">{marginStatus.panelMargin.toFixed(1)}%</span>
+                  </div>
+                </div>
+                {marginStatus.hasBreakup && !marginStatus.matches && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Breakup profit margin ({(100 - totalPercentage).toFixed(1)}%) must match the panel type margin ({marginStatus.panelMargin.toFixed(1)}%)
+                  </p>
+                )}
+                {!marginStatus.hasBreakup && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Adjust cost components so profit margin equals {marginStatus.panelMargin.toFixed(1)}%
+                  </p>
+                )}
+              </div>
+            ) : null;
+          })()}
+          
           <div className="space-y-4">
             <div className="space-y-3">
               {costComponents.map((component, index) => (

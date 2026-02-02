@@ -1110,6 +1110,27 @@ export async function registerRoutes(
     res.json(types.filter(t => t.isActive));
   });
 
+  // Get cost breakup summaries for all panel types (for margin validation)
+  app.get("/api/admin/panel-types/cost-summaries", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const types = await storage.getAllPanelTypes();
+      const summaries: Record<string, { totalCostPercent: number; profitMargin: number }> = {};
+      
+      for (const type of types) {
+        const components = await storage.getCostComponentsByPanelType(type.id);
+        const totalCostPercent = components.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
+        summaries[type.id] = {
+          totalCostPercent,
+          profitMargin: 100 - totalCostPercent,
+        };
+      }
+      
+      res.json(summaries);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to fetch cost summaries" });
+    }
+  });
+
   // Panel rates now use jobs instead of projects
   app.get("/api/jobs/:jobId/panel-rates", requireAuth, async (req, res) => {
     const rates = await storage.getEffectiveRates(req.params.jobId as string);
