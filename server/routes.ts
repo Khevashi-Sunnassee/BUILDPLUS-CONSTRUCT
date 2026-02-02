@@ -934,49 +934,54 @@ export async function registerRoutes(
         const panelsToImport: any[] = [];
         const existingPanelSourceIds = await storage.getExistingPanelSourceIds(jobId);
         
-        // Header mapping - normalize headers to field names
+        // Header mapping - normalized patterns (no #, (), ², ³ as these are stripped during header detection)
         const headerMapping: Record<string, string> = {
-          "column #": "panelMark",
-          "column#": "panelMark",
+          "column": "panelMark",        // "Column #" becomes "column" after normalization
+          "column no": "panelMark",
           "columnno": "panelMark",
           "panelmark": "panelMark",
+          "panel mark": "panelMark",
           "mark": "panelMark",
+          "element": "panelMark",       // Some sheets use "Element" for panel mark
           "building": "building",
           "structural elevation number": "structuralElevation",
+          "structural elevation no": "structuralElevation",
           "structuralelevation": "structuralElevation",
           "structuralelevationno": "structuralElevation",
           "level": "level",
           "column type": "panelType",
           "columntype": "panelType",
           "paneltype": "panelType",
+          "panel type": "panelType",
           "type": "panelType",
           "reckli detail": "reckliDetail",
           "recklidetail": "reckliDetail",
           "thickness": "thickness",
           "width": "width",
           "height": "height",
-          "gross area (m2)": "areaM2",
-          "gross area m2": "areaM2",
+          "gross area m2": "areaM2",    // "(m²)" becomes "m2" after removing () and ²
+          "gross area": "areaM2",
           "grossaream2": "areaM2",
-          "net area (m2)": "areaM2",
           "net area m2": "areaM2",
+          "net area": "areaM2",
           "netaream2": "areaM2",
-          "concrete strength (mpa)": "concreteStrength",
+          "area": "areaM2",
           "concrete strength mpa": "concreteStrength",
+          "concrete strength": "concreteStrength",
           "concretestrength": "concreteStrength",
           "concretestrengthmpa": "concreteStrength",
-          "vol (m3)": "volumeM3",
-          "vol m3": "volumeM3",
+          "vol m3": "volumeM3",         // "(m³)" becomes "m3" after removing () and ³
+          "vol": "volumeM3",
           "volm3": "volumeM3",
           "volume": "volumeM3",
-          "weight (t)": "weightT",
           "weight t": "weightT",
+          "weight": "weightT",
           "weightt": "weightT",
+          "mass": "weightT",
           "colum qty": "qty",
           "columqty": "qty",
           "qty": "qty",
           "quantity": "qty",
-          "# rebates": "rebates",
           "rebates": "rebates",
         };
         
@@ -1042,22 +1047,57 @@ export async function registerRoutes(
           
           sheetResult.headerRow = headerRow + 1; // 1-indexed for user
           
-          // Map headers to field names
+          // Log detected headers for debugging
+          console.log(`[Estimate Import] Sheet "${sheetName}" - Headers found at row ${headerRow + 1}:`, headers.slice(0, 15));
+          
+          // Map headers to field names with priority ordering (more specific patterns first)
           const colMapping: Record<number, string> = {};
+          const priorityPatterns = [
+            // Panel mark patterns (most specific first)
+            { patterns: ["column no", "columnno", "panel mark", "panelmark", "element", "mark", "column"], field: "panelMark" },
+            { patterns: ["column type", "columntype", "panel type", "paneltype"], field: "panelType" },
+            { patterns: ["structural elevation no", "structural elevation number", "structuralelevationno", "structuralelevation"], field: "structuralElevation" },
+            { patterns: ["building"], field: "building" },
+            { patterns: ["level"], field: "level" },
+            { patterns: ["type"], field: "panelType" },
+            { patterns: ["reckli detail", "recklidetail"], field: "reckliDetail" },
+            { patterns: ["thickness"], field: "thickness" },
+            { patterns: ["width"], field: "width" },
+            { patterns: ["height"], field: "height" },
+            { patterns: ["gross area", "net area", "area"], field: "areaM2" },
+            { patterns: ["concrete strength", "concretestrength"], field: "concreteStrength" },
+            { patterns: ["vol", "volume"], field: "volumeM3" },
+            { patterns: ["weight", "mass"], field: "weightT" },
+            { patterns: ["colum qty", "columqty", "qty", "quantity"], field: "qty" },
+            { patterns: ["rebates"], field: "rebates" },
+          ];
+          
           headers.forEach((header, idx) => {
-            const normalizedHeader = header.replace(/\s+/g, " ").toLowerCase();
-            for (const [pattern, field] of Object.entries(headerMapping)) {
-              if (normalizedHeader.includes(pattern) || normalizedHeader === pattern) {
-                colMapping[idx] = field;
-                break;
+            if (colMapping[idx]) return; // Already mapped
+            const normalizedHeader = header.replace(/\s+/g, " ").toLowerCase().trim();
+            if (!normalizedHeader) return;
+            
+            for (const { patterns, field } of priorityPatterns) {
+              // Skip if we already found this field
+              if (Object.values(colMapping).includes(field)) continue;
+              
+              for (const pattern of patterns) {
+                if (normalizedHeader === pattern || normalizedHeader.includes(pattern)) {
+                  colMapping[idx] = field;
+                  console.log(`[Estimate Import] Sheet "${sheetName}" - Mapped column ${idx}: "${header}" -> ${field}`);
+                  break;
+                }
               }
+              if (colMapping[idx]) break;
             }
           });
           
           // Check for required columns
           const mappedFields = Object.values(colMapping);
+          console.log(`[Estimate Import] Sheet "${sheetName}" - Mapped fields:`, mappedFields);
+          
           if (!mappedFields.includes("panelMark")) {
-            sheetResult.errors.push("Missing required column: Column # / Panel Mark");
+            sheetResult.errors.push(`Missing required column: Column # / Panel Mark. Detected headers: ${headers.slice(0, 10).join(", ")}`);
             results.push(sheetResult);
             continue;
           }
