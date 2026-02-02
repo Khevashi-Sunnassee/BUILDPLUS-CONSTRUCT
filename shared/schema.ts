@@ -128,6 +128,7 @@ export const panelRegister = pgTable("panel_register", {
   drawingCode: text("drawing_code"),
   sheetNumber: text("sheet_number"),
   building: text("building"),
+  zone: text("zone"),
   level: text("level"),
   structuralElevation: text("structural_elevation"),
   reckliDetail: text("reckli_detail"),

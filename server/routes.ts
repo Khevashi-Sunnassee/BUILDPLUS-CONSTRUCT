@@ -970,6 +970,7 @@ export async function registerRoutes(
           "mark": "panelMark",
           "element": "panelMark",       // Some sheets use "Element" for panel mark
           "building": "building",
+          "zone": "zone",
           "structural elevation number": "structuralElevation",
           "structural elevation no": "structuralElevation",
           "structuralelevation": "structuralElevation",
@@ -1084,6 +1085,7 @@ export async function registerRoutes(
             { patterns: ["column type", "columntype", "panel type", "paneltype"], field: "panelType" },
             { patterns: ["structural elevation no", "structural elevation number", "structuralelevationno", "structuralelevation"], field: "structuralElevation" },
             { patterns: ["building"], field: "building" },
+            { patterns: ["zone"], field: "zone" },
             { patterns: ["level"], field: "level" },
             { patterns: ["type"], field: "panelType" },
             { patterns: ["reckli detail", "recklidetail"], field: "reckliDetail" },
@@ -1207,11 +1209,15 @@ export async function registerRoutes(
             else if (typeRaw.includes("SLAB")) panelType = "OTHER";
             else if (typeRaw.includes("BALUSTRADE")) panelType = "OTHER";
             
+            // Default building to "1" if no building and no zone provided
+            const buildingValue = rowData.building ? String(rowData.building) : (rowData.zone ? "" : "1");
+            
             panelsToImport.push({
               jobId,
               panelMark,
               panelType,
-              building: String(rowData.building || ""),
+              building: buildingValue,
+              zone: String(rowData.zone || ""),
               level: String(rowData.level || ""),
               structuralElevation: String(rowData.structuralElevation || ""),
               reckliDetail: String(rowData.reckliDetail || ""),
