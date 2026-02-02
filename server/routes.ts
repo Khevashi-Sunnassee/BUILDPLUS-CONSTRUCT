@@ -764,6 +764,24 @@ export async function registerRoutes(
     res.json(panel);
   });
 
+  app.post("/api/admin/panels/:id/validate", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const panel = await storage.getPanelRegisterItem(req.params.id as string);
+      if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      if (panel.status !== "PENDING") {
+        return res.status(400).json({ error: "Only panels with PENDING status can be validated" });
+      }
+      const updatedPanel = await storage.updatePanelRegisterItem(req.params.id as string, { 
+        status: "NOT_STARTED" 
+      });
+      res.json(updatedPanel);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to validate panel" });
+    }
+  });
+
   app.delete("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
     await storage.deletePanelRegisterItem(req.params.id as string);
     res.json({ ok: true });

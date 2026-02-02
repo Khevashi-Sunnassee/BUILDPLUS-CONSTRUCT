@@ -343,6 +343,23 @@ export default function AdminPanelsPage() {
     },
   });
 
+  const validatePanelMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/admin/panels/${id}/validate`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      toast({ title: "Panel validated successfully", description: "Panel is now available for drafting work" });
+      setPanelDialogOpen(false);
+      setEditingPanel(null);
+      panelForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Failed to validate panel", variant: "destructive" });
+    },
+  });
+
   const deletePanelMutation = useMutation({
     mutationFn: async (id: string) => {
       return apiRequest("DELETE", `/api/admin/panels/${id}`, {});
@@ -1639,10 +1656,40 @@ export default function AdminPanelsPage() {
                 </div>
               </div>
               
-              <DialogFooter>
+              {editingPanel?.status === "PENDING" && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-3 mt-4">
+                  <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4" />
+                    This panel is pending validation. Validate it to make it available for drafting work.
+                  </p>
+                </div>
+              )}
+              
+              <DialogFooter className="gap-2 sm:gap-0">
                 <Button type="button" variant="outline" onClick={() => setPanelDialogOpen(false)}>
                   Cancel
                 </Button>
+                {editingPanel?.status === "PENDING" && (
+                  <Button
+                    type="button"
+                    variant="default"
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={validatePanelMutation.isPending}
+                    onClick={() => {
+                      if (editingPanel) {
+                        validatePanelMutation.mutate(editingPanel.id);
+                      }
+                    }}
+                    data-testid="button-validate-panel"
+                  >
+                    {validatePanelMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Validate Panel
+                  </Button>
+                )}
                 <Button
                   type="submit"
                   disabled={createPanelMutation.isPending || updatePanelMutation.isPending}
