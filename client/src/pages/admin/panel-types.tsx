@@ -72,8 +72,7 @@ const panelTypeSchema = z.object({
   installCostPerM3: z.string().optional(),
   totalRatePerM2: z.string().optional(),
   totalRatePerM3: z.string().optional(),
-  marginPerM2: z.string().optional(),
-  marginPerM3: z.string().optional(),
+  marginPercent: z.string().optional(),
   sellRatePerM2: z.string().optional(),
   sellRatePerM3: z.string().optional(),
   expectedWeightPerM3: z.string().optional(),
@@ -135,8 +134,7 @@ export default function AdminPanelTypesPage() {
       installCostPerM3: "",
       totalRatePerM2: "",
       totalRatePerM3: "",
-      marginPerM2: "20",
-      marginPerM3: "20",
+      marginPercent: "20",
       sellRatePerM2: "",
       sellRatePerM3: "",
       expectedWeightPerM3: "2500",
@@ -149,14 +147,7 @@ export default function AdminPanelTypesPage() {
   const supplyCostM3 = form.watch("supplyCostPerM3");
   const installCostM2 = form.watch("installCostPerM2");
   const installCostM3 = form.watch("installCostPerM3");
-  const marginM2 = form.watch("marginPerM2");
-  const marginM3 = form.watch("marginPerM3");
-  const sellRateM2 = form.watch("sellRatePerM2");
-  const sellRateM3 = form.watch("sellRatePerM3");
-
-  // State to track which field was last edited (margin or sell rate)
-  const [lastEditedM2, setLastEditedM2] = useState<"margin" | "sell" | null>(null);
-  const [lastEditedM3, setLastEditedM3] = useState<"margin" | "sell" | null>(null);
+  const marginPercent = form.watch("marginPercent");
 
   // Auto-calculate Total Rate = Supply + Install
   useEffect(() => {
@@ -174,66 +165,33 @@ export default function AdminPanelTypesPage() {
   }, [supplyCostM3, installCostM3, form]);
 
   // Calculate Sell Rate from Margin (Sell = Total / (1 - Margin%))
-  const calculateSellFromMargin = (total: number, marginPercent: number): number => {
-    if (marginPercent >= 100) return total * 10; // Cap at very high sell rate
-    if (marginPercent <= 0) return total;
-    return total / (1 - marginPercent / 100);
+  const calculateSellFromMargin = (total: number, marginPercentVal: number): number => {
+    if (marginPercentVal >= 100) return total * 10; // Cap at very high sell rate
+    if (marginPercentVal <= 0) return total;
+    return total / (1 - marginPercentVal / 100);
   };
 
-  // Calculate Margin from Sell Rate (Margin% = (Sell - Total) / Sell * 100)
-  const calculateMarginFromSell = (total: number, sell: number): number => {
-    if (sell <= 0) return 0;
-    return ((sell - total) / sell) * 100;
-  };
-
-  // M2: Update sell rate when margin changes
+  // Update both sell rates when margin changes
   useEffect(() => {
-    if (lastEditedM2 !== "margin") return;
-    const total = parseFloat(form.getValues("totalRatePerM2") || "0") || 0;
-    const margin = parseFloat(marginM2 || "0") || 0;
-    if (total > 0) {
-      const sell = calculateSellFromMargin(total, margin);
-      form.setValue("sellRatePerM2", sell.toFixed(2));
+    const margin = parseFloat(marginPercent || "0") || 0;
+    
+    const totalM2 = parseFloat(form.getValues("totalRatePerM2") || "0") || 0;
+    if (totalM2 > 0) {
+      const sellM2 = calculateSellFromMargin(totalM2, margin);
+      form.setValue("sellRatePerM2", sellM2.toFixed(2));
     }
-  }, [marginM2, lastEditedM2, form]);
-
-  // M2: Update margin when sell rate changes
-  useEffect(() => {
-    if (lastEditedM2 !== "sell") return;
-    const total = parseFloat(form.getValues("totalRatePerM2") || "0") || 0;
-    const sell = parseFloat(sellRateM2 || "0") || 0;
-    if (total > 0 && sell > 0) {
-      const margin = calculateMarginFromSell(total, sell);
-      form.setValue("marginPerM2", margin.toFixed(1));
+    
+    const totalM3 = parseFloat(form.getValues("totalRatePerM3") || "0") || 0;
+    if (totalM3 > 0) {
+      const sellM3 = calculateSellFromMargin(totalM3, margin);
+      form.setValue("sellRatePerM3", sellM3.toFixed(2));
     }
-  }, [sellRateM2, lastEditedM2, form]);
-
-  // M3: Update sell rate when margin changes
-  useEffect(() => {
-    if (lastEditedM3 !== "margin") return;
-    const total = parseFloat(form.getValues("totalRatePerM3") || "0") || 0;
-    const margin = parseFloat(marginM3 || "0") || 0;
-    if (total > 0) {
-      const sell = calculateSellFromMargin(total, margin);
-      form.setValue("sellRatePerM3", sell.toFixed(2));
-    }
-  }, [marginM3, lastEditedM3, form]);
-
-  // M3: Update margin when sell rate changes
-  useEffect(() => {
-    if (lastEditedM3 !== "sell") return;
-    const total = parseFloat(form.getValues("totalRatePerM3") || "0") || 0;
-    const sell = parseFloat(sellRateM3 || "0") || 0;
-    if (total > 0 && sell > 0) {
-      const margin = calculateMarginFromSell(total, sell);
-      form.setValue("marginPerM3", margin.toFixed(1));
-    }
-  }, [sellRateM3, lastEditedM3, form]);
+  }, [marginPercent, form]);
 
   // Recalculate sell rates when total changes (using current margin)
   useEffect(() => {
+    const margin = parseFloat(form.getValues("marginPercent") || "0") || 0;
     const total = parseFloat(form.getValues("totalRatePerM2") || "0") || 0;
-    const margin = parseFloat(form.getValues("marginPerM2") || "0") || 0;
     if (total > 0 && margin > 0) {
       const sell = calculateSellFromMargin(total, margin);
       form.setValue("sellRatePerM2", sell.toFixed(2));
@@ -241,8 +199,8 @@ export default function AdminPanelTypesPage() {
   }, [supplyCostM2, installCostM2]);
 
   useEffect(() => {
+    const margin = parseFloat(form.getValues("marginPercent") || "0") || 0;
     const total = parseFloat(form.getValues("totalRatePerM3") || "0") || 0;
-    const margin = parseFloat(form.getValues("marginPerM3") || "0") || 0;
     if (total > 0 && margin > 0) {
       const sell = calculateSellFromMargin(total, margin);
       form.setValue("sellRatePerM3", sell.toFixed(2));
@@ -346,8 +304,6 @@ export default function AdminPanelTypesPage() {
 
   const handleOpenCreate = () => {
     setEditingType(null);
-    setLastEditedM2(null);
-    setLastEditedM3(null);
     form.reset({
       code: "",
       name: "",
@@ -358,8 +314,7 @@ export default function AdminPanelTypesPage() {
       installCostPerM3: "",
       totalRatePerM2: "",
       totalRatePerM3: "",
-      marginPerM2: "20",
-      marginPerM3: "20",
+      marginPercent: "20",
       sellRatePerM2: "",
       sellRatePerM3: "",
       expectedWeightPerM3: "2500",
@@ -370,23 +325,14 @@ export default function AdminPanelTypesPage() {
 
   const handleOpenEdit = (type: PanelTypeConfig) => {
     setEditingType(type);
-    setLastEditedM2(null);
-    setLastEditedM3(null);
     
-    // Calculate margins from existing total and sell rates
+    // Calculate margin from existing total and sell rates (use M2 as reference)
     const totalM2 = parseFloat(type.totalRatePerM2 || "0") || 0;
-    const totalM3 = parseFloat(type.totalRatePerM3 || "0") || 0;
     const sellM2 = parseFloat(type.sellRatePerM2 || "0") || 0;
-    const sellM3 = parseFloat(type.sellRatePerM3 || "0") || 0;
     
-    let marginM2 = "20";
-    let marginM3 = "20";
-    
+    let margin = "20";
     if (totalM2 > 0 && sellM2 > 0) {
-      marginM2 = (((sellM2 - totalM2) / sellM2) * 100).toFixed(1);
-    }
-    if (totalM3 > 0 && sellM3 > 0) {
-      marginM3 = (((sellM3 - totalM3) / sellM3) * 100).toFixed(1);
+      margin = (((sellM2 - totalM2) / sellM2) * 100).toFixed(1);
     }
     
     form.reset({
@@ -399,8 +345,7 @@ export default function AdminPanelTypesPage() {
       installCostPerM3: type.installCostPerM3 || "",
       totalRatePerM2: type.totalRatePerM2 || "",
       totalRatePerM3: type.totalRatePerM3 || "",
-      marginPerM2: marginM2,
-      marginPerM3: marginM3,
+      marginPercent: margin,
       sellRatePerM2: type.sellRatePerM2 || "",
       sellRatePerM3: type.sellRatePerM3 || "",
       expectedWeightPerM3: type.expectedWeightPerM3 || "2500",
@@ -787,72 +732,41 @@ export default function AdminPanelTypesPage() {
               <div className="space-y-4">
                 <h4 className="font-medium flex items-center gap-2 text-green-600 dark:text-green-400">
                   <DollarSign className="h-4 w-4" />
-                  Sell Rates & Margin
+                  Margin & Sell Rates
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  Adjust margin to set sell rate, or adjust sell rate to calculate margin.
+                  Set the margin percentage to automatically calculate sell rates for both m² and m³.
                 </p>
+                <FormField
+                  control={form.control}
+                  name="marginPercent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Margin %</FormLabel>
+                      <FormControl>
+                        <div className="relative w-32">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            placeholder="20"
+                            className="pr-7"
+                            {...field}
+                            data-testid="input-margin-percent"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="marginPerM2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Margin % (m²)</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              placeholder="20"
-                              className="pr-7"
-                              {...field}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setLastEditedM2("margin");
-                              }}
-                              data-testid="input-margin-m2"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="marginPerM3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Margin % (m³)</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <Input
-                              type="number"
-                              step="0.1"
-                              placeholder="20"
-                              className="pr-7"
-                              {...field}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setLastEditedM3("margin");
-                              }}
-                              data-testid="input-margin-m3"
-                            />
-                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="sellRatePerM2"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Sell Rate per m²</FormLabel>
+                        <FormLabel>Sell Rate per m² (Auto-calculated)</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -860,12 +774,9 @@ export default function AdminPanelTypesPage() {
                               type="number"
                               step="0.01"
                               placeholder="0.00"
-                              className="pl-7"
+                              className="pl-7 bg-muted"
                               {...field}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setLastEditedM2("sell");
-                              }}
+                              readOnly
                               data-testid="input-sell-rate-m2"
                             />
                           </div>
@@ -879,7 +790,7 @@ export default function AdminPanelTypesPage() {
                     name="sellRatePerM3"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Sell Rate per m³</FormLabel>
+                        <FormLabel>Sell Rate per m³ (Auto-calculated)</FormLabel>
                         <FormControl>
                           <div className="relative">
                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
@@ -887,12 +798,9 @@ export default function AdminPanelTypesPage() {
                               type="number"
                               step="0.01"
                               placeholder="0.00"
-                              className="pl-7"
+                              className="pl-7 bg-muted"
                               {...field}
-                              onChange={(e) => {
-                                field.onChange(e);
-                                setLastEditedM3("sell");
-                              }}
+                              readOnly
                               data-testid="input-sell-rate-m3"
                             />
                           </div>
