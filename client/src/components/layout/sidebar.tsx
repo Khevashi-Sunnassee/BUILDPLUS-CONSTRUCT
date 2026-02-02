@@ -77,12 +77,14 @@ const urlToFunctionKey: Record<string, string> = {
   "/production-report": "production_report",
   "/logistics": "logistics",
   "/weekly-wages": "weekly_wages",
+  "/reports": "daily_reports",
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",
   "/admin/panel-types": "admin_panel_types",
   "/admin/devices": "admin_devices",
   "/admin/users": "admin_users",
   "/admin/settings": "admin_settings",
+  "/manager/review": "daily_reports",
 };
 
 export function AppSidebar() {

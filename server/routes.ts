@@ -302,7 +302,7 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/daily-logs/:id", requireAuth, async (req, res) => {
+  app.delete("/api/daily-logs/:id", requireAuth, requirePermission("daily_reports", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const log = await storage.getDailyLog(req.params.id as string);
       if (!log) {
@@ -783,12 +783,12 @@ export async function registerRoutes(
     }
   });
 
-  app.put("/api/production-entries/:id", requireAuth, async (req, res) => {
+  app.put("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     const entry = await storage.updateProductionEntry(req.params.id as string, req.body);
     res.json(entry);
   });
 
-  app.delete("/api/production-entries/:id", requireAuth, async (req, res) => {
+  app.delete("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     await storage.deleteProductionEntry(req.params.id as string);
     res.json({ ok: true });
   });
@@ -2538,23 +2538,23 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
-  app.put("/api/load-lists/:id", requireAuth, async (req, res) => {
+  app.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
     const loadList = await storage.updateLoadList(req.params.id as string, req.body);
     res.json(loadList);
   });
 
-  app.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  app.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
     await storage.deleteLoadList(req.params.id as string);
     res.json({ success: true });
   });
 
-  app.post("/api/load-lists/:id/panels", requireAuth, async (req, res) => {
+  app.post("/api/load-lists/:id/panels", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
     const { panelId, sequence } = req.body;
     const panel = await storage.addPanelToLoadList(req.params.id as string, panelId, sequence);
     res.json(panel);
   });
 
-  app.delete("/api/load-lists/:id/panels/:panelId", requireAuth, async (req, res) => {
+  app.delete("/api/load-lists/:id/panels/:panelId", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
     await storage.removePanelFromLoadList(req.params.id as string, req.params.panelId as string);
     res.json({ success: true });
   });
@@ -2609,7 +2609,7 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
-  app.post("/api/weekly-wage-reports", requireAuth, async (req, res) => {
+  app.post("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_wages", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const parseResult = insertWeeklyWageReportSchema.safeParse(req.body);
       if (!parseResult.success) {
@@ -2635,7 +2635,7 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
-  app.put("/api/weekly-wage-reports/:id", requireAuth, async (req, res) => {
+  app.put("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekly_wages", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const parseResult = insertWeeklyWageReportSchema.partial().safeParse(req.body);
       if (!parseResult.success) {
@@ -2653,7 +2653,7 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
-  app.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  app.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), requirePermission("weekly_wages", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       await storage.deleteWeeklyWageReport(req.params.id);
       res.json({ success: true });
