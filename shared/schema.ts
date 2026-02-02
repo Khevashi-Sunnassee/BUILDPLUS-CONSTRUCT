@@ -529,6 +529,7 @@ export const insertDeliveryRecordSchema = createInsertSchema(deliveryRecords).om
 
 export const insertWeeklyWageReportSchema = createInsertSchema(weeklyWageReports).omit({
   id: true,
+  createdById: true,
   createdAt: true,
   updatedAt: true,
 });
