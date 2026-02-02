@@ -1050,6 +1050,27 @@ export async function registerRoutes(
     res.json(types);
   });
 
+  // Get cost breakup summaries for all panel types (for margin validation) - MUST be before :id route
+  app.get("/api/admin/panel-types/cost-summaries", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const types = await storage.getAllPanelTypes();
+      const summaries: Record<string, { totalCostPercent: number; profitMargin: number }> = {};
+      
+      for (const type of types) {
+        const components = await storage.getCostComponentsByPanelType(type.id);
+        const totalCostPercent = components.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
+        summaries[type.id] = {
+          totalCostPercent,
+          profitMargin: 100 - totalCostPercent,
+        };
+      }
+      
+      res.json(summaries);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to fetch cost summaries" });
+    }
+  });
+
   app.get("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
     const type = await storage.getPanelType(req.params.id as string);
     if (!type) return res.status(404).json({ error: "Panel type not found" });
@@ -1108,27 +1129,6 @@ export async function registerRoutes(
   app.get("/api/panel-types", requireAuth, async (req, res) => {
     const types = await storage.getAllPanelTypes();
     res.json(types.filter(t => t.isActive));
-  });
-
-  // Get cost breakup summaries for all panel types (for margin validation)
-  app.get("/api/admin/panel-types/cost-summaries", requireRole("ADMIN"), async (req, res) => {
-    try {
-      const types = await storage.getAllPanelTypes();
-      const summaries: Record<string, { totalCostPercent: number; profitMargin: number }> = {};
-      
-      for (const type of types) {
-        const components = await storage.getCostComponentsByPanelType(type.id);
-        const totalCostPercent = components.reduce((sum, c) => sum + (parseFloat(c.percentageOfRevenue) || 0), 0);
-        summaries[type.id] = {
-          totalCostPercent,
-          profitMargin: 100 - totalCostPercent,
-        };
-      }
-      
-      res.json(summaries);
-    } catch (error: any) {
-      res.status(500).json({ error: error.message || "Failed to fetch cost summaries" });
-    }
   });
 
   // Panel rates now use jobs instead of projects
