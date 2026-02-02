@@ -501,8 +501,8 @@ export default function AdminPanelsPage() {
     
     // Create panels template sheet with example rows
     const template = [
-      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
-      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-002", "Panel Type": "COLUMN", "Description": "Column panel", "Drawing Code": "DWG-001", "Sheet Number": "A002", "Estimated Hours": 6 },
+      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Building": "Building A", "Level": "Level 1", "Structural Elevation": "RL 10.500", "Reckli Detail": "", "Estimated Hours": 8 },
+      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-002", "Panel Type": "COLUMN", "Description": "Column panel", "Drawing Code": "DWG-001", "Sheet Number": "A002", "Building": "Building B", "Level": "Ground", "Structural Elevation": "RL 0.000", "Reckli Detail": "Reckli Pattern 1", "Estimated Hours": 6 },
     ];
     const panelsSheet = XLSX.utils.json_to_sheet(template);
     
@@ -511,6 +511,7 @@ export default function AdminPanelsPage() {
       "Job Number": j.jobNumber,
       "Job Name": j.name,
       "Client": j.client || "",
+      "Crane Capacity": j.craneCapacity || "",
       "Status": j.status,
     }));
     const jobsSheet = XLSX.utils.json_to_sheet(jobsData);

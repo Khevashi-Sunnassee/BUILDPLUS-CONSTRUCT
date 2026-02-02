@@ -825,6 +825,10 @@ export async function registerRoutes(
           description: row.description || row["Description"] || null,
           drawingCode: row.drawingCode || row["Drawing Code"] || row.drawing_code || null,
           sheetNumber: row.sheetNumber || row["Sheet Number"] || row.sheet_number || null,
+          building: row.building || row["Building"] || null,
+          level: row.level || row["Level"] || null,
+          structuralElevation: row.structuralElevation || row["Structural Elevation"] || row.structural_elevation || null,
+          reckliDetail: row.reckliDetail || row["Reckli Detail"] || row.reckli_detail || null,
           estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
           status: "NOT_STARTED" as const,
         });
