@@ -11,6 +11,7 @@ import {
   Search,
   AlertTriangle,
   FolderOpen,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -89,13 +90,21 @@ export default function DailyReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-daily-reports-title">
-          Daily Reports
-        </h1>
-        <p className="text-muted-foreground">
-          Review and manage your drafting time entries
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-daily-reports-title">
+            Daily Reports
+          </h1>
+          <p className="text-muted-foreground">
+            Review and manage your drafting time entries
+          </p>
+        </div>
+        <Link href="/manual-entry">
+          <Button data-testid="button-add-manual-entry">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Manual Entry
+          </Button>
+        </Link>
       </div>
 
       <Card>
