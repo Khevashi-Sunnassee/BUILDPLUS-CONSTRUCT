@@ -124,6 +124,34 @@ export async function registerRoutes(
     res.json(logsWithStats);
   });
 
+  app.post("/api/daily-logs", requireAuth, async (req, res) => {
+    try {
+      const user = await storage.getUser(req.session.userId!);
+      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      
+      const { logDay } = req.body;
+      if (!logDay) {
+        return res.status(400).json({ error: "logDay is required" });
+      }
+      
+      const existingLog = await storage.getDailyLogByUserAndDay(user.id, logDay);
+      if (existingLog) {
+        return res.json(existingLog);
+      }
+      
+      const newLog = await storage.createDailyLog({
+        userId: user.id,
+        logDay: logDay,
+        status: "DRAFT",
+      });
+      
+      res.status(201).json(newLog);
+    } catch (error: any) {
+      console.error("Error creating daily log:", error);
+      res.status(500).json({ error: error.message || "Failed to create daily log" });
+    }
+  });
+
   app.get("/api/daily-logs/submitted", requireRole("MANAGER", "ADMIN"), async (req, res) => {
     const logs = await storage.getSubmittedDailyLogs();
     res.json(logs);

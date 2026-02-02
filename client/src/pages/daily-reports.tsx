@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
 import jsPDF from "jspdf";
@@ -23,6 +23,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -38,6 +48,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface DailyLogSummary {
   id: string;
@@ -54,14 +66,45 @@ interface DailyLogSummary {
 
 export default function DailyReportsPage() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("week");
   const [searchQuery, setSearchQuery] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
+  const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
     queryKey: ["/api/daily-logs", { status: statusFilter, dateRange }],
+  });
+
+  const createDailyLogMutation = useMutation({
+    mutationFn: async (data: { logDay: string }) => {
+      return await apiRequest("/api/daily-logs", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      setIsNewDayDialogOpen(false);
+      toast({
+        title: "Daily log created",
+        description: `Created log for ${format(new Date(newDayDate + "T00:00:00"), "dd/MM/yyyy")}`,
+      });
+      if (data?.id) {
+        setLocation(`/daily-report/${data.id}`);
+      }
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create daily log",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
   });
 
   const filteredLogs = logs?.filter((log) => {
@@ -232,12 +275,57 @@ export default function DailyReportsPage() {
             )}
             Export PDF
           </Button>
-          <Link href="/manual-entry">
-            <Button data-testid="button-add-manual-entry">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Manual Entry
-            </Button>
-          </Link>
+          <Dialog open={isNewDayDialogOpen} onOpenChange={setIsNewDayDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-start-new-day">
+                <Plus className="h-4 w-4 mr-2" />
+                Start New Day
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Start New Daily Log</DialogTitle>
+                <DialogDescription>
+                  Create a new daily log for a specific date. You can add time entries afterwards.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="logDay">Date</Label>
+                  <Input
+                    id="logDay"
+                    type="date"
+                    value={newDayDate}
+                    onChange={(e) => setNewDayDate(e.target.value)}
+                    data-testid="input-new-day-date"
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsNewDayDialogOpen(false)}
+                  data-testid="button-cancel-new-day"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() =>
+                    createDailyLogMutation.mutate({
+                      logDay: newDayDate,
+                    })
+                  }
+                  disabled={createDailyLogMutation.isPending}
+                  data-testid="button-create-new-day"
+                >
+                  {createDailyLogMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
