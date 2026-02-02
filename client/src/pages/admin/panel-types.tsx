@@ -112,13 +112,29 @@ export default function AdminPanelTypesPage() {
     enabled: !!costBreakupType?.id && costBreakupDialogOpen,
   });
 
+  // Default cost components for new panel types
+  const defaultCostComponents: CostComponent[] = [
+    { name: "REO", percentageOfRevenue: "10" },
+    { name: "CONCRETE", percentageOfRevenue: "7" },
+    { name: "LABOUR", percentageOfRevenue: "50" },
+    { name: "DRAFTING", percentageOfRevenue: "3" },
+    { name: "LOGISTICS", percentageOfRevenue: "6" },
+    { name: "GENERAL OVERHEADS", percentageOfRevenue: "12" },
+  ];
+
   useEffect(() => {
     if (currentCostComponents) {
-      setCostComponents(currentCostComponents.map(c => ({
-        id: c.id,
-        name: c.name,
-        percentageOfRevenue: c.percentageOfRevenue,
-      })));
+      if (currentCostComponents.length > 0) {
+        // Use existing components if they exist
+        setCostComponents(currentCostComponents.map(c => ({
+          id: c.id,
+          name: c.name,
+          percentageOfRevenue: c.percentageOfRevenue,
+        })));
+      } else {
+        // Use default components if no existing components
+        setCostComponents(defaultCostComponents);
+      }
     }
   }, [currentCostComponents]);
 
@@ -272,7 +288,8 @@ export default function AdminPanelTypesPage() {
 
   const handleOpenCostBreakup = (type: PanelTypeConfig) => {
     setCostBreakupType(type);
-    setCostComponents([]);
+    // Set default components initially - will be replaced by existing data if any
+    setCostComponents(defaultCostComponents);
     setCostBreakupDialogOpen(true);
   };
 
