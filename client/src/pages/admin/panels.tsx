@@ -935,6 +935,8 @@ export default function AdminPanelsPage() {
                 {!filterJobId && !groupByJob && !groupByPanelType && <TableHead>Job</TableHead>}
                 <TableHead>Panel Mark</TableHead>
                 <TableHead>{groupByPanelType ? "Job" : "Type"}</TableHead>
+                <TableHead>Building</TableHead>
+                <TableHead>Level</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
                 <TableHead className="text-right">Length (mm)</TableHead>
                 <TableHead className="text-right">Width (mm)</TableHead>
@@ -957,7 +959,7 @@ export default function AdminPanelsPage() {
                           onClick={() => togglePanelTypeCollapse(panelType)}
                           data-testid={`row-type-group-${panelType}`}
                         >
-                          <TableCell colSpan={10}>
+                          <TableCell colSpan={12}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -983,6 +985,8 @@ export default function AdminPanelsPage() {
                             <TableCell>
                               <span className="text-sm font-mono">{panel.job.jobNumber}</span>
                             </TableCell>
+                            <TableCell className="text-sm">{panel.building || "-"}</TableCell>
+                            <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
@@ -1039,7 +1043,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1056,7 +1060,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={10}>
+                          <TableCell colSpan={12}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -1083,6 +1087,8 @@ export default function AdminPanelsPage() {
                             <TableCell>
                               <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                             </TableCell>
+                            <TableCell className="text-sm">{panel.building || "-"}</TableCell>
+                            <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
@@ -1139,7 +1145,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1163,6 +1169,8 @@ export default function AdminPanelsPage() {
                       <TableCell>
                         <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                       </TableCell>
+                      <TableCell className="text-sm">{panel.building || "-"}</TableCell>
+                      <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                       <TableCell className="text-center">{panel.qty || 1}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
@@ -1215,7 +1223,7 @@ export default function AdminPanelsPage() {
                   ))}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? 9 : 10} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? 11 : 12} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>
