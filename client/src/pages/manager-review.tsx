@@ -157,7 +157,7 @@ export default function ManagerReviewPage() {
                       <div className="flex-1">
                         <div className="flex items-center gap-3 flex-wrap">
                           <CardTitle className="text-lg">
-                            {format(new Date(log.logDay), "EEEE, MMMM d, yyyy")}
+                            {format(new Date(log.logDay), "EEEE, dd/MM/yyyy")}
                           </CardTitle>
                           <Badge variant="default">Submitted</Badge>
                         </div>

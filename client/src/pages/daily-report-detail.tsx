@@ -185,6 +185,26 @@ export default function DailyReportDetailPage() {
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: 1200,
+        onclone: (clonedDoc) => {
+          clonedDoc.documentElement.classList.remove("dark");
+          clonedDoc.documentElement.style.colorScheme = "light";
+          const clonedElement = clonedDoc.body.querySelector("[data-pdf-content]") || clonedDoc.body;
+          if (clonedElement instanceof HTMLElement) {
+            clonedElement.style.backgroundColor = "#ffffff";
+            clonedElement.style.color = "#000000";
+          }
+          clonedDoc.querySelectorAll("*").forEach((el) => {
+            if (el instanceof HTMLElement) {
+              const computed = window.getComputedStyle(el);
+              if (computed.backgroundColor.includes("rgb(") && !computed.backgroundColor.includes("255, 255, 255")) {
+                const bg = computed.backgroundColor;
+                if (bg.includes("rgb(0,") || bg.includes("rgb(10,") || bg.includes("rgb(20,") || bg.includes("rgb(30,") || bg.includes("hsl(")) {
+                  el.style.backgroundColor = "#ffffff";
+                }
+              }
+            }
+          });
+        },
       });
       
       const imgData = canvas.toDataURL("image/png");
@@ -217,7 +237,7 @@ export default function DailyReportDetailPage() {
       
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text(`${log.user?.name || log.user?.email} - ${format(new Date(log.logDay), "EEEE, MMMM d, yyyy")}`, margin + logoSize + 8, 21);
+      pdf.text(`${log.user?.name || log.user?.email} - ${format(new Date(log.logDay), "EEEE, dd/MM/yyyy")}`, margin + logoSize + 8, 21);
       
       pdf.setFontSize(9);
       pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
@@ -290,7 +310,7 @@ export default function DailyReportDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight" data-testid="text-log-date">
-                {format(new Date(log.logDay), "EEEE, MMMM d, yyyy")}
+                {format(new Date(log.logDay), "EEEE, dd/MM/yyyy")}
               </h1>
               {getStatusBadge(log.status)}
             </div>

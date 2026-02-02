@@ -280,7 +280,7 @@ export default function AdminUsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {format(new Date(user.createdAt), "MMM d, yyyy")}
+                        {format(new Date(user.createdAt), "dd/MM/yyyy")}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">

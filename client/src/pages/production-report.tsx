@@ -106,7 +106,7 @@ export default function ProductionReportPage() {
 
   const formatDate = (dateStr: string) => {
     try {
-      return format(new Date(dateStr + "T00:00:00"), "EEE, MMM d, yyyy");
+      return format(new Date(dateStr + "T00:00:00"), "dd/MM/yyyy");
     } catch {
       return dateStr;
     }
@@ -143,6 +143,26 @@ export default function ProductionReportPage() {
         logging: false,
         backgroundColor: "#ffffff",
         windowWidth: 1200,
+        onclone: (clonedDoc) => {
+          clonedDoc.documentElement.classList.remove("dark");
+          clonedDoc.documentElement.style.colorScheme = "light";
+          const clonedElement = clonedDoc.body.querySelector("[data-pdf-content]") || clonedDoc.body;
+          if (clonedElement instanceof HTMLElement) {
+            clonedElement.style.backgroundColor = "#ffffff";
+            clonedElement.style.color = "#000000";
+          }
+          clonedDoc.querySelectorAll("*").forEach((el) => {
+            if (el instanceof HTMLElement) {
+              const computed = window.getComputedStyle(el);
+              if (computed.backgroundColor.includes("rgb(") && !computed.backgroundColor.includes("255, 255, 255")) {
+                const bg = computed.backgroundColor;
+                if (bg.includes("rgb(0,") || bg.includes("rgb(10,") || bg.includes("rgb(20,") || bg.includes("rgb(30,") || bg.includes("hsl(")) {
+                  el.style.backgroundColor = "#ffffff";
+                }
+              }
+            }
+          });
+        },
       });
       
       const imgData = canvas.toDataURL("image/png");

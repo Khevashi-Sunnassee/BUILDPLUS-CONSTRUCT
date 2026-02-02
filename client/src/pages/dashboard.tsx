@@ -211,7 +211,7 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between p-2 rounded-md hover-elevate cursor-pointer transition-colors" data-testid={`log-item-${log.id}`}>
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium">
-                          {format(new Date(log.logDay), "EEE, MMM d")}
+                          {format(new Date(log.logDay), "dd/MM/yyyy")}
                         </span>
                         <span className="text-xs text-muted-foreground capitalize">
                           {log.app}
