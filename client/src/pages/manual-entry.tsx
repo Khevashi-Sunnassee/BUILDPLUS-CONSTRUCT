@@ -35,7 +35,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -175,7 +177,32 @@ export default function ManualEntryPage() {
 
   const filteredPanels = panels?.filter(p => 
     !selectedJobId || selectedJobId === "none" || p.jobId === selectedJobId
-  );
+  )?.sort((a, b) => {
+    // Sort by Building first, then by Level, then by Panel Mark
+    const buildingA = a.building || "";
+    const buildingB = b.building || "";
+    if (buildingA !== buildingB) {
+      return buildingA.localeCompare(buildingB, undefined, { numeric: true });
+    }
+    const levelA = a.level || "";
+    const levelB = b.level || "";
+    if (levelA !== levelB) {
+      return levelA.localeCompare(levelB, undefined, { numeric: true });
+    }
+    return a.panelMark.localeCompare(b.panelMark, undefined, { numeric: true });
+  });
+
+  // Group panels by Building and Level for display
+  const groupedPanels = filteredPanels?.filter(p => p.status !== "COMPLETED").reduce((acc, panel) => {
+    const building = panel.building || "No Building";
+    const level = panel.level || "No Level";
+    const key = `${building}|${level}`;
+    if (!acc[key]) {
+      acc[key] = { building, level, panels: [] };
+    }
+    acc[key].panels.push(panel);
+    return acc;
+  }, {} as Record<string, { building: string; level: string; panels: typeof filteredPanels }>);
 
   const form = useForm<ManualEntryForm>({
     resolver: zodResolver(manualEntrySchema),
@@ -550,16 +577,27 @@ export default function ManualEntryPage() {
                                   <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
+                              <SelectContent className="max-h-[400px]">
                                 <SelectItem value="none">No panel selected</SelectItem>
-                                {filteredPanels?.filter(p => p.status !== "COMPLETED").map((panel) => (
-                                  <SelectItem key={panel.id} value={panel.id}>
-                                    <div className="flex items-center">
-                                      {panel.panelMark}
-                                      {panel.description && <span className="text-muted-foreground ml-1">- {panel.description}</span>}
-                                      {getStatusBadge(panel.status)}
-                                    </div>
-                                  </SelectItem>
+                                {groupedPanels && Object.entries(groupedPanels)
+                                  .sort(([keyA], [keyB]) => keyA.localeCompare(keyB, undefined, { numeric: true }))
+                                  .map(([key, { building, level, panels: groupPanels }]) => (
+                                  <SelectGroup key={key}>
+                                    <SelectLabel className="bg-muted/50 text-xs font-semibold py-1.5">
+                                      Bldg: {building} / Level: {level}
+                                    </SelectLabel>
+                                    {groupPanels?.map((panel) => (
+                                      <SelectItem key={panel.id} value={panel.id}>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-mono font-medium">{panel.panelMark}</span>
+                                          <span className="text-muted-foreground text-xs">
+                                            {panel.panelType || "WALL"}
+                                          </span>
+                                          {getStatusBadge(panel.status)}
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectGroup>
                                 ))}
                               </SelectContent>
                             </Select>
