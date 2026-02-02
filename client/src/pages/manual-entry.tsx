@@ -295,8 +295,8 @@ export default function ManualEntryPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
-      // Navigate back to the day view for the selected date
-      navigate(`/daily-reports/day/${selectedDate}`);
+      // Navigate back to the daily reports list
+      navigate("/daily-reports");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
