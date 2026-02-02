@@ -5,6 +5,7 @@ import {
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
+  userPermissions, FUNCTION_KEYS,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -20,6 +21,7 @@ import {
   type InsertLoadList, type LoadList, type InsertLoadListPanel, type LoadListPanel,
   type InsertDeliveryRecord, type DeliveryRecord,
   type InsertWeeklyWageReport, type WeeklyWageReport,
+  type InsertUserPermission, type UserPermission, type FunctionKey, type PermissionLevel,
 } from "@shared/schema";
 
 export interface LoadListWithDetails extends LoadList {
@@ -203,6 +205,14 @@ export interface IStorage {
   createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport>;
   updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined>;
   deleteWeeklyWageReport(id: string): Promise<void>;
+
+  // User Permissions
+  getUserPermissions(userId: string): Promise<UserPermission[]>;
+  getUserPermission(userId: string, functionKey: FunctionKey): Promise<UserPermission | undefined>;
+  setUserPermission(userId: string, functionKey: FunctionKey, permissionLevel: PermissionLevel): Promise<UserPermission>;
+  deleteUserPermission(userId: string, functionKey: FunctionKey): Promise<void>;
+  initializeUserPermissions(userId: string): Promise<UserPermission[]>;
+  getAllUserPermissionsForAdmin(): Promise<{ user: User; permissions: UserPermission[] }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1437,6 +1447,81 @@ export class DatabaseStorage implements IStorage {
 
   async deleteWeeklyWageReport(id: string): Promise<void> {
     await db.delete(weeklyWageReports).where(eq(weeklyWageReports.id, id));
+  }
+
+  // User Permissions
+  async getUserPermissions(userId: string): Promise<UserPermission[]> {
+    return await db.select().from(userPermissions).where(eq(userPermissions.userId, userId));
+  }
+
+  async getUserPermission(userId: string, functionKey: FunctionKey): Promise<UserPermission | undefined> {
+    const [permission] = await db.select().from(userPermissions)
+      .where(and(
+        eq(userPermissions.userId, userId),
+        eq(userPermissions.functionKey, functionKey)
+      ));
+    return permission;
+  }
+
+  async setUserPermission(userId: string, functionKey: FunctionKey, permissionLevel: PermissionLevel): Promise<UserPermission> {
+    const existing = await this.getUserPermission(userId, functionKey);
+    if (existing) {
+      const [updated] = await db.update(userPermissions)
+        .set({ permissionLevel, updatedAt: new Date() })
+        .where(eq(userPermissions.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(userPermissions).values({
+        userId,
+        functionKey,
+        permissionLevel,
+      }).returning();
+      return created;
+    }
+  }
+
+  async deleteUserPermission(userId: string, functionKey: FunctionKey): Promise<void> {
+    await db.delete(userPermissions)
+      .where(and(
+        eq(userPermissions.userId, userId),
+        eq(userPermissions.functionKey, functionKey)
+      ));
+  }
+
+  async initializeUserPermissions(userId: string): Promise<UserPermission[]> {
+    const existingPerms = await this.getUserPermissions(userId);
+    const existingKeys = new Set(existingPerms.map(p => p.functionKey));
+    const missingKeys = FUNCTION_KEYS.filter(key => !existingKeys.has(key));
+    
+    if (missingKeys.length === 0) return existingPerms;
+
+    const newPerms = await db.insert(userPermissions)
+      .values(missingKeys.map(functionKey => ({
+        userId,
+        functionKey,
+        permissionLevel: "VIEW_AND_UPDATE" as PermissionLevel,
+      })))
+      .returning();
+    
+    return [...existingPerms, ...newPerms];
+  }
+
+  async getAllUserPermissionsForAdmin(): Promise<{ user: User; permissions: UserPermission[] }[]> {
+    const allUsers = await db.select().from(users).where(eq(users.isActive, true));
+    const allPerms = await db.select().from(userPermissions);
+    
+    const permsByUser = new Map<string, UserPermission[]>();
+    for (const perm of allPerms) {
+      const existing = permsByUser.get(perm.userId) || [];
+      existing.push(perm);
+      permsByUser.set(perm.userId, existing);
+    }
+    
+    return allUsers.map(user => ({
+      user,
+      permissions: permsByUser.get(user.id) || [],
+    }));
   }
 }
 
