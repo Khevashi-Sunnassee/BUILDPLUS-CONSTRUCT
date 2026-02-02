@@ -4,7 +4,7 @@ import {
   users, devices, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
-  trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays,
+  trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -19,6 +19,7 @@ import {
   type InsertTrailerType, type TrailerType,
   type InsertLoadList, type LoadList, type InsertLoadListPanel, type LoadListPanel,
   type InsertDeliveryRecord, type DeliveryRecord,
+  type InsertWeeklyWageReport, type WeeklyWageReport,
 } from "@shared/schema";
 
 export interface LoadListWithDetails extends LoadList {
@@ -194,6 +195,14 @@ export interface IStorage {
   getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined>;
   createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord>;
   updateDeliveryRecord(id: string, data: Partial<InsertDeliveryRecord>): Promise<DeliveryRecord | undefined>;
+
+  // Weekly Wage Reports
+  getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]>;
+  getWeeklyWageReport(id: string): Promise<WeeklyWageReport | undefined>;
+  getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string): Promise<WeeklyWageReport | undefined>;
+  createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport>;
+  updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined>;
+  deleteWeeklyWageReport(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1384,6 +1393,50 @@ export class DatabaseStorage implements IStorage {
       .where(eq(deliveryRecords.id, id))
       .returning();
     return updated;
+  }
+
+  // Weekly Wage Reports
+  async getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]> {
+    let query = db.select().from(weeklyWageReports);
+    if (startDate && endDate) {
+      query = query.where(and(
+        gte(weeklyWageReports.weekStartDate, startDate),
+        lte(weeklyWageReports.weekEndDate, endDate)
+      )) as typeof query;
+    }
+    return await query.orderBy(desc(weeklyWageReports.weekStartDate), asc(weeklyWageReports.factory));
+  }
+
+  async getWeeklyWageReport(id: string): Promise<WeeklyWageReport | undefined> {
+    const [report] = await db.select().from(weeklyWageReports).where(eq(weeklyWageReports.id, id));
+    return report;
+  }
+
+  async getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string): Promise<WeeklyWageReport | undefined> {
+    const [report] = await db.select().from(weeklyWageReports)
+      .where(and(
+        eq(weeklyWageReports.weekStartDate, weekStartDate),
+        eq(weeklyWageReports.weekEndDate, weekEndDate),
+        eq(weeklyWageReports.factory, factory)
+      ));
+    return report;
+  }
+
+  async createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport> {
+    const [report] = await db.insert(weeklyWageReports).values(data).returning();
+    return report;
+  }
+
+  async updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined> {
+    const [updated] = await db.update(weeklyWageReports)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(weeklyWageReports.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteWeeklyWageReport(id: string): Promise<void> {
+    await db.delete(weeklyWageReports).where(eq(weeklyWageReports.id, id));
   }
 }
 

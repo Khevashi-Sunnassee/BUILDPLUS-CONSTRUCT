@@ -2312,5 +2312,184 @@ Return ONLY valid JSON, no explanation text.`
     res.json(record);
   });
 
+  // Weekly Wage Reports
+  app.get("/api/weekly-wage-reports", requireAuth, async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const reports = await storage.getWeeklyWageReports(startDate, endDate);
+      res.json(reports);
+    } catch (error: any) {
+      console.error("Error fetching weekly wage reports:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch weekly wage reports" });
+    }
+  });
+
+  app.get("/api/weekly-wage-reports/:id", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.getWeeklyWageReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error fetching weekly wage report:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch weekly wage report" });
+    }
+  });
+
+  app.post("/api/weekly-wage-reports", requireAuth, async (req, res) => {
+    try {
+      const { weekStartDate, weekEndDate, factory } = req.body;
+      
+      if (!weekStartDate || !weekEndDate || !factory) {
+        return res.status(400).json({ error: "Week start date, end date, and factory are required" });
+      }
+      
+      // Check if report already exists
+      const existing = await storage.getWeeklyWageReportByWeek(weekStartDate, weekEndDate, factory);
+      if (existing) {
+        return res.status(400).json({ error: "Weekly wage report already exists for this week and factory" });
+      }
+      
+      const report = await storage.createWeeklyWageReport({
+        ...req.body,
+        createdById: req.session.userId!,
+      });
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error creating weekly wage report:", error);
+      res.status(500).json({ error: error.message || "Failed to create weekly wage report" });
+    }
+  });
+
+  app.put("/api/weekly-wage-reports/:id", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.updateWeeklyWageReport(req.params.id, req.body);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      res.json(report);
+    } catch (error: any) {
+      console.error("Error updating weekly wage report:", error);
+      res.status(500).json({ error: error.message || "Failed to update weekly wage report" });
+    }
+  });
+
+  app.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      await storage.deleteWeeklyWageReport(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting weekly wage report:", error);
+      res.status(500).json({ error: error.message || "Failed to delete weekly wage report" });
+    }
+  });
+
+  // Weekly Wage Analysis - compare actual wages vs estimated wages based on production
+  app.get("/api/weekly-wage-reports/:id/analysis", requireAuth, async (req, res) => {
+    try {
+      const report = await storage.getWeeklyWageReport(req.params.id);
+      if (!report) {
+        return res.status(404).json({ error: "Report not found" });
+      }
+      
+      // Get production entries for the week
+      const entries = await storage.getProductionEntriesInRange(report.weekStartDate, report.weekEndDate);
+      
+      // Filter by factory if needed
+      const factoryEntries = entries.filter(e => {
+        // Production entries might have factory via the panel or job
+        return true; // For now, include all - can be filtered later if needed
+      });
+      
+      // Get all panel types and their cost components
+      const allPanelTypes = await storage.getAllPanelTypes();
+      const panelTypesMap = new Map(allPanelTypes.map(pt => [pt.code, pt]));
+      
+      // Calculate expected wages based on production revenue and cost percentages
+      let totalRevenue = 0;
+      let expectedProductionWages = 0;
+      let expectedDraftingWages = 0;
+      
+      for (const entry of factoryEntries) {
+        // Get panel type to find cost components
+        const panelType = panelTypesMap.get(entry.panel?.panelType || "");
+        if (!panelType) continue;
+        
+        // Calculate revenue from this entry
+        const volume = parseFloat(entry.volumeM3 || "0");
+        const area = parseFloat(entry.areaM2 || "0");
+        const sellRateM3 = parseFloat(panelType.sellRatePerM3 || "0");
+        const sellRateM2 = parseFloat(panelType.sellRatePerM2 || "0");
+        const entryRevenue = (volume * sellRateM3) + (area * sellRateM2);
+        totalRevenue += entryRevenue;
+        
+        // Get cost components for this panel type
+        const costComponents = await storage.getCostComponentsForPanelType(panelType.id);
+        for (const component of costComponents) {
+          const percentage = parseFloat(component.percentageOfRevenue) / 100;
+          const cost = entryRevenue * percentage;
+          
+          // Map cost components to wage categories (e.g., "Labour" -> Production Wages)
+          const componentName = component.name.toLowerCase();
+          if (componentName.includes("labour") || componentName.includes("production")) {
+            expectedProductionWages += cost;
+          }
+          if (componentName.includes("drafting")) {
+            expectedDraftingWages += cost;
+          }
+        }
+      }
+      
+      // Parse actual wages from the report
+      const actualProductionWages = parseFloat(report.productionWages || "0");
+      const actualOfficeWages = parseFloat(report.officeWages || "0");
+      const actualEstimatingWages = parseFloat(report.estimatingWages || "0");
+      const actualOnsiteWages = parseFloat(report.onsiteWages || "0");
+      const actualDraftingWages = parseFloat(report.draftingWages || "0");
+      const actualCivilWages = parseFloat(report.civilWages || "0");
+      const totalActualWages = actualProductionWages + actualOfficeWages + actualEstimatingWages + 
+                               actualOnsiteWages + actualDraftingWages + actualCivilWages;
+      
+      res.json({
+        report,
+        analysis: {
+          weekStartDate: report.weekStartDate,
+          weekEndDate: report.weekEndDate,
+          factory: report.factory,
+          productionEntryCount: factoryEntries.length,
+          totalRevenue: Math.round(totalRevenue * 100) / 100,
+          actualWages: {
+            production: actualProductionWages,
+            office: actualOfficeWages,
+            estimating: actualEstimatingWages,
+            onsite: actualOnsiteWages,
+            drafting: actualDraftingWages,
+            civil: actualCivilWages,
+            total: totalActualWages,
+          },
+          estimatedWages: {
+            production: Math.round(expectedProductionWages * 100) / 100,
+            drafting: Math.round(expectedDraftingWages * 100) / 100,
+          },
+          variance: {
+            production: Math.round((actualProductionWages - expectedProductionWages) * 100) / 100,
+            productionPercentage: expectedProductionWages > 0 
+              ? Math.round(((actualProductionWages - expectedProductionWages) / expectedProductionWages) * 100 * 10) / 10 
+              : 0,
+            drafting: Math.round((actualDraftingWages - expectedDraftingWages) * 100) / 100,
+            draftingPercentage: expectedDraftingWages > 0 
+              ? Math.round(((actualDraftingWages - expectedDraftingWages) / expectedDraftingWages) * 100 * 10) / 10 
+              : 0,
+          },
+        },
+      });
+    } catch (error: any) {
+      console.error("Error generating wage analysis:", error);
+      res.status(500).json({ error: error.message || "Failed to generate wage analysis" });
+    }
+  });
+
   return httpServer;
 }
