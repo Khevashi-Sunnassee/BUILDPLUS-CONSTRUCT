@@ -499,8 +499,6 @@ export default function DailyReportDetailPage() {
                 <TableRow>
                   <TableHead className="w-24">Time</TableHead>
                   <TableHead className="w-20">App</TableHead>
-                  <TableHead>File</TableHead>
-                  <TableHead>Sheet/Layout</TableHead>
                   <TableHead>Panel Mark</TableHead>
                   <TableHead>Drawing Code</TableHead>
                   <TableHead>Job</TableHead>
@@ -520,16 +518,6 @@ export default function DailyReportDetailPage() {
                       <Badge variant="outline" className="capitalize">
                         {row.app}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-[150px] truncate" title={row.fileName || ""}>
-                      {row.fileName || "-"}
-                    </TableCell>
-                    <TableCell>
-                      {row.app === "revit" ? (
-                        row.revitSheetNumber ? `${row.revitSheetNumber}: ${row.revitSheetName || ""}` : row.revitViewName || "-"
-                      ) : (
-                        row.acadLayoutName || "-"
-                      )}
                     </TableCell>
                     <TableCell>
                       {editingRowId === row.id ? (
@@ -706,7 +694,7 @@ export default function DailyReportDetailPage() {
                 ))}
                 {(!log.rows || log.rows.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={canEdit ? 10 : 9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-8 text-muted-foreground">
                       No time entries for this day
                     </TableCell>
                   </TableRow>
