@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import { format } from "date-fns";
 import {
   Plus,
@@ -95,12 +95,19 @@ interface PanelWithJob extends PanelRegister {
 
 export default function ManualEntryPage() {
   const [, navigate] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
+  
+  // Parse date from URL query parameter if present
+  const urlParams = new URLSearchParams(searchString);
+  const dateFromUrl = urlParams.get("date");
+  const initialDate = dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl) ? dateFromUrl : today;
+  
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [addNewPanel, setAddNewPanel] = useState(false);
   const [newPanelMark, setNewPanelMark] = useState("");
-  const [selectedDate, setSelectedDate] = useState(today);
+  const [selectedDate, setSelectedDate] = useState(initialDate);
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
@@ -140,9 +147,19 @@ export default function ManualEntryPage() {
     
     if (!latestDate) return "09:00";
     
-    // Format the time as HH:MM
-    const hours = String(latestDate.getHours()).padStart(2, '0');
-    const minutes = String(latestDate.getMinutes()).padStart(2, '0');
+    // Format the time as HH:MM in Melbourne timezone
+    // The Date object from UTC timestamp will be automatically converted to local time
+    // For server-side Melbourne times, we need to format using the Intl API
+    const formatter = new Intl.DateTimeFormat('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+      timeZone: 'Australia/Melbourne'
+    });
+    
+    const parts = formatter.formatToParts(latestDate);
+    const hours = parts.find(p => p.type === 'hour')?.value || '09';
+    const minutes = parts.find(p => p.type === 'minute')?.value || '00';
     return `${hours}:${minutes}`;
   }, [dailyLogs, selectedDate]);
 
@@ -162,7 +179,7 @@ export default function ManualEntryPage() {
   const form = useForm<ManualEntryForm>({
     resolver: zodResolver(manualEntrySchema),
     defaultValues: {
-      logDay: today,
+      logDay: initialDate,
       app: "revit",
       startTime: "09:00",
       endTime: "09:30",

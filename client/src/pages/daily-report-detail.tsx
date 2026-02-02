@@ -14,6 +14,7 @@ import {
   Check,
   X,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -213,6 +214,14 @@ export default function DailyReportDetailPage() {
         <div className="flex items-center gap-2">
           {canEdit && (
             <>
+              <Button
+                variant="outline"
+                onClick={() => setLocation(`/manual-entry?date=${log.logDay}`)}
+                data-testid="button-add-entry"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Entry
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => mergeMutation.mutate()}
