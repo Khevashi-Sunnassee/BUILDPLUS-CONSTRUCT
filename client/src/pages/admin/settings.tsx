@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2 } from "lucide-react";
+import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -167,19 +168,14 @@ export default function AdminSettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center gap-6">
             <div className="flex-shrink-0">
-              {(logoPreview || settings?.logoBase64) ? (
-                <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
-                  <img 
-                    src={logoPreview || settings?.logoBase64 || ""} 
-                    alt="Company Logo" 
-                    className="max-w-full max-h-full object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="w-24 h-24 rounded-lg border-2 border-dashed bg-muted flex items-center justify-center">
-                  <Image className="h-8 w-8 text-muted-foreground" />
-                </div>
-              )}
+              <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                <img 
+                  src={logoPreview || settings?.logoBase64 || defaultLogo} 
+                  alt="Company Logo" 
+                  className="max-w-full max-h-full object-contain"
+                  data-testid="img-logo-preview"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <div className="flex gap-2">
@@ -205,7 +201,7 @@ export default function AdminSettingsPage() {
                   )}
                   Upload Logo
                 </Button>
-                {(logoPreview || settings?.logoBase64) && (
+                {settings?.logoBase64 && (
                   <Button
                     type="button"
                     variant="ghost"
