@@ -470,10 +470,6 @@ export default function AdminPanelTypesPage() {
                   <TableHead>Code</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Supply/m²</TableHead>
-                  <TableHead className="text-right">Supply/m³</TableHead>
-                  <TableHead className="text-right">Install/m²</TableHead>
-                  <TableHead className="text-right">Install/m³</TableHead>
                   <TableHead className="text-right">Total/m²</TableHead>
                   <TableHead className="text-right">Total/m³</TableHead>
                   <TableHead className="text-right">Sell/m²</TableHead>
@@ -485,7 +481,7 @@ export default function AdminPanelTypesPage() {
               <TableBody>
                 {!panelTypes?.length ? (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                       No panel types configured. Add your first panel type to get started.
                     </TableCell>
                   </TableRow>
@@ -508,18 +504,6 @@ export default function AdminPanelTypesPage() {
                             Inactive
                           </Badge>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(type.supplyCostPerM2)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(type.supplyCostPerM3)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(type.installCostPerM2)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono text-sm">
-                        {formatCurrency(type.installCostPerM3)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatCurrency(type.totalRatePerM2)}
