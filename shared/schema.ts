@@ -310,6 +310,7 @@ export const productionEntries = pgTable("production_entries", {
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   productionDate: text("production_date").notNull(),
   factory: text("factory").default("QLD").notNull(),
+  status: text("status").default("DRAFT").notNull(), // DRAFT = scheduled, COMPLETED = produced
   volumeM3: text("volume_m3"),
   areaM2: text("area_m2"),
   notes: text("notes"),
@@ -321,6 +322,7 @@ export const productionEntries = pgTable("production_entries", {
   userIdIdx: index("production_entries_user_id_idx").on(table.userId),
   productionDateIdx: index("production_entries_production_date_idx").on(table.productionDate),
   factoryIdx: index("production_entries_factory_idx").on(table.factory),
+  statusIdx: index("production_entries_status_idx").on(table.status),
 }));
 
 export const productionDays = pgTable("production_days", {
