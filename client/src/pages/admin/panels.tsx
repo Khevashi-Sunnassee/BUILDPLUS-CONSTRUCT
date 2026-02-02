@@ -1208,6 +1208,36 @@ export default function AdminPanelsPage() {
               {editingPanel ? "Update panel details" : "Add a new panel to the register"}
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Import Info Section - only shown for source=3 (Estimate Import) */}
+          {editingPanel && editingPanel.source === 3 && (
+            <div className="bg-muted/50 rounded-md p-4 space-y-2 border">
+              <h4 className="font-medium text-sm text-muted-foreground">Import Details</h4>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Tab Name:</span>
+                  <p className="font-medium">{editingPanel.sourceSheet || editingPanel.sheetNumber || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">File Name:</span>
+                  <p className="font-medium">{editingPanel.sourceFileName || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Imported Date:</span>
+                  <p className="font-medium">
+                    {editingPanel.createdAt 
+                      ? new Date(editingPanel.createdAt).toLocaleDateString('en-AU', {
+                          day: '2-digit',
+                          month: '2-digit', 
+                          year: 'numeric'
+                        })
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <Form {...panelForm}>
             <form onSubmit={panelForm.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
