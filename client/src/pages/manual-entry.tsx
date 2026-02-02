@@ -20,6 +20,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -329,6 +330,21 @@ export default function ManualEntryPage() {
       } else {
         navigate("/daily-reports");
       }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateDocumentStatusMutation = useMutation({
+    mutationFn: async ({ panelId, documentStatus }: { panelId: string; documentStatus: string }) => {
+      const res = await apiRequest("PUT", `/api/panels/${panelId}/document-status`, { documentStatus });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Document status updated successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -672,6 +688,35 @@ export default function ManualEntryPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* Document Status Section */}
+                    <div className="flex items-center gap-4 p-3 bg-background rounded-md border">
+                      <div className="flex-1">
+                        <Label className="text-sm font-medium">Document Status</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Track the document approval workflow: DRAFT → IFA → IFC → Approved for Production
+                        </p>
+                      </div>
+                      <Select
+                        value={selectedPanel.documentStatus || "DRAFT"}
+                        onValueChange={(value) => {
+                          updateDocumentStatusMutation.mutate({ 
+                            panelId: selectedPanel.id, 
+                            documentStatus: value 
+                          });
+                        }}
+                        disabled={updateDocumentStatusMutation.isPending}
+                      >
+                        <SelectTrigger className="w-[180px]" data-testid="select-document-status">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="DRAFT">DRAFT</SelectItem>
+                          <SelectItem value="IFA">IFA (Issued for Approval)</SelectItem>
+                          <SelectItem value="IFC">IFC (Issued for Construction)</SelectItem>
+                          <SelectItem value="APPROVED">Approved for Production</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       <FormField
                         control={form.control}
