@@ -126,6 +126,7 @@ interface DeliveryRecord {
 const loadListSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
   trailerTypeId: z.string().optional(),
+  factory: z.string().default("QLD"),
   docketNumber: z.string().optional(),
   scheduledDate: z.string().optional(),
   notes: z.string().optional(),
@@ -199,6 +200,7 @@ export default function LogisticsPage() {
     defaultValues: {
       jobId: "",
       trailerTypeId: "",
+      factory: "QLD",
       docketNumber: "",
       scheduledDate: "",
       notes: "",
@@ -715,7 +717,7 @@ export default function LogisticsPage() {
           </DialogHeader>
           <Form {...loadListForm}>
             <form onSubmit={loadListForm.handleSubmit(handleCreateLoadList)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={loadListForm.control}
                   name="jobId"
@@ -765,6 +767,27 @@ export default function LogisticsPage() {
                               {tt.name}
                             </SelectItem>
                           ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={loadListForm.control}
+                  name="factory"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Factory</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || "QLD"}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-factory">
+                            <SelectValue placeholder="Select factory" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="QLD">QLD</SelectItem>
+                          <SelectItem value="VIC">Victoria</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />

@@ -327,6 +327,7 @@ export const loadLists = pgTable("load_lists", {
   loadDate: text("load_date").notNull(),
   loadTime: text("load_time").notNull(),
   trailerTypeId: varchar("trailer_type_id", { length: 36 }).references(() => trailerTypes.id),
+  factory: text("factory").default("QLD").notNull(),
   uhf: text("uhf"),
   status: loadListStatusEnum("status").default("PENDING").notNull(),
   notes: text("notes"),
@@ -337,6 +338,7 @@ export const loadLists = pgTable("load_lists", {
   jobIdIdx: index("load_lists_job_id_idx").on(table.jobId),
   loadDateIdx: index("load_lists_load_date_idx").on(table.loadDate),
   statusIdx: index("load_lists_status_idx").on(table.status),
+  factoryIdx: index("load_lists_factory_idx").on(table.factory),
 }));
 
 export const loadListPanels = pgTable("load_list_panels", {
