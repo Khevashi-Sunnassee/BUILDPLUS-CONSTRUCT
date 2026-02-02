@@ -530,7 +530,7 @@ export default function ProductionReportDetailPage() {
           </Button>
           <Button onClick={openCreateDialog} data-testid="button-add-entry">
             <Plus className="h-4 w-4 mr-2" />
-            Add Entry
+            Add Panel
           </Button>
           <Button 
             variant="destructive" 
@@ -771,7 +771,7 @@ export default function ProductionReportDetailPage() {
                 {(!filteredEntries || filteredEntries.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                      No production entries for this date. Click "Add Entry" to record production.
+                      No production entries for this date. Click "Add Panel" to record production.
                     </TableCell>
                   </TableRow>
                 )}
