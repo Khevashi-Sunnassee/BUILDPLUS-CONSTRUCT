@@ -196,6 +196,7 @@ export default function AdminPanelTypesPage() {
     onSuccess: () => {
       toast({ title: "Cost breakup saved successfully" });
       refetchCostComponents();
+      setCostBreakupDialogOpen(false);
     },
     onError: (error: any) => {
       toast({ title: error.message || "Failed to save cost breakup", variant: "destructive" });
@@ -867,9 +868,15 @@ export default function AdminPanelTypesPage() {
               Add Component
             </Button>
             <div className="flex justify-between items-center p-3 rounded-lg bg-muted">
-              <span className="font-medium">Total:</span>
+              <span className="font-medium">Total Cost:</span>
               <span className={`font-bold ${totalPercentage > 100 ? "text-destructive" : "text-green-600"}`}>
                 {totalPercentage.toFixed(1)}%
+              </span>
+            </div>
+            <div className="flex justify-between items-center p-3 rounded-lg bg-muted">
+              <span className="font-medium">Profit Margin:</span>
+              <span className={`font-bold ${totalPercentage > 100 ? "text-destructive" : "text-blue-600"}`}>
+                {(100 - totalPercentage).toFixed(1)}%
               </span>
             </div>
             {totalPercentage > 100 && (
