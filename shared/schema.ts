@@ -388,6 +388,27 @@ export const deliveryRecords = pgTable("delivery_records", {
   deliveryDateIdx: index("delivery_records_delivery_date_idx").on(table.deliveryDate),
 }));
 
+export const weeklyWageReports = pgTable("weekly_wage_reports", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  weekStartDate: text("week_start_date").notNull(),
+  weekEndDate: text("week_end_date").notNull(),
+  factory: text("factory").default("QLD").notNull(),
+  productionWages: text("production_wages"),
+  officeWages: text("office_wages"),
+  estimatingWages: text("estimating_wages"),
+  onsiteWages: text("onsite_wages"),
+  draftingWages: text("drafting_wages"),
+  civilWages: text("civil_wages"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  weekFactoryIdx: uniqueIndex("weekly_wage_reports_week_factory_idx").on(table.weekStartDate, table.weekEndDate, table.factory),
+  factoryIdx: index("weekly_wage_reports_factory_idx").on(table.factory),
+  weekStartIdx: index("weekly_wage_reports_week_start_idx").on(table.weekStartDate),
+}));
+
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
   createdAt: true,
@@ -506,6 +527,12 @@ export const insertDeliveryRecordSchema = createInsertSchema(deliveryRecords).om
   updatedAt: true,
 });
 
+export const insertWeeklyWageReportSchema = createInsertSchema(weeklyWageReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -585,6 +612,8 @@ export type InsertLoadListPanel = z.infer<typeof insertLoadListPanelSchema>;
 export type LoadListPanel = typeof loadListPanels.$inferSelect;
 export type InsertDeliveryRecord = z.infer<typeof insertDeliveryRecordSchema>;
 export type DeliveryRecord = typeof deliveryRecords.$inferSelect;
+export type InsertWeeklyWageReport = z.infer<typeof insertWeeklyWageReportSchema>;
+export type WeeklyWageReport = typeof weeklyWageReports.$inferSelect;
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
