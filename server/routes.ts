@@ -782,6 +782,40 @@ export async function registerRoutes(
     }
   });
 
+  // Update panel document status (for drafting register workflow)
+  app.put("/api/panels/:id/document-status", requireAuth, async (req, res) => {
+    try {
+      const { documentStatus } = req.body;
+      if (!documentStatus || !["DRAFT", "IFA", "IFC", "APPROVED"].includes(documentStatus)) {
+        return res.status(400).json({ error: "Invalid document status. Must be DRAFT, IFA, IFC, or APPROVED" });
+      }
+      
+      const panel = await storage.getPanelRegisterItem(req.params.id as string);
+      if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      
+      // Only MANAGER or ADMIN can approve IFC documents for production
+      if (documentStatus === "APPROVED") {
+        const user = req.user as any;
+        if (!["MANAGER", "ADMIN"].includes(user.role)) {
+          return res.status(403).json({ error: "Only managers or admins can approve documents for production" });
+        }
+        // Must be in IFC status to approve
+        if (panel.documentStatus !== "IFC") {
+          return res.status(400).json({ error: "Panel must be in IFC status before it can be approved for production" });
+        }
+      }
+      
+      const updatedPanel = await storage.updatePanelRegisterItem(req.params.id as string, { 
+        documentStatus 
+      });
+      res.json(updatedPanel);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to update document status" });
+    }
+  });
+
   app.delete("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
     await storage.deletePanelRegisterItem(req.params.id as string);
     res.json({ ok: true });
