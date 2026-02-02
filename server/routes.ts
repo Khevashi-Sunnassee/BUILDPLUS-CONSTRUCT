@@ -912,8 +912,13 @@ export async function registerRoutes(
         const fileBuffer = req.file.buffer;
         const fileHash = sha256Hex(fileBuffer);
         
+        console.log(`[Estimate Import] ======= NEW IMPORT STARTED =======`);
+        console.log(`[Estimate Import] File: "${fileName}" (${fileBuffer.length} bytes, hash: ${fileHash.substring(0, 12)}...)`);
+        
         // Parse workbook
         const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+        
+        console.log(`[Estimate Import] All sheet names in workbook:`, workbook.SheetNames);
         
         // Find TakeOff sheets
         const takeoffSheets = workbook.SheetNames.filter(name => {
@@ -921,7 +926,10 @@ export async function registerRoutes(
           return normalized.includes("takeoff");
         });
         
+        console.log(`[Estimate Import] Detected TakeOff sheets:`, takeoffSheets);
+        
         if (takeoffSheets.length === 0) {
+          console.log(`[Estimate Import] ERROR: No TakeOff sheets found`);
           return res.status(400).json({ error: "No TakeOff sheets found in the workbook" });
         }
         
