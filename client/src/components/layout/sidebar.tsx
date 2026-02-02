@@ -18,6 +18,7 @@ import {
   Factory,
   Layers,
   Truck,
+  DollarSign,
 } from "lucide-react";
 import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import {
@@ -48,6 +49,7 @@ const userNavItems = [
   { title: "Daily Reports", url: "/daily-reports", icon: FileText },
   { title: "Production Report", url: "/production-report", icon: Factory },
   { title: "Logistics", url: "/logistics", icon: Truck },
+  { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Reports", url: "/reports", icon: Clock },
   { title: "Downloads", url: "/downloads", icon: Download },
 ];
