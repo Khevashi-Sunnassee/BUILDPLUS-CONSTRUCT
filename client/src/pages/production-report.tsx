@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import jsPDF from "jspdf";
@@ -17,12 +17,23 @@ import {
   Layers,
   FileDown,
   Loader2,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -38,9 +49,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface ProductionReportSummary {
   date: string;
+  factory: string;
   entryCount: number;
   panelCount: number;
   totalVolumeM3: number;
@@ -52,7 +66,35 @@ export default function ProductionReportPage() {
   const [dateRange, setDateRange] = useState<string>("month");
   const [searchQuery, setSearchQuery] = useState("");
   const [isExporting, setIsExporting] = useState(false);
+  const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
+  const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [newDayFactory, setNewDayFactory] = useState("QLD");
   const reportRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
+
+  const createProductionDayMutation = useMutation({
+    mutationFn: async (data: { productionDate: string; factory: string }) => {
+      return await apiRequest("/api/production-days", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      setIsNewDayDialogOpen(false);
+      toast({
+        title: "Production day created",
+        description: `Created ${format(new Date(newDayDate + "T00:00:00"), "dd/MM/yyyy")} - ${newDayFactory}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create production day",
+        description: error.message || "An error occurred",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Calculate date range based on selection
   const { startDate, endDate } = useMemo(() => {
@@ -269,12 +311,70 @@ export default function ProductionReportPage() {
             )}
             Export PDF
           </Button>
-          <Link href={`/production-report/${format(new Date(), "yyyy-MM-dd")}`}>
-            <Button data-testid="button-add-production-entry">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Production Entry
-            </Button>
-          </Link>
+          <Dialog open={isNewDayDialogOpen} onOpenChange={setIsNewDayDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" data-testid="button-start-new-day">
+                <Plus className="h-4 w-4 mr-2" />
+                Start New Day
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Start New Production Day</DialogTitle>
+                <DialogDescription>
+                  Create a new production day record for a specific factory. You can add entries afterwards.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="productionDate">Date</Label>
+                  <Input
+                    id="productionDate"
+                    type="date"
+                    value={newDayDate}
+                    onChange={(e) => setNewDayDate(e.target.value)}
+                    data-testid="input-new-day-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="factory">Factory</Label>
+                  <Select value={newDayFactory} onValueChange={setNewDayFactory}>
+                    <SelectTrigger id="factory" data-testid="select-new-day-factory">
+                      <SelectValue placeholder="Select factory" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="QLD">QLD</SelectItem>
+                      <SelectItem value="VIC">Victoria</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsNewDayDialogOpen(false)}
+                  data-testid="button-cancel-new-day"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() =>
+                    createProductionDayMutation.mutate({
+                      productionDate: newDayDate,
+                      factory: newDayFactory,
+                    })
+                  }
+                  disabled={createProductionDayMutation.isPending}
+                  data-testid="button-create-new-day"
+                >
+                  {createProductionDayMutation.isPending && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  Create
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -326,6 +426,7 @@ export default function ProductionReportPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-48">Date</TableHead>
+                    <TableHead className="w-28">Factory</TableHead>
                     <TableHead className="text-right">Panels</TableHead>
                     <TableHead className="text-right">Volume (m³)</TableHead>
                     <TableHead className="text-right">Area (m²)</TableHead>
@@ -337,12 +438,12 @@ export default function ProductionReportPage() {
                 <TableBody>
                   {filteredReports.map((report) => (
                     <TableRow 
-                      key={report.date} 
+                      key={`${report.date}-${report.factory}`} 
                       className="cursor-pointer hover-elevate" 
-                      data-testid={`row-report-${report.date}`}
+                      data-testid={`row-report-${report.date}-${report.factory}`}
                     >
                       <TableCell>
-                        <Link href={`/production-report/${report.date}`}>
+                        <Link href={`/production-report/${report.date}?factory=${report.factory}`}>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium">
@@ -350,6 +451,14 @@ export default function ProductionReportPage() {
                             </span>
                           </div>
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Badge variant={report.factory === "QLD" ? "default" : "secondary"}>
+                            {report.factory}
+                          </Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
@@ -376,8 +485,8 @@ export default function ProductionReportPage() {
                         {getStatusBadge(report.entryCount)}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/production-report/${report.date}`}>
-                          <Button variant="ghost" size="icon" data-testid={`button-view-${report.date}`}>
+                        <Link href={`/production-report/${report.date}?factory=${report.factory}`}>
+                          <Button variant="ghost" size="icon" data-testid={`button-view-${report.date}-${report.factory}`}>
                             <ChevronRight className="h-4 w-4" />
                           </Button>
                         </Link>
