@@ -116,6 +116,7 @@ export default function AdminPanelsPage() {
   const [importData, setImportData] = useState<any[]>([]);
   const [selectedJobForImport, setSelectedJobForImport] = useState<string>("");
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(true);
@@ -262,17 +263,35 @@ export default function AdminPanelsPage() {
       const result = await response.json();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      let message = `Imported ${result.imported} panels, ${result.skipped} skipped`;
+      
+      // Handle errors (job not found, missing fields, etc.)
       if (result.errors && result.errors.length > 0) {
-        message += `. ${result.errors.length} errors.`;
+        setImportErrors(result.errors);
+        const jobErrors = result.errors.filter((e: string) => e.includes("not found"));
+        if (jobErrors.length > 0 && result.imported === 0) {
+          toast({ 
+            title: "Import Failed - Jobs Not Found", 
+            description: `No records were imported. ${jobErrors.length} row(s) have invalid job numbers.`,
+            variant: "destructive" 
+          });
+          return; // Don't close dialog so user can see errors
+        }
+        toast({ 
+          title: `Imported ${result.imported} panels`, 
+          description: `${result.skipped} skipped, ${result.errors.length} errors`,
+          variant: result.imported > 0 ? "default" : "destructive"
+        });
+      } else {
+        toast({ title: `Successfully imported ${result.imported} panels` });
+        setImportDialogOpen(false);
+        setImportData([]);
+        setSelectedJobForImport("");
+        setImportErrors([]);
       }
-      toast({ title: message });
-      setImportDialogOpen(false);
-      setImportData([]);
-      setSelectedJobForImport("");
     },
     onError: async (error: any) => {
       const errorData = error.response ? await error.response.json().catch(() => ({})) : {};
+      setImportErrors(errorData.details || []);
       toast({ 
         title: "Import failed", 
         description: errorData.error || error.message,
@@ -431,6 +450,7 @@ export default function AdminPanelsPage() {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
       setImportData(jsonData);
       setSelectedJobForImport(filterJobId || "");
+      setImportErrors([]); // Clear previous errors
       setImportDialogOpen(true);
     };
     reader.readAsBinaryString(file);
@@ -1124,7 +1144,25 @@ export default function AdminPanelsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="max-h-[250px] overflow-auto border rounded-md">
+            {/* Import Errors Display */}
+            {importErrors.length > 0 && (
+              <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-300 dark:border-red-800 rounded-md">
+                <p className="text-sm font-medium text-red-800 dark:text-red-200 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4" />
+                  Import Validation Errors ({importErrors.length})
+                </p>
+                <p className="text-xs text-red-700 dark:text-red-300 mt-1 mb-2">
+                  No records were added for rows with invalid job numbers. Ensure the job exists in the system.
+                </p>
+                <ul className="text-sm text-red-700 dark:text-red-300 list-disc list-inside max-h-24 overflow-auto">
+                  {importErrors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            <div className="max-h-[200px] overflow-auto border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
