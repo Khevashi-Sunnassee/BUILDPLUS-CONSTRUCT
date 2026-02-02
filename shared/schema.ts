@@ -11,6 +11,7 @@ export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRE
 export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
 export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
+export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IFC", "APPROVED"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -164,6 +165,7 @@ export const panelRegister = pgTable("panel_register", {
   panelSourceId: text("panel_source_id"),
   source: integer("source").default(1).notNull(), // 1=Manual, 2=Excel Template, 3=Estimate
   status: panelStatusEnum("status").default("NOT_STARTED").notNull(),
+  documentStatus: documentStatusEnum("document_status").default("DRAFT").notNull(),
   estimatedHours: integer("estimated_hours"),
   actualHours: integer("actual_hours").default(0),
   notes: text("notes"),
