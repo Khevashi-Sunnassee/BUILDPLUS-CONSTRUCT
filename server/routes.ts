@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import { storage, sha256Hex } from "./storage";
-import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema } from "@shared/schema";
+import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema } from "@shared/schema";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
@@ -2340,11 +2340,12 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/weekly-wage-reports", requireAuth, async (req, res) => {
     try {
-      const { weekStartDate, weekEndDate, factory } = req.body;
-      
-      if (!weekStartDate || !weekEndDate || !factory) {
-        return res.status(400).json({ error: "Week start date, end date, and factory are required" });
+      const parseResult = insertWeeklyWageReportSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request data" });
       }
+      
+      const { weekStartDate, weekEndDate, factory } = parseResult.data;
       
       // Check if report already exists
       const existing = await storage.getWeeklyWageReportByWeek(weekStartDate, weekEndDate, factory);
@@ -2353,7 +2354,7 @@ Return ONLY valid JSON, no explanation text.`
       }
       
       const report = await storage.createWeeklyWageReport({
-        ...req.body,
+        ...parseResult.data,
         createdById: req.session.userId!,
       });
       res.json(report);
@@ -2365,7 +2366,12 @@ Return ONLY valid JSON, no explanation text.`
 
   app.put("/api/weekly-wage-reports/:id", requireAuth, async (req, res) => {
     try {
-      const report = await storage.updateWeeklyWageReport(req.params.id, req.body);
+      const parseResult = insertWeeklyWageReportSchema.partial().safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request data" });
+      }
+      
+      const report = await storage.updateWeeklyWageReport(req.params.id, parseResult.data);
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -2397,11 +2403,8 @@ Return ONLY valid JSON, no explanation text.`
       // Get production entries for the week
       const entries = await storage.getProductionEntriesInRange(report.weekStartDate, report.weekEndDate);
       
-      // Filter by factory if needed
-      const factoryEntries = entries.filter(e => {
-        // Production entries might have factory via the panel or job
-        return true; // For now, include all - can be filtered later if needed
-      });
+      // Filter by factory
+      const factoryEntries = entries.filter(e => e.factory === report.factory);
       
       // Get all panel types and their cost components
       const allPanelTypes = await storage.getAllPanelTypes();

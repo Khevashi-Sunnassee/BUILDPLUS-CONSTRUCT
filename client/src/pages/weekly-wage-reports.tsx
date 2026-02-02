@@ -417,53 +417,53 @@ export default function WeeklyWageReportsPage() {
             </Button>
           </div>
         ) : (
-          <Table>
+          <Table data-testid="table-wage-reports">
             <TableHeader>
               <TableRow>
-                <TableHead>Week</TableHead>
-                <TableHead>Factory</TableHead>
-                <TableHead className="text-right">Production</TableHead>
-                <TableHead className="text-right">Office</TableHead>
-                <TableHead className="text-right">Estimating</TableHead>
-                <TableHead className="text-right">Onsite</TableHead>
-                <TableHead className="text-right">Drafting</TableHead>
-                <TableHead className="text-right">Civil</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead data-testid="header-week">Week</TableHead>
+                <TableHead data-testid="header-factory">Factory</TableHead>
+                <TableHead className="text-right" data-testid="header-production">Production</TableHead>
+                <TableHead className="text-right" data-testid="header-office">Office</TableHead>
+                <TableHead className="text-right" data-testid="header-estimating">Estimating</TableHead>
+                <TableHead className="text-right" data-testid="header-onsite">Onsite</TableHead>
+                <TableHead className="text-right" data-testid="header-drafting">Drafting</TableHead>
+                <TableHead className="text-right" data-testid="header-civil">Civil</TableHead>
+                <TableHead className="text-right" data-testid="header-total">Total</TableHead>
+                <TableHead className="text-right" data-testid="header-actions">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredReports.map((report) => (
                 <TableRow key={report.id} data-testid={`row-report-${report.id}`}>
-                  <TableCell>
+                  <TableCell data-testid={`cell-week-${report.id}`}>
                     <div className="flex flex-col">
-                      <span className="font-medium">
+                      <span className="font-medium" data-testid={`text-week-${report.id}`}>
                         {formatDateDDMMYYYY(report.weekStartDate)} - {formatDateDDMMYYYY(report.weekEndDate)}
                       </span>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{report.factory}</Badge>
+                  <TableCell data-testid={`cell-factory-${report.id}`}>
+                    <Badge variant="outline" data-testid={`badge-factory-${report.id}`}>{report.factory}</Badge>
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-sm" data-testid={`cell-production-${report.id}`}>
                     {formatCurrency(report.productionWages)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-sm" data-testid={`cell-office-${report.id}`}>
                     {formatCurrency(report.officeWages)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-sm" data-testid={`cell-estimating-${report.id}`}>
                     {formatCurrency(report.estimatingWages)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-sm" data-testid={`cell-onsite-${report.id}`}>
                     {formatCurrency(report.onsiteWages)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-sm" data-testid={`cell-drafting-${report.id}`}>
                     {formatCurrency(report.draftingWages)}
                   </TableCell>
-                  <TableCell className="text-right font-mono text-sm">
+                  <TableCell className="text-right font-mono text-sm" data-testid={`cell-civil-${report.id}`}>
                     {formatCurrency(report.civilWages)}
                   </TableCell>
-                  <TableCell className="text-right font-mono font-medium">
+                  <TableCell className="text-right font-mono font-medium" data-testid={`cell-total-${report.id}`}>
                     {formatCurrency(calculateTotalWages(report))}
                   </TableCell>
                   <TableCell className="text-right">
