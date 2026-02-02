@@ -304,20 +304,29 @@ export async function registerRoutes(
         await storage.updatePanelActualHours(actualPanelRegisterId, durationMin);
       }
 
-      // Update panel details if provided
+      // Update panel details if provided - only update fields that have non-empty values
       if (actualPanelRegisterId && panelDetails) {
-        await storage.updatePanelRegisterItem(actualPanelRegisterId, {
-          loadWidth: panelDetails.loadWidth,
-          loadHeight: panelDetails.loadHeight,
-          panelThickness: panelDetails.panelThickness,
-          panelVolume: panelDetails.panelVolume,
-          panelMass: panelDetails.panelMass,
-          panelArea: panelDetails.panelArea,
-          day28Fc: panelDetails.day28Fc,
-          liftFcm: panelDetails.liftFcm,
-          rotationalLifters: panelDetails.rotationalLifters,
-          primaryLifters: panelDetails.primaryLifters,
-        });
+        // First verify the panel belongs to the selected job
+        const panel = await storage.getPanelRegisterItem(actualPanelRegisterId);
+        if (panel && panel.jobId === jobId) {
+          // Filter out undefined/empty fields to avoid clearing existing values
+          const updateData: Record<string, string | number | undefined> = {};
+          if (panelDetails.loadWidth && panelDetails.loadWidth.trim()) updateData.loadWidth = panelDetails.loadWidth;
+          if (panelDetails.loadHeight && panelDetails.loadHeight.trim()) updateData.loadHeight = panelDetails.loadHeight;
+          if (panelDetails.panelThickness && panelDetails.panelThickness.trim()) updateData.panelThickness = panelDetails.panelThickness;
+          if (panelDetails.panelVolume && panelDetails.panelVolume.trim()) updateData.panelVolume = panelDetails.panelVolume;
+          if (panelDetails.panelMass && panelDetails.panelMass.trim()) updateData.panelMass = panelDetails.panelMass;
+          if (panelDetails.panelArea && panelDetails.panelArea.trim()) updateData.panelArea = panelDetails.panelArea;
+          if (panelDetails.day28Fc && panelDetails.day28Fc.trim()) updateData.day28Fc = panelDetails.day28Fc;
+          if (panelDetails.liftFcm && panelDetails.liftFcm.trim()) updateData.liftFcm = panelDetails.liftFcm;
+          if (panelDetails.rotationalLifters && panelDetails.rotationalLifters.trim()) updateData.rotationalLifters = panelDetails.rotationalLifters;
+          if (panelDetails.primaryLifters && panelDetails.primaryLifters.trim()) updateData.primaryLifters = panelDetails.primaryLifters;
+
+          // Only update if there are fields to update
+          if (Object.keys(updateData).length > 0) {
+            await storage.updatePanelRegisterItem(actualPanelRegisterId, updateData);
+          }
+        }
       }
 
       res.json({ ok: true, dailyLogId: dailyLog.id, newPanelCreated: createNewPanel && newPanelMark ? true : false });
