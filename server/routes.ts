@@ -763,6 +763,35 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // Get panel counts by source
+  app.get("/api/admin/panels/source-counts", requireRole("ADMIN"), async (req, res) => {
+    const counts = await storage.getPanelCountsBySource();
+    res.json(counts);
+  });
+
+  // Delete all panels by source (only if they have no production records)
+  app.delete("/api/admin/panels/by-source/:source", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const source = parseInt(req.params.source);
+      if (![1, 2, 3].includes(source)) {
+        return res.status(400).json({ error: "Invalid source. Must be 1 (Manual), 2 (Excel), or 3 (Estimate)" });
+      }
+      
+      // Check if any panels from this source have production records
+      const hasRecords = await storage.panelsWithSourceHaveRecords(source);
+      if (hasRecords) {
+        return res.status(400).json({ 
+          error: "Cannot delete panels that have production records or are approved for production" 
+        });
+      }
+      
+      const deletedCount = await storage.deletePanelsBySource(source);
+      res.json({ deleted: deletedCount });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to delete panels" });
+    }
+  });
+
   app.post("/api/admin/panels/import", requireRole("ADMIN"), async (req, res) => {
     try {
       const { data, jobId } = req.body;
@@ -829,6 +858,7 @@ export async function registerRoutes(
           level: row.level || row["Level"] || null,
           structuralElevation: row.structuralElevation || row["Structural Elevation"] || row.structural_elevation || null,
           reckliDetail: row.reckliDetail || row["Reckli Detail"] || row.reckli_detail || null,
+          source: 2, // Excel Template import
           estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
           status: "NOT_STARTED" as const,
         });

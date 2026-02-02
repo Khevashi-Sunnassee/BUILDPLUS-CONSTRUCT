@@ -102,6 +102,9 @@ export interface IStorage {
   getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
   importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }>;
   updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
+  getPanelCountsBySource(): Promise<{ source: number; count: number }[]>;
+  panelsWithSourceHaveRecords(source: number): Promise<boolean>;
+  deletePanelsBySource(source: number): Promise<number>;
 
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
   getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
@@ -807,6 +810,53 @@ export class DatabaseStorage implements IStorage {
         status: newActualHours > 0 ? "IN_PROGRESS" : panel.status,
       }).where(eq(panelRegister.id, panelId));
     }
+  }
+
+  async getPanelCountsBySource(): Promise<{ source: number; count: number }[]> {
+    const result = await db.select({
+      source: panelRegister.source,
+      count: sql<number>`count(*)::int`
+    })
+    .from(panelRegister)
+    .groupBy(panelRegister.source);
+    return result;
+  }
+
+  async panelsWithSourceHaveRecords(source: number): Promise<boolean> {
+    // Check if any panels from this source are approved for production or have production entries
+    const panelsFromSource = await db.select({ id: panelRegister.id })
+      .from(panelRegister)
+      .where(eq(panelRegister.source, source));
+    
+    if (panelsFromSource.length === 0) return false;
+    
+    const panelIds = panelsFromSource.map(p => p.id);
+    
+    // Check for approved panels
+    const approvedPanels = await db.select({ id: panelRegister.id })
+      .from(panelRegister)
+      .where(and(
+        eq(panelRegister.source, source),
+        eq(panelRegister.approvedForProduction, true)
+      ))
+      .limit(1);
+    
+    if (approvedPanels.length > 0) return true;
+    
+    // Check for production entries
+    const productionRecords = await db.select({ id: productionEntries.id })
+      .from(productionEntries)
+      .where(sql`${productionEntries.panelId} = ANY(${panelIds})`)
+      .limit(1);
+    
+    return productionRecords.length > 0;
+  }
+
+  async deletePanelsBySource(source: number): Promise<number> {
+    const result = await db.delete(panelRegister)
+      .where(eq(panelRegister.source, source))
+      .returning({ id: panelRegister.id });
+    return result.length;
   }
 
   async getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined> {

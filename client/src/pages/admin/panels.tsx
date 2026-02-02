@@ -183,6 +183,43 @@ export default function AdminPanelsPage() {
     queryKey: ["/api/panel-types"],
   });
 
+  const { data: sourceCounts } = useQuery<{ source: number; count: number }[]>({
+    queryKey: ["/api/admin/panels/source-counts"],
+  });
+
+  const [deleteSourceDialogOpen, setDeleteSourceDialogOpen] = useState(false);
+  const [sourceToDelete, setSourceToDelete] = useState<number | null>(null);
+
+  const deleteBySourceMutation = useMutation({
+    mutationFn: async (source: number) => {
+      return apiRequest("DELETE", `/api/admin/panels/by-source/${source}`);
+    },
+    onSuccess: async (response) => {
+      const result = await response.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels/source-counts"] });
+      toast({ title: `Deleted ${result.deleted} panels` });
+      setDeleteSourceDialogOpen(false);
+      setSourceToDelete(null);
+    },
+    onError: async (error: any) => {
+      const errorData = error.response ? await error.response.json().catch(() => ({})) : {};
+      toast({ 
+        title: "Cannot delete panels", 
+        description: errorData.error || "Some panels have production records",
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const sourceLabels: Record<number, string> = {
+    1: "Manual",
+    2: "Excel Template",
+    3: "Estimate",
+  };
+
+  const getSourceLabel = (source: number) => sourceLabels[source] || "Unknown";
+
   const filteredPanels = panels?.filter(panel => {
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
@@ -645,6 +682,33 @@ export default function AdminPanelsPage() {
             <Upload className="h-4 w-4 mr-2" />
             Import Excel
           </Button>
+          {sourceCounts && sourceCounts.length > 0 && (
+            <Select 
+              value="" 
+              onValueChange={(value) => {
+                if (value) {
+                  setSourceToDelete(parseInt(value));
+                  setDeleteSourceDialogOpen(true);
+                }
+              }}
+            >
+              <SelectTrigger className="w-[180px]" data-testid="select-bulk-delete">
+                <Trash2 className="h-4 w-4 mr-2" />
+                <span>Bulk Delete</span>
+              </SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3].map(source => {
+                  const count = sourceCounts.find(s => s.source === source)?.count || 0;
+                  if (count === 0) return null;
+                  return (
+                    <SelectItem key={source} value={source.toString()} data-testid={`option-delete-source-${source}`}>
+                      {getSourceLabel(source)} ({count} panels)
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+          )}
           <Button onClick={openCreateDialog} data-testid="button-create-panel">
             <Plus className="h-4 w-4 mr-2" />
             Add Panel
@@ -751,6 +815,7 @@ export default function AdminPanelsPage() {
                 <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Drawing / Sheet</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -803,6 +868,11 @@ export default function AdminPanelsPage() {
                                 {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
                                 {!panel.drawingCode && !panel.sheetNumber && "-"}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {getSourceLabel(panel.source)}
+                              </Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
                             <TableCell>
@@ -896,6 +966,11 @@ export default function AdminPanelsPage() {
                           {panel.sheetNumber && <div>Sheet: {panel.sheetNumber}</div>}
                           {!panel.drawingCode && !panel.sheetNumber && "-"}
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-xs">
+                          {getSourceLabel(panel.source)}
+                        </Badge>
                       </TableCell>
                       <TableCell>{getStatusBadge(panel.status)}</TableCell>
                       <TableCell>
@@ -1335,6 +1410,33 @@ export default function AdminPanelsPage() {
             >
               {deletePanelMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete by Source Confirmation Dialog */}
+      <AlertDialog open={deleteSourceDialogOpen} onOpenChange={setDeleteSourceDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete All {sourceToDelete ? getSourceLabel(sourceToDelete) : ""} Panels?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all {sourceCounts?.find(s => s.source === sourceToDelete)?.count || 0} panels 
+              that were created via {sourceToDelete ? getSourceLabel(sourceToDelete) : ""}.
+              This action cannot be undone.
+              <br /><br />
+              <strong>Note:</strong> Panels with production records or approved for production cannot be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSourceToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => sourceToDelete && deleteBySourceMutation.mutate(sourceToDelete)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-source"
+            >
+              {deleteBySourceMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete All
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

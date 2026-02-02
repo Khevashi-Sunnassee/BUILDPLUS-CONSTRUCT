@@ -130,6 +130,7 @@ export const panelRegister = pgTable("panel_register", {
   level: text("level"),
   structuralElevation: text("structural_elevation"),
   reckliDetail: text("reckli_detail"),
+  source: integer("source").default(1).notNull(), // 1=Manual, 2=Excel Template, 3=Estimate
   status: panelStatusEnum("status").default("NOT_STARTED").notNull(),
   estimatedHours: integer("estimated_hours"),
   actualHours: integer("actual_hours").default(0),
