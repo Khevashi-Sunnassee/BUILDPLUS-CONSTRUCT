@@ -12,6 +12,7 @@ import {
   Clock,
   DollarSign,
   Layers,
+  Users,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -635,7 +636,7 @@ export default function KPIDashboardPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="production" data-testid="tab-production">
               <Factory className="h-4 w-4 mr-2" />
               Production
@@ -647,6 +648,10 @@ export default function KPIDashboardPage() {
             <TabsTrigger value="drafting" data-testid="tab-drafting">
               <Clock className="h-4 w-4 mr-2" />
               Drafting
+            </TabsTrigger>
+            <TabsTrigger value="labour" data-testid="tab-labour">
+              <Users className="h-4 w-4 mr-2" />
+              Labour
             </TabsTrigger>
             <TabsTrigger value="cost-analysis" data-testid="tab-cost-analysis">
               <Layers className="h-4 w-4 mr-2" />
@@ -1063,6 +1068,296 @@ export default function KPIDashboardPage() {
             </Card>
           </TabsContent>
 
+          <TabsContent value="labour" className="space-y-6 mt-6">
+            {/* Labour Cost Analysis Header */}
+            <Card className="border-2 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-transparent">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xl flex items-center gap-2">
+                  <Users className="h-5 w-5 text-amber-600" />
+                  LABOUR COST ANALYSIS - {getMonthName().toUpperCase()}
+                </CardTitle>
+                <CardDescription>
+                  Compare estimated labour costs (from panel type cost %) against actual production wages
+                </CardDescription>
+              </CardHeader>
+            </Card>
+
+            {/* Labour Summary Badge */}
+            <div className="flex items-center gap-4">
+              <Badge variant="secondary" className="text-base px-4 py-2" data-testid="badge-labour-panels">
+                TOTAL PANELS: {labourCostData?.totals?.panelCount ?? 0}
+              </Badge>
+              <Badge 
+                variant={labourCostData?.totals?.isOverBudget ? "destructive" : "default"}
+                className={`text-base px-4 py-2 ${!labourCostData?.totals?.isOverBudget ? "bg-green-600" : ""}`}
+                data-testid="badge-labour-status"
+              >
+                {labourCostData?.totals?.isOverBudget ? 'OVER BUDGET' : 'UNDER BUDGET'}
+              </Badge>
+            </div>
+
+            {/* Labour Cost Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Revenue</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {labourCostLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100" data-testid="text-labour-total-revenue">
+                      ${labourCostData?.totals?.revenue?.toLocaleString() ?? 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:from-cyan-950/30 dark:to-cyan-900/20 border-cyan-200 dark:border-cyan-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-cyan-700 dark:text-cyan-300">Estimated Labour</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {labourCostLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold text-cyan-900 dark:text-cyan-100" data-testid="text-labour-estimated">
+                      ${labourCostData?.totals?.estimatedLabour?.toLocaleString() ?? 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200 dark:border-orange-800">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">Actual Labour</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {labourCostLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold text-orange-900 dark:text-orange-100" data-testid="text-labour-actual">
+                      ${labourCostData?.totals?.actualLabour?.toLocaleString() ?? 0}
+                      {!labourCostData?.hasWeeklyWageData && (
+                        <span className="text-xs font-normal text-muted-foreground ml-2">(No wage data)</span>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className={`bg-gradient-to-br ${
+                labourCostData?.totals?.isOverBudget 
+                  ? 'from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border-red-500 border-2' 
+                  : 'from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800'
+              }`}>
+                <CardHeader className="pb-2">
+                  <CardTitle className={`text-sm font-medium ${
+                    labourCostData?.totals?.isOverBudget 
+                      ? 'text-red-700 dark:text-red-300' 
+                      : 'text-green-700 dark:text-green-300'
+                  }`}>
+                    Variance
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {labourCostLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className={`text-2xl font-bold ${
+                        labourCostData?.totals?.isOverBudget 
+                          ? 'text-red-700 dark:text-red-300' 
+                          : 'text-green-700 dark:text-green-300'
+                      }`} data-testid="text-labour-variance">
+                        {labourCostData?.totals?.isOverBudget ? '+' : ''}
+                        ${labourCostData?.totals?.variance?.toLocaleString() ?? 0}
+                      </span>
+                      {labourCostData?.totals?.variancePercent !== 0 && (
+                        <Badge 
+                          variant={labourCostData?.totals?.isOverBudget ? "destructive" : "default"}
+                          className={!labourCostData?.totals?.isOverBudget ? "bg-green-600 hover:bg-green-700" : ""}
+                          data-testid="badge-labour-variance-percent"
+                        >
+                          {labourCostData?.totals?.isOverBudget ? '+' : ''}{labourCostData?.totals?.variancePercent}%
+                        </Badge>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Labour Cost Alert */}
+            {labourCostData?.totals?.isOverBudget && (
+              <Card className="border-red-500 border-2 bg-red-50 dark:bg-red-950/30">
+                <CardContent className="py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-full bg-red-100 dark:bg-red-900">
+                      <TrendingUp className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-red-700 dark:text-red-300">Labour Costs Above Target</p>
+                      <p className="text-sm text-red-600 dark:text-red-400">
+                        Actual labour is ${Math.abs(labourCostData.totals.variance).toLocaleString()} ({Math.abs(labourCostData.totals.variancePercent)}%) 
+                        above the estimated budget based on panel type cost ratios.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Labour Cost Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Daily Labour Cost Comparison
+                </CardTitle>
+                <CardDescription>
+                  Estimated vs actual labour costs per day with variance indicators
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {labourCostLoading ? (
+                  <Skeleton className="h-[400px] w-full" />
+                ) : labourCostData?.dailyData && labourCostData.dailyData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={400}>
+                    <ComposedChart data={labourCostData.dailyData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis 
+                        dataKey="date" 
+                        tick={{ fontSize: 10 }} 
+                        interval={0} 
+                        angle={-45} 
+                        textAnchor="end" 
+                        height={60} 
+                        tickFormatter={(d) => formatDate(d)} 
+                      />
+                      <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+                      <Tooltip 
+                        formatter={(value: number, name: string) => [`$${value.toLocaleString()}`, name]}
+                        labelFormatter={(label) => formatDate(label)}
+                      />
+                      <Legend />
+                      <Bar dataKey="estimatedLabour" fill="#06b6d4" name="Estimated Labour" />
+                      <Bar dataKey="actualLabour" fill="#f97316" name="Actual Labour" />
+                      <Line 
+                        type="monotone" 
+                        dataKey="variance" 
+                        stroke="#ef4444" 
+                        strokeWidth={2} 
+                        name="Variance" 
+                        dot={(props) => {
+                          const { cx, cy, payload } = props;
+                          if (payload.isOverBudget) {
+                            return <circle cx={cx} cy={cy} r={4} fill="#ef4444" stroke="#fff" strokeWidth={2} />;
+                          }
+                          return <circle cx={cx} cy={cy} r={4} fill="#22c55e" stroke="#fff" strokeWidth={2} />;
+                        }}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
+                    No labour cost data available for this period. Ensure production entries and weekly wage reports exist.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Labour Cost Daily Table */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Daily Labour Cost Breakdown</CardTitle>
+                <CardDescription>
+                  Detailed view of estimated vs actual labour by day
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {labourCostLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : labourCostData?.dailyData && labourCostData.dailyData.length > 0 ? (
+                  <div className="overflow-auto max-h-[400px] border rounded-lg">
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-semibold">Date</th>
+                          <th className="text-right py-3 px-4 font-semibold">Panels</th>
+                          <th className="text-right py-3 px-4 font-semibold">Revenue</th>
+                          <th className="text-right py-3 px-4 font-semibold">Estimated</th>
+                          <th className="text-right py-3 px-4 font-semibold">Actual</th>
+                          <th className="text-right py-3 px-4 font-semibold">Variance</th>
+                          <th className="text-center py-3 px-4 font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {labourCostData.dailyData.map((day, idx) => (
+                          <tr key={day.date} className="border-b hover:bg-muted/50" data-testid={`row-labour-daily-${idx}`}>
+                            <td className="py-3 px-4 font-medium">{formatDate(day.date)}</td>
+                            <td className="text-right py-3 px-4 text-muted-foreground">{day.panelCount}</td>
+                            <td className="text-right py-3 px-4 font-mono text-blue-600 dark:text-blue-400">
+                              ${day.revenue.toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 font-mono text-cyan-600 dark:text-cyan-400">
+                              ${day.estimatedLabour.toLocaleString()}
+                            </td>
+                            <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
+                              ${day.actualLabour.toLocaleString()}
+                            </td>
+                            <td className={`text-right py-3 px-4 font-mono font-semibold ${
+                              day.isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                            }`}>
+                              {day.isOverBudget ? '+' : ''}${day.variance.toLocaleString()}
+                              <span className="text-xs ml-1">({day.isOverBudget ? '+' : ''}{day.variancePercent}%)</span>
+                            </td>
+                            <td className="text-center py-3 px-4">
+                              <Badge 
+                                variant={day.isOverBudget ? "destructive" : "default"}
+                                className={!day.isOverBudget ? "bg-green-600 hover:bg-green-700" : ""}
+                              >
+                                {day.isOverBudget ? 'Over' : 'Under'}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                        <tr className="font-bold bg-muted/50 border-t-2">
+                          <td className="py-3 px-4">Total</td>
+                          <td className="text-right py-3 px-4">{labourCostData.totals.panelCount}</td>
+                          <td className="text-right py-3 px-4 font-mono text-blue-600 dark:text-blue-400">
+                            ${labourCostData.totals.revenue.toLocaleString()}
+                          </td>
+                          <td className="text-right py-3 px-4 font-mono text-cyan-600 dark:text-cyan-400">
+                            ${labourCostData.totals.estimatedLabour.toLocaleString()}
+                          </td>
+                          <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
+                            ${labourCostData.totals.actualLabour.toLocaleString()}
+                          </td>
+                          <td className={`text-right py-3 px-4 font-mono font-semibold ${
+                            labourCostData.totals.isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
+                          }`}>
+                            {labourCostData.totals.isOverBudget ? '+' : ''}${labourCostData.totals.variance.toLocaleString()}
+                            <span className="text-xs ml-1">({labourCostData.totals.isOverBudget ? '+' : ''}{labourCostData.totals.variancePercent}%)</span>
+                          </td>
+                          <td className="text-center py-3 px-4">
+                            <Badge 
+                              variant={labourCostData.totals.isOverBudget ? "destructive" : "default"}
+                              className={!labourCostData.totals.isOverBudget ? "bg-green-600 hover:bg-green-700" : ""}
+                            >
+                              {labourCostData.totals.isOverBudget ? 'Over Budget' : 'Under Budget'}
+                            </Badge>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No daily labour cost data for this period
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="cost-analysis" className="space-y-6 mt-6">
             <Card className="border-2 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
               <CardHeader className="pb-2">
@@ -1411,280 +1706,6 @@ export default function KPIDashboardPage() {
                 ) : (
                   <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                     No daily cost data for this period
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Labour Cost Analysis Section */}
-            <Card className="border-2 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-transparent">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <DollarSign className="h-5 w-5 text-amber-600" />
-                  Labour Cost Analysis
-                </CardTitle>
-                <CardDescription>
-                  Compare estimated labour costs (from panel type cost %) against actual production wages
-                </CardDescription>
-              </CardHeader>
-            </Card>
-
-            {/* Labour Cost Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/30 dark:to-blue-900/20 border-blue-200 dark:border-blue-800">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Revenue</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {labourCostLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-100" data-testid="text-labour-total-revenue">
-                      ${labourCostData?.totals?.revenue?.toLocaleString() ?? 0}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100/50 dark:from-cyan-950/30 dark:to-cyan-900/20 border-cyan-200 dark:border-cyan-800">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-cyan-700 dark:text-cyan-300">Estimated Labour</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {labourCostLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    <div className="text-2xl font-bold text-cyan-900 dark:text-cyan-100" data-testid="text-labour-estimated">
-                      ${labourCostData?.totals?.estimatedLabour?.toLocaleString() ?? 0}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/30 dark:to-orange-900/20 border-orange-200 dark:border-orange-800">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-orange-700 dark:text-orange-300">Actual Labour</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {labourCostLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    <div className="text-2xl font-bold text-orange-900 dark:text-orange-100" data-testid="text-labour-actual">
-                      ${labourCostData?.totals?.actualLabour?.toLocaleString() ?? 0}
-                      {!labourCostData?.hasWeeklyWageData && (
-                        <span className="text-xs font-normal text-muted-foreground ml-2">(No wage data)</span>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              <Card className={`bg-gradient-to-br ${
-                labourCostData?.totals?.isOverBudget 
-                  ? 'from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 border-red-500 border-2' 
-                  : 'from-green-50 to-green-100/50 dark:from-green-950/30 dark:to-green-900/20 border-green-200 dark:border-green-800'
-              }`}>
-                <CardHeader className="pb-2">
-                  <CardTitle className={`text-sm font-medium ${
-                    labourCostData?.totals?.isOverBudget 
-                      ? 'text-red-700 dark:text-red-300' 
-                      : 'text-green-700 dark:text-green-300'
-                  }`}>
-                    Variance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {labourCostLoading ? (
-                    <Skeleton className="h-8 w-24" />
-                  ) : (
-                    <div className="flex items-center gap-2">
-                      <span className={`text-2xl font-bold ${
-                        labourCostData?.totals?.isOverBudget 
-                          ? 'text-red-700 dark:text-red-300' 
-                          : 'text-green-700 dark:text-green-300'
-                      }`} data-testid="text-labour-variance">
-                        {labourCostData?.totals?.isOverBudget ? '+' : ''}
-                        ${labourCostData?.totals?.variance?.toLocaleString() ?? 0}
-                      </span>
-                      {labourCostData?.totals?.variancePercent !== 0 && (
-                        <Badge 
-                          variant={labourCostData?.totals?.isOverBudget ? "destructive" : "default"}
-                          className={!labourCostData?.totals?.isOverBudget ? "bg-green-600 hover:bg-green-700" : ""}
-                          data-testid="badge-labour-variance-percent"
-                        >
-                          {labourCostData?.totals?.isOverBudget ? '+' : ''}{labourCostData?.totals?.variancePercent}%
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Labour Cost Alert */}
-            {labourCostData?.totals?.isOverBudget && (
-              <Card className="border-red-500 border-2 bg-red-50 dark:bg-red-950/30">
-                <CardContent className="py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-full bg-red-100 dark:bg-red-900">
-                      <TrendingUp className="h-5 w-5 text-red-600 dark:text-red-400" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-red-700 dark:text-red-300">Labour Costs Above Target</p>
-                      <p className="text-sm text-red-600 dark:text-red-400">
-                        Actual labour is ${Math.abs(labourCostData.totals.variance).toLocaleString()} ({Math.abs(labourCostData.totals.variancePercent)}%) 
-                        above the estimated budget based on panel type cost ratios.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Labour Cost Chart */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Daily Labour Cost Comparison
-                </CardTitle>
-                <CardDescription>
-                  Estimated vs actual labour costs per day with variance indicators
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {labourCostLoading ? (
-                  <Skeleton className="h-[400px] w-full" />
-                ) : labourCostData?.dailyData && labourCostData.dailyData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={400}>
-                    <ComposedChart data={labourCostData.dailyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="date" 
-                        tick={{ fontSize: 10 }} 
-                        interval={0} 
-                        angle={-45} 
-                        textAnchor="end" 
-                        height={60} 
-                        tickFormatter={(d) => formatDate(d)} 
-                      />
-                      <YAxis tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-                      <Tooltip 
-                        formatter={(value: number, name: string) => [`$${value.toLocaleString()}`, name]}
-                        labelFormatter={(label) => formatDate(label)}
-                      />
-                      <Legend />
-                      <Bar dataKey="estimatedLabour" fill="#06b6d4" name="Estimated Labour" />
-                      <Bar dataKey="actualLabour" fill="#f97316" name="Actual Labour" />
-                      <Line 
-                        type="monotone" 
-                        dataKey="variance" 
-                        stroke="#ef4444" 
-                        strokeWidth={2} 
-                        name="Variance" 
-                        dot={(props) => {
-                          const { cx, cy, payload } = props;
-                          if (payload.isOverBudget) {
-                            return <circle cx={cx} cy={cy} r={4} fill="#ef4444" stroke="#fff" strokeWidth={2} />;
-                          }
-                          return <circle cx={cx} cy={cy} r={4} fill="#22c55e" stroke="#fff" strokeWidth={2} />;
-                        }}
-                      />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[400px] flex items-center justify-center text-muted-foreground">
-                    No labour cost data available for this period. Ensure production entries and weekly wage reports exist.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Labour Cost Daily Table */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Daily Labour Cost Breakdown</CardTitle>
-                <CardDescription>
-                  Detailed view of estimated vs actual labour by day
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {labourCostLoading ? (
-                  <Skeleton className="h-[300px] w-full" />
-                ) : labourCostData?.dailyData && labourCostData.dailyData.length > 0 ? (
-                  <div className="overflow-auto max-h-[400px] border rounded-lg">
-                    <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-4 font-semibold">Date</th>
-                          <th className="text-right py-3 px-4 font-semibold">Panels</th>
-                          <th className="text-right py-3 px-4 font-semibold">Revenue</th>
-                          <th className="text-right py-3 px-4 font-semibold">Estimated</th>
-                          <th className="text-right py-3 px-4 font-semibold">Actual</th>
-                          <th className="text-right py-3 px-4 font-semibold">Variance</th>
-                          <th className="text-center py-3 px-4 font-semibold">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {labourCostData.dailyData.map((day, idx) => (
-                          <tr key={day.date} className="border-b hover:bg-muted/50" data-testid={`row-labour-daily-${idx}`}>
-                            <td className="py-3 px-4 font-medium">{formatDate(day.date)}</td>
-                            <td className="text-right py-3 px-4 text-muted-foreground">{day.panelCount}</td>
-                            <td className="text-right py-3 px-4 font-mono text-blue-600 dark:text-blue-400">
-                              ${day.revenue.toLocaleString()}
-                            </td>
-                            <td className="text-right py-3 px-4 font-mono text-cyan-600 dark:text-cyan-400">
-                              ${day.estimatedLabour.toLocaleString()}
-                            </td>
-                            <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
-                              ${day.actualLabour.toLocaleString()}
-                            </td>
-                            <td className={`text-right py-3 px-4 font-mono font-semibold ${
-                              day.isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                            }`}>
-                              {day.isOverBudget ? '+' : ''}${day.variance.toLocaleString()}
-                              <span className="text-xs ml-1">({day.isOverBudget ? '+' : ''}{day.variancePercent}%)</span>
-                            </td>
-                            <td className="text-center py-3 px-4">
-                              <Badge 
-                                variant={day.isOverBudget ? "destructive" : "default"}
-                                className={!day.isOverBudget ? "bg-green-600 hover:bg-green-700" : ""}
-                              >
-                                {day.isOverBudget ? 'Over' : 'Under'}
-                              </Badge>
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="font-bold bg-muted/50 border-t-2">
-                          <td className="py-3 px-4">Total</td>
-                          <td className="text-right py-3 px-4">{labourCostData.totals.panelCount}</td>
-                          <td className="text-right py-3 px-4 font-mono text-blue-600 dark:text-blue-400">
-                            ${labourCostData.totals.revenue.toLocaleString()}
-                          </td>
-                          <td className="text-right py-3 px-4 font-mono text-cyan-600 dark:text-cyan-400">
-                            ${labourCostData.totals.estimatedLabour.toLocaleString()}
-                          </td>
-                          <td className="text-right py-3 px-4 font-mono text-orange-600 dark:text-orange-400">
-                            ${labourCostData.totals.actualLabour.toLocaleString()}
-                          </td>
-                          <td className={`text-right py-3 px-4 font-mono font-semibold ${
-                            labourCostData.totals.isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'
-                          }`}>
-                            {labourCostData.totals.isOverBudget ? '+' : ''}${labourCostData.totals.variance.toLocaleString()}
-                            <span className="text-xs ml-1">({labourCostData.totals.isOverBudget ? '+' : ''}{labourCostData.totals.variancePercent}%)</span>
-                          </td>
-                          <td className="text-center py-3 px-4">
-                            <Badge 
-                              variant={labourCostData.totals.isOverBudget ? "destructive" : "default"}
-                              className={!labourCostData.totals.isOverBudget ? "bg-green-600 hover:bg-green-700" : ""}
-                            >
-                              {labourCostData.totals.isOverBudget ? 'Over Budget' : 'Under Budget'}
-                            </Badge>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
-                    No daily labour cost data for this period
                   </div>
                 )}
               </CardContent>
