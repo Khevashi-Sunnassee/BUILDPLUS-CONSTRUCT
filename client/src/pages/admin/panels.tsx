@@ -94,6 +94,7 @@ const panelSchema = z.object({
   building: z.string().optional(),
   level: z.string().optional(),
   structuralElevation: z.string().optional(),
+  reckliDetail: z.string().optional(),
   estimatedHours: z.number().optional(),
   status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]),
 });
@@ -534,6 +535,7 @@ export default function AdminPanelsPage() {
       building: "",
       level: "",
       structuralElevation: "",
+      reckliDetail: "",
       estimatedHours: undefined,
       status: "NOT_STARTED",
     });
@@ -552,6 +554,7 @@ export default function AdminPanelsPage() {
       building: panel.building || "",
       level: panel.level || "",
       structuralElevation: panel.structuralElevation || "",
+      reckliDetail: panel.reckliDetail || "",
       estimatedHours: panel.estimatedHours || undefined,
       status: panel.status,
     });
@@ -1148,6 +1151,30 @@ export default function AdminPanelsPage() {
                     </FormItem>
                   )}
                 />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={panelForm.control}
+                  name="reckliDetail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reckli Detail</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Reckli detail/pattern" {...field} data-testid="input-panel-reckli" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Crane Capacity (from Job)</label>
+                  <Input 
+                    value={jobs?.find(j => j.id === panelForm.watch("jobId"))?.craneCapacity || "Not set"} 
+                    disabled 
+                    className="bg-muted"
+                    data-testid="input-panel-crane-capacity"
+                  />
+                </div>
               </div>
               <FormField
                 control={panelForm.control}

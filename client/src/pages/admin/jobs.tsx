@@ -89,6 +89,7 @@ const jobSchema = z.object({
   city: z.string().optional(),
   state: z.enum(AUSTRALIAN_STATES).optional().nullable(),
   description: z.string().optional(),
+  craneCapacity: z.string().optional(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
@@ -433,6 +434,7 @@ export default function AdminJobsPage() {
       city: "",
       state: null,
       description: "",
+      craneCapacity: "",
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -450,6 +452,7 @@ export default function AdminJobsPage() {
       city: job.city || "",
       state: job.state || null,
       description: job.description || "",
+      craneCapacity: job.craneCapacity || "",
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
@@ -896,6 +899,19 @@ export default function AdminJobsPage() {
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea placeholder="Job description" {...field} data-testid="input-job-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobForm.control}
+                name="craneCapacity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Crane Capacity</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
