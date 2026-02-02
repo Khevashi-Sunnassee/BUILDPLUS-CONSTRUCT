@@ -115,6 +115,7 @@ export default function AdminPanelsPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importData, setImportData] = useState<any[]>([]);
   const [selectedJobForImport, setSelectedJobForImport] = useState<string>("");
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(true);
@@ -437,14 +438,38 @@ export default function AdminPanelsPage() {
   };
 
   const downloadTemplate = () => {
+    // Check if jobs exist
+    if (!jobs || jobs.length === 0) {
+      toast({
+        title: "No Jobs in System",
+        description: "Please load jobs into the system before downloading the template. No panels can be added for jobs that don't exist.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create panels template sheet with example rows
     const template = [
-      { "Job Number": "JOB-001", "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
-      { "Job Number": "JOB-001", "Panel Mark": "PM-002", "Panel Type": "COLUMN", "Description": "Column panel", "Drawing Code": "DWG-001", "Sheet Number": "A002", "Estimated Hours": 6 },
+      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
+      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-002", "Panel Type": "COLUMN", "Description": "Column panel", "Drawing Code": "DWG-001", "Sheet Number": "A002", "Estimated Hours": 6 },
     ];
-    const ws = XLSX.utils.json_to_sheet(template);
+    const panelsSheet = XLSX.utils.json_to_sheet(template);
+    
+    // Create jobs reference sheet with existing jobs
+    const jobsData = jobs.map(j => ({
+      "Job Number": j.jobNumber,
+      "Job Name": j.name,
+      "Client": j.client || "",
+      "Status": j.status,
+    }));
+    const jobsSheet = XLSX.utils.json_to_sheet(jobsData);
+    
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Panels");
+    XLSX.utils.book_append_sheet(wb, panelsSheet, "Panels");
+    XLSX.utils.book_append_sheet(wb, jobsSheet, "Jobs Reference");
     XLSX.writeFile(wb, "panels_import_template.xlsx");
+    
+    setTemplateDialogOpen(false);
   };
 
   const openCreateDialog = () => {
@@ -552,7 +577,7 @@ export default function AdminPanelsPage() {
             className="hidden"
             data-testid="input-file-upload"
           />
-          <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+          <Button variant="outline" onClick={() => setTemplateDialogOpen(true)} data-testid="button-download-template">
             <Download className="h-4 w-4 mr-2" />
             Template
           </Button>
@@ -1400,6 +1425,51 @@ export default function AdminPanelsPage() {
               {approveProductionMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <CheckCircle2 className="h-4 w-4 mr-2" />
               {buildingPanel?.approvedForProduction ? "Update & Keep Approved" : "Approve for Production"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Template Download Confirmation Dialog */}
+      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              Download Panel Import Template
+            </DialogTitle>
+            <DialogDescription>
+              Before downloading the template, please confirm:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Have you loaded jobs into the system?
+              </p>
+              <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">
+                No panels can be added for jobs that do not exist in the system. The template will include a "Jobs Reference" sheet with all current jobs.
+              </p>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              <p><strong>Current Jobs in System:</strong> {jobs?.length || 0}</p>
+              {jobs && jobs.length > 0 && (
+                <ul className="mt-2 list-disc list-inside max-h-32 overflow-auto">
+                  {jobs.slice(0, 10).map(j => (
+                    <li key={j.id}>{j.jobNumber} - {j.name}</li>
+                  ))}
+                  {jobs.length > 10 && <li className="text-muted-foreground">...and {jobs.length - 10} more</li>}
+                </ul>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTemplateDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={downloadTemplate} disabled={!jobs || jobs.length === 0} data-testid="button-confirm-download-template">
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
             </Button>
           </DialogFooter>
         </DialogContent>
