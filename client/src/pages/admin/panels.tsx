@@ -976,7 +976,7 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{panel.panelVolume || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)} m³` : "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
@@ -1076,7 +1076,7 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
                             <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
-                            <TableCell className="text-right font-mono text-sm">{panel.panelVolume || "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-sm">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)} m³` : "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
@@ -1156,7 +1156,7 @@ export default function AdminPanelsPage() {
                       <TableCell className="text-center">{panel.qty || 1}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{panel.loadHeight || "-"}</TableCell>
                       <TableCell className="text-right font-mono text-sm">{panel.loadWidth || "-"}</TableCell>
-                      <TableCell className="text-right font-mono text-sm">{panel.panelVolume || "-"}</TableCell>
+                      <TableCell className="text-right font-mono text-sm">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)} m³` : "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {getSourceLabel(panel.source)}
