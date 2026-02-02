@@ -97,6 +97,7 @@ const jobSchema = z.object({
   numberOfBuildings: z.number().int().min(0).optional().nullable(),
   levels: z.string().optional(),
   productionStartDate: z.string().optional(),
+  expectedCycleTimePerFloor: z.number().int().min(1).optional().nullable(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
@@ -552,6 +553,7 @@ export default function AdminJobsPage() {
       numberOfBuildings: null,
       levels: "",
       productionStartDate: "",
+      expectedCycleTimePerFloor: null,
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -574,6 +576,7 @@ export default function AdminJobsPage() {
       numberOfBuildings: job.numberOfBuildings ?? null,
       levels: job.levels || "",
       productionStartDate: job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : "",
+      expectedCycleTimePerFloor: job.expectedCycleTimePerFloor ?? null,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
@@ -1096,6 +1099,27 @@ export default function AdminJobsPage() {
                     <FormControl>
                       <Input type="date" {...field} data-testid="input-job-production-start-date" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobForm.control}
+                name="expectedCycleTimePerFloor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expected Cycle Time per Floor (days)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1"
+                        placeholder="e.g., 5"
+                        value={field.value ?? ""} 
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                        data-testid="input-job-cycle-time-per-floor" 
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Days required to complete production for each floor</p>
                     <FormMessage />
                   </FormItem>
                 )}

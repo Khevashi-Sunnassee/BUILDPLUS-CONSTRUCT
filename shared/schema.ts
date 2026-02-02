@@ -119,6 +119,7 @@ export const jobs = pgTable("jobs", {
   numberOfBuildings: integer("number_of_buildings"),
   levels: text("levels"), // comma-separated list of level names (e.g., "Ground,L1,L2,L3,Roof")
   productionStartDate: timestamp("production_start_date"),
+  expectedCycleTimePerFloor: integer("expected_cycle_time_per_floor"), // days per floor for production scheduling
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
