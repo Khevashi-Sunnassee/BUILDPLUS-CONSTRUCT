@@ -83,6 +83,7 @@ interface LoadListWithDetails {
   scheduledDate?: string | null;
   notes?: string | null;
   status: string;
+  factory: string;
   createdById?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -167,6 +168,7 @@ export default function LogisticsPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedLoadLists, setExpandedLoadLists] = useState<Set<string>>(new Set());
   const [selectedJobId, setSelectedJobId] = useState<string>("");
+  const [factoryFilter, setFactoryFilter] = useState("all");
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -460,8 +462,14 @@ export default function LogisticsPage() {
     );
   }
 
-  const pendingLoadLists = loadLists?.filter(ll => ll.status === "PENDING") || [];
-  const completedLoadLists = loadLists?.filter(ll => ll.status === "COMPLETE") || [];
+  const filteredLoadLists = loadLists?.filter(ll => {
+    if (factoryFilter !== "all" && ll.factory !== factoryFilter) {
+      return false;
+    }
+    return true;
+  }) || [];
+  const pendingLoadLists = filteredLoadLists.filter(ll => ll.status === "PENDING");
+  const completedLoadLists = filteredLoadLists.filter(ll => ll.status === "COMPLETE");
 
   return (
     <div className="space-y-6">
@@ -476,6 +484,16 @@ export default function LogisticsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+            <SelectTrigger className="w-36" data-testid="select-factory-filter">
+              <SelectValue placeholder="Factory" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Factories</SelectItem>
+              <SelectItem value="QLD">QLD</SelectItem>
+              <SelectItem value="VIC">Victoria</SelectItem>
+            </SelectContent>
+          </Select>
           <Button 
             variant="outline"
             onClick={exportToPDF} 
