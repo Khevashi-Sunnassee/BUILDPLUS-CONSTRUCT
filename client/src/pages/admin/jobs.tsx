@@ -94,6 +94,8 @@ const jobSchema = z.object({
   state: z.enum(AUSTRALIAN_STATES).optional().nullable(),
   description: z.string().optional(),
   craneCapacity: z.string().optional(),
+  numberOfBuildings: z.number().int().min(0).optional().nullable(),
+  levels: z.string().optional(),
   productionStartDate: z.string().optional(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
@@ -525,6 +527,8 @@ export default function AdminJobsPage() {
         "Site Contact": "John Smith",
         "Site Contact Phone": "0412 345 678",
         "Description": "Description here",
+        "Number of Buildings": 2,
+        "Levels": "Ground,L1,L2,Roof",
         "Status": "ACTIVE"
       },
     ];
@@ -545,6 +549,8 @@ export default function AdminJobsPage() {
       state: null,
       description: "",
       craneCapacity: "",
+      numberOfBuildings: null,
+      levels: "",
       productionStartDate: "",
       siteContact: "",
       siteContactPhone: "",
@@ -565,6 +571,8 @@ export default function AdminJobsPage() {
       state: job.state || null,
       description: job.description || "",
       craneCapacity: job.craneCapacity || "",
+      numberOfBuildings: job.numberOfBuildings ?? null,
+      levels: job.levels || "",
       productionStartDate: job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : "",
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
@@ -1036,6 +1044,45 @@ export default function AdminJobsPage() {
                     <FormControl>
                       <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobForm.control}
+                name="numberOfBuildings"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Number of Buildings</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min={0}
+                        placeholder="e.g. 3" 
+                        {...field}
+                        value={field.value ?? ""}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value, 10) : null)}
+                        data-testid="input-job-number-of-buildings" 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobForm.control}
+                name="levels"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Levels</FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="e.g. Ground,L1,L2,L3,Roof" 
+                        {...field} 
+                        data-testid="input-job-levels" 
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">Comma-separated list of level names</p>
                     <FormMessage />
                   </FormItem>
                 )}

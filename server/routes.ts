@@ -676,6 +676,9 @@ export async function registerRoutes(
         const stateRaw = String(row.state || row["State"] || "").toUpperCase().trim();
         const state = validStates.includes(stateRaw) ? stateRaw as "VIC" | "NSW" | "QLD" | "SA" | "WA" | "TAS" | "NT" | "ACT" : null;
         
+        const numberOfBuildingsRaw = row.numberOfBuildings || row["Number of Buildings"] || row.number_of_buildings;
+        const numberOfBuildings = numberOfBuildingsRaw ? parseInt(String(numberOfBuildingsRaw), 10) : null;
+        
         return {
           jobNumber: String(row.jobNumber || row["Job Number"] || row.job_number || "").trim(),
           name: String(row.name || row["Name"] || row["Job Name"] || "").trim(),
@@ -686,6 +689,8 @@ export async function registerRoutes(
           siteContact: row.siteContact || row["Site Contact"] || row.site_contact || null,
           siteContactPhone: row.siteContactPhone || row["Site Contact Phone"] || row.site_contact_phone || null,
           description: row.description || row["Description"] || null,
+          numberOfBuildings: !isNaN(numberOfBuildings!) ? numberOfBuildings : null,
+          levels: row.levels || row["Levels"] || null,
           status,
         };
       }).filter((j: any) => j.jobNumber && j.name);

@@ -116,6 +116,8 @@ export const jobs = pgTable("jobs", {
   siteContactPhone: text("site_contact_phone"),
   description: text("description"),
   craneCapacity: text("crane_capacity"),
+  numberOfBuildings: integer("number_of_buildings"),
+  levels: text("levels"), // comma-separated list of level names (e.g., "Ground,L1,L2,L3,Roof")
   productionStartDate: timestamp("production_start_date"),
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
