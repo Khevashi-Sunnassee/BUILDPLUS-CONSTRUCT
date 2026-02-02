@@ -68,6 +68,11 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { Job, PanelRegister, TrailerType } from "@shared/schema";
 
 interface LoadListWithDetails {
@@ -873,8 +878,8 @@ export default function LogisticsPage() {
       </Dialog>
 
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader className="pb-2">
             <DialogTitle>Record Delivery</DialogTitle>
             <DialogDescription>
               {selectedLoadList && (
@@ -886,11 +891,14 @@ export default function LogisticsPage() {
           </DialogHeader>
           <Form {...deliveryForm}>
             <form onSubmit={deliveryForm.handleSubmit(handleCreateDelivery)} className="flex-1 overflow-hidden flex flex-col">
-              <ScrollArea className="flex-1 pr-4">
-                <div className="space-y-6 pb-4">
-                  {/* Load Information */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Load Information</h4>
+              <ScrollArea className="flex-1 h-[50vh] pr-4">
+                <div className="space-y-3 pb-4">
+                  {/* Load Information - Always visible */}
+                  <div className="space-y-3 p-3 rounded-md border bg-muted/30">
+                    <h4 className="font-medium text-sm flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Load Information
+                    </h4>
                     <div className="grid grid-cols-4 gap-3">
                       <FormField
                         control={deliveryForm.control}
@@ -941,13 +949,6 @@ export default function LogisticsPage() {
                         )}
                       />
                     </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Vehicle Information */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Vehicle Information</h4>
                     <div className="grid grid-cols-3 gap-3">
                       <FormField
                         control={deliveryForm.control}
@@ -988,208 +989,238 @@ export default function LogisticsPage() {
                     </div>
                   </div>
 
-                  <Separator />
+                  {/* Depot to LTE - Collapsible */}
+                  <Collapsible defaultOpen className="border rounded-md">
+                    <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover-elevate rounded-t-md">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Depot to LTE
+                      </h4>
+                      <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-3 pt-0">
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={deliveryForm.control}
+                          name="leaveDepotTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Leave Depot (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-leave-depot" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={deliveryForm.control}
+                          name="arriveLteTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Arrive LTE (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-arrive-lte" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                  {/* Start - Depot to LTE */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Start (Depot to LTE)</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={deliveryForm.control}
-                        name="leaveDepotTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Leave Depot (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-leave-depot" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deliveryForm.control}
-                        name="arriveLteTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Arrive LTE (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-arrive-lte" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
+                  {/* Pickup Location - Collapsible */}
+                  <Collapsible defaultOpen className="border rounded-md">
+                    <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover-elevate rounded-t-md">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Pickup Location
+                      </h4>
+                      <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-3 pt-0">
+                      <div className="grid grid-cols-3 gap-3">
+                        <FormField
+                          control={deliveryForm.control}
+                          name="pickupLocation"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Location</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Pickup location" {...field} data-testid="input-pickup-location" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={deliveryForm.control}
+                          name="pickupArriveTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Arrive (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-pickup-arrive" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={deliveryForm.control}
+                          name="pickupLeaveTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Leave (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-pickup-leave" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                  <Separator />
+                  {/* Delivery Location (Holding) - Collapsible */}
+                  <Collapsible defaultOpen className="border rounded-md">
+                    <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover-elevate rounded-t-md">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Truck className="h-4 w-4" />
+                        Delivery Location (Holding)
+                      </h4>
+                      <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-3 pt-0">
+                      <div className="grid grid-cols-3 gap-3">
+                        <FormField
+                          control={deliveryForm.control}
+                          name="deliveryLocation"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Location</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Delivery location" {...field} data-testid="input-delivery-location" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={deliveryForm.control}
+                          name="arriveHoldingTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Arrive Holding (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-arrive-holding" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={deliveryForm.control}
+                          name="leaveHoldingTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Leave Holding (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-leave-holding" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                  {/* Pickup Location */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Pickup Location</h4>
-                    <div className="grid grid-cols-3 gap-3">
-                      <FormField
-                        control={deliveryForm.control}
-                        name="pickupLocation"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Location</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Pickup location" {...field} data-testid="input-pickup-location" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deliveryForm.control}
-                        name="pickupArriveTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Arrive (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-pickup-arrive" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deliveryForm.control}
-                        name="pickupLeaveTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Leave (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-pickup-leave" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
+                  {/* Unloading - Collapsible */}
+                  <Collapsible defaultOpen className="border rounded-md">
+                    <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover-elevate rounded-t-md">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Package className="h-4 w-4" />
+                        Unloading
+                      </h4>
+                      <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-3 pt-0">
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={deliveryForm.control}
+                          name="siteFirstLiftTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Site First Lift (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-site-first-lift" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={deliveryForm.control}
+                          name="siteLastLiftTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Site Last Lift / Leave (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-site-last-lift" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
-                  <Separator />
-
-                  {/* Delivery Location */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Delivery Location (Holding)</h4>
-                    <div className="grid grid-cols-3 gap-3">
-                      <FormField
-                        control={deliveryForm.control}
-                        name="deliveryLocation"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Location</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Delivery location" {...field} data-testid="input-delivery-location" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deliveryForm.control}
-                        name="arriveHoldingTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Arrive Holding (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-arrive-holding" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deliveryForm.control}
-                        name="leaveHoldingTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Leave Holding (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-leave-holding" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Unloading */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Unloading</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={deliveryForm.control}
-                        name="siteFirstLiftTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Site First Lift (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-site-first-lift" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={deliveryForm.control}
-                        name="siteLastLiftTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Site Last Lift / Leave (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-site-last-lift" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
-
-                  {/* Return Depot */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm text-muted-foreground">Return Depot / Reload</h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <FormField
-                        control={deliveryForm.control}
-                        name="returnDepotArriveTime"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Arrive (time)</FormLabel>
-                            <FormControl>
-                              <Input type="time" {...field} data-testid="input-return-depot-arrive" />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </div>
-
-                  <Separator />
+                  {/* Return Depot - Collapsible */}
+                  <Collapsible defaultOpen className="border rounded-md">
+                    <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover-elevate rounded-t-md">
+                      <h4 className="font-medium text-sm flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Return Depot / Reload
+                      </h4>
+                      <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="p-3 pt-0">
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={deliveryForm.control}
+                          name="returnDepotArriveTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Arrive (time)</FormLabel>
+                              <FormControl>
+                                <Input type="time" {...field} data-testid="input-return-depot-arrive" />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
 
                   {/* Comment */}
-                  <FormField
-                    control={deliveryForm.control}
-                    name="comment"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Comment</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            placeholder="Any delivery comments..." 
-                            className="resize-none"
-                            rows={3}
-                            {...field} 
-                            data-testid="input-delivery-comment" 
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="space-y-2 p-3 rounded-md border">
+                    <FormField
+                      control={deliveryForm.control}
+                      name="comment"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Comment</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Any delivery comments..." 
+                              className="resize-none"
+                              rows={2}
+                              {...field} 
+                              data-testid="input-delivery-comment" 
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               </ScrollArea>
 
-              <DialogFooter className="pt-4 border-t mt-4">
+              <DialogFooter className="pt-4 border-t mt-2 flex-shrink-0">
                 <Button type="button" variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
                   Cancel
                 </Button>
