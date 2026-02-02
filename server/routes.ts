@@ -1,11 +1,17 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
+import multer from "multer";
 import { storage, sha256Hex } from "./storage";
 import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema } from "@shared/schema";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
+
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
+});
 
 declare module "express-session" {
   interface SessionData {
@@ -878,6 +884,366 @@ export async function registerRoutes(
       });
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Import failed" });
+    }
+  });
+
+  // Estimate Import - dynamically parses TakeOff sheets from estimate Excel files
+  app.post("/api/jobs/:jobId/panels/import-estimate", 
+    requireAuth, 
+    requireRole("ADMIN", "MANAGER"),
+    upload.single("file"),
+    async (req, res) => {
+      try {
+        const { jobId } = req.params;
+        const replace = req.body.replace === "true";
+        
+        // Validate job exists
+        const job = await storage.getJob(jobId);
+        if (!job) {
+          return res.status(404).json({ error: "Job not found" });
+        }
+        
+        // Check for file
+        if (!req.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
+        
+        const fileName = req.file.originalname;
+        const fileBuffer = req.file.buffer;
+        const fileHash = sha256Hex(fileBuffer);
+        
+        // Parse workbook
+        const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+        
+        // Find TakeOff sheets
+        const takeoffSheets = workbook.SheetNames.filter(name => {
+          const normalized = name.toLowerCase().replace(/[\s\-]/g, "");
+          return normalized.includes("takeoff");
+        });
+        
+        if (takeoffSheets.length === 0) {
+          return res.status(400).json({ error: "No TakeOff sheets found in the workbook" });
+        }
+        
+        // If replace is true, delete existing source=3 panels for this job
+        if (replace) {
+          await storage.deletePanelsByJobAndSource(jobId, 3);
+        }
+        
+        const results: any[] = [];
+        const panelsToImport: any[] = [];
+        const existingPanelSourceIds = await storage.getExistingPanelSourceIds(jobId);
+        
+        // Header mapping - normalize headers to field names
+        const headerMapping: Record<string, string> = {
+          "column #": "panelMark",
+          "column#": "panelMark",
+          "columnno": "panelMark",
+          "panelmark": "panelMark",
+          "mark": "panelMark",
+          "building": "building",
+          "structural elevation number": "structuralElevation",
+          "structuralelevation": "structuralElevation",
+          "structuralelevationno": "structuralElevation",
+          "level": "level",
+          "column type": "panelType",
+          "columntype": "panelType",
+          "paneltype": "panelType",
+          "type": "panelType",
+          "reckli detail": "reckliDetail",
+          "recklidetail": "reckliDetail",
+          "thickness": "thickness",
+          "width": "width",
+          "height": "height",
+          "gross area (m2)": "areaM2",
+          "gross area m2": "areaM2",
+          "grossaream2": "areaM2",
+          "net area (m2)": "areaM2",
+          "net area m2": "areaM2",
+          "netaream2": "areaM2",
+          "concrete strength (mpa)": "concreteStrength",
+          "concrete strength mpa": "concreteStrength",
+          "concretestrength": "concreteStrength",
+          "concretestrengthmpa": "concreteStrength",
+          "vol (m3)": "volumeM3",
+          "vol m3": "volumeM3",
+          "volm3": "volumeM3",
+          "volume": "volumeM3",
+          "weight (t)": "weightT",
+          "weight t": "weightT",
+          "weightt": "weightT",
+          "colum qty": "qty",
+          "columqty": "qty",
+          "qty": "qty",
+          "quantity": "qty",
+          "# rebates": "rebates",
+          "rebates": "rebates",
+        };
+        
+        // Process each TakeOff sheet
+        for (const sheetName of takeoffSheets) {
+          const sheetResult = {
+            sheetName,
+            takeoffCategory: "",
+            headerRow: -1,
+            created: 0,
+            duplicates: 0,
+            skipped: 0,
+            errors: [] as string[],
+          };
+          
+          // Derive takeoffCategory from sheet name
+          let category = sheetName
+            .replace(/takeoff/gi, "")
+            .replace(/take off/gi, "")
+            .replace(/take-off/gi, "")
+            .trim();
+          if (!category) category = "Uncategorised";
+          sheetResult.takeoffCategory = category;
+          
+          const sheet = workbook.Sheets[sheetName];
+          const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 });
+          
+          // Find header row - look for row with key headers
+          let headerRow = -1;
+          let headers: string[] = [];
+          const requiredHeaders = ["column", "level", "thickness", "width", "height", "vol", "weight"];
+          
+          for (let i = 0; i < Math.min(20, data.length); i++) {
+            const row = data[i];
+            if (!row || row.length < 5) continue;
+            
+            const normalizedCells = row.map((cell: any) => 
+              String(cell || "").toLowerCase().replace(/[()#²³]/g, "").trim()
+            );
+            
+            let matches = 0;
+            for (const required of requiredHeaders) {
+              if (normalizedCells.some(c => c.includes(required))) matches++;
+            }
+            
+            if (matches >= 4) {
+              headerRow = i;
+              headers = normalizedCells;
+              break;
+            }
+          }
+          
+          if (headerRow === -1) {
+            sheetResult.errors.push("Could not find header row");
+            results.push(sheetResult);
+            continue;
+          }
+          
+          sheetResult.headerRow = headerRow + 1; // 1-indexed for user
+          
+          // Map headers to field names
+          const colMapping: Record<number, string> = {};
+          headers.forEach((header, idx) => {
+            const normalizedHeader = header.replace(/\s+/g, " ").toLowerCase();
+            for (const [pattern, field] of Object.entries(headerMapping)) {
+              if (normalizedHeader.includes(pattern) || normalizedHeader === pattern) {
+                colMapping[idx] = field;
+                break;
+              }
+            }
+          });
+          
+          // Check for required columns
+          const mappedFields = Object.values(colMapping);
+          if (!mappedFields.includes("panelMark")) {
+            sheetResult.errors.push("Missing required column: Column # / Panel Mark");
+            results.push(sheetResult);
+            continue;
+          }
+          if (!mappedFields.includes("level") && !mappedFields.includes("thickness")) {
+            sheetResult.errors.push("Missing required columns: Level or Thickness");
+            results.push(sheetResult);
+            continue;
+          }
+          
+          // Find panelMark column index for key
+          const panelMarkColIdx = Object.entries(colMapping).find(([_, v]) => v === "panelMark")?.[0];
+          
+          // Process data rows
+          for (let i = headerRow + 1; i < data.length; i++) {
+            const row = data[i];
+            if (!row || row.length === 0) continue;
+            
+            // Get panel mark
+            const panelMark = String(row[Number(panelMarkColIdx)] || "").trim();
+            
+            // Skip total/summary rows
+            const firstCell = String(row[0] || "").toLowerCase();
+            if (["total", "subtotal", "summary"].some(t => firstCell.includes(t))) {
+              continue;
+            }
+            
+            // Skip if no panel mark and row is mostly empty
+            const nonEmptyCells = row.filter((c: any) => c !== null && c !== undefined && c !== "").length;
+            if (!panelMark && nonEmptyCells < 3) {
+              continue; // End of data
+            }
+            
+            if (!panelMark) {
+              sheetResult.skipped++;
+              continue;
+            }
+            
+            // Extract row data
+            const rowData: Record<string, any> = {};
+            Object.entries(colMapping).forEach(([colIdx, field]) => {
+              rowData[field] = row[Number(colIdx)];
+            });
+            
+            // Convert numeric fields
+            const thickness = parseFloat(rowData.thickness) || null;
+            const width = parseFloat(rowData.width) || null;
+            const height = parseFloat(rowData.height) || null;
+            const areaM2 = parseFloat(rowData.areaM2) || null;
+            const volumeM3 = parseFloat(rowData.volumeM3) || null;
+            const weightT = parseFloat(rowData.weightT) || null;
+            const qty = parseInt(rowData.qty) || 1;
+            const concreteStrength = String(rowData.concreteStrength || "");
+            
+            // Convert measurements (thickness might be in meters, convert to mm if < 1)
+            const thicknessMm = thickness ? (thickness < 1 ? thickness * 1000 : thickness) : null;
+            const widthMm = width ? (width < 10 ? width * 1000 : width) : null;
+            const heightMm = height ? (height < 10 ? height * 1000 : height) : null;
+            
+            // Weight conversion (T to kg)
+            const weightKg = weightT ? weightT * 1000 : null;
+            
+            // Calculate panelSourceId for idempotency
+            const sourceRowNum = i + 1; // 1-indexed
+            const panelSourceId = sha256Hex(
+              `${jobId}-${fileHash}-${sheetName}-${sourceRowNum}-${panelMark}-${rowData.structuralElevation || ""}`
+            );
+            
+            // Check if already exists
+            if (existingPanelSourceIds.has(panelSourceId)) {
+              sheetResult.duplicates++;
+              continue;
+            }
+            
+            // Determine panel type from column type or category
+            let panelType = "WALL";
+            const typeRaw = String(rowData.panelType || category || "").toUpperCase().replace(/\s+/g, "_");
+            if (typeRaw.includes("COLUMN")) panelType = "COLUMN";
+            else if (typeRaw.includes("CUBE")) panelType = "CUBE_BASE";
+            else if (typeRaw.includes("LID")) panelType = "OTHER";
+            else if (typeRaw.includes("BEAM")) panelType = "OTHER";
+            else if (typeRaw.includes("SLAB")) panelType = "OTHER";
+            else if (typeRaw.includes("BALUSTRADE")) panelType = "OTHER";
+            
+            panelsToImport.push({
+              jobId,
+              panelMark,
+              panelType,
+              building: String(rowData.building || ""),
+              level: String(rowData.level || ""),
+              structuralElevation: String(rowData.structuralElevation || ""),
+              reckliDetail: String(rowData.reckliDetail || ""),
+              qty,
+              takeoffCategory: category,
+              concreteStrengthMpa: concreteStrength,
+              panelThickness: thicknessMm ? String(thicknessMm) : null,
+              loadWidth: widthMm ? String(widthMm) : null,
+              loadHeight: heightMm ? String(heightMm) : null,
+              panelArea: areaM2 ? String(areaM2) : null,
+              panelVolume: volumeM3 ? String(volumeM3) : null,
+              panelMass: weightKg ? String(weightKg) : null,
+              sourceFileName: fileName,
+              sourceSheet: sheetName,
+              sourceRow: sourceRowNum,
+              panelSourceId,
+              source: 3, // Estimate import
+              status: "PENDING" as const,
+            });
+            
+            sheetResult.created++;
+            existingPanelSourceIds.add(panelSourceId);
+          }
+          
+          results.push(sheetResult);
+        }
+        
+        // Import all panels
+        let imported = 0;
+        let importErrors: string[] = [];
+        
+        if (panelsToImport.length > 0) {
+          try {
+            const importResult = await storage.importEstimatePanels(panelsToImport);
+            imported = importResult.imported;
+            importErrors = importResult.errors || [];
+          } catch (err: any) {
+            importErrors.push(err.message);
+          }
+        }
+        
+        // Calculate totals
+        const totals = {
+          created: results.reduce((sum, r) => sum + r.created, 0),
+          duplicates: results.reduce((sum, r) => sum + r.duplicates, 0),
+          skipped: results.reduce((sum, r) => sum + r.skipped, 0),
+          imported,
+          sheetsProcessed: results.length,
+        };
+        
+        res.json({
+          success: true,
+          totals,
+          sheets: results,
+          errors: importErrors.length > 0 ? importErrors.slice(0, 10) : undefined,
+        });
+      } catch (error: any) {
+        console.error("Estimate import error:", error);
+        res.status(500).json({ error: error.message || "Failed to import estimate" });
+      }
+    }
+  );
+
+  // Get job totals (m2, m3, elements)
+  app.get("/api/jobs/:jobId/totals", requireAuth, async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const panels = await storage.getPanelsByJob(jobId);
+      
+      let totalAreaM2 = 0;
+      let totalVolumeM3 = 0;
+      let totalElements = 0;
+      let pendingCount = 0;
+      let validatedCount = 0;
+      
+      for (const panel of panels) {
+        const qty = panel.qty || 1;
+        totalElements += qty;
+        
+        if (panel.panelArea) {
+          totalAreaM2 += parseFloat(panel.panelArea) * qty;
+        }
+        if (panel.panelVolume) {
+          totalVolumeM3 += parseFloat(panel.panelVolume) * qty;
+        }
+        
+        if (panel.status === "PENDING") {
+          pendingCount += qty;
+        } else {
+          validatedCount += qty;
+        }
+      }
+      
+      res.json({
+        totalAreaM2: Math.round(totalAreaM2 * 100) / 100,
+        totalVolumeM3: Math.round(totalVolumeM3 * 1000) / 1000,
+        totalElements,
+        pendingCount,
+        validatedCount,
+        panelCount: panels.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to get job totals" });
     }
   });
 

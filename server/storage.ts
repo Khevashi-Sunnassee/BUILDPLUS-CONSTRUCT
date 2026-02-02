@@ -34,7 +34,7 @@ export interface LoadListWithDetails extends LoadList {
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 
-export function sha256Hex(raw: string) {
+export function sha256Hex(raw: string | Buffer) {
   return crypto.createHash("sha256").update(raw).digest("hex");
 }
 
@@ -105,6 +105,9 @@ export interface IStorage {
   getPanelCountsBySource(): Promise<{ source: number; count: number }[]>;
   panelsWithSourceHaveRecords(source: number): Promise<boolean>;
   deletePanelsBySource(source: number): Promise<number>;
+  deletePanelsByJobAndSource(jobId: string, source: number): Promise<number>;
+  getExistingPanelSourceIds(jobId: string): Promise<Set<string>>;
+  importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[] }>;
 
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
   getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
@@ -857,6 +860,91 @@ export class DatabaseStorage implements IStorage {
       .where(eq(panelRegister.source, source))
       .returning({ id: panelRegister.id });
     return result.length;
+  }
+
+  async deletePanelsByJobAndSource(jobId: string, source: number): Promise<number> {
+    // Only delete panels that don't have production records and are not approved
+    const panels = await db.select({ id: panelRegister.id })
+      .from(panelRegister)
+      .where(and(
+        eq(panelRegister.jobId, jobId),
+        eq(panelRegister.source, source),
+        eq(panelRegister.approvedForProduction, false)
+      ));
+    
+    if (panels.length === 0) return 0;
+    
+    const panelIds = panels.map(p => p.id);
+    
+    // Check which panels have production records
+    const panelsWithRecords = await db.select({ panelId: productionEntries.panelId })
+      .from(productionEntries)
+      .where(inArray(productionEntries.panelId, panelIds));
+    
+    const panelIdsWithRecords = new Set(panelsWithRecords.map(p => p.panelId));
+    const deletableIds = panelIds.filter(id => !panelIdsWithRecords.has(id));
+    
+    if (deletableIds.length === 0) return 0;
+    
+    const result = await db.delete(panelRegister)
+      .where(inArray(panelRegister.id, deletableIds))
+      .returning({ id: panelRegister.id });
+    return result.length;
+  }
+
+  async getExistingPanelSourceIds(jobId: string): Promise<Set<string>> {
+    const panels = await db.select({ panelSourceId: panelRegister.panelSourceId })
+      .from(panelRegister)
+      .where(and(
+        eq(panelRegister.jobId, jobId),
+        sql`${panelRegister.panelSourceId} IS NOT NULL`
+      ));
+    return new Set(panels.map(p => p.panelSourceId).filter(Boolean) as string[]);
+  }
+
+  async importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[] }> {
+    const errors: string[] = [];
+    let imported = 0;
+    
+    for (const panel of data) {
+      try {
+        // Check if panelMark already exists for this job (unless it has a unique panelSourceId)
+        const existing = await db.select().from(panelRegister)
+          .where(and(
+            eq(panelRegister.jobId, panel.jobId),
+            eq(panelRegister.panelMark, panel.panelMark)
+          ))
+          .limit(1);
+        
+        if (existing.length > 0) {
+          // Update existing panel with new data if it's from the same source
+          if (existing[0].panelSourceId === panel.panelSourceId) {
+            await db.update(panelRegister)
+              .set({
+                ...panel,
+                updatedAt: new Date(),
+              })
+              .where(eq(panelRegister.id, existing[0].id));
+            imported++;
+          } else {
+            // Panel mark already exists from different source - create with modified mark
+            const newMark = `${panel.panelMark}_${panel.sourceRow}`;
+            await db.insert(panelRegister).values({
+              ...panel,
+              panelMark: newMark,
+            });
+            imported++;
+          }
+        } else {
+          await db.insert(panelRegister).values(panel);
+          imported++;
+        }
+      } catch (err: any) {
+        errors.push(`Row ${panel.sourceRow}: ${err.message}`);
+      }
+    }
+    
+    return { imported, errors };
   }
 
   async getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined> {
