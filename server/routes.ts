@@ -1434,7 +1434,7 @@ export async function registerRoutes(
 
   app.put("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, ...entryFields } = req.body;
+      const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, status, ...entryFields } = req.body;
       
       // Update panel with final dimensions if provided
       if (panelId) {
@@ -1448,9 +1448,14 @@ export async function registerRoutes(
         if (Object.keys(panelUpdates).length > 0) {
           await storage.updatePanelRegisterItem(panelId, panelUpdates);
         }
+        
+        // Update panel status to COMPLETED when production entry is marked as completed
+        if (status === "COMPLETED") {
+          await storage.updatePanel(panelId, { status: "COMPLETED" });
+        }
       }
       
-      const entry = await storage.updateProductionEntry(req.params.id as string, { ...entryFields, panelId });
+      const entry = await storage.updateProductionEntry(req.params.id as string, { ...entryFields, panelId, status });
       res.json(entry);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to update production entry" });
@@ -1471,20 +1476,30 @@ export async function registerRoutes(
     if (!["PENDING", "COMPLETED"].includes(status)) {
       return res.status(400).json({ error: "Invalid status. Must be PENDING or COMPLETED" });
     }
-    // Validate all entries exist before updating
-    const validEntries = [];
+    // Validate all entries exist before updating and collect panel IDs
+    const validEntries: { id: string; panelId: string }[] = [];
     for (const id of entryIds) {
       const entry = await storage.getProductionEntry(id);
       if (entry) {
-        validEntries.push(id);
+        validEntries.push({ id, panelId: entry.panelId });
       }
     }
     if (validEntries.length === 0) {
       return res.status(404).json({ error: "No valid entries found" });
     }
+    // Update production entry statuses
     const updated = await Promise.all(
-      validEntries.map(id => storage.updateProductionEntry(id, { status }))
+      validEntries.map(e => storage.updateProductionEntry(e.id, { status }))
     );
+    
+    // When marking as COMPLETED, also update the panel status to COMPLETED
+    if (status === "COMPLETED") {
+      const uniquePanelIds = [...new Set(validEntries.map(e => e.panelId))];
+      await Promise.all(
+        uniquePanelIds.map(panelId => storage.updatePanel(panelId, { status: "COMPLETED" }))
+      );
+    }
+    
     res.json({ updated: updated.length });
   });
 
