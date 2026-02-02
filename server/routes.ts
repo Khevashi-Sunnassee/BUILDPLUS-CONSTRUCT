@@ -1912,7 +1912,7 @@ export async function registerRoutes(
       });
       
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5.2",
         messages: [
           {
             role: "system",
@@ -1948,7 +1948,7 @@ Return ONLY valid JSON, no explanation text.`
             ]
           }
         ],
-        max_tokens: 1000,
+        max_completion_tokens: 1000,
       });
       
       const content = response.choices[0]?.message?.content || "{}";
