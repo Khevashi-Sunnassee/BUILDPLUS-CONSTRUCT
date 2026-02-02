@@ -95,6 +95,8 @@ interface ProductionEntryWithDetails extends ProductionEntry {
   panel: PanelRegister;
   job: Job;
   user: User;
+  bayNumber?: string;
+  factory?: string;
   labourCost?: number;
   supplyCost?: number;
   totalCost?: number;
@@ -316,10 +318,10 @@ export default function ProductionReportDetailPage() {
       panelId: entry.panelId,
       jobId: entry.jobId,
       productionDate: entry.productionDate,
-      bayNumber: (entry as any).bayNumber || "",
+      bayNumber: entry.bayNumber || "",
       volumeM3: entry.volumeM3 || "",
       areaM2: entry.areaM2 || "",
-      factory: (entry as any).factory || factory,
+      factory: entry.factory || factory,
       notes: entry.notes || "",
     });
     setEntryDialogOpen(true);
@@ -714,8 +716,8 @@ export default function ProductionReportDetailPage() {
                         )}
                       </Button>
                     </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-sm">{(entry as any).bayNumber || "-"}</span>
+                    <TableCell data-testid={`cell-bay-${entry.id}`}>
+                      <span className="font-mono text-sm">{entry.bayNumber || "-"}</span>
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-sm">{entry.job.jobNumber} - {entry.job.name}</span>
