@@ -97,6 +97,13 @@ const panelSchema = z.object({
   reckliDetail: z.string().optional(),
   estimatedHours: z.number().optional(),
   status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING"]),
+  loadWidth: z.string().optional(),
+  loadHeight: z.string().optional(),
+  panelThickness: z.string().optional(),
+  panelVolume: z.string().optional(),
+  panelMass: z.string().optional(),
+  qty: z.number().optional(),
+  concreteStrengthMpa: z.string().optional(),
 });
 
 type PanelFormData = z.infer<typeof panelSchema>;
@@ -605,6 +612,13 @@ export default function AdminPanelsPage() {
       reckliDetail: "",
       estimatedHours: undefined,
       status: "NOT_STARTED",
+      loadWidth: "",
+      loadHeight: "",
+      panelThickness: "",
+      panelVolume: "",
+      panelMass: "",
+      qty: 1,
+      concreteStrengthMpa: "",
     });
     setPanelDialogOpen(true);
   };
@@ -624,6 +638,13 @@ export default function AdminPanelsPage() {
       reckliDetail: panel.reckliDetail || "",
       estimatedHours: panel.estimatedHours || undefined,
       status: panel.status,
+      loadWidth: panel.loadWidth || "",
+      loadHeight: panel.loadHeight || "",
+      panelThickness: panel.panelThickness || "",
+      panelVolume: panel.panelVolume || "",
+      panelMass: panel.panelMass || "",
+      qty: panel.qty || 1,
+      concreteStrengthMpa: panel.concreteStrengthMpa || "",
     });
     setPanelDialogOpen(true);
   };
@@ -1220,7 +1241,7 @@ export default function AdminPanelsPage() {
       </Card>
 
       <Dialog open={panelDialogOpen} onOpenChange={setPanelDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPanel ? "Edit Panel" : "Create New Panel"}</DialogTitle>
             <DialogDescription>
@@ -1451,6 +1472,173 @@ export default function AdminPanelsPage() {
                   </FormItem>
                 )}
               />
+              
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium mb-3">Panel Dimensions & Weight</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={panelForm.control}
+                    name="qty"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantity</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            placeholder="1"
+                            {...field}
+                            value={field.value || 1}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
+                            data-testid="input-panel-qty"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={panelForm.control}
+                    name="concreteStrengthMpa"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Concrete Strength (MPa)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="50" {...field} data-testid="input-panel-concrete" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4 mt-3">
+                  <FormField
+                    control={panelForm.control}
+                    name="loadWidth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Width (mm)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="3000" 
+                            {...field} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              const width = parseFloat(e.target.value) || 0;
+                              const height = parseFloat(panelForm.getValues("loadHeight") || "0") || 0;
+                              const thickness = parseFloat(panelForm.getValues("panelThickness") || "0") || 0;
+                              if (width > 0 && height > 0 && thickness > 0) {
+                                const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
+                                const massKg = volumeM3 * 2500;
+                                panelForm.setValue("panelVolume", volumeM3.toFixed(3));
+                                panelForm.setValue("panelMass", Math.round(massKg).toString());
+                              }
+                            }}
+                            data-testid="input-panel-width"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={panelForm.control}
+                    name="loadHeight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Height (mm)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="2400" 
+                            {...field} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              const width = parseFloat(panelForm.getValues("loadWidth") || "0") || 0;
+                              const height = parseFloat(e.target.value) || 0;
+                              const thickness = parseFloat(panelForm.getValues("panelThickness") || "0") || 0;
+                              if (width > 0 && height > 0 && thickness > 0) {
+                                const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
+                                const massKg = volumeM3 * 2500;
+                                panelForm.setValue("panelVolume", volumeM3.toFixed(3));
+                                panelForm.setValue("panelMass", Math.round(massKg).toString());
+                              }
+                            }}
+                            data-testid="input-panel-height"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={panelForm.control}
+                    name="panelThickness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Thickness (mm)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="200" 
+                            {...field} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              const width = parseFloat(panelForm.getValues("loadWidth") || "0") || 0;
+                              const height = parseFloat(panelForm.getValues("loadHeight") || "0") || 0;
+                              const thickness = parseFloat(e.target.value) || 0;
+                              if (width > 0 && height > 0 && thickness > 0) {
+                                const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
+                                const massKg = volumeM3 * 2500;
+                                panelForm.setValue("panelVolume", volumeM3.toFixed(3));
+                                panelForm.setValue("panelMass", Math.round(massKg).toString());
+                              }
+                            }}
+                            data-testid="input-panel-thickness"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-3">
+                  <FormField
+                    control={panelForm.control}
+                    name="panelVolume"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Volume (m³)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            className="bg-muted" 
+                            readOnly
+                            data-testid="input-panel-volume"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={panelForm.control}
+                    name="panelMass"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Mass (kg)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            className="bg-muted" 
+                            readOnly
+                            data-testid="input-panel-mass"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setPanelDialogOpen(false)}>
                   Cancel
