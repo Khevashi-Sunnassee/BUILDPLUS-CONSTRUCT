@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   FileText,
@@ -22,6 +23,7 @@ import {
   Shield,
 } from "lucide-react";
 import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
+import type { UserPermission } from "@shared/schema";
 import {
   Sidebar,
   SidebarContent,
@@ -69,9 +71,35 @@ const adminNavItems = [
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
 ];
 
+const urlToFunctionKey: Record<string, string> = {
+  "/daily-reports": "daily_reports",
+  "/kpi-dashboard": "kpi_dashboard",
+  "/production-report": "production_report",
+  "/logistics": "logistics",
+  "/weekly-wages": "weekly_wages",
+  "/admin/jobs": "admin_jobs",
+  "/admin/panels": "panel_register",
+  "/admin/panel-types": "admin_panel_types",
+  "/admin/devices": "admin_devices",
+  "/admin/users": "admin_users",
+  "/admin/settings": "admin_settings",
+};
+
 export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
+
+  const { data: myPermissions = [] } = useQuery<UserPermission[]>({
+    queryKey: ["/api/permissions/my-permissions"],
+    enabled: !!user,
+  });
+
+  const isItemHidden = (url: string): boolean => {
+    const functionKey = urlToFunctionKey[url];
+    if (!functionKey) return false;
+    const permission = myPermissions.find(p => p.functionKey === functionKey);
+    return permission?.permissionLevel === "HIDDEN";
+  };
 
   const isActive = (url: string) => {
     if (url === "/dashboard") return location === "/" || location === "/dashboard";
@@ -105,7 +133,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {userNavItems.map((item) => (
+              {userNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
@@ -156,7 +184,7 @@ export function AppSidebar() {
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {adminNavItems.map((item) => (
+                {adminNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
