@@ -26,7 +26,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Job Rate Overrides**: Override default panel type rates at job level for custom pricing
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
 - **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
-- **Logistics System**: Create load lists by selecting approved panels, assign trailer types (Layover, A-Frame), track delivery records with truck rego, driver name, and departure/arrival times. Load lists auto-complete when delivery is recorded.
+- **Logistics System**: Create load lists by selecting approved panels, assign trailer types (Layover, A-Frame), comprehensive delivery recording with: load document #, truck/trailer rego, date, preload info, load number, panel count, full time tracking (depot to LTE, pickup location times, holding times, unloading first/last lift, return depot), and comments. Load lists auto-complete when delivery is recorded.
 - **Logistics Reporting**: Reports page includes Logistics tab showing panels shipped per day, total deliveries, and average delivery phase timings (Depot to LTE, Pickup Time, Holding Time, Unload Time).
 
 ## Tech Stack
