@@ -10,6 +10,7 @@ export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLET
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING"]);
 export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
+export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -39,6 +40,7 @@ export const FUNCTION_KEYS = [
   "production_report",
   "logistics",
   "weekly_wages",
+  "weekly_job_logs",
   "kpi_dashboard",
   "jobs",
   "panel_register",
@@ -96,6 +98,7 @@ export const jobs = pgTable("jobs", {
   description: text("description"),
   craneCapacity: text("crane_capacity"),
   productionStartDate: timestamp("production_start_date"),
+  projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -103,6 +106,7 @@ export const jobs = pgTable("jobs", {
   jobNumberIdx: index("jobs_job_number_idx").on(table.jobNumber),
   statusIdx: index("jobs_status_idx").on(table.status),
   codeIdx: index("jobs_code_idx").on(table.code),
+  projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
 }));
 
 export const workTypes = pgTable("work_types", {
@@ -592,6 +596,54 @@ export const insertWeeklyWageReportSchema = createInsertSchema(weeklyWageReports
   updatedAt: true,
 });
 
+// Weekly Job Reports - for project managers to report site progress and production schedule
+export const weeklyJobReports = pgTable("weekly_job_reports", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  projectManagerId: varchar("project_manager_id", { length: 36 }).notNull().references(() => users.id),
+  reportDate: text("report_date").notNull(), // YYYY-MM-DD format
+  reportTime: text("report_time").notNull(), // HH:MM format
+  status: weeklyReportStatusEnum("status").default("DRAFT").notNull(),
+  notes: text("notes"),
+  submittedAt: timestamp("submitted_at"),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  projectManagerIdx: index("weekly_job_reports_pm_idx").on(table.projectManagerId),
+  reportDateIdx: index("weekly_job_reports_date_idx").on(table.reportDate),
+  statusIdx: index("weekly_job_reports_status_idx").on(table.status),
+}));
+
+// Weekly Job Report Schedule Items - levels required per job in 7/14/21/28 days
+export const weeklyJobReportSchedules = pgTable("weekly_job_report_schedules", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  reportId: varchar("report_id", { length: 36 }).notNull().references(() => weeklyJobReports.id, { onDelete: "cascade" }),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  levels7Days: text("levels_7_days"), // comma-separated levels required in 7 days
+  levels14Days: text("levels_14_days"), // comma-separated levels required in 14 days
+  levels21Days: text("levels_21_days"), // comma-separated levels required in 21 days
+  levels28Days: text("levels_28_days"), // comma-separated levels required in 28 days
+  priority: integer("priority").default(0).notNull(), // production priority order
+  siteProgress: text("site_progress"), // site progress notes
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  reportIdx: index("weekly_job_report_schedules_report_idx").on(table.reportId),
+  jobIdx: index("weekly_job_report_schedules_job_idx").on(table.jobId),
+}));
+
+export const insertWeeklyJobReportSchema = createInsertSchema(weeklyJobReports).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWeeklyJobReportScheduleSchema = createInsertSchema(weeklyJobReportSchedules).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -673,6 +725,11 @@ export type InsertDeliveryRecord = z.infer<typeof insertDeliveryRecordSchema>;
 export type DeliveryRecord = typeof deliveryRecords.$inferSelect;
 export type InsertWeeklyWageReport = z.infer<typeof insertWeeklyWageReportSchema>;
 export type WeeklyWageReport = typeof weeklyWageReports.$inferSelect;
+export type InsertWeeklyJobReport = z.infer<typeof insertWeeklyJobReportSchema>;
+export type WeeklyJobReport = typeof weeklyJobReports.$inferSelect;
+export type InsertWeeklyJobReportSchedule = z.infer<typeof insertWeeklyJobReportScheduleSchema>;
+export type WeeklyJobReportSchedule = typeof weeklyJobReportSchedules.$inferSelect;
+export type WeeklyReportStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
 export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({
   id: true,
