@@ -510,25 +510,51 @@ export default function ProductionSlotsPage() {
       </Dialog>
 
       <Dialog open={showPanelBreakdownDialog} onOpenChange={setShowPanelBreakdownDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[80vh]">
           <DialogHeader>
             <DialogTitle>Panel Breakdown</DialogTitle>
             <DialogDescription>
-              {selectedSlot && `${selectedSlot.job.jobNumber} - ${selectedSlot.level} (${selectedSlot.panelCount} panels)`}
+              {selectedSlot && `${selectedSlot.job.jobNumber} - Level ${selectedSlot.level} (${selectedSlot.panelCount} panels)`}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            {Object.entries(groupedByPanelType(panelsForSlot)).map(([type, count]) => (
-              <div key={type} className="flex justify-between items-center py-2 border-b">
-                <span>{type}</span>
-                <Badge variant="secondary">{count}</Badge>
-              </div>
-            ))}
-            {panelsForSlot.length === 0 && (
+          <div className="max-h-[60vh] overflow-y-auto">
+            {panelsForSlot.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">No panels found for this level</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Panel Mark</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Load Width</TableHead>
+                    <TableHead>Load Height</TableHead>
+                    <TableHead>Thickness</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {panelsForSlot.map((panel) => (
+                    <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                      <TableCell className="font-medium">{panel.panelMark || "-"}</TableCell>
+                      <TableCell>{panel.panelType || "-"}</TableCell>
+                      <TableCell>{panel.loadWidth || "-"}</TableCell>
+                      <TableCell>{panel.loadHeight || "-"}</TableCell>
+                      <TableCell>{panel.panelThickness || "-"}</TableCell>
+                      <TableCell>
+                        <Badge variant={panel.status === "COMPLETED" ? "default" : "secondary"}>
+                          {panel.status || "NOT_STARTED"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex justify-between items-center gap-2">
+            <div className="text-sm text-muted-foreground">
+              Summary: {Object.entries(groupedByPanelType(panelsForSlot)).map(([type, count]) => `${type}: ${count}`).join(", ")}
+            </div>
             <Button variant="outline" onClick={() => setShowPanelBreakdownDialog(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
