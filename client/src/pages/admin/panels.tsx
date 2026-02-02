@@ -162,9 +162,11 @@ export default function AdminPanelsPage() {
     panelArea: "",
     day28Fc: "",
     liftFcm: "",
+    concreteStrengthMpa: "",
     rotationalLifters: "",
     primaryLifters: "",
   });
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const pdfInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-calculate area, volume, and mass when dimensions change
@@ -466,6 +468,7 @@ export default function AdminPanelsPage() {
           panelArea: result.extracted.panelArea || "",
           day28Fc: result.extracted.day28Fc || "",
           liftFcm: result.extracted.liftFcm || "",
+          concreteStrengthMpa: result.extracted.concreteStrengthMpa || "",
           rotationalLifters: result.extracted.rotationalLifters || "",
           primaryLifters: result.extracted.primaryLifters || "",
         });
@@ -525,6 +528,7 @@ export default function AdminPanelsPage() {
     }
     
     setBuildingPanel(panel);
+    setValidationErrors([]);
     setBuildFormData({
       loadWidth: panel.loadWidth || "",
       loadHeight: panel.loadHeight || "",
@@ -534,6 +538,7 @@ export default function AdminPanelsPage() {
       panelArea: panel.panelArea || "",
       day28Fc: panel.day28Fc || "",
       liftFcm: panel.liftFcm || "",
+      concreteStrengthMpa: panel.concreteStrengthMpa || "",
       rotationalLifters: panel.rotationalLifters || "",
       primaryLifters: panel.primaryLifters || "",
     });
@@ -545,6 +550,7 @@ export default function AdminPanelsPage() {
     setBuildDialogOpen(false);
     setBuildingPanel(null);
     setPdfFile(null);
+    setValidationErrors([]);
     setBuildFormData({
       loadWidth: "",
       loadHeight: "",
@@ -554,6 +560,7 @@ export default function AdminPanelsPage() {
       panelArea: "",
       day28Fc: "",
       liftFcm: "",
+      concreteStrengthMpa: "",
       rotationalLifters: "",
       primaryLifters: "",
     });
@@ -593,6 +600,27 @@ export default function AdminPanelsPage() {
 
   const handleApproveProduction = () => {
     if (!buildingPanel) return;
+    
+    // Validation - required fields before approval
+    const errors: string[] = [];
+    if (!buildFormData.loadWidth) errors.push("Load Width is required");
+    if (!buildFormData.loadHeight) errors.push("Load Height is required");
+    if (!buildFormData.panelThickness) errors.push("Panel Thickness is required");
+    if (!buildFormData.concreteStrengthMpa) errors.push("Concrete Strength (MPa) is required");
+    if (!buildFormData.day28Fc) errors.push("28-Day f'c is required");
+    if (!buildFormData.liftFcm) errors.push("Lift f'cm is required");
+    
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      toast({
+        title: "Validation Required",
+        description: "Please fill in all required fields before approving for production.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setValidationErrors([]);
     approveProductionMutation.mutate({ panelId: buildingPanel.id, data: buildFormData });
   };
 
@@ -2000,33 +2028,36 @@ export default function AdminPanelsPage() {
             {/* Panel Specifications Form */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="loadWidth">Load Width (mm)</Label>
+                <Label htmlFor="loadWidth">Load Width (mm) <span className="text-red-500">*</span></Label>
                 <Input
                   id="loadWidth"
                   value={buildFormData.loadWidth}
                   onChange={(e) => setBuildFormData({ ...buildFormData, loadWidth: e.target.value })}
                   placeholder="e.g., 3000"
                   data-testid="input-load-width"
+                  className={validationErrors.includes("Load Width is required") ? "border-red-500" : ""}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="loadHeight">Load Height (mm)</Label>
+                <Label htmlFor="loadHeight">Load Height (mm) <span className="text-red-500">*</span></Label>
                 <Input
                   id="loadHeight"
                   value={buildFormData.loadHeight}
                   onChange={(e) => setBuildFormData({ ...buildFormData, loadHeight: e.target.value })}
                   placeholder="e.g., 2500"
                   data-testid="input-load-height"
+                  className={validationErrors.includes("Load Height is required") ? "border-red-500" : ""}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="panelThickness">Panel Thickness (mm)</Label>
+                <Label htmlFor="panelThickness">Panel Thickness (mm) <span className="text-red-500">*</span></Label>
                 <Input
                   id="panelThickness"
                   value={buildFormData.panelThickness}
                   onChange={(e) => setBuildFormData({ ...buildFormData, panelThickness: e.target.value })}
                   placeholder="e.g., 200"
                   data-testid="input-panel-thickness"
+                  className={validationErrors.includes("Panel Thickness is required") ? "border-red-500" : ""}
                 />
               </div>
               <div className="space-y-2">
@@ -2063,26 +2094,60 @@ export default function AdminPanelsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="day28Fc">28-Day f'c (MPa)</Label>
+                <Label htmlFor="day28Fc">28-Day f'c (MPa) <span className="text-red-500">*</span></Label>
                 <Input
                   id="day28Fc"
                   value={buildFormData.day28Fc}
                   onChange={(e) => setBuildFormData({ ...buildFormData, day28Fc: e.target.value })}
                   placeholder="e.g., 40"
                   data-testid="input-day28-fc"
+                  className={validationErrors.includes("28-Day f'c is required") ? "border-red-500" : ""}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="liftFcm">Lift f'cm (MPa)</Label>
+                <Label htmlFor="liftFcm">Lift f'cm (MPa) <span className="text-red-500">*</span></Label>
                 <Input
                   id="liftFcm"
                   value={buildFormData.liftFcm}
                   onChange={(e) => setBuildFormData({ ...buildFormData, liftFcm: e.target.value })}
                   placeholder="e.g., 25"
                   data-testid="input-lift-fcm"
+                  className={validationErrors.includes("Lift f'cm is required") ? "border-red-500" : ""}
                 />
               </div>
             </div>
+
+            {/* Concrete Strength Section */}
+            <div className="border rounded-lg p-4 space-y-4 bg-amber-50/50 dark:bg-amber-950/20">
+              <div className="flex items-center gap-2">
+                <h4 className="font-medium text-sm">Concrete Specification <span className="text-red-500">*</span></h4>
+                <Badge variant="secondary" className="text-xs">Required for Approval</Badge>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="concreteStrengthMpa">Concrete Strength (MPa) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="concreteStrengthMpa"
+                  value={buildFormData.concreteStrengthMpa}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, concreteStrengthMpa: e.target.value })}
+                  placeholder="e.g., 40, 50, 65"
+                  data-testid="input-concrete-strength"
+                  className={validationErrors.includes("Concrete Strength (MPa) is required") ? "border-red-500" : ""}
+                />
+                <p className="text-xs text-muted-foreground">Enter the specified concrete strength grade (e.g., N40, N50)</p>
+              </div>
+            </div>
+
+            {/* Validation Errors Display */}
+            {validationErrors.length > 0 && (
+              <div className="border border-red-200 bg-red-50 dark:bg-red-950/20 rounded-lg p-3">
+                <p className="font-medium text-sm text-red-600 dark:text-red-400 mb-2">Please complete all required fields:</p>
+                <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 space-y-1">
+                  {validationErrors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

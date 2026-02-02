@@ -3097,6 +3097,7 @@ Return ONLY valid JSON, no explanation text.`
         panelArea, 
         day28Fc, 
         liftFcm,
+        concreteStrengthMpa,
         rotationalLifters,
         primaryLifters,
         productionPdfUrl 
@@ -3116,6 +3117,7 @@ Return ONLY valid JSON, no explanation text.`
         panelArea,
         day28Fc,
         liftFcm,
+        concreteStrengthMpa,
         rotationalLifters,
         primaryLifters,
         productionPdfUrl,
