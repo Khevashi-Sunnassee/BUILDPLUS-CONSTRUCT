@@ -73,6 +73,7 @@ export interface IStorage {
   deleteLogRow(id: string): Promise<void>;
   deleteDailyLog(id: string): Promise<void>;
   deleteProductionDay(id: string): Promise<void>;
+  deleteProductionDayByDateAndFactory(date: string, factory: string): Promise<void>;
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
@@ -433,6 +434,23 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductionDay(id: string): Promise<void> {
     await db.delete(productionDays).where(eq(productionDays.id, id));
+  }
+
+  async deleteProductionDayByDateAndFactory(date: string, factory: string): Promise<void> {
+    // First delete all production entries for this date and factory
+    await db.delete(productionEntries).where(
+      and(
+        eq(productionEntries.productionDate, date),
+        eq(productionEntries.factory, factory)
+      )
+    );
+    // Then delete the production day
+    await db.delete(productionDays).where(
+      and(
+        eq(productionDays.productionDate, date),
+        eq(productionDays.factory, factory)
+      )
+    );
   }
 
   async createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent> {

@@ -293,9 +293,11 @@ export async function registerRoutes(
     }
   });
 
-  app.delete("/api/production-days/:id", requireRole("MANAGER", "ADMIN"), async (req, res) => {
+  app.delete("/api/production-days/:date", requireRole("MANAGER", "ADMIN"), async (req, res) => {
     try {
-      await storage.deleteProductionDay(req.params.id as string);
+      const date = req.params.date;
+      const factory = (req.query.factory as string) || "QLD";
+      await storage.deleteProductionDayByDateAndFactory(date, factory);
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting production day:", error);
