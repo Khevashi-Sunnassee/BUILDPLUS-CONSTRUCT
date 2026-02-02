@@ -87,6 +87,7 @@ export const jobs = pgTable("jobs", {
   code: text("code"),
   client: text("client"),
   address: text("address"),
+  city: text("city"),
   state: australianStateEnum("state"),
   siteContact: text("site_contact"),
   siteContactPhone: text("site_contact_phone"),

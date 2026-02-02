@@ -634,6 +634,7 @@ export async function registerRoutes(
           name: String(row.name || row["Name"] || row["Job Name"] || "").trim(),
           client: row.client || row["Client"] || null,
           address: row.address || row["Address"] || null,
+          city: row.city || row["City"] || null,
           state,
           siteContact: row.siteContact || row["Site Contact"] || row.site_contact || null,
           siteContactPhone: row.siteContactPhone || row["Site Contact Phone"] || row.site_contact_phone || null,

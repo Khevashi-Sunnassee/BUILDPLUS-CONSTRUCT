@@ -86,6 +86,7 @@ const jobSchema = z.object({
   name: z.string().min(1, "Name is required"),
   client: z.string().optional(),
   address: z.string().optional(),
+  city: z.string().optional(),
   state: z.enum(AUSTRALIAN_STATES).optional().nullable(),
   description: z.string().optional(),
   siteContact: z.string().optional(),
@@ -382,6 +383,7 @@ export default function AdminJobsPage() {
         "Name": "Example Job", 
         "Client": "Example Client", 
         "Address": "123 Example St", 
+        "City": "Melbourne",
         "State": "VIC",
         "Site Contact": "John Smith",
         "Site Contact Phone": "0412 345 678",
@@ -402,6 +404,7 @@ export default function AdminJobsPage() {
       name: "",
       client: "",
       address: "",
+      city: "",
       state: null,
       description: "",
       siteContact: "",
@@ -418,6 +421,7 @@ export default function AdminJobsPage() {
       name: job.name,
       client: job.client || "",
       address: job.address || "",
+      city: job.city || "",
       state: job.state || null,
       description: job.description || "",
       siteContact: job.siteContact || "",
@@ -734,15 +738,28 @@ export default function AdminJobsPage() {
                   )}
                 />
               </div>
+              <FormField
+                control={jobForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Street address" {...field} data-testid="input-job-address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid grid-cols-3 gap-4">
                 <FormField
                   control={jobForm.control}
-                  name="address"
+                  name="city"
                   render={({ field }) => (
-                    <FormItem className="col-span-2">
-                      <FormLabel>Address</FormLabel>
+                    <FormItem>
+                      <FormLabel>City</FormLabel>
                       <FormControl>
-                        <Input placeholder="Job address" {...field} data-testid="input-job-address" />
+                        <Input placeholder="City" {...field} data-testid="input-job-city" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -760,11 +777,11 @@ export default function AdminJobsPage() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-job-state">
-                            <SelectValue placeholder="Select state" />
+                            <SelectValue placeholder="Select" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="none">No State</SelectItem>
+                          <SelectItem value="none">-</SelectItem>
                           {AUSTRALIAN_STATES.map((state) => (
                             <SelectItem key={state} value={state}>{state}</SelectItem>
                           ))}
