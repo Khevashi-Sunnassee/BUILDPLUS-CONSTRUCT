@@ -374,7 +374,16 @@ export default function AdminJobsPage() {
 
   const downloadTemplate = () => {
     const template = [
-      { "Job Number": "JOB001", "Name": "Example Job", "Client": "Example Client", "Address": "123 Example St", "Description": "Description here" },
+      { 
+        "Job Number": "JOB001", 
+        "Name": "Example Job", 
+        "Client": "Example Client", 
+        "Address": "123 Example St", 
+        "Site Contact": "John Smith",
+        "Site Contact Phone": "0412 345 678",
+        "Description": "Description here",
+        "Status": "ACTIVE"
+      },
     ];
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();

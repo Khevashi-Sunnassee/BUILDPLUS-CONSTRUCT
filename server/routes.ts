@@ -619,14 +619,23 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid import data" });
       }
       
-      const jobsToImport = data.map((row: any) => ({
-        jobNumber: String(row.jobNumber || row["Job Number"] || row.job_number || "").trim(),
-        name: String(row.name || row["Name"] || row["Job Name"] || "").trim(),
-        client: row.client || row["Client"] || null,
-        address: row.address || row["Address"] || null,
-        description: row.description || row["Description"] || null,
-        status: "ACTIVE" as const,
-      })).filter((j: any) => j.jobNumber && j.name);
+      const validStatuses = ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"];
+      
+      const jobsToImport = data.map((row: any) => {
+        const statusRaw = String(row.status || row["Status"] || "ACTIVE").toUpperCase().replace(/ /g, "_");
+        const status = validStatuses.includes(statusRaw) ? statusRaw as "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED" : "ACTIVE";
+        
+        return {
+          jobNumber: String(row.jobNumber || row["Job Number"] || row.job_number || "").trim(),
+          name: String(row.name || row["Name"] || row["Job Name"] || "").trim(),
+          client: row.client || row["Client"] || null,
+          address: row.address || row["Address"] || null,
+          siteContact: row.siteContact || row["Site Contact"] || row.site_contact || null,
+          siteContactPhone: row.siteContactPhone || row["Site Contact Phone"] || row.site_contact_phone || null,
+          description: row.description || row["Description"] || null,
+          status,
+        };
+      }).filter((j: any) => j.jobNumber && j.name);
       
       const result = await storage.importJobs(jobsToImport);
       res.json(result);
