@@ -134,6 +134,7 @@ export const dailyLogs = pgTable("daily_logs", {
   logDay: text("log_day").notNull(),
   tz: text("tz").default("Australia/Melbourne").notNull(),
   discipline: disciplineEnum("discipline").default("DRAFTING").notNull(),
+  factory: text("factory").default("QLD").notNull(),
   status: logStatusEnum("status").default("PENDING").notNull(),
   submittedAt: timestamp("submitted_at"),
   approvedAt: timestamp("approved_at"),
@@ -142,8 +143,9 @@ export const dailyLogs = pgTable("daily_logs", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  userLogDayDisciplineIdx: uniqueIndex("user_log_day_discipline_idx").on(table.userId, table.logDay, table.discipline),
+  userLogDayDisciplineFactoryIdx: uniqueIndex("user_log_day_discipline_factory_idx").on(table.userId, table.logDay, table.discipline, table.factory),
   logDayIdx: index("daily_logs_log_day_idx").on(table.logDay),
+  factoryIdx: index("daily_logs_factory_idx").on(table.factory),
 }));
 
 export const logRows = pgTable("log_rows", {

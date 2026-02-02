@@ -18,6 +18,7 @@ import {
   FileDown,
   Loader2,
   Trash2,
+  Factory,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +66,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 interface DailyLogSummary {
   id: string;
   logDay: string;
+  factory: string;
   status: string;
   totalMinutes: number;
   idleMinutes: number;
@@ -81,10 +83,12 @@ export default function DailyReportsPage() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("week");
+  const [factoryFilter, setFactoryFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
   const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [newDayFactory, setNewDayFactory] = useState("QLD");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -107,7 +111,7 @@ export default function DailyReportsPage() {
   };
 
   const createDailyLogMutation = useMutation({
-    mutationFn: async (data: { logDay: string }) => {
+    mutationFn: async (data: { logDay: string; factory: string }) => {
       return await apiRequest("POST", "/api/daily-logs", data);
     },
     onSuccess: (data: any) => {
@@ -115,7 +119,7 @@ export default function DailyReportsPage() {
       setIsNewDayDialogOpen(false);
       toast({
         title: "Daily log created",
-        description: `Created log for ${format(new Date(newDayDate + "T00:00:00"), "dd/MM/yyyy")}`,
+        description: `Created log for ${format(new Date(newDayDate + "T00:00:00"), "dd/MM/yyyy")} - ${newDayFactory}`,
       });
       if (data?.id) {
         setLocation(`/daily-report/${data.id}`);
@@ -146,6 +150,11 @@ export default function DailyReportsPage() {
   });
 
   const filteredLogs = logs?.filter((log) => {
+    // Filter by factory
+    if (factoryFilter !== "all" && log.factory !== factoryFilter) {
+      return false;
+    }
+    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return (
@@ -333,15 +342,29 @@ export default function DailyReportsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="logDay">Date</Label>
-                  <Input
-                    id="logDay"
-                    type="date"
-                    value={newDayDate}
-                    onChange={(e) => setNewDayDate(e.target.value)}
-                    data-testid="input-new-day-date"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="logDay">Date</Label>
+                    <Input
+                      id="logDay"
+                      type="date"
+                      value={newDayDate}
+                      onChange={(e) => setNewDayDate(e.target.value)}
+                      data-testid="input-new-day-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Factory</Label>
+                    <Select value={newDayFactory} onValueChange={setNewDayFactory}>
+                      <SelectTrigger data-testid="select-new-day-factory">
+                        <SelectValue placeholder="Select factory" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="QLD">QLD</SelectItem>
+                        <SelectItem value="VIC">Victoria</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
               <DialogFooter>
@@ -356,6 +379,7 @@ export default function DailyReportsPage() {
                   onClick={() =>
                     createDailyLogMutation.mutate({
                       logDay: newDayDate,
+                      factory: newDayFactory,
                     })
                   }
                   disabled={createDailyLogMutation.isPending}
@@ -414,6 +438,16 @@ export default function DailyReportsPage() {
                   <SelectItem value="all">All Time</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+                <SelectTrigger className="w-36" data-testid="select-factory-filter">
+                  <SelectValue placeholder="Factory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Factories</SelectItem>
+                  <SelectItem value="QLD">QLD</SelectItem>
+                  <SelectItem value="VIC">Victoria</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -432,6 +466,7 @@ export default function DailyReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-32">Date</TableHead>
+                    <TableHead className="w-24">Factory</TableHead>
                     {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
                       <TableHead>User</TableHead>
                     )}
@@ -455,6 +490,12 @@ export default function DailyReportsPage() {
                             </span>
                           </div>
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-medium">
+                          <Factory className="h-3 w-3 mr-1" />
+                          {log.factory}
+                        </Badge>
                       </TableCell>
                       {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
                         <TableCell className="text-muted-foreground">
