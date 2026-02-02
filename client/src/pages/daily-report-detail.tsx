@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import lteLogo from "@/assets/lte-logo.png";
 import {
   ArrowLeft,
   Calendar,
@@ -15,6 +18,7 @@ import {
   X,
   Loader2,
   Plus,
+  FileDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,6 +67,8 @@ export default function DailyReportDetailPage() {
   const { toast } = useToast();
   const [editingRowId, setEditingRowId] = useState<string | null>(null);
   const [editValues, setEditValues] = useState<Record<string, any>>({});
+  const [isExporting, setIsExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   const logId = params?.id;
 
@@ -168,6 +174,88 @@ export default function DailyReportDetailPage() {
   const totalMinutes = log?.rows?.reduce((sum, row) => sum + row.durationMin, 0) || 0;
   const totalIdle = log?.rows?.reduce((sum, row) => sum + row.idleMin, 0) || 0;
 
+  const exportToPDF = async () => {
+    if (!reportRef.current || !log) return;
+    
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 1200,
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const headerHeight = 35;
+      const margin = 10;
+      const footerHeight = 12;
+      const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
+      const usableWidth = pdfWidth - (margin * 2);
+      
+      pdf.setFillColor(30, 64, 175);
+      pdf.rect(0, 0, pdfWidth, 28, "F");
+      
+      const logoSize = 18;
+      try {
+        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+      } catch (e) {}
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("LTE Daily Time Report", margin + logoSize + 8, 14);
+      
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`${log.user?.name || log.user?.email} - ${format(new Date(log.logDay), "EEEE, MMMM d, yyyy")}`, margin + logoSize + 8, 21);
+      
+      pdf.setFontSize(9);
+      pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      
+      pdf.setTextColor(0, 0, 0);
+      
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const imgRatio = imgWidth / imgHeight;
+      let scaledWidth = usableWidth;
+      let scaledHeight = scaledWidth / imgRatio;
+      
+      if (scaledHeight > usableHeight) {
+        scaledHeight = usableHeight;
+        scaledWidth = scaledHeight * imgRatio;
+      }
+      
+      const imgX = (pdfWidth - scaledWidth) / 2;
+      pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
+      
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
+      
+      pdf.save(`LTE-Daily-Report-${log.logDay}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -212,6 +300,19 @@ export default function DailyReportDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={exportToPDF} 
+            disabled={isExporting}
+            data-testid="button-export-pdf"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4 mr-2" />
+            )}
+            Export PDF
+          </Button>
           {canEdit && (
             <>
               <Button
@@ -266,6 +367,7 @@ export default function DailyReportDetailPage() {
         </div>
       </div>
 
+      <div ref={reportRef}>
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -509,6 +611,7 @@ export default function DailyReportDetailPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
