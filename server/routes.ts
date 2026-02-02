@@ -1425,8 +1425,8 @@ export async function registerRoutes(
     if (!entryIds || !Array.isArray(entryIds) || entryIds.length === 0 || !status) {
       return res.status(400).json({ error: "entryIds array and status required" });
     }
-    if (!["DRAFT", "COMPLETED"].includes(status)) {
-      return res.status(400).json({ error: "Invalid status. Must be DRAFT or COMPLETED" });
+    if (!["PENDING", "COMPLETED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be PENDING or COMPLETED" });
     }
     // Validate all entries exist before updating
     const validEntries = [];
@@ -1610,7 +1610,7 @@ export async function registerRoutes(
       report.jobIds.add(entry.jobId);
       
       // Count by status
-      const status = (entry as any).status || "DRAFT";
+      const status = (entry as any).status || "PENDING";
       if (status === "COMPLETED") {
         report.completedCount++;
       } else {

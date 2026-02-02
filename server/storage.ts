@@ -174,6 +174,7 @@ export interface IStorage {
     panelArea?: string | null;
     day28Fc?: string | null;
     liftFcm?: string | null;
+    concreteStrengthMpa?: string | null;
     rotationalLifters?: string | null;
     primaryLifters?: string | null;
     productionPdfUrl?: string | null;
@@ -1320,6 +1321,7 @@ export class DatabaseStorage implements IStorage {
     panelArea?: string | null;
     day28Fc?: string | null;
     liftFcm?: string | null;
+    concreteStrengthMpa?: string | null;
     rotationalLifters?: string | null;
     primaryLifters?: string | null;
     productionPdfUrl?: string | null;
