@@ -772,6 +772,13 @@ export default function AdminPanelsPage() {
     pending: filteredPanels?.filter(p => p.status === "PENDING").length || 0,
   };
 
+  const volumeAreaTotals = {
+    totalM2: filteredPanels?.reduce((sum, p) => sum + parseFloat(p.panelArea || "0"), 0) || 0,
+    totalM3: filteredPanels?.reduce((sum, p) => sum + parseFloat(p.panelVolume || "0"), 0) || 0,
+    completedM2: filteredPanels?.filter(p => p.status === "COMPLETED").reduce((sum, p) => sum + parseFloat(p.panelArea || "0"), 0) || 0,
+    completedM3: filteredPanels?.filter(p => p.status === "COMPLETED").reduce((sum, p) => sum + parseFloat(p.panelVolume || "0"), 0) || 0,
+  };
+
   if (panelsLoading) {
     return (
       <div className="space-y-6">
@@ -880,6 +887,33 @@ export default function AdminPanelsPage() {
           <CardContent className="p-4">
             <div className="text-2xl font-bold text-orange-500">{statusCounts.onHold}</div>
             <div className="text-sm text-muted-foreground">On Hold</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-4 gap-4">
+        <Card data-testid="card-total-m2">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{volumeAreaTotals.totalM2.toFixed(2)}</div>
+            <div className="text-sm text-muted-foreground">Total m²</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-completed-m2">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-500">{volumeAreaTotals.completedM2.toFixed(2)}</div>
+            <div className="text-sm text-muted-foreground">Completed m²</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-total-m3">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold">{volumeAreaTotals.totalM3.toFixed(2)}</div>
+            <div className="text-sm text-muted-foreground">Total m³</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="card-completed-m3">
+          <CardContent className="p-4">
+            <div className="text-2xl font-bold text-green-500">{volumeAreaTotals.completedM3.toFixed(2)}</div>
+            <div className="text-sm text-muted-foreground">Completed m³</div>
           </CardContent>
         </Card>
       </div>
