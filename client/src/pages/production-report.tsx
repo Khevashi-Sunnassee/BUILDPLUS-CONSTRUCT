@@ -19,6 +19,8 @@ import {
   Loader2,
   MapPin,
   Trash2,
+  Circle,
+  CheckCircle2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,6 +73,8 @@ interface ProductionReportSummary {
   totalVolumeM3: number;
   totalAreaM2: number;
   jobCount: number;
+  draftCount: number;
+  completedCount: number;
 }
 
 export default function ProductionReportPage() {
@@ -204,13 +208,37 @@ export default function ProductionReportPage() {
     }
   };
 
-  const getStatusBadge = (entryCount: number) => {
+  const getStatusBadge = (report: ProductionReportSummary) => {
+    const { draftCount = 0, completedCount = 0, entryCount } = report;
     if (entryCount === 0) {
-      return <Badge variant="secondary">No Entries</Badge>;
-    } else if (entryCount < 5) {
-      return <Badge variant="outline">In Progress</Badge>;
+      return <Badge variant="secondary">Scheduled</Badge>;
+    } else if (draftCount > 0 && completedCount === 0) {
+      return (
+        <Badge variant="secondary" className="gap-1">
+          <Circle className="h-3 w-3" />
+          All Draft
+        </Badge>
+      );
+    } else if (draftCount === 0 && completedCount > 0) {
+      return (
+        <Badge className="gap-1 bg-green-600">
+          <CheckCircle2 className="h-3 w-3" />
+          Completed
+        </Badge>
+      );
     } else {
-      return <Badge variant="default">Active</Badge>;
+      return (
+        <div className="flex gap-1">
+          <Badge variant="secondary" className="gap-1 text-xs">
+            <Circle className="h-2.5 w-2.5" />
+            {draftCount}
+          </Badge>
+          <Badge className="gap-1 text-xs bg-green-600">
+            <CheckCircle2 className="h-2.5 w-2.5" />
+            {completedCount}
+          </Badge>
+        </div>
+      );
     }
   };
 
@@ -548,7 +576,7 @@ export default function ProductionReportPage() {
                         {report.jobCount}
                       </TableCell>
                       <TableCell className="text-center">
-                        {getStatusBadge(report.entryCount)}
+                        {getStatusBadge(report)}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">

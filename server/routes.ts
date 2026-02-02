@@ -1386,6 +1386,32 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // Batch update production entry statuses
+  app.put("/api/production-entries/batch-status", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+    const { entryIds, status } = req.body;
+    if (!entryIds || !Array.isArray(entryIds) || entryIds.length === 0 || !status) {
+      return res.status(400).json({ error: "entryIds array and status required" });
+    }
+    if (!["DRAFT", "COMPLETED"].includes(status)) {
+      return res.status(400).json({ error: "Invalid status. Must be DRAFT or COMPLETED" });
+    }
+    // Validate all entries exist before updating
+    const validEntries = [];
+    for (const id of entryIds) {
+      const entry = await storage.getProductionEntry(id);
+      if (entry) {
+        validEntries.push(id);
+      }
+    }
+    if (validEntries.length === 0) {
+      return res.status(404).json({ error: "No valid entries found" });
+    }
+    const updated = await Promise.all(
+      validEntries.map(id => storage.updateProductionEntry(id, { status }))
+    );
+    res.json({ updated: updated.length });
+  });
+
   app.get("/api/production-summary", requireAuth, async (req, res) => {
     const date = req.query.date as string;
     if (!date) return res.status(400).json({ error: "Date required" });
@@ -1501,6 +1527,8 @@ export async function registerRoutes(
       totalVolumeM3: number;
       totalAreaM2: number;
       jobIds: Set<string>;
+      draftCount: number;
+      completedCount: number;
     }>();
     
     // First, add all production days (even empty ones)
@@ -1515,6 +1543,8 @@ export async function registerRoutes(
           totalVolumeM3: 0,
           totalAreaM2: 0,
           jobIds: new Set(),
+          draftCount: 0,
+          completedCount: 0,
         });
       }
     }
@@ -1534,6 +1564,8 @@ export async function registerRoutes(
           totalVolumeM3: 0,
           totalAreaM2: 0,
           jobIds: new Set(),
+          draftCount: 0,
+          completedCount: 0,
         });
       }
       
@@ -1543,6 +1575,14 @@ export async function registerRoutes(
       report.totalVolumeM3 += parseFloat(entry.volumeM3 || "0");
       report.totalAreaM2 += parseFloat(entry.areaM2 || "0");
       report.jobIds.add(entry.jobId);
+      
+      // Count by status
+      const status = (entry as any).status || "DRAFT";
+      if (status === "COMPLETED") {
+        report.completedCount++;
+      } else {
+        report.draftCount++;
+      }
     }
     
     // Convert to array and sort by date descending, then factory

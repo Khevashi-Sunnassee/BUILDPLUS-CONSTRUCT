@@ -24,6 +24,9 @@ import {
   TrendingUp,
   TrendingDown,
   FileDown,
+  CheckCircle2,
+  Circle,
+  CheckSquare,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -129,6 +132,7 @@ export default function ProductionReportDetailPage() {
   const [deleteDayDialogOpen, setDeleteDayDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [isExporting, setIsExporting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: summaryData, isLoading: entriesLoading } = useQuery<ProductionSummaryWithCosts>({
@@ -239,6 +243,53 @@ export default function ProductionReportDetailPage() {
       toast({ title: "Failed to delete production day", variant: "destructive" });
     },
   });
+
+  // Update single entry status
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      return apiRequest("PUT", `/api/production-entries/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      toast({ title: "Status updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update status", variant: "destructive" });
+    },
+  });
+
+  // Batch update all entries to COMPLETED
+  const markAllCompletedMutation = useMutation({
+    mutationFn: async (entryIds: string[]) => {
+      return apiRequest("PUT", "/api/production-entries/batch-status", { entryIds, status: "COMPLETED" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      toast({ title: "All entries marked as completed" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update statuses", variant: "destructive" });
+    },
+  });
+
+  // Filter entries by status
+  const filteredEntries = useMemo(() => {
+    if (!entries) return [];
+    if (statusFilter === "all") return entries;
+    return entries.filter(e => e.status === statusFilter);
+  }, [entries, statusFilter]);
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    if (!entries) return { draft: 0, completed: 0, total: 0 };
+    return {
+      draft: entries.filter(e => e.status === "DRAFT").length,
+      completed: entries.filter(e => e.status === "COMPLETED").length,
+      total: entries.length,
+    };
+  }, [entries]);
 
   const openCreateDialog = () => {
     setEditingEntry(null);
@@ -578,12 +629,53 @@ export default function ProductionReportDetailPage() {
           </div>
 
           <div className="border rounded-lg">
-            <div className="bg-muted/50 px-4 py-2 border-b font-medium">
-              FLAT PANELS
+            <div className="bg-muted/50 px-4 py-2 border-b flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <span className="font-medium">PRODUCTION SCHEDULE</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={statusCounts.draft > 0 ? "secondary" : "outline"} className="gap-1">
+                    <Circle className="h-3 w-3" />
+                    Draft: {statusCounts.draft}
+                  </Badge>
+                  <Badge variant={statusCounts.completed > 0 ? "default" : "outline"} className="gap-1 bg-green-600">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Completed: {statusCounts.completed}
+                  </Badge>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32" data-testid="select-status-filter">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="DRAFT">Draft</SelectItem>
+                    <SelectItem value="COMPLETED">Completed</SelectItem>
+                  </SelectContent>
+                </Select>
+                {statusCounts.draft > 0 && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const draftIds = entries?.filter(e => e.status === "DRAFT").map(e => e.id) || [];
+                      if (draftIds.length > 0) {
+                        markAllCompletedMutation.mutate(draftIds);
+                      }
+                    }}
+                    disabled={markAllCompletedMutation.isPending}
+                    data-testid="button-mark-all-completed"
+                  >
+                    <CheckSquare className="h-4 w-4 mr-1" />
+                    {markAllCompletedMutation.isPending ? "Updating..." : "Mark All Completed"}
+                  </Button>
+                )}
+              </div>
             </div>
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-[100px]">Status</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Panel ID</TableHead>
                   <TableHead>Panel Type</TableHead>
@@ -596,8 +688,27 @@ export default function ProductionReportDetailPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {entries?.map((entry) => (
+                {filteredEntries?.map((entry) => (
                   <TableRow key={entry.id} data-testid={`row-entry-${entry.id}`}>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`gap-1 ${entry.status === "COMPLETED" ? "text-green-600" : "text-muted-foreground"}`}
+                        onClick={() => {
+                          const newStatus = entry.status === "COMPLETED" ? "DRAFT" : "COMPLETED";
+                          updateStatusMutation.mutate({ id: entry.id, status: newStatus });
+                        }}
+                        disabled={updateStatusMutation.isPending}
+                        data-testid={`button-toggle-status-${entry.id}`}
+                      >
+                        {entry.status === "COMPLETED" ? (
+                          <><CheckCircle2 className="h-4 w-4" /> Done</>
+                        ) : (
+                          <><Circle className="h-4 w-4" /> Draft</>
+                        )}
+                      </Button>
+                    </TableCell>
                     <TableCell>
                       <span className="font-mono text-sm">{entry.job.jobNumber} - {entry.job.name}</span>
                     </TableCell>
@@ -647,7 +758,7 @@ export default function ProductionReportDetailPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {(!entries || entries.length === 0) && (
+                {(!filteredEntries || filteredEntries.length === 0) && (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       No production entries for this date. Click "Add Entry" to record production.
