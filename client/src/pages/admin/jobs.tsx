@@ -81,7 +81,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, PanelRegister } from "@shared/schema";
+import type { Job, PanelRegister, User as UserType } from "@shared/schema";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -98,6 +98,7 @@ const jobSchema = z.object({
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
+  projectManagerId: z.string().optional().nullable(),
 });
 
 type JobFormData = z.infer<typeof jobSchema>;
@@ -159,6 +160,10 @@ export default function AdminJobsPage() {
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
+  });
+
+  const { data: users } = useQuery<UserType[]>({
+    queryKey: ["/api/admin/users"],
   });
 
   // Filter and sort jobs
@@ -246,6 +251,7 @@ export default function AdminJobsPage() {
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
+      projectManagerId: null,
     },
   });
 
@@ -543,6 +549,7 @@ export default function AdminJobsPage() {
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
+      projectManagerId: null,
     });
     setJobDialogOpen(true);
   };
@@ -562,6 +569,7 @@ export default function AdminJobsPage() {
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
+      projectManagerId: job.projectManagerId || null,
     });
     setJobDialogOpen(true);
   };
@@ -1041,6 +1049,32 @@ export default function AdminJobsPage() {
                     <FormControl>
                       <Input type="date" {...field} data-testid="input-job-production-start-date" />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={jobForm.control}
+                name="projectManagerId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Manager</FormLabel>
+                    <Select 
+                      onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                      value={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-job-project-manager">
+                          <SelectValue placeholder="Select project manager" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No Project Manager</SelectItem>
+                        {users?.map((user) => (
+                          <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
