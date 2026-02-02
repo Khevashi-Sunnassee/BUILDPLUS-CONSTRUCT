@@ -71,7 +71,6 @@ const adminNavItems = [
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
-  { title: "Downloads", url: "/downloads", icon: Download },
 ];
 
 const urlToFunctionKey: Record<string, string> = {
