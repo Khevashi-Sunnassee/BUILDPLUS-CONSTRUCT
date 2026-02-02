@@ -130,6 +130,14 @@ export const panelRegister = pgTable("panel_register", {
   level: text("level"),
   structuralElevation: text("structural_elevation"),
   reckliDetail: text("reckli_detail"),
+  qty: integer("qty").default(1).notNull(),
+  takeoffCategory: text("takeoff_category"),
+  concreteStrengthMpa: text("concrete_strength_mpa"),
+  // Traceability fields for imports
+  sourceFileName: text("source_file_name"),
+  sourceSheet: text("source_sheet"),
+  sourceRow: integer("source_row"),
+  panelSourceId: text("panel_source_id"),
   source: integer("source").default(1).notNull(), // 1=Manual, 2=Excel Template, 3=Estimate
   status: panelStatusEnum("status").default("NOT_STARTED").notNull(),
   estimatedHours: integer("estimated_hours"),

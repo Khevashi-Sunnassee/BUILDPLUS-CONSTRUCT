@@ -1,0 +1,285 @@
+REPLIT BUILD SPEC — JOB SCREEN “ESTIMATE XLSX IMPORT” → PANEL TABLE (SOURCE=3)
+1) Objective
+
+Add an Estimate Import feature that runs from a Job screen in the Replit web app:
+
+User opens a Job (Project) page
+
+Clicks Import Estimate (XLSX)
+
+Uploads the estimate workbook (.xlsx)
+
+System dynamically finds all worksheets with TakeOff (incl “Take Off”, “Take-Off”)
+
+Extracts all panel rows across all TakeOff sheets into one combined list
+
+Maps Excel columns → Panel table using the fixed mapping template
+
+Inserts each panel with:
+
+jobId (or projectId) = current job
+
+status = PENDING
+
+source = 3 (mandatory)
+
+takeoffCategory derived from the tab name (Walls/Cores/Columns etc)
+
+traceability fields (file, sheet, row, rawJson)
+
+Returns an import summary (counts per sheet + totals)
+
+Supports repeat-safe idempotent imports (no duplicates if same file imported again)
+
+2) UI placement (Job screen)
+2.1 Job page button + modal
+
+On the Job details screen:
+
+Route:
+
+/jobs/[jobId] (or /projects/[projectId] — whichever your app uses)
+
+Add a card or section: Estimate Import
+
+Button: Import Estimate (XLSX)
+
+Button (optional): Re-import (Replace previous SOURCE=3)
+
+Clicking opens a modal:
+
+File picker (.xlsx)
+
+Checkbox: “Replace existing imported panels (source=3) for this job”
+
+Confirm button: Run Import
+
+After completion:
+
+Summary table per TakeOff sheet
+
+Total inserted + duplicates skipped + errors
+
+Link to Panels tab/list for that Job
+
+2.2 Job Panels list
+
+Add a Job Panels view:
+
+/jobs/[jobId]/panels (or tab inside job page)
+
+Default filter: source = 3 (so you see what came from estimate import)
+
+Filters: status, takeoffCategory, panelType, level, search
+
+3) Panel table requirements (DB)
+
+Every imported row becomes a Panel record linked to the job:
+
+3.1 Required fields
+
+jobId (or projectId) — MUST be populated from the Job screen context
+
+status — set "PENDING"
+
+source — set 3
+
+takeoffCategory — derived from sheet name
+
+traceability fields:
+
+sourceFileName
+
+sourceSheet
+
+sourceRow
+
+rawJson
+
+idempotency field:
+
+panelSourceId (unique) OR equivalent unique constraint
+
+4) Excel→DB mapping (MUST FOLLOW EXACTLY)
+
+Use this mapping template for each imported row:
+
+EXCEL HEADER	PANEL TABLE FIELD
+Column #	panelMark
+BUILDING	building
+Structural Elevation Number	structuralElevationNumber
+Level	level
+Column Type	panelType
+Reckli detail	reckliDetail
+Thickness	panelThicknessMm
+Width	panelWidthMm
+Height	panelHeightMm
+Gross Area (m2)	calculatedAreaM2
+Concrete Strength (MPa)	concreteStrengthMpa
+VOL (M3)	calculatedVolumeM3
+Weight (T)	calculatedWeightKg (convert tonnes to kg: T × 1000)
+
+Conversion rule
+
+calculatedWeightKg = (Weight (T)) * 1000
+
+Unmapped columns must still be stored in rawJson.
+
+5) Dynamic sheet scanning rules (works for any estimate)
+5.1 “TakeOff” sheet detection (dynamic)
+
+Include a sheet if normalized name contains takeoff:
+
+accept: “TakeOff”, “Take Off”, “Take-Off”
+Implementation:
+
+normalized = lower(sheetName).replace(/[\s-]/g,"")
+
+include if normalized.includes("takeoff")
+
+5.2 takeoffCategory from tab name
+
+For each included sheet:
+
+Remove “TakeOff” / “Take Off” / “Take-Off” (case-insensitive)
+
+Trim + collapse spaces
+
+If empty → "Uncategorised"
+
+Example:
+
+"Perimeter Walls TakeOff" → "Perimeter Walls"
+
+6) Header detection + row extraction (dynamic and robust)
+6.1 Header row detection
+
+Scan first 200 rows; choose row with best header score.
+
+A header row candidate:
+
+≥ 6 non-empty string cells AND
+
+contains at least 2 of:
+
+level, thickness, width, height, gross area, concrete strength, vol, weight, column, structural elevation
+
+Choose highest score.
+
+If none → skip sheet (reason HeaderNotFound).
+
+6.2 Header normalization
+
+Normalize headers before matching:
+
+trim, lowercase
+
+remove punctuation (), #
+
+collapse whitespace
+
+treat m² as m2, m³ as m3
+
+6.3 Determine key column
+
+Prefer the column mapped to panelMark (Column #). Else first non-empty header.
+
+6.4 Stop/skip rules
+
+STOP when key cell blank AND row ≥80% empty
+
+SKIP rows containing TOTAL/SUBTOTAL/SUMMARY
+
+SKIP rows where key cell blank but row has other data
+
+7) Eligibility rules (must match the template)
+
+Only import a sheet if the detected header includes at least:
+
+Column # (panelMark)
+
+Level
+
+Thickness OR (Width AND Height) (minimum structural definition)
+
+If missing → skip (reason MissingRequiredColumns).
+
+8) Insert logic (must set source=3 and status=PENDING)
+
+For each extracted data row, create a Panel record with:
+
+jobId = params.jobId (from Job screen)
+
+status = "PENDING"
+
+source = 3 ✅ (hardcoded)
+
+takeoffCategory = derived from sheet name
+
+mapped fields (section 4)
+
+computed: calculatedWeightKg = WeightT * 1000
+
+traceability:
+
+sourceFileName (original upload name)
+
+sourceSheet (tab name)
+
+sourceRow (1-based excel row index)
+
+rawJson = JSON of { header:value, ... }
+
+9) Idempotency (repeat import safe)
+
+Compute a unique row key to prevent duplicates:
+
+panelSourceId = sha256(jobId + fileSha256 + sheetName + sourceRow + panelMark + structuralElevationNumber)
+
+Then:
+
+if exists → skip (count as duplicate)
+
+else → insert
+
+If user checks “Replace existing imported panels (source=3)”:
+
+delete existing Panel rows for that jobId where source = 3 before inserting.
+
+10) API endpoint (Job-based)
+
+Create:
+
+POST /api/jobs/[jobId]/panels/import-estimate
+
+Auth required (ADMIN or allowed role per your business rules)
+
+Accepts multipart/form-data:
+
+file (xlsx)
+
+replace (true/false)
+
+Flow:
+
+Validate job exists
+
+Parse workbook
+
+Import panels into Panel table linked to job
+
+Return summary
+
+Response must include:
+
+totals (created, duplicates, skipped, errors)
+
+per-sheet summary:
+
+sheetName, takeoffCategory, headerRow, created, duplicates, skipped, reasonSkipped
+
+11) What to paste into Replit/dev (final prompt)
+
+Copy/paste this:
+
+Add a Job-screen Estimate XLSX Import. On /jobs/[jobId] add “Import Estimate (XLSX)” button that uploads an xlsx and calls POST /api/jobs/[jobId]/panels/import-estimate. The importer must dynamically scan all sheets whose name contains TakeOff (including take off/take-off), detect the header row, extract panel rows, and map Excel columns using the fixed mapping: Column#→panelMark, BUILDING→building, Structural Elevation Number→structuralElevationNumber, Level→level, Column Type→panelType, Reckli detail→reckliDetail, Thickness→panelThicknessMm, Width→panelWidthMm, Height→panelHeightMm, Gross Area(m2)→calculatedAreaM2, Concrete Strength(MPa)→concreteStrengthMpa, VOL(M3)→calculatedVolumeM3, Weight(T)→calculatedWeightKg (tonnes*1000). Insert into Panel table with jobId, status=PENDING, source=3 hardcoded, takeoffCategory from tab name minus TakeOff, plus sourceFileName/sourceSheet/sourceRow/rawJson. Must be idempotent using panelSourceId hash; include optional Replace checkbox to delete existing panels for job where source=3 before importing. Return per-sheet import summary.
