@@ -18,7 +18,8 @@ The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/
 
 **Technical Implementations & Features:**
 - **Authentication**: Standalone email/password authentication with bcrypt and `express-session`.
-- **Authorization**: RBAC roles (USER, MANAGER, ADMIN) for granular access control.
+- **Authorization**: RBAC roles (USER, MANAGER, ADMIN) combined with granular per-user permission system.
+- **User Permissions System**: Admin-configurable permission levels (HIDDEN, VIEW, VIEW_AND_UPDATE) for each function per user. Functions include daily_reports, production_report, logistics, weekly_wages, kpi_dashboard, jobs, panel_register, and various admin sections. Sidebar navigation respects permissions, and API routes enforce access levels.
 - **Data Ingestion**: Idempotent API endpoint (`POST /api/agent/ingest`) for Windows Agent data ingestion, secured by device key authentication.
 - **Time Management**: Daily log management with viewing, editing, and submission for approval. Includes manual time entry with on-the-fly panel registration and automatic start time defaulting.
 - **Approval Workflow**: Managers can review, approve, or reject submitted logs with comments.
