@@ -260,7 +260,7 @@ export default function DailyReportsPage() {
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Daily Reports", margin + logoWidth + 6, 12);
+      pdf.text("Drafting Register", margin + logoWidth + 6, 12);
       
       // Subtitle info
       pdf.setFontSize(10);
@@ -302,7 +302,7 @@ export default function DailyReportsPage() {
       pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
-      pdf.save(`LTE-Daily-Reports-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      pdf.save(`LTE-Drafting-Register-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {
@@ -315,7 +315,7 @@ export default function DailyReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-daily-reports-title">
-            Daily Reports
+            Drafting Register
           </h1>
           <p className="text-muted-foreground">
             Review and manage your drafting time entries
@@ -576,7 +576,7 @@ export default function DailyReportsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium">No daily reports found</h3>
+              <h3 className="text-lg font-medium">No drafting entries found</h3>
               <p className="text-sm text-muted-foreground mt-1">
                 Time entries from your Windows Agent will appear here
               </p>

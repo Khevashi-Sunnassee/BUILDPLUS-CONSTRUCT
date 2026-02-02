@@ -49,7 +49,7 @@ import {
 const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
-  { title: "Daily Reports", url: "/daily-reports", icon: FileText },
+  { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Production Schedule", url: "/production-report", icon: Factory },
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },

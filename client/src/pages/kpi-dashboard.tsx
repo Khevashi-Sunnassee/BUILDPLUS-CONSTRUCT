@@ -513,7 +513,7 @@ export default function KPIDashboardPage() {
             KPI Dashboard
           </h1>
           <p className="text-muted-foreground">
-            Performance metrics and daily reporting
+            Performance metrics and drafting analytics
           </p>
         </div>
 

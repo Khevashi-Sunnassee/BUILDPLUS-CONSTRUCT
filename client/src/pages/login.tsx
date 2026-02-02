@@ -68,7 +68,7 @@ export default function LoginPage() {
             data-testid="img-lte-logo"
           />
           <h1 className="text-2xl font-bold text-foreground">Performance Management</h1>
-          <p className="text-muted-foreground mt-1">KPI Tracking & Daily Reporting</p>
+          <p className="text-muted-foreground mt-1">KPI Tracking & Drafting Management</p>
         </div>
 
         <Card className="border-border shadow-lg">

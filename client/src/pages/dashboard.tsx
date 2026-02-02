@@ -164,7 +164,7 @@ export default function DashboardPage() {
             <Link href="/daily-reports">
               <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-view-daily-reports">
                 <FileText className="h-4 w-4" />
-                View Daily Reports
+                View Drafting Register
               </Button>
             </Link>
             <Link href="/reports">
