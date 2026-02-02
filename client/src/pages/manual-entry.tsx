@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
+import { useAuth } from "@/lib/auth";
 import { format } from "date-fns";
 import {
   Plus,
@@ -100,7 +101,10 @@ export default function ManualEntryPage() {
   const [, navigate] = useLocation();
   const searchString = useSearch();
   const { toast } = useToast();
+  const { user } = useAuth();
   const today = format(new Date(), "yyyy-MM-dd");
+  
+  const canApproveForProduction = user?.role === "MANAGER" || user?.role === "ADMIN";
   
   // Parse date and logId from URL query parameters if present
   const urlParams = new URLSearchParams(searchString);
@@ -713,7 +717,12 @@ export default function ManualEntryPage() {
                           <SelectItem value="DRAFT">DRAFT</SelectItem>
                           <SelectItem value="IFA">IFA (Issued for Approval)</SelectItem>
                           <SelectItem value="IFC">IFC (Issued for Construction)</SelectItem>
-                          <SelectItem value="APPROVED">Approved for Production</SelectItem>
+                          <SelectItem 
+                            value="APPROVED" 
+                            disabled={!canApproveForProduction || selectedPanel.documentStatus !== "IFC"}
+                          >
+                            Approved for Production {!canApproveForProduction && "(Manager/Admin only)"}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

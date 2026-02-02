@@ -1394,8 +1394,12 @@ export async function registerRoutes(
         if (!panel) {
           return res.status(404).json({ error: "Panel not found" });
         }
+        // Check both approvedForProduction flag and documentStatus
         if (!panel.approvedForProduction) {
           return res.status(400).json({ error: "Panel is not approved for production. Please approve the panel in the Panel Register first." });
+        }
+        if (panel.documentStatus !== "APPROVED") {
+          return res.status(400).json({ error: "Panel document status must be 'Approved for Production'. Current status: " + (panel.documentStatus || "DRAFT") + ". Please update the document status in the Drafting Register first." });
         }
         
         // Update panel with final dimensions if provided
