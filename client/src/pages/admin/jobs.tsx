@@ -137,8 +137,10 @@ export default function AdminJobsPage() {
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [stateFilter, setStateFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("jobNumber");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+  const [groupByState, setGroupByState] = useState(true);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -150,19 +152,33 @@ export default function AdminJobsPage() {
       // Status filter
       if (statusFilter !== "all" && job.status !== statusFilter) return false;
       
-      // Search filter (job number, name, client, address)
+      // State filter
+      if (stateFilter !== "all") {
+        if (stateFilter === "none" && job.state) return false;
+        if (stateFilter !== "none" && job.state !== stateFilter) return false;
+      }
+      
+      // Search filter (job number, name, client, address, city)
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         return (
           job.jobNumber.toLowerCase().includes(query) ||
           job.name.toLowerCase().includes(query) ||
           (job.client && job.client.toLowerCase().includes(query)) ||
-          (job.address && job.address.toLowerCase().includes(query))
+          (job.address && job.address.toLowerCase().includes(query)) ||
+          (job.city && job.city.toLowerCase().includes(query))
         );
       }
       return true;
     })
     .sort((a, b) => {
+      // If grouping by state, sort by state first
+      if (groupByState) {
+        const stateA = a.state || "ZZZ"; // Put null states at end
+        const stateB = b.state || "ZZZ";
+        if (stateA !== stateB) return stateA.localeCompare(stateB);
+      }
+      
       let comparison = 0;
       switch (sortField) {
         case "jobNumber":
@@ -177,6 +193,16 @@ export default function AdminJobsPage() {
       }
       return sortDirection === "asc" ? comparison : -comparison;
     });
+
+  // Group jobs by state for display
+  const groupedJobs = groupByState
+    ? filteredAndSortedJobs.reduce((acc, job) => {
+        const state = job.state || "No State";
+        if (!acc[state]) acc[state] = [];
+        acc[state].push(job);
+        return acc;
+      }, {} as Record<string, JobWithPanels[]>)
+    : { "All Jobs": filteredAndSortedJobs };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -512,8 +538,20 @@ export default function AdminJobsPage() {
                 data-testid="input-search-jobs"
               />
             </div>
+            <Select value={stateFilter} onValueChange={setStateFilter}>
+              <SelectTrigger className="w-[120px]" data-testid="select-state-filter">
+                <SelectValue placeholder="Filter by state" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All States</SelectItem>
+                <SelectItem value="none">No State</SelectItem>
+                {AUSTRALIAN_STATES.map((state) => (
+                  <SelectItem key={state} value={state}>{state}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
+              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -524,11 +562,20 @@ export default function AdminJobsPage() {
                 <SelectItem value="ARCHIVED">Archived</SelectItem>
               </SelectContent>
             </Select>
-            {(searchQuery || statusFilter !== "all") && (
+            <Button
+              variant={groupByState ? "default" : "outline"}
+              size="sm"
+              onClick={() => setGroupByState(!groupByState)}
+              data-testid="button-toggle-grouping"
+            >
+              <MapPin className="h-4 w-4 mr-1" />
+              Group by State
+            </Button>
+            {(searchQuery || statusFilter !== "all" || stateFilter !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setSearchQuery(""); setStatusFilter("all"); }}
+                onClick={() => { setSearchQuery(""); setStatusFilter("all"); setStateFilter("all"); }}
                 data-testid="button-clear-filters"
               >
                 Clear Filters
@@ -562,6 +609,7 @@ export default function AdminJobsPage() {
                     Client {getSortIcon("client")}
                   </Button>
                 </TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -578,83 +626,103 @@ export default function AdminJobsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAndSortedJobs.map((job) => (
-                <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Hash className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-mono font-medium">{job.jobNumber}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{job.name}</div>
-                      {job.address && (
-                        <div className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {job.address}
+              {Object.entries(groupedJobs).map(([stateGroup, stateJobs]) => (
+                <>
+                  {groupByState && stateGroup !== "All Jobs" && (
+                    <TableRow key={`header-${stateGroup}`} className="bg-muted/50">
+                      <TableCell colSpan={7} className="py-2">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <MapPin className="h-4 w-4" />
+                          {stateGroup}
+                          <Badge variant="secondary" className="ml-2">{stateJobs.length}</Badge>
                         </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {job.client && (
-                      <div className="flex items-center gap-1">
-                        <Building className="h-4 w-4 text-muted-foreground" />
-                        {job.client}
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(job.status)}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate(`/admin/panels?jobId=${job.id}`)}
-                      data-testid={`button-view-panels-${job.id}`}
-                    >
-                      {job.panels.length} panels
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </Button>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenCostOverrides(job)}
-                        title="Cost Overrides"
-                        data-testid={`button-cost-overrides-${job.id}`}
-                      >
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => openEditDialog(job)}
-                        data-testid={`button-edit-job-${job.id}`}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          setDeletingJobId(job.id);
-                          setDeletingJobPanelCount(job.panels.length);
-                          setDeleteDialogOpen(true);
-                        }}
-                        data-testid={`button-delete-job-${job.id}`}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {stateJobs.map((job) => (
+                    <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Hash className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-mono font-medium">{job.jobNumber}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div>
+                          <div className="font-medium">{job.name}</div>
+                          {job.address && (
+                            <div className="text-sm text-muted-foreground">{job.address}</div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {job.client && (
+                          <div className="flex items-center gap-1">
+                            <Building className="h-4 w-4 text-muted-foreground" />
+                            {job.client}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {job.city && <span>{job.city}</span>}
+                          {job.city && job.state && <span>, </span>}
+                          {job.state && <span className="font-medium">{job.state}</span>}
+                          {!job.city && !job.state && <span className="text-muted-foreground">-</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell>{getStatusBadge(job.status)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigate(`/admin/panels?jobId=${job.id}`)}
+                          data-testid={`button-view-panels-${job.id}`}
+                        >
+                          {job.panels.length} panels
+                          <ChevronRight className="h-4 w-4 ml-1" />
+                        </Button>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenCostOverrides(job)}
+                            title="Cost Overrides"
+                            data-testid={`button-cost-overrides-${job.id}`}
+                          >
+                            <DollarSign className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(job)}
+                            data-testid={`button-edit-job-${job.id}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setDeletingJobId(job.id);
+                              setDeletingJobPanelCount(job.panels.length);
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-job-${job.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ))}
               {filteredAndSortedJobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     {jobs?.length ? "No jobs match your filters." : "No jobs found. Add a job or import from Excel."}
                   </TableCell>
                 </TableRow>
