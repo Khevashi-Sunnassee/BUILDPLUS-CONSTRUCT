@@ -82,6 +82,7 @@ const productionEntrySchema = z.object({
   panelId: z.string().min(1, "Panel is required"),
   jobId: z.string().min(1, "Job is required"),
   productionDate: z.string().min(1, "Date is required"),
+  bayNumber: z.string().optional(),
   volumeM3: z.string().min(1, "Volume (m³) is required"),
   areaM2: z.string().min(1, "Area (m²) is required"),
   factory: z.string().default("QLD"),
@@ -171,6 +172,7 @@ export default function ProductionReportDetailPage() {
       panelId: "",
       jobId: "",
       productionDate: selectedDate,
+      bayNumber: "",
       volumeM3: "",
       areaM2: "",
       factory: factory,
@@ -298,6 +300,7 @@ export default function ProductionReportDetailPage() {
       panelId: "",
       jobId: "",
       productionDate: selectedDate,
+      bayNumber: "",
       volumeM3: "",
       areaM2: "",
       factory: factory,
@@ -313,6 +316,7 @@ export default function ProductionReportDetailPage() {
       panelId: entry.panelId,
       jobId: entry.jobId,
       productionDate: entry.productionDate,
+      bayNumber: (entry as any).bayNumber || "",
       volumeM3: entry.volumeM3 || "",
       areaM2: entry.areaM2 || "",
       factory: (entry as any).factory || factory,
@@ -676,6 +680,7 @@ export default function ProductionReportDetailPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-[100px]">Status</TableHead>
+                  <TableHead>Bay</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Panel ID</TableHead>
                   <TableHead>Panel Type</TableHead>
@@ -708,6 +713,9 @@ export default function ProductionReportDetailPage() {
                           <><Circle className="h-4 w-4" /> Draft</>
                         )}
                       </Button>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-mono text-sm">{(entry as any).bayNumber || "-"}</span>
                     </TableCell>
                     <TableCell>
                       <span className="font-mono text-sm">{entry.job.jobNumber} - {entry.job.name}</span>
@@ -760,7 +768,7 @@ export default function ProductionReportDetailPage() {
                 ))}
                 {(!filteredEntries || filteredEntries.length === 0) && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       No production entries for this date. Click "Add Entry" to record production.
                     </TableCell>
                   </TableRow>
@@ -847,6 +855,19 @@ export default function ProductionReportDetailPage() {
                         )}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={entryForm.control}
+                name="bayNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bay Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g., Bay 1, Bay A" data-testid="input-entry-bay" />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
