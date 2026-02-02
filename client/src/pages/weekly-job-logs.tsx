@@ -344,6 +344,7 @@ export default function WeeklyJobLogsPage() {
                 <TableRow>
                   <TableHead>Report Date</TableHead>
                   <TableHead>Week</TableHead>
+                  <TableHead>Created By</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Jobs</TableHead>
                   <TableHead>Actions</TableHead>
@@ -354,6 +355,7 @@ export default function WeeklyJobLogsPage() {
                   <TableRow key={report.id} data-testid={`row-my-report-${report.id}`}>
                     <TableCell>{formatDate(report.reportDate)}</TableCell>
                     <TableCell>{formatDate(report.weekStartDate)} - {formatDate(report.weekEndDate)}</TableCell>
+                    <TableCell>{report.projectManager?.name || report.projectManager?.email || "-"}</TableCell>
                     <TableCell>{getStatusBadge(report.status)}</TableCell>
                     <TableCell>{report.schedules.length}</TableCell>
                     <TableCell className="space-x-2">
