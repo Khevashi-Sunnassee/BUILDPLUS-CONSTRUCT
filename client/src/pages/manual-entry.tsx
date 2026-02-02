@@ -239,9 +239,15 @@ export default function ManualEntryPage() {
     if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
       const panel = panels?.find(p => p.id === watchedPanelRegisterId);
       if (panel) {
+        // Populate panel mark from selected panel
+        form.setValue("panelMark", panel.panelMark || "");
         // Populate drawing code
         if (panel.drawingCode) {
           form.setValue("drawingCode", panel.drawingCode);
+        }
+        // Populate sheet information from panel
+        if (panel.sheetNumber) {
+          form.setValue("revitSheetNumber", panel.sheetNumber);
         }
         // Populate panel details
         form.setValue("panelLoadWidth", panel.loadWidth || "");
@@ -257,6 +263,8 @@ export default function ManualEntryPage() {
       }
     } else {
       // Clear panel details when no panel selected
+      form.setValue("panelMark", "");
+      form.setValue("revitSheetNumber", "");
       form.setValue("panelLoadWidth", "");
       form.setValue("panelLoadHeight", "");
       form.setValue("panelThickness", "");
@@ -325,6 +333,7 @@ export default function ManualEntryPage() {
     form.setValue("panelRegisterId", "");
     form.setValue("panelMark", "");
     form.setValue("drawingCode", "");
+    form.setValue("revitSheetNumber", "");
   };
 
   const getStatusBadge = (status: string) => {
