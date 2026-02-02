@@ -128,11 +128,11 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="p-4">
-        <div className="flex items-center justify-center">
+        <div className="flex items-center justify-start">
           <img 
             src={logoSrc} 
             alt="LTE Precast Concrete Structures" 
-            className="h-10"
+            className="h-[60px]"
             data-testid="img-sidebar-logo"
           />
         </div>
