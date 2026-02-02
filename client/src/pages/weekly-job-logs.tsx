@@ -12,8 +12,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Send, Check, X, Trash2, Edit, Eye } from "lucide-react";
+import { Plus, Send, Check, X, Trash2, Edit, Eye, ChevronDown, ChevronRight, User as UserIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule } from "@shared/schema";
 
 interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -45,6 +46,7 @@ export default function WeeklyJobLogsPage() {
   const [selectedReport, setSelectedReport] = useState<WeeklyJobReportWithDetails | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
   
   const [reportDate, setReportDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [weekStartDate, setWeekStartDate] = useState("");
@@ -56,10 +58,39 @@ export default function WeeklyJobLogsPage() {
     queryKey: ["/api/weekly-job-reports/my-reports"],
   });
 
+  const { data: allReports = [], isLoading: loadingAllReports } = useQuery<WeeklyJobReportWithDetails[]>({
+    queryKey: ["/api/weekly-job-reports"],
+    enabled: isManagerOrAdmin,
+  });
+
   const { data: pendingReports = [], isLoading: loadingPending } = useQuery<WeeklyJobReportWithDetails[]>({
     queryKey: ["/api/weekly-job-reports/pending-approval"],
     enabled: isManagerOrAdmin,
   });
+
+  const toggleUserExpanded = (userId: string) => {
+    setExpandedUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  };
+
+  const reportsByUser = isManagerOrAdmin ? allReports.reduce((acc, report) => {
+    const pmId = report.projectManagerId;
+    if (!acc[pmId]) {
+      acc[pmId] = {
+        user: report.projectManager,
+        reports: []
+      };
+    }
+    acc[pmId].reports.push(report);
+    return acc;
+  }, {} as Record<string, { user: User; reports: WeeklyJobReportWithDetails[] }>) : {};
 
   const { data: allJobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
@@ -74,6 +105,7 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report created successfully" });
@@ -90,6 +122,7 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report updated successfully" });
@@ -106,6 +139,7 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report submitted for approval" });
@@ -121,6 +155,7 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/approved"] });
@@ -139,6 +174,7 @@ export default function WeeklyJobLogsPage() {
       return response.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report rejected" });
@@ -156,6 +192,7 @@ export default function WeeklyJobLogsPage() {
       await apiRequest("DELETE", `/api/weekly-job-reports/${id}`, {});
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
       queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
       toast({ title: "Report deleted" });
@@ -328,71 +365,151 @@ export default function WeeklyJobLogsPage() {
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle data-testid="text-my-reports-title">My Reports</CardTitle>
-          <CardDescription>Your weekly job report submissions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loadingMyReports ? (
-            <p>Loading...</p>
-          ) : myReports.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No reports yet. Create your first weekly report.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Report Date</TableHead>
-                  <TableHead>Week</TableHead>
-                  <TableHead>Created By</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Jobs</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {myReports.map((report) => (
-                  <TableRow key={report.id} data-testid={`row-my-report-${report.id}`}>
-                    <TableCell>{formatDate(report.reportDate)}</TableCell>
-                    <TableCell>{formatDate(report.weekStartDate)} - {formatDate(report.weekEndDate)}</TableCell>
-                    <TableCell>{report.projectManager?.name || report.projectManager?.email || "-"}</TableCell>
-                    <TableCell>{getStatusBadge(report.status)}</TableCell>
-                    <TableCell>{report.schedules.length}</TableCell>
-                    <TableCell className="space-x-2">
-                      <Button size="sm" variant="ghost" onClick={() => handleView(report)} data-testid={`button-view-${report.id}`}>
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {report.status === "DRAFT" && (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => handleEdit(report)} data-testid={`button-edit-${report.id}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" onClick={() => submitReportMutation.mutate(report.id)} data-testid={`button-submit-${report.id}`}>
-                            <Send className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteReportMutation.mutate(report.id)} data-testid={`button-delete-${report.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                      {report.status === "REJECTED" && (
-                        <>
-                          <Button size="sm" variant="ghost" onClick={() => handleEdit(report)} data-testid={`button-edit-rejected-${report.id}`}>
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteReportMutation.mutate(report.id)} data-testid={`button-delete-rejected-${report.id}`}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </TableCell>
-                  </TableRow>
+      {isManagerOrAdmin ? (
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-all-reports-title">All Reports by User</CardTitle>
+            <CardDescription>Weekly job reports grouped by team member</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingAllReports ? (
+              <p>Loading...</p>
+            ) : Object.keys(reportsByUser).length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No reports yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {Object.entries(reportsByUser).map(([userId, { user: pmUser, reports }]) => (
+                  <Collapsible 
+                    key={userId} 
+                    open={expandedUsers.has(userId)}
+                    onOpenChange={() => toggleUserExpanded(userId)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer hover-elevate" data-testid={`trigger-user-${userId}`}>
+                        {expandedUsers.has(userId) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        <UserIcon className="h-4 w-4" />
+                        <span className="font-medium">{pmUser?.name || pmUser?.email || "Unknown User"}</span>
+                        <Badge variant="secondary" className="ml-auto">{reports.length} report{reports.length !== 1 ? "s" : ""}</Badge>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="ml-4 mt-2 border-l-2 pl-4">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Report Date</TableHead>
+                              <TableHead>Week</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead>Jobs</TableHead>
+                              <TableHead>Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {reports.map((report) => (
+                              <TableRow key={report.id} data-testid={`row-report-${report.id}`}>
+                                <TableCell>{formatDate(report.reportDate)}</TableCell>
+                                <TableCell>{formatDate(report.weekStartDate)} - {formatDate(report.weekEndDate)}</TableCell>
+                                <TableCell>{getStatusBadge(report.status)}</TableCell>
+                                <TableCell>{report.schedules.length}</TableCell>
+                                <TableCell className="space-x-2">
+                                  <Button size="sm" variant="ghost" onClick={() => handleView(report)} data-testid={`button-view-${report.id}`}>
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  {report.projectManagerId === user?.id && report.status === "DRAFT" && (
+                                    <>
+                                      <Button size="sm" variant="ghost" onClick={() => handleEdit(report)} data-testid={`button-edit-${report.id}`}>
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" onClick={() => submitReportMutation.mutate(report.id)} data-testid={`button-submit-${report.id}`}>
+                                        <Send className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteReportMutation.mutate(report.id)} data-testid={`button-delete-${report.id}`}>
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle data-testid="text-my-reports-title">My Reports</CardTitle>
+            <CardDescription>Your weekly job report submissions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingMyReports ? (
+              <p>Loading...</p>
+            ) : myReports.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8">No reports yet. Create your first weekly report.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Report Date</TableHead>
+                    <TableHead>Week</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Jobs</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {myReports.map((report) => (
+                    <TableRow key={report.id} data-testid={`row-my-report-${report.id}`}>
+                      <TableCell>{formatDate(report.reportDate)}</TableCell>
+                      <TableCell>{formatDate(report.weekStartDate)} - {formatDate(report.weekEndDate)}</TableCell>
+                      <TableCell>{getStatusBadge(report.status)}</TableCell>
+                      <TableCell>{report.schedules.length}</TableCell>
+                      <TableCell className="space-x-2">
+                        <Button size="sm" variant="ghost" onClick={() => handleView(report)} data-testid={`button-view-${report.id}`}>
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {report.status === "DRAFT" && (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => handleEdit(report)} data-testid={`button-edit-${report.id}`}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => submitReportMutation.mutate(report.id)} data-testid={`button-submit-${report.id}`}>
+                              <Send className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteReportMutation.mutate(report.id)} data-testid={`button-delete-${report.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                        {report.status === "REJECTED" && (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => handleEdit(report)} data-testid={`button-edit-rejected-${report.id}`}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteReportMutation.mutate(report.id)} data-testid={`button-delete-rejected-${report.id}`}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={showForm} onOpenChange={(open) => !open && resetForm()}>
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
