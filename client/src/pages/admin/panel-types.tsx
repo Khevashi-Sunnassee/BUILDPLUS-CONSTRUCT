@@ -474,24 +474,30 @@ export default function AdminPanelTypesPage() {
                 ) : (
                   panelTypes.map((type) => {
                     const marginStatus = getMarginStatus(type);
-                    const hasMismatch = marginStatus.hasBreakup && !marginStatus.matches;
+                    // Pending if: no breakup exists OR breakup exists but margins don't match
+                    const needsBreakupAdjustment = !marginStatus.matches;
                     
                     return (
                     <TableRow 
                       key={type.id} 
                       data-testid={`row-panel-type-${type.id}`}
-                      className={hasMismatch ? "bg-red-50 dark:bg-red-950/30" : ""}
+                      className={needsBreakupAdjustment ? "bg-red-50 dark:bg-red-950/30" : ""}
                     >
                       <TableCell>
                         <Badge variant="outline">{type.code}</Badge>
                       </TableCell>
                       <TableCell className="font-medium">{type.name}</TableCell>
                       <TableCell>
-                        {hasMismatch ? (
-                          <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Pending
-                          </Badge>
+                        {needsBreakupAdjustment ? (
+                          <div className="flex flex-col gap-1">
+                            <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                              <AlertTriangle className="h-3 w-3 mr-1" />
+                              Pending
+                            </Badge>
+                            <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                              Adjust Breakup
+                            </span>
+                          </div>
                         ) : type.isActive ? (
                           <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                             <CheckCircle className="h-3 w-3 mr-1" />
@@ -504,9 +510,9 @@ export default function AdminPanelTypesPage() {
                           </Badge>
                         )}
                       </TableCell>
-                      <TableCell className={`text-right font-mono text-sm ${hasMismatch ? "text-red-600 dark:text-red-400 font-bold" : ""}`}>
+                      <TableCell className={`text-right font-mono text-sm ${needsBreakupAdjustment ? "text-red-600 dark:text-red-400 font-bold" : ""}`}>
                         {marginStatus.panelMargin !== null ? `${marginStatus.panelMargin.toFixed(1)}%` : "-"}
-                        {hasMismatch && marginStatus.breakupMargin !== undefined && (
+                        {needsBreakupAdjustment && marginStatus.breakupMargin !== undefined && (
                           <div className="text-xs text-red-500">
                             Breakup: {marginStatus.breakupMargin.toFixed(1)}%
                           </div>
@@ -1078,16 +1084,27 @@ export default function AdminPanelTypesPage() {
             <Button type="button" variant="outline" onClick={() => setCostBreakupDialogOpen(false)}>
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleSaveCostComponents}
-              disabled={saveCostComponentsMutation.isPending || totalPercentage > 100}
-              data-testid="button-save-cost-breakup"
-            >
-              {saveCostComponentsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </Button>
+            {(() => {
+              const marginStatus = costBreakupType ? getMarginStatus(costBreakupType) : null;
+              const breakupProfitMargin = 100 - totalPercentage;
+              const panelMargin = marginStatus?.panelMargin ?? 0;
+              // Allow 0.5% tolerance for rounding
+              const marginsMatch = Math.abs(breakupProfitMargin - panelMargin) < 0.5;
+              const canSave = !saveCostComponentsMutation.isPending && totalPercentage <= 100 && marginsMatch;
+              
+              return (
+                <Button
+                  type="button"
+                  onClick={handleSaveCostComponents}
+                  disabled={!canSave}
+                  data-testid="button-save-cost-breakup"
+                >
+                  {saveCostComponentsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  <Save className="h-4 w-4 mr-2" />
+                  {marginsMatch ? "Save" : "Margins Must Match"}
+                </Button>
+              );
+            })()}
           </DialogFooter>
         </DialogContent>
       </Dialog>
