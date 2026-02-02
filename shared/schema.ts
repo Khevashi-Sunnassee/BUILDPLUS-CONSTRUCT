@@ -252,6 +252,7 @@ export const productionEntries = pgTable("production_entries", {
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   productionDate: text("production_date").notNull(),
+  factory: text("factory").default("QLD").notNull(),
   volumeM3: text("volume_m3"),
   areaM2: text("area_m2"),
   notes: text("notes"),
@@ -262,6 +263,7 @@ export const productionEntries = pgTable("production_entries", {
   jobIdIdx: index("production_entries_job_id_idx").on(table.jobId),
   userIdIdx: index("production_entries_user_id_idx").on(table.userId),
   productionDateIdx: index("production_entries_production_date_idx").on(table.productionDate),
+  factoryIdx: index("production_entries_factory_idx").on(table.factory),
 }));
 
 export const panelTypeCostComponents = pgTable("panel_type_cost_components", {
