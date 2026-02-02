@@ -3189,6 +3189,41 @@ Return ONLY valid JSON, no explanation text.`
     res.json({ success: true });
   });
 
+  // Zones
+  app.get("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
+    const zones = await storage.getAllZones();
+    res.json(zones);
+  });
+
+  app.get("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
+    const zone = await storage.getZone(req.params.id as string);
+    if (!zone) return res.status(404).json({ error: "Zone not found" });
+    res.json(zone);
+  });
+
+  app.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const existing = await storage.getZoneByCode(req.body.code);
+      if (existing) {
+        return res.status(400).json({ error: "Zone with this code already exists" });
+      }
+      const zone = await storage.createZone(req.body);
+      res.json(zone);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create zone" });
+    }
+  });
+
+  app.put("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
+    const zone = await storage.updateZone(req.params.id as string, req.body);
+    res.json(zone);
+  });
+
+  app.delete("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
+    await storage.deleteZone(req.params.id as string);
+    res.json({ success: true });
+  });
+
   // Load Lists
   app.get("/api/load-lists", requireAuth, requirePermission("logistics"), async (req, res) => {
     const loadLists = await storage.getAllLoadLists();

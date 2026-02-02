@@ -932,7 +932,7 @@ export default function LogisticsPage() {
       </Dialog>
 
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader className="pb-2">
             <DialogTitle>Record Delivery</DialogTitle>
             <DialogDescription>
@@ -945,7 +945,7 @@ export default function LogisticsPage() {
           </DialogHeader>
           <Form {...deliveryForm}>
             <form onSubmit={deliveryForm.handleSubmit(handleCreateDelivery)} className="flex-1 overflow-hidden flex flex-col">
-              <ScrollArea className="flex-1 h-[50vh] pr-4">
+              <ScrollArea className="flex-1 h-[65vh] pr-4">
                 <div className="space-y-3 pb-4">
                   {/* Load Information - Always visible */}
                   <div className="space-y-3 p-3 rounded-md border bg-muted/30">

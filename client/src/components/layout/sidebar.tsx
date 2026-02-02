@@ -21,6 +21,7 @@ import {
   Truck,
   DollarSign,
   Shield,
+  MapPin,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -67,6 +68,7 @@ const adminNavItems = [
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
+  { title: "Zones", url: "/admin/zones", icon: MapPin },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
@@ -83,6 +85,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",
   "/admin/panel-types": "admin_panel_types",
+  "/admin/zones": "admin_zones",
   "/admin/devices": "admin_devices",
   "/admin/users": "admin_users",
   "/admin/settings": "admin_settings",

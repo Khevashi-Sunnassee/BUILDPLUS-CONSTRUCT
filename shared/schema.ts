@@ -52,6 +52,7 @@ export const FUNCTION_KEYS = [
   "admin_work_types",
   "admin_trailer_types",
   "admin_user_permissions",
+  "admin_zones",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -83,6 +84,23 @@ export const globalSettings = pgTable("global_settings", {
 });
 
 export const australianStateEnum = pgEnum("australian_state", ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"]);
+
+export const zones = pgTable("zones", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  description: text("description"),
+  color: text("color").default("#3B82F6"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: uniqueIndex("zones_code_idx").on(table.code),
+}));
+
+export const insertZoneSchema = createInsertSchema(zones).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertZone = z.infer<typeof insertZoneSchema>;
+export type Zone = typeof zones.$inferSelect;
 
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

@@ -5,7 +5,7 @@ import {
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
-  userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules,
+  userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -24,6 +24,7 @@ import {
   type InsertUserPermission, type UserPermission, type FunctionKey, type PermissionLevel,
   type InsertWeeklyJobReport, type WeeklyJobReport,
   type InsertWeeklyJobReportSchedule, type WeeklyJobReportSchedule,
+  type InsertZone, type Zone,
 } from "@shared/schema";
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -241,6 +242,14 @@ export interface IStorage {
   deleteUserPermission(userId: string, functionKey: FunctionKey): Promise<void>;
   initializeUserPermissions(userId: string): Promise<UserPermission[]>;
   getAllUserPermissionsForAdmin(): Promise<{ user: User; permissions: UserPermission[] }[]>;
+
+  // Zones
+  getAllZones(): Promise<Zone[]>;
+  getZone(id: string): Promise<Zone | undefined>;
+  getZoneByCode(code: string): Promise<Zone | undefined>;
+  createZone(data: InsertZone): Promise<Zone>;
+  updateZone(id: string, data: Partial<InsertZone>): Promise<Zone | undefined>;
+  deleteZone(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1803,6 +1812,34 @@ export class DatabaseStorage implements IStorage {
       user,
       permissions: permsByUser.get(user.id) || [],
     }));
+  }
+
+  async getAllZones(): Promise<Zone[]> {
+    return db.select().from(zones).orderBy(asc(zones.name));
+  }
+
+  async getZone(id: string): Promise<Zone | undefined> {
+    const [zone] = await db.select().from(zones).where(eq(zones.id, id));
+    return zone;
+  }
+
+  async getZoneByCode(code: string): Promise<Zone | undefined> {
+    const [zone] = await db.select().from(zones).where(eq(zones.code, code));
+    return zone;
+  }
+
+  async createZone(data: InsertZone): Promise<Zone> {
+    const [zone] = await db.insert(zones).values(data).returning();
+    return zone;
+  }
+
+  async updateZone(id: string, data: Partial<InsertZone>): Promise<Zone | undefined> {
+    const [zone] = await db.update(zones).set({ ...data, updatedAt: new Date() }).where(eq(zones.id, id)).returning();
+    return zone;
+  }
+
+  async deleteZone(id: string): Promise<void> {
+    await db.delete(zones).where(eq(zones.id, id));
   }
 }
 
