@@ -83,10 +83,15 @@ const productionEntrySchema = z.object({
   jobId: z.string().min(1, "Job is required"),
   productionDate: z.string().min(1, "Date is required"),
   bayNumber: z.string().optional(),
-  volumeM3: z.string().min(1, "Volume (m³) is required"),
-  areaM2: z.string().min(1, "Area (m²) is required"),
+  volumeM3: z.string().optional(),
+  areaM2: z.string().optional(),
   factory: z.string().default("QLD"),
   notes: z.string().optional(),
+  loadWidth: z.string().optional(),
+  loadHeight: z.string().optional(),
+  panelThickness: z.string().optional(),
+  panelVolume: z.string().optional(),
+  panelMass: z.string().optional(),
 });
 
 type ProductionEntryFormData = z.infer<typeof productionEntrySchema>;
@@ -95,8 +100,6 @@ interface ProductionEntryWithDetails extends ProductionEntry {
   panel: PanelRegister;
   job: Job;
   user: User;
-  bayNumber?: string;
-  factory?: string;
   labourCost?: number;
   supplyCost?: number;
   totalCost?: number;
@@ -179,6 +182,11 @@ export default function ProductionReportDetailPage() {
       areaM2: "",
       factory: factory,
       notes: "",
+      loadWidth: "",
+      loadHeight: "",
+      panelThickness: "",
+      panelVolume: "",
+      panelMass: "",
     },
   });
 
@@ -189,6 +197,8 @@ export default function ProductionReportDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       toast({ title: "Production entry created successfully" });
       setEntryDialogOpen(false);
       entryForm.reset();
@@ -206,6 +216,8 @@ export default function ProductionReportDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       toast({ title: "Production entry updated successfully" });
       setEntryDialogOpen(false);
       setEditingEntry(null);
@@ -307,6 +319,11 @@ export default function ProductionReportDetailPage() {
       areaM2: "",
       factory: factory,
       notes: "",
+      loadWidth: "",
+      loadHeight: "",
+      panelThickness: "",
+      panelVolume: "",
+      panelMass: "",
     });
     setEntryDialogOpen(true);
   };
@@ -323,6 +340,11 @@ export default function ProductionReportDetailPage() {
       areaM2: entry.areaM2 || "",
       factory: entry.factory || factory,
       notes: entry.notes || "",
+      loadWidth: entry.panel.loadWidth || "",
+      loadHeight: entry.panel.loadHeight || "",
+      panelThickness: entry.panel.panelThickness || "",
+      panelVolume: entry.panel.panelVolume || "",
+      panelMass: entry.panel.panelMass || "",
     });
     setEntryDialogOpen(true);
   };
@@ -339,6 +361,31 @@ export default function ProductionReportDetailPage() {
     setSelectedJobId(jobId);
     entryForm.setValue("jobId", jobId);
     entryForm.setValue("panelId", "");
+    entryForm.setValue("loadWidth", "");
+    entryForm.setValue("loadHeight", "");
+    entryForm.setValue("panelThickness", "");
+    entryForm.setValue("panelVolume", "");
+    entryForm.setValue("panelMass", "");
+    entryForm.setValue("volumeM3", "");
+    entryForm.setValue("areaM2", "");
+  };
+
+  const handlePanelChange = (panelId: string) => {
+    entryForm.setValue("panelId", panelId);
+    const panel = selectedJobPanels.find(p => p.id === panelId);
+    if (panel) {
+      entryForm.setValue("loadWidth", panel.loadWidth || "");
+      entryForm.setValue("loadHeight", panel.loadHeight || "");
+      entryForm.setValue("panelThickness", panel.panelThickness || "");
+      entryForm.setValue("panelVolume", panel.panelVolume || "");
+      entryForm.setValue("panelMass", panel.panelMass || "");
+      entryForm.setValue("volumeM3", panel.panelVolume || "");
+      const width = parseFloat(panel.loadWidth || "0") / 1000;
+      const height = parseFloat(panel.loadHeight || "0") / 1000;
+      if (width > 0 && height > 0) {
+        entryForm.setValue("areaM2", (width * height).toFixed(2));
+      }
+    }
   };
 
   const panelTypeCounts = useMemo(() => {
@@ -827,7 +874,7 @@ export default function ProductionReportDetailPage() {
                   <FormItem>
                     <FormLabel>Panel (Approved for Production)</FormLabel>
                     <Select 
-                      onValueChange={field.onChange} 
+                      onValueChange={handlePanelChange} 
                       value={field.value}
                       disabled={!selectedJobId || selectedJobPanels.length === 0}
                     >
@@ -874,13 +921,102 @@ export default function ProductionReportDetailPage() {
                   </FormItem>
                 )}
               />
+              <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+                <h4 className="font-medium text-sm">Panel Dimensions</h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <FormField
+                    control={entryForm.control}
+                    name="loadWidth"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Width (mm)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            data-testid="input-entry-load-width" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={entryForm.control}
+                    name="loadHeight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Length (mm)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            data-testid="input-entry-load-height" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={entryForm.control}
+                    name="panelThickness"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Thickness (mm)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            {...field} 
+                            data-testid="input-entry-thickness" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={entryForm.control}
+                    name="panelVolume"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Volume (m³)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            {...field} 
+                            data-testid="input-entry-panel-volume" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={entryForm.control}
+                    name="panelMass"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Mass (kg)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            step="0.01"
+                            {...field} 
+                            data-testid="input-entry-panel-mass" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={entryForm.control}
                   name="volumeM3"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Volume (m³)</FormLabel>
+                      <FormLabel>Production Volume (m³)</FormLabel>
                       <FormControl>
                         <Input 
                           type="number" 

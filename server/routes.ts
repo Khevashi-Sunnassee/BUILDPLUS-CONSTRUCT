@@ -1354,7 +1354,7 @@ export async function registerRoutes(
   app.post("/api/production-entries", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       // Validate that the panel is approved for production
-      const { panelId } = req.body;
+      const { panelId, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, ...entryFields } = req.body;
       if (panelId) {
         const panel = await storage.getPanelById(panelId);
         if (!panel) {
@@ -1363,10 +1363,23 @@ export async function registerRoutes(
         if (!panel.approvedForProduction) {
           return res.status(400).json({ error: "Panel is not approved for production. Please approve the panel in the Panel Register first." });
         }
+        
+        // Update panel with final dimensions if provided
+        const panelUpdates: any = {};
+        if (loadWidth !== undefined) panelUpdates.loadWidth = loadWidth;
+        if (loadHeight !== undefined) panelUpdates.loadHeight = loadHeight;
+        if (panelThickness !== undefined) panelUpdates.panelThickness = panelThickness;
+        if (panelVolume !== undefined) panelUpdates.panelVolume = panelVolume;
+        if (panelMass !== undefined) panelUpdates.panelMass = panelMass;
+        
+        if (Object.keys(panelUpdates).length > 0) {
+          await storage.updatePanelRegisterItem(panelId, panelUpdates);
+        }
       }
       
       const entryData = {
-        ...req.body,
+        ...entryFields,
+        panelId,
         userId: req.session.userId!,
       };
       const entry = await storage.createProductionEntry(entryData);
@@ -1377,8 +1390,28 @@ export async function registerRoutes(
   });
 
   app.put("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
-    const entry = await storage.updateProductionEntry(req.params.id as string, req.body);
-    res.json(entry);
+    try {
+      const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, ...entryFields } = req.body;
+      
+      // Update panel with final dimensions if provided
+      if (panelId) {
+        const panelUpdates: any = {};
+        if (loadWidth !== undefined) panelUpdates.loadWidth = loadWidth;
+        if (loadHeight !== undefined) panelUpdates.loadHeight = loadHeight;
+        if (panelThickness !== undefined) panelUpdates.panelThickness = panelThickness;
+        if (panelVolume !== undefined) panelUpdates.panelVolume = panelVolume;
+        if (panelMass !== undefined) panelUpdates.panelMass = panelMass;
+        
+        if (Object.keys(panelUpdates).length > 0) {
+          await storage.updatePanelRegisterItem(panelId, panelUpdates);
+        }
+      }
+      
+      const entry = await storage.updateProductionEntry(req.params.id as string, { ...entryFields, panelId });
+      res.json(entry);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to update production entry" });
+    }
   });
 
   app.delete("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
