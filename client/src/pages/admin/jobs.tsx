@@ -816,7 +816,10 @@ export default function AdminJobsPage() {
                           onClick={() => navigate(`/admin/panels?jobId=${job.id}`)}
                           data-testid={`button-view-panels-${job.id}`}
                         >
-                          {job.panels.length} panels
+                          <span className="text-green-500">{job.panels.filter(p => p.status === "COMPLETED").length}</span>
+                          <span className="mx-1">/</span>
+                          <span>{job.panels.length}</span>
+                          <span className="ml-1 text-muted-foreground">panels</span>
                           <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
                       </TableCell>
