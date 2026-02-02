@@ -33,6 +33,37 @@ const requireRole = (...roles: string[]) => {
   };
 };
 
+type PermissionLevel = "VIEW" | "VIEW_AND_UPDATE";
+
+const requirePermission = (functionKey: string, minimumLevel: PermissionLevel = "VIEW") => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    const user = await storage.getUser(req.session.userId);
+    if (!user) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    if (user.role === "ADMIN") {
+      return next();
+    }
+    
+    const permission = await storage.getUserPermission(req.session.userId, functionKey);
+    
+    if (!permission || permission.permissionLevel === "HIDDEN") {
+      return res.status(403).json({ error: "Access denied to this function" });
+    }
+    
+    if (minimumLevel === "VIEW_AND_UPDATE" && permission.permissionLevel === "VIEW") {
+      return res.status(403).json({ error: "You only have view access to this function" });
+    }
+    
+    next();
+  };
+};
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -89,7 +120,7 @@ export async function registerRoutes(
     res.json(stats);
   });
 
-  app.get("/api/daily-logs", requireAuth, async (req, res) => {
+  app.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), async (req, res) => {
     const user = await storage.getUser(req.session.userId!);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
 
@@ -124,7 +155,7 @@ export async function registerRoutes(
     res.json(logsWithStats);
   });
 
-  app.post("/api/daily-logs", requireAuth, async (req, res) => {
+  app.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
@@ -710,7 +741,7 @@ export async function registerRoutes(
     res.json(panels);
   });
 
-  app.get("/api/production-entries", requireAuth, async (req, res) => {
+  app.get("/api/production-entries", requireAuth, requirePermission("production_report"), async (req, res) => {
     const date = req.query.date as string;
     if (date) {
       const entries = await storage.getProductionEntriesByDate(date);
@@ -721,13 +752,13 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/production-entries/:id", requireAuth, async (req, res) => {
+  app.get("/api/production-entries/:id", requireAuth, requirePermission("production_report"), async (req, res) => {
     const entry = await storage.getProductionEntry(req.params.id as string);
     if (!entry) return res.status(404).json({ error: "Entry not found" });
     res.json(entry);
   });
 
-  app.post("/api/production-entries", requireAuth, async (req, res) => {
+  app.post("/api/production-entries", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       // Validate that the panel is approved for production
       const { panelId } = req.body;
@@ -2470,18 +2501,18 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   // Load Lists
-  app.get("/api/load-lists", requireAuth, async (req, res) => {
+  app.get("/api/load-lists", requireAuth, requirePermission("logistics"), async (req, res) => {
     const loadLists = await storage.getAllLoadLists();
     res.json(loadLists);
   });
 
-  app.get("/api/load-lists/:id", requireAuth, async (req, res) => {
+  app.get("/api/load-lists/:id", requireAuth, requirePermission("logistics"), async (req, res) => {
     const loadList = await storage.getLoadList(req.params.id as string);
     if (!loadList) return res.status(404).json({ error: "Load list not found" });
     res.json(loadList);
   });
 
-  app.post("/api/load-lists", requireAuth, async (req, res) => {
+  app.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const { panelIds, docketNumber, scheduledDate, ...data } = req.body;
       
@@ -2553,7 +2584,7 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   // Weekly Wage Reports
-  app.get("/api/weekly-wage-reports", requireAuth, async (req, res) => {
+  app.get("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_wages"), async (req, res) => {
     try {
       const startDate = req.query.startDate as string | undefined;
       const endDate = req.query.endDate as string | undefined;
@@ -2565,7 +2596,7 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
-  app.get("/api/weekly-wage-reports/:id", requireAuth, async (req, res) => {
+  app.get("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekly_wages"), async (req, res) => {
     try {
       const report = await storage.getWeeklyWageReport(req.params.id);
       if (!report) {
