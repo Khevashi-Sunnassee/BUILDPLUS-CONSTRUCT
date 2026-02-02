@@ -254,20 +254,29 @@ export default function AdminPanelsPage() {
   });
 
   const importPanelsMutation = useMutation({
-    mutationFn: async ({ data, jobId }: { data: any[]; jobId: string }) => {
-      return apiRequest("POST", "/api/admin/panels/import", { data, jobId });
+    mutationFn: async ({ data, jobId }: { data: any[]; jobId?: string }) => {
+      return apiRequest("POST", "/api/admin/panels/import", { data, jobId: jobId || undefined });
     },
     onSuccess: async (response) => {
       const result = await response.json();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      toast({ title: `Imported ${result.imported} panels, ${result.skipped} skipped` });
+      let message = `Imported ${result.imported} panels, ${result.skipped} skipped`;
+      if (result.errors && result.errors.length > 0) {
+        message += `. ${result.errors.length} errors.`;
+      }
+      toast({ title: message });
       setImportDialogOpen(false);
       setImportData([]);
       setSelectedJobForImport("");
     },
-    onError: () => {
-      toast({ title: "Import failed", variant: "destructive" });
+    onError: async (error: any) => {
+      const errorData = error.response ? await error.response.json().catch(() => ({})) : {};
+      toast({ 
+        title: "Import failed", 
+        description: errorData.error || error.message,
+        variant: "destructive" 
+      });
     },
   });
 
@@ -429,12 +438,13 @@ export default function AdminPanelsPage() {
 
   const downloadTemplate = () => {
     const template = [
-      { "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
+      { "Job Number": "JOB-001", "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Estimated Hours": 8 },
+      { "Job Number": "JOB-001", "Panel Mark": "PM-002", "Panel Type": "COLUMN", "Description": "Column panel", "Drawing Code": "DWG-001", "Sheet Number": "A002", "Estimated Hours": 6 },
     ];
     const ws = XLSX.utils.json_to_sheet(template);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Panels");
-    XLSX.writeFile(wb, "panels_template.xlsx");
+    XLSX.writeFile(wb, "panels_import_template.xlsx");
   };
 
   const openCreateDialog = () => {
@@ -1059,24 +1069,28 @@ export default function AdminPanelsPage() {
       </Dialog>
 
       <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5" />
               Import Panels from Excel
             </DialogTitle>
             <DialogDescription>
-              Select a job and review the data before importing. {importData.length} rows found.
+              Review the data before importing. {importData.length} rows found.
+              {importData.some(r => r["Job Number"] || r.jobNumber || r.job_number || r["Job"]) 
+                ? " Job numbers detected in Excel."
+                : " No job numbers in Excel - select a fallback job below."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Import to Job</label>
+              <label className="text-sm font-medium">Fallback Job (used when Excel row has no Job Number)</label>
               <Select value={selectedJobForImport} onValueChange={setSelectedJobForImport}>
                 <SelectTrigger className="mt-1" data-testid="select-import-job">
-                  <SelectValue placeholder="Select job for import" />
+                  <SelectValue placeholder="Select fallback job (optional if job in Excel)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">No fallback - require job in Excel</SelectItem>
                   {jobs?.map((job) => (
                     <SelectItem key={job.id} value={job.id}>
                       {job.jobNumber} - {job.name}
@@ -1089,19 +1103,21 @@ export default function AdminPanelsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>Job Number</TableHead>
                     <TableHead>Panel Mark</TableHead>
+                    <TableHead>Panel Type</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Drawing Code</TableHead>
-                    <TableHead>Sheet</TableHead>
+                    <TableHead>Est. Hours</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {importData.slice(0, 10).map((row, idx) => (
                     <TableRow key={idx}>
+                      <TableCell className="font-mono text-sm">{row["Job Number"] || row.jobNumber || row.job_number || row["Job"] || "-"}</TableCell>
                       <TableCell className="font-mono">{row.panelMark || row["Panel Mark"] || row["Mark"] || "-"}</TableCell>
+                      <TableCell>{row.panelType || row["Panel Type"] || row["Type"] || "WALL"}</TableCell>
                       <TableCell>{row.description || row["Description"] || "-"}</TableCell>
-                      <TableCell>{row.drawingCode || row["Drawing Code"] || "-"}</TableCell>
-                      <TableCell>{row.sheetNumber || row["Sheet Number"] || "-"}</TableCell>
+                      <TableCell>{row.estimatedHours || row["Estimated Hours"] || "-"}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -1118,8 +1134,11 @@ export default function AdminPanelsPage() {
               Cancel
             </Button>
             <Button
-              onClick={() => importPanelsMutation.mutate({ data: importData, jobId: selectedJobForImport })}
-              disabled={importPanelsMutation.isPending || !selectedJobForImport}
+              onClick={() => importPanelsMutation.mutate({ 
+                data: importData, 
+                jobId: selectedJobForImport === "none" ? undefined : selectedJobForImport 
+              })}
+              disabled={importPanelsMutation.isPending}
               data-testid="button-confirm-import"
             >
               {importPanelsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

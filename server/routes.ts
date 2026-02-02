@@ -699,33 +699,82 @@ export async function registerRoutes(
   app.post("/api/admin/panels/import", requireRole("ADMIN"), async (req, res) => {
     try {
       const { data, jobId } = req.body;
-      if (!data || !Array.isArray(data) || !jobId) {
-        return res.status(400).json({ error: "Invalid import data or missing job ID" });
+      if (!data || !Array.isArray(data)) {
+        return res.status(400).json({ error: "Invalid import data" });
       }
       
-      const job = await storage.getJob(jobId);
-      if (!job) {
-        return res.status(404).json({ error: "Job not found" });
+      // Get all jobs for lookup by job number
+      const allJobs = await storage.getAllJobs();
+      const jobsByNumber: Record<string, typeof allJobs[0]> = {};
+      allJobs.forEach(job => {
+        jobsByNumber[job.jobNumber.toLowerCase()] = job;
+      });
+      
+      // If a specific jobId is provided, use it as fallback
+      let fallbackJob = null;
+      if (jobId) {
+        fallbackJob = await storage.getJob(jobId);
       }
       
-      const panelsToImport = data.map((row: any) => {
+      const panelsToImport: any[] = [];
+      const errors: string[] = [];
+      
+      for (let i = 0; i < data.length; i++) {
+        const row = data[i];
+        const rowNumber = i + 2; // Excel row (1-indexed + header row)
+        
+        // Get job number from Excel row
+        const jobNumber = String(row.jobNumber || row["Job Number"] || row.job_number || row["Job"] || "").trim();
+        
+        // Look up job by number or use fallback
+        let resolvedJob = null;
+        if (jobNumber) {
+          resolvedJob = jobsByNumber[jobNumber.toLowerCase()];
+          if (!resolvedJob) {
+            errors.push(`Row ${rowNumber}: Job "${jobNumber}" not found`);
+            continue;
+          }
+        } else if (fallbackJob) {
+          resolvedJob = fallbackJob;
+        } else {
+          errors.push(`Row ${rowNumber}: No job specified and no fallback job selected`);
+          continue;
+        }
+        
+        const panelMark = String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim();
+        if (!panelMark) {
+          errors.push(`Row ${rowNumber}: Missing panel mark`);
+          continue;
+        }
+        
         const typeRaw = (row.panelType || row["Panel Type"] || row.panel_type || row["Type"] || "WALL").toUpperCase().replace(/ /g, "_");
         const validTypes = ["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"];
         const panelType = validTypes.includes(typeRaw) ? typeRaw as any : "OTHER";
-        return {
-          jobId,
-          panelMark: String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim(),
+        
+        panelsToImport.push({
+          jobId: resolvedJob.id,
+          panelMark,
           panelType,
           description: row.description || row["Description"] || null,
           drawingCode: row.drawingCode || row["Drawing Code"] || row.drawing_code || null,
           sheetNumber: row.sheetNumber || row["Sheet Number"] || row.sheet_number || null,
           estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
           status: "NOT_STARTED" as const,
-        };
-      }).filter((p: any) => p.panelMark);
+        });
+      }
+      
+      if (panelsToImport.length === 0) {
+        return res.status(400).json({ 
+          error: "No valid panels to import", 
+          details: errors.slice(0, 10) // Show first 10 errors
+        });
+      }
       
       const result = await storage.importPanelRegister(panelsToImport);
-      res.json(result);
+      res.json({ 
+        ...result, 
+        errors: errors.length > 0 ? errors.slice(0, 10) : undefined 
+      });
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Import failed" });
     }
