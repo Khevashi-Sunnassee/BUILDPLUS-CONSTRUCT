@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { format } from "date-fns";
+import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import {
   Calendar,
   ChevronRight,
@@ -47,8 +47,46 @@ export default function ProductionReportPage() {
   const [dateRange, setDateRange] = useState<string>("month");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Calculate date range based on selection
+  const { startDate, endDate } = useMemo(() => {
+    const today = new Date();
+    let start: Date;
+    let end: Date = today;
+
+    switch (dateRange) {
+      case "week":
+        start = startOfWeek(today, { weekStartsOn: 1 });
+        end = endOfWeek(today, { weekStartsOn: 1 });
+        break;
+      case "month":
+        start = startOfMonth(today);
+        end = endOfMonth(today);
+        break;
+      case "quarter":
+        start = startOfQuarter(today);
+        end = endOfQuarter(today);
+        break;
+      case "all":
+        start = subDays(today, 365);
+        break;
+      default:
+        start = startOfMonth(today);
+        end = endOfMonth(today);
+    }
+
+    return {
+      startDate: format(start, "yyyy-MM-dd"),
+      endDate: format(end, "yyyy-MM-dd"),
+    };
+  }, [dateRange]);
+
   const { data: reports, isLoading } = useQuery<ProductionReportSummary[]>({
-    queryKey: ["/api/production-reports", { dateRange }],
+    queryKey: ["/api/production-reports", { startDate, endDate }],
+    queryFn: async () => {
+      const res = await fetch(`/api/production-reports?startDate=${startDate}&endDate=${endDate}`);
+      if (!res.ok) throw new Error("Failed to fetch reports");
+      return res.json();
+    },
   });
 
   const filteredReports = reports?.filter((report) => {
