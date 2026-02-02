@@ -1,17 +1,17 @@
 import { eq, and, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
-  users, devices, projects, mappingRules, dailyLogs, logRows,
+  users, devices, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
-  panelTypes, projectPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
+  panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords,
   type InsertUser, type User, type InsertDevice, type Device,
-  type InsertProject, type Project, type InsertMappingRule, type MappingRule,
+  type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
   type InsertApprovalEvent, type ApprovalEvent, type GlobalSettings,
   type InsertJob, type Job, type InsertPanelRegister, type PanelRegister,
   type InsertProductionEntry, type ProductionEntry,
-  type InsertPanelType, type PanelTypeConfig, type InsertProjectPanelRate, type ProjectPanelRate,
+  type InsertPanelType, type PanelTypeConfig, type InsertJobPanelRate, type JobPanelRate,
   type InsertWorkType, type WorkType,
   type InsertPanelTypeCostComponent, type PanelTypeCostComponent,
   type InsertJobCostOverride, type JobCostOverride,
@@ -54,25 +54,19 @@ export interface IStorage {
   deleteDevice(id: string): Promise<void>;
   getAllDevices(): Promise<(Device & { user: User })[]>;
 
-  getProject(id: string): Promise<Project | undefined>;
-  createProject(data: InsertProject): Promise<Project>;
-  updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined>;
-  deleteProject(id: string): Promise<void>;
-  getAllProjects(): Promise<(Project & { mappingRules: MappingRule[] })[]>;
-
   createMappingRule(data: InsertMappingRule): Promise<MappingRule>;
   deleteMappingRule(id: string): Promise<void>;
   getMappingRules(): Promise<MappingRule[]>;
 
-  getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { project?: Project })[]; user: User }) | undefined>;
+  getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined>;
   getDailyLogsByUser(userId: string, filters?: { status?: string; dateRange?: string }): Promise<DailyLog[]>;
-  getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { project?: Project })[]; user: User })[]>;
+  getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]>;
   upsertDailyLog(data: { userId: string; logDay: string; tz: string }): Promise<DailyLog>;
   updateDailyLogStatus(id: string, data: { status: string; submittedAt?: Date; approvedAt?: Date; approvedBy?: string; managerComment?: string }): Promise<DailyLog | undefined>;
 
   getLogRow(id: string): Promise<LogRow | undefined>;
   upsertLogRow(sourceEventId: string, data: Partial<InsertLogRow> & { dailyLogId: string }): Promise<LogRow>;
-  updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; projectId: string; isUserEdited: boolean; workTypeId: number | null }>): Promise<LogRow | undefined>;
+  updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; jobId: string; isUserEdited: boolean; workTypeId: number | null }>): Promise<LogRow | undefined>;
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
@@ -87,7 +81,7 @@ export interface IStorage {
   createJob(data: InsertJob): Promise<Job>;
   updateJob(id: string, data: Partial<InsertJob>): Promise<Job | undefined>;
   deleteJob(id: string): Promise<void>;
-  getAllJobs(): Promise<(Job & { panels: PanelRegister[]; project?: Project })[]>;
+  getAllJobs(): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[] })[]>;
   importJobs(data: InsertJob[]): Promise<{ imported: number; skipped: number }>;
 
   getPanelRegisterItem(id: string): Promise<(PanelRegister & { job: Job }) | undefined>;
@@ -121,11 +115,11 @@ export interface IStorage {
   deletePanelType(id: string): Promise<void>;
   getAllPanelTypes(): Promise<PanelTypeConfig[]>;
 
-  getProjectPanelRate(id: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig }) | undefined>;
-  getProjectPanelRates(projectId: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig })[]>;
-  upsertProjectPanelRate(projectId: string, panelTypeId: string, data: Partial<InsertProjectPanelRate>): Promise<ProjectPanelRate>;
-  deleteProjectPanelRate(id: string): Promise<void>;
-  getEffectiveRates(projectId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; projectRate?: ProjectPanelRate })[]>;
+  getJobPanelRate(id: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig }) | undefined>;
+  getJobPanelRates(jobId: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig })[]>;
+  upsertJobPanelRate(jobId: string, panelTypeId: string, data: Partial<InsertJobPanelRate>): Promise<JobPanelRate>;
+  deleteJobPanelRate(id: string): Promise<void>;
+  getEffectiveRates(jobId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; jobRate?: JobPanelRate })[]>;
 
   getWorkType(id: number): Promise<WorkType | undefined>;
   getWorkTypeByCode(code: string): Promise<WorkType | undefined>;
@@ -280,35 +274,6 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r.devices, user: r.users }));
   }
 
-  async getProject(id: string): Promise<Project | undefined> {
-    const [project] = await db.select().from(projects).where(eq(projects.id, id));
-    return project;
-  }
-
-  async createProject(data: InsertProject): Promise<Project> {
-    const [project] = await db.insert(projects).values(data).returning();
-    return project;
-  }
-
-  async updateProject(id: string, data: Partial<InsertProject>): Promise<Project | undefined> {
-    const [project] = await db.update(projects).set({ ...data, updatedAt: new Date() }).where(eq(projects.id, id)).returning();
-    return project;
-  }
-
-  async deleteProject(id: string): Promise<void> {
-    await db.delete(mappingRules).where(eq(mappingRules.projectId, id));
-    await db.delete(projects).where(eq(projects.id, id));
-  }
-
-  async getAllProjects(): Promise<(Project & { mappingRules: MappingRule[] })[]> {
-    const projectList = await db.select().from(projects).orderBy(desc(projects.createdAt));
-    const rules = await db.select().from(mappingRules).orderBy(asc(mappingRules.priority));
-    return projectList.map(p => ({
-      ...p,
-      mappingRules: rules.filter(r => r.projectId === p.id),
-    }));
-  }
-
   async createMappingRule(data: InsertMappingRule): Promise<MappingRule> {
     const [rule] = await db.insert(mappingRules).values(data).returning();
     return rule;
@@ -322,17 +287,17 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(mappingRules).orderBy(asc(mappingRules.priority));
   }
 
-  async getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { project?: Project })[]; user: User }) | undefined> {
+  async getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined> {
     const [log] = await db.select().from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id)).where(eq(dailyLogs.id, id));
     if (!log) return undefined;
 
-    const rows = await db.select().from(logRows).leftJoin(projects, eq(logRows.projectId, projects.id))
+    const rows = await db.select().from(logRows).leftJoin(jobs, eq(logRows.jobId, jobs.id))
       .where(eq(logRows.dailyLogId, id)).orderBy(asc(logRows.startAt));
 
     return {
       ...log.daily_logs,
       user: log.users,
-      rows: rows.map(r => ({ ...r.log_rows, project: r.projects || undefined })),
+      rows: rows.map(r => ({ ...r.log_rows, job: r.jobs || undefined })),
     };
   }
 
@@ -368,18 +333,18 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
   }
 
-  async getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { project?: Project })[]; user: User })[]> {
+  async getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]> {
     const logs = await db.select().from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id))
       .where(eq(dailyLogs.status, "SUBMITTED")).orderBy(desc(dailyLogs.logDay));
 
     const result = [];
     for (const log of logs) {
-      const rows = await db.select().from(logRows).leftJoin(projects, eq(logRows.projectId, projects.id))
+      const rows = await db.select().from(logRows).leftJoin(jobs, eq(logRows.jobId, jobs.id))
         .where(eq(logRows.dailyLogId, log.daily_logs.id)).orderBy(asc(logRows.startAt));
       result.push({
         ...log.daily_logs,
         user: log.users,
-        rows: rows.map(r => ({ ...r.log_rows, project: r.projects || undefined })),
+        rows: rows.map(r => ({ ...r.log_rows, job: r.jobs || undefined })),
       });
     }
     return result;
@@ -424,7 +389,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; projectId: string; isUserEdited: boolean }>): Promise<LogRow | undefined> {
+  async updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; jobId: string; isUserEdited: boolean }>): Promise<LogRow | undefined> {
     const [row] = await db.update(logRows).set({ ...data, updatedAt: new Date() }).where(eq(logRows.id, id)).returning();
     return row;
   }
@@ -513,12 +478,12 @@ export class DatabaseStorage implements IStorage {
     
     const allRows = await db.select().from(logRows)
       .innerJoin(dailyLogs, eq(logRows.dailyLogId, dailyLogs.id))
-      .leftJoin(projects, eq(logRows.projectId, projects.id))
+      .leftJoin(jobs, eq(logRows.jobId, jobs.id))
       .leftJoin(users, eq(dailyLogs.userId, users.id))
       .where(gte(dailyLogs.logDay, startDateStr));
 
     const userMap = new Map<string, { name: string; email: string; totalMinutes: number; days: Set<string> }>();
-    const projectMap = new Map<string, { name: string; code: string; totalMinutes: number }>();
+    const jobMap = new Map<string, { name: string; code: string; totalMinutes: number }>();
     const appMap = new Map<string, number>();
     const sheetMap = new Map<string, { sheetNumber: string; sheetName: string; totalMinutes: number; projectName: string }>();
     const dailyMap = new Map<string, { date: string; totalMinutes: number; users: Set<string> }>();
@@ -538,13 +503,13 @@ export class DatabaseStorage implements IStorage {
       user.totalMinutes += row.log_rows.durationMin;
       user.days.add(logDay);
 
-      // By project
-      if (row.projects) {
-        const projectId = row.projects.id;
-        if (!projectMap.has(projectId)) {
-          projectMap.set(projectId, { name: row.projects.name, code: row.projects.code || "", totalMinutes: 0 });
+      // By job
+      if (row.jobs) {
+        const jobId = row.jobs.id;
+        if (!jobMap.has(jobId)) {
+          jobMap.set(jobId, { name: row.jobs.name, code: row.jobs.code || row.jobs.jobNumber || "", totalMinutes: 0 });
         }
-        projectMap.get(projectId)!.totalMinutes += row.log_rows.durationMin;
+        jobMap.get(jobId)!.totalMinutes += row.log_rows.durationMin;
       }
 
       // By app
@@ -554,13 +519,13 @@ export class DatabaseStorage implements IStorage {
       // By sheet (Revit sheets)
       const sheetNumber = row.log_rows.revitSheetNumber;
       if (sheetNumber) {
-        const sheetKey = `${sheetNumber}-${row.projects?.name || "Unknown"}`;
+        const sheetKey = `${sheetNumber}-${row.jobs?.name || "Unknown"}`;
         if (!sheetMap.has(sheetKey)) {
           sheetMap.set(sheetKey, { 
             sheetNumber, 
             sheetName: row.log_rows.revitSheetName || "", 
             totalMinutes: 0,
-            projectName: row.projects?.name || "Unknown"
+            projectName: row.jobs?.name || "Unknown"
           });
         }
         sheetMap.get(sheetKey)!.totalMinutes += row.log_rows.durationMin;
@@ -607,12 +572,12 @@ export class DatabaseStorage implements IStorage {
       summary: {
         totalMinutes,
         totalUsers: userMap.size,
-        totalProjects: projectMap.size,
+        totalProjects: jobMap.size,
         totalSheets: sheetMap.size,
         avgMinutesPerDay: userMap.size > 0 ? Math.round(totalMinutes / Array.from(userMap.values()).reduce((sum, u) => sum + u.days.size, 0)) : 0,
       },
       byUser: Array.from(userMap.values()).map(u => ({ name: u.name, email: u.email, totalMinutes: u.totalMinutes, activeDays: u.days.size })),
-      byProject: Array.from(projectMap.values()),
+      byProject: Array.from(jobMap.values()),
       byApp: Array.from(appMap.entries()).map(([app, totalMinutes]) => ({ app, totalMinutes })),
       bySheet: Array.from(sheetMap.values()).sort((a, b) => b.totalMinutes - a.totalMinutes),
       dailyTrend,
@@ -647,10 +612,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(jobs).where(eq(jobs.id, id));
   }
 
-  async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; project?: Project })[]> {
+  async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[] })[]> {
     const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
     const allPanels = await db.select().from(panelRegister);
-    const allProjects = await db.select().from(projects);
+    const allRules = await db.select().from(mappingRules);
     
     const panelsByJob = new Map<string, PanelRegister[]>();
     for (const panel of allPanels) {
@@ -660,12 +625,18 @@ export class DatabaseStorage implements IStorage {
       panelsByJob.get(panel.jobId)!.push(panel);
     }
     
-    const projectsById = new Map(allProjects.map(p => [p.id, p]));
+    const rulesByJob = new Map<string, MappingRule[]>();
+    for (const rule of allRules) {
+      if (!rulesByJob.has(rule.jobId)) {
+        rulesByJob.set(rule.jobId, []);
+      }
+      rulesByJob.get(rule.jobId)!.push(rule);
+    }
     
     return allJobs.map(job => ({
       ...job,
       panels: panelsByJob.get(job.id) || [],
-      project: job.projectId ? projectsById.get(job.projectId) : undefined,
+      mappingRules: rulesByJob.get(job.id) || [],
     }));
   }
 
@@ -904,52 +875,52 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(panelTypes).orderBy(asc(panelTypes.name));
   }
 
-  async getProjectPanelRate(id: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig }) | undefined> {
-    const result = await db.select().from(projectPanelRates)
-      .innerJoin(panelTypes, eq(projectPanelRates.panelTypeId, panelTypes.id))
-      .where(eq(projectPanelRates.id, id));
+  async getJobPanelRate(id: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig }) | undefined> {
+    const result = await db.select().from(jobPanelRates)
+      .innerJoin(panelTypes, eq(jobPanelRates.panelTypeId, panelTypes.id))
+      .where(eq(jobPanelRates.id, id));
     if (!result.length) return undefined;
-    return { ...result[0].project_panel_rates, panelType: result[0].panel_types };
+    return { ...result[0].job_panel_rates, panelType: result[0].panel_types };
   }
 
-  async getProjectPanelRates(projectId: string): Promise<(ProjectPanelRate & { panelType: PanelTypeConfig })[]> {
-    const result = await db.select().from(projectPanelRates)
-      .innerJoin(panelTypes, eq(projectPanelRates.panelTypeId, panelTypes.id))
-      .where(eq(projectPanelRates.projectId, projectId));
-    return result.map(r => ({ ...r.project_panel_rates, panelType: r.panel_types }));
+  async getJobPanelRates(jobId: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig })[]> {
+    const result = await db.select().from(jobPanelRates)
+      .innerJoin(panelTypes, eq(jobPanelRates.panelTypeId, panelTypes.id))
+      .where(eq(jobPanelRates.jobId, jobId));
+    return result.map(r => ({ ...r.job_panel_rates, panelType: r.panel_types }));
   }
 
-  async upsertProjectPanelRate(projectId: string, panelTypeId: string, data: Partial<InsertProjectPanelRate>): Promise<ProjectPanelRate> {
-    const existing = await db.select().from(projectPanelRates)
-      .where(and(eq(projectPanelRates.projectId, projectId), eq(projectPanelRates.panelTypeId, panelTypeId)));
+  async upsertJobPanelRate(jobId: string, panelTypeId: string, data: Partial<InsertJobPanelRate>): Promise<JobPanelRate> {
+    const existing = await db.select().from(jobPanelRates)
+      .where(and(eq(jobPanelRates.jobId, jobId), eq(jobPanelRates.panelTypeId, panelTypeId)));
     
     if (existing.length > 0) {
-      const [updated] = await db.update(projectPanelRates)
+      const [updated] = await db.update(jobPanelRates)
         .set({ ...data, updatedAt: new Date() })
-        .where(eq(projectPanelRates.id, existing[0].id))
+        .where(eq(jobPanelRates.id, existing[0].id))
         .returning();
       return updated;
     } else {
-      const [created] = await db.insert(projectPanelRates)
-        .values({ projectId, panelTypeId, ...data })
+      const [created] = await db.insert(jobPanelRates)
+        .values({ jobId, panelTypeId, ...data })
         .returning();
       return created;
     }
   }
 
-  async deleteProjectPanelRate(id: string): Promise<void> {
-    await db.delete(projectPanelRates).where(eq(projectPanelRates.id, id));
+  async deleteJobPanelRate(id: string): Promise<void> {
+    await db.delete(jobPanelRates).where(eq(jobPanelRates.id, id));
   }
 
-  async getEffectiveRates(projectId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; projectRate?: ProjectPanelRate })[]> {
+  async getEffectiveRates(jobId: string): Promise<(PanelTypeConfig & { isOverridden: boolean; jobRate?: JobPanelRate })[]> {
     const allTypes = await this.getAllPanelTypes();
-    const projectRates = await this.getProjectPanelRates(projectId);
-    const ratesMap = new Map(projectRates.map(r => [r.panelTypeId, r]));
+    const jobRates = await this.getJobPanelRates(jobId);
+    const ratesMap = new Map(jobRates.map(r => [r.panelTypeId, r]));
     
     return allTypes.map(pt => ({
       ...pt,
       isOverridden: ratesMap.has(pt.id),
-      projectRate: ratesMap.get(pt.id),
+      jobRate: ratesMap.get(pt.id),
     }));
   }
 

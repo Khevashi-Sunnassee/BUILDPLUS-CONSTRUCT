@@ -104,7 +104,7 @@ export async function registerRoutes(
         const totalMinutes = fullLog.rows.reduce((sum, r) => sum + r.durationMin, 0);
         const idleMinutes = fullLog.rows.reduce((sum, r) => sum + r.idleMin, 0);
         const missingPanelMarkMinutes = fullLog.rows.filter(r => !r.panelMark).reduce((sum, r) => sum + r.durationMin, 0);
-        const missingProjectMinutes = fullLog.rows.filter(r => !r.projectId).reduce((sum, r) => sum + r.durationMin, 0);
+        const missingJobMinutes = fullLog.rows.filter(r => !r.jobId).reduce((sum, r) => sum + r.durationMin, 0);
         logsWithStats.push({
           id: log.id,
           logDay: log.logDay,
@@ -112,7 +112,7 @@ export async function registerRoutes(
           totalMinutes,
           idleMinutes,
           missingPanelMarkMinutes,
-          missingProjectMinutes,
+          missingJobMinutes,
           rowCount: fullLog.rows.length,
           userName: fullLog.user.name,
           userEmail: fullLog.user.email,
@@ -203,12 +203,12 @@ export async function registerRoutes(
     if (log.status !== "PENDING" && log.status !== "REJECTED") {
       return res.status(400).json({ error: "Cannot edit rows in submitted/approved logs" });
     }
-    const { panelMark, drawingCode, notes, projectId, workTypeId } = req.body;
+    const { panelMark, drawingCode, notes, jobId, workTypeId } = req.body;
     const updatedRow = await storage.updateLogRow(req.params.id, {
       panelMark,
       drawingCode,
       notes,
-      projectId,
+      jobId,
       workTypeId: workTypeId === null ? null : (workTypeId !== undefined ? workTypeId : undefined),
       isUserEdited: true,
     });
@@ -221,7 +221,7 @@ export async function registerRoutes(
       const user = await storage.getUser(req.session.userId!);
       if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-      const { logDay, projectId, jobId, panelRegisterId, workTypeId, app, startTime, endTime, fileName, filePath,
+      const { logDay, jobId, panelRegisterId, workTypeId, app, startTime, endTime, fileName, filePath,
               revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
               panelMark, drawingCode, notes, createNewPanel, newPanelMark } = req.body;
 
@@ -274,7 +274,6 @@ export async function registerRoutes(
 
       await storage.upsertLogRow(sourceEventId, {
         dailyLogId: dailyLog.id,
-        projectId: projectId || undefined,
         jobId: jobId || undefined,
         panelRegisterId: actualPanelRegisterId || undefined,
         workTypeId: workTypeId || undefined,
@@ -311,9 +310,10 @@ export async function registerRoutes(
     }
   });
 
+  // Legacy /api/projects endpoint - now redirects to jobs for backward compatibility
   app.get("/api/projects", requireAuth, async (req, res) => {
-    const projects = await storage.getAllProjects();
-    res.json(projects.map(p => ({ id: p.id, name: p.name, code: p.code })));
+    const jobs = await storage.getAllJobs();
+    res.json(jobs.map(j => ({ id: j.id, name: j.name, code: j.code || j.jobNumber })));
   });
 
   app.get("/api/jobs", requireAuth, async (req, res) => {
@@ -351,29 +351,16 @@ export async function registerRoutes(
     res.json(settings);
   });
 
+  // Legacy /api/admin/projects endpoints - redirect to jobs for backward compatibility
   app.get("/api/admin/projects", requireRole("ADMIN"), async (req, res) => {
-    const projects = await storage.getAllProjects();
-    res.json(projects);
+    const jobs = await storage.getAllJobs();
+    res.json(jobs);
   });
 
-  app.post("/api/admin/projects", requireRole("ADMIN"), async (req, res) => {
-    const project = await storage.createProject(req.body);
-    res.json(project);
-  });
-
-  app.put("/api/admin/projects/:id", requireRole("ADMIN"), async (req, res) => {
-    const project = await storage.updateProject(req.params.id, req.body);
-    res.json(project);
-  });
-
-  app.delete("/api/admin/projects/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteProject(req.params.id);
-    res.json({ ok: true });
-  });
-
-  app.post("/api/admin/projects/:id/rules", requireRole("ADMIN"), async (req, res) => {
+  // Mapping rules now use jobId instead of projectId
+  app.post("/api/admin/jobs/:id/rules", requireRole("ADMIN"), async (req, res) => {
     const rule = await storage.createMappingRule({
-      projectId: req.params.id,
+      jobId: req.params.id,
       pathContains: req.body.pathContains,
       priority: req.body.priority || 100,
     });
@@ -451,11 +438,7 @@ export async function registerRoutes(
       if (existing) {
         return res.status(400).json({ error: "Job with this number already exists" });
       }
-      const jobData = {
-        ...req.body,
-        projectId: req.body.projectId && req.body.projectId !== "none" ? req.body.projectId : null,
-      };
-      const job = await storage.createJob(jobData);
+      const job = await storage.createJob(req.body);
       res.json(job);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to create job" });
@@ -463,11 +446,7 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    const jobData = {
-      ...req.body,
-      projectId: req.body.projectId && req.body.projectId !== "none" ? req.body.projectId : null,
-    };
-    const job = await storage.updateJob(req.params.id, jobData);
+    const job = await storage.updateJob(req.params.id, req.body);
     res.json(job);
   });
 
@@ -683,32 +662,27 @@ export async function registerRoutes(
     const allPanelTypes = await storage.getAllPanelTypes();
     const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
     
-    const projectRatesCache = new Map<string, Map<string, any>>();
+    const jobRatesCache = new Map<string, Map<string, any>>();
     
     const getRatesForEntry = async (jobId: string, panelTypeCode: string) => {
-      if (!projectRatesCache.has(jobId)) {
-        const job = await storage.getJob(jobId);
-        if (job?.projectId) {
-          const rates = await storage.getProjectPanelRates(job.projectId);
-          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
-        } else {
-          projectRatesCache.set(jobId, new Map());
-        }
+      if (!jobRatesCache.has(jobId)) {
+        const rates = await storage.getJobPanelRates(jobId);
+        jobRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
       }
       
-      const projectRates = projectRatesCache.get(jobId);
-      const projectRate = projectRates?.get(panelTypeCode);
+      const jobRates = jobRatesCache.get(jobId);
+      const jobRate = jobRates?.get(panelTypeCode);
       const defaultRate = panelTypesByCode.get(panelTypeCode);
       
       return {
-        labourCostPerM2: projectRate?.labourCostPerM2 || defaultRate?.labourCostPerM2 || "0",
-        labourCostPerM3: projectRate?.labourCostPerM3 || defaultRate?.labourCostPerM3 || "0",
-        supplyCostPerM2: projectRate?.supplyCostPerM2 || defaultRate?.supplyCostPerM2 || "0",
-        supplyCostPerM3: projectRate?.supplyCostPerM3 || defaultRate?.supplyCostPerM3 || "0",
-        totalRatePerM2: projectRate?.totalRatePerM2 || defaultRate?.totalRatePerM2 || "0",
-        totalRatePerM3: projectRate?.totalRatePerM3 || defaultRate?.totalRatePerM3 || "0",
-        sellRatePerM2: projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0",
-        sellRatePerM3: projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0",
+        labourCostPerM2: jobRate?.labourCostPerM2 || defaultRate?.labourCostPerM2 || "0",
+        labourCostPerM3: jobRate?.labourCostPerM3 || defaultRate?.labourCostPerM3 || "0",
+        supplyCostPerM2: jobRate?.supplyCostPerM2 || defaultRate?.supplyCostPerM2 || "0",
+        supplyCostPerM3: jobRate?.supplyCostPerM3 || defaultRate?.supplyCostPerM3 || "0",
+        totalRatePerM2: jobRate?.totalRatePerM2 || defaultRate?.totalRatePerM2 || "0",
+        totalRatePerM3: jobRate?.totalRatePerM3 || defaultRate?.totalRatePerM3 || "0",
+        sellRatePerM2: jobRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0",
+        sellRatePerM3: jobRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0",
       };
     };
     
@@ -826,22 +800,23 @@ export async function registerRoutes(
     res.json(types.filter(t => t.isActive));
   });
 
-  app.get("/api/projects/:projectId/panel-rates", requireAuth, async (req, res) => {
-    const rates = await storage.getEffectiveRates(req.params.projectId);
+  // Panel rates now use jobs instead of projects
+  app.get("/api/jobs/:jobId/panel-rates", requireAuth, async (req, res) => {
+    const rates = await storage.getEffectiveRates(req.params.jobId);
     res.json(rates);
   });
 
-  app.put("/api/projects/:projectId/panel-rates/:panelTypeId", requireRole("ADMIN"), async (req, res) => {
+  app.put("/api/jobs/:jobId/panel-rates/:panelTypeId", requireRole("ADMIN"), async (req, res) => {
     try {
-      const rate = await storage.upsertProjectPanelRate(req.params.projectId, req.params.panelTypeId, req.body);
+      const rate = await storage.upsertJobPanelRate(req.params.jobId, req.params.panelTypeId, req.body);
       res.json(rate);
     } catch (error: any) {
-      res.status(400).json({ error: error.message || "Failed to update project rate" });
+      res.status(400).json({ error: error.message || "Failed to update job rate" });
     }
   });
 
-  app.delete("/api/projects/:projectId/panel-rates/:rateId", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteProjectPanelRate(req.params.rateId);
+  app.delete("/api/jobs/:jobId/panel-rates/:rateId", requireRole("ADMIN"), async (req, res) => {
+    await storage.deleteJobPanelRate(req.params.rateId);
     res.json({ ok: true });
   });
 
@@ -929,15 +904,15 @@ export async function registerRoutes(
           tz: body.tz,
         });
 
-        let mappedProjectId: string | null = null;
-        if (!b.projectId && b.filePath) {
+        let mappedJobId: string | null = null;
+        if (!b.jobId && b.filePath) {
           const match = rules.find(r => b.filePath!.toLowerCase().includes(r.pathContains.toLowerCase()));
-          if (match) mappedProjectId = match.projectId;
+          if (match) mappedJobId = match.jobId;
         }
 
         await storage.upsertLogRow(b.sourceEventId, {
           dailyLogId: dailyLog.id,
-          projectId: b.projectId || mappedProjectId || undefined,
+          jobId: b.jobId || mappedJobId || undefined,
           startAt: new Date(b.startedAt),
           endAt: new Date(b.endedAt),
           durationMin: b.durationMin,
@@ -1076,17 +1051,17 @@ export async function registerRoutes(
     // Batch fetch logs with rows and users in efficient queries (2 queries total)
     const logsWithRows = await storage.getDailyLogsWithRowsInRange(startDate, endDate);
     
-    // Collect unique project IDs from rows to batch fetch only needed projects
-    const projectIds = new Set<string>();
+    // Collect unique job IDs from rows to batch fetch only needed jobs
+    const jobIds = new Set<string>();
     for (const { rows } of logsWithRows) {
       for (const row of rows) {
-        if (row.projectId) projectIds.add(row.projectId);
+        if (row.jobId) jobIds.add(row.jobId);
       }
     }
     
-    // Fetch only projects that are referenced in the data
-    const allProjects = await storage.getAllProjects();
-    const projectsMap = new Map(allProjects.filter(p => projectIds.has(p.id)).map(p => [p.id, p]));
+    // Fetch only jobs that are referenced in the data
+    const allJobs = await storage.getAllJobs();
+    const jobsMap = new Map(allJobs.filter(j => jobIds.has(j.id)).map(j => [j.id, j]));
     
     // Fetch work types for mapping
     const allWorkTypes = await storage.getActiveWorkTypes();
@@ -1100,9 +1075,9 @@ export async function registerRoutes(
       activeMinutes: number;
       byUser: Map<string, { name: string; minutes: number; idle: number }>;
       byApp: Map<string, number>;
-      byProject: Map<string, { name: string; minutes: number }>;
+      byJob: Map<string, { name: string; minutes: number }>;
       byWorkType: Map<number | string, { name: string; code: string; minutes: number }>;
-      byPanel: Map<string, { panelMark: string; minutes: number; projectName: string }>;
+      byPanel: Map<string, { panelMark: string; minutes: number; jobName: string }>;
     }>();
     
     for (const { log, user, rows } of logsWithRows) {
@@ -1115,7 +1090,7 @@ export async function registerRoutes(
           activeMinutes: 0,
           byUser: new Map(),
           byApp: new Map(),
-          byProject: new Map(),
+          byJob: new Map(),
           byWorkType: new Map(),
           byPanel: new Map(),
         });
@@ -1140,14 +1115,14 @@ export async function registerRoutes(
         const app = row.app;
         day.byApp.set(app, (day.byApp.get(app) || 0) + row.durationMin);
         
-        // By project - use preloaded project data
-        if (row.projectId) {
-          const project = projectsMap.get(row.projectId);
-          if (project) {
-            if (!day.byProject.has(project.id)) {
-              day.byProject.set(project.id, { name: project.name, minutes: 0 });
+        // By job - use preloaded job data
+        if (row.jobId) {
+          const job = jobsMap.get(row.jobId);
+          if (job) {
+            if (!day.byJob.has(job.id)) {
+              day.byJob.set(job.id, { name: job.name, minutes: 0 });
             }
-            day.byProject.get(project.id)!.minutes += row.durationMin;
+            day.byJob.get(job.id)!.minutes += row.durationMin;
           }
         }
         
@@ -1167,11 +1142,11 @@ export async function registerRoutes(
         if (row.panelMark) {
           const panelKey = row.panelMark;
           if (!day.byPanel.has(panelKey)) {
-            const project = row.projectId ? projectsMap.get(row.projectId) : null;
+            const job = row.jobId ? jobsMap.get(row.jobId) : null;
             day.byPanel.set(panelKey, {
               panelMark: row.panelMark,
               minutes: 0,
-              projectName: project?.name || "Unknown",
+              jobName: job?.name || "Unknown",
             });
           }
           day.byPanel.get(panelKey)!.minutes += row.durationMin;
@@ -1190,7 +1165,7 @@ export async function registerRoutes(
         activeHours: Math.round((d.totalMinutes - d.idleMinutes) / 60 * 100) / 100,
         byUser: Object.fromEntries(d.byUser),
         byApp: Object.fromEntries(d.byApp),
-        byProject: Object.fromEntries(d.byProject),
+        byProject: Object.fromEntries(d.byJob),
         byWorkType: Object.fromEntries(d.byWorkType),
         byPanel: Object.fromEntries(d.byPanel),
       }))
@@ -1198,7 +1173,7 @@ export async function registerRoutes(
     
     // Aggregate work type totals across all days
     const workTypeTotals = new Map<string, { name: string; code: string; minutes: number }>();
-    const panelTotals = new Map<string, { panelMark: string; minutes: number; projectName: string }>();
+    const panelTotals = new Map<string, { panelMark: string; minutes: number; jobName: string }>();
     
     for (const day of result) {
       for (const [key, wt] of Object.entries(day.byWorkType) as [string, any][]) {
@@ -1209,7 +1184,7 @@ export async function registerRoutes(
       }
       for (const [key, panel] of Object.entries(day.byPanel) as [string, any][]) {
         if (!panelTotals.has(key)) {
-          panelTotals.set(key, { panelMark: panel.panelMark, minutes: 0, projectName: panel.projectName });
+          panelTotals.set(key, { panelMark: panel.panelMark, minutes: 0, jobName: panel.jobName });
         }
         panelTotals.get(key)!.minutes += panel.minutes;
       }
@@ -1287,31 +1262,26 @@ export async function registerRoutes(
       return code;
     };
     
-    const projectRatesCache = new Map<string, Map<string, any>>();
+    const jobRatesCache = new Map<string, Map<string, any>>();
     
     const getRatesForEntry = async (jobId: string, panelTypeCode: string) => {
       const normalizedCode = normalizePanelType(panelTypeCode);
-      if (!projectRatesCache.has(jobId)) {
-        const job = await storage.getJob(jobId);
-        if (job?.projectId) {
-          const rates = await storage.getProjectPanelRates(job.projectId);
-          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
-        } else {
-          projectRatesCache.set(jobId, new Map());
-        }
+      if (!jobRatesCache.has(jobId)) {
+        const rates = await storage.getJobPanelRates(jobId);
+        jobRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
       }
       
-      const projectRates = projectRatesCache.get(jobId);
-      const projectRate = projectRates?.get(normalizedCode);
+      const jobRates = jobRatesCache.get(jobId);
+      const jobRate = jobRates?.get(normalizedCode);
       const defaultRate = panelTypesByCode.get(normalizedCode);
       
       return {
-        labourCostPerM2: projectRate?.labourCostPerM2 || defaultRate?.labourCostPerM2 || "0",
-        labourCostPerM3: projectRate?.labourCostPerM3 || defaultRate?.labourCostPerM3 || "0",
-        supplyCostPerM2: projectRate?.supplyCostPerM2 || defaultRate?.supplyCostPerM2 || "0",
-        supplyCostPerM3: projectRate?.supplyCostPerM3 || defaultRate?.supplyCostPerM3 || "0",
-        sellRatePerM2: projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0",
-        sellRatePerM3: projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0",
+        labourCostPerM2: jobRate?.labourCostPerM2 || defaultRate?.labourCostPerM2 || "0",
+        labourCostPerM3: jobRate?.labourCostPerM3 || defaultRate?.labourCostPerM3 || "0",
+        supplyCostPerM2: jobRate?.supplyCostPerM2 || defaultRate?.supplyCostPerM2 || "0",
+        supplyCostPerM3: jobRate?.supplyCostPerM3 || defaultRate?.supplyCostPerM3 || "0",
+        sellRatePerM2: jobRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0",
+        sellRatePerM3: jobRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0",
       };
     };
     
@@ -1454,7 +1424,7 @@ export async function registerRoutes(
     
     const jobCostOverridesCache = new Map<string, any[]>();
     const panelTypeCostComponentsCache = new Map<string, any[]>();
-    const projectRatesCache = new Map<string, Map<string, any>>();
+    const jobRatesCache = new Map<string, Map<string, any>>();
     
     const getCostComponents = async (jobId: string, panelTypeCode: string) => {
       const normalizedCode = normalizePanelType(panelTypeCode);
@@ -1488,22 +1458,17 @@ export async function registerRoutes(
     
     const getRates = async (jobId: string, panelTypeCode: string) => {
       const normalizedCode = normalizePanelType(panelTypeCode);
-      if (!projectRatesCache.has(jobId)) {
-        const job = await storage.getJob(jobId);
-        if (job?.projectId) {
-          const rates = await storage.getProjectPanelRates(job.projectId);
-          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
-        } else {
-          projectRatesCache.set(jobId, new Map());
-        }
+      if (!jobRatesCache.has(jobId)) {
+        const rates = await storage.getJobPanelRates(jobId);
+        jobRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
       }
-      const projectRates = projectRatesCache.get(jobId);
-      const projectRate = projectRates?.get(normalizedCode);
+      const jobRates = jobRatesCache.get(jobId);
+      const jobRate = jobRates?.get(normalizedCode);
       const defaultRate = panelTypesByCode.get(normalizedCode);
       
       return {
-        sellRatePerM2: parseFloat(projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
-        sellRatePerM3: parseFloat(projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
+        sellRatePerM2: parseFloat(jobRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
+        sellRatePerM3: parseFloat(jobRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
       };
     };
     
@@ -1576,7 +1541,7 @@ export async function registerRoutes(
     
     const jobCostOverridesCache = new Map<string, any[]>();
     const panelTypeCostComponentsCache = new Map<string, any[]>();
-    const projectRatesCache = new Map<string, Map<string, any>>();
+    const jobRatesCache = new Map<string, Map<string, any>>();
     
     const getCostComponents = async (jobId: string, panelTypeCode: string) => {
       const normalizedCode = normalizePanelType(panelTypeCode);
@@ -1608,22 +1573,17 @@ export async function registerRoutes(
     
     const getRates = async (jobId: string, panelTypeCode: string) => {
       const normalizedCode = normalizePanelType(panelTypeCode);
-      if (!projectRatesCache.has(jobId)) {
-        const job = await storage.getJob(jobId);
-        if (job?.projectId) {
-          const rates = await storage.getProjectPanelRates(job.projectId);
-          projectRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
-        } else {
-          projectRatesCache.set(jobId, new Map());
-        }
+      if (!jobRatesCache.has(jobId)) {
+        const rates = await storage.getJobPanelRates(jobId);
+        jobRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
       }
-      const projectRates = projectRatesCache.get(jobId);
-      const projectRate = projectRates?.get(normalizedCode);
+      const jobRates = jobRatesCache.get(jobId);
+      const jobRate = jobRates?.get(normalizedCode);
       const defaultRate = panelTypesByCode.get(normalizedCode);
       
       return {
-        sellRatePerM2: parseFloat(projectRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
-        sellRatePerM3: parseFloat(projectRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
+        sellRatePerM2: parseFloat(jobRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
+        sellRatePerM3: parseFloat(jobRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
       };
     };
     

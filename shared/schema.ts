@@ -45,32 +45,23 @@ export const globalSettings = pgTable("global_settings", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const projects = pgTable("projects", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull(),
-  code: text("code").unique(),
-  client: text("client"),
-  address: text("address"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobNumber: text("job_number").notNull().unique(),
   name: text("name").notNull(),
+  code: text("code"),
   client: text("client"),
   address: text("address"),
   siteContact: text("site_contact"),
   siteContactPhone: text("site_contact_phone"),
   description: text("description"),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
-  projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   jobNumberIdx: index("jobs_job_number_idx").on(table.jobNumber),
   statusIdx: index("jobs_status_idx").on(table.status),
+  codeIdx: index("jobs_code_idx").on(table.code),
 }));
 
 export const workTypes = pgTable("work_types", {
@@ -127,13 +118,14 @@ export const panelRegister = pgTable("panel_register", {
 
 export const mappingRules = pgTable("mapping_rules", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id", { length: 36 }).notNull().references(() => projects.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   pathContains: text("path_contains").notNull(),
   priority: integer("priority").default(100).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   priorityIdx: index("mapping_rules_priority_idx").on(table.priority),
+  jobIdIdx: index("mapping_rules_job_id_idx").on(table.jobId),
 }));
 
 export const dailyLogs = pgTable("daily_logs", {
@@ -157,7 +149,6 @@ export const dailyLogs = pgTable("daily_logs", {
 export const logRows = pgTable("log_rows", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   dailyLogId: varchar("daily_log_id", { length: 36 }).notNull().references(() => dailyLogs.id),
-  projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
   panelRegisterId: varchar("panel_register_id", { length: 36 }).references(() => panelRegister.id),
   workTypeId: integer("work_type_id").references(() => workTypes.id),
@@ -186,7 +177,6 @@ export const logRows = pgTable("log_rows", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   dailyLogIdIdx: index("log_rows_daily_log_id_idx").on(table.dailyLogId),
-  projectIdIdx: index("log_rows_project_id_idx").on(table.projectId),
   jobIdIdx: index("log_rows_job_id_idx").on(table.jobId),
   panelRegisterIdIdx: index("log_rows_panel_register_id_idx").on(table.panelRegisterId),
   startAtIdx: index("log_rows_start_at_idx").on(table.startAt),
@@ -238,9 +228,9 @@ export const panelTypes = pgTable("panel_types", {
   codeIdx: uniqueIndex("panel_types_code_idx").on(table.code),
 }));
 
-export const projectPanelRates = pgTable("project_panel_rates", {
+export const jobPanelRates = pgTable("job_panel_rates", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  projectId: varchar("project_id", { length: 36 }).notNull().references(() => projects.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   panelTypeId: varchar("panel_type_id", { length: 36 }).notNull().references(() => panelTypes.id),
   labourCostPerM2: text("labour_cost_per_m2"),
   labourCostPerM3: text("labour_cost_per_m3"),
@@ -253,7 +243,7 @@ export const projectPanelRates = pgTable("project_panel_rates", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  projectPanelTypeIdx: uniqueIndex("project_panel_rates_project_panel_type_idx").on(table.projectId, table.panelTypeId),
+  jobPanelTypeIdx: uniqueIndex("job_panel_rates_job_panel_type_idx").on(table.jobId, table.panelTypeId),
 }));
 
 export const productionEntries = pgTable("production_entries", {
@@ -390,12 +380,6 @@ export const insertDeviceSchema = createInsertSchema(devices).omit({
   updatedAt: true,
 });
 
-export const insertProjectSchema = createInsertSchema(projects).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export const insertMappingRuleSchema = createInsertSchema(mappingRules).omit({
   id: true,
   createdAt: true,
@@ -468,7 +452,7 @@ export const insertJobCostOverrideSchema = createInsertSchema(jobCostOverrides).
   updatedAt: true,
 });
 
-export const insertProjectPanelRateSchema = createInsertSchema(projectPanelRates).omit({
+export const insertJobPanelRateSchema = createInsertSchema(jobPanelRates).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
@@ -524,7 +508,7 @@ export const agentBlockSchema = z.object({
   rawPanelMark: z.string().optional().nullable(),
   rawDrawingCode: z.string().optional().nullable(),
   source: z.string().optional().nullable(),
-  projectId: z.string().optional().nullable(),
+  jobId: z.string().optional().nullable(),
 });
 
 export const agentIngestSchema = z.object({
@@ -539,8 +523,6 @@ export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type InsertDevice = z.infer<typeof insertDeviceSchema>;
 export type Device = typeof devices.$inferSelect;
-export type InsertProject = z.infer<typeof insertProjectSchema>;
-export type Project = typeof projects.$inferSelect;
 export type InsertMappingRule = z.infer<typeof insertMappingRuleSchema>;
 export type MappingRule = typeof mappingRules.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
@@ -560,8 +542,8 @@ export type InsertProductionEntry = z.infer<typeof insertProductionEntrySchema>;
 export type ProductionEntry = typeof productionEntries.$inferSelect;
 export type InsertPanelType = z.infer<typeof insertPanelTypeSchema>;
 export type PanelTypeConfig = typeof panelTypes.$inferSelect;
-export type InsertProjectPanelRate = z.infer<typeof insertProjectPanelRateSchema>;
-export type ProjectPanelRate = typeof projectPanelRates.$inferSelect;
+export type InsertJobPanelRate = z.infer<typeof insertJobPanelRateSchema>;
+export type JobPanelRate = typeof jobPanelRates.$inferSelect;
 export type InsertWorkType = z.infer<typeof insertWorkTypeSchema>;
 export type WorkType = typeof workTypes.$inferSelect;
 export type InsertPanelTypeCostComponent = z.infer<typeof insertPanelTypeCostComponentSchema>;

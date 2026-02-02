@@ -70,7 +70,7 @@ export default function DailyReportDetailPage() {
     enabled: !!logId,
   });
 
-  const { data: projects } = useQuery<Project[]>({
+  const { data: jobs } = useQuery<any[]>({
     queryKey: ["/api/projects"],
   });
 
@@ -142,12 +142,12 @@ export default function DailyReportDetailPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const startEditing = (row: LogRow & { project?: Project }) => {
+  const startEditing = (row: LogRow & { job?: any }) => {
     setEditingRowId(row.id);
     setEditValues({
       panelMark: row.panelMark || "",
       drawingCode: row.drawingCode || "",
-      projectId: row.projectId || "",
+      jobId: row.jobId || "",
       workTypeId: row.workTypeId ?? null,
       notes: row.notes || "",
     });
@@ -377,24 +377,24 @@ export default function DailyReportDetailPage() {
                     <TableCell>
                       {editingRowId === row.id ? (
                         <Select
-                          value={editValues.projectId || "none"}
-                          onValueChange={(v) => setEditValues({ ...editValues, projectId: v === "none" ? null : v })}
+                          value={editValues.jobId || "none"}
+                          onValueChange={(v) => setEditValues({ ...editValues, jobId: v === "none" ? null : v })}
                         >
-                          <SelectTrigger className="h-8 w-32" data-testid="select-project">
+                          <SelectTrigger className="h-8 w-32" data-testid="select-job">
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {projects?.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {p.code || p.name}
+                            {jobs?.map((j) => (
+                              <SelectItem key={j.id} value={j.id}>
+                                {j.code || j.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       ) : (
-                        <span className={!row.project ? "text-muted-foreground" : ""}>
-                          {row.project?.code || row.project?.name || "-"}
+                        <span className={!row.job ? "text-muted-foreground" : ""}>
+                          {row.job?.code || row.job?.name || "-"}
                         </span>
                       )}
                     </TableCell>

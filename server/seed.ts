@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, projects, dailyLogs, logRows, globalSettings, workTypes, trailerTypes } from "@shared/schema";
+import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 
@@ -101,25 +101,31 @@ export async function seedDatabase() {
     isActive: true,
   }).returning();
 
-  const [project1] = await db.insert(projects).values({
-    name: "Melbourne Central Tower Renovation",
+  const [job1] = await db.insert(jobs).values({
+    jobNumber: "MCT-2026",
     code: "MCT-2026",
+    name: "Melbourne Central Tower Renovation",
     client: "Melbourne Property Group",
     address: "123 Bourke Street, Melbourne VIC 3000",
+    status: "ACTIVE",
   }).returning();
 
-  const [project2] = await db.insert(projects).values({
-    name: "Southbank Residential Complex",
+  const [job2] = await db.insert(jobs).values({
+    jobNumber: "SRC-2026",
     code: "SRC-2026",
+    name: "Southbank Residential Complex",
     client: "Urban Living Developments",
     address: "45 City Road, Southbank VIC 3006",
+    status: "ACTIVE",
   }).returning();
 
-  const [project3] = await db.insert(projects).values({
-    name: "Docklands Office Fitout",
+  const [job3] = await db.insert(jobs).values({
+    jobNumber: "DOF-2026",
     code: "DOF-2026",
+    name: "Docklands Office Fitout",
     client: "Docklands Commercial Pty Ltd",
     address: "888 Collins Street, Docklands VIC 3008",
+    status: "ACTIVE",
   }).returning();
 
   await db.insert(globalSettings).values({
@@ -181,7 +187,7 @@ export async function seedDatabase() {
   await db.insert(logRows).values([
     {
       dailyLogId: log1.id,
-      projectId: project1.id,
+      jobId: job1.id,
       startAt: new Date(baseTime),
       endAt: new Date(baseTime.getTime() + 45 * 60000),
       durationMin: 45,
@@ -200,7 +206,7 @@ export async function seedDatabase() {
     },
     {
       dailyLogId: log1.id,
-      projectId: project1.id,
+      jobId: job1.id,
       startAt: new Date(baseTime.getTime() + 45 * 60000),
       endAt: new Date(baseTime.getTime() + 120 * 60000),
       durationMin: 75,
@@ -219,7 +225,7 @@ export async function seedDatabase() {
     },
     {
       dailyLogId: log1.id,
-      projectId: project2.id,
+      jobId: job2.id,
       startAt: new Date(baseTime.getTime() + 135 * 60000),
       endAt: new Date(baseTime.getTime() + 195 * 60000),
       durationMin: 60,
@@ -239,7 +245,7 @@ export async function seedDatabase() {
   await db.insert(logRows).values([
     {
       dailyLogId: log2.id,
-      projectId: project1.id,
+      jobId: job1.id,
       startAt: new Date(baseTime),
       endAt: new Date(baseTime.getTime() + 90 * 60000),
       durationMin: 90,
@@ -256,7 +262,7 @@ export async function seedDatabase() {
     },
     {
       dailyLogId: log2.id,
-      projectId: project3.id,
+      jobId: job3.id,
       startAt: new Date(baseTime.getTime() + 105 * 60000),
       endAt: new Date(baseTime.getTime() + 180 * 60000),
       durationMin: 75,
@@ -276,7 +282,7 @@ export async function seedDatabase() {
   await db.insert(logRows).values([
     {
       dailyLogId: log3.id,
-      projectId: project2.id,
+      jobId: job2.id,
       startAt: new Date(baseTime),
       endAt: new Date(baseTime.getTime() + 120 * 60000),
       durationMin: 120,
@@ -298,7 +304,7 @@ export async function seedDatabase() {
   await db.insert(logRows).values([
     {
       dailyLogId: log4.id,
-      projectId: project1.id,
+      jobId: job1.id,
       startAt: new Date(baseTime),
       endAt: new Date(baseTime.getTime() + 180 * 60000),
       durationMin: 180,
