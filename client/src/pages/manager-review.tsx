@@ -230,7 +230,7 @@ export default function ManagerReviewPage() {
                               <TableHead>Sheet/Layout</TableHead>
                               <TableHead>Panel Mark</TableHead>
                               <TableHead>Drawing Code</TableHead>
-                              <TableHead>Project</TableHead>
+                              <TableHead>Job</TableHead>
                               <TableHead className="text-right w-20">Minutes</TableHead>
                               <TableHead className="w-16">Edited</TableHead>
                             </TableRow>

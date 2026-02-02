@@ -61,7 +61,7 @@ interface SheetData {
   sheetNumber: string;
   sheetName: string;
   totalMinutes: number;
-  projectName: string;
+  jobName: string;
 }
 
 interface DailyTrend {
@@ -327,7 +327,7 @@ export default function ReportsPage() {
   const sheetChartData = report?.bySheet?.slice(0, 10).map(s => ({
     name: s.sheetNumber,
     hours: Number(formatHours(s.totalMinutes)),
-    project: s.projectName,
+    job: s.jobName,
   })) || [];
 
   return (
@@ -410,7 +410,7 @@ export default function ReportsPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium">Projects</CardTitle>
+            <CardTitle className="text-sm font-medium">Jobs</CardTitle>
             <FolderOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -510,9 +510,9 @@ export default function ReportsPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FolderOpen className="h-5 w-5" />
-                  Hours by Project
+                  Hours by Job
                 </CardTitle>
-                <CardDescription>Time distribution across projects</CardDescription>
+                <CardDescription>Time distribution across jobs</CardDescription>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -733,7 +733,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead>Sheet Number</TableHead>
                       <TableHead>Sheet Name</TableHead>
-                      <TableHead>Project</TableHead>
+                      <TableHead>Job</TableHead>
                       <TableHead className="text-right">Hours</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -742,7 +742,7 @@ export default function ReportsPage() {
                       <TableRow key={i}>
                         <TableCell className="font-medium">{sheet.sheetNumber}</TableCell>
                         <TableCell>{sheet.sheetName || "—"}</TableCell>
-                        <TableCell>{sheet.projectName}</TableCell>
+                        <TableCell>{sheet.jobName}</TableCell>
                         <TableCell className="text-right">{formatHours(sheet.totalMinutes)}h</TableCell>
                       </TableRow>
                     ))}

@@ -163,7 +163,7 @@ export default function DailyReportsPage() {
                     <TableHead className="text-right">Total Time</TableHead>
                     <TableHead className="text-right">Idle</TableHead>
                     <TableHead className="text-right">Missing Panel</TableHead>
-                    <TableHead className="text-right">Missing Project</TableHead>
+                    <TableHead className="text-right">Missing Job</TableHead>
                     <TableHead className="text-center">Status</TableHead>
                     <TableHead className="w-10"></TableHead>
                   </TableRow>

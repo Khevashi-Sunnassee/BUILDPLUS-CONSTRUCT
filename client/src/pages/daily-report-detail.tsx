@@ -49,10 +49,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { DailyLog, LogRow, Project, WorkType } from "@shared/schema";
+import type { DailyLog, LogRow, Job, WorkType } from "@shared/schema";
 
 interface DailyLogDetail extends DailyLog {
-  rows: (LogRow & { project?: Project })[];
+  rows: (LogRow & { job?: Job })[];
   user: { name: string; email: string };
 }
 
@@ -70,8 +70,8 @@ export default function DailyReportDetailPage() {
     enabled: !!logId,
   });
 
-  const { data: jobs } = useQuery<any[]>({
-    queryKey: ["/api/projects"],
+  const { data: jobs } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
   });
 
   const { data: workTypes } = useQuery<WorkType[]>({
@@ -318,7 +318,7 @@ export default function DailyReportDetailPage() {
                   <TableHead>Sheet/Layout</TableHead>
                   <TableHead>Panel Mark</TableHead>
                   <TableHead>Drawing Code</TableHead>
-                  <TableHead>Project</TableHead>
+                  <TableHead>Job</TableHead>
                   <TableHead>Work Type</TableHead>
                   <TableHead className="text-right w-20">Minutes</TableHead>
                   <TableHead>Notes</TableHead>

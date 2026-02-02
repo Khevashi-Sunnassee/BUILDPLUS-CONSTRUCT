@@ -78,7 +78,7 @@ interface DraftingDailyData {
   byApp: Record<string, number>;
   byProject: Record<string, { name: string; minutes: number }>;
   byWorkType: Record<string, { name: string; code: string; minutes: number }>;
-  byPanel: Record<string, { panelMark: string; minutes: number; projectName: string }>;
+  byPanel: Record<string, { panelMark: string; minutes: number; jobName: string }>;
 }
 
 interface ProductionReportResponse {
@@ -124,7 +124,7 @@ interface DraftingReportResponse {
     generalPercentage: number;
     unassignedHours: number;
     byWorkType: Array<{ name: string; code: string; minutes: number; hours: number; percentage: number }>;
-    byPanel: Array<{ panelMark: string; minutes: number; hours: number; projectName: string }>;
+    byPanel: Array<{ panelMark: string; minutes: number; hours: number; jobName: string }>;
   };
   period: { startDate: string; endDate: string };
 }
@@ -960,7 +960,7 @@ export default function KPIDashboardPage() {
                         <thead className="sticky top-0 bg-background">
                           <tr className="border-b">
                             <th className="text-left py-2 font-medium">Panel Mark</th>
-                            <th className="text-left py-2 font-medium">Project</th>
+                            <th className="text-left py-2 font-medium">Job</th>
                             <th className="text-right py-2 font-medium">Hours</th>
                           </tr>
                         </thead>
@@ -968,7 +968,7 @@ export default function KPIDashboardPage() {
                           {draftingData.totals.byPanel.slice(0, 10).map((panel, index) => (
                             <tr key={index} className="border-b">
                               <td className="py-2 font-mono">{panel.panelMark}</td>
-                              <td className="py-2 text-muted-foreground">{panel.projectName}</td>
+                              <td className="py-2 text-muted-foreground">{panel.jobName}</td>
                               <td className="py-2 text-right font-medium">{panel.hours.toFixed(1)}</td>
                             </tr>
                           ))}
