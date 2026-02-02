@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -627,9 +627,9 @@ export default function AdminJobsPage() {
             </TableHeader>
             <TableBody>
               {Object.entries(groupedJobs).map(([stateGroup, stateJobs]) => (
-                <>
+                <Fragment key={stateGroup}>
                   {groupByState && stateGroup !== "All Jobs" && (
-                    <TableRow key={`header-${stateGroup}`} className="bg-muted/50">
+                    <TableRow className="bg-muted/50">
                       <TableCell colSpan={7} className="py-2">
                         <div className="flex items-center gap-2 font-semibold">
                           <MapPin className="h-4 w-4" />
@@ -718,7 +718,7 @@ export default function AdminJobsPage() {
                       </TableCell>
                     </TableRow>
                   ))}
-                </>
+                </Fragment>
               ))}
               {filteredAndSortedJobs.length === 0 && (
                 <TableRow>
