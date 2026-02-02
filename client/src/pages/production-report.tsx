@@ -405,7 +405,7 @@ export default function ProductionReportPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Project ID</TableHead>
+                  <TableHead>Job</TableHead>
                   <TableHead>Panel ID</TableHead>
                   <TableHead>Panel Type</TableHead>
                   <TableHead className="text-right">m³</TableHead>

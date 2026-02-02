@@ -533,7 +533,7 @@ export default function AdminJobsPage() {
                   <FormItem>
                     <FormLabel>Job Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Project name" {...field} data-testid="input-job-name" />
+                      <Input placeholder="Job name" {...field} data-testid="input-job-name" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -584,7 +584,7 @@ export default function AdminJobsPage() {
                   <FormItem>
                     <FormLabel>Address</FormLabel>
                     <FormControl>
-                      <Input placeholder="Project address" {...field} data-testid="input-job-address" />
+                      <Input placeholder="Job address" {...field} data-testid="input-job-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

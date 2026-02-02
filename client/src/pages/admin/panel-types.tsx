@@ -324,7 +324,7 @@ export default function AdminPanelTypesPage() {
         <CardHeader>
           <CardTitle>Panel Types</CardTitle>
           <CardDescription>
-            Define default rates per m² and m³ for each panel type. These rates serve as defaults for projects.
+            Define default rates per m² and m³ for each panel type. These rates serve as defaults for jobs.
           </CardDescription>
         </CardHeader>
         <CardContent>

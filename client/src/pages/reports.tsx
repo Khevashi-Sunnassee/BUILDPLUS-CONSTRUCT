@@ -338,7 +338,7 @@ export default function ReportsPage() {
             Reports & Analytics
           </h1>
           <p className="text-muted-foreground">
-            Comprehensive time tracking analysis across users, projects, and sheets
+            Comprehensive time tracking analysis across users, jobs, and sheets
           </p>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
