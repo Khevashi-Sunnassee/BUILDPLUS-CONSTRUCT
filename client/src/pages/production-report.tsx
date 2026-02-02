@@ -18,6 +18,7 @@ import {
   FileDown,
   Loader2,
   MapPin,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -69,8 +80,25 @@ export default function ProductionReportPage() {
   const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
   const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [newDayFactory, setNewDayFactory] = useState("QLD");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingDay, setDeletingDay] = useState<{ date: string; factory: string } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const deleteProductionDayMutation = useMutation({
+    mutationFn: async ({ date, factory }: { date: string; factory: string }) => {
+      return await apiRequest("DELETE", `/api/production-days/${date}?factory=${factory}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      setDeleteDialogOpen(false);
+      setDeletingDay(null);
+      toast({ title: "Production day deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete production day", variant: "destructive" });
+    },
+  });
 
   const createProductionDayMutation = useMutation({
     mutationFn: async (data: { productionDate: string; factory: string }) => {
@@ -500,11 +528,25 @@ export default function ProductionReportPage() {
                         {getStatusBadge(report.entryCount)}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/production-report/${report.date}?factory=${report.factory}`}>
-                          <Button variant="ghost" size="icon" data-testid={`button-view-${report.date}-${report.factory}`}>
-                            <ChevronRight className="h-4 w-4" />
+                        <div className="flex items-center gap-1">
+                          <Link href={`/production-report/${report.date}?factory=${report.factory}`}>
+                            <Button variant="ghost" size="icon" data-testid={`button-view-${report.date}-${report.factory}`}>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingDay({ date: report.date, factory: report.factory });
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-${report.date}-${report.factory}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -523,6 +565,31 @@ export default function ProductionReportPage() {
         </CardContent>
       </Card>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Production Day?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this production day and all its entries. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingDay && deleteProductionDayMutation.mutate(deletingDay)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteProductionDayMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

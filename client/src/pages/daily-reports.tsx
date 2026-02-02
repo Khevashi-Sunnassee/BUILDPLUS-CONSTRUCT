@@ -17,6 +17,7 @@ import {
   Plus,
   FileDown,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -74,6 +85,8 @@ export default function DailyReportsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
   const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
@@ -114,6 +127,21 @@ export default function DailyReportsPage() {
         description: error.message || "An error occurred",
         variant: "destructive",
       });
+    },
+  });
+
+  const deleteDailyLogMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest("DELETE", `/api/daily-logs/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      setDeleteDialogOpen(false);
+      setDeletingLogId(null);
+      toast({ title: "Daily log deleted" });
+    },
+    onError: () => {
+      toast({ title: "Failed to delete daily log", variant: "destructive" });
     },
   });
 
@@ -466,11 +494,25 @@ export default function DailyReportsPage() {
                         {getStatusBadge(log.status)}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/daily-reports/${log.id}`}>
-                          <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
-                            <ChevronRight className="h-4 w-4" />
+                        <div className="flex items-center gap-1">
+                          <Link href={`/daily-reports/${log.id}`}>
+                            <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeletingLogId(log.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-${log.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        </Link>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -489,6 +531,31 @@ export default function DailyReportsPage() {
         </CardContent>
       </Card>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Daily Log?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this daily log and all its time entries. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingLogId && deleteDailyLogMutation.mutate(deletingLogId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteDailyLogMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
