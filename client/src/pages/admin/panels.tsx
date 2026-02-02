@@ -490,6 +490,16 @@ export default function AdminPanelsPage() {
 
   // Build dialog functions
   const openBuildDialog = (panel: PanelRegister) => {
+    // Prevent opening production dialog for PENDING panels
+    if (panel.status === "PENDING") {
+      toast({
+        title: "Panel must be validated first",
+        description: "This panel is still pending validation. Please validate it before setting up for production.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setBuildingPanel(panel);
     setBuildFormData({
       loadWidth: panel.loadWidth || "",
