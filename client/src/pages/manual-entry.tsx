@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -43,6 +43,19 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import type { Job, PanelRegister, WorkType } from "@shared/schema";
 
+interface LogRowWithTimes {
+  id: string;
+  endAt: Date | string;
+}
+
+interface DailyLogWithRows {
+  id: string;
+  userId: string;
+  logDay: string;
+  status: string;
+  rows: LogRowWithTimes[];
+}
+
 const manualEntrySchema = z.object({
   logDay: z.string().min(1, "Date is required"),
   jobId: z.string().optional(),
@@ -75,6 +88,7 @@ export default function ManualEntryPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [addNewPanel, setAddNewPanel] = useState(false);
   const [newPanelMark, setNewPanelMark] = useState("");
+  const [selectedDate, setSelectedDate] = useState(today);
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
@@ -87,6 +101,47 @@ export default function ManualEntryPage() {
   const { data: workTypes } = useQuery<WorkType[]>({
     queryKey: ["/api/work-types"],
   });
+
+  // Fetch existing daily logs to find the latest end time
+  const { data: dailyLogs } = useQuery<DailyLogWithRows[]>({
+    queryKey: ["/api/daily-logs"],
+  });
+
+  // Calculate the latest end time from existing entries for the selected date
+  const latestEndTime = useMemo(() => {
+    if (!dailyLogs) return "09:00";
+    
+    // Find the log for the selected date
+    const logForDay = dailyLogs.find(log => log.logDay === selectedDate);
+    if (!logForDay || !logForDay.rows || logForDay.rows.length === 0) return "09:00";
+    
+    // Find the latest end time from all rows
+    let latestDate: Date | null = null;
+    for (const row of logForDay.rows) {
+      if (row.endAt) {
+        const endDate = new Date(row.endAt);
+        if (!latestDate || endDate > latestDate) {
+          latestDate = endDate;
+        }
+      }
+    }
+    
+    if (!latestDate) return "09:00";
+    
+    // Format the time as HH:MM
+    const hours = String(latestDate.getHours()).padStart(2, '0');
+    const minutes = String(latestDate.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }, [dailyLogs, selectedDate]);
+
+  // Calculate end time (30 minutes after start)
+  const calculateEndTime = (startTime: string): string => {
+    const [hours, minutes] = startTime.split(':').map(Number);
+    const totalMinutes = hours * 60 + minutes + 30;
+    const endHours = Math.floor(totalMinutes / 60) % 24;
+    const endMinutes = totalMinutes % 60;
+    return `${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`;
+  };
 
   const filteredPanels = panels?.filter(p => 
     !selectedJobId || selectedJobId === "none" || p.jobId === selectedJobId
@@ -113,6 +168,27 @@ export default function ManualEntryPage() {
       notes: "",
     },
   });
+
+  // Update start and end times when latest end time changes or date changes
+  useEffect(() => {
+    const newStartTime = latestEndTime;
+    const newEndTime = calculateEndTime(newStartTime);
+    form.setValue("startTime", newStartTime);
+    form.setValue("endTime", newEndTime);
+  }, [latestEndTime, form]);
+
+  // Handle date change - update selectedDate state
+  const handleDateChange = (newDate: string) => {
+    setSelectedDate(newDate);
+    form.setValue("logDay", newDate);
+  };
+
+  // Prevent Enter key from submitting form on date input
+  const handleDateKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+    }
+  };
 
   const watchedPanelRegisterId = form.watch("panelRegisterId");
 
@@ -216,7 +292,13 @@ export default function ManualEntryPage() {
                     <FormItem>
                       <FormLabel>Date</FormLabel>
                       <FormControl>
-                        <Input type="date" {...field} data-testid="input-log-day" />
+                        <Input 
+                          type="date" 
+                          {...field} 
+                          onChange={(e) => handleDateChange(e.target.value)}
+                          onKeyDown={handleDateKeyDown}
+                          data-testid="input-log-day" 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

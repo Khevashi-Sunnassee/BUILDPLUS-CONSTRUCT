@@ -16,7 +16,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Manager Approval**: Review submitted logs, approve/reject with comments
 - **Reports & Analytics**: Time by user, job, app with charts
 - **Admin Provisioning**: Manage users, jobs, devices, global settings
-- **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available, with option to add new panels to the register on-the-fly
+- **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available, with option to add new panels to the register on-the-fly. Automatically defaults start time to the latest end time from existing entries for the selected date, enabling seamless continuation of work tracking.
 - **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting/cost-breakup charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
 - **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides, component filter dropdown for detailed daily breakdown, and interactive summary tables with click-to-filter functionality
 - **Jobs Management**: Create jobs, import from Excel, track status (ACTIVE/ON_HOLD/COMPLETED/ARCHIVED), with cost overrides dialog for customized job-specific cost ratios

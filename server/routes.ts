@@ -116,6 +116,7 @@ export async function registerRoutes(
           rowCount: fullLog.rows.length,
           userName: fullLog.user.name,
           userEmail: fullLog.user.email,
+          rows: fullLog.rows, // Include rows for auto-fill in Manual Entry
         });
       }
     }
