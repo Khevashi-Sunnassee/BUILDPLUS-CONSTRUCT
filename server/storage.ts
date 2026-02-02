@@ -4,13 +4,14 @@ import {
   users, devices, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
-  trailerTypes, loadLists, loadListPanels, deliveryRecords,
+  trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
   type InsertApprovalEvent, type ApprovalEvent, type GlobalSettings,
   type InsertJob, type Job, type InsertPanelRegister, type PanelRegister,
   type InsertProductionEntry, type ProductionEntry,
+  type InsertProductionDay, type ProductionDay,
   type InsertPanelType, type PanelTypeConfig, type InsertJobPanelRate, type JobPanelRate,
   type InsertWorkType, type WorkType,
   type InsertPanelTypeCostComponent, type PanelTypeCostComponent,
@@ -95,12 +96,17 @@ export interface IStorage {
 
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
   getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesByDateAndFactory(date: string, factory: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry>;
   updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined>;
   deleteProductionEntry(id: string): Promise<void>;
   getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
+  
+  getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]>;
+  getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined>;
+  createProductionDay(data: InsertProductionDay): Promise<ProductionDay>;
   getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]>;
   getDailyLogsWithRowsInRange(startDate: string, endDate: string): Promise<Array<{
     log: DailyLog;
@@ -845,6 +851,42 @@ export class DatabaseStorage implements IStorage {
     }
     
     return Object.entries(summary).map(([panelType, data]) => ({ panelType, ...data }));
+  }
+
+  async getProductionEntriesByDateAndFactory(date: string, factory: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const result = await db.select().from(productionEntries)
+      .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
+      .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
+      .innerJoin(users, eq(productionEntries.userId, users.id))
+      .where(and(
+        eq(productionEntries.productionDate, date),
+        eq(productionEntries.factory, factory)
+      ))
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
+  }
+
+  async getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]> {
+    return await db.select().from(productionDays)
+      .where(and(
+        gte(productionDays.productionDate, startDate),
+        lte(productionDays.productionDate, endDate)
+      ))
+      .orderBy(desc(productionDays.productionDate), asc(productionDays.factory));
+  }
+
+  async getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined> {
+    const [day] = await db.select().from(productionDays)
+      .where(and(
+        eq(productionDays.productionDate, date),
+        eq(productionDays.factory, factory)
+      ));
+    return day;
+  }
+
+  async createProductionDay(data: InsertProductionDay): Promise<ProductionDay> {
+    const [day] = await db.insert(productionDays).values(data).returning();
+    return day;
   }
 
   async getPanelType(id: string): Promise<PanelTypeConfig | undefined> {

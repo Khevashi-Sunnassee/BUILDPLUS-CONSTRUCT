@@ -762,7 +762,7 @@ export async function registerRoutes(
     });
   });
 
-  // Get production reports list (grouped by date)
+  // Get production reports list (grouped by date and factory)
   app.get("/api/production-reports", requireAuth, async (req, res) => {
     const { startDate, endDate } = req.query;
     
@@ -770,11 +770,16 @@ export async function registerRoutes(
     const end = endDate ? String(endDate) : format(new Date(), "yyyy-MM-dd");
     const start = startDate ? String(startDate) : format(subDays(new Date(), 30), "yyyy-MM-dd");
     
+    // Get production days (manually created)
+    const productionDaysData = await storage.getProductionDays(start, end);
+    
+    // Get entries
     const entries = await storage.getProductionEntriesInRange(start, end);
     
-    // Group entries by date
-    const reportsByDate = new Map<string, {
+    // Group entries by date + factory
+    const reportsByKey = new Map<string, {
       date: string;
+      factory: string;
       entryCount: number;
       panelCount: number;
       totalVolumeM3: number;
@@ -782,11 +787,32 @@ export async function registerRoutes(
       jobIds: Set<string>;
     }>();
     
+    // First, add all production days (even empty ones)
+    for (const day of productionDaysData) {
+      const key = `${day.productionDate}-${day.factory}`;
+      if (!reportsByKey.has(key)) {
+        reportsByKey.set(key, {
+          date: day.productionDate,
+          factory: day.factory,
+          entryCount: 0,
+          panelCount: 0,
+          totalVolumeM3: 0,
+          totalAreaM2: 0,
+          jobIds: new Set(),
+        });
+      }
+    }
+    
+    // Then add entries
     for (const entry of entries) {
       const date = entry.productionDate;
-      if (!reportsByDate.has(date)) {
-        reportsByDate.set(date, {
+      const factory = (entry as any).factory || "QLD";
+      const key = `${date}-${factory}`;
+      
+      if (!reportsByKey.has(key)) {
+        reportsByKey.set(key, {
           date,
+          factory,
           entryCount: 0,
           panelCount: 0,
           totalVolumeM3: 0,
@@ -795,7 +821,7 @@ export async function registerRoutes(
         });
       }
       
-      const report = reportsByDate.get(date)!;
+      const report = reportsByKey.get(key)!;
       report.entryCount++;
       report.panelCount++;
       report.totalVolumeM3 += parseFloat(entry.volumeM3 || "0");
@@ -803,16 +829,48 @@ export async function registerRoutes(
       report.jobIds.add(entry.jobId);
     }
     
-    // Convert to array and sort by date descending
-    const reports = Array.from(reportsByDate.values())
+    // Convert to array and sort by date descending, then factory
+    const reports = Array.from(reportsByKey.values())
       .map(r => ({
         ...r,
         jobCount: r.jobIds.size,
         jobIds: undefined, // Remove the Set from response
       }))
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort((a, b) => {
+        const dateCompare = b.date.localeCompare(a.date);
+        if (dateCompare !== 0) return dateCompare;
+        return a.factory.localeCompare(b.factory);
+      });
     
     res.json(reports);
+  });
+
+  // Create a new production day
+  app.post("/api/production-days", requireAuth, async (req, res) => {
+    try {
+      const { productionDate, factory, notes } = req.body;
+      
+      if (!productionDate || !factory) {
+        return res.status(400).json({ error: "Date and factory are required" });
+      }
+      
+      // Check if day already exists
+      const existing = await storage.getProductionDay(productionDate, factory);
+      if (existing) {
+        return res.status(400).json({ error: "Production day already exists for this date and factory" });
+      }
+      
+      const day = await storage.createProductionDay({
+        productionDate,
+        factory,
+        notes,
+        createdById: req.session.userId!,
+      });
+      
+      res.json(day);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to create production day" });
+    }
   });
 
   app.get("/api/admin/panel-types", requireRole("ADMIN"), async (req, res) => {

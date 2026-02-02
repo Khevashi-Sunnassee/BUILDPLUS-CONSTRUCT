@@ -266,6 +266,20 @@ export const productionEntries = pgTable("production_entries", {
   factoryIdx: index("production_entries_factory_idx").on(table.factory),
 }));
 
+export const productionDays = pgTable("production_days", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  productionDate: text("production_date").notNull(),
+  factory: text("factory").notNull(),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  dateFactoryIdx: uniqueIndex("production_days_date_factory_idx").on(table.productionDate, table.factory),
+  factoryIdx: index("production_days_factory_idx").on(table.factory),
+  dateIdx: index("production_days_date_idx").on(table.productionDate),
+}));
+
 export const panelTypeCostComponents = pgTable("panel_type_cost_components", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   panelTypeId: varchar("panel_type_id", { length: 36 }).notNull().references(() => panelTypes.id, { onDelete: "cascade" }),
@@ -435,6 +449,12 @@ export const insertProductionEntrySchema = createInsertSchema(productionEntries)
   updatedAt: true,
 });
 
+export const insertProductionDaySchema = createInsertSchema(productionDays).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPanelTypeSchema = createInsertSchema(panelTypes).omit({
   id: true,
   createdAt: true,
@@ -541,6 +561,8 @@ export type GlobalSettings = typeof globalSettings.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type InsertProductionEntry = z.infer<typeof insertProductionEntrySchema>;
 export type ProductionEntry = typeof productionEntries.$inferSelect;
+export type InsertProductionDay = z.infer<typeof insertProductionDaySchema>;
+export type ProductionDay = typeof productionDays.$inferSelect;
 export type InsertPanelType = z.infer<typeof insertPanelTypeSchema>;
 export type PanelTypeConfig = typeof panelTypes.$inferSelect;
 export type InsertJobPanelRate = z.infer<typeof insertJobPanelRateSchema>;
