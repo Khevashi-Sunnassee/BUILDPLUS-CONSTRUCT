@@ -57,11 +57,11 @@ const userNavItems = [
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
-  { title: "Reports", url: "/reports", icon: Clock },
 ];
 
 const managerNavItems = [
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
+  { title: "Reports", url: "/reports", icon: Clock },
 ];
 
 const adminNavItems = [
