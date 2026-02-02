@@ -42,10 +42,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import type { DailyLog, LogRow, Project, User as UserType } from "@shared/schema";
+import type { DailyLog, LogRow, Job, User as UserType } from "@shared/schema";
 
 interface SubmittedLog extends DailyLog {
-  rows: (LogRow & { project?: Project })[];
+  rows: (LogRow & { job?: Job })[];
   user: UserType;
 }
 
@@ -115,8 +115,8 @@ export default function ManagerReviewPage() {
     const totalMinutes = log.rows.reduce((sum, row) => sum + row.durationMin, 0);
     const idleMinutes = log.rows.reduce((sum, row) => sum + row.idleMin, 0);
     const editedRows = log.rows.filter((row) => row.isUserEdited).length;
-    const missingProject = log.rows.filter((row) => !row.projectId).length;
-    return { totalMinutes, idleMinutes, editedRows, missingProject };
+    const missingJob = log.rows.filter((row) => !row.jobId).length;
+    return { totalMinutes, idleMinutes, editedRows, missingJob };
   };
 
   if (isLoading) {
@@ -278,7 +278,7 @@ export default function ManagerReviewPage() {
                                   </div>
                                 </TableCell>
                                 <TableCell>
-                                  {row.project?.code || row.project?.name || "-"}
+                                  {row.job?.code || row.job?.name || "-"}
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
                                   {row.durationMin}

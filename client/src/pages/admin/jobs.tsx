@@ -72,7 +72,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, PanelRegister, Project } from "@shared/schema";
+import type { Job, PanelRegister } from "@shared/schema";
 
 const jobSchema = z.object({
   jobNumber: z.string().min(1, "Job number is required"),
@@ -83,14 +83,12 @@ const jobSchema = z.object({
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
-  projectId: z.string().optional(),
 });
 
 type JobFormData = z.infer<typeof jobSchema>;
 
 interface JobWithPanels extends Job {
   panels: PanelRegister[];
-  project?: Project;
 }
 
 interface CostOverride {
@@ -127,10 +125,6 @@ export default function AdminJobsPage() {
     queryKey: ["/api/admin/jobs"],
   });
 
-  const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/admin/projects"],
-  });
-
   const jobForm = useForm<JobFormData>({
     resolver: zodResolver(jobSchema),
     defaultValues: {
@@ -142,14 +136,12 @@ export default function AdminJobsPage() {
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
-      projectId: "",
     },
   });
 
   const createJobMutation = useMutation({
     mutationFn: async (data: JobFormData) => {
-      const submitData = { ...data, projectId: data.projectId === "none" ? undefined : data.projectId };
-      return apiRequest("POST", "/api/admin/jobs", submitData);
+      return apiRequest("POST", "/api/admin/jobs", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
@@ -164,8 +156,7 @@ export default function AdminJobsPage() {
 
   const updateJobMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: JobFormData }) => {
-      const submitData = { ...data, projectId: data.projectId === "none" ? null : data.projectId };
-      return apiRequest("PUT", `/api/admin/jobs/${id}`, submitData);
+      return apiRequest("PUT", `/api/admin/jobs/${id}`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
@@ -327,7 +318,6 @@ export default function AdminJobsPage() {
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
-      projectId: "",
     });
     setJobDialogOpen(true);
   };
@@ -343,7 +333,6 @@ export default function AdminJobsPage() {
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
-      projectId: job.projectId || "none",
     });
     setJobDialogOpen(true);
   };
@@ -629,31 +618,6 @@ export default function AdminJobsPage() {
                   )}
                 />
               </div>
-              <FormField
-                control={jobForm.control}
-                name="projectId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Link to Project (Optional)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || "none"}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-job-project">
-                          <SelectValue placeholder="Select project" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No project</SelectItem>
-                        {projects?.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.code ? `${project.code} - ${project.name}` : project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={jobForm.control}
                 name="description"

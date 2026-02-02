@@ -60,7 +60,6 @@ const managerNavItems = [
 
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
-  { title: "Projects", url: "/admin/projects", icon: FolderOpen },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },

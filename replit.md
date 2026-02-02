@@ -14,8 +14,8 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Windows Agent API**: Idempotent ingestion via `POST /api/agent/ingest` with device key auth
 - **Daily Log Management**: View, edit, submit for approval
 - **Manager Approval**: Review submitted logs, approve/reject with comments
-- **Reports & Analytics**: Time by user, project, app with charts
-- **Admin Provisioning**: Manage users, projects, devices, global settings
+- **Reports & Analytics**: Time by user, job, app with charts
+- **Admin Provisioning**: Manage users, jobs, devices, global settings
 - **Manual Time Entry**: Log time manually when the Autodesk add-ins are not available, with option to add new panels to the register on-the-fly
 - **KPI Dashboard**: Comprehensive performance dashboard with selectable date periods, production/financial/drafting/cost-breakup charts, work type analytics (rework metrics, distribution pie chart, panel time breakdown), and PDF export
 - **Cost Breakup**: Track expected costs by component (labour, concrete, steel, etc.) as percentages of revenue per panel type, with job-level overrides, component filter dropdown for detailed daily breakdown, and interactive summary tables with click-to-filter functionality
@@ -23,7 +23,7 @@ A comprehensive performance management system (formerly time tracking portal) fo
 - **Panel Register**: Track panels with dynamic panel types from database, estimated hours, actual hours logged, Excel import/export, and panel production approval workflow
 - **Panel Production Approval**: "Build" dialog for entering panel specifications (load dimensions, volume, mass, area, concrete strength), AI-powered PDF analysis using OpenAI to extract specs from shop drawings, and approval workflow - only approved panels can have production entries
 - **Configurable Panel Types**: Admin-managed panel types with configurable rates (supply cost, install cost, sell rate per m²/m³) and expected weight per m³ (default 2500kg) for load list calculations
-- **Project Rate Overrides**: Override default panel type rates at project level for custom pricing
+- **Job Rate Overrides**: Override default panel type rates at job level for custom pricing
 - **Production Report**: Track production work with volume (m³) and area (m²), daily cost/revenue/profit calculations using panel type rates
 - **Work Types**: Categorize drafting work by type (General Drafting, Client Changes, Errors/Redrafting) for both manual entries and CAD/Revit addin data
 - **Logistics System**: Create load lists by selecting approved panels, assign trailer types (Layover, A-Frame), track delivery records with truck rego, driver name, and departure/arrival times. Load lists auto-complete when delivery is recorded.
@@ -47,7 +47,6 @@ client/
       reports.tsx         - Analytics & charts
       admin/
         settings.tsx      - Global settings
-        projects.tsx      - Project management (with panel rates dialog)
         jobs.tsx          - Jobs management
         panels.tsx        - Panel register
         panel-types.tsx   - Panel type configuration with rates
@@ -76,13 +75,12 @@ shared/
 ## Database Schema
 - **users**: Email/password auth, roles (USER/MANAGER/ADMIN)
 - **devices**: Windows Agent devices with hashed API keys
-- **projects**: Project metadata (name, code, client, address)
-- **mappingRules**: File path to project auto-mapping
+- **jobs**: Job metadata (jobNumber, name, code, client, address, status, siteContact, siteContactPhone) - consolidated from former projects table
+- **mappingRules**: File path to job auto-mapping
 - **dailyLogs**: Per-user per-day log containers
 - **logRows**: Individual time blocks with CAD/Revit metadata, linked to jobs/panels
 - **approvalEvents**: Approval history trail
 - **globalSettings**: System-wide config (timezone, capture interval)
-- **jobs**: Job metadata (jobNumber, name, client, address, status, siteContact, siteContactPhone)
 - **panelRegister**: Panel tracking (jobId, panelMark, panelType, estimatedHours, actualHours, status, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelArea, day28Fc, liftFcm, rotationalLifters, primaryLifters, productionPdfUrl, approvedForProduction, approvedAt, approvedById)
 - **trailerTypes**: Trailer type configuration (code, name, description, sortOrder, isActive) - LAYOVER, A_FRAME
 - **loadLists**: Load list containers (jobId, trailerTypeId, docketNumber, scheduledDate, notes, status, createdById)
@@ -90,7 +88,7 @@ shared/
 - **deliveryRecords**: Delivery tracking (loadListId, truckRego, driverName, departedFactoryAt, arrivedSiteAt, departedSiteAt, notes, enteredById)
 - **productionEntries**: Production work entries (panelId, jobId, userId, productionDate, volumeM3, areaM2)
 - **panelTypes**: Configurable panel types with rates (code, name, labourCostPerM2/M3, supplyCostPerM2/M3, sellRatePerM2/M3)
-- **projectPanelRates**: Project-level rate overrides for specific panel types
+- **jobPanelRates**: Job-level rate overrides for specific panel types
 - **panelTypeCostComponents**: Cost component percentages per panel type (name, percentageOfRevenue)
 - **jobCostOverrides**: Job-level cost component overrides (defaultPercentage, revisedPercentage, notes)
 - **workTypes**: Work type categorization (code, name, description, sortOrder) - GENERAL, CLIENT_CHANGE, ERROR_REWORK
@@ -115,7 +113,6 @@ shared/
 
 ### Admin Routes
 - GET/PUT /api/admin/settings - Global settings
-- CRUD /api/admin/projects - Project management
 - CRUD /api/admin/jobs - Jobs management (with Excel import)
 - CRUD /api/admin/panels - Panel register management (with Excel import)
 - POST /api/admin/panels/:id/analyze-pdf - AI-powered PDF analysis for panel specs
@@ -140,8 +137,8 @@ shared/
 - POST /api/admin/panel-types - Create panel type
 - PUT /api/admin/panel-types/:id - Update panel type
 - DELETE /api/admin/panel-types/:id - Delete panel type
-- GET /api/projects/:projectId/panel-rates - Get effective rates for project
-- PUT /api/projects/:projectId/panel-rates/:panelTypeId - Set project rate override
+- GET /api/jobs/:jobId/panel-rates - Get effective rates for job
+- PUT /api/jobs/:jobId/panel-rates/:panelTypeId - Set job rate override
 
 ### KPI Dashboard Routes
 - GET /api/reports/production-daily - Daily production data with panel counts and volumes

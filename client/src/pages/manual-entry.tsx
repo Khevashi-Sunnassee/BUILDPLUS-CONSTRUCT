@@ -45,7 +45,6 @@ import type { Job, PanelRegister, WorkType } from "@shared/schema";
 
 const manualEntrySchema = z.object({
   logDay: z.string().min(1, "Date is required"),
-  projectId: z.string().optional(),
   jobId: z.string().optional(),
   panelRegisterId: z.string().optional(),
   workTypeId: z.string().optional(),
@@ -65,12 +64,6 @@ const manualEntrySchema = z.object({
 
 type ManualEntryForm = z.infer<typeof manualEntrySchema>;
 
-interface Project {
-  id: string;
-  name: string;
-  code: string | null;
-}
-
 interface PanelWithJob extends PanelRegister {
   job: Job;
 }
@@ -82,10 +75,6 @@ export default function ManualEntryPage() {
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [addNewPanel, setAddNewPanel] = useState(false);
   const [newPanelMark, setNewPanelMark] = useState("");
-
-  const { data: projects } = useQuery<Project[]>({
-    queryKey: ["/api/projects"],
-  });
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
@@ -110,7 +99,6 @@ export default function ManualEntryPage() {
       app: "revit",
       startTime: "09:00",
       endTime: "09:30",
-      projectId: "",
       jobId: "",
       panelRegisterId: "",
       workTypeId: "",
@@ -164,7 +152,6 @@ export default function ManualEntryPage() {
   const onSubmit = (data: ManualEntryForm) => {
     const submitData = {
       ...data,
-      projectId: data.projectId === "none" ? undefined : data.projectId,
       jobId: data.jobId === "none" ? undefined : data.jobId,
       panelRegisterId: addNewPanel ? undefined : (data.panelRegisterId === "none" ? undefined : data.panelRegisterId),
       workTypeId: data.workTypeId && data.workTypeId !== "none" ? parseInt(data.workTypeId) : undefined,
@@ -288,31 +275,6 @@ export default function ManualEntryPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="projectId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Project</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-project">
-                            <SelectValue placeholder="Select project (optional)" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No project</SelectItem>
-                          {projects?.map((project) => (
-                            <SelectItem key={project.id} value={project.id}>
-                              {project.code ? `${project.code} - ${project.name}` : project.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
               </div>
 
               <Card className="bg-muted/30">

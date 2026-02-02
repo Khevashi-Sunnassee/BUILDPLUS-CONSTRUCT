@@ -17,7 +17,6 @@ import DailyReportDetailPage from "@/pages/daily-report-detail";
 import ManagerReviewPage from "@/pages/manager-review";
 import ReportsPage from "@/pages/reports";
 import AdminSettingsPage from "@/pages/admin/settings";
-import AdminProjectsPage from "@/pages/admin/projects";
 import AdminDevicesPage from "@/pages/admin/devices";
 import AdminUsersPage from "@/pages/admin/users";
 import AdminJobsPage from "@/pages/admin/jobs";
@@ -184,14 +183,6 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminSettingsPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/admin/projects">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <AdminProjectsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
