@@ -26,6 +26,10 @@ import {
   ArrowUp,
   ArrowDown,
   AlertCircle,
+  FileUp,
+  CheckCircle2,
+  XCircle,
+  BarChart3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -134,6 +138,15 @@ export default function AdminJobsPage() {
   const [costOverridesDialogOpen, setCostOverridesDialogOpen] = useState(false);
   const [costOverridesJob, setCostOverridesJob] = useState<JobWithPanels | null>(null);
   const [localOverrides, setLocalOverrides] = useState<CostOverride[]>([]);
+  
+  // Estimate import state
+  const [estimateDialogOpen, setEstimateDialogOpen] = useState(false);
+  const [estimateJob, setEstimateJob] = useState<JobWithPanels | null>(null);
+  const [estimateFile, setEstimateFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [replaceExisting, setReplaceExisting] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
+  const estimateFileInputRef = useRef<HTMLInputElement>(null);
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -290,6 +303,96 @@ export default function AdminJobsPage() {
       });
     },
   });
+
+  // Job totals query
+  const { data: jobTotals, refetch: refetchJobTotals } = useQuery<{
+    totalAreaM2: number;
+    totalVolumeM3: number;
+    totalElements: number;
+    pendingCount: number;
+    validatedCount: number;
+    panelCount: number;
+  }>({
+    queryKey: ["/api/jobs", estimateJob?.id, "totals"],
+    queryFn: async () => {
+      if (!estimateJob?.id) return null;
+      const res = await fetch(`/api/jobs/${estimateJob.id}/totals`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch totals");
+      return res.json();
+    },
+    enabled: !!estimateJob?.id && estimateDialogOpen,
+  });
+
+  // Estimate import mutation
+  const importEstimateMutation = useMutation({
+    mutationFn: async ({ jobId, file, replace }: { jobId: string; file: File; replace: boolean }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("replace", String(replace));
+      
+      const res = await fetch(`/api/jobs/${jobId}/panels/import-estimate`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to import estimate");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      refetchJobTotals();
+      toast({ 
+        title: "Estimate imported successfully",
+        description: `Imported ${data.totals.imported} panels from ${data.totals.sheetsProcessed} sheets`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Import failed", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
+  const handleOpenEstimateImport = (job: JobWithPanels) => {
+    setEstimateJob(job);
+    setEstimateFile(null);
+    setReplaceExisting(false);
+    setImportResult(null);
+    setEstimateDialogOpen(true);
+  };
+
+  const handleEstimateFileSelect = (file: File) => {
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      setEstimateFile(file);
+      setImportResult(null);
+    } else {
+      toast({ title: "Invalid file type", description: "Please select an Excel file (.xlsx or .xls)", variant: "destructive" });
+    }
+  };
+
+  const handleEstimateDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleEstimateFileSelect(file);
+  };
+
+  const handleRunEstimateImport = () => {
+    if (!estimateJob || !estimateFile) return;
+    importEstimateMutation.mutate({
+      jobId: estimateJob.id,
+      file: estimateFile,
+      replace: replaceExisting,
+    });
+  };
 
   const { data: panelTypes } = useQuery<PanelTypeInfo[]>({
     queryKey: ["/api/panel-types"],
@@ -688,6 +791,15 @@ export default function AdminJobsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenEstimateImport(job)}
+                            title="Import from Estimate"
+                            data-testid={`button-import-estimate-${job.id}`}
+                          >
+                            <FileUp className="h-4 w-4 text-blue-600" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
@@ -1127,6 +1239,214 @@ export default function AdminJobsPage() {
             <Button variant="outline" onClick={() => setCostOverridesDialogOpen(false)}>
               Close
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Estimate Import Dialog */}
+      <Dialog open={estimateDialogOpen} onOpenChange={setEstimateDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileUp className="h-5 w-5" />
+              Import from Estimate - {estimateJob?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Upload an estimate Excel file to automatically create panels from TakeOff sheets.
+              Panels will be set to PENDING status until validated.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Job Totals Summary */}
+          {jobTotals && (
+            <Card className="bg-muted/50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <BarChart3 className="h-4 w-4" />
+                  <span className="font-medium">Current Job Totals</span>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <div className="text-muted-foreground">Total Elements</div>
+                    <div className="font-semibold text-lg">{jobTotals.totalElements}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Total Area (m²)</div>
+                    <div className="font-semibold text-lg">{jobTotals.totalAreaM2.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Total Volume (m³)</div>
+                    <div className="font-semibold text-lg">{jobTotals.totalVolumeM3.toFixed(3)}</div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400">
+                      Pending: {jobTotals.pendingCount}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                      Validated: {jobTotals.validatedCount}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* File Upload Area */}
+          <div
+            className={`
+              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
+              ${isDragging ? "border-primary bg-primary/10" : "border-muted-foreground/25 hover:border-primary/50"}
+              ${estimateFile ? "bg-muted/50" : ""}
+            `}
+            onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleEstimateDrop}
+            onClick={() => estimateFileInputRef.current?.click()}
+            data-testid="dropzone-estimate-file"
+          >
+            <input
+              ref={estimateFileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleEstimateFileSelect(file);
+              }}
+              data-testid="input-estimate-file"
+            />
+            {estimateFile ? (
+              <div className="flex items-center justify-center gap-3">
+                <FileSpreadsheet className="h-8 w-8 text-green-600" />
+                <div className="text-left">
+                  <div className="font-medium">{estimateFile.name}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {(estimateFile.size / 1024).toFixed(1)} KB
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEstimateFile(null);
+                    setImportResult(null);
+                  }}
+                  data-testid="button-remove-file"
+                >
+                  <XCircle className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Upload className="h-10 w-10 mx-auto mb-3 text-muted-foreground" />
+                <div className="font-medium">Drop estimate Excel file here</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  or click to browse (.xlsx, .xls)
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Replace existing checkbox */}
+          {estimateFile && !importResult && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="replaceExisting"
+                checked={replaceExisting}
+                onChange={(e) => setReplaceExisting(e.target.checked)}
+                className="h-4 w-4"
+                data-testid="checkbox-replace-existing"
+              />
+              <label htmlFor="replaceExisting" className="text-sm">
+                Replace existing imported panels (source=3) for this job
+              </label>
+            </div>
+          )}
+
+          {/* Import Results */}
+          {importResult && (
+            <Card className="border-green-200 dark:border-green-800">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="font-medium text-green-700 dark:text-green-400">Import Complete</span>
+                </div>
+                <div className="grid grid-cols-4 gap-4 text-sm mb-4">
+                  <div>
+                    <div className="text-muted-foreground">Sheets</div>
+                    <div className="font-semibold">{importResult.totals.sheetsProcessed}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Imported</div>
+                    <div className="font-semibold text-green-600">{importResult.totals.imported}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Duplicates</div>
+                    <div className="font-semibold text-yellow-600">{importResult.totals.duplicates}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Skipped</div>
+                    <div className="font-semibold text-muted-foreground">{importResult.totals.skipped}</div>
+                  </div>
+                </div>
+
+                {/* Per-sheet summary */}
+                <div className="space-y-2 max-h-40 overflow-auto">
+                  {importResult.sheets?.map((sheet: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 rounded px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{sheet.takeoffCategory}</Badge>
+                        <span className="text-muted-foreground">{sheet.sheetName}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-green-600">{sheet.created} added</span>
+                        {sheet.duplicates > 0 && (
+                          <span className="text-yellow-600">{sheet.duplicates} dup</span>
+                        )}
+                        {sheet.errors?.length > 0 && (
+                          <span className="text-destructive">{sheet.errors.length} errors</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setEstimateDialogOpen(false)}
+              data-testid="button-close-estimate-dialog"
+            >
+              {importResult ? "Close" : "Cancel"}
+            </Button>
+            {!importResult && (
+              <Button
+                onClick={handleRunEstimateImport}
+                disabled={!estimateFile || importEstimateMutation.isPending}
+                data-testid="button-run-estimate-import"
+              >
+                {importEstimateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {importEstimateMutation.isPending ? "Importing..." : "Import Panels"}
+              </Button>
+            )}
+            {importResult && (
+              <Button
+                onClick={() => navigate(`/admin/panels?jobId=${estimateJob?.id}`)}
+                data-testid="button-view-imported-panels"
+              >
+                View Imported Panels
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
