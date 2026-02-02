@@ -22,7 +22,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -84,12 +86,28 @@ interface LoadListWithDetails {
 interface DeliveryRecord {
   id: string;
   loadListId: string;
-  truckRego: string;
-  driverName?: string | null;
-  departedFactoryAt?: string | null;
-  arrivedSiteAt?: string | null;
-  departedSiteAt?: string | null;
-  notes?: string | null;
+  docketNumber?: string | null;
+  loadDocumentNumber?: string | null;
+  truckRego?: string | null;
+  trailerRego?: string | null;
+  deliveryDate?: string | null;
+  preload?: string | null;
+  loadNumber?: string | null;
+  numberPanels?: number | null;
+  comment?: string | null;
+  startTime?: string | null;
+  leaveDepotTime?: string | null;
+  arriveLteTime?: string | null;
+  pickupLocation?: string | null;
+  pickupArriveTime?: string | null;
+  pickupLeaveTime?: string | null;
+  deliveryLocation?: string | null;
+  arriveHoldingTime?: string | null;
+  leaveHoldingTime?: string | null;
+  siteFirstLiftTime?: string | null;
+  siteLastLiftTime?: string | null;
+  returnDepotArriveTime?: string | null;
+  totalHours?: string | null;
   enteredById?: string | null;
   createdAt: string;
   updatedAt: string;
@@ -105,12 +123,25 @@ const loadListSchema = z.object({
 });
 
 const deliverySchema = z.object({
-  truckRego: z.string().min(1, "Truck rego is required"),
-  driverName: z.string().optional(),
-  departedFactoryAt: z.string().optional(),
-  arrivedSiteAt: z.string().optional(),
-  departedSiteAt: z.string().optional(),
-  notes: z.string().optional(),
+  loadDocumentNumber: z.string().optional(),
+  truckRego: z.string().optional(),
+  trailerRego: z.string().optional(),
+  deliveryDate: z.string().optional(),
+  preload: z.string().optional(),
+  loadNumber: z.string().optional(),
+  numberPanels: z.coerce.number().optional(),
+  comment: z.string().optional(),
+  leaveDepotTime: z.string().optional(),
+  arriveLteTime: z.string().optional(),
+  pickupLocation: z.string().optional(),
+  pickupArriveTime: z.string().optional(),
+  pickupLeaveTime: z.string().optional(),
+  deliveryLocation: z.string().optional(),
+  arriveHoldingTime: z.string().optional(),
+  leaveHoldingTime: z.string().optional(),
+  siteFirstLiftTime: z.string().optional(),
+  siteLastLiftTime: z.string().optional(),
+  returnDepotArriveTime: z.string().optional(),
 });
 
 type LoadListFormData = z.infer<typeof loadListSchema>;
@@ -166,12 +197,25 @@ export default function LogisticsPage() {
   const deliveryForm = useForm<DeliveryFormData>({
     resolver: zodResolver(deliverySchema),
     defaultValues: {
+      loadDocumentNumber: "",
       truckRego: "",
-      driverName: "",
-      departedFactoryAt: "",
-      arrivedSiteAt: "",
-      departedSiteAt: "",
-      notes: "",
+      trailerRego: "",
+      deliveryDate: "",
+      preload: "",
+      loadNumber: "",
+      numberPanels: undefined,
+      comment: "",
+      leaveDepotTime: "",
+      arriveLteTime: "",
+      pickupLocation: "",
+      pickupArriveTime: "",
+      pickupLeaveTime: "",
+      deliveryLocation: "",
+      arriveHoldingTime: "",
+      leaveHoldingTime: "",
+      siteFirstLiftTime: "",
+      siteLastLiftTime: "",
+      returnDepotArriveTime: "",
     },
   });
 
@@ -235,16 +279,33 @@ export default function LogisticsPage() {
   const openDeliveryDialog = (loadList: LoadListWithDetails) => {
     setSelectedLoadList(loadList);
     if (loadList.deliveryRecord) {
+      const dr = loadList.deliveryRecord;
       deliveryForm.reset({
-        truckRego: loadList.deliveryRecord.truckRego || "",
-        driverName: loadList.deliveryRecord.driverName || "",
-        departedFactoryAt: loadList.deliveryRecord.departedFactoryAt || "",
-        arrivedSiteAt: loadList.deliveryRecord.arrivedSiteAt || "",
-        departedSiteAt: loadList.deliveryRecord.departedSiteAt || "",
-        notes: loadList.deliveryRecord.notes || "",
+        loadDocumentNumber: dr.loadDocumentNumber || "",
+        truckRego: dr.truckRego || "",
+        trailerRego: dr.trailerRego || "",
+        deliveryDate: dr.deliveryDate || "",
+        preload: dr.preload || "",
+        loadNumber: dr.loadNumber || "",
+        numberPanels: dr.numberPanels ?? undefined,
+        comment: dr.comment || "",
+        leaveDepotTime: dr.leaveDepotTime || "",
+        arriveLteTime: dr.arriveLteTime || "",
+        pickupLocation: dr.pickupLocation || "",
+        pickupArriveTime: dr.pickupArriveTime || "",
+        pickupLeaveTime: dr.pickupLeaveTime || "",
+        deliveryLocation: dr.deliveryLocation || "",
+        arriveHoldingTime: dr.arriveHoldingTime || "",
+        leaveHoldingTime: dr.leaveHoldingTime || "",
+        siteFirstLiftTime: dr.siteFirstLiftTime || "",
+        siteLastLiftTime: dr.siteLastLiftTime || "",
+        returnDepotArriveTime: dr.returnDepotArriveTime || "",
       });
     } else {
-      deliveryForm.reset();
+      // Pre-fill number of panels from load list
+      deliveryForm.reset({
+        numberPanels: loadList.panels?.length || undefined,
+      });
     }
     setDeliveryDialogOpen(true);
   };
@@ -466,20 +527,27 @@ export default function LogisticsPage() {
                           </div>
                           {loadList.deliveryRecord && (
                             <div className="mt-2 text-sm text-muted-foreground grid grid-cols-2 md:grid-cols-4 gap-2">
-                              <span className="flex items-center gap-1">
-                                <Truck className="h-3 w-3" />
-                                {loadList.deliveryRecord.truckRego}
-                              </span>
-                              {loadList.deliveryRecord.driverName && (
+                              {loadList.deliveryRecord.truckRego && (
                                 <span className="flex items-center gap-1">
-                                  <User className="h-3 w-3" />
-                                  {loadList.deliveryRecord.driverName}
+                                  <Truck className="h-3 w-3" />
+                                  {loadList.deliveryRecord.truckRego}
                                 </span>
                               )}
-                              {loadList.deliveryRecord.arrivedSiteAt && (
+                              {loadList.deliveryRecord.loadDocumentNumber && (
+                                <span className="flex items-center gap-1 text-muted-foreground">
+                                  Doc# {loadList.deliveryRecord.loadDocumentNumber}
+                                </span>
+                              )}
+                              {loadList.deliveryRecord.deliveryDate && (
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {loadList.deliveryRecord.deliveryDate}
+                                </span>
+                              )}
+                              {loadList.deliveryRecord.siteFirstLiftTime && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="h-3 w-3" />
-                                  Arrived: {loadList.deliveryRecord.arrivedSiteAt}
+                                  First lift: {loadList.deliveryRecord.siteFirstLiftTime}
                                 </span>
                               )}
                             </div>
@@ -681,7 +749,7 @@ export default function LogisticsPage() {
       </Dialog>
 
       <Dialog open={deliveryDialogOpen} onOpenChange={setDeliveryDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Record Delivery</DialogTitle>
             <DialogDescription>
@@ -693,93 +761,311 @@ export default function LogisticsPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...deliveryForm}>
-            <form onSubmit={deliveryForm.handleSubmit(handleCreateDelivery)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={deliveryForm.control}
-                  name="truckRego"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Truck Rego</FormLabel>
-                      <FormControl>
-                        <Input placeholder="ABC-123" {...field} data-testid="input-truck-rego" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={deliveryForm.control}
-                  name="driverName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Driver Name</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Driver name" {...field} data-testid="input-driver-name" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+            <form onSubmit={deliveryForm.handleSubmit(handleCreateDelivery)} className="flex-1 overflow-hidden flex flex-col">
+              <ScrollArea className="flex-1 pr-4">
+                <div className="space-y-6 pb-4">
+                  {/* Load Information */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Load Information</h4>
+                    <div className="grid grid-cols-4 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="loadDocumentNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Load Document #</FormLabel>
+                            <FormControl>
+                              <Input placeholder="LD-001" {...field} data-testid="input-load-document" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="loadNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Load Number</FormLabel>
+                            <FormControl>
+                              <Input placeholder="1" {...field} data-testid="input-load-number" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="deliveryDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} data-testid="input-delivery-date" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="numberPanels"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Number of Panels</FormLabel>
+                            <FormControl>
+                              <Input type="number" placeholder="0" {...field} value={field.value ?? ""} data-testid="input-number-panels" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={deliveryForm.control}
-                  name="departedFactoryAt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Departed Factory</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} data-testid="input-departed-factory" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={deliveryForm.control}
-                  name="arrivedSiteAt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Arrived Site</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} data-testid="input-arrived-site" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={deliveryForm.control}
-                  name="departedSiteAt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Departed Site</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} data-testid="input-departed-site" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                  <Separator />
 
-              <FormField
-                control={deliveryForm.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Any delivery notes..." {...field} data-testid="input-delivery-notes" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  {/* Vehicle Information */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Vehicle Information</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="truckRego"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Truck Rego</FormLabel>
+                            <FormControl>
+                              <Input placeholder="ABC-123" {...field} data-testid="input-truck-rego" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="trailerRego"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Trailer Rego</FormLabel>
+                            <FormControl>
+                              <Input placeholder="XYZ-456" {...field} data-testid="input-trailer-rego" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="preload"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Preload</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Yes/No" {...field} data-testid="input-preload" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
 
-              <DialogFooter>
+                  <Separator />
+
+                  {/* Start - Depot to LTE */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Start (Depot to LTE)</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="leaveDepotTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Leave Depot (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-leave-depot" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="arriveLteTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Arrive LTE (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-arrive-lte" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Pickup Location */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Pickup Location</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="pickupLocation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Pickup location" {...field} data-testid="input-pickup-location" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="pickupArriveTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Arrive (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-pickup-arrive" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="pickupLeaveTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Leave (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-pickup-leave" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Delivery Location */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Delivery Location (Holding)</h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="deliveryLocation"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Delivery location" {...field} data-testid="input-delivery-location" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="arriveHoldingTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Arrive Holding (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-arrive-holding" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="leaveHoldingTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Leave Holding (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-leave-holding" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Unloading */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Unloading</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="siteFirstLiftTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Site First Lift (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-site-first-lift" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={deliveryForm.control}
+                        name="siteLastLiftTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Site Last Lift / Leave (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-site-last-lift" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Return Depot */}
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-muted-foreground">Return Depot / Reload</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={deliveryForm.control}
+                        name="returnDepotArriveTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Arrive (time)</FormLabel>
+                            <FormControl>
+                              <Input type="time" {...field} data-testid="input-return-depot-arrive" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* Comment */}
+                  <FormField
+                    control={deliveryForm.control}
+                    name="comment"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Comment</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Any delivery comments..." 
+                            className="resize-none"
+                            rows={3}
+                            {...field} 
+                            data-testid="input-delivery-comment" 
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </ScrollArea>
+
+              <DialogFooter className="pt-4 border-t mt-4">
                 <Button type="button" variant="outline" onClick={() => setDeliveryDialogOpen(false)}>
                   Cancel
                 </Button>
