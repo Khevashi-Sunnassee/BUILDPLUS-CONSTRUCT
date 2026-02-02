@@ -3598,7 +3598,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/weekly-job-reports/my-reports", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.user!.id;
+      const userId = req.session.userId!;
       const reports = await storage.getWeeklyJobReports(userId);
       res.json(reports);
     } catch (error: any) {
@@ -3642,7 +3642,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/my-jobs", requireAuth, async (req, res) => {
     try {
-      const userId = req.session.user!.id;
+      const userId = req.session.userId!;
       const myJobs = await storage.getJobsForProjectManager(userId);
       res.json(myJobs);
     } catch (error: any) {
@@ -3654,7 +3654,7 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/weekly-job-reports", requireAuth, async (req, res) => {
     try {
       const { schedules, ...reportData } = req.body;
-      const userId = req.session.user!.id;
+      const userId = req.session.userId!;
       
       const report = await storage.createWeeklyJobReport(
         { ...reportData, projectManagerId: userId },
@@ -3696,7 +3696,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/weekly-job-reports/:id/approve", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const approvedById = req.session.user!.id;
+      const approvedById = req.session.userId!;
       const report = await storage.approveWeeklyJobReport(req.params.id, approvedById);
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
@@ -3710,7 +3710,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/weekly-job-reports/:id/reject", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const approvedById = req.session.user!.id;
+      const approvedById = req.session.userId!;
       const { rejectionReason } = req.body;
       const report = await storage.rejectWeeklyJobReport(req.params.id, approvedById, rejectionReason || "No reason provided");
       if (!report) {
