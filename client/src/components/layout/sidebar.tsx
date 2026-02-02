@@ -50,13 +50,14 @@ import {
 const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
+  { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
+  { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Production Schedule", url: "/production-report", icon: Factory },
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Reports", url: "/reports", icon: Clock },
-  { title: "Downloads", url: "/downloads", icon: Download },
 ];
 
 const managerNavItems = [
@@ -65,13 +66,12 @@ const managerNavItems = [
 
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
-  { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
-  { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Zones", url: "/admin/zones", icon: MapPin },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
+  { title: "Downloads", url: "/downloads", icon: Download },
 ];
 
 const urlToFunctionKey: Record<string, string> = {
