@@ -1,7 +1,10 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
+import lteLogo from "@/assets/lte-logo.png";
 import {
   Calendar,
   ChevronRight,
@@ -12,6 +15,8 @@ import {
   Square,
   Plus,
   Layers,
+  FileDown,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -46,6 +51,8 @@ interface ProductionReportSummary {
 export default function ProductionReportPage() {
   const [dateRange, setDateRange] = useState<string>("month");
   const [searchQuery, setSearchQuery] = useState("");
+  const [isExporting, setIsExporting] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
 
   // Calculate date range based on selection
   const { startDate, endDate } = useMemo(() => {
@@ -115,6 +122,108 @@ export default function ProductionReportPage() {
     }
   };
 
+  const getPeriodLabel = () => {
+    switch (dateRange) {
+      case "week": return "This Week";
+      case "month": return "This Month";
+      case "quarter": return "This Quarter";
+      case "all": return "All Time";
+      default: return dateRange;
+    }
+  };
+
+  const exportToPDF = async () => {
+    if (!reportRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const canvas = await html2canvas(reportRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+        windowWidth: 1200,
+      });
+      
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const headerHeight = 35;
+      const margin = 10;
+      const footerHeight = 12;
+      const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
+      const usableWidth = pdfWidth - (margin * 2);
+      
+      // Draw header background
+      pdf.setFillColor(30, 64, 175);
+      pdf.rect(0, 0, pdfWidth, 28, "F");
+      
+      // Add logo
+      const logoSize = 18;
+      try {
+        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+      } catch (e) {
+        // Logo load failed, continue without it
+      }
+      
+      // Header text
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(18);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("LTE Production Reports", margin + logoSize + 8, 14);
+      
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(getPeriodLabel(), margin + logoSize + 8, 21);
+      
+      // Generated date on right
+      pdf.setFontSize(9);
+      pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      
+      // Reset text color for content
+      pdf.setTextColor(0, 0, 0);
+      
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      
+      const imgRatio = imgWidth / imgHeight;
+      let scaledWidth = usableWidth;
+      let scaledHeight = scaledWidth / imgRatio;
+      
+      if (scaledHeight > usableHeight) {
+        scaledHeight = usableHeight;
+        scaledWidth = scaledHeight * imgRatio;
+      }
+      
+      // Center the content
+      const imgX = (pdfWidth - scaledWidth) / 2;
+      pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
+      
+      // Footer
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
+      
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
+      
+      pdf.save(`LTE-Production-Reports-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -126,17 +235,33 @@ export default function ProductionReportPage() {
             Track production work and costs for panels by date
           </p>
         </div>
-        <Link href={`/production-report/${format(new Date(), "yyyy-MM-dd")}`}>
-          <Button data-testid="button-add-production-entry">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Production Entry
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline"
+            onClick={exportToPDF} 
+            disabled={isExporting || isLoading}
+            data-testid="button-export-pdf"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4 mr-2" />
+            )}
+            Export PDF
           </Button>
-        </Link>
+          <Link href={`/production-report/${format(new Date(), "yyyy-MM-dd")}`}>
+            <Button data-testid="button-add-production-entry">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Production Entry
+            </Button>
+          </Link>
+        </div>
       </div>
 
+      <div ref={reportRef}>
       <Card>
         <CardHeader className="pb-4">
-          <div className="flex flex-col sm:flex-row gap-4 justify-between">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between print:hidden">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <span className="text-sm font-medium">Filters</span>
@@ -253,6 +378,7 @@ export default function ProductionReportPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
