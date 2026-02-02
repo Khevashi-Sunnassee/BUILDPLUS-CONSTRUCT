@@ -83,9 +83,9 @@ export default function AdminSettingsPage() {
       return;
     }
 
-    // Validate file size (max 500KB)
-    if (file.size > 500 * 1024) {
-      toast({ title: "Logo must be less than 500KB", variant: "destructive" });
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ title: "Logo must be less than 2MB", variant: "destructive" });
       return;
     }
 
@@ -219,7 +219,7 @@ export default function AdminSettingsPage() {
                 )}
               </div>
               <p className="text-sm text-muted-foreground">
-                PNG, JPG or SVG. Max 500KB. Displayed in sidebar and reports.
+                PNG, JPG or SVG. Max 2MB. Displayed in sidebar and reports.
               </p>
             </div>
           </div>
