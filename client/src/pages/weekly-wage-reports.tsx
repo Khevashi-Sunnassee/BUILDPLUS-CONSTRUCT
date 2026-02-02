@@ -374,9 +374,59 @@ export default function WeeklyWageReportsPage() {
       });
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const headerHeight = 35;
+      const margin = 10;
+      const footerHeight = 12;
+      const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
+      const usableWidth = pdfWidth - (margin * 2);
       
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      // Clean header with logo - proper aspect ratio
+      const logoHeight = 12;
+      const logoWidth = 24; // 2:1 aspect ratio for typical logo
+      try {
+        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
+      } catch (e) {}
+      
+      // Report title
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Weekly Wage Reports", margin + logoWidth + 6, 12);
+      
+      // Subtitle info
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Week of ${format(selectedWeekStart, "dd/MM/yyyy")}`, margin + logoWidth + 6, 19);
+      
+      // Generated date on the right
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth - margin, 19, { align: "right" });
+      
+      // Draw a simple line under header
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, 24, pdfWidth - margin, 24);
+      
+      // Reset text color for content
+      pdf.setTextColor(0, 0, 0);
+      
+      // Calculate scaled dimensions for content
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+      const imgRatio = imgWidth / imgHeight;
+      let scaledWidth = usableWidth;
+      let scaledHeight = scaledWidth / imgRatio;
+      
+      if (scaledHeight > usableHeight) {
+        scaledHeight = usableHeight;
+        scaledWidth = scaledHeight * imgRatio;
+      }
+      
+      // Center the content
+      const imgX = (pdfWidth - scaledWidth) / 2;
+      pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
+      
       pdf.save(`weekly-wage-reports-${format(new Date(), "yyyy-MM-dd")}.pdf`);
       
       toast({ title: "PDF exported successfully" });

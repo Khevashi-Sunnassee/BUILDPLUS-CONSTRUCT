@@ -367,25 +367,32 @@ export default function ProductionReportDetailPage() {
       const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
       const usableWidth = pdfWidth - (margin * 2);
       
-      pdf.setFillColor(30, 64, 175);
-      pdf.rect(0, 0, pdfWidth, 28, "F");
-      
-      const logoSize = 18;
+      // Clean header with logo - proper aspect ratio
+      const logoHeight = 12;
+      const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 5, logoSize, logoSize);
+        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
       } catch (e) {}
       
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(18);
+      // Report title
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text(`${companyName} Production Report`, margin + logoSize + 8, 14);
+      pdf.text("Production Report", margin + logoWidth + 6, 12);
       
+      // Subtitle info
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text(formatDateDisplay(selectedDate), margin + logoSize + 8, 21);
+      pdf.text(formatDateDisplay(selectedDate), margin + logoWidth + 6, 19);
       
-      pdf.setFontSize(9);
-      pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      // Generated date on the right
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth - margin, 19, { align: "right" });
+      
+      // Draw a simple line under header
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, 24, pdfWidth - margin, 24);
       
       pdf.setTextColor(0, 0, 0);
       
