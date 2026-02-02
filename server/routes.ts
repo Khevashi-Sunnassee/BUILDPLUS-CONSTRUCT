@@ -224,7 +224,7 @@ export async function registerRoutes(
 
       const { logDay, jobId, panelRegisterId, workTypeId, app, startTime, endTime, fileName, filePath,
               revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
-              panelMark, drawingCode, notes, createNewPanel, newPanelMark } = req.body;
+              panelMark, drawingCode, notes, createNewPanel, newPanelMark, panelDetails } = req.body;
 
       if (!logDay || !app || !startTime || !endTime) {
         return res.status(400).json({ error: "Missing required fields" });
@@ -302,6 +302,22 @@ export async function registerRoutes(
       // Update panel's actualHours if linked to a panel register
       if (actualPanelRegisterId) {
         await storage.updatePanelActualHours(actualPanelRegisterId, durationMin);
+      }
+
+      // Update panel details if provided
+      if (actualPanelRegisterId && panelDetails) {
+        await storage.updatePanelRegisterItem(actualPanelRegisterId, {
+          loadWidth: panelDetails.loadWidth,
+          loadHeight: panelDetails.loadHeight,
+          panelThickness: panelDetails.panelThickness,
+          panelVolume: panelDetails.panelVolume,
+          panelMass: panelDetails.panelMass,
+          panelArea: panelDetails.panelArea,
+          day28Fc: panelDetails.day28Fc,
+          liftFcm: panelDetails.liftFcm,
+          rotationalLifters: panelDetails.rotationalLifters,
+          primaryLifters: panelDetails.primaryLifters,
+        });
       }
 
       res.json({ ok: true, dailyLogId: dailyLog.id, newPanelCreated: createNewPanel && newPanelMark ? true : false });

@@ -15,6 +15,7 @@ import {
   ClipboardList,
   Briefcase,
   AlertCircle,
+  Ruler,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,17 @@ const manualEntrySchema = z.object({
   panelMark: z.string().optional(),
   drawingCode: z.string().optional(),
   notes: z.string().optional(),
+  // Panel details fields
+  panelLoadWidth: z.string().optional(),
+  panelLoadHeight: z.string().optional(),
+  panelThickness: z.string().optional(),
+  panelVolume: z.string().optional(),
+  panelMass: z.string().optional(),
+  panelArea: z.string().optional(),
+  panelDay28Fc: z.string().optional(),
+  panelLiftFcm: z.string().optional(),
+  panelRotationalLifters: z.string().optional(),
+  panelPrimaryLifters: z.string().optional(),
 });
 
 type ManualEntryForm = z.infer<typeof manualEntrySchema>;
@@ -166,6 +178,17 @@ export default function ManualEntryPage() {
       panelMark: "",
       drawingCode: "",
       notes: "",
+      // Panel details defaults
+      panelLoadWidth: "",
+      panelLoadHeight: "",
+      panelThickness: "",
+      panelVolume: "",
+      panelMass: "",
+      panelArea: "",
+      panelDay28Fc: "",
+      panelLiftFcm: "",
+      panelRotationalLifters: "",
+      panelPrimaryLifters: "",
     },
   });
 
@@ -192,12 +215,41 @@ export default function ManualEntryPage() {
 
   const watchedPanelRegisterId = form.watch("panelRegisterId");
 
+  // Get the selected panel for display
+  const selectedPanel = panels?.find(p => p.id === watchedPanelRegisterId);
+
   useEffect(() => {
     if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
       const panel = panels?.find(p => p.id === watchedPanelRegisterId);
-      if (panel && panel.drawingCode) {
-        form.setValue("drawingCode", panel.drawingCode);
+      if (panel) {
+        // Populate drawing code
+        if (panel.drawingCode) {
+          form.setValue("drawingCode", panel.drawingCode);
+        }
+        // Populate panel details
+        form.setValue("panelLoadWidth", panel.loadWidth || "");
+        form.setValue("panelLoadHeight", panel.loadHeight || "");
+        form.setValue("panelThickness", panel.panelThickness || "");
+        form.setValue("panelVolume", panel.panelVolume || "");
+        form.setValue("panelMass", panel.panelMass || "");
+        form.setValue("panelArea", panel.panelArea || "");
+        form.setValue("panelDay28Fc", panel.day28Fc || "");
+        form.setValue("panelLiftFcm", panel.liftFcm || "");
+        form.setValue("panelRotationalLifters", panel.rotationalLifters || "");
+        form.setValue("panelPrimaryLifters", panel.primaryLifters || "");
       }
+    } else {
+      // Clear panel details when no panel selected
+      form.setValue("panelLoadWidth", "");
+      form.setValue("panelLoadHeight", "");
+      form.setValue("panelThickness", "");
+      form.setValue("panelVolume", "");
+      form.setValue("panelMass", "");
+      form.setValue("panelArea", "");
+      form.setValue("panelDay28Fc", "");
+      form.setValue("panelLiftFcm", "");
+      form.setValue("panelRotationalLifters", "");
+      form.setValue("panelPrimaryLifters", "");
     }
   }, [watchedPanelRegisterId, panels, form]);
 
@@ -233,6 +285,19 @@ export default function ManualEntryPage() {
       workTypeId: data.workTypeId && data.workTypeId !== "none" ? parseInt(data.workTypeId) : undefined,
       createNewPanel: addNewPanel && newPanelMark ? true : undefined,
       newPanelMark: addNewPanel && newPanelMark ? newPanelMark : undefined,
+      // Include panel details for update
+      panelDetails: data.panelRegisterId && data.panelRegisterId !== "none" ? {
+        loadWidth: data.panelLoadWidth || undefined,
+        loadHeight: data.panelLoadHeight || undefined,
+        panelThickness: data.panelThickness || undefined,
+        panelVolume: data.panelVolume || undefined,
+        panelMass: data.panelMass || undefined,
+        panelArea: data.panelArea || undefined,
+        day28Fc: data.panelDay28Fc || undefined,
+        liftFcm: data.panelLiftFcm || undefined,
+        rotationalLifters: data.panelRotationalLifters || undefined,
+        primaryLifters: data.panelPrimaryLifters || undefined,
+      } : undefined,
     };
     createEntryMutation.mutate(submitData as ManualEntryForm);
   };
@@ -523,6 +588,151 @@ export default function ManualEntryPage() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Panel Details Section - shows when panel is selected */}
+              {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" && (
+                <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Ruler className="h-4 w-4" />
+                      Panel Details - {selectedPanel.panelMark}
+                    </CardTitle>
+                    <CardDescription className="text-sm">
+                      Review and update panel specifications. Changes will be saved to the panel record.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <FormField
+                        control={form.control}
+                        name="panelLoadWidth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Load Width (mm)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 2400" {...field} data-testid="input-panel-load-width" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="panelLoadHeight"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Load Height (mm)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 3000" {...field} data-testid="input-panel-load-height" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="panelThickness"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Thickness (mm)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 200" {...field} data-testid="input-panel-thickness" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <FormField
+                        control={form.control}
+                        name="panelVolume"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Volume (m³)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 1.44" {...field} data-testid="input-panel-volume" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="panelMass"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mass (kg)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 3600" {...field} data-testid="input-panel-mass" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="panelArea"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Area (m²)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 7.2" {...field} data-testid="input-panel-area" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="panelDay28Fc"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>28-Day Fc (MPa)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 40" {...field} data-testid="input-panel-day28fc" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="panelLiftFcm"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Lift Fcm (MPa)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 25" {...field} data-testid="input-panel-lift-fcm" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="panelRotationalLifters"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Rotational Lifters</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 2x Rotational" {...field} data-testid="input-panel-rotational-lifters" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="panelPrimaryLifters"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Primary Lifters</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., 4x Primary" {...field} data-testid="input-panel-primary-lifters" />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
               <FormField
                 control={form.control}
