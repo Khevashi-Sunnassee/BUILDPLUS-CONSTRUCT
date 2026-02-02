@@ -180,7 +180,7 @@ export default function ManualEntryPage() {
     resolver: zodResolver(manualEntrySchema),
     defaultValues: {
       logDay: initialDate,
-      app: "revit",
+      app: "acad",
       startTime: "09:00",
       endTime: "09:30",
       jobId: "",
