@@ -9,6 +9,7 @@ export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
 export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
 export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
+export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -20,6 +21,38 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const userPermissions = pgTable("user_permissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  functionKey: text("function_key").notNull(),
+  permissionLevel: permissionLevelEnum("permission_level").default("VIEW_AND_UPDATE").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userFunctionIdx: uniqueIndex("user_permissions_user_function_idx").on(table.userId, table.functionKey),
+  userIdIdx: index("user_permissions_user_id_idx").on(table.userId),
+}));
+
+export const FUNCTION_KEYS = [
+  "daily_reports",
+  "production_report",
+  "logistics",
+  "weekly_wages",
+  "kpi_dashboard",
+  "jobs",
+  "panel_register",
+  "admin_users",
+  "admin_devices",
+  "admin_jobs",
+  "admin_settings",
+  "admin_panel_types",
+  "admin_work_types",
+  "admin_trailer_types",
+  "admin_user_permissions",
+] as const;
+
+export type FunctionKey = typeof FUNCTION_KEYS[number];
 
 export const devices = pgTable("devices", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -615,6 +648,16 @@ export type InsertDeliveryRecord = z.infer<typeof insertDeliveryRecordSchema>;
 export type DeliveryRecord = typeof deliveryRecords.$inferSelect;
 export type InsertWeeklyWageReport = z.infer<typeof insertWeeklyWageReportSchema>;
 export type WeeklyWageReport = typeof weeklyWageReports.$inferSelect;
+
+export const insertUserPermissionSchema = createInsertSchema(userPermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
+export type UserPermission = typeof userPermissions.$inferSelect;
+export type PermissionLevel = "HIDDEN" | "VIEW" | "VIEW_AND_UPDATE";
+
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
 export type JobStatus = "ACTIVE" | "ON_HOLD" | "COMPLETED" | "ARCHIVED";
