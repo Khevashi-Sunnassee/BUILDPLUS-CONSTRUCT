@@ -4,7 +4,7 @@ import { useRoute, useLocation } from "wouter";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import lteLogo from "@/assets/lte-logo.png";
+import defaultLogo from "@/assets/lte-logo.png";
 import {
   ArrowLeft,
   Calendar,
@@ -85,6 +85,12 @@ export default function DailyReportDetailPage() {
   const { data: workTypes } = useQuery<WorkType[]>({
     queryKey: ["/api/work-types"],
   });
+
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
+  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
   const updateRowMutation = useMutation({
     mutationFn: async ({ rowId, updates }: { rowId: string; updates: any }) => {
@@ -255,13 +261,13 @@ export default function DailyReportDetailPage() {
       // Simple clean header with logo
       const logoSize = 16;
       try {
-        pdf.addImage(lteLogo, "PNG", margin, 8, logoSize, logoSize);
+        pdf.addImage(reportLogo, "PNG", margin, 8, logoSize, logoSize);
       } catch (e) {}
       
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text("LTE Daily Time Report", margin + logoSize + 6, 14);
+      pdf.text(`${companyName} - Daily Time Report`, margin + logoSize + 6, 14);
       
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");

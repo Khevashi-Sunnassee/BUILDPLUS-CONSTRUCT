@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import lteLogo from "@/assets/lte-logo.png";
+import defaultLogo from "@/assets/lte-logo.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -138,6 +138,12 @@ export default function ReportsPage() {
     queryKey: ["/api/reports", { period }],
   });
 
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
+  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+
   // Calculate date range for logistics based on period
   const getDateRange = () => {
     const now = new Date();
@@ -255,7 +261,7 @@ export default function ReportsPage() {
       // Add logo
       const logoSize = 18;
       try {
-        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+        pdf.addImage(reportLogo, "PNG", margin, 5, logoSize, logoSize);
       } catch (e) {
         // Logo load failed, continue without it
       }
@@ -264,7 +270,7 @@ export default function ReportsPage() {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(18);
       pdf.setFont("helvetica", "bold");
-      const reportTitle = activeTab === "logistics" ? "LTE Logistics Report" : "LTE Analytics Report";
+      const reportTitle = activeTab === "logistics" ? `${companyName} Logistics Report` : `${companyName} Analytics Report`;
       pdf.text(reportTitle, margin + logoSize + 8, 14);
       
       pdf.setFontSize(10);
@@ -302,7 +308,7 @@ export default function ReportsPage() {
       
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
       const fileName = activeTab === "logistics" 

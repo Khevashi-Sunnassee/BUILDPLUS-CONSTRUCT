@@ -1,9 +1,9 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2 } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,31 @@ export default function AdminSettingsPage() {
   const { toast } = useToast();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [companyName, setCompanyName] = useState("");
 
   const { data: settings, isLoading } = useQuery<GlobalSettings>({
     queryKey: ["/api/admin/settings"],
+  });
+
+  // Sync company name from settings
+  useEffect(() => {
+    if (settings?.companyName) {
+      setCompanyName(settings.companyName);
+    }
+  }, [settings?.companyName]);
+
+  const saveCompanyNameMutation = useMutation({
+    mutationFn: async (name: string) => {
+      return apiRequest("POST", "/api/admin/settings/company-name", { companyName: name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      toast({ title: "Company name saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save company name", variant: "destructive" });
+    },
   });
 
 
@@ -154,73 +176,107 @@ export default function AdminSettingsPage() {
         </p>
       </div>
 
-      {/* Logo Upload Section */}
+      {/* Company Branding Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Image className="h-5 w-5" />
-            Company Logo
+            <Building2 className="h-5 w-5" />
+            Company Branding
           </CardTitle>
           <CardDescription>
-            Upload your company logo to display in the app and reports
+            Configure your company name and logo for the app and reports
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-6">
-            <div className="flex-shrink-0">
-              <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
-                <img 
-                  src={logoPreview || settings?.logoBase64 || defaultLogo} 
-                  alt="Company Logo" 
-                  className="max-w-full max-h-full object-contain"
-                  data-testid="img-logo-preview"
-                />
+        <CardContent className="space-y-6">
+          {/* Company Name */}
+          <div className="space-y-2">
+            <Label htmlFor="companyName">Company Name</Label>
+            <Input
+              id="companyName"
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+              placeholder="Enter company name"
+              data-testid="input-company-name"
+            />
+            <p className="text-sm text-muted-foreground">
+              Displayed on all reports and exports
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => saveCompanyNameMutation.mutate(companyName)}
+              disabled={saveCompanyNameMutation.isPending || companyName === settings?.companyName}
+              data-testid="button-save-company-name"
+            >
+              {saveCompanyNameMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Company Name
+            </Button>
+          </div>
+
+          {/* Logo Upload */}
+          <div className="space-y-2">
+            <Label>Company Logo</Label>
+            <div className="flex items-center gap-6">
+              <div className="flex-shrink-0">
+                <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                  <img 
+                    src={logoPreview || settings?.logoBase64 || defaultLogo} 
+                    alt="Company Logo" 
+                    className="max-w-full max-h-full object-contain"
+                    data-testid="img-logo-preview"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex gap-2">
-                <input
-                  type="file"
-                  ref={logoInputRef}
-                  accept="image/*"
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                  data-testid="input-logo-file"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => logoInputRef.current?.click()}
-                  disabled={uploadLogoMutation.isPending}
-                  data-testid="button-upload-logo"
-                >
-                  {uploadLogoMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4 mr-2" />
-                  )}
-                  Upload Logo
-                </Button>
-                {settings?.logoBase64 && (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="file"
+                    ref={logoInputRef}
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    data-testid="input-logo-file"
+                  />
                   <Button
                     type="button"
-                    variant="ghost"
-                    onClick={() => removeLogoMutation.mutate()}
-                    disabled={removeLogoMutation.isPending}
-                    data-testid="button-remove-logo"
+                    variant="outline"
+                    onClick={() => logoInputRef.current?.click()}
+                    disabled={uploadLogoMutation.isPending}
+                    data-testid="button-upload-logo"
                   >
-                    {removeLogoMutation.isPending ? (
+                    {uploadLogoMutation.isPending ? (
                       <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     ) : (
-                      <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                      <Upload className="h-4 w-4 mr-2" />
                     )}
-                    Remove
+                    Upload Logo
                   </Button>
-                )}
+                  {settings?.logoBase64 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => removeLogoMutation.mutate()}
+                      disabled={removeLogoMutation.isPending}
+                      data-testid="button-remove-logo"
+                    >
+                      {removeLogoMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2 text-destructive" />
+                      )}
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  PNG, JPG or SVG. Max 2MB. Displayed in sidebar and reports.
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                PNG, JPG or SVG. Max 2MB. Displayed in sidebar and reports.
-              </p>
             </div>
           </div>
         </CardContent>

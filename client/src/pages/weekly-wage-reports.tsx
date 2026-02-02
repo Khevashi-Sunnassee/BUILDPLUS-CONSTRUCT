@@ -6,7 +6,7 @@ import { z } from "zod";
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import lteLogo from "@/assets/lte-logo.png";
+import defaultLogo from "@/assets/lte-logo.png";
 import {
   DollarSign,
   Plus,
@@ -223,6 +223,12 @@ export default function WeeklyWageReportsPage() {
   const { data: reports, isLoading } = useQuery<WeeklyWageReport[]>({
     queryKey: ["/api/weekly-wage-reports"],
   });
+
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
+  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
   const { data: analysisData, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery<WageAnalysis>({
     queryKey: ["/api/weekly-wage-reports", selectedReport?.id, "analysis"],
@@ -449,7 +455,7 @@ export default function WeeklyWageReportsPage() {
 
       <div ref={reportRef} className="bg-white dark:bg-card rounded-lg">
         <div className="p-4 border-b flex items-center gap-4">
-          <img src={lteLogo} alt="LTE Logo" className="h-10 w-auto" />
+          <img src={reportLogo} alt="Company Logo" className="h-10 w-auto" />
           <div>
             <h2 className="text-lg font-semibold">Weekly Wage Report Summary</h2>
             <p className="text-sm text-muted-foreground">

@@ -45,7 +45,7 @@ import {
 } from "recharts";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import lteLogo from "@/assets/lte-logo.png";
+import defaultLogo from "@/assets/lte-logo.png";
 
 interface ProductionDailyData {
   date: string;
@@ -297,6 +297,12 @@ export default function KPIDashboardPage() {
     enabled: !!startDate && !!endDate,
   });
 
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
+  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+
   // Reset component filter when component names change (e.g., date range changes)
   useEffect(() => {
     if (costDailyData?.componentNames && selectedComponent !== "all") {
@@ -438,7 +444,7 @@ export default function KPIDashboardPage() {
       // Add logo
       const logoSize = 18;
       try {
-        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+        pdf.addImage(reportLogo, "PNG", margin, 5, logoSize, logoSize);
       } catch (e) {
         // Logo load failed, continue without it
       }
@@ -447,7 +453,7 @@ export default function KPIDashboardPage() {
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(18);
       pdf.setFont("helvetica", "bold");
-      pdf.text("LTE Performance Report", margin + logoSize + 8, 14);
+      pdf.text(`${companyName} Performance Report`, margin + logoSize + 8, 14);
       
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
@@ -484,7 +490,7 @@ export default function KPIDashboardPage() {
       
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
       pdf.save(`LTE-Performance-Report-${startDate}-${endDate}.pdf`);

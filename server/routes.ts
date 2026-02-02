@@ -501,24 +501,41 @@ export async function registerRoutes(
   app.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) => {
     try {
       const { logoBase64 } = req.body;
-      if (!logoBase64 || typeof logoBase64 !== "string") {
+      if (typeof logoBase64 !== "string") {
         return res.status(400).json({ error: "Logo data is required" });
       }
-      // Validate it's a data URL
-      if (!logoBase64.startsWith("data:image/")) {
+      // Allow empty string to remove logo, otherwise validate it's a data URL
+      if (logoBase64 !== "" && !logoBase64.startsWith("data:image/")) {
         return res.status(400).json({ error: "Invalid image format" });
       }
-      const settings = await storage.updateGlobalSettings({ logoBase64 });
+      const settings = await storage.updateGlobalSettings({ logoBase64: logoBase64 || null });
       res.json({ success: true, logoBase64: settings.logoBase64 });
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to upload logo" });
     }
   });
 
-  // Public endpoint to get the logo
+  // Company name update endpoint
+  app.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { companyName } = req.body;
+      if (!companyName || typeof companyName !== "string") {
+        return res.status(400).json({ error: "Company name is required" });
+      }
+      const settings = await storage.updateGlobalSettings({ companyName });
+      res.json({ success: true, companyName: settings.companyName });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to save company name" });
+    }
+  });
+
+  // Public endpoint to get the logo and company name (for reports)
   app.get("/api/settings/logo", async (req, res) => {
     const settings = await storage.getGlobalSettings();
-    res.json({ logoBase64: settings?.logoBase64 || null });
+    res.json({ 
+      logoBase64: settings?.logoBase64 || null,
+      companyName: settings?.companyName || "LTE Precast Concrete Structures"
+    });
   });
 
   // Legacy /api/admin/projects endpoints - redirect to jobs for backward compatibility

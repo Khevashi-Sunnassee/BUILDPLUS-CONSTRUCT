@@ -6,7 +6,7 @@ import { z } from "zod";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import lteLogo from "@/assets/lte-logo.png";
+import defaultLogo from "@/assets/lte-logo.png";
 import {
   Truck,
   Plus,
@@ -196,6 +196,12 @@ export default function LogisticsPage() {
     },
     enabled: createDialogOpen,
   });
+
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: ["/api/settings/logo"],
+  });
+  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
+  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
   const loadListForm = useForm<LoadListFormData>({
     resolver: zodResolver(loadListSchema),
@@ -399,13 +405,13 @@ export default function LogisticsPage() {
       
       const logoSize = 18;
       try {
-        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+        pdf.addImage(reportLogo, "PNG", margin, 5, logoSize, logoSize);
       } catch (e) {}
       
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(18);
       pdf.setFont("helvetica", "bold");
-      pdf.text("LTE Logistics Report", margin + logoSize + 8, 14);
+      pdf.text(`${companyName} Logistics Report`, margin + logoSize + 8, 14);
       
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
@@ -437,7 +443,7 @@ export default function LogisticsPage() {
       
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
+      pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
       pdf.save(`LTE-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`);
