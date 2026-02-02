@@ -30,6 +30,7 @@ import ProductionReportDetailPage from "@/pages/production-report-detail";
 import KPIDashboardPage from "@/pages/kpi-dashboard";
 import LogisticsPage from "@/pages/logistics";
 import WeeklyWageReportsPage from "@/pages/weekly-wage-reports";
+import WeeklyJobLogsPage from "@/pages/weekly-job-logs";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -186,6 +187,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <WeeklyWageReportsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/weekly-job-logs">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <WeeklyJobLogsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

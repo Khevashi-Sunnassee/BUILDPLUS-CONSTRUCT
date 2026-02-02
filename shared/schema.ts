@@ -601,7 +601,8 @@ export const weeklyJobReports = pgTable("weekly_job_reports", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   projectManagerId: varchar("project_manager_id", { length: 36 }).notNull().references(() => users.id),
   reportDate: text("report_date").notNull(), // YYYY-MM-DD format
-  reportTime: text("report_time").notNull(), // HH:MM format
+  weekStartDate: text("week_start_date").notNull(), // YYYY-MM-DD format
+  weekEndDate: text("week_end_date").notNull(), // YYYY-MM-DD format
   status: weeklyReportStatusEnum("status").default("DRAFT").notNull(),
   notes: text("notes"),
   submittedAt: timestamp("submitted_at"),

@@ -53,6 +53,7 @@ const userNavItems = [
   { title: "Production Schedule", url: "/production-report", icon: Factory },
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
+  { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Reports", url: "/reports", icon: Clock },
   { title: "Downloads", url: "/downloads", icon: Download },
 ];
@@ -77,6 +78,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/production-report": "production_report",
   "/logistics": "logistics",
   "/weekly-wages": "weekly_wages",
+  "/weekly-job-logs": "weekly_job_logs",
   "/reports": "daily_reports",
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",
