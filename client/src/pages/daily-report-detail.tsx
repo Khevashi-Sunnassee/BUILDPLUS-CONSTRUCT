@@ -221,15 +221,17 @@ export default function DailyReportDetailPage() {
             clonedElement.style.backgroundColor = "#ffffff";
             clonedElement.style.color = "#000000";
           }
+          // Hide elements marked with data-pdf-hide
+          clonedDoc.querySelectorAll("[data-pdf-hide]").forEach((el) => {
+            if (el instanceof HTMLElement) {
+              el.style.display = "none";
+            }
+          });
+          // Remove all grey/dark backgrounds
           clonedDoc.querySelectorAll("*").forEach((el) => {
             if (el instanceof HTMLElement) {
-              const computed = window.getComputedStyle(el);
-              if (computed.backgroundColor.includes("rgb(") && !computed.backgroundColor.includes("255, 255, 255")) {
-                const bg = computed.backgroundColor;
-                if (bg.includes("rgb(0,") || bg.includes("rgb(10,") || bg.includes("rgb(20,") || bg.includes("rgb(30,") || bg.includes("hsl(")) {
-                  el.style.backgroundColor = "#ffffff";
-                }
-              }
+              el.style.backgroundColor = "transparent";
+              el.style.color = "#000000";
             }
           });
         },
@@ -244,31 +246,34 @@ export default function DailyReportDetailPage() {
       
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      const headerHeight = 35;
+      const headerHeight = 30;
       const margin = 10;
-      const footerHeight = 12;
+      const footerHeight = 10;
       const usableHeight = pdfHeight - headerHeight - footerHeight - margin;
       const usableWidth = pdfWidth - (margin * 2);
       
-      pdf.setFillColor(30, 64, 175);
-      pdf.rect(0, 0, pdfWidth, 28, "F");
-      
-      const logoSize = 18;
+      // Simple clean header with logo
+      const logoSize = 16;
       try {
-        pdf.addImage(lteLogo, "PNG", margin, 5, logoSize, logoSize);
+        pdf.addImage(lteLogo, "PNG", margin, 8, logoSize, logoSize);
       } catch (e) {}
       
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(18);
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text("LTE Daily Time Report", margin + logoSize + 8, 14);
+      pdf.text("LTE Daily Time Report", margin + logoSize + 6, 14);
       
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
-      pdf.text(`${log.user?.name || log.user?.email} - ${format(new Date(log.logDay), "EEEE, dd/MM/yyyy")}`, margin + logoSize + 8, 21);
+      pdf.text(`${log.user?.name || log.user?.email} - ${format(new Date(log.logDay), "EEEE, dd/MM/yyyy")}`, margin + logoSize + 6, 21);
       
       pdf.setFontSize(9);
+      pdf.setTextColor(100, 100, 100);
       pdf.text(`Generated: ${format(new Date(), "dd MMM yyyy, HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      
+      // Draw a simple line under header
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, 26, pdfWidth - margin, 26);
       
       pdf.setTextColor(0, 0, 0);
       
@@ -286,15 +291,14 @@ export default function DailyReportDetailPage() {
       const imgX = (pdfWidth - scaledWidth) / 2;
       pdf.addImage(imgData, "PNG", imgX, headerHeight, scaledWidth, scaledHeight);
       
-      pdf.setFillColor(248, 250, 252);
-      pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
-      pdf.setDrawColor(226, 232, 240);
-      pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
+      // Simple footer line
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, pdfHeight - footerHeight, pdfWidth - margin, pdfHeight - footerHeight);
       
       pdf.setFontSize(8);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 5);
-      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
+      pdf.setTextColor(100, 100, 100);
+      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 4);
+      pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 4, { align: "right" });
       
       pdf.save(`LTE-Daily-Report-${log.logDay}.pdf`);
     } catch (error) {
@@ -505,7 +509,7 @@ export default function DailyReportDetailPage() {
                   <TableHead>Work Type</TableHead>
                   <TableHead className="text-right w-20">Minutes</TableHead>
                   <TableHead>Notes</TableHead>
-                  {canEdit && <TableHead className="w-20"></TableHead>}
+                  {canEdit && <TableHead className="w-20" data-pdf-hide></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -619,7 +623,7 @@ export default function DailyReportDetailPage() {
                       )}
                     </TableCell>
                     {canEdit && (
-                      <TableCell>
+                      <TableCell data-pdf-hide>
                         {editingRowId === row.id ? (
                           <div className="flex gap-1">
                             <Button
