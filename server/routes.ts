@@ -143,9 +143,20 @@ export async function registerRoutes(
         const idleMinutes = fullLog.rows.reduce((sum, r) => sum + r.idleMin, 0);
         const missingPanelMarkMinutes = fullLog.rows.filter(r => !r.panelMark).reduce((sum, r) => sum + r.durationMin, 0);
         const missingJobMinutes = fullLog.rows.filter(r => !r.jobId).reduce((sum, r) => sum + r.durationMin, 0);
+        
+        // Calculate last entry end time from rows
+        let lastEntryEndTime: string | null = null;
+        if (fullLog.rows.length > 0) {
+          const sortedRows = [...fullLog.rows].sort((a, b) => 
+            new Date(b.endAt).getTime() - new Date(a.endAt).getTime()
+          );
+          lastEntryEndTime = sortedRows[0].endAt.toISOString();
+        }
+        
         logsWithStats.push({
           id: log.id,
           logDay: log.logDay,
+          factory: log.factory,
           status: log.status,
           totalMinutes,
           idleMinutes,
@@ -154,6 +165,8 @@ export async function registerRoutes(
           rowCount: fullLog.rows.length,
           userName: fullLog.user.name,
           userEmail: fullLog.user.email,
+          userId: fullLog.user.id,
+          lastEntryEndTime,
           rows: fullLog.rows, // Include rows for auto-fill in Manual Entry
         });
       }

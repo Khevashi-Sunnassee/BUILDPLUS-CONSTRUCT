@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
@@ -9,6 +9,7 @@ import defaultLogo from "@/assets/lte-logo.png";
 import {
   Calendar,
   ChevronRight,
+  ChevronDown,
   Clock,
   Filter,
   Search,
@@ -19,6 +20,7 @@ import {
   Loader2,
   Trash2,
   Factory,
+  User,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -60,8 +62,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+
+type GroupBy = "none" | "user" | "date";
 
 interface DailyLogSummary {
   id: string;
@@ -75,6 +80,8 @@ interface DailyLogSummary {
   rowCount: number;
   userName?: string;
   userEmail?: string;
+  userId?: string;
+  lastEntryEndTime?: string | null;
 }
 
 export default function DailyReportsPage() {
@@ -91,6 +98,8 @@ export default function DailyReportsPage() {
   const [newDayFactory, setNewDayFactory] = useState("QLD");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingLogId, setDeletingLogId] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
@@ -189,6 +198,60 @@ export default function DailyReportsPage() {
     };
     const config = variants[status] || variants.PENDING;
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  };
+
+  const groupedLogs = (() => {
+    if (groupBy === "none" || !filteredLogs) return null;
+    
+    const groups: Record<string, { label: string; logs: DailyLogSummary[] }> = {};
+    
+    for (const log of filteredLogs) {
+      let key: string;
+      let label: string;
+      
+      if (groupBy === "user") {
+        key = log.userId || log.userEmail || "unknown";
+        label = log.userName || log.userEmail || "Unknown User";
+      } else {
+        key = log.logDay;
+        label = format(new Date(log.logDay), "dd/MM/yyyy");
+      }
+      
+      if (!groups[key]) {
+        groups[key] = { label, logs: [] };
+      }
+      groups[key].logs.push(log);
+    }
+    
+    return groups;
+  })();
+
+  // Expand all groups by default when grouping changes
+  useEffect(() => {
+    if (groupedLogs) {
+      setExpandedGroups(new Set(Object.keys(groupedLogs)));
+    }
+  }, [groupBy, filteredLogs?.length]);
+
+  const formatEndTime = (endTime: string | null | undefined) => {
+    if (!endTime) return "-";
+    try {
+      return format(new Date(endTime), "HH:mm");
+    } catch {
+      return "-";
+    }
   };
 
   const getPeriodLabel = () => {
@@ -461,6 +524,16 @@ export default function DailyReportsPage() {
                   <SelectItem value="VIC">Victoria</SelectItem>
                 </SelectContent>
               </Select>
+              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+                <SelectTrigger className="w-36" data-testid="select-group-by">
+                  <SelectValue placeholder="Group By" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Grouping</SelectItem>
+                  <SelectItem value="user">Group by User</SelectItem>
+                  <SelectItem value="date">Group by Date</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -474,105 +547,243 @@ export default function DailyReportsPage() {
               ))}
             </div>
           ) : filteredLogs && filteredLogs.length > 0 ? (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-32">Date</TableHead>
-                    <TableHead className="w-24">Factory</TableHead>
-                    {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
-                      <TableHead>User</TableHead>
-                    )}
-                    <TableHead className="text-right">Total Time</TableHead>
-                    <TableHead className="text-right">Idle</TableHead>
-                    <TableHead className="text-right">Missing Panel</TableHead>
-                    <TableHead className="text-right">Missing Job</TableHead>
-                    <TableHead className="text-center">Status</TableHead>
-                    <TableHead className="w-10"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredLogs.map((log) => (
-                    <TableRow key={log.id} className="cursor-pointer hover-elevate" data-testid={`row-log-${log.id}`}>
-                      <TableCell>
-                        <Link href={`/daily-reports/${log.id}`}>
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">
-                              {format(new Date(log.logDay), "dd/MM/yyyy")}
-                            </span>
-                          </div>
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="font-medium">
-                          <Factory className="h-3 w-3 mr-1" />
-                          {log.factory}
-                        </Badge>
-                      </TableCell>
+            groupBy !== "none" && groupedLogs ? (
+              <div className="space-y-2">
+                {Object.entries(groupedLogs).map(([groupKey, { label, logs: groupLogs }]) => (
+                  <Collapsible 
+                    key={groupKey} 
+                    open={expandedGroups.has(groupKey)}
+                    onOpenChange={() => toggleGroup(groupKey)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer hover-elevate" data-testid={`trigger-group-${groupKey}`}>
+                        {expandedGroups.has(groupKey) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        {groupBy === "user" ? <User className="h-4 w-4" /> : <Calendar className="h-4 w-4" />}
+                        <span className="font-medium">{label}</span>
+                        <Badge variant="secondary" className="ml-auto">{groupLogs.length} log{groupLogs.length !== 1 ? "s" : ""}</Badge>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="ml-4 mt-2 border-l-2 pl-4">
+                        <div className="rounded-md border">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                {groupBy !== "date" && <TableHead className="w-32">Date</TableHead>}
+                                <TableHead className="w-24">Factory</TableHead>
+                                {groupBy !== "user" && (user?.role === "MANAGER" || user?.role === "ADMIN") && (
+                                  <TableHead>User</TableHead>
+                                )}
+                                <TableHead className="text-right">Total Time</TableHead>
+                                <TableHead className="text-right">Last Entry</TableHead>
+                                <TableHead className="text-right">Idle</TableHead>
+                                <TableHead className="text-right">Missing Panel</TableHead>
+                                <TableHead className="text-right">Missing Job</TableHead>
+                                <TableHead className="text-center">Status</TableHead>
+                                <TableHead className="w-10"></TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {groupLogs.map((log) => (
+                                <TableRow key={log.id} className="cursor-pointer hover-elevate" data-testid={`row-log-${log.id}`}>
+                                  {groupBy !== "date" && (
+                                    <TableCell>
+                                      <Link href={`/daily-reports/${log.id}`}>
+                                        <div className="flex items-center gap-2">
+                                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                                          <span className="font-medium">
+                                            {format(new Date(log.logDay), "dd/MM/yyyy")}
+                                          </span>
+                                        </div>
+                                      </Link>
+                                    </TableCell>
+                                  )}
+                                  <TableCell>
+                                    <Badge variant="outline" className="font-medium">
+                                      <Factory className="h-3 w-3 mr-1" />
+                                      {log.factory}
+                                    </Badge>
+                                  </TableCell>
+                                  {groupBy !== "user" && (user?.role === "MANAGER" || user?.role === "ADMIN") && (
+                                    <TableCell className="text-muted-foreground">
+                                      {log.userName || log.userEmail}
+                                    </TableCell>
+                                  )}
+                                  <TableCell className="text-right font-medium">
+                                    <div className="flex items-center justify-end gap-1">
+                                      <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                      {formatMinutes(log.totalMinutes)}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    {formatEndTime(log.lastEntryEndTime)}
+                                  </TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    {formatMinutes(log.idleMinutes)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {log.missingPanelMarkMinutes > 0 ? (
+                                      <div className="flex items-center justify-end gap-1 text-amber-600">
+                                        <AlertTriangle className="h-3.5 w-3.5" />
+                                        {formatMinutes(log.missingPanelMarkMinutes)}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {log.missingProjectMinutes > 0 ? (
+                                      <div className="flex items-center justify-end gap-1 text-amber-600">
+                                        <FolderOpen className="h-3.5 w-3.5" />
+                                        {formatMinutes(log.missingProjectMinutes)}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {getStatusBadge(log.status)}
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-1">
+                                      <Link href={`/daily-reports/${log.id}`}>
+                                        <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
+                                          <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                      </Link>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDeletingLogId(log.id);
+                                          setDeleteDialogOpen(true);
+                                        }}
+                                        data-testid={`button-delete-${log.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-32">Date</TableHead>
+                      <TableHead className="w-24">Factory</TableHead>
                       {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
-                        <TableCell className="text-muted-foreground">
-                          {log.userName || log.userEmail}
-                        </TableCell>
+                        <TableHead>User</TableHead>
                       )}
-                      <TableCell className="text-right font-medium">
-                        <div className="flex items-center justify-end gap-1">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          {formatMinutes(log.totalMinutes)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatMinutes(log.idleMinutes)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {log.missingPanelMarkMinutes > 0 ? (
-                          <div className="flex items-center justify-end gap-1 text-amber-600">
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                            {formatMinutes(log.missingPanelMarkMinutes)}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {log.missingProjectMinutes > 0 ? (
-                          <div className="flex items-center justify-end gap-1 text-amber-600">
-                            <FolderOpen className="h-3.5 w-3.5" />
-                            {formatMinutes(log.missingProjectMinutes)}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {getStatusBadge(log.status)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Link href={`/daily-reports/${log.id}`}>
-                            <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
-                              <ChevronRight className="h-4 w-4" />
-                            </Button>
-                          </Link>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingLogId(log.id);
-                              setDeleteDialogOpen(true);
-                            }}
-                            data-testid={`button-delete-${log.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </div>
-                      </TableCell>
+                      <TableHead className="text-right">Total Time</TableHead>
+                      <TableHead className="text-right">Last Entry</TableHead>
+                      <TableHead className="text-right">Idle</TableHead>
+                      <TableHead className="text-right">Missing Panel</TableHead>
+                      <TableHead className="text-right">Missing Job</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="w-10"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredLogs.map((log) => (
+                      <TableRow key={log.id} className="cursor-pointer hover-elevate" data-testid={`row-log-${log.id}`}>
+                        <TableCell>
+                          <Link href={`/daily-reports/${log.id}`}>
+                            <div className="flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {format(new Date(log.logDay), "dd/MM/yyyy")}
+                              </span>
+                            </div>
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="font-medium">
+                            <Factory className="h-3 w-3 mr-1" />
+                            {log.factory}
+                          </Badge>
+                        </TableCell>
+                        {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
+                          <TableCell className="text-muted-foreground">
+                            {log.userName || log.userEmail}
+                          </TableCell>
+                        )}
+                        <TableCell className="text-right font-medium">
+                          <div className="flex items-center justify-end gap-1">
+                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                            {formatMinutes(log.totalMinutes)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatEndTime(log.lastEntryEndTime)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatMinutes(log.idleMinutes)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {log.missingPanelMarkMinutes > 0 ? (
+                            <div className="flex items-center justify-end gap-1 text-amber-600">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              {formatMinutes(log.missingPanelMarkMinutes)}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {log.missingProjectMinutes > 0 ? (
+                            <div className="flex items-center justify-end gap-1 text-amber-600">
+                              <FolderOpen className="h-3.5 w-3.5" />
+                              {formatMinutes(log.missingProjectMinutes)}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {getStatusBadge(log.status)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Link href={`/daily-reports/${log.id}`}>
+                              <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
+                                <ChevronRight className="h-4 w-4" />
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeletingLogId(log.id);
+                                setDeleteDialogOpen(true);
+                              }}
+                              data-testid={`button-delete-${log.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
