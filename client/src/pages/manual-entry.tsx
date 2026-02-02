@@ -99,9 +99,10 @@ export default function ManualEntryPage() {
   const { toast } = useToast();
   const today = format(new Date(), "yyyy-MM-dd");
   
-  // Parse date from URL query parameter if present
+  // Parse date and logId from URL query parameters if present
   const urlParams = new URLSearchParams(searchString);
   const dateFromUrl = urlParams.get("date");
+  const logIdFromUrl = urlParams.get("logId");
   const initialDate = dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl) ? dateFromUrl : today;
   
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -295,8 +296,12 @@ export default function ManualEntryPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
-      // Navigate back to the daily reports list
-      navigate("/daily-reports");
+      // Navigate back to the daily report detail if we came from there, otherwise to the list
+      if (logIdFromUrl) {
+        navigate(`/daily-reports/${logIdFromUrl}`);
+      } else {
+        navigate("/daily-reports");
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -350,7 +355,7 @@ export default function ManualEntryPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate("/daily-reports")} data-testid="button-back">
+        <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
@@ -799,7 +804,7 @@ export default function ManualEntryPage() {
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => navigate("/daily-reports")}
+                  onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")}
                   data-testid="button-cancel"
                 >
                   Cancel

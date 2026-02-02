@@ -379,7 +379,7 @@ export default function DailyReportDetailPage() {
             <>
               <Button
                 variant="outline"
-                onClick={() => setLocation(`/manual-entry?date=${log.logDay}`)}
+                onClick={() => setLocation(`/manual-entry?date=${log.logDay}&logId=${log.id}`)}
                 data-testid="button-add-entry"
               >
                 <Plus className="h-4 w-4 mr-2" />
