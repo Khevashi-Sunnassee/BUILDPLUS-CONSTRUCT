@@ -5,6 +5,7 @@ import { storage, sha256Hex } from "./storage";
 import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema } from "@shared/schema";
 import { z } from "zod";
 import * as XLSX from "xlsx";
+import { format, subDays } from "date-fns";
 
 declare module "express-session" {
   interface SessionData {
@@ -759,6 +760,59 @@ export async function registerRoutes(
         panelCount: entriesWithCosts.length,
       },
     });
+  });
+
+  // Get production reports list (grouped by date)
+  app.get("/api/production-reports", requireAuth, async (req, res) => {
+    const { startDate, endDate } = req.query;
+    
+    // Default to last 30 days if no range specified
+    const end = endDate ? String(endDate) : format(new Date(), "yyyy-MM-dd");
+    const start = startDate ? String(startDate) : format(subDays(new Date(), 30), "yyyy-MM-dd");
+    
+    const entries = await storage.getProductionEntriesInRange(start, end);
+    
+    // Group entries by date
+    const reportsByDate = new Map<string, {
+      date: string;
+      entryCount: number;
+      panelCount: number;
+      totalVolumeM3: number;
+      totalAreaM2: number;
+      jobIds: Set<string>;
+    }>();
+    
+    for (const entry of entries) {
+      const date = entry.productionDate;
+      if (!reportsByDate.has(date)) {
+        reportsByDate.set(date, {
+          date,
+          entryCount: 0,
+          panelCount: 0,
+          totalVolumeM3: 0,
+          totalAreaM2: 0,
+          jobIds: new Set(),
+        });
+      }
+      
+      const report = reportsByDate.get(date)!;
+      report.entryCount++;
+      report.panelCount++;
+      report.totalVolumeM3 += parseFloat(entry.volumeM3 || "0");
+      report.totalAreaM2 += parseFloat(entry.areaM2 || "0");
+      report.jobIds.add(entry.jobId);
+    }
+    
+    // Convert to array and sort by date descending
+    const reports = Array.from(reportsByDate.values())
+      .map(r => ({
+        ...r,
+        jobCount: r.jobIds.size,
+        jobIds: undefined, // Remove the Set from response
+      }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+    
+    res.json(reports);
   });
 
   app.get("/api/admin/panel-types", requireRole("ADMIN"), async (req, res) => {

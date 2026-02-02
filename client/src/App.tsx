@@ -25,6 +25,7 @@ import AdminPanelTypesPage from "@/pages/admin/panel-types";
 import DownloadsPage from "@/pages/downloads";
 import ManualEntryPage from "@/pages/manual-entry";
 import ProductionReportPage from "@/pages/production-report";
+import ProductionReportDetailPage from "@/pages/production-report-detail";
 import KPIDashboardPage from "@/pages/kpi-dashboard";
 import LogisticsPage from "@/pages/logistics";
 
@@ -151,6 +152,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ProductionReportPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/production-report/:date">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ProductionReportDetailPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
