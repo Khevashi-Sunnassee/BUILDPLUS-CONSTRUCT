@@ -197,7 +197,7 @@ export default function ProductionReportDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       toast({ title: "Production entry created successfully" });
       setEntryDialogOpen(false);
@@ -216,7 +216,7 @@ export default function ProductionReportDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
       toast({ title: "Production entry updated successfully" });
       setEntryDialogOpen(false);
