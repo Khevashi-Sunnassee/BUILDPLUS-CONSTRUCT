@@ -19,6 +19,7 @@ import {
   Layers,
   Truck,
   DollarSign,
+  Shield,
 } from "lucide-react";
 import lteLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import {
@@ -65,6 +66,7 @@ const adminNavItems = [
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
+  { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
 ];
 
 export function AppSidebar() {
