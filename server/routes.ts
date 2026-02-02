@@ -683,9 +683,13 @@ export async function registerRoutes(
 
   app.get("/api/production-summary-with-costs", requireAuth, async (req, res) => {
     const date = req.query.date as string;
+    const factoryFilter = req.query.factory as string | undefined;
     if (!date) return res.status(400).json({ error: "Date required" });
     
-    const entries = await storage.getProductionEntriesByDate(date);
+    // If factory filter specified, use the factory-filtered query
+    const entries = factoryFilter 
+      ? await storage.getProductionEntriesByDateAndFactory(date, factoryFilter)
+      : await storage.getProductionEntriesByDate(date);
     const allPanelTypes = await storage.getAllPanelTypes();
     const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
     

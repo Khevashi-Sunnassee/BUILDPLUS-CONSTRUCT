@@ -81,6 +81,7 @@ const productionEntrySchema = z.object({
   productionDate: z.string().min(1, "Date is required"),
   volumeM3: z.string().min(1, "Volume (m³) is required"),
   areaM2: z.string().min(1, "Area (m²) is required"),
+  factory: z.string().default("QLD"),
   notes: z.string().optional(),
 });
 
@@ -117,6 +118,10 @@ export default function ProductionReportDetailPage() {
   const { toast } = useToast();
   const selectedDate = params?.date || format(new Date(), "yyyy-MM-dd");
   
+  // Get factory from URL query params
+  const urlParams = new URLSearchParams(window.location.search);
+  const factory = urlParams.get("factory") || "QLD";
+  
   const [entryDialogOpen, setEntryDialogOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<ProductionEntryWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -126,9 +131,9 @@ export default function ProductionReportDetailPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: summaryData, isLoading: entriesLoading } = useQuery<ProductionSummaryWithCosts>({
-    queryKey: ["/api/production-summary-with-costs", selectedDate],
+    queryKey: ["/api/production-summary-with-costs", selectedDate, factory],
     queryFn: async () => {
-      const res = await fetch(`/api/production-summary-with-costs?date=${selectedDate}`);
+      const res = await fetch(`/api/production-summary-with-costs?date=${selectedDate}&factory=${factory}`);
       if (!res.ok) throw new Error("Failed to fetch entries");
       return res.json();
     },
@@ -157,6 +162,7 @@ export default function ProductionReportDetailPage() {
       productionDate: selectedDate,
       volumeM3: "",
       areaM2: "",
+      factory: factory,
       notes: "",
     },
   });
@@ -166,7 +172,7 @@ export default function ProductionReportDetailPage() {
       return apiRequest("POST", "/api/production-entries", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
       toast({ title: "Production entry created successfully" });
       setEntryDialogOpen(false);
@@ -183,7 +189,7 @@ export default function ProductionReportDetailPage() {
       return apiRequest("PUT", `/api/production-entries/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
       toast({ title: "Production entry updated successfully" });
       setEntryDialogOpen(false);
@@ -201,7 +207,7 @@ export default function ProductionReportDetailPage() {
       return apiRequest("DELETE", `/api/production-entries/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
       toast({ title: "Entry deleted" });
       setDeleteDialogOpen(false);
@@ -221,6 +227,7 @@ export default function ProductionReportDetailPage() {
       productionDate: selectedDate,
       volumeM3: "",
       areaM2: "",
+      factory: factory,
       notes: "",
     });
     setEntryDialogOpen(true);
@@ -235,6 +242,7 @@ export default function ProductionReportDetailPage() {
       productionDate: entry.productionDate,
       volumeM3: entry.volumeM3 || "",
       areaM2: entry.areaM2 || "",
+      factory: (entry as any).factory || factory,
       notes: entry.notes || "",
     });
     setEntryDialogOpen(true);
@@ -408,8 +416,11 @@ export default function ProductionReportDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-production-title">
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-production-title">
               Production Report
+              <Badge variant={factory === "QLD" ? "default" : "secondary"} className="text-sm">
+                {factory}
+              </Badge>
             </h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <Calendar className="h-4 w-4" />
@@ -443,7 +454,7 @@ export default function ProductionReportDetailPage() {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
             <Factory className="h-5 w-5" />
-            PRODUCTION REPORT - QLD
+            PRODUCTION REPORT - {factory}
           </CardTitle>
           <CardDescription>{formatDateDisplay(selectedDate)}</CardDescription>
         </CardHeader>
