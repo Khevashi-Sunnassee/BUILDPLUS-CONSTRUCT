@@ -132,6 +132,7 @@ export default function AdminPanelsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
+  const [levelFilter, setLevelFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
   const [groupByPanelType, setGroupByPanelType] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
@@ -237,9 +238,20 @@ export default function AdminPanelsPage() {
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
     if (panelTypeFilter !== "all" && panel.panelType !== panelTypeFilter) return false;
+    if (levelFilter !== "all" && panel.level !== levelFilter) return false;
     // Search by panel mark
     if (searchTerm && !panel.panelMark.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
+  })?.sort((a, b) => {
+    // Sort by Building first, then by Level
+    const buildingA = a.building || "";
+    const buildingB = b.building || "";
+    if (buildingA !== buildingB) {
+      return buildingA.localeCompare(buildingB, undefined, { numeric: true });
+    }
+    const levelA = a.level || "";
+    const levelB = b.level || "";
+    return levelA.localeCompare(levelB, undefined, { numeric: true });
   });
 
   // Group panels by job for grouped view
@@ -264,6 +276,11 @@ export default function AdminPanelsPage() {
 
   // Get unique panel types from current data for filter dropdown
   const uniquePanelTypes = Array.from(new Set(panels?.map(p => p.panelType).filter(Boolean) || [])).sort();
+
+  // Get unique levels from current data for filter dropdown
+  const uniqueLevels = Array.from(new Set(panels?.map(p => p.level).filter(Boolean) || [])).sort((a, b) => 
+    a!.localeCompare(b!, undefined, { numeric: true })
+  );
 
   const toggleJobCollapse = (jobId: string) => {
     setCollapsedJobs(prev => {
@@ -908,6 +925,19 @@ export default function AdminPanelsPage() {
                     {uniquePanelTypes.map(type => (
                       <SelectItem key={type} value={type}>
                         {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={levelFilter} onValueChange={setLevelFilter}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-level-filter">
+                    <SelectValue placeholder="All Levels" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Levels</SelectItem>
+                    {uniqueLevels.map(level => (
+                      <SelectItem key={level} value={level!}>
+                        {level}
                       </SelectItem>
                     ))}
                   </SelectContent>
