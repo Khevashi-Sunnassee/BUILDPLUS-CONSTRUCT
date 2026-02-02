@@ -429,7 +429,7 @@ export default function ProductionReportDetailPage() {
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Production Report", margin + logoWidth + 6, 12);
+      pdf.text("Production Schedule", margin + logoWidth + 6, 12);
       
       // Subtitle info
       pdf.setFontSize(10);
@@ -497,7 +497,7 @@ export default function ProductionReportDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-production-title">
-              Production Report
+              Production Schedule
               <Badge variant={factory === "QLD" ? "default" : "secondary"} className="text-sm">
                 {factory}
               </Badge>

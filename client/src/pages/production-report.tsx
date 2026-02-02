@@ -311,7 +311,7 @@ export default function ProductionReportPage() {
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Production Reports", margin + logoWidth + 6, 12);
+      pdf.text("Production Schedule", margin + logoWidth + 6, 12);
       
       // Subtitle info
       pdf.setFontSize(10);
@@ -370,7 +370,7 @@ export default function ProductionReportPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-production-reports-title">
-            Production Reports
+            Production Schedule
           </h1>
           <p className="text-muted-foreground">
             Track production work and costs for panels by date

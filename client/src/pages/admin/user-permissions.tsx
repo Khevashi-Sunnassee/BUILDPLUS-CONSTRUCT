@@ -48,7 +48,7 @@ interface UserWithPermissions {
 
 const FUNCTION_LABELS: Record<string, string> = {
   daily_reports: "Daily Reports",
-  production_report: "Production Report",
+  production_report: "Production Schedule",
   logistics: "Logistics",
   weekly_wages: "Weekly Wage Reports",
   kpi_dashboard: "KPI Dashboard",
