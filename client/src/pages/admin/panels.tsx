@@ -91,6 +91,9 @@ const panelSchema = z.object({
   description: z.string().optional(),
   drawingCode: z.string().optional(),
   sheetNumber: z.string().optional(),
+  building: z.string().optional(),
+  level: z.string().optional(),
+  structuralElevation: z.string().optional(),
   estimatedHours: z.number().optional(),
   status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]),
 });
@@ -219,6 +222,9 @@ export default function AdminPanelsPage() {
       description: "",
       drawingCode: "",
       sheetNumber: "",
+      building: "",
+      level: "",
+      structuralElevation: "",
       estimatedHours: undefined,
       status: "NOT_STARTED",
     },
@@ -525,6 +531,9 @@ export default function AdminPanelsPage() {
       description: "",
       drawingCode: "",
       sheetNumber: "",
+      building: "",
+      level: "",
+      structuralElevation: "",
       estimatedHours: undefined,
       status: "NOT_STARTED",
     });
@@ -540,6 +549,9 @@ export default function AdminPanelsPage() {
       description: panel.description || "",
       drawingCode: panel.drawingCode || "",
       sheetNumber: panel.sheetNumber || "",
+      building: panel.building || "",
+      level: panel.level || "",
+      structuralElevation: panel.structuralElevation || "",
       estimatedHours: panel.estimatedHours || undefined,
       status: panel.status,
     });
@@ -1090,6 +1102,47 @@ export default function AdminPanelsPage() {
                       <FormLabel>Sheet Number</FormLabel>
                       <FormControl>
                         <Input placeholder="A001" {...field} data-testid="input-panel-sheet" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={panelForm.control}
+                  name="building"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Building</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Building A" {...field} data-testid="input-panel-building" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={panelForm.control}
+                  name="level"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Level</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Level 1" {...field} data-testid="input-panel-level" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={panelForm.control}
+                  name="structuralElevation"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Structural Elevation</FormLabel>
+                      <FormControl>
+                        <Input placeholder="RL 10.500" {...field} data-testid="input-panel-elevation" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
