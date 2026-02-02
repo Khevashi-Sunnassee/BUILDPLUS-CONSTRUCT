@@ -474,8 +474,20 @@ export async function registerRoutes(
   });
 
   app.get("/api/panels", requireAuth, async (req, res) => {
-    const panels = await storage.getAllPanelRegisterItems();
-    res.json(panels);
+    const jobId = req.query.jobId as string | undefined;
+    const level = req.query.level as string | undefined;
+    
+    if (jobId && level) {
+      // Filter by job and level for production slot panel breakdown
+      const panels = await storage.getPanelsByJobAndLevel(jobId, level);
+      res.json(panels);
+    } else if (jobId) {
+      const panels = await storage.getPanelsByJob(jobId);
+      res.json(panels);
+    } else {
+      const panels = await storage.getAllPanelRegisterItems();
+      res.json(panels);
+    }
   });
 
   app.get("/api/reports", requireAuth, async (req, res) => {

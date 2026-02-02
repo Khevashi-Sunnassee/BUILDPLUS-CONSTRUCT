@@ -116,6 +116,7 @@ export interface IStorage {
 
   getPanelRegisterItem(id: string): Promise<(PanelRegister & { job: Job }) | undefined>;
   getPanelsByJob(jobId: string): Promise<PanelRegister[]>;
+  getPanelsByJobAndLevel(jobId: string, level: string): Promise<PanelRegister[]>;
   createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister>;
   updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined>;
   deletePanelRegisterItem(id: string): Promise<void>;
@@ -810,6 +811,12 @@ export class DatabaseStorage implements IStorage {
 
   async getPanelsByJob(jobId: string): Promise<PanelRegister[]> {
     return db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId)).orderBy(asc(panelRegister.panelMark));
+  }
+
+  async getPanelsByJobAndLevel(jobId: string, level: string): Promise<PanelRegister[]> {
+    return db.select().from(panelRegister)
+      .where(and(eq(panelRegister.jobId, jobId), eq(panelRegister.level, level)))
+      .orderBy(asc(panelRegister.panelMark));
   }
 
   async createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister> {
