@@ -2029,8 +2029,11 @@ export async function registerRoutes(
     }
     
     // Calculate total revenue per week for proportional distribution
-    for (const [, day] of dailyData) {
-      for (const [, week] of weeklyActualLabour) {
+    const dailyDataArray = Array.from(dailyData.values());
+    const weeklyArray = Array.from(weeklyActualLabour.values());
+    
+    for (const day of dailyDataArray) {
+      for (const week of weeklyArray) {
         if (day.date >= week.weekStart && day.date <= week.weekEnd) {
           week.totalRevenue += day.revenue;
         }
@@ -2038,13 +2041,13 @@ export async function registerRoutes(
     }
     
     // Build daily results with actual labour distributed proportionally
-    const result = Array.from(dailyData.values())
+    const result = dailyDataArray
       .sort((a, b) => a.date.localeCompare(b.date))
       .map(d => {
         let actualLabour = 0;
         
         // Find which week this day belongs to and distribute wages proportionally
-        for (const [, week] of weeklyActualLabour) {
+        for (const week of weeklyArray) {
           if (d.date >= week.weekStart && d.date <= week.weekEnd && week.totalRevenue > 0) {
             // Distribute production wages proportionally to this day's revenue share
             actualLabour = (d.revenue / week.totalRevenue) * week.productionWages;
