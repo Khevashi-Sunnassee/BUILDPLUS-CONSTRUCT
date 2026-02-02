@@ -1451,7 +1451,7 @@ export async function registerRoutes(
         
         // Update panel status to COMPLETED when production entry is marked as completed
         if (status === "COMPLETED") {
-          await storage.updatePanel(panelId, { status: "COMPLETED" });
+          await storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" });
         }
       }
       
@@ -1494,9 +1494,9 @@ export async function registerRoutes(
     
     // When marking as COMPLETED, also update the panel status to COMPLETED
     if (status === "COMPLETED") {
-      const uniquePanelIds = [...new Set(validEntries.map(e => e.panelId))];
+      const uniquePanelIds = Array.from(new Set(validEntries.map(e => e.panelId)));
       await Promise.all(
-        uniquePanelIds.map(panelId => storage.updatePanel(panelId, { status: "COMPLETED" }))
+        uniquePanelIds.map(panelId => storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" }))
       );
     }
     
@@ -3482,7 +3482,7 @@ Return ONLY valid JSON, no explanation text.`
         totalRevenue += entryRevenue;
         
         // Get cost components for this panel type
-        const costComponents = await storage.getCostComponentsForPanelType(panelType.id);
+        const costComponents = await storage.getCostComponentsByPanelType(panelType.id);
         for (const component of costComponents) {
           const percentage = parseFloat(component.percentageOfRevenue) / 100;
           const cost = entryRevenue * percentage;
