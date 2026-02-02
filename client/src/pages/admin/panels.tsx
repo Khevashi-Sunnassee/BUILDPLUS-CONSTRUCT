@@ -143,6 +143,7 @@ export default function AdminPanelsPage() {
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
   const [groupByPanelType, setGroupByPanelType] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const [viewMode, setViewMode] = useState<"list" | "summary">("list");
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -779,6 +780,44 @@ export default function AdminPanelsPage() {
     completedM3: filteredPanels?.filter(p => p.status === "COMPLETED").reduce((sum, p) => sum + parseFloat(p.panelVolume || "0"), 0) || 0,
   };
 
+  const panelsByBuildingAndLevel = filteredPanels?.reduce((acc, panel) => {
+    const building = panel.building || "Unassigned";
+    const level = panel.level || "Unassigned";
+    
+    if (!acc[building]) acc[building] = {};
+    if (!acc[building][level]) {
+      acc[building][level] = { count: 0, area: 0, volume: 0, completed: 0, panels: [] };
+    }
+    
+    acc[building][level].count++;
+    acc[building][level].area += parseFloat(panel.panelArea || "0");
+    acc[building][level].volume += parseFloat(panel.panelVolume || "0");
+    if (panel.status === "COMPLETED") acc[building][level].completed++;
+    acc[building][level].panels.push(panel);
+    
+    return acc;
+  }, {} as Record<string, Record<string, { count: number; area: number; volume: number; completed: number; panels: PanelRegister[] }>>);
+
+  const sortedBuildings = Object.keys(panelsByBuildingAndLevel || {}).sort((a, b) => {
+    if (a === "Unassigned") return 1;
+    if (b === "Unassigned") return -1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
+
+  const sortLevel = (a: string, b: string) => {
+    if (a === "Unassigned") return 1;
+    if (b === "Unassigned") return -1;
+    const levelOrder = ["basement", "ground", "g", "l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10", "roof"];
+    const aLower = a.toLowerCase();
+    const bLower = b.toLowerCase();
+    const aIdx = levelOrder.findIndex(l => aLower.includes(l));
+    const bIdx = levelOrder.findIndex(l => bLower.includes(l));
+    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+    if (aIdx !== -1) return -1;
+    if (bIdx !== -1) return 1;
+    return a.localeCompare(b, undefined, { numeric: true });
+  };
+
   if (panelsLoading) {
     return (
       <div className="space-y-6">
@@ -924,37 +963,61 @@ export default function AdminPanelsPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <ClipboardList className="h-5 w-5" />
-                Panel List
+                {viewMode === "list" ? "Panel List" : "Building & Level Summary"}
               </CardTitle>
               <CardDescription>
                 {filteredPanels?.length || 0} panels {statusFilter !== "all" && `(${statusFilter.replace("_", " ")})`}
               </CardDescription>
             </div>
             <div className="flex items-center gap-4 flex-wrap">
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search panel mark..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-[180px]"
-                  data-testid="input-search-panel"
-                />
+              <div className="flex items-center gap-1 border rounded-md p-1">
+                <Button
+                  variant={viewMode === "list" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  data-testid="button-view-list"
+                >
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  List
+                </Button>
+                <Button
+                  variant={viewMode === "summary" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setViewMode("summary")}
+                  data-testid="button-view-summary"
+                >
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Summary
+                </Button>
               </div>
-              <div className="flex items-center gap-2">
-                <Switch 
-                  id="group-by-job" 
-                  checked={groupByJob} 
-                  onCheckedChange={(checked) => {
-                    setGroupByJob(checked);
-                    if (checked) setGroupByPanelType(false);
-                  }}
-                  data-testid="switch-group-by-job"
-                />
-                <Label htmlFor="group-by-job" className="text-sm cursor-pointer">
-                  Group by Job
-                </Label>
-              </div>
+              {viewMode === "list" && (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search panel mark..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-8 w-[180px]"
+                      data-testid="input-search-panel"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch 
+                      id="group-by-job" 
+                      checked={groupByJob} 
+                      onCheckedChange={(checked) => {
+                        setGroupByJob(checked);
+                        if (checked) setGroupByPanelType(false);
+                      }}
+                      data-testid="switch-group-by-job"
+                    />
+                    <Label htmlFor="group-by-job" className="text-sm cursor-pointer">
+                      Group by Job
+                    </Label>
+                  </div>
+                </>
+              )}
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
                 {!filterJobId && (
@@ -1028,6 +1091,82 @@ export default function AdminPanelsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {viewMode === "summary" ? (
+            <div className="space-y-6">
+              {sortedBuildings.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No panels to display
+                </div>
+              ) : (
+                sortedBuildings.map((building) => {
+                  const levels = panelsByBuildingAndLevel?.[building] || {};
+                  const sortedLevels = Object.keys(levels).sort(sortLevel);
+                  const buildingTotals = {
+                    count: Object.values(levels).reduce((sum, l) => sum + l.count, 0),
+                    area: Object.values(levels).reduce((sum, l) => sum + l.area, 0),
+                    volume: Object.values(levels).reduce((sum, l) => sum + l.volume, 0),
+                    completed: Object.values(levels).reduce((sum, l) => sum + l.completed, 0),
+                  };
+                  
+                  return (
+                    <Card key={building} className="border" data-testid={`card-building-${building}`}>
+                      <CardHeader className="py-3 px-4 bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Layers className="h-5 w-5" />
+                            Building: {building}
+                          </CardTitle>
+                          <div className="flex items-center gap-4 text-sm">
+                            <span><strong>{buildingTotals.count}</strong> panels</span>
+                            <span><strong>{buildingTotals.completed}</strong> completed</span>
+                            <span><strong>{buildingTotals.area.toFixed(2)}</strong> m²</span>
+                            <span><strong>{buildingTotals.volume.toFixed(2)}</strong> m³</span>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[200px]">Level</TableHead>
+                              <TableHead className="text-center">Panels</TableHead>
+                              <TableHead className="text-center">Completed</TableHead>
+                              <TableHead className="text-right">Area (m²)</TableHead>
+                              <TableHead className="text-right">Volume (m³)</TableHead>
+                              <TableHead className="text-center">Progress</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {sortedLevels.map((level) => {
+                              const data = levels[level];
+                              const progress = data.count > 0 ? (data.completed / data.count) * 100 : 0;
+                              return (
+                                <TableRow key={level} data-testid={`row-level-${building}-${level}`}>
+                                  <TableCell className="font-medium">{level}</TableCell>
+                                  <TableCell className="text-center">{data.count}</TableCell>
+                                  <TableCell className="text-center">
+                                    <span className="text-green-600">{data.completed}</span>
+                                  </TableCell>
+                                  <TableCell className="text-right">{data.area.toFixed(2)}</TableCell>
+                                  <TableCell className="text-right">{data.volume.toFixed(3)}</TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="flex items-center gap-2 justify-center">
+                                      <Progress value={progress} className="w-20 h-2" />
+                                      <span className="text-xs text-muted-foreground w-10">{progress.toFixed(0)}%</span>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -1331,6 +1470,7 @@ export default function AdminPanelsPage() {
               )}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
