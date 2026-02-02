@@ -76,6 +76,7 @@ interface ProductionReportSummary {
 export default function ProductionReportPage() {
   const [dateRange, setDateRange] = useState<string>("month");
   const [searchQuery, setSearchQuery] = useState("");
+  const [factoryFilter, setFactoryFilter] = useState("all");
   const [isExporting, setIsExporting] = useState(false);
   const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
   const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -164,6 +165,11 @@ export default function ProductionReportPage() {
   });
 
   const filteredReports = reports?.filter((report) => {
+    // Filter by factory
+    if (factoryFilter !== "all" && report.factory !== factoryFilter) {
+      return false;
+    }
+    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       return report.date.includes(query);
@@ -449,6 +455,16 @@ export default function ProductionReportPage() {
                   <SelectItem value="month">This Month</SelectItem>
                   <SelectItem value="quarter">This Quarter</SelectItem>
                   <SelectItem value="all">All Time</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+                <SelectTrigger className="w-36" data-testid="select-factory-filter">
+                  <SelectValue placeholder="Factory" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Factories</SelectItem>
+                  <SelectItem value="QLD">QLD</SelectItem>
+                  <SelectItem value="VIC">Victoria</SelectItem>
                 </SelectContent>
               </Select>
             </div>
