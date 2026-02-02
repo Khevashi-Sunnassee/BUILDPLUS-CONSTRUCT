@@ -1030,7 +1030,12 @@ export async function registerRoutes(
           }
           
           if (headerRow === -1) {
-            sheetResult.errors.push("Could not find header row");
+            // Log first few rows for debugging
+            console.log(`[Estimate Import] Sheet "${sheetName}" - Could not find header row`);
+            console.log(`[Estimate Import] First 5 rows:`, data.slice(0, 5).map((r: any) => 
+              r?.slice(0, 8).map((c: any) => String(c || "").substring(0, 30))
+            ));
+            sheetResult.errors.push("Could not find header row - sheet may have different column structure");
             results.push(sheetResult);
             continue;
           }

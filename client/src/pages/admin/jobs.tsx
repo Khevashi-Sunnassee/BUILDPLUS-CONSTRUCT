@@ -1415,6 +1415,21 @@ export default function AdminJobsPage() {
                       </div>
                     </div>
                   ))}
+                  {/* Show error details */}
+                  {importResult.sheets?.some((s: any) => s.errors?.length > 0) && (
+                    <div className="mt-3 p-3 bg-destructive/10 border border-destructive/30 rounded-md">
+                      <p className="text-sm font-medium text-destructive mb-2">Error Details:</p>
+                      <ul className="text-sm text-destructive/80 list-disc list-inside space-y-1">
+                        {importResult.sheets?.flatMap((sheet: any) => 
+                          sheet.errors?.map((error: string, idx: number) => (
+                            <li key={`${sheet.sheetName}-${idx}`}>
+                              <span className="font-medium">{sheet.sheetName}:</span> {error}
+                            </li>
+                          )) || []
+                        )}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
