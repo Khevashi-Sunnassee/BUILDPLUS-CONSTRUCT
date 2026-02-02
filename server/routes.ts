@@ -130,7 +130,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/daily-logs/:id", requireAuth, async (req, res) => {
-    const log = await storage.getDailyLog(req.params.id);
+    const log = await storage.getDailyLog(req.params.id as string);
     if (!log) {
       return res.status(404).json({ error: "Log not found" });
     }
@@ -143,14 +143,14 @@ export async function registerRoutes(
   });
 
   app.post("/api/daily-logs/:id/submit", requireAuth, async (req, res) => {
-    const existingLog = await storage.getDailyLog(req.params.id);
+    const existingLog = await storage.getDailyLog(req.params.id as string);
     if (!existingLog) {
       return res.status(404).json({ error: "Log not found" });
     }
     if (existingLog.userId !== req.session.userId) {
       return res.status(403).json({ error: "You can only submit your own logs" });
     }
-    const log = await storage.updateDailyLogStatus(req.params.id, {
+    const log = await storage.updateDailyLogStatus(req.params.id as string, {
       status: "SUBMITTED",
       submittedAt: new Date(),
     });
@@ -167,7 +167,7 @@ export async function registerRoutes(
   app.post("/api/daily-logs/:id/approve", requireRole("MANAGER", "ADMIN"), async (req, res) => {
     const { approve, comment } = req.body;
     const status = approve ? "APPROVED" : "REJECTED";
-    const log = await storage.updateDailyLogStatus(req.params.id, {
+    const log = await storage.updateDailyLogStatus(req.params.id as string, {
       status,
       approvedAt: approve ? new Date() : undefined,
       approvedBy: approve ? req.session.userId : undefined,
@@ -189,7 +189,7 @@ export async function registerRoutes(
   });
 
   app.patch("/api/log-rows/:id", requireAuth, async (req, res) => {
-    const row = await storage.getLogRow(req.params.id);
+    const row = await storage.getLogRow(req.params.id as string);
     if (!row) {
       return res.status(404).json({ error: "Row not found" });
     }
@@ -206,7 +206,7 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Cannot edit rows in submitted/approved logs" });
     }
     const { panelMark, drawingCode, notes, jobId, workTypeId } = req.body;
-    const updatedRow = await storage.updateLogRow(req.params.id, {
+    const updatedRow = await storage.updateLogRow(req.params.id as string, {
       panelMark,
       drawingCode,
       notes,
@@ -253,8 +253,8 @@ export async function registerRoutes(
           panelMark: newPanelMark,
           panelType: "OTHER",
           status: "IN_PROGRESS",
-          estimatedHours: "0",
-          actualHours: "0",
+          estimatedHours: 0,
+          actualHours: 0,
         });
         actualPanelRegisterId = newPanel.id;
         actualPanelMark = newPanelMark;
@@ -387,7 +387,7 @@ export async function registerRoutes(
   // Mapping rules now use jobId instead of projectId
   app.post("/api/admin/jobs/:id/rules", requireRole("ADMIN"), async (req, res) => {
     const rule = await storage.createMappingRule({
-      jobId: req.params.id,
+      jobId: req.params.id as string,
       pathContains: req.body.pathContains,
       priority: req.body.priority || 100,
     });
@@ -395,7 +395,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/admin/mapping-rules/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteMappingRule(req.params.id);
+    await storage.deleteMappingRule(req.params.id as string);
     res.json({ ok: true });
   });
 
@@ -411,12 +411,12 @@ export async function registerRoutes(
   });
 
   app.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) => {
-    const device = await storage.updateDevice(req.params.id, req.body);
+    const device = await storage.updateDevice(req.params.id as string, req.body);
     res.json(device);
   });
 
   app.delete("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteDevice(req.params.id);
+    await storage.deleteDevice(req.params.id as string);
     res.json({ ok: true });
   });
 
@@ -439,12 +439,12 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
-    const user = await storage.updateUser(req.params.id, req.body);
+    const user = await storage.updateUser(req.params.id as string, req.body);
     res.json({ ...user, passwordHash: undefined });
   });
 
   app.delete("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteUser(req.params.id);
+    await storage.deleteUser(req.params.id as string);
     res.json({ ok: true });
   });
 
@@ -454,7 +454,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    const job = await storage.getJob(req.params.id);
+    const job = await storage.getJob(req.params.id as string);
     if (!job) return res.status(404).json({ error: "Job not found" });
     res.json(job);
   });
@@ -473,12 +473,12 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    const job = await storage.updateJob(req.params.id, req.body);
+    const job = await storage.updateJob(req.params.id as string, req.body);
     res.json(job);
   });
 
   app.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteJob(req.params.id);
+    await storage.deleteJob(req.params.id as string);
     res.json({ ok: true });
   });
 
@@ -506,13 +506,13 @@ export async function registerRoutes(
   });
 
   app.get("/api/jobs/:id/cost-overrides", requireAuth, async (req, res) => {
-    const overrides = await storage.getJobCostOverrides(req.params.id);
+    const overrides = await storage.getJobCostOverrides(req.params.id as string);
     res.json(overrides);
   });
 
   app.post("/api/jobs/:id/cost-overrides/initialize", requireRole("ADMIN"), async (req, res) => {
     try {
-      const overrides = await storage.initializeJobCostOverrides(req.params.id);
+      const overrides = await storage.initializeJobCostOverrides(req.params.id as string);
       res.json(overrides);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to initialize cost overrides" });
@@ -528,7 +528,7 @@ export async function registerRoutes(
           return res.status(400).json({ error: "Revised percentage must be between 0 and 100" });
         }
       }
-      const override = await storage.updateJobCostOverride(req.params.id, {
+      const override = await storage.updateJobCostOverride(req.params.id as string, {
         revisedPercentage: revisedPercentage !== null && revisedPercentage !== undefined ? String(revisedPercentage) : null,
         notes: notes || null,
       });
@@ -545,12 +545,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/panels/by-job/:jobId", requireRole("ADMIN"), async (req, res) => {
-    const panels = await storage.getPanelsByJob(req.params.jobId);
+    const panels = await storage.getPanelsByJob(req.params.jobId as string);
     res.json(panels);
   });
 
   app.get("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
-    const panel = await storage.getPanelRegisterItem(req.params.id);
+    const panel = await storage.getPanelRegisterItem(req.params.id as string);
     if (!panel) return res.status(404).json({ error: "Panel not found" });
     res.json(panel);
   });
@@ -568,12 +568,12 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
-    const panel = await storage.updatePanelRegisterItem(req.params.id, req.body);
+    const panel = await storage.updatePanelRegisterItem(req.params.id as string, req.body);
     res.json(panel);
   });
 
   app.delete("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deletePanelRegisterItem(req.params.id);
+    await storage.deletePanelRegisterItem(req.params.id as string);
     res.json({ ok: true });
   });
 
@@ -618,7 +618,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/panels/by-job/:jobId", requireAuth, async (req, res) => {
-    const panels = await storage.getPanelsByJob(req.params.jobId);
+    const panels = await storage.getPanelsByJob(req.params.jobId as string);
     res.json(panels);
   });
 
@@ -634,7 +634,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/production-entries/:id", requireAuth, async (req, res) => {
-    const entry = await storage.getProductionEntry(req.params.id);
+    const entry = await storage.getProductionEntry(req.params.id as string);
     if (!entry) return res.status(404).json({ error: "Entry not found" });
     res.json(entry);
   });
@@ -665,12 +665,12 @@ export async function registerRoutes(
   });
 
   app.put("/api/production-entries/:id", requireAuth, async (req, res) => {
-    const entry = await storage.updateProductionEntry(req.params.id, req.body);
+    const entry = await storage.updateProductionEntry(req.params.id as string, req.body);
     res.json(entry);
   });
 
   app.delete("/api/production-entries/:id", requireAuth, async (req, res) => {
-    await storage.deleteProductionEntry(req.params.id);
+    await storage.deleteProductionEntry(req.params.id as string);
     res.json({ ok: true });
   });
 
@@ -821,7 +821,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
-    const type = await storage.getPanelType(req.params.id);
+    const type = await storage.getPanelType(req.params.id as string);
     if (!type) return res.status(404).json({ error: "Panel type not found" });
     res.json(type);
   });
@@ -836,18 +836,18 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
-    const type = await storage.updatePanelType(req.params.id, req.body);
+    const type = await storage.updatePanelType(req.params.id as string, req.body);
     if (!type) return res.status(404).json({ error: "Panel type not found" });
     res.json(type);
   });
 
   app.delete("/api/admin/panel-types/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deletePanelType(req.params.id);
+    await storage.deletePanelType(req.params.id as string);
     res.json({ ok: true });
   });
 
   app.get("/api/panel-types/:id/cost-components", requireAuth, async (req, res) => {
-    const components = await storage.getCostComponentsByPanelType(req.params.id);
+    const components = await storage.getCostComponentsByPanelType(req.params.id as string);
     res.json(components);
   });
 
@@ -861,9 +861,9 @@ export async function registerRoutes(
       if (total > 100) {
         return res.status(400).json({ error: "Total percentage cannot exceed 100%" });
       }
-      const inserted = await storage.replaceCostComponents(req.params.id, 
+      const inserted = await storage.replaceCostComponents(req.params.id as string, 
         components.map((c: any, i: number) => ({
-          panelTypeId: req.params.id,
+          panelTypeId: req.params.id as string,
           name: c.name,
           percentageOfRevenue: String(c.percentageOfRevenue),
           sortOrder: i,
@@ -882,13 +882,13 @@ export async function registerRoutes(
 
   // Panel rates now use jobs instead of projects
   app.get("/api/jobs/:jobId/panel-rates", requireAuth, async (req, res) => {
-    const rates = await storage.getEffectiveRates(req.params.jobId);
+    const rates = await storage.getEffectiveRates(req.params.jobId as string);
     res.json(rates);
   });
 
   app.put("/api/jobs/:jobId/panel-rates/:panelTypeId", requireRole("ADMIN"), async (req, res) => {
     try {
-      const rate = await storage.upsertJobPanelRate(req.params.jobId, req.params.panelTypeId, req.body);
+      const rate = await storage.upsertJobPanelRate(req.params.jobId as string, req.params.panelTypeId as string, req.body);
       res.json(rate);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to update job rate" });
@@ -896,7 +896,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/jobs/:jobId/panel-rates/:rateId", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteJobPanelRate(req.params.rateId);
+    await storage.deleteJobPanelRate(req.params.rateId as string);
     res.json({ ok: true });
   });
 
@@ -930,7 +930,7 @@ export async function registerRoutes(
       if (!parsed.success) {
         return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
       }
-      const workType = await storage.updateWorkType(parseInt(req.params.id), parsed.data);
+      const workType = await storage.updateWorkType(parseInt(req.params.id as string), parsed.data);
       if (!workType) {
         return res.status(404).json({ error: "Work type not found" });
       }
@@ -941,7 +941,7 @@ export async function registerRoutes(
   });
 
   app.delete("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteWorkType(parseInt(req.params.id));
+    await storage.deleteWorkType(parseInt(req.params.id as string));
     res.json({ ok: true });
   });
 
@@ -1041,7 +1041,7 @@ export async function registerRoutes(
       // Check if code exists in configured panel types
       if (panelTypesByCode.has(code)) return code;
       // Check case-insensitive match
-      for (const [configuredCode] of panelTypesByCode) {
+      for (const [configuredCode] of Array.from(panelTypesByCode)) {
         if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
       }
       return code; // Return original code if no configured match
@@ -1336,7 +1336,7 @@ export async function registerRoutes(
     const normalizePanelType = (code: string | null): string => {
       if (!code) return "OTHER";
       if (panelTypesByCode.has(code)) return code;
-      for (const [configuredCode] of panelTypesByCode) {
+      for (const [configuredCode] of Array.from(panelTypesByCode)) {
         if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
       }
       return code;
@@ -1496,7 +1496,7 @@ export async function registerRoutes(
     const normalizePanelType = (code: string | null): string => {
       if (!code) return "OTHER";
       if (panelTypesByCode.has(code)) return code;
-      for (const [configuredCode] of panelTypesByCode) {
+      for (const [configuredCode] of Array.from(panelTypesByCode)) {
         if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
       }
       return code;
@@ -1613,7 +1613,7 @@ export async function registerRoutes(
     const normalizePanelType = (code: string | null): string => {
       if (!code) return "OTHER";
       if (panelTypesByCode.has(code)) return code;
-      for (const [configuredCode] of panelTypesByCode) {
+      for (const [configuredCode] of Array.from(panelTypesByCode)) {
         if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
       }
       return code;
@@ -1899,7 +1899,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: "PDF data is required" });
       }
       
-      const panel = await storage.getPanelById(id);
+      const panel = await storage.getPanelById(id as string);
       if (!panel) {
         return res.status(404).json({ error: "Panel not found" });
       }
@@ -1995,12 +1995,12 @@ Return ONLY valid JSON, no explanation text.`
         productionPdfUrl 
       } = req.body;
       
-      const panel = await storage.getPanelById(id);
+      const panel = await storage.getPanelById(id as string);
       if (!panel) {
         return res.status(404).json({ error: "Panel not found" });
       }
       
-      const updated = await storage.approvePanelForProduction(id, userId, {
+      const updated = await storage.approvePanelForProduction(id as string, userId, {
         loadWidth,
         loadHeight,
         panelThickness,
@@ -2026,12 +2026,12 @@ Return ONLY valid JSON, no explanation text.`
     try {
       const { id } = req.params;
       
-      const panel = await storage.getPanelById(id);
+      const panel = await storage.getPanelById(id as string);
       if (!panel) {
         return res.status(404).json({ error: "Panel not found" });
       }
       
-      const updated = await storage.revokePanelProductionApproval(id);
+      const updated = await storage.revokePanelProductionApproval(id as string);
       
       res.json({ success: true, panel: updated });
     } catch (error: any) {
@@ -2071,12 +2071,12 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   app.put("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
-    const trailerType = await storage.updateTrailerType(req.params.id, req.body);
+    const trailerType = await storage.updateTrailerType(req.params.id as string, req.body);
     res.json(trailerType);
   });
 
   app.delete("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
-    await storage.deleteTrailerType(req.params.id);
+    await storage.deleteTrailerType(req.params.id as string);
     res.json({ success: true });
   });
 
@@ -2087,7 +2087,7 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   app.get("/api/load-lists/:id", requireAuth, async (req, res) => {
-    const loadList = await storage.getLoadList(req.params.id);
+    const loadList = await storage.getLoadList(req.params.id as string);
     if (!loadList) return res.status(404).json({ error: "Load list not found" });
     res.json(loadList);
   });
@@ -2119,29 +2119,29 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   app.put("/api/load-lists/:id", requireAuth, async (req, res) => {
-    const loadList = await storage.updateLoadList(req.params.id, req.body);
+    const loadList = await storage.updateLoadList(req.params.id as string, req.body);
     res.json(loadList);
   });
 
   app.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
-    await storage.deleteLoadList(req.params.id);
+    await storage.deleteLoadList(req.params.id as string);
     res.json({ success: true });
   });
 
   app.post("/api/load-lists/:id/panels", requireAuth, async (req, res) => {
     const { panelId, sequence } = req.body;
-    const panel = await storage.addPanelToLoadList(req.params.id, panelId, sequence);
+    const panel = await storage.addPanelToLoadList(req.params.id as string, panelId, sequence);
     res.json(panel);
   });
 
   app.delete("/api/load-lists/:id/panels/:panelId", requireAuth, async (req, res) => {
-    await storage.removePanelFromLoadList(req.params.id, req.params.panelId);
+    await storage.removePanelFromLoadList(req.params.id as string, req.params.panelId as string);
     res.json({ success: true });
   });
 
   // Delivery Records
   app.get("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
-    const record = await storage.getDeliveryRecord(req.params.id);
+    const record = await storage.getDeliveryRecord(req.params.id as string);
     res.json(record || null);
   });
 
@@ -2149,7 +2149,7 @@ Return ONLY valid JSON, no explanation text.`
     try {
       const record = await storage.createDeliveryRecord({
         ...req.body,
-        loadListId: req.params.id,
+        loadListId: req.params.id as string,
         enteredById: req.session.userId!,
       });
       res.json(record);
@@ -2159,7 +2159,7 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   app.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
-    const record = await storage.updateDeliveryRecord(req.params.id, req.body);
+    const record = await storage.updateDeliveryRecord(req.params.id as string, req.body);
     res.json(record);
   });
 

@@ -389,7 +389,7 @@ export class DatabaseStorage implements IStorage {
     return row;
   }
 
-  async updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; jobId: string; isUserEdited: boolean }>): Promise<LogRow | undefined> {
+  async updateLogRow(id: string, data: Partial<{ panelMark: string; drawingCode: string; notes: string; jobId: string; isUserEdited: boolean; workTypeId: number | null }>): Promise<LogRow | undefined> {
     const [row] = await db.update(logRows).set({ ...data, updatedAt: new Date() }).where(eq(logRows.id, id)).returning();
     return row;
   }
@@ -935,7 +935,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWorkType(data: InsertWorkType): Promise<WorkType> {
-    const [workType] = await db.insert(workTypes).values(data).returning();
+    const [workType] = await db.insert(workTypes).values(data as any).returning();
     return workType;
   }
 
