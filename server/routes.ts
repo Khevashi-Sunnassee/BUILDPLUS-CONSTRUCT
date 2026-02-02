@@ -1890,6 +1890,209 @@ export async function registerRoutes(
     });
   });
 
+  // Labour Cost Analysis - compares estimated labour (from cost components %) vs actual labour (from weekly wages)
+  app.get("/api/reports/labour-cost-analysis", requireAuth, async (req, res) => {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const factory = req.query.factory as string | undefined;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate required" });
+    }
+    
+    const entries = await storage.getProductionEntriesInRange(startDate, endDate);
+    const filteredEntries = factory && factory !== "all" 
+      ? entries.filter(e => e.factory === factory) 
+      : entries;
+    
+    const allPanelTypes = await storage.getAllPanelTypes();
+    const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
+    
+    const normalizePanelType = (code: string | null): string => {
+      if (!code) return "OTHER";
+      if (panelTypesByCode.has(code)) return code;
+      for (const [configuredCode] of Array.from(panelTypesByCode)) {
+        if (configuredCode.toLowerCase() === code.toLowerCase()) return configuredCode;
+      }
+      return code;
+    };
+    
+    const panelTypeCostComponentsCache = new Map<string, any[]>();
+    const jobCostOverridesCache = new Map<string, any[]>();
+    const jobRatesCache = new Map<string, Map<string, any>>();
+    
+    // Get labour percentage from cost components
+    const getLabourPercentage = async (jobId: string, panelTypeCode: string): Promise<number> => {
+      const normalizedCode = normalizePanelType(panelTypeCode);
+      const panelType = panelTypesByCode.get(normalizedCode);
+      if (!panelType) return 0;
+      
+      // Check for job-level overrides first
+      if (!jobCostOverridesCache.has(jobId)) {
+        jobCostOverridesCache.set(jobId, await storage.getJobCostOverrides(jobId));
+      }
+      const overrides = jobCostOverridesCache.get(jobId)!;
+      const jobOverrides = overrides.filter(o => o.panelTypeId === panelType.id);
+      
+      if (jobOverrides.length > 0) {
+        const labourOverride = jobOverrides.find(o => 
+          o.componentName.toLowerCase().includes('labour') || 
+          o.componentName.toLowerCase().includes('labor')
+        );
+        if (labourOverride) {
+          return parseFloat(labourOverride.revisedPercentage || labourOverride.defaultPercentage || "0");
+        }
+      }
+      
+      // Fall back to panel type cost components
+      if (!panelTypeCostComponentsCache.has(panelType.id)) {
+        panelTypeCostComponentsCache.set(panelType.id, await storage.getCostComponentsByPanelType(panelType.id));
+      }
+      const components = panelTypeCostComponentsCache.get(panelType.id)!;
+      const labourComponent = components.find(c => 
+        c.name.toLowerCase().includes('labour') || 
+        c.name.toLowerCase().includes('labor')
+      );
+      
+      return labourComponent ? parseFloat(labourComponent.percentageOfRevenue) : 0;
+    };
+    
+    const getRates = async (jobId: string, panelTypeCode: string) => {
+      const normalizedCode = normalizePanelType(panelTypeCode);
+      if (!jobRatesCache.has(jobId)) {
+        const rates = await storage.getJobPanelRates(jobId);
+        jobRatesCache.set(jobId, new Map(rates.map(r => [r.panelType.code, r])));
+      }
+      const jobRates = jobRatesCache.get(jobId);
+      const jobRate = jobRates?.get(normalizedCode);
+      const defaultRate = panelTypesByCode.get(normalizedCode);
+      
+      return {
+        sellRatePerM2: parseFloat(jobRate?.sellRatePerM2 || defaultRate?.sellRatePerM2 || "0"),
+        sellRatePerM3: parseFloat(jobRate?.sellRatePerM3 || defaultRate?.sellRatePerM3 || "0"),
+      };
+    };
+    
+    // Calculate daily estimated labour
+    const dailyData = new Map<string, { 
+      date: string; 
+      revenue: number; 
+      estimatedLabour: number;
+      panelCount: number;
+    }>();
+    
+    for (const entry of filteredEntries) {
+      const date = entry.productionDate;
+      const panelType = normalizePanelType(entry.panel.panelType);
+      const rates = await getRates(entry.jobId, panelType);
+      const labourPercent = await getLabourPercentage(entry.jobId, panelType);
+      
+      const volumeM3 = parseFloat(entry.volumeM3 || "0");
+      const areaM2 = parseFloat(entry.areaM2 || "0");
+      const revenue = (volumeM3 * rates.sellRatePerM3) + (areaM2 * rates.sellRatePerM2);
+      const estimatedLabour = revenue * (labourPercent / 100);
+      
+      if (!dailyData.has(date)) {
+        dailyData.set(date, { date, revenue: 0, estimatedLabour: 0, panelCount: 0 });
+      }
+      const day = dailyData.get(date)!;
+      day.revenue += revenue;
+      day.estimatedLabour += estimatedLabour;
+      day.panelCount += 1;
+    }
+    
+    // Get weekly wage reports to calculate actual labour
+    const allWeeklyWages = await storage.getWeeklyWageReports(startDate, endDate);
+    const weeklyWages = factory && factory !== "all" 
+      ? allWeeklyWages.filter(w => w.factory === factory)
+      : allWeeklyWages;
+    
+    // Calculate actual production wages per day by distributing weekly wages
+    // We'll distribute weekly production wages across days proportionally to production volume
+    const weeklyActualLabour = new Map<string, { 
+      weekStart: string; 
+      weekEnd: string; 
+      productionWages: number;
+      totalRevenue: number;
+    }>();
+    
+    for (const wage of weeklyWages) {
+      const weekKey = `${wage.weekStartDate}_${wage.weekEndDate}`;
+      if (!weeklyActualLabour.has(weekKey)) {
+        weeklyActualLabour.set(weekKey, {
+          weekStart: wage.weekStartDate,
+          weekEnd: wage.weekEndDate,
+          productionWages: parseFloat(wage.productionWages || "0"),
+          totalRevenue: 0,
+        });
+      }
+    }
+    
+    // Calculate total revenue per week for proportional distribution
+    for (const [, day] of dailyData) {
+      for (const [, week] of weeklyActualLabour) {
+        if (day.date >= week.weekStart && day.date <= week.weekEnd) {
+          week.totalRevenue += day.revenue;
+        }
+      }
+    }
+    
+    // Build daily results with actual labour distributed proportionally
+    const result = Array.from(dailyData.values())
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(d => {
+        let actualLabour = 0;
+        
+        // Find which week this day belongs to and distribute wages proportionally
+        for (const [, week] of weeklyActualLabour) {
+          if (d.date >= week.weekStart && d.date <= week.weekEnd && week.totalRevenue > 0) {
+            // Distribute production wages proportionally to this day's revenue share
+            actualLabour = (d.revenue / week.totalRevenue) * week.productionWages;
+            break;
+          }
+        }
+        
+        const variance = actualLabour - d.estimatedLabour;
+        const variancePercent = d.estimatedLabour > 0 ? (variance / d.estimatedLabour) * 100 : 0;
+        const isOverBudget = variance > 0;
+        
+        return {
+          date: d.date,
+          revenue: Math.round(d.revenue * 100) / 100,
+          estimatedLabour: Math.round(d.estimatedLabour * 100) / 100,
+          actualLabour: Math.round(actualLabour * 100) / 100,
+          variance: Math.round(variance * 100) / 100,
+          variancePercent: Math.round(variancePercent * 10) / 10,
+          isOverBudget,
+          panelCount: d.panelCount,
+        };
+      });
+    
+    // Calculate totals
+    const totals = {
+      revenue: Math.round(result.reduce((s, d) => s + d.revenue, 0) * 100) / 100,
+      estimatedLabour: Math.round(result.reduce((s, d) => s + d.estimatedLabour, 0) * 100) / 100,
+      actualLabour: Math.round(result.reduce((s, d) => s + d.actualLabour, 0) * 100) / 100,
+      variance: 0,
+      variancePercent: 0,
+      isOverBudget: false,
+      panelCount: result.reduce((s, d) => s + d.panelCount, 0),
+    };
+    totals.variance = Math.round((totals.actualLabour - totals.estimatedLabour) * 100) / 100;
+    totals.variancePercent = totals.estimatedLabour > 0 
+      ? Math.round((totals.variance / totals.estimatedLabour) * 1000) / 10 
+      : 0;
+    totals.isOverBudget = totals.variance > 0;
+    
+    res.json({
+      period: { startDate, endDate },
+      factory: factory || "all",
+      dailyData: result,
+      totals,
+      hasWeeklyWageData: weeklyWages.length > 0,
+    });
+  });
+
   // Logistics reporting - panels shipped per day and delivery phase timing
   app.get("/api/reports/logistics", requireAuth, async (req, res) => {
     try {
