@@ -26,6 +26,7 @@ The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/
 - **Reporting & Analytics**: Comprehensive reports on time by user, job, and application.
 - **Admin Provisioning**: Centralized management for users, jobs, devices, global settings, panel types, and work types.
 - **Jobs & Panel Management**: Creation and tracking of jobs (with Excel import/export), panel registration with dynamic types, estimated/actual hours, and a production approval workflow.
+- **Estimate Import System**: Drag & drop Excel file upload for importing panels from estimate TakeOff sheets. Features include dynamic sheet detection, header row parsing, column mapping, idempotent import using panelSourceId hash, and PENDING status for validation workflow. Imported panels can be validated before use in drafting.
 - **AI Integration**: AI-powered PDF analysis using OpenAI for extracting panel specifications from shop drawings during the production approval process.
 - **Configurable Rates**: Panel types are configurable with rates (supply cost, install cost, sell rate) and expected weight. Job-specific rate overrides are supported.
 - **Production Tracking**: Production reports grouped by date, showing summaries of panels, volume, area, financial metrics (cost, revenue, profit, margin), with edit/delete functionality.

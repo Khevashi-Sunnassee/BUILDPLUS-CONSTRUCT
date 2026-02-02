@@ -96,7 +96,7 @@ const panelSchema = z.object({
   structuralElevation: z.string().optional(),
   reckliDetail: z.string().optional(),
   estimatedHours: z.number().optional(),
-  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING"]),
 });
 
 type PanelFormData = z.infer<typeof panelSchema>;
@@ -608,15 +608,16 @@ export default function AdminPanelsPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: any }> = {
+    const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: any; className?: string }> = {
       NOT_STARTED: { variant: "outline", icon: AlertCircle },
       IN_PROGRESS: { variant: "default", icon: ClockIcon },
       COMPLETED: { variant: "secondary", icon: CheckCircle },
       ON_HOLD: { variant: "destructive", icon: Pause },
+      PENDING: { variant: "outline", icon: AlertCircle, className: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700" },
     };
-    const { variant, icon: Icon } = config[status] || config.NOT_STARTED;
+    const { variant, icon: Icon, className } = config[status] || config.NOT_STARTED;
     return (
-      <Badge variant={variant} className="gap-1">
+      <Badge variant={variant} className={`gap-1 ${className || ""}`}>
         <Icon className="h-3 w-3" />
         {status.replace("_", " ")}
       </Badge>
@@ -635,6 +636,7 @@ export default function AdminPanelsPage() {
     inProgress: filteredPanels?.filter(p => p.status === "IN_PROGRESS").length || 0,
     completed: filteredPanels?.filter(p => p.status === "COMPLETED").length || 0,
     onHold: filteredPanels?.filter(p => p.status === "ON_HOLD").length || 0,
+    pending: filteredPanels?.filter(p => p.status === "PENDING").length || 0,
   };
 
   if (panelsLoading) {
@@ -796,6 +798,7 @@ export default function AdminPanelsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="PENDING">Pending Validation</SelectItem>
                     <SelectItem value="NOT_STARTED">Not Started</SelectItem>
                     <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                     <SelectItem value="COMPLETED">Completed</SelectItem>
@@ -813,6 +816,7 @@ export default function AdminPanelsPage() {
                 {!filterJobId && !groupByJob && <TableHead>Job</TableHead>}
                 <TableHead>Panel Mark</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead className="text-center">Qty</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead>Drawing / Sheet</TableHead>
                 <TableHead>Source</TableHead>
@@ -834,7 +838,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={7}>
+                          <TableCell colSpan={10}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -861,6 +865,7 @@ export default function AdminPanelsPage() {
                             <TableCell>
                               <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                             </TableCell>
+                            <TableCell className="text-center">{panel.qty || 1}</TableCell>
                             <TableCell>{panel.description || "-"}</TableCell>
                             <TableCell>
                               <div className="text-sm">
@@ -959,6 +964,7 @@ export default function AdminPanelsPage() {
                       <TableCell>
                         <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
                       </TableCell>
+                      <TableCell className="text-center">{panel.qty || 1}</TableCell>
                       <TableCell>{panel.description || "-"}</TableCell>
                       <TableCell>
                         <div className="text-sm">
@@ -1102,6 +1108,7 @@ export default function AdminPanelsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <SelectItem value="PENDING">Pending Validation</SelectItem>
                           <SelectItem value="NOT_STARTED">Not Started</SelectItem>
                           <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
                           <SelectItem value="COMPLETED">Completed</SelectItem>
