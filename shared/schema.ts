@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW",
 export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IFC", "APPROVED"]);
 export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHEDULED", "PENDING_UPDATE", "BOOKED", "COMPLETED"]);
+export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -21,6 +22,8 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"),
   role: roleEnum("role").default("USER").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  poApprover: boolean("po_approver").default(false),
+  poApprovalLimit: decimal("po_approval_limit", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -46,6 +49,7 @@ export const FUNCTION_KEYS = [
   "kpi_dashboard",
   "jobs",
   "panel_register",
+  "purchase_orders",
   "admin_users",
   "admin_devices",
   "admin_jobs",
@@ -55,6 +59,8 @@ export const FUNCTION_KEYS = [
   "admin_trailer_types",
   "admin_user_permissions",
   "admin_zones",
+  "admin_suppliers",
+  "admin_item_catalog",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -825,3 +831,137 @@ export const insertProductionSlotAdjustmentSchema = createInsertSchema(productio
 });
 export type InsertProductionSlotAdjustment = z.infer<typeof insertProductionSlotAdjustmentSchema>;
 export type ProductionSlotAdjustment = typeof productionSlotAdjustments.$inferSelect;
+
+// ============== Purchase Order Tables ==============
+
+export const suppliers = pgTable("suppliers", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  keyContact: text("key_contact"),
+  email: text("email"),
+  phone: text("phone"),
+  abn: text("abn"),
+  acn: text("acn"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postcode: text("postcode"),
+  country: text("country").default("Australia"),
+  paymentTerms: text("payment_terms"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  nameIdx: index("suppliers_name_idx").on(table.name),
+  abnIdx: index("suppliers_abn_idx").on(table.abn),
+}));
+
+export const itemCategories = pgTable("item_categories", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  nameIdx: uniqueIndex("item_categories_name_idx").on(table.name),
+}));
+
+export const items = pgTable("items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code"),
+  name: text("name").notNull(),
+  description: text("description"),
+  categoryId: varchar("category_id", { length: 36 }).references(() => itemCategories.id),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  unitOfMeasure: text("unit_of_measure").default("EA"),
+  unitPrice: decimal("unit_price", { precision: 12, scale: 2 }),
+  minOrderQty: integer("min_order_qty").default(1),
+  leadTimeDays: integer("lead_time_days"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: index("items_code_idx").on(table.code),
+  nameIdx: index("items_name_idx").on(table.name),
+  categoryIdx: index("items_category_idx").on(table.categoryId),
+  supplierIdx: index("items_supplier_idx").on(table.supplierId),
+}));
+
+export const purchaseOrders = pgTable("purchase_orders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  poNumber: text("po_number").notNull().unique(),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  supplierName: text("supplier_name"),
+  supplierContact: text("supplier_contact"),
+  supplierEmail: text("supplier_email"),
+  supplierPhone: text("supplier_phone"),
+  supplierAddress: text("supplier_address"),
+  requestedById: varchar("requested_by_id", { length: 36 }).notNull().references(() => users.id),
+  status: poStatusEnum("status").default("DRAFT").notNull(),
+  deliveryAddress: text("delivery_address"),
+  requiredByDate: timestamp("required_by_date"),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("10"),
+  taxAmount: decimal("tax_amount", { precision: 12, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 12, scale: 2 }).default("0"),
+  notes: text("notes"),
+  internalNotes: text("internal_notes"),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectedById: varchar("rejected_by_id", { length: 36 }).references(() => users.id),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  poNumberIdx: uniqueIndex("purchase_orders_po_number_idx").on(table.poNumber),
+  statusIdx: index("purchase_orders_status_idx").on(table.status),
+  requestedByIdx: index("purchase_orders_requested_by_idx").on(table.requestedById),
+  supplierIdx: index("purchase_orders_supplier_idx").on(table.supplierId),
+}));
+
+export const purchaseOrderItems = pgTable("purchase_order_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id", { length: 36 }).notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
+  itemId: varchar("item_id", { length: 36 }).references(() => items.id),
+  itemCode: text("item_code"),
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 12, scale: 2 }).notNull(),
+  unitOfMeasure: text("unit_of_measure").default("EA"),
+  unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 12, scale: 2 }).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  poIdx: index("purchase_order_items_po_idx").on(table.purchaseOrderId),
+  itemIdx: index("purchase_order_items_item_idx").on(table.itemId),
+  sortOrderIdx: index("purchase_order_items_sort_order_idx").on(table.sortOrder),
+}));
+
+// Insert schemas and types for PO tables
+export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
+export type Supplier = typeof suppliers.$inferSelect;
+
+export const insertItemCategorySchema = createInsertSchema(itemCategories).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertItemCategory = z.infer<typeof insertItemCategorySchema>;
+export type ItemCategory = typeof itemCategories.$inferSelect;
+
+export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertItem = z.infer<typeof insertItemSchema>;
+export type Item = typeof items.$inferSelect;
+
+export const insertPurchaseOrderSchema = createInsertSchema(purchaseOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPurchaseOrder = z.infer<typeof insertPurchaseOrderSchema>;
+export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
+
+export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
+export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+
+export type POStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";

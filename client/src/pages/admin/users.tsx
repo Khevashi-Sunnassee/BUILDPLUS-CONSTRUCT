@@ -68,6 +68,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Switch } from "@/components/ui/switch";
 import type { User as UserType, Role } from "@shared/schema";
 
 const userSchema = z.object({
@@ -75,6 +76,8 @@ const userSchema = z.object({
   name: z.string().optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
+  poApprover: z.boolean().optional(),
+  poApprovalLimit: z.string().optional(),
 });
 
 type UserFormData = z.infer<typeof userSchema>;
@@ -97,6 +100,8 @@ export default function AdminUsersPage() {
       name: "",
       password: "",
       role: "USER",
+      poApprover: false,
+      poApprovalLimit: "",
     },
   });
 
@@ -166,13 +171,15 @@ export default function AdminUsersPage() {
       name: user.name || "",
       password: "",
       role: user.role as "USER" | "MANAGER" | "ADMIN",
+      poApprover: user.poApprover || false,
+      poApprovalLimit: user.poApprovalLimit || "",
     });
     setDialogOpen(true);
   };
 
   const openNewUser = () => {
     setEditingUser(null);
-    form.reset({ email: "", name: "", password: "", role: "USER" });
+    form.reset({ email: "", name: "", password: "", role: "USER", poApprover: false, poApprovalLimit: "" });
     setDialogOpen(true);
   };
 
@@ -182,6 +189,8 @@ export default function AdminUsersPage() {
         email: data.email,
         name: data.name,
         role: data.role,
+        poApprover: data.poApprover,
+        poApprovalLimit: data.poApprovalLimit,
       };
       if (data.password) {
         updateData.password = data.password;
@@ -424,6 +433,57 @@ export default function AdminUsersPage() {
                   </FormItem>
                 )}
               />
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium mb-3">Purchase Order Approval</h4>
+                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="poApprover"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>PO Approver</FormLabel>
+                          <FormDescription>
+                            Allow this user to approve purchase orders
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-po-approver"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  {form.watch("poApprover") && (
+                    <FormField
+                      control={form.control}
+                      name="poApprovalLimit"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Approval Limit ($)</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="e.g. 5000.00"
+                              data-testid="input-po-approval-limit"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Maximum PO value this user can approve. Leave blank for unlimited.
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </div>
+              </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                   Cancel

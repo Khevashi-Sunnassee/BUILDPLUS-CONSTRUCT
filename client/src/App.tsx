@@ -24,6 +24,9 @@ import AdminPanelsPage from "@/pages/admin/panels";
 import AdminPanelTypesPage from "@/pages/admin/panel-types";
 import AdminUserPermissionsPage from "@/pages/admin/user-permissions";
 import AdminZonesPage from "@/pages/admin/zones";
+import AdminSuppliersPage from "@/pages/admin/suppliers";
+import AdminItemCategoriesPage from "@/pages/admin/item-categories";
+import AdminItemsPage from "@/pages/admin/items";
 import DownloadsPage from "@/pages/downloads";
 import ManualEntryPage from "@/pages/manual-entry";
 import ProductionReportPage from "@/pages/production-report";
@@ -33,6 +36,8 @@ import LogisticsPage from "@/pages/logistics";
 import WeeklyWageReportsPage from "@/pages/weekly-wage-reports";
 import WeeklyJobLogsPage from "@/pages/weekly-job-logs";
 import ProductionSlotsPage from "@/pages/production-slots";
+import PurchaseOrdersPage from "@/pages/purchase-orders";
+import PurchaseOrderFormPage from "@/pages/purchase-order-form";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -209,6 +214,22 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/purchase-orders">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PurchaseOrdersPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/purchase-orders/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PurchaseOrderFormPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/manager/review">
         <ProtectedRoute requiredRole={["MANAGER", "ADMIN"]}>
           <AuthenticatedLayout>
@@ -277,6 +298,30 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminZonesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/suppliers">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminSuppliersPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/item-categories">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminItemCategoriesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/items">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminItemsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

@@ -3899,5 +3899,393 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  // ============== Suppliers ==============
+  app.get("/api/suppliers", requireAuth, async (req, res) => {
+    try {
+      const suppliersData = await storage.getAllSuppliers();
+      res.json(suppliersData);
+    } catch (error: any) {
+      console.error("Error fetching suppliers:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch suppliers" });
+    }
+  });
+
+  app.get("/api/suppliers/active", requireAuth, async (req, res) => {
+    try {
+      const suppliersData = await storage.getActiveSuppliers();
+      res.json(suppliersData);
+    } catch (error: any) {
+      console.error("Error fetching active suppliers:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch suppliers" });
+    }
+  });
+
+  app.get("/api/suppliers/:id", requireAuth, async (req, res) => {
+    try {
+      const supplier = await storage.getSupplier(req.params.id);
+      if (!supplier) return res.status(404).json({ error: "Supplier not found" });
+      res.json(supplier);
+    } catch (error: any) {
+      console.error("Error fetching supplier:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch supplier" });
+    }
+  });
+
+  app.post("/api/suppliers", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const supplier = await storage.createSupplier(req.body);
+      res.json(supplier);
+    } catch (error: any) {
+      console.error("Error creating supplier:", error);
+      res.status(500).json({ error: error.message || "Failed to create supplier" });
+    }
+  });
+
+  app.patch("/api/suppliers/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const supplier = await storage.updateSupplier(req.params.id, req.body);
+      if (!supplier) return res.status(404).json({ error: "Supplier not found" });
+      res.json(supplier);
+    } catch (error: any) {
+      console.error("Error updating supplier:", error);
+      res.status(500).json({ error: error.message || "Failed to update supplier" });
+    }
+  });
+
+  app.delete("/api/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      await storage.deleteSupplier(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting supplier:", error);
+      res.status(500).json({ error: error.message || "Failed to delete supplier" });
+    }
+  });
+
+  // ============== Item Categories ==============
+  app.get("/api/item-categories", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getAllItemCategories();
+      res.json(categories);
+    } catch (error: any) {
+      console.error("Error fetching item categories:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/item-categories/active", requireAuth, async (req, res) => {
+    try {
+      const categories = await storage.getActiveItemCategories();
+      res.json(categories);
+    } catch (error: any) {
+      console.error("Error fetching active item categories:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch categories" });
+    }
+  });
+
+  app.get("/api/item-categories/:id", requireAuth, async (req, res) => {
+    try {
+      const category = await storage.getItemCategory(req.params.id);
+      if (!category) return res.status(404).json({ error: "Category not found" });
+      res.json(category);
+    } catch (error: any) {
+      console.error("Error fetching category:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch category" });
+    }
+  });
+
+  app.post("/api/item-categories", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const category = await storage.createItemCategory(req.body);
+      res.json(category);
+    } catch (error: any) {
+      console.error("Error creating category:", error);
+      res.status(500).json({ error: error.message || "Failed to create category" });
+    }
+  });
+
+  app.patch("/api/item-categories/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const category = await storage.updateItemCategory(req.params.id, req.body);
+      if (!category) return res.status(404).json({ error: "Category not found" });
+      res.json(category);
+    } catch (error: any) {
+      console.error("Error updating category:", error);
+      res.status(500).json({ error: error.message || "Failed to update category" });
+    }
+  });
+
+  app.delete("/api/item-categories/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      await storage.deleteItemCategory(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting category:", error);
+      res.status(500).json({ error: error.message || "Failed to delete category" });
+    }
+  });
+
+  // ============== Items ==============
+  app.get("/api/items", requireAuth, async (req, res) => {
+    try {
+      const itemsData = await storage.getAllItems();
+      res.json(itemsData);
+    } catch (error: any) {
+      console.error("Error fetching items:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch items" });
+    }
+  });
+
+  app.get("/api/items/active", requireAuth, async (req, res) => {
+    try {
+      const itemsData = await storage.getActiveItems();
+      res.json(itemsData);
+    } catch (error: any) {
+      console.error("Error fetching active items:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch items" });
+    }
+  });
+
+  app.get("/api/items/:id", requireAuth, async (req, res) => {
+    try {
+      const item = await storage.getItem(req.params.id);
+      if (!item) return res.status(404).json({ error: "Item not found" });
+      res.json(item);
+    } catch (error: any) {
+      console.error("Error fetching item:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch item" });
+    }
+  });
+
+  app.post("/api/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const item = await storage.createItem(req.body);
+      res.json(item);
+    } catch (error: any) {
+      console.error("Error creating item:", error);
+      res.status(500).json({ error: error.message || "Failed to create item" });
+    }
+  });
+
+  app.patch("/api/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const item = await storage.updateItem(req.params.id, req.body);
+      if (!item) return res.status(404).json({ error: "Item not found" });
+      res.json(item);
+    } catch (error: any) {
+      console.error("Error updating item:", error);
+      res.status(500).json({ error: error.message || "Failed to update item" });
+    }
+  });
+
+  app.delete("/api/items/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      await storage.deleteItem(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting item:", error);
+      res.status(500).json({ error: error.message || "Failed to delete item" });
+    }
+  });
+
+  // ============== Purchase Orders ==============
+  app.get("/api/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      let orders;
+      if (status) {
+        orders = await storage.getPurchaseOrdersByStatus(status);
+      } else {
+        orders = await storage.getAllPurchaseOrders();
+      }
+      res.json(orders);
+    } catch (error: any) {
+      console.error("Error fetching purchase orders:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch purchase orders" });
+    }
+  });
+
+  app.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const orders = await storage.getPurchaseOrdersByUser(userId);
+      res.json(orders);
+    } catch (error: any) {
+      console.error("Error fetching my purchase orders:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch purchase orders" });
+    }
+  });
+
+  app.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
+    try {
+      const poNumber = await storage.getNextPONumber();
+      res.json({ poNumber });
+    } catch (error: any) {
+      console.error("Error getting next PO number:", error);
+      res.status(500).json({ error: error.message || "Failed to get next PO number" });
+    }
+  });
+
+  app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+      res.json(order);
+    } catch (error: any) {
+      console.error("Error fetching purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const { items: lineItems, ...poData } = req.body;
+      const poNumber = await storage.getNextPONumber();
+      const order = await storage.createPurchaseOrder(
+        { ...poData, poNumber, requestedById: userId },
+        lineItems || []
+      );
+      res.json(order);
+    } catch (error: any) {
+      console.error("Error creating purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to create purchase order" });
+    }
+  });
+
+  app.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+      
+      const userId = (req.session as any).userId;
+      if (order.requestedById !== userId && order.status !== "DRAFT") {
+        return res.status(403).json({ error: "Cannot edit this purchase order" });
+      }
+      
+      const { items: lineItems, ...poData } = req.body;
+      const updated = await storage.updatePurchaseOrder(req.params.id, poData, lineItems);
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to update purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+      
+      const userId = (req.session as any).userId;
+      if (order.requestedById !== userId) {
+        return res.status(403).json({ error: "Only the requester can submit this PO" });
+      }
+      
+      if (order.status !== "DRAFT") {
+        return res.status(400).json({ error: "Only draft POs can be submitted" });
+      }
+
+      const submitted = await storage.submitPurchaseOrder(req.params.id);
+      res.json(submitted);
+    } catch (error: any) {
+      console.error("Error submitting purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to submit purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+      
+      if (order.status !== "SUBMITTED") {
+        return res.status(400).json({ error: "Only submitted POs can be approved" });
+      }
+
+      const userId = (req.session as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Check if user can approve POs
+      if (!user.poApprover && user.role !== "ADMIN") {
+        return res.status(403).json({ error: "You are not authorized to approve purchase orders" });
+      }
+
+      // Check approval limit (if not admin)
+      if (user.role !== "ADMIN" && user.poApprovalLimit) {
+        const orderTotal = parseFloat(order.total || "0");
+        const limit = parseFloat(user.poApprovalLimit);
+        if (orderTotal > limit) {
+          return res.status(403).json({ 
+            error: `PO total ($${orderTotal.toFixed(2)}) exceeds your approval limit ($${limit.toFixed(2)})` 
+          });
+        }
+      }
+
+      const approved = await storage.approvePurchaseOrder(req.params.id, userId);
+      res.json(approved);
+    } catch (error: any) {
+      console.error("Error approving purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to approve purchase order" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+      
+      if (order.status !== "SUBMITTED") {
+        return res.status(400).json({ error: "Only submitted POs can be rejected" });
+      }
+
+      const userId = (req.session as any).userId;
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      // Check if user can approve/reject POs
+      if (!user.poApprover && user.role !== "ADMIN") {
+        return res.status(403).json({ error: "You are not authorized to reject purchase orders" });
+      }
+
+      const { reason } = req.body;
+      if (!reason) {
+        return res.status(400).json({ error: "Rejection reason is required" });
+      }
+
+      const rejected = await storage.rejectPurchaseOrder(req.params.id, userId, reason);
+      res.json(rejected);
+    } catch (error: any) {
+      console.error("Error rejecting purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to reject purchase order" });
+    }
+  });
+
+  app.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+    try {
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+      
+      const userId = (req.session as any).userId;
+      const user = await storage.getUser(userId);
+      
+      // Only owner can delete DRAFT, only ADMIN can delete any
+      if (order.requestedById !== userId && user?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Cannot delete this purchase order" });
+      }
+      
+      if (order.status !== "DRAFT" && user?.role !== "ADMIN") {
+        return res.status(400).json({ error: "Only draft POs can be deleted" });
+      }
+
+      await storage.deletePurchaseOrder(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting purchase order:", error);
+      res.status(500).json({ error: error.message || "Failed to delete purchase order" });
+    }
+  });
+
   return httpServer;
 }

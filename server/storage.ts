@@ -7,6 +7,7 @@ import {
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
   productionSlots, productionSlotAdjustments,
+  suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -28,6 +29,11 @@ import {
   type InsertZone, type Zone,
   type InsertProductionSlot, type ProductionSlot,
   type InsertProductionSlotAdjustment, type ProductionSlotAdjustment,
+  type InsertSupplier, type Supplier,
+  type InsertItemCategory, type ItemCategory,
+  type InsertItem, type Item,
+  type InsertPurchaseOrder, type PurchaseOrder,
+  type InsertPurchaseOrderItem, type PurchaseOrderItem,
 } from "@shared/schema";
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -50,6 +56,19 @@ export interface ProductionSlotWithDetails extends ProductionSlot {
 
 export interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
   changedBy: User;
+}
+
+export interface PurchaseOrderWithDetails extends PurchaseOrder {
+  requestedBy: User;
+  approvedBy?: User | null;
+  rejectedBy?: User | null;
+  supplier?: Supplier | null;
+  items: PurchaseOrderItem[];
+}
+
+export interface ItemWithDetails extends Item {
+  category?: ItemCategory | null;
+  supplier?: Supplier | null;
 }
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -275,6 +294,45 @@ export interface IStorage {
   getJobsWithoutProductionSlots(): Promise<Job[]>;
   deleteProductionSlot(id: string): Promise<void>;
   checkAndCompleteSlotByPanelCompletion(jobId: string, level: string, buildingNumber: number): Promise<void>;
+
+  // Suppliers
+  getAllSuppliers(): Promise<Supplier[]>;
+  getActiveSuppliers(): Promise<Supplier[]>;
+  getSupplier(id: string): Promise<Supplier | undefined>;
+  createSupplier(data: InsertSupplier): Promise<Supplier>;
+  updateSupplier(id: string, data: Partial<InsertSupplier>): Promise<Supplier | undefined>;
+  deleteSupplier(id: string): Promise<void>;
+
+  // Item Categories
+  getAllItemCategories(): Promise<ItemCategory[]>;
+  getActiveItemCategories(): Promise<ItemCategory[]>;
+  getItemCategory(id: string): Promise<ItemCategory | undefined>;
+  createItemCategory(data: InsertItemCategory): Promise<ItemCategory>;
+  updateItemCategory(id: string, data: Partial<InsertItemCategory>): Promise<ItemCategory | undefined>;
+  deleteItemCategory(id: string): Promise<void>;
+
+  // Items
+  getAllItems(): Promise<ItemWithDetails[]>;
+  getActiveItems(): Promise<ItemWithDetails[]>;
+  getItem(id: string): Promise<ItemWithDetails | undefined>;
+  getItemsByCategory(categoryId: string): Promise<ItemWithDetails[]>;
+  getItemsBySupplier(supplierId: string): Promise<ItemWithDetails[]>;
+  createItem(data: InsertItem): Promise<Item>;
+  updateItem(id: string, data: Partial<InsertItem>): Promise<Item | undefined>;
+  deleteItem(id: string): Promise<void>;
+
+  // Purchase Orders
+  getAllPurchaseOrders(): Promise<PurchaseOrderWithDetails[]>;
+  getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrderWithDetails[]>;
+  getPurchaseOrdersByUser(userId: string): Promise<PurchaseOrderWithDetails[]>;
+  getPurchaseOrder(id: string): Promise<PurchaseOrderWithDetails | undefined>;
+  createPurchaseOrder(data: InsertPurchaseOrder, lineItems: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails>;
+  updatePurchaseOrder(id: string, data: Partial<InsertPurchaseOrder>, lineItems?: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails | undefined>;
+  submitPurchaseOrder(id: string): Promise<PurchaseOrder | undefined>;
+  approvePurchaseOrder(id: string, approvedById: string): Promise<PurchaseOrder | undefined>;
+  rejectPurchaseOrder(id: string, rejectedById: string, reason: string): Promise<PurchaseOrder | undefined>;
+  deletePurchaseOrder(id: string): Promise<void>;
+  getNextPONumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2216,6 +2274,270 @@ export class DatabaseStorage implements IStorage {
         }).where(eq(productionSlots.id, slot.id));
       }
     }
+  }
+
+  // ============== Suppliers ==============
+  async getAllSuppliers(): Promise<Supplier[]> {
+    return db.select().from(suppliers).orderBy(asc(suppliers.name));
+  }
+
+  async getActiveSuppliers(): Promise<Supplier[]> {
+    return db.select().from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.name));
+  }
+
+  async getSupplier(id: string): Promise<Supplier | undefined> {
+    const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
+    return supplier;
+  }
+
+  async createSupplier(data: InsertSupplier): Promise<Supplier> {
+    const [supplier] = await db.insert(suppliers).values(data).returning();
+    return supplier;
+  }
+
+  async updateSupplier(id: string, data: Partial<InsertSupplier>): Promise<Supplier | undefined> {
+    const [supplier] = await db.update(suppliers).set({ ...data, updatedAt: new Date() }).where(eq(suppliers.id, id)).returning();
+    return supplier;
+  }
+
+  async deleteSupplier(id: string): Promise<void> {
+    await db.delete(suppliers).where(eq(suppliers.id, id));
+  }
+
+  // ============== Item Categories ==============
+  async getAllItemCategories(): Promise<ItemCategory[]> {
+    return db.select().from(itemCategories).orderBy(asc(itemCategories.name));
+  }
+
+  async getActiveItemCategories(): Promise<ItemCategory[]> {
+    return db.select().from(itemCategories).where(eq(itemCategories.isActive, true)).orderBy(asc(itemCategories.name));
+  }
+
+  async getItemCategory(id: string): Promise<ItemCategory | undefined> {
+    const [category] = await db.select().from(itemCategories).where(eq(itemCategories.id, id));
+    return category;
+  }
+
+  async createItemCategory(data: InsertItemCategory): Promise<ItemCategory> {
+    const [category] = await db.insert(itemCategories).values(data).returning();
+    return category;
+  }
+
+  async updateItemCategory(id: string, data: Partial<InsertItemCategory>): Promise<ItemCategory | undefined> {
+    const [category] = await db.update(itemCategories).set({ ...data, updatedAt: new Date() }).where(eq(itemCategories.id, id)).returning();
+    return category;
+  }
+
+  async deleteItemCategory(id: string): Promise<void> {
+    await db.delete(itemCategories).where(eq(itemCategories.id, id));
+  }
+
+  // ============== Items ==============
+  async getAllItems(): Promise<ItemWithDetails[]> {
+    const rows = await db.select().from(items)
+      .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
+      .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .orderBy(asc(items.name));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+  }
+
+  async getActiveItems(): Promise<ItemWithDetails[]> {
+    const rows = await db.select().from(items)
+      .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
+      .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .where(eq(items.isActive, true))
+      .orderBy(asc(items.name));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+  }
+
+  async getItem(id: string): Promise<ItemWithDetails | undefined> {
+    const [row] = await db.select().from(items)
+      .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
+      .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .where(eq(items.id, id));
+    if (!row) return undefined;
+    return { ...row.items, category: row.item_categories, supplier: row.suppliers };
+  }
+
+  async getItemsByCategory(categoryId: string): Promise<ItemWithDetails[]> {
+    const rows = await db.select().from(items)
+      .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
+      .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .where(eq(items.categoryId, categoryId))
+      .orderBy(asc(items.name));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+  }
+
+  async getItemsBySupplier(supplierId: string): Promise<ItemWithDetails[]> {
+    const rows = await db.select().from(items)
+      .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
+      .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .where(eq(items.supplierId, supplierId))
+      .orderBy(asc(items.name));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+  }
+
+  async createItem(data: InsertItem): Promise<Item> {
+    const [item] = await db.insert(items).values(data).returning();
+    return item;
+  }
+
+  async updateItem(id: string, data: Partial<InsertItem>): Promise<Item | undefined> {
+    const [item] = await db.update(items).set({ ...data, updatedAt: new Date() }).where(eq(items.id, id)).returning();
+    return item;
+  }
+
+  async deleteItem(id: string): Promise<void> {
+    await db.delete(items).where(eq(items.id, id));
+  }
+
+  // ============== Purchase Orders ==============
+  private async getPurchaseOrderWithDetails(poId: string): Promise<PurchaseOrderWithDetails | undefined> {
+    const [poRow] = await db.select().from(purchaseOrders)
+      .leftJoin(users, eq(purchaseOrders.requestedById, users.id))
+      .leftJoin(suppliers, eq(purchaseOrders.supplierId, suppliers.id))
+      .where(eq(purchaseOrders.id, poId));
+    if (!poRow) return undefined;
+
+    const lineItems = await db.select().from(purchaseOrderItems)
+      .where(eq(purchaseOrderItems.purchaseOrderId, poId))
+      .orderBy(asc(purchaseOrderItems.sortOrder));
+
+    let approvedBy: User | null = null;
+    let rejectedBy: User | null = null;
+    if (poRow.purchase_orders.approvedById) {
+      const [u] = await db.select().from(users).where(eq(users.id, poRow.purchase_orders.approvedById));
+      approvedBy = u || null;
+    }
+    if (poRow.purchase_orders.rejectedById) {
+      const [u] = await db.select().from(users).where(eq(users.id, poRow.purchase_orders.rejectedById));
+      rejectedBy = u || null;
+    }
+
+    return {
+      ...poRow.purchase_orders,
+      requestedBy: poRow.users!,
+      approvedBy,
+      rejectedBy,
+      supplier: poRow.suppliers,
+      items: lineItems,
+    };
+  }
+
+  async getAllPurchaseOrders(): Promise<PurchaseOrderWithDetails[]> {
+    const poRows = await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+    const results: PurchaseOrderWithDetails[] = [];
+    for (const po of poRows) {
+      const details = await this.getPurchaseOrderWithDetails(po.id);
+      if (details) results.push(details);
+    }
+    return results;
+  }
+
+  async getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrderWithDetails[]> {
+    const poRows = await db.select().from(purchaseOrders)
+      .where(eq(purchaseOrders.status, status as any))
+      .orderBy(desc(purchaseOrders.createdAt));
+    const results: PurchaseOrderWithDetails[] = [];
+    for (const po of poRows) {
+      const details = await this.getPurchaseOrderWithDetails(po.id);
+      if (details) results.push(details);
+    }
+    return results;
+  }
+
+  async getPurchaseOrdersByUser(userId: string): Promise<PurchaseOrderWithDetails[]> {
+    const poRows = await db.select().from(purchaseOrders)
+      .where(eq(purchaseOrders.requestedById, userId))
+      .orderBy(desc(purchaseOrders.createdAt));
+    const results: PurchaseOrderWithDetails[] = [];
+    for (const po of poRows) {
+      const details = await this.getPurchaseOrderWithDetails(po.id);
+      if (details) results.push(details);
+    }
+    return results;
+  }
+
+  async getPurchaseOrder(id: string): Promise<PurchaseOrderWithDetails | undefined> {
+    return this.getPurchaseOrderWithDetails(id);
+  }
+
+  async createPurchaseOrder(data: InsertPurchaseOrder, lineItems: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails> {
+    const [po] = await db.insert(purchaseOrders).values(data).returning();
+    
+    if (lineItems.length > 0) {
+      await db.insert(purchaseOrderItems).values(
+        lineItems.map((item, idx) => ({
+          ...item,
+          purchaseOrderId: po.id,
+          sortOrder: item.sortOrder ?? idx,
+        }))
+      );
+    }
+    
+    return (await this.getPurchaseOrderWithDetails(po.id))!;
+  }
+
+  async updatePurchaseOrder(id: string, data: Partial<InsertPurchaseOrder>, lineItems?: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails | undefined> {
+    const [po] = await db.update(purchaseOrders).set({ ...data, updatedAt: new Date() }).where(eq(purchaseOrders.id, id)).returning();
+    if (!po) return undefined;
+    
+    if (lineItems !== undefined) {
+      await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
+      if (lineItems.length > 0) {
+        await db.insert(purchaseOrderItems).values(
+          lineItems.map((item, idx) => ({
+            ...item,
+            purchaseOrderId: id,
+            sortOrder: item.sortOrder ?? idx,
+          }))
+        );
+      }
+    }
+    
+    return this.getPurchaseOrderWithDetails(id);
+  }
+
+  async submitPurchaseOrder(id: string): Promise<PurchaseOrder | undefined> {
+    const [po] = await db.update(purchaseOrders).set({
+      status: "SUBMITTED",
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(purchaseOrders.id, id)).returning();
+    return po;
+  }
+
+  async approvePurchaseOrder(id: string, approvedById: string): Promise<PurchaseOrder | undefined> {
+    const [po] = await db.update(purchaseOrders).set({
+      status: "APPROVED",
+      approvedById,
+      approvedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(purchaseOrders.id, id)).returning();
+    return po;
+  }
+
+  async rejectPurchaseOrder(id: string, rejectedById: string, reason: string): Promise<PurchaseOrder | undefined> {
+    const [po] = await db.update(purchaseOrders).set({
+      status: "REJECTED",
+      rejectedById,
+      rejectedAt: new Date(),
+      rejectionReason: reason,
+      updatedAt: new Date(),
+    }).where(eq(purchaseOrders.id, id)).returning();
+    return po;
+  }
+
+  async deletePurchaseOrder(id: string): Promise<void> {
+    await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
+    await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
+  }
+
+  async getNextPONumber(): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders);
+    const count = Number(result?.count || 0) + 1;
+    const year = new Date().getFullYear();
+    return `PO-${year}-${String(count).padStart(4, "0")}`;
   }
 }
 
