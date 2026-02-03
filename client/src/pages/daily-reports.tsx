@@ -21,6 +21,7 @@ import {
   Trash2,
   Factory,
   User,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -603,10 +604,12 @@ export default function DailyReportsPage() {
                                     </TableCell>
                                   )}
                                   <TableCell>
-                                    <Badge variant="outline" className="font-medium">
-                                      <Factory className="h-3 w-3 mr-1" />
-                                      {log.factory}
-                                    </Badge>
+                                    <div className="flex items-center gap-1.5">
+                                      <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                      <Badge variant={log.factory === "QLD" ? "default" : "secondary"}>
+                                        {log.factory}
+                                      </Badge>
+                                    </div>
                                   </TableCell>
                                   {groupBy !== "user" && (user?.role === "MANAGER" || user?.role === "ADMIN") && (
                                     <TableCell className="text-muted-foreground">
@@ -712,10 +715,12 @@ export default function DailyReportsPage() {
                           </Link>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="font-medium">
-                            <Factory className="h-3 w-3 mr-1" />
-                            {log.factory}
-                          </Badge>
+                          <div className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                            <Badge variant={log.factory === "QLD" ? "default" : "secondary"}>
+                              {log.factory}
+                            </Badge>
+                          </div>
                         </TableCell>
                         {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
                           <TableCell className="text-muted-foreground">
