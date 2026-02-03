@@ -524,6 +524,13 @@ export async function registerRoutes(
   });
 
   app.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
+    if (req.body.weekStartDay !== undefined) {
+      const weekStartDay = parseInt(req.body.weekStartDay, 10);
+      if (isNaN(weekStartDay) || weekStartDay < 0 || weekStartDay > 6) {
+        return res.status(400).json({ error: "weekStartDay must be a number between 0 (Sunday) and 6 (Saturday)" });
+      }
+      req.body.weekStartDay = weekStartDay;
+    }
     const settings = await storage.updateGlobalSettings(req.body);
     res.json(settings);
   });

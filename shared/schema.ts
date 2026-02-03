@@ -87,6 +87,7 @@ export const globalSettings = pgTable("global_settings", {
   requireAddins: boolean("require_addins").default(true).notNull(),
   logoBase64: text("logo_base64"),
   companyName: text("company_name").default("LTE Precast Concrete Structures"),
+  weekStartDay: integer("week_start_day").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

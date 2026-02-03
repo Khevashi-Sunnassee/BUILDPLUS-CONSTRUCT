@@ -13,9 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Send, Check, X, Trash2, Edit, Eye, ChevronDown, ChevronRight, User as UserIcon } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays, getDay } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule, ProductionSlot } from "@shared/schema";
+import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule, ProductionSlot, GlobalSettings } from "@shared/schema";
 
 interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   projectManager: User;
@@ -67,6 +67,42 @@ export default function WeeklyJobLogsPage() {
     queryKey: ["/api/weekly-job-reports/pending-approval"],
     enabled: isManagerOrAdmin,
   });
+
+  const { data: globalSettings } = useQuery<GlobalSettings>({
+    queryKey: ["/api/admin/settings"],
+  });
+
+  const configuredWeekStartDay = globalSettings?.weekStartDay ?? 1;
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+  const calculateWeekBoundaries = (dateStr: string) => {
+    if (!dateStr) return { weekStart: "", weekEnd: "" };
+    const date = parseISO(dateStr);
+    const currentDay = getDay(date);
+    const daysToSubtract = (currentDay - configuredWeekStartDay + 7) % 7;
+    const weekStart = addDays(date, -daysToSubtract);
+    const weekEnd = addDays(weekStart, 6);
+    return {
+      weekStart: format(weekStart, "yyyy-MM-dd"),
+      weekEnd: format(weekEnd, "yyyy-MM-dd"),
+    };
+  };
+
+  useEffect(() => {
+    if (reportDate && showForm) {
+      const { weekStart, weekEnd } = calculateWeekBoundaries(reportDate);
+      setWeekStartDate(weekStart);
+      setWeekEndDate(weekEnd);
+    }
+  }, [reportDate, showForm, configuredWeekStartDay]);
+
+  const handleWeekStartChange = (dateStr: string) => {
+    if (dateStr) {
+      const { weekStart, weekEnd } = calculateWeekBoundaries(dateStr);
+      setWeekStartDate(weekStart);
+      setWeekEndDate(weekEnd);
+    }
+  };
 
   const toggleUserExpanded = (userId: string) => {
     setExpandedUsers(prev => {
@@ -283,6 +319,20 @@ export default function WeeklyJobLogsPage() {
       toast({ title: "Please specify week start and end dates", variant: "destructive" });
       return;
     }
+    
+    const startDateDay = getDay(parseISO(weekStartDate));
+    if (startDateDay !== configuredWeekStartDay) {
+      const { weekStart, weekEnd } = calculateWeekBoundaries(weekStartDate);
+      setWeekStartDate(weekStart);
+      setWeekEndDate(weekEnd);
+      toast({ 
+        title: "Week dates adjusted", 
+        description: `Week start aligned to ${dayNames[configuredWeekStartDay]}. Please review and save again.`,
+        variant: "default" 
+      });
+      return;
+    }
+    
     const data = {
       reportDate,
       weekStartDate,
@@ -300,8 +350,9 @@ export default function WeeklyJobLogsPage() {
   const handleEdit = (report: WeeklyJobReportWithDetails) => {
     setSelectedReport(report);
     setReportDate(report.reportDate);
-    setWeekStartDate(report.weekStartDate);
-    setWeekEndDate(report.weekEndDate);
+    const { weekStart, weekEnd } = calculateWeekBoundaries(report.weekStartDate);
+    setWeekStartDate(weekStart);
+    setWeekEndDate(weekEnd);
     setGeneralNotes(report.notes || "");
     setSchedules(report.schedules.map(s => ({
       jobId: s.jobId,
@@ -563,11 +614,26 @@ export default function WeeklyJobLogsPage() {
               </div>
               <div>
                 <Label>Week Start</Label>
-                <Input type="date" value={weekStartDate} onChange={(e) => setWeekStartDate(e.target.value)} data-testid="input-week-start" />
+                <Input 
+                  type="date" 
+                  value={weekStartDate} 
+                  onChange={(e) => handleWeekStartChange(e.target.value)} 
+                  data-testid="input-week-start"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Aligned to {dayNames[configuredWeekStartDay]}
+                </p>
               </div>
               <div>
                 <Label>Week End</Label>
-                <Input type="date" value={weekEndDate} onChange={(e) => setWeekEndDate(e.target.value)} data-testid="input-week-end" />
+                <Input 
+                  type="date" 
+                  value={weekEndDate} 
+                  readOnly 
+                  className="bg-muted"
+                  data-testid="input-week-end"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Auto-calculated (7 days)</p>
               </div>
             </div>
             

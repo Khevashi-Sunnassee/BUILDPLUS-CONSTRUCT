@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2 } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -39,17 +40,23 @@ export default function AdminSettingsPage() {
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
+  const [weekStartDay, setWeekStartDay] = useState<number>(1);
+
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   const { data: settings, isLoading } = useQuery<GlobalSettings>({
     queryKey: ["/api/admin/settings"],
   });
 
-  // Sync company name from settings
+  // Sync company name and week start day from settings
   useEffect(() => {
     if (settings?.companyName) {
       setCompanyName(settings.companyName);
     }
-  }, [settings?.companyName]);
+    if (settings?.weekStartDay !== undefined) {
+      setWeekStartDay(settings.weekStartDay);
+    }
+  }, [settings?.companyName, settings?.weekStartDay]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -62,6 +69,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save company name", variant: "destructive" });
+    },
+  });
+
+  const saveWeekStartDayMutation = useMutation({
+    mutationFn: async (day: number) => {
+      return apiRequest("PUT", "/api/admin/settings", { weekStartDay: day });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Week start day saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save week start day", variant: "destructive" });
     },
   });
 
@@ -278,6 +298,59 @@ export default function AdminSettingsPage() {
                 </p>
               </div>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Week Configuration Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Week Configuration
+          </CardTitle>
+          <CardDescription>
+            Configure the first day of the week for reports and scheduling
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="weekStartDay">Week Start Day</Label>
+            <div className="flex items-center gap-4">
+              <Select
+                value={weekStartDay.toString()}
+                onValueChange={(value) => setWeekStartDay(parseInt(value))}
+              >
+                <SelectTrigger className="w-48" data-testid="select-week-start-day">
+                  <SelectValue placeholder="Select day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {dayNames.map((day, index) => (
+                    <SelectItem key={index} value={index.toString()}>
+                      {day}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveWeekStartDayMutation.mutate(weekStartDay)}
+                disabled={saveWeekStartDayMutation.isPending || weekStartDay === settings?.weekStartDay}
+                data-testid="button-save-week-start-day"
+              >
+                {saveWeekStartDayMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Weekly Job Reports will be aligned to this day. Users can only select dates that fall on this day.
+            </p>
           </div>
         </CardContent>
       </Card>
