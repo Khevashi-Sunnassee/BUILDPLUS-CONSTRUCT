@@ -151,12 +151,9 @@ export default function ChatPage() {
   useEffect(() => {
     setTimeout(() => {
       if (scrollAreaRef.current) {
-        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-        if (viewport) {
-          viewport.scrollTop = viewport.scrollHeight;
-        }
+        scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
       }
-    }, 50);
+    }, 100);
   }, [messages, selectedConversationId]);
 
   const createConversationMutation = useMutation({
@@ -657,7 +654,7 @@ export default function ChatPage() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
+            <div className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
               {messagesLoading ? (
                 <div className="text-center text-muted-foreground">Loading messages...</div>
               ) : messages.length === 0 ? (
@@ -753,7 +750,7 @@ export default function ChatPage() {
                   <div ref={messagesEndRef} />
                 </div>
               )}
-            </ScrollArea>
+            </div>
 
             <div className="p-4 border-t">
               {pendingFiles.length > 0 && (
