@@ -2463,14 +2463,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPurchaseOrder(data: InsertPurchaseOrder, lineItems: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails> {
-    const [po] = await db.insert(purchaseOrders).values(data).returning();
+    // Calculate totals from line items
+    let subtotal = 0;
+    const processedItems = lineItems.map((item, idx) => {
+      const qty = parseFloat(String(item.quantity || 0));
+      const price = parseFloat(String(item.unitPrice || 0));
+      const lineTotal = qty * price;
+      subtotal += lineTotal;
+      return {
+        ...item,
+        sortOrder: item.sortOrder ?? idx,
+        lineTotal: lineTotal.toFixed(2),
+      };
+    });
     
-    if (lineItems.length > 0) {
+    const taxRate = parseFloat(String(data.taxRate || 10));
+    const taxAmount = subtotal * (taxRate / 100);
+    const total = subtotal + taxAmount;
+    
+    const [po] = await db.insert(purchaseOrders).values({
+      ...data,
+      subtotal: subtotal.toFixed(2),
+      taxRate: taxRate.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      total: total.toFixed(2),
+    }).returning();
+    
+    if (processedItems.length > 0) {
       await db.insert(purchaseOrderItems).values(
-        lineItems.map((item, idx) => ({
+        processedItems.map(item => ({
           ...item,
           purchaseOrderId: po.id,
-          sortOrder: item.sortOrder ?? idx,
         }))
       );
     }
@@ -2479,21 +2502,44 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updatePurchaseOrder(id: string, data: Partial<InsertPurchaseOrder>, lineItems?: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails | undefined> {
-    const [po] = await db.update(purchaseOrders).set({ ...data, updatedAt: new Date() }).where(eq(purchaseOrders.id, id)).returning();
-    if (!po) return undefined;
+    let updateData: any = { ...data, updatedAt: new Date() };
     
     if (lineItems !== undefined) {
+      // Calculate totals from line items
+      let subtotal = 0;
+      const processedItems = lineItems.map((item, idx) => {
+        const qty = parseFloat(String(item.quantity || 0));
+        const price = parseFloat(String(item.unitPrice || 0));
+        const lineTotal = qty * price;
+        subtotal += lineTotal;
+        return {
+          ...item,
+          purchaseOrderId: id,
+          sortOrder: item.sortOrder ?? idx,
+          lineTotal: lineTotal.toFixed(2),
+        };
+      });
+      
+      const taxRate = parseFloat(String(data.taxRate || 10));
+      const taxAmount = subtotal * (taxRate / 100);
+      const total = subtotal + taxAmount;
+      
+      updateData = {
+        ...updateData,
+        subtotal: subtotal.toFixed(2),
+        taxRate: taxRate.toFixed(2),
+        taxAmount: taxAmount.toFixed(2),
+        total: total.toFixed(2),
+      };
+      
       await db.delete(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, id));
-      if (lineItems.length > 0) {
-        await db.insert(purchaseOrderItems).values(
-          lineItems.map((item, idx) => ({
-            ...item,
-            purchaseOrderId: id,
-            sortOrder: item.sortOrder ?? idx,
-          }))
-        );
+      if (processedItems.length > 0) {
+        await db.insert(purchaseOrderItems).values(processedItems);
       }
     }
+    
+    const [po] = await db.update(purchaseOrders).set(updateData).where(eq(purchaseOrders.id, id)).returning();
+    if (!po) return undefined;
     
     return this.getPurchaseOrderWithDetails(id);
   }
