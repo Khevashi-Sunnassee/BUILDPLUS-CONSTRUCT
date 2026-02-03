@@ -4604,5 +4604,244 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  // ==================== Task Management (Monday.com-style) ====================
+  
+  // Task Groups
+  app.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (req, res) => {
+    try {
+      const groups = await storage.getAllTaskGroups();
+      res.json(groups);
+    } catch (error: any) {
+      console.error("Error fetching task groups:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task groups" });
+    }
+  });
+
+  app.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
+    try {
+      const group = await storage.getTaskGroup(req.params.id);
+      if (!group) return res.status(404).json({ error: "Task group not found" });
+      res.json(group);
+    } catch (error: any) {
+      console.error("Error fetching task group:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task group" });
+    }
+  });
+
+  app.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const group = await storage.createTaskGroup(req.body);
+      res.status(201).json(group);
+    } catch (error: any) {
+      console.error("Error creating task group:", error);
+      res.status(500).json({ error: error.message || "Failed to create task group" });
+    }
+  });
+
+  app.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const group = await storage.updateTaskGroup(req.params.id, req.body);
+      if (!group) return res.status(404).json({ error: "Task group not found" });
+      res.json(group);
+    } catch (error: any) {
+      console.error("Error updating task group:", error);
+      res.status(500).json({ error: error.message || "Failed to update task group" });
+    }
+  });
+
+  app.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      await storage.deleteTaskGroup(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting task group:", error);
+      res.status(500).json({ error: error.message || "Failed to delete task group" });
+    }
+  });
+
+  app.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const { groupIds } = req.body;
+      if (!Array.isArray(groupIds)) {
+        return res.status(400).json({ error: "groupIds must be an array" });
+      }
+      await storage.reorderTaskGroups(groupIds);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error reordering task groups:", error);
+      res.status(500).json({ error: error.message || "Failed to reorder task groups" });
+    }
+  });
+
+  // Tasks
+  app.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
+    try {
+      const task = await storage.getTask(req.params.id);
+      if (!task) return res.status(404).json({ error: "Task not found" });
+      res.json(task);
+    } catch (error: any) {
+      console.error("Error fetching task:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task" });
+    }
+  });
+
+  app.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const task = await storage.createTask({
+        ...req.body,
+        createdById: userId,
+      });
+      res.status(201).json(task);
+    } catch (error: any) {
+      console.error("Error creating task:", error);
+      res.status(500).json({ error: error.message || "Failed to create task" });
+    }
+  });
+
+  app.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const task = await storage.updateTask(req.params.id, req.body);
+      if (!task) return res.status(404).json({ error: "Task not found" });
+      res.json(task);
+    } catch (error: any) {
+      console.error("Error updating task:", error);
+      res.status(500).json({ error: error.message || "Failed to update task" });
+    }
+  });
+
+  app.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      await storage.deleteTask(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting task:", error);
+      res.status(500).json({ error: error.message || "Failed to delete task" });
+    }
+  });
+
+  app.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const { groupId, taskIds } = req.body;
+      if (!groupId || !Array.isArray(taskIds)) {
+        return res.status(400).json({ error: "groupId and taskIds array are required" });
+      }
+      await storage.reorderTasks(groupId, taskIds);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error reordering tasks:", error);
+      res.status(500).json({ error: error.message || "Failed to reorder tasks" });
+    }
+  });
+
+  // Task Assignees
+  app.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), async (req, res) => {
+    try {
+      const assignees = await storage.getTaskAssignees(req.params.id);
+      res.json(assignees);
+    } catch (error: any) {
+      console.error("Error fetching task assignees:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task assignees" });
+    }
+  });
+
+  app.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const { userIds } = req.body;
+      if (!Array.isArray(userIds)) {
+        return res.status(400).json({ error: "userIds must be an array" });
+      }
+      const assignees = await storage.setTaskAssignees(req.params.id, userIds);
+      res.json(assignees);
+    } catch (error: any) {
+      console.error("Error setting task assignees:", error);
+      res.status(500).json({ error: error.message || "Failed to set task assignees" });
+    }
+  });
+
+  // Task Updates (Activity Log)
+  app.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), async (req, res) => {
+    try {
+      const updates = await storage.getTaskUpdates(req.params.id);
+      res.json(updates);
+    } catch (error: any) {
+      console.error("Error fetching task updates:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task updates" });
+    }
+  });
+
+  app.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const update = await storage.createTaskUpdate({
+        taskId: req.params.id,
+        userId,
+        content: req.body.content,
+      });
+      res.status(201).json(update);
+    } catch (error: any) {
+      console.error("Error creating task update:", error);
+      res.status(500).json({ error: error.message || "Failed to create task update" });
+    }
+  });
+
+  app.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      await storage.deleteTaskUpdate(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting task update:", error);
+      res.status(500).json({ error: error.message || "Failed to delete task update" });
+    }
+  });
+
+  // Task Files
+  app.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), async (req, res) => {
+    try {
+      const files = await storage.getTaskFiles(req.params.id);
+      res.json(files);
+    } catch (error: any) {
+      console.error("Error fetching task files:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task files" });
+    }
+  });
+
+  app.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), upload.single("file"), async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // For now, store file as base64 data URL (in production, use cloud storage)
+      const base64 = file.buffer.toString("base64");
+      const dataUrl = `data:${file.mimetype};base64,${base64}`;
+
+      const taskFile = await storage.createTaskFile({
+        taskId: req.params.id,
+        fileName: file.originalname,
+        fileUrl: dataUrl,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        uploadedById: userId,
+      });
+      res.status(201).json(taskFile);
+    } catch (error: any) {
+      console.error("Error uploading task file:", error);
+      res.status(500).json({ error: error.message || "Failed to upload task file" });
+    }
+  });
+
+  app.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      await storage.deleteTaskFile(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting task file:", error);
+      res.status(500).json({ error: error.message || "Failed to delete task file" });
+    }
+  });
+
   return httpServer;
 }

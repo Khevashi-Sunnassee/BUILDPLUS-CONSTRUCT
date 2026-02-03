@@ -8,6 +8,7 @@ import {
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
   productionSlots, productionSlotAdjustments,
   suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems,
+  taskGroups, tasks, taskAssignees, taskUpdates, taskFiles,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -34,6 +35,11 @@ import {
   type InsertItem, type Item,
   type InsertPurchaseOrder, type PurchaseOrder,
   type InsertPurchaseOrderItem, type PurchaseOrderItem,
+  type InsertTaskGroup, type TaskGroup,
+  type InsertTask, type Task, type TaskStatus,
+  type InsertTaskAssignee, type TaskAssignee,
+  type InsertTaskUpdate, type TaskUpdate,
+  type InsertTaskFile, type TaskFile,
 } from "@shared/schema";
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -69,6 +75,18 @@ export interface PurchaseOrderWithDetails extends PurchaseOrder {
 export interface ItemWithDetails extends Item {
   category?: ItemCategory | null;
   supplier?: Supplier | null;
+}
+
+export interface TaskWithDetails extends Task {
+  assignees: (TaskAssignee & { user: User })[];
+  subtasks: Task[];
+  updatesCount: number;
+  filesCount: number;
+  createdBy?: User | null;
+}
+
+export interface TaskGroupWithTasks extends TaskGroup {
+  tasks: TaskWithDetails[];
 }
 import bcrypt from "bcrypt";
 import crypto from "crypto";
@@ -335,6 +353,31 @@ export interface IStorage {
   rejectPurchaseOrder(id: string, rejectedById: string, reason: string): Promise<PurchaseOrder | undefined>;
   deletePurchaseOrder(id: string): Promise<void>;
   getNextPONumber(): Promise<string>;
+
+  // Task Management (Monday.com-style)
+  getAllTaskGroups(): Promise<TaskGroupWithTasks[]>;
+  getTaskGroup(id: string): Promise<TaskGroupWithTasks | undefined>;
+  createTaskGroup(data: InsertTaskGroup): Promise<TaskGroup>;
+  updateTaskGroup(id: string, data: Partial<InsertTaskGroup>): Promise<TaskGroup | undefined>;
+  deleteTaskGroup(id: string): Promise<void>;
+  reorderTaskGroups(groupIds: string[]): Promise<void>;
+
+  getTask(id: string): Promise<TaskWithDetails | undefined>;
+  createTask(data: InsertTask): Promise<Task>;
+  updateTask(id: string, data: Partial<InsertTask>): Promise<Task | undefined>;
+  deleteTask(id: string): Promise<void>;
+  reorderTasks(groupId: string, taskIds: string[]): Promise<void>;
+
+  getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]>;
+  setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]>;
+
+  getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User })[]>;
+  createTaskUpdate(data: InsertTaskUpdate): Promise<TaskUpdate>;
+  deleteTaskUpdate(id: string): Promise<void>;
+
+  getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]>;
+  createTaskFile(data: InsertTaskFile): Promise<TaskFile>;
+  deleteTaskFile(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2621,6 +2664,225 @@ export class DatabaseStorage implements IStorage {
     const count = Number(result?.count || 0) + 1;
     const year = new Date().getFullYear();
     return `PO-${year}-${String(count).padStart(4, "0")}`;
+  }
+
+  // Task Management (Monday.com-style) Implementations
+  private async getTaskWithDetails(taskId: string): Promise<TaskWithDetails | undefined> {
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
+    if (!task) return undefined;
+
+    const assigneesResult = await db.select()
+      .from(taskAssignees)
+      .innerJoin(users, eq(taskAssignees.userId, users.id))
+      .where(eq(taskAssignees.taskId, taskId));
+    
+    const assignees = assigneesResult.map(r => ({
+      ...r.task_assignees,
+      user: r.users,
+    }));
+
+    const subtasksResult = await db.select().from(tasks)
+      .where(eq(tasks.parentId, taskId))
+      .orderBy(asc(tasks.sortOrder));
+
+    const [updatesCount] = await db.select({ count: sql<number>`count(*)` })
+      .from(taskUpdates)
+      .where(eq(taskUpdates.taskId, taskId));
+
+    const [filesCount] = await db.select({ count: sql<number>`count(*)` })
+      .from(taskFiles)
+      .where(eq(taskFiles.taskId, taskId));
+
+    let createdBy: User | null = null;
+    if (task.createdById) {
+      const [creator] = await db.select().from(users).where(eq(users.id, task.createdById));
+      createdBy = creator || null;
+    }
+
+    return {
+      ...task,
+      assignees,
+      subtasks: subtasksResult,
+      updatesCount: Number(updatesCount?.count || 0),
+      filesCount: Number(filesCount?.count || 0),
+      createdBy,
+    };
+  }
+
+  async getAllTaskGroups(): Promise<TaskGroupWithTasks[]> {
+    const groups = await db.select().from(taskGroups).orderBy(asc(taskGroups.sortOrder));
+    
+    const result: TaskGroupWithTasks[] = [];
+    for (const group of groups) {
+      const groupTasks = await db.select().from(tasks)
+        .where(and(eq(tasks.groupId, group.id), sql`${tasks.parentId} IS NULL`))
+        .orderBy(asc(tasks.sortOrder));
+
+      const tasksWithDetails: TaskWithDetails[] = [];
+      for (const task of groupTasks) {
+        const taskDetails = await this.getTaskWithDetails(task.id);
+        if (taskDetails) {
+          tasksWithDetails.push(taskDetails);
+        }
+      }
+
+      result.push({
+        ...group,
+        tasks: tasksWithDetails,
+      });
+    }
+
+    return result;
+  }
+
+  async getTaskGroup(id: string): Promise<TaskGroupWithTasks | undefined> {
+    const [group] = await db.select().from(taskGroups).where(eq(taskGroups.id, id));
+    if (!group) return undefined;
+
+    const groupTasks = await db.select().from(tasks)
+      .where(and(eq(tasks.groupId, id), sql`${tasks.parentId} IS NULL`))
+      .orderBy(asc(tasks.sortOrder));
+
+    const tasksWithDetails: TaskWithDetails[] = [];
+    for (const task of groupTasks) {
+      const taskDetails = await this.getTaskWithDetails(task.id);
+      if (taskDetails) {
+        tasksWithDetails.push(taskDetails);
+      }
+    }
+
+    return {
+      ...group,
+      tasks: tasksWithDetails,
+    };
+  }
+
+  async createTaskGroup(data: InsertTaskGroup): Promise<TaskGroup> {
+    const [maxOrder] = await db.select({ maxOrder: sql<number>`COALESCE(MAX(sort_order), 0)` }).from(taskGroups);
+    const [group] = await db.insert(taskGroups).values({
+      ...data,
+      sortOrder: (maxOrder?.maxOrder || 0) + 1,
+    }).returning();
+    return group;
+  }
+
+  async updateTaskGroup(id: string, data: Partial<InsertTaskGroup>): Promise<TaskGroup | undefined> {
+    const [group] = await db.update(taskGroups).set({
+      ...data,
+      updatedAt: new Date(),
+    }).where(eq(taskGroups.id, id)).returning();
+    return group;
+  }
+
+  async deleteTaskGroup(id: string): Promise<void> {
+    await db.delete(taskGroups).where(eq(taskGroups.id, id));
+  }
+
+  async reorderTaskGroups(groupIds: string[]): Promise<void> {
+    for (let i = 0; i < groupIds.length; i++) {
+      await db.update(taskGroups).set({ sortOrder: i, updatedAt: new Date() }).where(eq(taskGroups.id, groupIds[i]));
+    }
+  }
+
+  async getTask(id: string): Promise<TaskWithDetails | undefined> {
+    return this.getTaskWithDetails(id);
+  }
+
+  async createTask(data: InsertTask): Promise<Task> {
+    const [maxOrder] = await db.select({ maxOrder: sql<number>`COALESCE(MAX(sort_order), 0)` })
+      .from(tasks)
+      .where(eq(tasks.groupId, data.groupId));
+    const [task] = await db.insert(tasks).values({
+      ...data,
+      sortOrder: (maxOrder?.maxOrder || 0) + 1,
+    }).returning();
+    return task;
+  }
+
+  async updateTask(id: string, data: Partial<InsertTask>): Promise<Task | undefined> {
+    const [task] = await db.update(tasks).set({
+      ...data,
+      updatedAt: new Date(),
+    }).where(eq(tasks.id, id)).returning();
+    return task;
+  }
+
+  async deleteTask(id: string): Promise<void> {
+    await db.delete(tasks).where(eq(tasks.id, id));
+  }
+
+  async reorderTasks(groupId: string, taskIds: string[]): Promise<void> {
+    for (let i = 0; i < taskIds.length; i++) {
+      await db.update(tasks).set({ sortOrder: i, updatedAt: new Date() }).where(eq(tasks.id, taskIds[i]));
+    }
+  }
+
+  async getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]> {
+    const result = await db.select()
+      .from(taskAssignees)
+      .innerJoin(users, eq(taskAssignees.userId, users.id))
+      .where(eq(taskAssignees.taskId, taskId));
+    
+    return result.map(r => ({
+      ...r.task_assignees,
+      user: r.users,
+    }));
+  }
+
+  async setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]> {
+    await db.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
+    
+    for (const userId of userIds) {
+      await db.insert(taskAssignees).values({ taskId, userId }).onConflictDoNothing();
+    }
+    
+    return this.getTaskAssignees(taskId);
+  }
+
+  async getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User })[]> {
+    const result = await db.select()
+      .from(taskUpdates)
+      .innerJoin(users, eq(taskUpdates.userId, users.id))
+      .where(eq(taskUpdates.taskId, taskId))
+      .orderBy(desc(taskUpdates.createdAt));
+    
+    return result.map(r => ({
+      ...r.task_updates,
+      user: r.users,
+    }));
+  }
+
+  async createTaskUpdate(data: InsertTaskUpdate): Promise<TaskUpdate> {
+    const [update] = await db.insert(taskUpdates).values(data).returning();
+    return update;
+  }
+
+  async deleteTaskUpdate(id: string): Promise<void> {
+    await db.delete(taskUpdates).where(eq(taskUpdates.id, id));
+  }
+
+  async getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]> {
+    const files = await db.select().from(taskFiles).where(eq(taskFiles.taskId, taskId)).orderBy(desc(taskFiles.createdAt));
+    
+    const result: (TaskFile & { uploadedBy?: User | null })[] = [];
+    for (const file of files) {
+      let uploadedBy: User | null = null;
+      if (file.uploadedById) {
+        const [user] = await db.select().from(users).where(eq(users.id, file.uploadedById));
+        uploadedBy = user || null;
+      }
+      result.push({ ...file, uploadedBy });
+    }
+    return result;
+  }
+
+  async createTaskFile(data: InsertTaskFile): Promise<TaskFile> {
+    const [file] = await db.insert(taskFiles).values(data).returning();
+    return file;
+  }
+
+  async deleteTaskFile(id: string): Promise<void> {
+    await db.delete(taskFiles).where(eq(taskFiles.id, id));
   }
 }
 
