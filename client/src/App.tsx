@@ -38,6 +38,7 @@ import WeeklyJobLogsPage from "@/pages/weekly-job-logs";
 import ProductionSlotsPage from "@/pages/production-slots";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
 import PurchaseOrderFormPage from "@/pages/purchase-order-form";
+import TasksPage from "@/pages/tasks";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -226,6 +227,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <PurchaseOrderFormPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/tasks">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <TasksPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
