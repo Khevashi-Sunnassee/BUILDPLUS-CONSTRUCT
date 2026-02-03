@@ -23,6 +23,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileDown,
+  QrCode,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -289,7 +290,12 @@ export default function LogisticsPage() {
   });
 
   const handleCreateLoadList = (data: LoadListFormData) => {
-    createLoadListMutation.mutate(data);
+    // Transform empty trailerTypeId to undefined to avoid foreign key constraint error
+    const cleanedData = {
+      ...data,
+      trailerTypeId: data.trailerTypeId && data.trailerTypeId.length > 0 ? data.trailerTypeId : undefined,
+    };
+    createLoadListMutation.mutate(cleanedData);
   };
 
   const handleCreateDelivery = (data: DeliveryFormData) => {
@@ -344,6 +350,80 @@ export default function LogisticsPage() {
 
   const calculateTotalMass = (panels: { panel: PanelRegister }[]) => {
     return panels.reduce((sum, p) => sum + (parseFloat(p.panel.panelMass || "0") || 0), 0);
+  };
+
+  const printAllQrCodes = async (loadList: LoadListWithDetails) => {
+    if (loadList.panels.length === 0) {
+      toast({ variant: "destructive", title: "No panels", description: "This load list has no panels to print QR codes for" });
+      return;
+    }
+
+    try {
+      const QRCode = await import('qrcode');
+      
+      const qrItems = loadList.panels
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((lp) => ({
+          panel: lp.panel,
+          job: loadList.job,
+          url: `${window.location.origin}/panel/${lp.panel.id}`
+        }));
+
+      const qrData = await Promise.all(
+        qrItems.map(async (item) => {
+          const svgString = await QRCode.toString(item.url, { type: 'svg', width: 120, margin: 1 });
+          return { ...item, svg: svgString };
+        })
+      );
+
+      const qrCodesHtml = qrData.map((item) => `
+        <div class="qr-item">
+          <div class="qr-code">${item.svg}</div>
+          <div class="panel-mark">${item.panel.panelMark}</div>
+          <div class="job-number">${item.job.jobNumber}</div>
+        </div>
+      `).join('');
+
+      const printWindow = window.open('', '_blank', 'width=800,height=600');
+      if (!printWindow) {
+        toast({ variant: "destructive", title: "Popup Blocked", description: "Please allow popups to print the QR codes" });
+        return;
+      }
+
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>QR Codes - ${loadList.job.jobNumber} - Load List</title>
+            <style>
+              * { box-sizing: border-box; margin: 0; padding: 0; }
+              body { font-family: system-ui, sans-serif; padding: 20px; }
+              .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
+              .header h1 { font-size: 18px; margin-bottom: 5px; }
+              .header p { font-size: 12px; color: #666; }
+              .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+              .qr-item { display: flex; flex-direction: column; align-items: center; padding: 15px; border: 1px solid #ddd; border-radius: 8px; page-break-inside: avoid; }
+              .qr-code svg { width: 120px; height: 120px; }
+              .panel-mark { font-size: 16px; font-weight: bold; font-family: monospace; margin-top: 8px; }
+              .job-number { font-size: 11px; color: #666; margin-top: 4px; }
+              @media print { body { padding: 10px; } .qr-grid { gap: 15px; } .qr-item { border: 1px solid #ccc; padding: 10px; } }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h1>Load List QR Codes</h1>
+              <p>${loadList.job.jobNumber} - ${loadList.job.name} | ${loadList.panels.length} Panels</p>
+            </div>
+            <div class="qr-grid">${qrCodesHtml}</div>
+            <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };</script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      console.error('Error generating QR codes:', err);
+      toast({ variant: "destructive", title: "Error", description: "Failed to generate QR codes" });
+    }
   };
 
   const watchedJobId = loadListForm.watch("jobId");
@@ -607,6 +687,17 @@ export default function LogisticsPage() {
                         </div>
                         <div className="flex items-center gap-2">
                           <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => printAllQrCodes(loadList)}
+                            disabled={loadList.panels.length === 0}
+                            title="Print all QR codes for panels on this load"
+                            data-testid={`button-print-qr-${loadList.id}`}
+                          >
+                            <QrCode className="h-4 w-4 mr-1" />
+                            Print QR
+                          </Button>
+                          <Button
                             variant="default"
                             size="sm"
                             onClick={() => openDeliveryDialog(loadList)}
@@ -714,6 +805,17 @@ export default function LogisticsPage() {
                               )}
                             </div>
                           )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => printAllQrCodes(loadList)}
+                            data-testid={`button-print-qr-complete-${loadList.id}`}
+                          >
+                            <QrCode className="h-4 w-4 mr-1" />
+                            Print QR
+                          </Button>
                         </div>
                       </div>
 
