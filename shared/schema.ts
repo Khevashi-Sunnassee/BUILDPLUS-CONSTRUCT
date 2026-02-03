@@ -1008,6 +1008,21 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   sortOrderIdx: index("purchase_order_items_sort_order_idx").on(table.sortOrder),
 }));
 
+export const purchaseOrderAttachments = pgTable("purchase_order_attachments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  purchaseOrderId: varchar("purchase_order_id", { length: 36 }).notNull().references(() => purchaseOrders.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  filePath: text("file_path").notNull(),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  poIdx: index("purchase_order_attachments_po_idx").on(table.purchaseOrderId),
+  uploadedByIdx: index("purchase_order_attachments_uploaded_by_idx").on(table.uploadedById),
+}));
+
 // Insert schemas and types for PO tables
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
@@ -1028,6 +1043,10 @@ export type PurchaseOrder = typeof purchaseOrders.$inferSelect;
 export const insertPurchaseOrderItemSchema = createInsertSchema(purchaseOrderItems).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSchema>;
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
+
+export const insertPurchaseOrderAttachmentSchema = createInsertSchema(purchaseOrderAttachments).omit({ id: true, createdAt: true });
+export type InsertPurchaseOrderAttachment = z.infer<typeof insertPurchaseOrderAttachmentSchema>;
+export type PurchaseOrderAttachment = typeof purchaseOrderAttachments.$inferSelect;
 
 export type POStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
