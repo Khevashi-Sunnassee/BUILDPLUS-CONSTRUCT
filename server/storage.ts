@@ -320,6 +320,7 @@ export interface IStorage {
   createItem(data: InsertItem): Promise<Item>;
   updateItem(id: string, data: Partial<InsertItem>): Promise<Item | undefined>;
   deleteItem(id: string): Promise<void>;
+  bulkImportItems(itemsData: InsertItem[]): Promise<{ created: number; updated: number; errors: string[] }>;
 
   // Purchase Orders
   getAllPurchaseOrders(): Promise<PurchaseOrderWithDetails[]>;
@@ -2389,6 +2390,34 @@ export class DatabaseStorage implements IStorage {
 
   async deleteItem(id: string): Promise<void> {
     await db.delete(items).where(eq(items.id, id));
+  }
+
+  async bulkImportItems(itemsData: InsertItem[]): Promise<{ created: number; updated: number; errors: string[] }> {
+    let created = 0;
+    let updated = 0;
+    const errors: string[] = [];
+
+    for (const itemData of itemsData) {
+      try {
+        // Check if item with same code exists (update) or create new
+        if (itemData.code) {
+          const existing = await db.select().from(items).where(eq(items.code, itemData.code)).limit(1);
+          if (existing.length > 0) {
+            await db.update(items).set({ ...itemData, updatedAt: new Date() }).where(eq(items.id, existing[0].id));
+            updated++;
+            continue;
+          }
+        }
+        
+        // Create new item
+        await db.insert(items).values(itemData);
+        created++;
+      } catch (error: any) {
+        errors.push(`Error importing item ${itemData.code || itemData.name}: ${error.message}`);
+      }
+    }
+
+    return { created, updated, errors };
   }
 
   // ============== Purchase Orders ==============
