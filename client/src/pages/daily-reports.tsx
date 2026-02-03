@@ -165,7 +165,7 @@ export default function DailyReportsPage() {
     queryKey: ["/api/drafting-program/my-allocated"],
   });
 
-  const [showAllocatedPanels, setShowAllocatedPanels] = useState(false);
+  const [showAllocatedPanels, setShowAllocatedPanels] = useState(true);
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: ["/api/settings/logo"],
