@@ -53,6 +53,7 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [, navigate] = useLocation();
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
@@ -137,12 +138,10 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-              <Link href="/chat" className="block">
-                <Button className="w-full pointer-events-none" data-testid="button-view-messages">
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  View All Messages
-                </Button>
-              </Link>
+              <Button className="w-full" data-testid="button-view-messages" onClick={() => navigate("/chat")}>
+                <MessageSquare className="h-4 w-4 mr-2" />
+                View All Messages
+              </Button>
             </div>
           </CardContent>
         </Card>

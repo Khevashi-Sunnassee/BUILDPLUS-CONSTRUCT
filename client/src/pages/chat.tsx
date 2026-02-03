@@ -149,9 +149,9 @@ export default function ChatPage() {
 
   useEffect(() => {
     if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current.scrollIntoView({ behavior: "instant" });
     }
-  }, [messages]);
+  }, [messages, selectedConversationId]);
 
   const createConversationMutation = useMutation({
     mutationFn: async (data: typeof newConversation) => {
