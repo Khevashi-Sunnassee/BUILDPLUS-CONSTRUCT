@@ -716,7 +716,7 @@ function TaskGroupComponent({
             <div />
             <div className="px-2">Item</div>
             <div />
-            <div className="px-2 text-center">Person</div>
+            <div className="px-2 text-center">Users</div>
             <div className="px-2 text-center">Status</div>
             <div className="px-2 text-center">Stage</div>
             <div className="px-2 text-center">Date</div>

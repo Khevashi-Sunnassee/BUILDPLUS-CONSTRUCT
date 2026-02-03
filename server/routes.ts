@@ -4805,7 +4805,12 @@ Return ONLY valid JSON, no explanation text.`
 
   app.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      const task = await storage.updateTask(req.params.id, req.body);
+      // Convert date string to Date object if present
+      const updateData = { ...req.body };
+      if (updateData.dueDate !== undefined) {
+        updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
+      }
+      const task = await storage.updateTask(req.params.id, updateData);
       if (!task) return res.status(404).json({ error: "Task not found" });
       res.json(task);
     } catch (error: any) {
