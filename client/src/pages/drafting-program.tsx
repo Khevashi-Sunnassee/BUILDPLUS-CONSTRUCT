@@ -548,6 +548,7 @@ export default function DraftingProgramPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Panel</TableHead>
+                          <TableHead>Job</TableHead>
                           <TableHead>Level</TableHead>
                           <TableHead>Production Date</TableHead>
                           <TableHead>Drawing Due</TableHead>
@@ -567,6 +568,7 @@ export default function DraftingProgramPage() {
                             } : undefined}
                           >
                             <TableCell className="font-medium">{entry.panel.panelMark}</TableCell>
+                            <TableCell>{entry.job.jobNumber}</TableCell>
                             <TableCell>{entry.level}</TableCell>
                             <TableCell>
                               {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
