@@ -4142,6 +4142,10 @@ Return ONLY valid JSON, no explanation text.`
       const userId = (req.session as any).userId;
       const { items: lineItems, ...poData } = req.body;
       const poNumber = await storage.getNextPONumber();
+      // Convert empty string supplierId to null to avoid foreign key constraint
+      if (poData.supplierId === "") {
+        poData.supplierId = null;
+      }
       const order = await storage.createPurchaseOrder(
         { ...poData, poNumber, requestedById: userId },
         lineItems || []
@@ -4164,6 +4168,10 @@ Return ONLY valid JSON, no explanation text.`
       }
       
       const { items: lineItems, ...poData } = req.body;
+      // Convert empty string supplierId to null to avoid foreign key constraint
+      if (poData.supplierId === "") {
+        poData.supplierId = null;
+      }
       const updated = await storage.updatePurchaseOrder(req.params.id, poData, lineItems);
       res.json(updated);
     } catch (error: any) {
