@@ -533,38 +533,41 @@ export default function DailyReportsPage() {
         </div>
       </div>
 
-      {allocatedData && allocatedData.stats.total > 0 && (
+      {allocatedData && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Total Allocated</div>
-                <div className="text-2xl font-bold" data-testid="text-total-allocated">{allocatedData.stats.total}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Completed</div>
-                <div className="text-2xl font-bold text-green-600" data-testid="text-completed-count">{allocatedData.stats.completed}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">In Progress</div>
-                <div className="text-2xl font-bold text-amber-500" data-testid="text-in-progress-count">{allocatedData.stats.inProgress}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-4">
-                <div className="text-sm text-muted-foreground">Hours Spent</div>
-                <div className="text-2xl font-bold" data-testid="text-hours-spent">{allocatedData.stats.totalActualHours.toFixed(1)}h</div>
-                {allocatedData.stats.totalEstimatedHours > 0 && (
-                  <div className="text-xs text-muted-foreground">of {allocatedData.stats.totalEstimatedHours.toFixed(1)}h estimated</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="mb-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Layers className="h-4 w-4" />
+                My Drafting Dashboard
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-sm text-muted-foreground">Panels Allocated</div>
+                  <div className="text-2xl font-bold" data-testid="text-total-allocated">{allocatedData.stats.total}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Completed</div>
+                  <div className="text-2xl font-bold text-green-600" data-testid="text-completed-count">{allocatedData.stats.completed}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">In Progress</div>
+                  <div className="text-2xl font-bold text-amber-500" data-testid="text-in-progress-count">{allocatedData.stats.inProgress}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-muted-foreground">Hours Spent</div>
+                  <div className="text-2xl font-bold" data-testid="text-hours-spent">{allocatedData.stats.totalActualHours.toFixed(1)}h</div>
+                  {allocatedData.stats.totalEstimatedHours > 0 && (
+                    <div className="text-xs text-muted-foreground">of {allocatedData.stats.totalEstimatedHours.toFixed(1)}h estimated</div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
+          {allocatedData.stats.total > 0 && (
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -670,6 +673,7 @@ export default function DailyReportsPage() {
               </CardContent>
             )}
           </Card>
+          )}
         </>
       )}
 
