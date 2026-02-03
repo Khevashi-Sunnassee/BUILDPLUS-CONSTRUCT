@@ -66,6 +66,7 @@ export const FUNCTION_KEYS = [
   "panel_register",
   "purchase_orders",
   "tasks",
+  "chat",
   "admin_users",
   "admin_devices",
   "admin_jobs",
@@ -1125,3 +1126,130 @@ export type InsertTaskFile = z.infer<typeof insertTaskFileSchema>;
 export type TaskFile = typeof taskFiles.$inferSelect;
 
 export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD";
+
+// ===============================
+// CHAT SYSTEM TABLES
+// ===============================
+
+export const conversationTypeEnum = pgEnum("conversation_type", ["DM", "GROUP", "CHANNEL"]);
+export const memberRoleEnum = pgEnum("member_role", ["OWNER", "ADMIN", "MEMBER"]);
+export const messageFormatEnum = pgEnum("message_format", ["PLAIN", "MARKDOWN"]);
+export const chatNotificationTypeEnum = pgEnum("chat_notification_type", ["MESSAGE", "MENTION"]);
+
+export const userChatSettings = pgTable("user_chat_settings", {
+  userId: varchar("user_id", { length: 36 }).primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  popupEnabled: boolean("popup_enabled").default(true).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  popupIdx: index("user_chat_settings_popup_idx").on(table.popupEnabled),
+}));
+
+export const conversations = pgTable("conversations", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  type: conversationTypeEnum("type").notNull(),
+  name: text("name"),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
+  panelId: varchar("panel_id", { length: 36 }).references(() => panelRegister.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("conversations_type_idx").on(table.type),
+  jobIdx: index("conversations_job_idx").on(table.jobId),
+  panelIdx: index("conversations_panel_idx").on(table.panelId),
+}));
+
+export const conversationMembers = pgTable("conversation_members", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id", { length: 36 }).notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: memberRoleEnum("role").default("MEMBER").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+  lastReadAt: timestamp("last_read_at"),
+  lastReadMsgId: varchar("last_read_msg_id", { length: 36 }),
+}, (table) => ({
+  uniqMember: uniqueIndex("conv_member_unique").on(table.conversationId, table.userId),
+  userIdx: index("conv_member_user_idx").on(table.userId),
+  convIdx: index("conv_member_conv_idx").on(table.conversationId),
+}));
+
+export const chatMessages = pgTable("chat_messages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  conversationId: varchar("conversation_id", { length: 36 }).notNull().references(() => conversations.id, { onDelete: "cascade" }),
+  senderId: varchar("sender_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  body: text("body"),
+  bodyFormat: messageFormatEnum("body_format").default("PLAIN").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  editedAt: timestamp("edited_at"),
+  deletedAt: timestamp("deleted_at"),
+  replyToId: varchar("reply_to_id", { length: 36 }),
+}, (table) => ({
+  convCreatedIdx: index("messages_conv_created_idx").on(table.conversationId, table.createdAt),
+}));
+
+export const chatMessageAttachments = pgTable("chat_message_attachments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id", { length: 36 }).notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  mimeType: text("mime_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull(),
+  storageKey: text("storage_key").notNull(),
+  url: text("url").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  msgIdx: index("chat_attachments_message_idx").on(table.messageId),
+}));
+
+export const chatMessageReactions = pgTable("chat_message_reactions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id", { length: 36 }).notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  emoji: text("emoji").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqReaction: uniqueIndex("chat_reaction_unique").on(table.messageId, table.userId, table.emoji),
+  messageIdx: index("chat_reactions_message_idx").on(table.messageId),
+}));
+
+export const chatMessageMentions = pgTable("chat_message_mentions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  messageId: varchar("message_id", { length: 36 }).notNull().references(() => chatMessages.id, { onDelete: "cascade" }),
+  mentionedUserId: varchar("mentioned_user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqMention: uniqueIndex("chat_mention_unique").on(table.messageId, table.mentionedUserId),
+  userIdx: index("chat_mention_user_idx").on(table.mentionedUserId),
+}));
+
+export const chatNotifications = pgTable("chat_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: chatNotificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  conversationId: varchar("conversation_id", { length: 36 }).references(() => conversations.id, { onDelete: "cascade" }),
+  messageId: varchar("message_id", { length: 36 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  readAt: timestamp("read_at"),
+}, (table) => ({
+  userCreatedIdx: index("chat_notif_user_created_idx").on(table.userId, table.createdAt),
+}));
+
+// Chat Insert Schemas and Types
+export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertConversation = z.infer<typeof insertConversationSchema>;
+export type Conversation = typeof conversations.$inferSelect;
+
+export const insertConversationMemberSchema = createInsertSchema(conversationMembers).omit({ id: true, joinedAt: true });
+export type InsertConversationMember = z.infer<typeof insertConversationMemberSchema>;
+export type ConversationMember = typeof conversationMembers.$inferSelect;
+
+export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({ id: true, createdAt: true });
+export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+
+export const insertChatMessageAttachmentSchema = createInsertSchema(chatMessageAttachments).omit({ id: true, createdAt: true });
+export type InsertChatMessageAttachment = z.infer<typeof insertChatMessageAttachmentSchema>;
+export type ChatMessageAttachment = typeof chatMessageAttachments.$inferSelect;
+
+export type ConversationType = "DM" | "GROUP" | "CHANNEL";
+export type MemberRole = "OWNER" | "ADMIN" | "MEMBER";
