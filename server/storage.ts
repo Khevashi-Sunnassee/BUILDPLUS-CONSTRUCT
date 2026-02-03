@@ -7,7 +7,7 @@ import {
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
   productionSlots, productionSlotAdjustments, draftingProgram,
-  suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems,
+  suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
@@ -36,6 +36,7 @@ import {
   type InsertItem, type Item,
   type InsertPurchaseOrder, type PurchaseOrder,
   type InsertPurchaseOrderItem, type PurchaseOrderItem,
+  type InsertPurchaseOrderAttachment, type PurchaseOrderAttachment,
   type InsertTaskGroup, type TaskGroup,
   type InsertTask, type Task, type TaskStatus,
   type InsertTaskAssignee, type TaskAssignee,
@@ -372,6 +373,12 @@ export interface IStorage {
   rejectPurchaseOrder(id: string, rejectedById: string, reason: string): Promise<PurchaseOrder | undefined>;
   deletePurchaseOrder(id: string): Promise<void>;
   getNextPONumber(): Promise<string>;
+
+  // PO Attachments
+  getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: User | null })[]>;
+  getPurchaseOrderAttachment(id: string): Promise<PurchaseOrderAttachment | undefined>;
+  createPurchaseOrderAttachment(data: InsertPurchaseOrderAttachment): Promise<PurchaseOrderAttachment>;
+  deletePurchaseOrderAttachment(id: string): Promise<void>;
 
   // Task Management (Monday.com-style)
   getAllTaskGroups(): Promise<TaskGroupWithTasks[]>;
@@ -2816,6 +2823,38 @@ export class DatabaseStorage implements IStorage {
     const count = Number(result?.count || 0) + 1;
     const year = new Date().getFullYear();
     return `PO-${year}-${String(count).padStart(4, "0")}`;
+  }
+
+  // PO Attachment Implementations
+  async getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: User | null })[]> {
+    const attachments = await db.select().from(purchaseOrderAttachments)
+      .where(eq(purchaseOrderAttachments.purchaseOrderId, poId))
+      .orderBy(desc(purchaseOrderAttachments.createdAt));
+    
+    const result: (PurchaseOrderAttachment & { uploadedBy?: User | null })[] = [];
+    for (const attachment of attachments) {
+      let uploadedBy: User | null = null;
+      if (attachment.uploadedById) {
+        const [user] = await db.select().from(users).where(eq(users.id, attachment.uploadedById));
+        uploadedBy = user || null;
+      }
+      result.push({ ...attachment, uploadedBy });
+    }
+    return result;
+  }
+
+  async getPurchaseOrderAttachment(id: string): Promise<PurchaseOrderAttachment | undefined> {
+    const [attachment] = await db.select().from(purchaseOrderAttachments).where(eq(purchaseOrderAttachments.id, id));
+    return attachment;
+  }
+
+  async createPurchaseOrderAttachment(data: InsertPurchaseOrderAttachment): Promise<PurchaseOrderAttachment> {
+    const [attachment] = await db.insert(purchaseOrderAttachments).values(data).returning();
+    return attachment;
+  }
+
+  async deletePurchaseOrderAttachment(id: string): Promise<void> {
+    await db.delete(purchaseOrderAttachments).where(eq(purchaseOrderAttachments.id, id));
   }
 
   // Task Management (Monday.com-style) Implementations

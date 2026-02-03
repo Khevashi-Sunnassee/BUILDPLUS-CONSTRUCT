@@ -4854,6 +4854,112 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  // ==================== PO Attachments ====================
+
+  app.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res) => {
+    try {
+      const attachments = await storage.getPurchaseOrderAttachments(req.params.id);
+      res.json(attachments);
+    } catch (error: any) {
+      console.error("Error fetching PO attachments:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch attachments" });
+    }
+  });
+
+  app.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("files", 10), async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ error: "No files uploaded" });
+      }
+
+      const order = await storage.getPurchaseOrder(req.params.id);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+
+      const fs = await import("fs/promises");
+      const path = await import("path");
+      const uploadsDir = path.join(process.cwd(), "uploads", "po-attachments");
+      await fs.mkdir(uploadsDir, { recursive: true });
+
+      const attachments = [];
+      for (const file of files) {
+        const timestamp = Date.now();
+        const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
+        const fileName = `${req.params.id}_${timestamp}_${safeFileName}`;
+        const filePath = path.join(uploadsDir, fileName);
+        
+        await fs.writeFile(filePath, file.buffer);
+
+        const attachment = await storage.createPurchaseOrderAttachment({
+          purchaseOrderId: req.params.id,
+          fileName,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          filePath,
+          uploadedById: userId,
+        });
+        attachments.push(attachment);
+      }
+
+      res.status(201).json(attachments);
+    } catch (error: any) {
+      console.error("Error uploading PO attachments:", error);
+      res.status(500).json({ error: error.message || "Failed to upload attachments" });
+    }
+  });
+
+  app.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => {
+    try {
+      const attachment = await storage.getPurchaseOrderAttachment(req.params.id);
+      if (!attachment) return res.status(404).json({ error: "Attachment not found" });
+
+      const fs = await import("fs");
+      if (!fs.existsSync(attachment.filePath)) {
+        return res.status(404).json({ error: "File not found on server" });
+      }
+
+      res.setHeader("Content-Disposition", `attachment; filename="${attachment.originalName}"`);
+      res.setHeader("Content-Type", attachment.mimeType);
+      fs.createReadStream(attachment.filePath).pipe(res);
+    } catch (error: any) {
+      console.error("Error downloading attachment:", error);
+      res.status(500).json({ error: error.message || "Failed to download attachment" });
+    }
+  });
+
+  app.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const user = await storage.getUser(userId);
+      const attachment = await storage.getPurchaseOrderAttachment(req.params.id);
+      if (!attachment) return res.status(404).json({ error: "Attachment not found" });
+
+      const order = await storage.getPurchaseOrder(attachment.purchaseOrderId);
+      if (!order) return res.status(404).json({ error: "Purchase order not found" });
+
+      // Only uploader, PO owner, or admin can delete
+      if (attachment.uploadedById !== userId && order.requestedById !== userId && user?.role !== "ADMIN") {
+        return res.status(403).json({ error: "Cannot delete this attachment" });
+      }
+
+      // Delete file from disk
+      const fs = await import("fs/promises");
+      try {
+        await fs.unlink(attachment.filePath);
+      } catch (e) {
+        console.warn("Could not delete file from disk:", e);
+      }
+
+      await storage.deletePurchaseOrderAttachment(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting attachment:", error);
+      res.status(500).json({ error: error.message || "Failed to delete attachment" });
+    }
+  });
+
   // ==================== Task Management (Monday.com-style) ====================
   
   // Task Groups
