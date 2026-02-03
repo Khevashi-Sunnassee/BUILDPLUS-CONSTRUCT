@@ -8,7 +8,8 @@ import {
   FileText,
   TrendingUp,
   Activity,
-  Timer
+  Timer,
+  MessageSquare
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,24 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import { format } from "date-fns";
+
+interface ChatConversation {
+  id: string;
+  name: string | null;
+  type: string;
+  unreadCount: number;
+  unreadMentions: number;
+  lastMessage?: {
+    body: string | null;
+    createdAt: string;
+  } | null;
+  members?: Array<{
+    user?: {
+      name: string;
+      email: string;
+    };
+  }>;
+}
 
 interface DashboardStats {
   todayMinutes: number;
@@ -38,6 +57,14 @@ export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
   });
+
+  const { data: conversations = [] } = useQuery<ChatConversation[]>({
+    queryKey: ["/api/chat/conversations"],
+  });
+
+  const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+  const totalMentions = conversations.reduce((sum, c) => sum + (c.unreadMentions || 0), 0);
+  const unreadConversations = conversations.filter(c => c.unreadCount > 0);
 
   const formatMinutes = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -68,6 +95,58 @@ export default function DashboardPage() {
           Welcome back, {user?.name || user?.email?.split("@")[0]}
         </p>
       </div>
+
+      {totalUnread > 0 && (
+        <Card className="border-primary bg-primary/5" data-testid="card-unread-messages">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              Unread Messages
+            </CardTitle>
+            <Badge variant="default" className="text-lg px-3 py-1">
+              {totalUnread}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {totalMentions > 0 && (
+                <p className="text-sm font-medium text-primary">
+                  You have {totalMentions} mention{totalMentions > 1 ? 's' : ''} requiring your attention
+                </p>
+              )}
+              <div className="space-y-2">
+                {unreadConversations.slice(0, 3).map(conv => {
+                  const displayName = conv.name || 
+                    conv.members?.find(m => m.user)?.user?.name || 
+                    conv.members?.find(m => m.user)?.user?.email || 
+                    "Conversation";
+                  return (
+                    <div key={conv.id} className="flex items-center justify-between p-2 rounded-md bg-background">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{displayName}</p>
+                        {conv.lastMessage?.body && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {conv.lastMessage.body}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant="secondary" className="ml-2 shrink-0">
+                        {conv.unreadCount} new
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+              <Link href="/chat">
+                <Button className="w-full" data-testid="button-view-messages">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  View All Messages
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card data-testid="card-today-minutes">
