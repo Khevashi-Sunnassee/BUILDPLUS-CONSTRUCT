@@ -115,6 +115,7 @@ export default function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const [newConversation, setNewConversation] = useState({
     name: "",
@@ -148,9 +149,14 @@ export default function ChatPage() {
   });
 
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "instant" });
-    }
+    setTimeout(() => {
+      if (scrollAreaRef.current) {
+        const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+        if (viewport) {
+          viewport.scrollTop = viewport.scrollHeight;
+        }
+      }
+    }, 50);
   }, [messages, selectedConversationId]);
 
   const createConversationMutation = useMutation({
@@ -651,7 +657,7 @@ export default function ChatPage() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-4" ref={scrollAreaRef}>
               {messagesLoading ? (
                 <div className="text-center text-muted-foreground">Loading messages...</div>
               ) : messages.length === 0 ? (

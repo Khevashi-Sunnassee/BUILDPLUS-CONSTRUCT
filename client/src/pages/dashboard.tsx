@@ -138,10 +138,12 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-              <Button className="w-full" data-testid="button-view-messages" onClick={() => navigate("/chat")}>
-                <MessageSquare className="h-4 w-4 mr-2" />
-                View All Messages
-              </Button>
+              <a href="/chat" className="block">
+                <Button className="w-full" data-testid="button-view-messages">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  View All Messages
+                </Button>
+              </a>
             </div>
           </CardContent>
         </Card>
