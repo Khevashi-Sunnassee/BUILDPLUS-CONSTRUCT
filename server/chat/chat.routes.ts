@@ -173,7 +173,7 @@ chatRouter.get("/messages", requireAuth, requireChatPermission, async (req, res)
       const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, msg.id));
       const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
         const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(eq(users.id, m.userId)).limit(1);
+          .from(users).where(eq(users.id, m.mentionedUserId)).limit(1);
         return { ...m, user: userRows[0] || null };
       }));
       return { ...msg, sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers };
@@ -205,7 +205,7 @@ chatRouter.get("/conversations/:conversationId/messages", requireAuth, requireCh
       const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, msg.id));
       const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
         const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(eq(users.id, m.userId)).limit(1);
+          .from(users).where(eq(users.id, m.mentionedUserId)).limit(1);
         return { ...m, user: userRows[0] || null };
       }));
       return { ...msg, sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers };
@@ -262,7 +262,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
     for (const mentionUserId of mentionedUserIds) {
       await db.insert(chatMessageMentions).values({
         messageId,
-        userId: mentionUserId,
+        mentionedUserId: mentionUserId,
       });
       
       await db.insert(chatNotifications).values({
@@ -270,6 +270,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
         messageId,
         conversationId,
         type: "MENTION",
+        title: "You were mentioned in a message",
       });
     }
 
@@ -280,7 +281,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
     const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, messageId));
     const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
       const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-        .from(users).where(eq(users.id, m.userId)).limit(1);
+        .from(users).where(eq(users.id, m.mentionedUserId)).limit(1);
       return { ...m, user: userRows[0] || null };
     }));
 
