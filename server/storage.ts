@@ -83,6 +83,7 @@ export interface TaskWithDetails extends Task {
   updatesCount: number;
   filesCount: number;
   createdBy?: User | null;
+  job?: Job | null;
 }
 
 export interface TaskGroupWithTasks extends TaskGroup {
@@ -2699,6 +2700,12 @@ export class DatabaseStorage implements IStorage {
       createdBy = creator || null;
     }
 
+    let job: Job | null = null;
+    if (task.jobId) {
+      const [jobResult] = await db.select().from(jobs).where(eq(jobs.id, task.jobId));
+      job = jobResult || null;
+    }
+
     return {
       ...task,
       assignees,
@@ -2706,6 +2713,7 @@ export class DatabaseStorage implements IStorage {
       updatesCount: Number(updatesCount?.count || 0),
       filesCount: Number(filesCount?.count || 0),
       createdBy,
+      job,
     };
   }
 

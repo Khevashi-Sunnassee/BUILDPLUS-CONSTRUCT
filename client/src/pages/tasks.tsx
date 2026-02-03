@@ -32,6 +32,7 @@ import {
   FileText,
   Image,
   File,
+  Briefcase,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -58,6 +59,13 @@ interface User {
   email: string;
 }
 
+interface Job {
+  id: string;
+  jobNumber: string;
+  name: string;
+  status: string;
+}
+
 interface TaskAssignee {
   id: string;
   taskId: string;
@@ -69,6 +77,7 @@ interface Task {
   id: string;
   groupId: string;
   parentId: string | null;
+  jobId: string | null;
   title: string;
   status: TaskStatus;
   dueDate: string | null;
@@ -83,6 +92,7 @@ interface Task {
   updatesCount: number;
   filesCount: number;
   createdBy: User | null;
+  job: Job | null;
 }
 
 interface TaskGroup {
@@ -145,11 +155,13 @@ function getInitials(name: string | null | undefined): string {
 function TaskRow({
   task,
   users,
+  jobs,
   isSubtask = false,
   onOpenSidebar,
 }: {
   task: Task;
   users: User[];
+  jobs: Job[];
   isSubtask?: boolean;
   onOpenSidebar: (task: Task) => void;
 }) {
@@ -247,6 +259,10 @@ function TaskRow({
     updateTaskMutation.mutate({ projectStage: stage === "none" ? null : stage });
   };
 
+  const handleJobChange = (jobId: string) => {
+    updateTaskMutation.mutate({ jobId: jobId === "none" ? null : jobId } as any);
+  };
+
   const handleToggleAssignee = (userId: string) => {
     const currentIds = task.assignees.map((a) => a.userId);
     const newIds = currentIds.includes(userId)
@@ -261,7 +277,7 @@ function TaskRow({
     <>
       <div
         className={cn(
-          "grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group",
+          "grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group",
           isSubtask && "bg-muted/30"
         )}
         data-testid={`task-row-${task.id}`}
@@ -374,6 +390,26 @@ function TaskRow({
             </div>
           </PopoverContent>
         </Popover>
+
+        <Select
+          value={task.jobId || "none"}
+          onValueChange={handleJobChange}
+        >
+          <SelectTrigger
+            className="h-7 border-0 text-xs"
+            data-testid={`select-job-${task.id}`}
+          >
+            <SelectValue placeholder="No job" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No job</SelectItem>
+            {jobs.map((job) => (
+              <SelectItem key={job.id} value={job.id}>
+                {job.jobNumber}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Select value={task.status} onValueChange={(v) => handleStatusChange(v as TaskStatus)}>
           <SelectTrigger
@@ -492,13 +528,14 @@ function TaskRow({
             key={subtask.id}
             task={subtask as any}
             users={users}
+            jobs={jobs}
             isSubtask
             onOpenSidebar={onOpenSidebar}
           />
         ))}
 
       {showAddSubtask && (
-        <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
+        <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
           <div />
           <div className="flex items-center gap-2 py-2 pl-6 pr-2">
             <div className="w-5" />
@@ -573,10 +610,12 @@ function TaskRow({
 function TaskGroupComponent({
   group,
   users,
+  jobs,
   onOpenSidebar,
 }: {
   group: TaskGroup;
   users: User[];
+  jobs: Job[];
   onOpenSidebar: (task: Task) => void;
 }) {
   const { toast } = useToast();
@@ -712,11 +751,12 @@ function TaskGroupComponent({
 
       {!isCollapsed && (
         <>
-          <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_120px_120px_100px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
+          <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
             <div />
             <div className="px-2">Item</div>
             <div />
             <div className="px-2 text-center">Users</div>
+            <div className="px-2 text-center">Job</div>
             <div className="px-2 text-center">Status</div>
             <div className="px-2 text-center">Stage</div>
             <div className="px-2 text-center">Date</div>
@@ -729,11 +769,12 @@ function TaskGroupComponent({
               key={task.id}
               task={task}
               users={users}
+              jobs={jobs}
               onOpenSidebar={onOpenSidebar}
             />
           ))}
 
-          <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
+          <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
             <div />
             <div className="flex items-center gap-2 py-2 pr-2">
               <Plus className="h-4 w-4 text-muted-foreground" />
@@ -755,7 +796,7 @@ function TaskGroupComponent({
                 data-testid={`input-new-task-${group.id}`}
               />
             </div>
-            <div className="col-span-7" />
+            <div className="col-span-8" />
           </div>
         </>
       )}
@@ -1078,6 +1119,7 @@ export default function TasksPage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [jobFilter, setJobFilter] = useState<string>("all");
 
   const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
     queryKey: ["/api/task-groups"],
@@ -1086,6 +1128,19 @@ export default function TasksPage() {
   const { data: users = [] } = useQuery<User[]>({
     queryKey: ["/api/users"],
   });
+
+  const { data: jobs = [] } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
+  });
+
+  const filteredGroups = groups.map((group) => ({
+    ...group,
+    tasks: group.tasks.filter((task) => {
+      if (jobFilter === "all") return true;
+      if (jobFilter === "none") return !task.jobId;
+      return task.jobId === jobFilter;
+    }),
+  }));
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -1125,13 +1180,32 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold">Tasks</h1>
           <p className="text-muted-foreground">Manage your team's work and track progress</p>
         </div>
-        <Button
-          onClick={() => setShowNewGroupInput(true)}
-          data-testid="btn-new-group"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Group
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <Select value={jobFilter} onValueChange={setJobFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-job-filter">
+                <SelectValue placeholder="Filter by job" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Jobs</SelectItem>
+                <SelectItem value="none">No Job Assigned</SelectItem>
+                {jobs.map((job) => (
+                  <SelectItem key={job.id} value={job.id}>
+                    {job.jobNumber} - {job.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button
+            onClick={() => setShowNewGroupInput(true)}
+            data-testid="btn-new-group"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Group
+          </Button>
+        </div>
       </div>
 
       {showNewGroupInput && (
@@ -1188,11 +1262,12 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="border rounded-lg overflow-hidden bg-card">
-          {groups.map((group) => (
+          {filteredGroups.map((group) => (
             <TaskGroupComponent
               key={group.id}
               group={group}
               users={users}
+              jobs={jobs}
               onOpenSidebar={setSelectedTask}
             />
           ))}

@@ -1011,6 +1011,7 @@ export const tasks = pgTable("tasks", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   groupId: varchar("group_id", { length: 36 }).notNull().references(() => taskGroups.id, { onDelete: "cascade" }),
   parentId: varchar("parent_id", { length: 36 }),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
   title: text("title").notNull(),
   status: taskStatusEnum("status").default("NOT_STARTED").notNull(),
   dueDate: timestamp("due_date"),
@@ -1023,6 +1024,7 @@ export const tasks = pgTable("tasks", {
 }, (table) => ({
   groupIdx: index("tasks_group_idx").on(table.groupId),
   parentIdx: index("tasks_parent_idx").on(table.parentId),
+  jobIdx: index("tasks_job_idx").on(table.jobId),
   statusIdx: index("tasks_status_idx").on(table.status),
   sortOrderIdx: index("tasks_sort_order_idx").on(table.sortOrder),
 }));
