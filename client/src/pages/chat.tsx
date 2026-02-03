@@ -416,8 +416,8 @@ export default function ChatPage() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Members</Label>
-                    <ScrollArea className="h-40 border rounded-md p-2">
+                    <Label>Members (select at least one)</Label>
+                    <ScrollArea className="h-48 border rounded-md p-2">
                       {users.map(user => (
                         <div key={user.id} className="flex items-center gap-2 py-1">
                           <Checkbox
