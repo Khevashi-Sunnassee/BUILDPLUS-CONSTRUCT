@@ -22,7 +22,6 @@ import {
   Truck,
   DollarSign,
   Shield,
-  MapPin,
   Calendar,
   Package,
   ShoppingCart,
@@ -53,7 +52,6 @@ import {
 
 const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
@@ -66,6 +64,7 @@ const userNavItems = [
 ];
 
 const managerNavItems = [
+  { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
   { title: "Reports", url: "/reports", icon: Clock },
 ];
@@ -73,7 +72,6 @@ const managerNavItems = [
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
-  { title: "Zones", url: "/admin/zones", icon: MapPin },
   { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
   { title: "Item Categories", url: "/admin/item-categories", icon: FolderOpen },
   { title: "Items", url: "/admin/items", icon: Package },
@@ -95,7 +93,6 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",
   "/admin/panel-types": "admin_panel_types",
-  "/admin/zones": "admin_zones",
   "/admin/suppliers": "admin_suppliers",
   "/admin/item-categories": "admin_item_catalog",
   "/admin/items": "admin_item_catalog",
