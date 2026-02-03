@@ -15,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Plus, Send, Check, X, Trash2, Edit, Eye, ChevronDown, ChevronRight, User as UserIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule } from "@shared/schema";
+import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule, ProductionSlot } from "@shared/schema";
 
 interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   projectManager: User;
@@ -102,6 +102,20 @@ export default function WeeklyJobLogsPage() {
   const { data: allJobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
   });
+
+  interface ProductionSlotWithJob extends ProductionSlot {
+    job: Job;
+  }
+
+  const { data: productionSlots = [] } = useQuery<ProductionSlotWithJob[]>({
+    queryKey: ["/api/production-slots"],
+  });
+
+  const getProductionSlotDate = (jobId: string, level: string | null): string | null => {
+    if (!level) return null;
+    const slot = productionSlots.find(s => s.jobId === jobId && s.level === level);
+    return slot ? format(new Date(slot.productionSlotDate), "dd/MM/yyyy") : null;
+  };
   
   // Filter to only active jobs
   const activeJobs = allJobs.filter((job) => job.status === "ACTIVE");
@@ -700,23 +714,51 @@ export default function WeeklyJobLogsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedReport.schedules.map((schedule) => (
+                      {selectedReport.schedules.map((schedule) => {
+                        const jobId = schedule.jobId;
+                        return (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">{schedule.job?.jobNumber} - {schedule.job?.name}</TableCell>
-                          <TableCell>{schedule.currentLevelOnsite || "-"}</TableCell>
-                          <TableCell>{schedule.levels7Days || "-"}</TableCell>
-                          <TableCell>{schedule.levels14Days || "-"}</TableCell>
-                          <TableCell>{schedule.levels21Days || "-"}</TableCell>
-                          <TableCell>{schedule.levels28Days || "-"}</TableCell>
+                          <TableCell>
+                            <div>{schedule.currentLevelOnsite || "-"}</div>
+                            {schedule.currentLevelOnsite && getProductionSlotDate(jobId, schedule.currentLevelOnsite) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.currentLevelOnsite)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels7Days || "-"}</div>
+                            {schedule.levels7Days && getProductionSlotDate(jobId, schedule.levels7Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels7Days)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels14Days || "-"}</div>
+                            {schedule.levels14Days && getProductionSlotDate(jobId, schedule.levels14Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels14Days)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels21Days || "-"}</div>
+                            {schedule.levels21Days && getProductionSlotDate(jobId, schedule.levels21Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels21Days)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels28Days || "-"}</div>
+                            {schedule.levels28Days && getProductionSlotDate(jobId, schedule.levels28Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels28Days)}</div>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {schedule.scheduleStatus === "ON_TRACK" && <Badge variant="default" className="bg-green-600">On Track</Badge>}
-                            {schedule.scheduleStatus === "RUNNING_BEHIND" && <Badge variant="default" className="bg-orange-500">Running Behind</Badge>}
-                            {schedule.scheduleStatus === "ON_HOLD" && <Badge variant="secondary">On Hold</Badge>}
+                            {schedule.scheduleStatus === "RUNNING_BEHIND" && <Badge variant="default" className="bg-red-600">Running Behind</Badge>}
+                            {schedule.scheduleStatus === "ON_HOLD" && <Badge variant="default" className="bg-orange-500">On Hold</Badge>}
                             {!schedule.scheduleStatus && "-"}
                           </TableCell>
                           <TableCell className="max-w-[250px] whitespace-pre-wrap">{schedule.siteProgress || "-"}</TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -779,23 +821,51 @@ export default function WeeklyJobLogsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedReport.schedules.map((schedule) => (
+                      {selectedReport.schedules.map((schedule) => {
+                        const jobId = schedule.jobId;
+                        return (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">{schedule.job?.jobNumber} - {schedule.job?.name}</TableCell>
-                          <TableCell>{schedule.currentLevelOnsite || "-"}</TableCell>
-                          <TableCell>{schedule.levels7Days || "-"}</TableCell>
-                          <TableCell>{schedule.levels14Days || "-"}</TableCell>
-                          <TableCell>{schedule.levels21Days || "-"}</TableCell>
-                          <TableCell>{schedule.levels28Days || "-"}</TableCell>
+                          <TableCell>
+                            <div>{schedule.currentLevelOnsite || "-"}</div>
+                            {schedule.currentLevelOnsite && getProductionSlotDate(jobId, schedule.currentLevelOnsite) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.currentLevelOnsite)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels7Days || "-"}</div>
+                            {schedule.levels7Days && getProductionSlotDate(jobId, schedule.levels7Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels7Days)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels14Days || "-"}</div>
+                            {schedule.levels14Days && getProductionSlotDate(jobId, schedule.levels14Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels14Days)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels21Days || "-"}</div>
+                            {schedule.levels21Days && getProductionSlotDate(jobId, schedule.levels21Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels21Days)}</div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div>{schedule.levels28Days || "-"}</div>
+                            {schedule.levels28Days && getProductionSlotDate(jobId, schedule.levels28Days) && (
+                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels28Days)}</div>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {schedule.scheduleStatus === "ON_TRACK" && <Badge variant="default" className="bg-green-600">On Track</Badge>}
-                            {schedule.scheduleStatus === "RUNNING_BEHIND" && <Badge variant="default" className="bg-orange-500">Running Behind</Badge>}
-                            {schedule.scheduleStatus === "ON_HOLD" && <Badge variant="secondary">On Hold</Badge>}
+                            {schedule.scheduleStatus === "RUNNING_BEHIND" && <Badge variant="default" className="bg-red-600">Running Behind</Badge>}
+                            {schedule.scheduleStatus === "ON_HOLD" && <Badge variant="default" className="bg-orange-500">On Hold</Badge>}
                             {!schedule.scheduleStatus && "-"}
                           </TableCell>
                           <TableCell className="max-w-[250px] whitespace-pre-wrap">{schedule.siteProgress || "-"}</TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
