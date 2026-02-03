@@ -1652,7 +1652,7 @@ export default function AdminPanelsPage() {
       </Card>
 
       <Dialog open={panelDialogOpen} onOpenChange={setPanelDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingPanel ? "Edit Panel" : "Create New Panel"}</DialogTitle>
             <DialogDescription>
@@ -1691,392 +1691,402 @@ export default function AdminPanelsPage() {
           
           <Form {...panelForm}>
             <form onSubmit={panelForm.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={panelForm.control}
-                name="jobId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Job</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!!filterJobId}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-panel-job">
-                          <SelectValue placeholder="Select job" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {jobs?.map((job) => (
-                          <SelectItem key={job.id} value={job.id}>
-                            {job.jobNumber} - {job.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={panelForm.control}
-                  name="panelMark"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Panel Mark</FormLabel>
-                      <FormControl>
-                        <Input placeholder="PM-001" {...field} data-testid="input-panel-mark" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={panelForm.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-panel-status">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="PENDING">Pending Validation</SelectItem>
-                          <SelectItem value="NOT_STARTED">Not Started</SelectItem>
-                          <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                          <SelectItem value="COMPLETED">Completed</SelectItem>
-                          <SelectItem value="ON_HOLD">On Hold</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={panelForm.control}
-                name="panelType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Panel Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-panel-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {panelTypes && panelTypes.length > 0 ? (
-                          panelTypes.map((pt) => (
-                            <SelectItem key={pt.id} value={pt.code}>{pt.name}</SelectItem>
-                          ))
-                        ) : (
-                          <>
-                            <SelectItem value="WALL">Wall</SelectItem>
-                            <SelectItem value="COLUMN">Column</SelectItem>
-                            <SelectItem value="CUBE_BASE">Cube Base</SelectItem>
-                            <SelectItem value="CUBE_RING">Cube Ring</SelectItem>
-                            <SelectItem value="LANDING_WALL">Landing Wall</SelectItem>
-                            <SelectItem value="OTHER">Other</SelectItem>
-                          </>
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={panelForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Panel description" {...field} data-testid="input-panel-description" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={panelForm.control}
-                  name="drawingCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Drawing Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="DWG-001" {...field} data-testid="input-panel-drawing" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={panelForm.control}
-                  name="sheetNumber"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Sheet Number</FormLabel>
-                      <FormControl>
-                        <Input placeholder="A001" {...field} data-testid="input-panel-sheet" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField
-                  control={panelForm.control}
-                  name="building"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Building</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Building A" {...field} data-testid="input-panel-building" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={panelForm.control}
-                  name="level"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Level</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Level 1" {...field} data-testid="input-panel-level" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={panelForm.control}
-                  name="structuralElevation"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Structural Elevation</FormLabel>
-                      <FormControl>
-                        <Input placeholder="RL 10.500" {...field} data-testid="input-panel-elevation" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={panelForm.control}
-                  name="reckliDetail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Reckli Detail</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Reckli detail/pattern" {...field} data-testid="input-panel-reckli" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Crane Capacity (from Job)</label>
-                  <Input 
-                    value={jobs?.find(j => j.id === panelForm.watch("jobId"))?.craneCapacity || "Not set"} 
-                    disabled 
-                    className="bg-muted"
-                    data-testid="input-panel-crane-capacity"
-                  />
-                </div>
-              </div>
-              <FormField
-                control={panelForm.control}
-                name="estimatedHours"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Estimated Hours</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="8"
-                        {...field}
-                        value={field.value || ""}
-                        onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                        data-testid="input-panel-hours"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-medium mb-3">Panel Dimensions & Weight</h4>
-                <div className="grid grid-cols-2 gap-4">
+              {/* Two-column layout for main content */}
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column - Panel Info */}
+                <div className="space-y-4">
                   <FormField
                     control={panelForm.control}
-                    name="qty"
+                    name="jobId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Quantity</FormLabel>
+                        <FormLabel>Job</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!filterJobId}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-panel-job">
+                              <SelectValue placeholder="Select job" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {jobs?.map((job) => (
+                              <SelectItem key={job.id} value={job.id}>
+                                {job.jobNumber} - {job.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={panelForm.control}
+                      name="panelMark"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Panel Mark</FormLabel>
+                          <FormControl>
+                            <Input placeholder="PM-001" {...field} data-testid="input-panel-mark" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={panelForm.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-panel-status">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="PENDING">Pending Validation</SelectItem>
+                              <SelectItem value="NOT_STARTED">Not Started</SelectItem>
+                              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                              <SelectItem value="COMPLETED">Completed</SelectItem>
+                              <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={panelForm.control}
+                    name="panelType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Panel Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-panel-type">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {panelTypes && panelTypes.length > 0 ? (
+                              panelTypes.map((pt) => (
+                                <SelectItem key={pt.id} value={pt.code}>{pt.name}</SelectItem>
+                              ))
+                            ) : (
+                              <>
+                                <SelectItem value="WALL">Wall</SelectItem>
+                                <SelectItem value="COLUMN">Column</SelectItem>
+                                <SelectItem value="CUBE_BASE">Cube Base</SelectItem>
+                                <SelectItem value="CUBE_RING">Cube Ring</SelectItem>
+                                <SelectItem value="LANDING_WALL">Landing Wall</SelectItem>
+                                <SelectItem value="OTHER">Other</SelectItem>
+                              </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={panelForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Panel description" {...field} data-testid="input-panel-description" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={panelForm.control}
+                      name="drawingCode"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Drawing Code</FormLabel>
+                          <FormControl>
+                            <Input placeholder="DWG-001" {...field} data-testid="input-panel-drawing" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={panelForm.control}
+                      name="sheetNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Sheet Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="A001" {...field} data-testid="input-panel-sheet" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <FormField
+                      control={panelForm.control}
+                      name="building"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Building</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Building A" {...field} data-testid="input-panel-building" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={panelForm.control}
+                      name="level"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Level</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Level 1" {...field} data-testid="input-panel-level" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={panelForm.control}
+                      name="structuralElevation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Struct. Elev.</FormLabel>
+                          <FormControl>
+                            <Input placeholder="RL 10.500" {...field} data-testid="input-panel-elevation" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+
+                {/* Right Column - Additional Info & Dimensions */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={panelForm.control}
+                      name="reckliDetail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Reckli Detail</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Reckli detail/pattern" {...field} data-testid="input-panel-reckli" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Crane Capacity</label>
+                      <Input 
+                        value={jobs?.find(j => j.id === panelForm.watch("jobId"))?.craneCapacity || "Not set"} 
+                        disabled 
+                        className="bg-muted"
+                        data-testid="input-panel-crane-capacity"
+                      />
+                    </div>
+                  </div>
+                  <FormField
+                    control={panelForm.control}
+                    name="estimatedHours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Estimated Hours</FormLabel>
                         <FormControl>
                           <Input
                             type="number"
-                            placeholder="1"
+                            placeholder="8"
                             {...field}
-                            value={field.value || 1}
-                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
-                            data-testid="input-panel-qty"
+                            value={field.value || ""}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            data-testid="input-panel-hours"
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={panelForm.control}
-                    name="concreteStrengthMpa"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Concrete Strength (MPa)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="50" {...field} data-testid="input-panel-concrete" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4 mt-3">
-                  <FormField
-                    control={panelForm.control}
-                    name="loadWidth"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Width (mm)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="3000" 
-                            {...field} 
-                            onChange={(e) => {
-                              field.onChange(e);
-                              const width = parseFloat(e.target.value) || 0;
-                              const height = parseFloat(panelForm.getValues("loadHeight") || "0") || 0;
-                              const thickness = parseFloat(panelForm.getValues("panelThickness") || "0") || 0;
-                              if (width > 0 && height > 0 && thickness > 0) {
-                                const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
-                                const massKg = volumeM3 * 2500;
-                                panelForm.setValue("panelVolume", volumeM3.toFixed(3));
-                                panelForm.setValue("panelMass", Math.round(massKg).toString());
-                              }
-                            }}
-                            data-testid="input-panel-width"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={panelForm.control}
-                    name="loadHeight"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Height (mm)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="2400" 
-                            {...field} 
-                            onChange={(e) => {
-                              field.onChange(e);
-                              const width = parseFloat(panelForm.getValues("loadWidth") || "0") || 0;
-                              const height = parseFloat(e.target.value) || 0;
-                              const thickness = parseFloat(panelForm.getValues("panelThickness") || "0") || 0;
-                              if (width > 0 && height > 0 && thickness > 0) {
-                                const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
-                                const massKg = volumeM3 * 2500;
-                                panelForm.setValue("panelVolume", volumeM3.toFixed(3));
-                                panelForm.setValue("panelMass", Math.round(massKg).toString());
-                              }
-                            }}
-                            data-testid="input-panel-height"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={panelForm.control}
-                    name="panelThickness"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Thickness (mm)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            placeholder="200" 
-                            {...field} 
-                            onChange={(e) => {
-                              field.onChange(e);
-                              const width = parseFloat(panelForm.getValues("loadWidth") || "0") || 0;
-                              const height = parseFloat(panelForm.getValues("loadHeight") || "0") || 0;
-                              const thickness = parseFloat(e.target.value) || 0;
-                              if (width > 0 && height > 0 && thickness > 0) {
-                                const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
-                                const massKg = volumeM3 * 2500;
-                                panelForm.setValue("panelVolume", volumeM3.toFixed(3));
-                                panelForm.setValue("panelMass", Math.round(massKg).toString());
-                              }
-                            }}
-                            data-testid="input-panel-thickness"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  <FormField
-                    control={panelForm.control}
-                    name="panelVolume"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Volume (m³)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            className="bg-muted" 
-                            readOnly
-                            data-testid="input-panel-volume"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={panelForm.control}
-                    name="panelMass"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Mass (kg)</FormLabel>
-                        <FormControl>
-                          <Input 
-                            {...field} 
-                            className="bg-muted" 
-                            readOnly
-                            data-testid="input-panel-mass"
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-medium mb-3">Dimensions & Weight</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={panelForm.control}
+                        name="qty"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="1"
+                                {...field}
+                                value={field.value || 1}
+                                onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : 1)}
+                                data-testid="input-panel-qty"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={panelForm.control}
+                        name="concreteStrengthMpa"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Concrete (MPa)</FormLabel>
+                            <FormControl>
+                              <Input placeholder="50" {...field} data-testid="input-panel-concrete" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-3">
+                      <FormField
+                        control={panelForm.control}
+                        name="loadWidth"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Width (mm)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="3000" 
+                                {...field} 
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const width = parseFloat(e.target.value) || 0;
+                                  const height = parseFloat(panelForm.getValues("loadHeight") || "0") || 0;
+                                  const thickness = parseFloat(panelForm.getValues("panelThickness") || "0") || 0;
+                                  if (width > 0 && height > 0 && thickness > 0) {
+                                    const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
+                                    const massKg = volumeM3 * 2500;
+                                    panelForm.setValue("panelVolume", volumeM3.toFixed(3));
+                                    panelForm.setValue("panelMass", Math.round(massKg).toString());
+                                  }
+                                }}
+                                data-testid="input-panel-width"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={panelForm.control}
+                        name="loadHeight"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Height (mm)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="2400" 
+                                {...field} 
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const width = parseFloat(panelForm.getValues("loadWidth") || "0") || 0;
+                                  const height = parseFloat(e.target.value) || 0;
+                                  const thickness = parseFloat(panelForm.getValues("panelThickness") || "0") || 0;
+                                  if (width > 0 && height > 0 && thickness > 0) {
+                                    const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
+                                    const massKg = volumeM3 * 2500;
+                                    panelForm.setValue("panelVolume", volumeM3.toFixed(3));
+                                    panelForm.setValue("panelMass", Math.round(massKg).toString());
+                                  }
+                                }}
+                                data-testid="input-panel-height"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={panelForm.control}
+                        name="panelThickness"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Thick (mm)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="200" 
+                                {...field} 
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  const width = parseFloat(panelForm.getValues("loadWidth") || "0") || 0;
+                                  const height = parseFloat(panelForm.getValues("loadHeight") || "0") || 0;
+                                  const thickness = parseFloat(e.target.value) || 0;
+                                  if (width > 0 && height > 0 && thickness > 0) {
+                                    const volumeM3 = (width / 1000) * (height / 1000) * (thickness / 1000);
+                                    const massKg = volumeM3 * 2500;
+                                    panelForm.setValue("panelVolume", volumeM3.toFixed(3));
+                                    panelForm.setValue("panelMass", Math.round(massKg).toString());
+                                  }
+                                }}
+                                data-testid="input-panel-thickness"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <FormField
+                        control={panelForm.control}
+                        name="panelVolume"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Volume (m³)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                className="bg-muted" 
+                                readOnly
+                                data-testid="input-panel-volume"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={panelForm.control}
+                        name="panelMass"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Mass (kg)</FormLabel>
+                            <FormControl>
+                              <Input 
+                                {...field} 
+                                className="bg-muted" 
+                                readOnly
+                                data-testid="input-panel-mass"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
               
