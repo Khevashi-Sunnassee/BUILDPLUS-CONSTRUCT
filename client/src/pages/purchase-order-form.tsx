@@ -23,8 +23,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle } from "lucide-react";
-import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User } from "@shared/schema";
+import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2 } from "lucide-react";
+import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job } from "@shared/schema";
 
 interface LineItem {
   id: string;
@@ -35,6 +35,8 @@ interface LineItem {
   unitOfMeasure: string;
   unitPrice: string;
   lineTotal: string;
+  jobId: string | null;
+  jobNumber?: string;
 }
 
 interface PurchaseOrderWithDetails extends PurchaseOrder {
@@ -73,6 +75,9 @@ export default function PurchaseOrderFormPage() {
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showJobDialog, setShowJobDialog] = useState(false);
+  const [jobSearchTerm, setJobSearchTerm] = useState("");
+  const [selectedLineIdForJob, setSelectedLineIdForJob] = useState<string | null>(null);
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers/active"],
@@ -81,6 +86,20 @@ export default function PurchaseOrderFormPage() {
   const { data: items = [], isLoading: loadingItems } = useQuery<Item[]>({
     queryKey: ["/api/items/active"],
   });
+
+  const { data: jobs = [] } = useQuery<Job[]>({
+    queryKey: ["/api/jobs"],
+  });
+
+  const filteredJobs = useMemo(() => {
+    if (!jobSearchTerm.trim()) return jobs;
+    const term = jobSearchTerm.toLowerCase();
+    return jobs.filter(job => 
+      job.jobNumber.toLowerCase().includes(term) ||
+      job.name.toLowerCase().includes(term) ||
+      job.clientName?.toLowerCase().includes(term)
+    );
+  }, [jobs, jobSearchTerm]);
 
   const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: ["/api/settings/logo"],
@@ -129,6 +148,8 @@ export default function PurchaseOrderFormPage() {
         unitOfMeasure: item.unitOfMeasure || "EA",
         unitPrice: item.unitPrice?.toString() || "0",
         lineTotal: item.lineTotal?.toString() || "0",
+        jobId: (item as any).jobId || null,
+        jobNumber: (item as any).jobNumber || "",
       }));
       setLineItems(mappedItems);
     }
@@ -280,8 +301,34 @@ export default function PurchaseOrderFormPage() {
       unitOfMeasure: "EA",
       unitPrice: "0.00",
       lineTotal: "0.00",
+      jobId: null,
+      jobNumber: "",
     };
     setLineItems(prev => [...prev, newItem]);
+  }, []);
+
+  const openJobSelector = useCallback((lineId: string) => {
+    setSelectedLineIdForJob(lineId);
+    setJobSearchTerm("");
+    setShowJobDialog(true);
+  }, []);
+
+  const handleJobSelect = useCallback((job: Job) => {
+    if (selectedLineIdForJob) {
+      setLineItems(prev => prev.map(line => {
+        if (line.id !== selectedLineIdForJob) return line;
+        return { ...line, jobId: job.id, jobNumber: job.jobNumber };
+      }));
+    }
+    setShowJobDialog(false);
+    setSelectedLineIdForJob(null);
+  }, [selectedLineIdForJob]);
+
+  const clearJobFromLine = useCallback((lineId: string) => {
+    setLineItems(prev => prev.map(line => {
+      if (line.id !== lineId) return line;
+      return { ...line, jobId: null, jobNumber: "" };
+    }));
   }, []);
 
   const removeLineItem = useCallback((id: string) => {
@@ -665,6 +712,7 @@ export default function PurchaseOrderFormPage() {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-[200px]">Item</TableHead>
+                    <TableHead className="w-[120px]">Job</TableHead>
                     <TableHead className="min-w-[200px]">Description</TableHead>
                     <TableHead className="w-[80px] text-right">Qty</TableHead>
                     <TableHead className="w-[80px]">Unit</TableHead>
@@ -677,7 +725,7 @@ export default function PurchaseOrderFormPage() {
                   {lineItems.length === 0 ? (
                     <TableRow>
                       <TableCell 
-                        colSpan={canEdit ? 7 : 6} 
+                        colSpan={canEdit ? 8 : 7} 
                         className="text-center py-8 text-muted-foreground"
                         data-testid="text-no-items"
                       >
@@ -712,6 +760,46 @@ export default function PurchaseOrderFormPage() {
                             </Select>
                           ) : (
                             <span className="text-sm">{line.itemCode || "-"}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-1">
+                          {canEdit ? (
+                            <div className="flex items-center gap-1">
+                              {line.jobId ? (
+                                <>
+                                  <Badge 
+                                    variant="secondary" 
+                                    className="font-mono cursor-pointer"
+                                    onClick={() => openJobSelector(line.id)}
+                                  >
+                                    {line.jobNumber}
+                                  </Badge>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6"
+                                    onClick={() => clearJobFromLine(line.id)}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  onClick={() => openJobSelector(line.id)}
+                                  data-testid={`button-select-job-${index}`}
+                                >
+                                  <Building2 className="h-3 w-3 mr-1" />
+                                  Select
+                                </Button>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm font-mono">{line.jobNumber || "-"}</span>
                           )}
                         </TableCell>
                         <TableCell className="p-1">
@@ -958,6 +1046,71 @@ export default function PurchaseOrderFormPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showJobDialog} onOpenChange={setShowJobDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Select Job</DialogTitle>
+            <DialogDescription>
+              Search and select a job to assign to this line item
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by job number, name, or client..."
+                value={jobSearchTerm}
+                onChange={(e) => setJobSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-job-search"
+              />
+            </div>
+            <div className="max-h-[300px] overflow-y-auto border rounded-lg">
+              {filteredJobs.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground">
+                  No jobs found
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {filteredJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      className="p-3 hover:bg-muted cursor-pointer transition-colors"
+                      onClick={() => handleJobSelect(job)}
+                      data-testid={`job-option-${job.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-mono font-medium">{job.jobNumber}</span>
+                          <span className="text-muted-foreground mx-2">-</span>
+                          <span>{job.name}</span>
+                        </div>
+                        {job.productionSlotColor && (
+                          <div 
+                            className="w-4 h-4 rounded-full" 
+                            style={{ backgroundColor: job.productionSlotColor }}
+                          />
+                        )}
+                      </div>
+                      {job.clientName && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          {job.clientName}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowJobDialog(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
