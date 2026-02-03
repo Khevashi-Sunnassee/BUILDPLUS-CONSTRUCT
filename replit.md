@@ -37,6 +37,7 @@ The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/
 - **Weekly Wage Reports**: Tracks weekly payroll costs across various categories and compares actual wages against estimated wages based on production revenue.
 - **Timezone Management**: All times are stored and displayed in the Australia/Melbourne timezone.
 - **Drafting Program**: Panel-level drafting scheduling system that links to production slots. Calculates Drawing Due Date (Production Date - IFC Days in Advance) and Drafting Window Start (Drawing Due Date - Days to Achieve IFC). Features resource assignment with proposed start dates, status tracking (NOT_SCHEDULED, SCHEDULED, IN_PROGRESS, COMPLETED, ON_HOLD), and grouping by job/level/week/assignee. Settings configurable: IFC Days in Advance (default 14), Days to Achieve IFC (default 21).
+- **Chat System**: Teams-style messaging with conversations (DM, GROUP, CHANNEL types). Features include @mentions with notification system, file attachments (up to 10 files per message stored at /uploads/chat), optional job/panel linking for context, read receipts, and per-user notification settings. Uses session-based authentication and respects "chat" permission from userPermissions table.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database for data storage.
