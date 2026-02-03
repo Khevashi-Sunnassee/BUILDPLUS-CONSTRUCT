@@ -34,6 +34,7 @@ import {
   BarChart3,
   QrCode,
   ExternalLink,
+  Printer,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1311,6 +1312,20 @@ export default function AdminPanelsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const job = jobs?.find(j => j.id === panel.jobId);
+                                    setQrCodePanel({ id: panel.id, panelMark: panel.panelMark, jobNumber: job?.jobNumber });
+                                    setQrCodeDialogOpen(true);
+                                  }}
+                                  title="View QR Code"
+                                  data-testid={`button-qr-panel-${panel.id}`}
+                                >
+                                  <QrCode className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
                                   onClick={(e) => { e.stopPropagation(); openEditDialog(panel); }}
                                   data-testid={`button-edit-panel-${panel.id}`}
                                 >
@@ -1416,6 +1431,20 @@ export default function AdminPanelsPage() {
                                   data-testid={`button-build-panel-${panel.id}`}
                                 >
                                   <Hammer className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const job = jobs?.find(j => j.id === panel.jobId);
+                                    setQrCodePanel({ id: panel.id, panelMark: panel.panelMark, jobNumber: job?.jobNumber });
+                                    setQrCodeDialogOpen(true);
+                                  }}
+                                  title="View QR Code"
+                                  data-testid={`button-qr-panel-${panel.id}`}
+                                >
+                                  <QrCode className="h-4 w-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -2631,6 +2660,82 @@ export default function AdminPanelsPage() {
                 >
                   <Download className="h-4 w-4 mr-2" />
                   Download
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    if (!qrCodePanel || !qrCodeRef.current) return;
+                    const printWindow = window.open('', '_blank', 'width=400,height=500');
+                    if (!printWindow) {
+                      toast({ variant: "destructive", title: "Popup Blocked", description: "Please allow popups to print the QR code" });
+                      return;
+                    }
+                    const svg = qrCodeRef.current.querySelector('svg');
+                    if (svg) {
+                      const svgData = new XMLSerializer().serializeToString(svg);
+                      printWindow.document.write(`
+                          <!DOCTYPE html>
+                          <html>
+                            <head>
+                              <title>QR Code - ${qrCodePanel.panelMark}</title>
+                              <style>
+                                body { 
+                                  display: flex; 
+                                  flex-direction: column; 
+                                  align-items: center; 
+                                  justify-content: center; 
+                                  min-height: 100vh; 
+                                  margin: 0; 
+                                  font-family: system-ui, sans-serif;
+                                }
+                                .panel-info { 
+                                  text-align: center; 
+                                  margin-bottom: 20px;
+                                }
+                                .panel-mark { 
+                                  font-size: 24px; 
+                                  font-weight: bold; 
+                                  font-family: monospace;
+                                }
+                                .job-number { 
+                                  font-size: 14px; 
+                                  color: #666; 
+                                  margin-top: 4px;
+                                }
+                                .qr-container { 
+                                  padding: 20px; 
+                                  background: white; 
+                                  border-radius: 8px;
+                                  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                                }
+                                @media print {
+                                  body { justify-content: flex-start; padding-top: 50px; }
+                                  .qr-container { box-shadow: none; }
+                                }
+                              </style>
+                            </head>
+                            <body>
+                              <div class="panel-info">
+                                <div class="panel-mark">${qrCodePanel.panelMark}</div>
+                                ${qrCodePanel.jobNumber ? `<div class="job-number">Job: ${qrCodePanel.jobNumber}</div>` : ''}
+                              </div>
+                              <div class="qr-container">${svgData}</div>
+                              <script>
+                                window.onload = function() {
+                                  window.print();
+                                  window.onafterprint = function() { window.close(); };
+                                };
+                              </script>
+                            </body>
+                          </html>
+                        `);
+                        printWindow.document.close();
+                      }
+                  }}
+                  data-testid="button-print-qr"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print
                 </Button>
                 <Button
                   variant="outline"
