@@ -231,6 +231,34 @@ export default function ChatPage() {
     },
   });
 
+  const deleteConversationMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      return apiRequest("DELETE", `/api/chat/conversations/${conversationId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      setSelectedConversationId(null);
+      toast({ title: "Conversation deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete conversation", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteMessageMutation = useMutation({
+    mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
+      return apiRequest("DELETE", `/api/chat/conversations/${conversationId}/messages/${messageId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", selectedConversationId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      toast({ title: "Message deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete message", description: error.message, variant: "destructive" });
+    },
+  });
+
   const handleSendMessage = () => {
     if (!messageContent.trim() && pendingFiles.length === 0) return;
     sendMessageMutation.mutate({ content: messageContent, files: pendingFiles });
@@ -585,6 +613,27 @@ export default function ChatPage() {
                     </ScrollArea>
                   </DialogContent>
                 </Dialog>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="icon" variant="ghost" data-testid="button-conversation-options">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onClick={() => {
+                        if (confirm("Are you sure you want to delete this conversation? This action cannot be undone.")) {
+                          deleteConversationMutation.mutate(selectedConversation.id);
+                        }
+                      }}
+                      data-testid="button-delete-conversation"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Conversation
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
 
@@ -596,20 +645,36 @@ export default function ChatPage() {
               ) : (
                 <div className="space-y-4">
                   {messages.map(msg => (
-                    <div key={msg.id} className="flex gap-3" data-testid={`message-${msg.id}`}>
+                    <div key={msg.id} className="flex gap-3 group" data-testid={`message-${msg.id}`}>
                       <Avatar className="h-8 w-8 shrink-0">
                         <AvatarFallback className="text-xs">
                           {getInitials(msg.sender?.name, msg.sender?.email)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
+                        <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">
                             {msg.sender?.name || msg.sender?.email || "Unknown"}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {format(new Date(msg.createdAt), "MMM d, h:mm a")}
                           </span>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                              if (confirm("Delete this message?")) {
+                                deleteMessageMutation.mutate({
+                                  conversationId: selectedConversation.id,
+                                  messageId: msg.id,
+                                });
+                              }
+                            }}
+                            data-testid={`button-delete-message-${msg.id}`}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                         </div>
                         <p className="text-sm mt-1 whitespace-pre-wrap">{msg.body}</p>
                         {msg.attachments && msg.attachments.length > 0 && (

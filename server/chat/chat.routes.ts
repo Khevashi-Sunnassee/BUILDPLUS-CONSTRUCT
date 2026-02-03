@@ -427,6 +427,66 @@ chatRouter.post("/conversations", requireAuth, requireChatPermission, async (req
   }
 });
 
+chatRouter.delete("/conversations/:conversationId", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const { conversationId } = req.params;
+
+    const membership = await db
+      .select()
+      .from(conversationMembers)
+      .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, userId)))
+      .limit(1);
+
+    if (!membership.length) {
+      return res.status(403).json({ error: "Not a member of this conversation" });
+    }
+
+    if (membership[0].role !== "OWNER" && membership[0].role !== "ADMIN") {
+      return res.status(403).json({ error: "Only owners and admins can delete conversations" });
+    }
+
+    await db.delete(conversations).where(eq(conversations.id, conversationId));
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.delete("/conversations/:conversationId/messages/:messageId", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const { conversationId, messageId } = req.params;
+
+    const message = await db
+      .select()
+      .from(chatMessages)
+      .where(and(eq(chatMessages.id, messageId), eq(chatMessages.conversationId, conversationId)))
+      .limit(1);
+
+    if (!message.length) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    if (message[0].senderId !== userId) {
+      const membership = await db
+        .select()
+        .from(conversationMembers)
+        .where(and(eq(conversationMembers.conversationId, conversationId), eq(conversationMembers.userId, userId)))
+        .limit(1);
+
+      if (!membership.length || (membership[0].role !== "OWNER" && membership[0].role !== "ADMIN")) {
+        return res.status(403).json({ error: "Only message sender or admins can delete messages" });
+      }
+    }
+
+    await db.delete(chatMessages).where(eq(chatMessages.id, messageId));
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
 chatRouter.post("/messages", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
