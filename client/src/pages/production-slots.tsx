@@ -214,6 +214,7 @@ export default function ProductionSlotsPage() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
       setBookingPanelId(null);
       setBookingDate("");
       if (data.created > 0) {
@@ -235,6 +236,7 @@ export default function ProductionSlotsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
       toast({ title: "Unbooked", description: "Panel removed from production schedule" });
     },
     onError: (error: any) => {

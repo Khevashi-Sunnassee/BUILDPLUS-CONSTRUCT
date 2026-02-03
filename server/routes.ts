@@ -1682,8 +1682,13 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Production entry not found" });
       }
       
+      // Reset panel status back to PENDING
+      if (entry.panelId) {
+        await storage.updatePanelRegisterItem(entry.panelId, { status: "PENDING" });
+      }
+      
       await storage.deleteProductionEntry(entryId);
-      res.json({ success: true });
+      res.json({ ok: true });
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Failed to delete production entry" });
     }
@@ -1779,6 +1784,10 @@ export async function registerRoutes(
             areaM2: panel.panelArea || null,
             userId: req.session.userId!,
           });
+          
+          // Update panel status to BOOKED
+          await storage.updatePanelRegisterItem(assignment.panelId, { status: "BOOKED" });
+          
           results.created++;
         } catch (err: any) {
           results.errors.push(`Failed to assign panel: ${err.message}`);
