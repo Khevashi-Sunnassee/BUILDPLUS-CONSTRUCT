@@ -574,7 +574,7 @@ export default function AdminPanelTypesPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingType ? "Edit Panel Type" : "Add Panel Type"}
@@ -584,352 +584,361 @@ export default function AdminPanelTypesPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="code"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Code</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="WALL"
-                          {...field}
-                          data-testid="input-panel-type-code"
-                        />
-                      </FormControl>
-                      <FormDescription>Unique identifier (uppercase)</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Wall Panel"
-                          {...field}
-                          data-testid="input-panel-type-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-6">
+                {/* Left Column - Basic Info */}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="code"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Code</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="WALL"
+                              {...field}
+                              data-testid="input-panel-type-code"
+                            />
+                          </FormControl>
+                          <FormDescription>Unique identifier (uppercase)</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Wall Panel"
+                              {...field}
+                              data-testid="input-panel-type-name"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Description of this panel type..."
-                        {...field}
-                        data-testid="input-panel-type-description"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Cost Rates
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="supplyCostPerM2"
+                    name="description"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Supply Cost per m²</FormLabel>
+                        <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7"
-                              {...field}
-                              data-testid="input-supply-cost-m2"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="supplyCostPerM3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Supply Cost per m³</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7"
-                              {...field}
-                              data-testid="input-supply-cost-m3"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="installCostPerM2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Install Cost per m²</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7"
-                              {...field}
-                              data-testid="input-install-cost-m2"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="installCostPerM3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Install Cost per m³</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7"
-                              {...field}
-                              data-testid="input-install-cost-m3"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-medium flex items-center gap-2">
-                  <DollarSign className="h-4 w-4" />
-                  Total Cost (Auto-calculated: Supply + Install)
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="totalRatePerM2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Cost per m²</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7 bg-muted"
-                              {...field}
-                              readOnly
-                              data-testid="input-total-rate-m2"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="totalRatePerM3"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Total Cost per m³</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7 bg-muted"
-                              {...field}
-                              readOnly
-                              data-testid="input-total-rate-m3"
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-medium flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <DollarSign className="h-4 w-4" />
-                  Margin & Sell Rates
-                </h4>
-                <p className="text-sm text-muted-foreground">
-                  Set the margin percentage to automatically calculate sell rates for both m² and m³.
-                </p>
-                <FormField
-                  control={form.control}
-                  name="marginPercent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Margin %</FormLabel>
-                      <FormControl>
-                        <div className="relative w-32">
-                          <Input
-                            type="number"
-                            step="0.1"
-                            placeholder="20"
-                            className="pr-7"
+                          <Textarea
+                            placeholder="Description of this panel type..."
+                            rows={2}
                             {...field}
-                            data-testid="input-margin-percent"
+                            data-testid="input-panel-type-description"
                           />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="sellRatePerM2"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Sell Rate per m² (Auto-calculated)</FormLabel>
-                        <FormControl>
-                          <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7 bg-muted"
-                              {...field}
-                              readOnly
-                              data-testid="input-sell-rate-m2"
-                            />
-                          </div>
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+
+                  <div className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <DollarSign className="h-4 w-4" />
+                      Cost Rates
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="supplyCostPerM2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Supply Cost/m²</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9"
+                                  {...field}
+                                  data-testid="input-supply-cost-m2"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="supplyCostPerM3"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Supply Cost/m³</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9"
+                                  {...field}
+                                  data-testid="input-supply-cost-m3"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="installCostPerM2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Install Cost/m²</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9"
+                                  {...field}
+                                  data-testid="input-install-cost-m2"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="installCostPerM3"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Install Cost/m³</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9"
+                                  {...field}
+                                  data-testid="input-install-cost-m3"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2 text-xs text-muted-foreground">
+                      <DollarSign className="h-3 w-3" />
+                      Total Cost (Auto-calculated)
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="totalRatePerM2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Total/m²</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9 bg-muted"
+                                  {...field}
+                                  readOnly
+                                  data-testid="input-total-rate-m2"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="totalRatePerM3"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Total/m³</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9 bg-muted"
+                                  {...field}
+                                  readOnly
+                                  data-testid="input-total-rate-m3"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Margin, Sell Rates, Weight, Active */}
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <h4 className="font-medium flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <DollarSign className="h-4 w-4" />
+                      Margin & Sell Rates
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      Set margin % to auto-calculate sell rates.
+                    </p>
+                    <FormField
+                      control={form.control}
+                      name="marginPercent"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Margin %</FormLabel>
+                          <FormControl>
+                            <div className="relative w-28">
+                              <Input
+                                type="number"
+                                step="0.1"
+                                placeholder="20"
+                                className="pr-7 h-9"
+                                {...field}
+                                data-testid="input-margin-percent"
+                              />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-3">
+                      <FormField
+                        control={form.control}
+                        name="sellRatePerM2"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Sell Rate/m²</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9 bg-muted"
+                                  {...field}
+                                  readOnly
+                                  data-testid="input-sell-rate-m2"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="sellRatePerM3"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Sell Rate/m³</FormLabel>
+                            <FormControl>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  placeholder="0.00"
+                                  className="pl-7 h-9 bg-muted"
+                                  {...field}
+                                  readOnly
+                                  data-testid="input-sell-rate-m3"
+                                />
+                              </div>
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+
                   <FormField
                     control={form.control}
-                    name="sellRatePerM3"
+                    name="expectedWeightPerM3"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Sell Rate per m³ (Auto-calculated)</FormLabel>
+                        <FormLabel className="text-xs">Expected Weight per m³</FormLabel>
                         <FormControl>
                           <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                             <Input
                               type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              className="pl-7 bg-muted"
+                              step="1"
+                              placeholder="2500"
+                              className="pr-10 h-9"
                               {...field}
-                              readOnly
-                              data-testid="input-sell-rate-m3"
+                              data-testid="input-expected-weight-m3"
                             />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">kg</span>
                           </div>
                         </FormControl>
+                        <FormDescription className="text-xs">
+                          Default weight per m³ for load calculations
+                        </FormDescription>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="isActive"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-sm">Active</FormLabel>
+                          <FormDescription className="text-xs">
+                            Inactive types won't appear in menus
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-panel-type-active"
+                          />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
                 </div>
               </div>
-
-              <FormField
-                control={form.control}
-                name="expectedWeightPerM3"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expected Weight per m³</FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Input
-                          type="number"
-                          step="1"
-                          placeholder="2500"
-                          className="pr-10"
-                          {...field}
-                          data-testid="input-expected-weight-m3"
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">kg</span>
-                      </div>
-                    </FormControl>
-                    <FormDescription>
-                      Default weight per cubic meter for load calculations
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="isActive"
-                render={({ field }) => (
-                  <FormItem className="flex items-center justify-between rounded-lg border p-4">
-                    <div className="space-y-0.5">
-                      <FormLabel className="text-base">Active</FormLabel>
-                      <FormDescription>
-                        Inactive panel types won't appear in dropdown menus
-                      </FormDescription>
-                    </div>
-                    <FormControl>
-                      <Switch
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
-                        data-testid="switch-panel-type-active"
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
 
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
