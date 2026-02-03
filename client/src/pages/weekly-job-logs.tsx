@@ -116,6 +116,24 @@ export default function WeeklyJobLogsPage() {
     const slot = productionSlots.find(s => s.jobId === jobId && s.level === level);
     return slot ? format(new Date(slot.productionSlotDate), "dd/MM/yyyy") : null;
   };
+
+  const getProductionSlotRawDate = (jobId: string, level: string | null): Date | null => {
+    if (!level) return null;
+    const slot = productionSlots.find(s => s.jobId === jobId && s.level === level);
+    return slot ? new Date(slot.productionSlotDate) : null;
+  };
+
+  const isWithinWarningWindow = (targetDate: Date, productionDate: Date | null): boolean => {
+    if (!productionDate) return false;
+    const diffDays = Math.abs(Math.ceil((productionDate.getTime() - targetDate.getTime()) / (1000 * 60 * 60 * 24)));
+    return diffDays <= 10;
+  };
+
+  const getTargetDate = (baseDate: string, daysOffset: number): Date => {
+    const base = new Date(baseDate);
+    base.setDate(base.getDate() + daysOffset);
+    return base;
+  };
   
   // Filter to only active jobs
   const activeJobs = allJobs.filter((job) => job.status === "ACTIVE");
@@ -585,7 +603,23 @@ export default function WeeklyJobLogsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {schedules.map((schedule, index) => (
+                    {schedules.map((schedule, index) => {
+                      const jobId = schedule.jobId;
+                      const baseDate = reportDate || format(new Date(), "yyyy-MM-dd");
+                      
+                      const currentProdDate = getProductionSlotRawDate(jobId, schedule.currentLevelOnsite);
+                      const day7ProdDate = getProductionSlotRawDate(jobId, schedule.levels7Days);
+                      const day14ProdDate = getProductionSlotRawDate(jobId, schedule.levels14Days);
+                      const day21ProdDate = getProductionSlotRawDate(jobId, schedule.levels21Days);
+                      const day28ProdDate = getProductionSlotRawDate(jobId, schedule.levels28Days);
+                      
+                      const isCurrentWarning = isWithinWarningWindow(getTargetDate(baseDate, 0), currentProdDate);
+                      const is7DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 7), day7ProdDate);
+                      const is14DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 14), day14ProdDate);
+                      const is21DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 21), day21ProdDate);
+                      const is28DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 28), day28ProdDate);
+                      
+                      return (
                       <TableRow key={index} data-testid={`row-schedule-${index}`}>
                         <TableCell>
                           <Select value={schedule.jobId} onValueChange={(v) => updateSchedule(index, "jobId", v)}>
@@ -602,19 +636,44 @@ export default function WeeklyJobLogsPage() {
                           </Select>
                         </TableCell>
                         <TableCell>
-                          <Input value={schedule.currentLevelOnsite || ""} onChange={(e) => updateSchedule(index, "currentLevelOnsite", e.target.value || null)} placeholder="e.g. L2" data-testid={`input-current-level-${index}`} />
+                          <Input value={schedule.currentLevelOnsite || ""} onChange={(e) => updateSchedule(index, "currentLevelOnsite", e.target.value || null)} placeholder="e.g. L2" data-testid={`input-current-level-${index}`} className={isCurrentWarning ? "border-red-500" : ""} />
+                          {schedule.currentLevelOnsite && getProductionSlotDate(jobId, schedule.currentLevelOnsite) && (
+                            <div className={`text-xs mt-1 ${isCurrentWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                              {getProductionSlotDate(jobId, schedule.currentLevelOnsite)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Input value={schedule.levels7Days} onChange={(e) => updateSchedule(index, "levels7Days", e.target.value)} placeholder="Level" data-testid={`input-day7-${index}`} />
+                          <Input value={schedule.levels7Days} onChange={(e) => updateSchedule(index, "levels7Days", e.target.value)} placeholder="Level" data-testid={`input-day7-${index}`} className={is7DayWarning ? "border-red-500" : ""} />
+                          {schedule.levels7Days && getProductionSlotDate(jobId, schedule.levels7Days) && (
+                            <div className={`text-xs mt-1 ${is7DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                              {getProductionSlotDate(jobId, schedule.levels7Days)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Input value={schedule.levels14Days} onChange={(e) => updateSchedule(index, "levels14Days", e.target.value)} placeholder="Level" data-testid={`input-day14-${index}`} />
+                          <Input value={schedule.levels14Days} onChange={(e) => updateSchedule(index, "levels14Days", e.target.value)} placeholder="Level" data-testid={`input-day14-${index}`} className={is14DayWarning ? "border-red-500" : ""} />
+                          {schedule.levels14Days && getProductionSlotDate(jobId, schedule.levels14Days) && (
+                            <div className={`text-xs mt-1 ${is14DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                              {getProductionSlotDate(jobId, schedule.levels14Days)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Input value={schedule.levels21Days} onChange={(e) => updateSchedule(index, "levels21Days", e.target.value)} placeholder="Level" data-testid={`input-day21-${index}`} />
+                          <Input value={schedule.levels21Days} onChange={(e) => updateSchedule(index, "levels21Days", e.target.value)} placeholder="Level" data-testid={`input-day21-${index}`} className={is21DayWarning ? "border-red-500" : ""} />
+                          {schedule.levels21Days && getProductionSlotDate(jobId, schedule.levels21Days) && (
+                            <div className={`text-xs mt-1 ${is21DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                              {getProductionSlotDate(jobId, schedule.levels21Days)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
-                          <Input value={schedule.levels28Days} onChange={(e) => updateSchedule(index, "levels28Days", e.target.value)} placeholder="Level" data-testid={`input-day28-${index}`} />
+                          <Input value={schedule.levels28Days} onChange={(e) => updateSchedule(index, "levels28Days", e.target.value)} placeholder="Level" data-testid={`input-day28-${index}`} className={is28DayWarning ? "border-red-500" : ""} />
+                          {schedule.levels28Days && getProductionSlotDate(jobId, schedule.levels28Days) && (
+                            <div className={`text-xs mt-1 ${is28DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                              {getProductionSlotDate(jobId, schedule.levels28Days)}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Select value={schedule.scheduleStatus} onValueChange={(v) => updateSchedule(index, "scheduleStatus", v)}>
@@ -643,7 +702,8 @@ export default function WeeklyJobLogsPage() {
                           </Button>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -716,37 +776,51 @@ export default function WeeklyJobLogsPage() {
                     <TableBody>
                       {selectedReport.schedules.map((schedule) => {
                         const jobId = schedule.jobId;
+                        const baseDate = selectedReport.reportDate;
+                        
+                        const currentProdDate = getProductionSlotRawDate(jobId, schedule.currentLevelOnsite);
+                        const day7ProdDate = getProductionSlotRawDate(jobId, schedule.levels7Days);
+                        const day14ProdDate = getProductionSlotRawDate(jobId, schedule.levels14Days);
+                        const day21ProdDate = getProductionSlotRawDate(jobId, schedule.levels21Days);
+                        const day28ProdDate = getProductionSlotRawDate(jobId, schedule.levels28Days);
+                        
+                        const isCurrentWarning = isWithinWarningWindow(getTargetDate(baseDate, 0), currentProdDate);
+                        const is7DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 7), day7ProdDate);
+                        const is14DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 14), day14ProdDate);
+                        const is21DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 21), day21ProdDate);
+                        const is28DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 28), day28ProdDate);
+                        
                         return (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">{schedule.job?.jobNumber} - {schedule.job?.name}</TableCell>
-                          <TableCell>
-                            <div>{schedule.currentLevelOnsite || "-"}</div>
+                          <TableCell className={isCurrentWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={isCurrentWarning ? "text-red-600 font-medium" : ""}>{schedule.currentLevelOnsite || "-"}</div>
                             {schedule.currentLevelOnsite && getProductionSlotDate(jobId, schedule.currentLevelOnsite) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.currentLevelOnsite)}</div>
+                              <div className={`text-xs ${isCurrentWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.currentLevelOnsite)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels7Days || "-"}</div>
+                          <TableCell className={is7DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is7DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels7Days || "-"}</div>
                             {schedule.levels7Days && getProductionSlotDate(jobId, schedule.levels7Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels7Days)}</div>
+                              <div className={`text-xs ${is7DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels7Days)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels14Days || "-"}</div>
+                          <TableCell className={is14DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is14DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels14Days || "-"}</div>
                             {schedule.levels14Days && getProductionSlotDate(jobId, schedule.levels14Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels14Days)}</div>
+                              <div className={`text-xs ${is14DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels14Days)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels21Days || "-"}</div>
+                          <TableCell className={is21DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is21DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels21Days || "-"}</div>
                             {schedule.levels21Days && getProductionSlotDate(jobId, schedule.levels21Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels21Days)}</div>
+                              <div className={`text-xs ${is21DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels21Days)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels28Days || "-"}</div>
+                          <TableCell className={is28DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is28DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels28Days || "-"}</div>
                             {schedule.levels28Days && getProductionSlotDate(jobId, schedule.levels28Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels28Days)}</div>
+                              <div className={`text-xs ${is28DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels28Days)}</div>
                             )}
                           </TableCell>
                           <TableCell>
@@ -823,37 +897,51 @@ export default function WeeklyJobLogsPage() {
                     <TableBody>
                       {selectedReport.schedules.map((schedule) => {
                         const jobId = schedule.jobId;
+                        const baseDate = selectedReport.reportDate;
+                        
+                        const currentProdDate = getProductionSlotRawDate(jobId, schedule.currentLevelOnsite);
+                        const day7ProdDate = getProductionSlotRawDate(jobId, schedule.levels7Days);
+                        const day14ProdDate = getProductionSlotRawDate(jobId, schedule.levels14Days);
+                        const day21ProdDate = getProductionSlotRawDate(jobId, schedule.levels21Days);
+                        const day28ProdDate = getProductionSlotRawDate(jobId, schedule.levels28Days);
+                        
+                        const isCurrentWarning = isWithinWarningWindow(getTargetDate(baseDate, 0), currentProdDate);
+                        const is7DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 7), day7ProdDate);
+                        const is14DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 14), day14ProdDate);
+                        const is21DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 21), day21ProdDate);
+                        const is28DayWarning = isWithinWarningWindow(getTargetDate(baseDate, 28), day28ProdDate);
+                        
                         return (
                         <TableRow key={schedule.id}>
                           <TableCell className="font-medium">{schedule.job?.jobNumber} - {schedule.job?.name}</TableCell>
-                          <TableCell>
-                            <div>{schedule.currentLevelOnsite || "-"}</div>
+                          <TableCell className={isCurrentWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={isCurrentWarning ? "text-red-600 font-medium" : ""}>{schedule.currentLevelOnsite || "-"}</div>
                             {schedule.currentLevelOnsite && getProductionSlotDate(jobId, schedule.currentLevelOnsite) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.currentLevelOnsite)}</div>
+                              <div className={`text-xs ${isCurrentWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.currentLevelOnsite)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels7Days || "-"}</div>
+                          <TableCell className={is7DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is7DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels7Days || "-"}</div>
                             {schedule.levels7Days && getProductionSlotDate(jobId, schedule.levels7Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels7Days)}</div>
+                              <div className={`text-xs ${is7DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels7Days)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels14Days || "-"}</div>
+                          <TableCell className={is14DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is14DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels14Days || "-"}</div>
                             {schedule.levels14Days && getProductionSlotDate(jobId, schedule.levels14Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels14Days)}</div>
+                              <div className={`text-xs ${is14DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels14Days)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels21Days || "-"}</div>
+                          <TableCell className={is21DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is21DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels21Days || "-"}</div>
                             {schedule.levels21Days && getProductionSlotDate(jobId, schedule.levels21Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels21Days)}</div>
+                              <div className={`text-xs ${is21DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels21Days)}</div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div>{schedule.levels28Days || "-"}</div>
+                          <TableCell className={is28DayWarning ? "bg-red-100 dark:bg-red-900/30" : ""}>
+                            <div className={is28DayWarning ? "text-red-600 font-medium" : ""}>{schedule.levels28Days || "-"}</div>
                             {schedule.levels28Days && getProductionSlotDate(jobId, schedule.levels28Days) && (
-                              <div className="text-xs text-muted-foreground">{getProductionSlotDate(jobId, schedule.levels28Days)}</div>
+                              <div className={`text-xs ${is28DayWarning ? "text-red-500 font-medium" : "text-muted-foreground"}`}>{getProductionSlotDate(jobId, schedule.levels28Days)}</div>
                             )}
                           </TableCell>
                           <TableCell>
