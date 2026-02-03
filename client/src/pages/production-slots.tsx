@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings } from "@shared/schema";
 
@@ -80,6 +80,12 @@ export default function ProductionSlotsPage() {
   // Panel assignment state
   const [selectedPanelIds, setSelectedPanelIds] = useState<Set<string>>(new Set());
   const [panelAssignmentDate, setPanelAssignmentDate] = useState<string>("");
+  
+  // Panel breakdown search/filter state
+  const [panelSearchQuery, setPanelSearchQuery] = useState<string>("");
+  const [panelStatusFilter, setPanelStatusFilter] = useState<string>("all");
+  const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
+  const [expandedPanelTypes, setExpandedPanelTypes] = useState<Set<string>>(new Set());
 
   const { data: slots = [], isLoading: loadingSlots } = useQuery<ProductionSlotWithDetails[]>({
     queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
@@ -289,6 +295,59 @@ export default function ProductionSlotsPage() {
     }
     return groups;
   };
+  
+  // Get unique panel types and statuses for filter dropdowns
+  const uniquePanelTypes = [...new Set(panelsForSlot.map(p => p.panelType || "Unknown"))].sort();
+  const uniquePanelStatuses = [...new Set(panelsForSlot.map(p => p.status || "NOT_STARTED"))].sort();
+  
+  // Filter and group panels
+  const filteredPanels = panelsForSlot.filter(panel => {
+    const matchesSearch = panelSearchQuery === "" || 
+      (panel.panelMark?.toLowerCase().includes(panelSearchQuery.toLowerCase())) ||
+      (panel.panelType?.toLowerCase().includes(panelSearchQuery.toLowerCase()));
+    const matchesStatus = panelStatusFilter === "all" || (panel.status || "NOT_STARTED") === panelStatusFilter;
+    const matchesType = panelTypeFilter === "all" || (panel.panelType || "Unknown") === panelTypeFilter;
+    return matchesSearch && matchesStatus && matchesType;
+  });
+  
+  const panelsByType = filteredPanels.reduce((acc, panel) => {
+    const type = panel.panelType || "Unknown";
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(panel);
+    return acc;
+  }, {} as Record<string, PanelRegister[]>);
+  
+  const togglePanelTypeGroup = (type: string) => {
+    setExpandedPanelTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(type)) {
+        next.delete(type);
+      } else {
+        next.add(type);
+      }
+      return next;
+    });
+  };
+  
+  const toggleSelectAllInType = (type: string, panels: PanelRegister[]) => {
+    const panelIds = panels.map(p => p.id);
+    const allSelected = panelIds.every(id => selectedPanelIds.has(id));
+    const newSet = new Set(selectedPanelIds);
+    if (allSelected) {
+      panelIds.forEach(id => newSet.delete(id));
+    } else {
+      panelIds.forEach(id => newSet.add(id));
+    }
+    setSelectedPanelIds(newSet);
+  };
+  
+  // Expand all panel type groups when dialog opens
+  useEffect(() => {
+    if (showPanelBreakdownDialog && panelsForSlot.length > 0) {
+      const types = [...new Set(panelsForSlot.map(p => p.panelType || "Unknown"))];
+      setExpandedPanelTypes(new Set(types));
+    }
+  }, [showPanelBreakdownDialog, panelsForSlot]);
 
   const toggleGroup = (groupKey: string) => {
     setExpandedGroups(prev => {
@@ -857,6 +916,9 @@ export default function ProductionSlotsPage() {
         if (!open) {
           setSelectedPanelIds(new Set());
           setPanelAssignmentDate("");
+          setPanelSearchQuery("");
+          setPanelStatusFilter("all");
+          setPanelTypeFilter("all");
         }
       }}>
         <DialogContent className="max-w-5xl max-h-[85vh]">
@@ -876,6 +938,46 @@ export default function ProductionSlotsPage() {
               )}
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Search and Filter Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="md:col-span-2 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by panel mark or type..."
+                value={panelSearchQuery}
+                onChange={(e) => setPanelSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-panel-search"
+              />
+            </div>
+            <div>
+              <Select value={panelTypeFilter} onValueChange={setPanelTypeFilter}>
+                <SelectTrigger data-testid="select-panel-type-filter">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {uniquePanelTypes.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Select value={panelStatusFilter} onValueChange={setPanelStatusFilter}>
+                <SelectTrigger data-testid="select-panel-status-filter">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {uniquePanelStatuses.map(status => (
+                    <SelectItem key={status} value={status}>{status.replace("_", " ")}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           
           {/* Panel Assignment Controls */}
           {selectedSlot && selectedSlot.status === "BOOKED" && isManagerOrAdmin && (
@@ -928,72 +1030,99 @@ export default function ProductionSlotsPage() {
           <div className="max-h-[50vh] overflow-y-auto">
             {panelsForSlot.length === 0 ? (
               <p className="text-muted-foreground text-center py-4">No panels found for this level</p>
+            ) : filteredPanels.length === 0 ? (
+              <p className="text-muted-foreground text-center py-4">No panels match your search criteria</p>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
-                      <TableHead className="w-12">
-                        <Checkbox
-                          checked={selectedPanelIds.size === panelsForSlot.length && panelsForSlot.length > 0}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedPanelIds(new Set(panelsForSlot.map(p => p.id)));
-                            } else {
-                              setSelectedPanelIds(new Set());
-                            }
-                          }}
-                          data-testid="checkbox-select-all-panels"
-                        />
-                      </TableHead>
-                    )}
-                    <TableHead>Panel Mark</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Load Width</TableHead>
-                    <TableHead>Load Height</TableHead>
-                    <TableHead>Thickness</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {panelsForSlot.map((panel) => (
-                    <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
-                      {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedPanelIds.has(panel.id)}
-                            onCheckedChange={(checked) => {
-                              const newSet = new Set(selectedPanelIds);
-                              if (checked) {
-                                newSet.add(panel.id);
-                              } else {
-                                newSet.delete(panel.id);
-                              }
-                              setSelectedPanelIds(newSet);
-                            }}
-                            data-testid={`checkbox-panel-${panel.id}`}
-                          />
-                        </TableCell>
-                      )}
-                      <TableCell className="font-medium">{panel.panelMark || "-"}</TableCell>
-                      <TableCell>{panel.panelType || "-"}</TableCell>
-                      <TableCell>{panel.loadWidth || "-"}</TableCell>
-                      <TableCell>{panel.loadHeight || "-"}</TableCell>
-                      <TableCell>{panel.panelThickness || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant={panel.status === "COMPLETED" ? "default" : "secondary"}>
-                          {panel.status || "NOT_STARTED"}
+              <div className="space-y-2">
+                {Object.entries(panelsByType).sort(([a], [b]) => a.localeCompare(b)).map(([type, panels]) => (
+                  <Collapsible 
+                    key={type}
+                    open={expandedPanelTypes.has(type)}
+                    onOpenChange={() => togglePanelTypeGroup(type)}
+                  >
+                    <CollapsibleTrigger asChild>
+                      <div 
+                        className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg cursor-pointer hover-elevate"
+                        data-testid={`trigger-panel-type-${type}`}
+                      >
+                        {expandedPanelTypes.has(type) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        <Layers className="h-4 w-4" />
+                        <span className="font-medium">{type}</span>
+                        <Badge variant="secondary" className="ml-auto">
+                          {panels.length} panel{panels.length !== 1 ? "s" : ""}
                         </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                        {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
+                          <Checkbox
+                            checked={panels.every(p => selectedPanelIds.has(p.id))}
+                            onCheckedChange={() => toggleSelectAllInType(type, panels)}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`checkbox-select-all-${type}`}
+                          />
+                        )}
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="ml-4 mt-1 border-l-2 pl-2">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
+                                <TableHead className="w-12"></TableHead>
+                              )}
+                              <TableHead>Panel Mark</TableHead>
+                              <TableHead>Load Width</TableHead>
+                              <TableHead>Load Height</TableHead>
+                              <TableHead>Thickness</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {panels.map((panel) => (
+                              <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                                {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
+                                  <TableCell>
+                                    <Checkbox
+                                      checked={selectedPanelIds.has(panel.id)}
+                                      onCheckedChange={(checked) => {
+                                        const newSet = new Set(selectedPanelIds);
+                                        if (checked) {
+                                          newSet.add(panel.id);
+                                        } else {
+                                          newSet.delete(panel.id);
+                                        }
+                                        setSelectedPanelIds(newSet);
+                                      }}
+                                      data-testid={`checkbox-panel-${panel.id}`}
+                                    />
+                                  </TableCell>
+                                )}
+                                <TableCell className="font-medium">{panel.panelMark || "-"}</TableCell>
+                                <TableCell>{panel.loadWidth || "-"}</TableCell>
+                                <TableCell>{panel.loadHeight || "-"}</TableCell>
+                                <TableCell>{panel.panelThickness || "-"}</TableCell>
+                                <TableCell>
+                                  <Badge variant={panel.status === "COMPLETED" ? "default" : "secondary"}>
+                                    {panel.status || "NOT_STARTED"}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                ))}
+              </div>
             )}
           </div>
           <DialogFooter className="flex justify-between items-center gap-2">
             <div className="text-sm text-muted-foreground">
-              Summary: {Object.entries(groupedByPanelType(panelsForSlot)).map(([type, count]) => `${type}: ${count}`).join(", ")}
+              Total: {panelsForSlot.length} panels | Showing: {filteredPanels.length} | Types: {Object.keys(panelsByType).length}
             </div>
             <Button variant="outline" onClick={() => setShowPanelBreakdownDialog(false)}>Close</Button>
           </DialogFooter>
