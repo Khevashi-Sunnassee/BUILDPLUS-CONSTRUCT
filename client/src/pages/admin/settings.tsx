@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,7 @@ export default function AdminSettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState("");
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
+  const [productionWindowDays, setProductionWindowDays] = useState<number>(10);
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -48,7 +49,7 @@ export default function AdminSettingsPage() {
     queryKey: ["/api/admin/settings"],
   });
 
-  // Sync company name and week start day from settings
+  // Sync company name, week start day, and production window days from settings
   useEffect(() => {
     if (settings?.companyName) {
       setCompanyName(settings.companyName);
@@ -56,7 +57,10 @@ export default function AdminSettingsPage() {
     if (settings?.weekStartDay !== undefined) {
       setWeekStartDay(settings.weekStartDay);
     }
-  }, [settings?.companyName, settings?.weekStartDay]);
+    if (settings?.productionWindowDays !== undefined) {
+      setProductionWindowDays(settings.productionWindowDays);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -82,6 +86,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save week start day", variant: "destructive" });
+    },
+  });
+
+  const saveProductionWindowDaysMutation = useMutation({
+    mutationFn: async (days: number) => {
+      return apiRequest("PUT", "/api/admin/settings", { productionWindowDays: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Production window days saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save production window days", variant: "destructive" });
     },
   });
 
@@ -350,6 +367,54 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Weekly Job Reports will be aligned to this day. Users can only select dates that fall on this day.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Production Configuration Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Factory className="h-5 w-5" />
+            Production Configuration
+          </CardTitle>
+          <CardDescription>
+            Configure production scheduling parameters
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="productionWindowDays">Production Window Days</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={productionWindowDays}
+                onChange={(e) => setProductionWindowDays(parseInt(e.target.value) || 10)}
+                className="w-24"
+                data-testid="input-production-window-days"
+              />
+              <span className="text-muted-foreground">days before due date</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveProductionWindowDaysMutation.mutate(productionWindowDays)}
+                disabled={saveProductionWindowDaysMutation.isPending || productionWindowDays === settings?.productionWindowDays}
+                data-testid="button-save-production-window-days"
+              >
+                {saveProductionWindowDaysMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Number of days before the Production Due Date when production can start. This defines the production window for scheduling panels.
             </p>
           </div>
         </CardContent>

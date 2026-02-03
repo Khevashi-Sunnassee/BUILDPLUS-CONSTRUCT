@@ -547,6 +547,13 @@ export async function registerRoutes(
       }
       req.body.weekStartDay = weekStartDay;
     }
+    if (req.body.productionWindowDays !== undefined) {
+      const productionWindowDays = parseInt(req.body.productionWindowDays, 10);
+      if (isNaN(productionWindowDays) || productionWindowDays < 1 || productionWindowDays > 60) {
+        return res.status(400).json({ error: "productionWindowDays must be a number between 1 and 60" });
+      }
+      req.body.productionWindowDays = productionWindowDays;
+    }
     const settings = await storage.updateGlobalSettings(req.body);
     res.json(settings);
   });
@@ -1637,6 +1644,109 @@ export async function registerRoutes(
     }
     
     res.json({ updated: updated.length });
+  });
+
+  // Bulk assign panels to production dates (for Production Slots workflow)
+  app.post("/api/production-slots/:slotId/assign-panels", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const { slotId } = req.params;
+      const { panelAssignments, factory } = req.body as {
+        panelAssignments: { panelId: string; productionDate: string }[];
+        factory?: string;
+      };
+
+      if (!panelAssignments || !Array.isArray(panelAssignments) || panelAssignments.length === 0) {
+        return res.status(400).json({ error: "Panel assignments are required" });
+      }
+
+      // Get the production slot and global settings for validation
+      const slot = await storage.getProductionSlot(slotId);
+      if (!slot) {
+        return res.status(404).json({ error: "Production slot not found" });
+      }
+      
+      // Verify slot is in BOOKED status
+      if (slot.status !== "BOOKED") {
+        return res.status(400).json({ error: "Production slot must be in BOOKED status to assign panels" });
+      }
+      
+      // Get job details to derive factory
+      const job = await storage.getJob(slot.jobId);
+      if (!job) {
+        return res.status(404).json({ error: "Job not found for production slot" });
+      }
+      
+      const settings = await storage.getGlobalSettings();
+      const productionWindowDays = settings?.productionWindowDays ?? 10;
+      
+      // Calculate production window boundaries
+      const dueDate = new Date(slot.productionSlotDate);
+      const startDate = new Date(dueDate);
+      startDate.setDate(startDate.getDate() - productionWindowDays);
+
+      const results: { created: number; skipped: number; errors: string[] } = { created: 0, skipped: 0, errors: [] };
+      // Derive factory from job state (QLD vs VIC)
+      const targetFactory = job.state === "QLD" ? "QLD" : "VIC";
+
+      for (const assignment of panelAssignments) {
+        try {
+          // Validate production date is within the window
+          const assignmentDate = new Date(assignment.productionDate);
+          if (assignmentDate < startDate || assignmentDate > dueDate) {
+            results.errors.push(`Date ${assignment.productionDate} is outside the production window`);
+            results.skipped++;
+            continue;
+          }
+          
+          const panel = await storage.getPanelById(assignment.panelId);
+          if (!panel) {
+            results.errors.push(`Panel ${assignment.panelId} not found`);
+            results.skipped++;
+            continue;
+          }
+          
+          // Verify panel belongs to the slot's job and level
+          if (panel.jobId !== slot.jobId) {
+            results.errors.push(`Panel ${panel.panelMark} does not belong to this job`);
+            results.skipped++;
+            continue;
+          }
+          if (panel.level !== slot.level) {
+            results.errors.push(`Panel ${panel.panelMark} is not on level ${slot.level}`);
+            results.skipped++;
+            continue;
+          }
+
+          // Check if panel already has a production entry
+          const existingEntry = await storage.getProductionEntryByPanelId(assignment.panelId);
+          if (existingEntry) {
+            results.errors.push(`Panel ${panel.panelMark} already has a production entry`);
+            results.skipped++;
+            continue;
+          }
+
+          // Create the production entry
+          await storage.createProductionEntry({
+            panelId: assignment.panelId,
+            jobId: panel.jobId,
+            productionDate: assignment.productionDate,
+            factory: targetFactory,
+            status: "PENDING",
+            volumeM3: panel.panelVolume || null,
+            areaM2: panel.panelArea || null,
+            userId: req.session.userId!,
+          });
+          results.created++;
+        } catch (err: any) {
+          results.errors.push(`Failed to assign panel: ${err.message}`);
+          results.skipped++;
+        }
+      }
+
+      res.json(results);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to assign panels" });
+    }
   });
 
   app.get("/api/production-summary", requireAuth, async (req, res) => {

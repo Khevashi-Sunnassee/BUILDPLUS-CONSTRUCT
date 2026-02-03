@@ -157,6 +157,7 @@ export interface IStorage {
   createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry>;
   updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined>;
   deleteProductionEntry(id: string): Promise<void>;
+  getProductionEntryByPanelId(panelId: string): Promise<ProductionEntry | undefined>;
   getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
   
@@ -1202,6 +1203,13 @@ export class DatabaseStorage implements IStorage {
 
   async deleteProductionEntry(id: string): Promise<void> {
     await db.delete(productionEntries).where(eq(productionEntries.id, id));
+  }
+
+  async getProductionEntryByPanelId(panelId: string): Promise<ProductionEntry | undefined> {
+    const [entry] = await db.select().from(productionEntries)
+      .where(eq(productionEntries.panelId, panelId))
+      .limit(1);
+    return entry;
   }
 
   async getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
