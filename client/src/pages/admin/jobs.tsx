@@ -85,6 +85,21 @@ import type { Job, PanelRegister, User as UserType } from "@shared/schema";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
+const JOB_COLOR_PALETTE = [
+  "#3b82f6", // blue
+  "#ef4444", // red
+  "#22c55e", // green
+  "#f59e0b", // amber
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#14b8a6", // teal
+  "#6366f1", // indigo
+  "#84cc16", // lime
+  "#a855f7", // purple
+];
+
 const jobSchema = z.object({
   jobNumber: z.string().min(1, "Job number is required"),
   name: z.string().min(1, "Name is required"),
@@ -289,8 +304,8 @@ export default function AdminJobsPage() {
       setEditingJob(null);
       jobForm.reset();
     },
-    onError: () => {
-      toast({ title: "Failed to update job", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Failed to update job", description: error.message, variant: "destructive" });
     },
   });
 
@@ -544,6 +559,12 @@ export default function AdminJobsPage() {
     XLSX.writeFile(wb, "jobs_template.xlsx");
   };
 
+  const getNextAvailableColor = () => {
+    const usedColors = new Set(jobs?.map(j => j.productionSlotColor).filter(Boolean) || []);
+    const availableColor = JOB_COLOR_PALETTE.find(c => !usedColors.has(c));
+    return availableColor || JOB_COLOR_PALETTE[(jobs?.length || 0) % JOB_COLOR_PALETTE.length];
+  };
+
   const openCreateDialog = () => {
     setEditingJob(null);
     jobForm.reset({
@@ -566,7 +587,7 @@ export default function AdminJobsPage() {
       siteContactPhone: "",
       status: "ACTIVE",
       projectManagerId: null,
-      productionSlotColor: null,
+      productionSlotColor: getNextAvailableColor(),
     });
     setJobDialogOpen(true);
   };
@@ -593,7 +614,7 @@ export default function AdminJobsPage() {
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
       projectManagerId: job.projectManagerId || null,
-      productionSlotColor: job.productionSlotColor || null,
+      productionSlotColor: job.productionSlotColor || getNextAvailableColor(),
     });
     setJobDialogOpen(true);
   };
