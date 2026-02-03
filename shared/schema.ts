@@ -131,6 +131,7 @@ export const jobs = pgTable("jobs", {
   expectedCycleTimePerFloor: integer("expected_cycle_time_per_floor"), // days per floor for production scheduling
   daysInAdvance: integer("days_in_advance").default(7), // days before site needs panels to cast
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
+  productionSlotColor: text("production_slot_color"), // hex color for production slots display
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -105,6 +105,7 @@ const jobSchema = z.object({
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
   projectManagerId: z.string().optional().nullable(),
+  productionSlotColor: z.string().optional().nullable(),
 });
 
 type JobFormData = z.infer<typeof jobSchema>;
@@ -258,6 +259,7 @@ export default function AdminJobsPage() {
       siteContactPhone: "",
       status: "ACTIVE",
       projectManagerId: null,
+      productionSlotColor: null,
     },
   });
 
@@ -564,6 +566,7 @@ export default function AdminJobsPage() {
       siteContactPhone: "",
       status: "ACTIVE",
       projectManagerId: null,
+      productionSlotColor: null,
     });
     setJobDialogOpen(true);
   };
@@ -590,6 +593,7 @@ export default function AdminJobsPage() {
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
       projectManagerId: job.projectManagerId || null,
+      productionSlotColor: job.productionSlotColor || null,
     });
     setJobDialogOpen(true);
   };
@@ -1228,6 +1232,45 @@ export default function AdminJobsPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={jobForm.control}
+                    name="productionSlotColor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Production Slot Color</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <input
+                              type="color"
+                              value={field.value || "#3b82f6"}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              className="h-9 w-14 cursor-pointer rounded border border-input"
+                              data-testid="input-job-production-slot-color"
+                            />
+                          </FormControl>
+                          <Input
+                            value={field.value || ""}
+                            onChange={(e) => field.onChange(e.target.value)}
+                            placeholder="#3b82f6"
+                            className="flex-1 font-mono text-sm"
+                            data-testid="input-job-production-slot-color-text"
+                          />
+                          {field.value && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => field.onChange(null)}
+                              data-testid="button-clear-job-color"
+                            >
+                              Clear
+                            </Button>
+                          )}
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
