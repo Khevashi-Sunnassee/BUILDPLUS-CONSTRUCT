@@ -375,7 +375,7 @@ export interface IStorage {
   getNextPONumber(): Promise<string>;
 
   // PO Attachments
-  getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: User | null })[]>;
+  getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: Pick<User, 'id' | 'name' | 'email'> | null })[]>;
   getPurchaseOrderAttachment(id: string): Promise<PurchaseOrderAttachment | undefined>;
   createPurchaseOrderAttachment(data: InsertPurchaseOrderAttachment): Promise<PurchaseOrderAttachment>;
   deletePurchaseOrderAttachment(id: string): Promise<void>;
@@ -2826,16 +2826,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // PO Attachment Implementations
-  async getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: User | null })[]> {
+  async getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: Pick<User, 'id' | 'name' | 'email'> | null })[]> {
     const attachments = await db.select().from(purchaseOrderAttachments)
       .where(eq(purchaseOrderAttachments.purchaseOrderId, poId))
       .orderBy(desc(purchaseOrderAttachments.createdAt));
     
-    const result: (PurchaseOrderAttachment & { uploadedBy?: User | null })[] = [];
+    const result: (PurchaseOrderAttachment & { uploadedBy?: Pick<User, 'id' | 'name' | 'email'> | null })[] = [];
     for (const attachment of attachments) {
-      let uploadedBy: User | null = null;
+      let uploadedBy: Pick<User, 'id' | 'name' | 'email'> | null = null;
       if (attachment.uploadedById) {
-        const [user] = await db.select().from(users).where(eq(users.id, attachment.uploadedById));
+        const [user] = await db.select({
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        }).from(users).where(eq(users.id, attachment.uploadedById));
         uploadedBy = user || null;
       }
       result.push({ ...attachment, uploadedBy });
