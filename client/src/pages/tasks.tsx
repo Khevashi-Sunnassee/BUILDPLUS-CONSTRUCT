@@ -295,15 +295,22 @@ function TaskRow({
 
   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
 
+  const jobColor = (task.job as any)?.productionSlotColor || null;
+
   return (
     <>
       <div
         className={cn(
-          "grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group",
+          "grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
           isSubtask && "bg-muted/30"
         )}
         data-testid={`task-row-${task.id}`}
       >
+        <div 
+          className="h-full w-1 rounded-r-sm"
+          style={{ backgroundColor: jobColor || 'transparent' }}
+          title={task.job ? `${task.job.jobNumber} - ${task.job.name}` : undefined}
+        />
         <div className="flex items-center justify-center px-1">
           <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 cursor-grab" />
         </div>
@@ -557,7 +564,8 @@ function TaskRow({
         ))}
 
       {showAddSubtask && (
-        <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
+        <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
+          <div />
           <div />
           <div className="flex items-center gap-2 py-2 pl-6 pr-2">
             <div className="w-5" />
@@ -773,7 +781,8 @@ function TaskGroupComponent({
 
       {!isCollapsed && (
         <>
-          <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
+          <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
+            <div />
             <div />
             <div className="px-2">Item</div>
             <div />
@@ -796,7 +805,8 @@ function TaskGroupComponent({
             />
           ))}
 
-          <div className="grid grid-cols-[40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
+          <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
+            <div />
             <div />
             <div className="flex items-center gap-2 py-2 pr-2">
               <Plus className="h-4 w-4 text-muted-foreground" />
