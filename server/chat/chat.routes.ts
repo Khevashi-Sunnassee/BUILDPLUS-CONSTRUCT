@@ -242,7 +242,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
       id: messageId,
       conversationId,
       senderId: userId,
-      content,
+      body: content,
     });
 
     const files = req.files as Express.Multer.File[] | undefined;
@@ -251,9 +251,10 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
         await db.insert(chatMessageAttachments).values({
           messageId,
           fileName: file.originalname,
-          fileType: file.mimetype,
-          fileSize: file.size,
-          filePath: `/uploads/chat/${file.filename}`,
+          mimeType: file.mimetype,
+          sizeBytes: file.size,
+          storageKey: file.filename,
+          url: `/uploads/chat/${file.filename}`,
         });
       }
     }
