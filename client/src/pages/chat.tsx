@@ -378,14 +378,14 @@ export default function ChatPage() {
                   <div className="space-y-2">
                     <Label>Link to Job (optional)</Label>
                     <Select
-                      value={newConversation.jobId || ""}
-                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, jobId: v || null }))}
+                      value={newConversation.jobId || "none"}
+                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, jobId: v === "none" ? null : v }))}
                     >
                       <SelectTrigger data-testid="select-job">
                         <SelectValue placeholder="Select a job" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {jobs.map(job => (
                           <SelectItem key={job.id} value={job.id.toString()}>
                             {job.jobNumber} - {job.name}
@@ -398,14 +398,14 @@ export default function ChatPage() {
                   <div className="space-y-2">
                     <Label>Link to Panel (optional)</Label>
                     <Select
-                      value={newConversation.panelId || ""}
-                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, panelId: v || null }))}
+                      value={newConversation.panelId || "none"}
+                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, panelId: v === "none" ? null : v }))}
                     >
                       <SelectTrigger data-testid="select-panel">
                         <SelectValue placeholder="Select a panel" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {panels.slice(0, 100).map(panel => (
                           <SelectItem key={panel.id} value={panel.id.toString()}>
                             {panel.panelMark}
