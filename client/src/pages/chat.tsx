@@ -56,11 +56,11 @@ interface ConversationMember {
 interface Conversation {
   id: string;
   name: string | null;
-  type: "DIRECT" | "GROUP" | "JOB" | "PANEL";
-  jobId: number | null;
-  panelId: number | null;
+  type: "DM" | "GROUP" | "CHANNEL";
+  jobId: string | null;
+  panelId: string | null;
   createdAt: string;
-  createdById: string;
+  createdById?: string;
   members?: ConversationMember[];
   lastMessage?: Message;
   job?: Job;
@@ -111,10 +111,10 @@ export default function ChatPage() {
 
   const [newConversation, setNewConversation] = useState({
     name: "",
-    type: "GROUP" as "DIRECT" | "GROUP" | "JOB" | "PANEL",
+    type: "GROUP" as "DM" | "GROUP" | "CHANNEL",
     memberIds: [] as string[],
-    jobId: null as number | null,
-    panelId: null as number | null,
+    jobId: null as string | null,
+    panelId: null as string | null,
   });
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
@@ -155,7 +155,7 @@ export default function ChatPage() {
       setShowNewConversationDialog(false);
       setNewConversation({
         name: "",
-        type: "GROUP",
+        type: "GROUP" as "DM" | "GROUP" | "CHANNEL",
         memberIds: [],
         jobId: null,
         panelId: null,
@@ -292,21 +292,22 @@ export default function ChatPage() {
 
   const getConversationDisplayName = (conv: Conversation) => {
     if (conv.name) return conv.name;
-    if (conv.type === "JOB" && conv.job) return `Job: ${conv.job.jobNumber}`;
-    if (conv.type === "PANEL" && conv.panel) return `Panel: ${conv.panel.panelMark}`;
-    if (conv.type === "DIRECT" && conv.members) {
+    if (conv.jobId && conv.job) return `Job: ${conv.job.jobNumber}`;
+    if (conv.panelId && conv.panel) return `Panel: ${conv.panel.panelMark}`;
+    if (conv.type === "DM" && conv.members) {
       const otherMembers = conv.members.filter(m => m.user);
       return otherMembers.map(m => m.user?.name || m.user?.email).join(", ");
     }
     return "Conversation";
   };
 
-  const getConversationIcon = (type: string) => {
-    switch (type) {
-      case "DIRECT": return <MessageSquare className="h-4 w-4" />;
+  const getConversationIcon = (conv: Conversation) => {
+    if (conv.jobId) return <Briefcase className="h-4 w-4" />;
+    if (conv.panelId) return <ClipboardList className="h-4 w-4" />;
+    switch (conv.type) {
+      case "DM": return <MessageSquare className="h-4 w-4" />;
       case "GROUP": return <Users className="h-4 w-4" />;
-      case "JOB": return <Briefcase className="h-4 w-4" />;
-      case "PANEL": return <ClipboardList className="h-4 w-4" />;
+      case "CHANNEL": return <Hash className="h-4 w-4" />;
       default: return <Hash className="h-4 w-4" />;
     }
   };
@@ -349,21 +350,20 @@ export default function ChatPage() {
                     <Label>Type</Label>
                     <Select
                       value={newConversation.type}
-                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, type: v as any, jobId: null, panelId: null }))}
+                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, type: v as "DM" | "GROUP" | "CHANNEL", jobId: null, panelId: null }))}
                     >
                       <SelectTrigger data-testid="select-conversation-type">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="DIRECT">Direct Message</SelectItem>
+                        <SelectItem value="DM">Direct Message</SelectItem>
                         <SelectItem value="GROUP">Group Chat</SelectItem>
-                        <SelectItem value="JOB">Job Discussion</SelectItem>
-                        <SelectItem value="PANEL">Panel Discussion</SelectItem>
+                        <SelectItem value="CHANNEL">Channel</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {(newConversation.type === "GROUP" || newConversation.type === "JOB" || newConversation.type === "PANEL") && (
+                  {(newConversation.type === "GROUP" || newConversation.type === "CHANNEL") && (
                     <div className="space-y-2">
                       <Label>Name</Label>
                       <Input
@@ -375,47 +375,45 @@ export default function ChatPage() {
                     </div>
                   )}
 
-                  {newConversation.type === "JOB" && (
-                    <div className="space-y-2">
-                      <Label>Link to Job</Label>
-                      <Select
-                        value={newConversation.jobId?.toString() || ""}
-                        onValueChange={(v) => setNewConversation(prev => ({ ...prev, jobId: v ? parseInt(v) : null }))}
-                      >
-                        <SelectTrigger data-testid="select-job">
-                          <SelectValue placeholder="Select a job" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {jobs.map(job => (
-                            <SelectItem key={job.id} value={job.id.toString()}>
-                              {job.jobNumber} - {job.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label>Link to Job (optional)</Label>
+                    <Select
+                      value={newConversation.jobId || ""}
+                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, jobId: v || null }))}
+                    >
+                      <SelectTrigger data-testid="select-job">
+                        <SelectValue placeholder="Select a job" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {jobs.map(job => (
+                          <SelectItem key={job.id} value={job.id.toString()}>
+                            {job.jobNumber} - {job.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                  {newConversation.type === "PANEL" && (
-                    <div className="space-y-2">
-                      <Label>Link to Panel</Label>
-                      <Select
-                        value={newConversation.panelId?.toString() || ""}
-                        onValueChange={(v) => setNewConversation(prev => ({ ...prev, panelId: v ? parseInt(v) : null }))}
-                      >
-                        <SelectTrigger data-testid="select-panel">
-                          <SelectValue placeholder="Select a panel" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {panels.slice(0, 100).map(panel => (
-                            <SelectItem key={panel.id} value={panel.id.toString()}>
-                              {panel.panelMark}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <Label>Link to Panel (optional)</Label>
+                    <Select
+                      value={newConversation.panelId || ""}
+                      onValueChange={(v) => setNewConversation(prev => ({ ...prev, panelId: v || null }))}
+                    >
+                      <SelectTrigger data-testid="select-panel">
+                        <SelectValue placeholder="Select a panel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">None</SelectItem>
+                        {panels.slice(0, 100).map(panel => (
+                          <SelectItem key={panel.id} value={panel.id.toString()}>
+                            {panel.panelMark}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div className="space-y-2">
                     <Label>Members</Label>
@@ -482,7 +480,7 @@ export default function ChatPage() {
                   data-testid={`conversation-${conv.id}`}
                 >
                   <div className="mt-0.5 text-muted-foreground">
-                    {getConversationIcon(conv.type)}
+                    {getConversationIcon(conv)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium truncate text-sm">
@@ -510,7 +508,7 @@ export default function ChatPage() {
             <div className="p-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="text-muted-foreground">
-                  {getConversationIcon(selectedConversation.type)}
+                  {getConversationIcon(selectedConversation)}
                 </div>
                 <div>
                   <h3 className="font-semibold">{getConversationDisplayName(selectedConversation)}</h3>

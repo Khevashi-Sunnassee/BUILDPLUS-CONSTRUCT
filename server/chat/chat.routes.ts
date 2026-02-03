@@ -1,4 +1,4 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { createId } from "@paralleldrive/cuid2";
 import { db } from "../db";
@@ -12,6 +12,8 @@ import {
   chatMessageAttachments,
   chatNotifications,
   userChatSettings,
+  chatMessageMentions,
+  userPermissions,
 } from "@shared/schema";
 import { and, eq, desc, gt, isNull, sql, inArray } from "drizzle-orm";
 import { chatUpload } from "./chat.files";
@@ -19,10 +21,28 @@ import { extractMentionUserIds } from "./chat.utils";
 
 export const chatRouter = Router();
 
-function requireAuth(req: Request, res: Response, next: Function) {
+function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
+  next();
+}
+
+async function requireChatPermission(req: Request, res: Response, next: NextFunction) {
+  const userId = req.session?.userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  
+  const permission = await db.select()
+    .from(userPermissions)
+    .where(and(eq(userPermissions.userId, userId), eq(userPermissions.functionKey, "chat")))
+    .limit(1);
+  
+  if (permission.length > 0 && permission[0].permissionLevel === "HIDDEN") {
+    return res.status(403).json({ error: "Access denied to chat" });
+  }
+  
   next();
 }
 
@@ -37,7 +57,7 @@ async function assertMember(userId: string, conversationId: string) {
 
 chatRouter.get("/health", (_req, res) => res.json({ ok: true }));
 
-chatRouter.get("/conversations", requireAuth, async (req, res) => {
+chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
 
@@ -99,11 +119,29 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
         panel = panelRows[0] || null;
       }
 
+      const members = await db
+        .select({
+          id: conversationMembers.id,
+          conversationId: conversationMembers.conversationId,
+          userId: conversationMembers.userId,
+          role: conversationMembers.role,
+          joinedAt: conversationMembers.joinedAt,
+        })
+        .from(conversationMembers)
+        .where(eq(conversationMembers.conversationId, conv.id));
+
+      const membersWithUsers = await Promise.all(members.map(async (m) => {
+        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(eq(users.id, m.userId)).limit(1);
+        return { ...m, user: userRows[0] || null };
+      }));
+
       results.push({
-        conversation: conv,
+        ...conv,
+        members: membersWithUsers,
+        lastMessage: lastMsg[0] || null,
         unreadCount: unreadCount.length,
         unreadMentions: unreadMentions.length,
-        lastMessage: lastMsg[0] || null,
         job,
         panel,
       });
@@ -115,7 +153,7 @@ chatRouter.get("/conversations", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.get("/messages", requireAuth, async (req, res) => {
+chatRouter.get("/messages", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const conversationId = String(req.query.conversationId || "");
@@ -132,7 +170,13 @@ chatRouter.get("/messages", requireAuth, async (req, res) => {
       const senderRows = await db.select({ id: users.id, name: users.name, email: users.email })
         .from(users).where(eq(users.id, msg.senderId)).limit(1);
       const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, msg.id));
-      return { ...msg, sender: senderRows[0] || null, attachments };
+      const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, msg.id));
+      const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
+        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(eq(users.id, m.userId)).limit(1);
+        return { ...m, user: userRows[0] || null };
+      }));
+      return { ...msg, sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers };
     }));
 
     res.json({ items: messagesWithSender.reverse(), nextCursor: null });
@@ -141,7 +185,111 @@ chatRouter.get("/messages", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.post("/upload", requireAuth, chatUpload.single("file"), async (req, res) => {
+chatRouter.get("/conversations/:conversationId/messages", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const conversationId = String(req.params.conversationId);
+    await assertMember(userId, conversationId);
+
+    const rows = await db
+      .select()
+      .from(chatMessages)
+      .where(and(eq(chatMessages.conversationId, conversationId), isNull(chatMessages.deletedAt)))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(50);
+
+    const messagesWithSender = await Promise.all(rows.map(async (msg) => {
+      const senderRows = await db.select({ id: users.id, name: users.name, email: users.email })
+        .from(users).where(eq(users.id, msg.senderId)).limit(1);
+      const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, msg.id));
+      const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, msg.id));
+      const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
+        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(eq(users.id, m.userId)).limit(1);
+        return { ...m, user: userRows[0] || null };
+      }));
+      return { ...msg, sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers };
+    }));
+
+    res.json(messagesWithSender.reverse());
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireChatPermission, chatUpload.array("files", 10), async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const conversationId = String(req.params.conversationId);
+    await assertMember(userId, conversationId);
+
+    const content = String(req.body.content || "");
+    let mentionedUserIds: string[] = [];
+    const rawMentions = req.body.mentionedUserIds;
+    if (Array.isArray(rawMentions)) {
+      mentionedUserIds = rawMentions.map(String);
+    } else if (typeof rawMentions === "string" && rawMentions) {
+      try {
+        const parsed = JSON.parse(rawMentions);
+        mentionedUserIds = Array.isArray(parsed) ? parsed.map(String) : [];
+      } catch {
+        mentionedUserIds = [];
+      }
+    }
+
+    const messageId = createId();
+    await db.insert(chatMessages).values({
+      id: messageId,
+      conversationId,
+      senderId: userId,
+      content,
+    });
+
+    const files = req.files as Express.Multer.File[] | undefined;
+    if (files && files.length > 0) {
+      for (const file of files) {
+        await db.insert(chatMessageAttachments).values({
+          messageId,
+          fileName: file.originalname,
+          fileType: file.mimetype,
+          fileSize: file.size,
+          filePath: `/uploads/chat/${file.filename}`,
+        });
+      }
+    }
+
+    for (const mentionUserId of mentionedUserIds) {
+      await db.insert(chatMessageMentions).values({
+        messageId,
+        userId: mentionUserId,
+      });
+      
+      await db.insert(chatNotifications).values({
+        userId: mentionUserId,
+        messageId,
+        conversationId,
+        type: "MENTION",
+      });
+    }
+
+    const msgRows = await db.select().from(chatMessages).where(eq(chatMessages.id, messageId)).limit(1);
+    const senderRows = await db.select({ id: users.id, name: users.name, email: users.email })
+      .from(users).where(eq(users.id, userId)).limit(1);
+    const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, messageId));
+    const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, messageId));
+    const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
+      const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
+        .from(users).where(eq(users.id, m.userId)).limit(1);
+      return { ...m, user: userRows[0] || null };
+    }));
+
+    res.json({ ...msgRows[0], sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.post("/upload", requireAuth, requireChatPermission, chatUpload.single("file"), async (req, res) => {
   try {
     const userId = req.session.userId!;
 
@@ -168,7 +316,7 @@ chatRouter.post("/upload", requireAuth, chatUpload.single("file"), async (req, r
   }
 });
 
-chatRouter.get("/mentions", requireAuth, async (req, res) => {
+chatRouter.get("/mentions", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const conversationId = String(req.query.conversationId || "");
@@ -196,7 +344,7 @@ chatRouter.get("/mentions", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.get("/settings", requireAuth, async (req, res) => {
+chatRouter.get("/settings", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const rows = await db.select().from(userChatSettings).where(eq(userChatSettings.userId, userId)).limit(1);
@@ -206,7 +354,7 @@ chatRouter.get("/settings", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.post("/settings/popup", requireAuth, async (req, res) => {
+chatRouter.post("/settings/popup", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const schema = z.object({ popupEnabled: z.boolean() });
@@ -232,7 +380,7 @@ chatRouter.post("/settings/popup", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.post("/conversations", requireAuth, async (req, res) => {
+chatRouter.post("/conversations", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const schema = z.object({
@@ -278,7 +426,7 @@ chatRouter.post("/conversations", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.post("/messages", requireAuth, async (req, res) => {
+chatRouter.post("/messages", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const schema = z.object({
@@ -368,7 +516,7 @@ chatRouter.post("/messages", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.get("/users", requireAuth, async (_req, res) => {
+chatRouter.get("/users", requireAuth, requireChatPermission, async (_req, res) => {
   try {
     const allUsers = await db.select({
       id: users.id,
@@ -381,7 +529,7 @@ chatRouter.get("/users", requireAuth, async (_req, res) => {
   }
 });
 
-chatRouter.get("/jobs", requireAuth, async (_req, res) => {
+chatRouter.get("/jobs", requireAuth, requireChatPermission, async (_req, res) => {
   try {
     const allJobs = await db.select({
       id: jobs.id,
@@ -394,7 +542,7 @@ chatRouter.get("/jobs", requireAuth, async (_req, res) => {
   }
 });
 
-chatRouter.get("/panels", requireAuth, async (req, res) => {
+chatRouter.get("/panels", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const jobId = String(req.query.jobId || "");
     if (!jobId) return res.json([]);
@@ -410,7 +558,7 @@ chatRouter.get("/panels", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.post("/mark-read", requireAuth, async (req, res) => {
+chatRouter.post("/mark-read", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const schema = z.object({
@@ -443,7 +591,7 @@ chatRouter.post("/mark-read", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.get("/unread-counts", requireAuth, async (req, res) => {
+chatRouter.get("/unread-counts", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
 
@@ -461,7 +609,7 @@ chatRouter.get("/unread-counts", requireAuth, async (req, res) => {
   }
 });
 
-chatRouter.post("/conversations/:conversationId/members", requireAuth, async (req, res) => {
+chatRouter.post("/conversations/:conversationId/members", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const conversationId = String(req.params.conversationId);
