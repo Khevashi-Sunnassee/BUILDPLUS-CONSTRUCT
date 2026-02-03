@@ -130,6 +130,12 @@ export async function registerRoutes(
     res.json(stats);
   });
 
+  // Get all users for chat member selection (accessible to all authenticated users)
+  app.get("/api/users", requireAuth, async (req, res) => {
+    const users = await storage.getAllUsers();
+    res.json(users.map(u => ({ ...u, passwordHash: undefined })));
+  });
+
   app.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), async (req, res) => {
     const user = await storage.getUser(req.session.userId!);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
