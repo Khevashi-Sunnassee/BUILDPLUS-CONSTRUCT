@@ -1656,12 +1656,11 @@ export async function registerRoutes(
       }
       
       // Get all panels for this job/level
-      const panels = await storage.getPanelsByJobId(slot.jobId);
-      const levelPanels = panels.filter(p => p.level === slot.level);
+      const panels = await storage.getPanelsByJobAndLevel(slot.jobId, slot.level);
       
       // Get production entries for these panels
       const entries: Record<string, { productionDate: string; entryId: string }> = {};
-      for (const panel of levelPanels) {
+      for (const panel of panels) {
         const entry = await storage.getProductionEntryByPanelId(panel.id);
         if (entry) {
           entries[panel.id] = { productionDate: entry.productionDate, entryId: entry.id };
