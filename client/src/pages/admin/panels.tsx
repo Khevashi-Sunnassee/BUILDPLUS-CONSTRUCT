@@ -32,7 +32,10 @@ import {
   Sparkles,
   Search,
   BarChart3,
+  QrCode,
+  ExternalLink,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -252,6 +255,11 @@ export default function AdminPanelsPage() {
 
   const [deleteSourceDialogOpen, setDeleteSourceDialogOpen] = useState(false);
   const [sourceToDelete, setSourceToDelete] = useState<number | null>(null);
+  
+  // QR Code modal state
+  const [qrCodeDialogOpen, setQrCodeDialogOpen] = useState(false);
+  const [qrCodePanel, setQrCodePanel] = useState<{ id: string; panelMark: string; jobNumber?: string } | null>(null);
+  const qrCodeRef = useRef<HTMLDivElement>(null);
 
   const deleteBySourceMutation = useMutation({
     mutationFn: async (source: number) => {
@@ -1501,6 +1509,19 @@ export default function AdminPanelsPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => {
+                              const job = jobs?.find(j => j.id === panel.jobId);
+                              setQrCodePanel({ id: panel.id, panelMark: panel.panelMark, jobNumber: job?.jobNumber });
+                              setQrCodeDialogOpen(true);
+                            }}
+                            title="View QR Code"
+                            data-testid={`button-qr-panel-${panel.id}`}
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => openEditDialog(panel)}
                             data-testid={`button-edit-panel-${panel.id}`}
                           >
@@ -2545,6 +2566,83 @@ export default function AdminPanelsPage() {
               Download Template
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* QR Code Dialog */}
+      <Dialog open={qrCodeDialogOpen} onOpenChange={setQrCodeDialogOpen}>
+        <DialogContent className="sm:max-w-md" data-testid="dialog-qr-code">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <QrCode className="h-5 w-5" />
+              Panel QR Code
+            </DialogTitle>
+            <DialogDescription>
+              Scan this code to view panel details and history
+            </DialogDescription>
+          </DialogHeader>
+          {qrCodePanel && (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="text-center">
+                <p className="font-mono font-bold text-lg">{qrCodePanel.panelMark}</p>
+                {qrCodePanel.jobNumber && (
+                  <p className="text-sm text-muted-foreground">Job: {qrCodePanel.jobNumber}</p>
+                )}
+              </div>
+              <div 
+                ref={qrCodeRef}
+                className="bg-white p-4 rounded-lg shadow-sm"
+                data-testid="qr-code-container"
+              >
+                <QRCodeSVG
+                  value={`${window.location.origin}/panel/${qrCodePanel.id}`}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground text-center break-all max-w-[280px]">
+                {window.location.origin}/panel/{qrCodePanel.id}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const svg = qrCodeRef.current?.querySelector('svg');
+                    if (svg) {
+                      const svgData = new XMLSerializer().serializeToString(svg);
+                      const canvas = document.createElement('canvas');
+                      const ctx = canvas.getContext('2d');
+                      const img = new Image();
+                      img.onload = () => {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx?.drawImage(img, 0, 0);
+                        const pngUrl = canvas.toDataURL('image/png');
+                        const downloadLink = document.createElement('a');
+                        downloadLink.download = `panel-${qrCodePanel.panelMark}-qr.png`;
+                        downloadLink.href = pngUrl;
+                        downloadLink.click();
+                      };
+                      img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
+                    }
+                  }}
+                  data-testid="button-download-qr"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.open(`/panel/${qrCodePanel.id}`, '_blank')}
+                  data-testid="button-open-panel-details"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Details
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

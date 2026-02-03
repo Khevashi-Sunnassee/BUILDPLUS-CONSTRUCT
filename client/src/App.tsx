@@ -39,6 +39,7 @@ import ProductionSlotsPage from "@/pages/production-slots";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
 import PurchaseOrderFormPage from "@/pages/purchase-order-form";
 import TasksPage from "@/pages/tasks";
+import PanelDetailsPage from "@/pages/panel-details";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -235,6 +236,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <TasksPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/panel/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PanelDetailsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

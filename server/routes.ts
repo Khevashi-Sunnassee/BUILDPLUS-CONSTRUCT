@@ -852,6 +852,110 @@ export async function registerRoutes(
     res.json(panels);
   });
 
+  // Panel details with history for QR code scanning
+  app.get("/api/panels/:id/details", requireAuth, async (req, res) => {
+    try {
+      const panel = await storage.getPanelById(req.params.id as string);
+      if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      
+      // Get related data
+      const job = panel.jobId ? await storage.getJob(panel.jobId) : null;
+      const panelType = panel.panelType ? await storage.getPanelType(panel.panelType) : null;
+      const zone = panel.currentZone ? await storage.getZone(panel.currentZone) : null;
+      
+      // Get production entry if exists
+      const productionEntry = await storage.getProductionEntryByPanelId(panel.id);
+      
+      // Build history from available data - only include events with real supporting data
+      const history: { id: string; action: string; description: string; createdAt: string; createdBy: string | null }[] = [];
+      
+      // Panel creation - this is always a real event
+      history.push({
+        id: `${panel.id}-created`,
+        action: "CREATED",
+        description: `Panel ${panel.panelMark} registered in the system`,
+        createdAt: panel.createdAt?.toISOString() || new Date().toISOString(),
+        createdBy: null,
+      });
+      
+      // Document validation - only if documentStatus indicates it was validated
+      if (panel.documentStatus === "VALIDATED" || panel.documentStatus === "APPROVED") {
+        history.push({
+          id: `${panel.id}-validated`,
+          action: "STATUS_CHANGED",
+          description: `Document status: ${panel.documentStatus}`,
+          createdAt: panel.updatedAt?.toISOString() || panel.createdAt?.toISOString() || new Date().toISOString(),
+          createdBy: null,
+        });
+      }
+      
+      // Production booking - only if there's an actual production entry
+      if (productionEntry) {
+        history.push({
+          id: `${panel.id}-booked`,
+          action: "PRODUCTION",
+          description: `Scheduled for production on ${new Date(productionEntry.productionDate).toLocaleDateString("en-AU")} at ${productionEntry.factory || "factory"}`,
+          createdAt: productionEntry.createdAt?.toISOString() || new Date().toISOString(),
+          createdBy: null,
+        });
+        
+        // Production completion - only if the entry is marked completed
+        if (productionEntry.status === "COMPLETED") {
+          history.push({
+            id: `${panel.id}-completed`,
+            action: "STATUS_CHANGED",
+            description: "Production completed",
+            createdAt: productionEntry.updatedAt?.toISOString() || new Date().toISOString(),
+            createdBy: null,
+          });
+        }
+      }
+      
+      // Zone assignment - only if there's actually a zone assigned
+      if (zone && panel.currentZone) {
+        history.push({
+          id: `${panel.id}-zone`,
+          action: "ZONE_CHANGED",
+          description: `Assigned to zone: ${zone.name}`,
+          createdAt: panel.updatedAt?.toISOString() || new Date().toISOString(),
+          createdBy: null,
+        });
+      }
+      
+      // Sort history by date
+      history.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      
+      res.json({
+        id: panel.id,
+        panelMark: panel.panelMark,
+        panelType: panel.panelType,
+        panelTypeName: panelType?.name || null,
+        status: panel.status,
+        documentStatus: panel.documentStatus,
+        currentZone: panel.currentZone,
+        zoneName: zone?.name || null,
+        level: panel.level,
+        loadWidth: panel.loadWidth,
+        loadHeight: panel.loadHeight,
+        panelThickness: panel.panelThickness,
+        estimatedVolume: panel.estimatedVolume,
+        estimatedWeight: panel.estimatedWeight,
+        jobNumber: job?.jobNumber || null,
+        jobName: job?.name || null,
+        productionDate: productionEntry?.productionDate || null,
+        deliveryDate: null, // Would come from logistics if delivered
+        factory: productionEntry?.factory || null,
+        createdAt: panel.createdAt?.toISOString() || new Date().toISOString(),
+        history,
+      });
+    } catch (error: any) {
+      console.error("Error fetching panel details:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch panel details" });
+    }
+  });
+
   app.get("/api/admin/panels/:id", requireRole("ADMIN"), async (req, res) => {
     const panel = await storage.getPanelRegisterItem(req.params.id as string);
     if (!panel) return res.status(404).json({ error: "Panel not found" });
