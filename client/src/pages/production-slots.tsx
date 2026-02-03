@@ -14,7 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings } from "@shared/schema";
 
@@ -77,15 +78,15 @@ export default function ProductionSlotsPage() {
   const [adjustClientConfirmed, setAdjustClientConfirmed] = useState<boolean>(false);
   const [adjustCascade, setAdjustCascade] = useState<boolean>(false);
   
-  // Panel assignment state
-  const [selectedPanelIds, setSelectedPanelIds] = useState<Set<string>>(new Set());
-  const [panelAssignmentDate, setPanelAssignmentDate] = useState<string>("");
-  
   // Panel breakdown search/filter state
   const [panelSearchQuery, setPanelSearchQuery] = useState<string>("");
   const [panelStatusFilter, setPanelStatusFilter] = useState<string>("all");
   const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
   const [expandedPanelTypes, setExpandedPanelTypes] = useState<Set<string>>(new Set());
+  
+  // Per-panel booking state
+  const [bookingPanelId, setBookingPanelId] = useState<string | null>(null);
+  const [bookingDate, setBookingDate] = useState<string>("");
 
   const { data: slots = [], isLoading: loadingSlots } = useQuery<ProductionSlotWithDetails[]>({
     queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
@@ -127,6 +128,18 @@ export default function ProductionSlotsPage() {
       if (!selectedSlot) return [];
       const response = await fetch(`/api/panels?jobId=${selectedSlot.jobId}&level=${encodeURIComponent(selectedSlot.level)}`);
       if (!response.ok) throw new Error("Failed to fetch panels");
+      return response.json();
+    },
+    enabled: !!selectedSlot && showPanelBreakdownDialog,
+  });
+  
+  // Fetch production entries for panels in this slot
+  const { data: panelEntries = {} } = useQuery<Record<string, { productionDate: string; entryId: string }>>({
+    queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"],
+    queryFn: async () => {
+      if (!selectedSlot) return {};
+      const response = await fetch(`/api/production-slots/${selectedSlot.id}/panel-entries`);
+      if (!response.ok) throw new Error("Failed to fetch panel entries");
       return response.json();
     },
     enabled: !!selectedSlot && showPanelBreakdownDialog,
@@ -192,25 +205,40 @@ export default function ProductionSlotsPage() {
     },
   });
 
-  const assignPanelsMutation = useMutation({
-    mutationFn: async ({ slotId, panelAssignments, factory }: { slotId: string; panelAssignments: { panelId: string; productionDate: string }[]; factory?: string }) => {
-      return apiRequest("POST", `/api/production-slots/${slotId}/assign-panels`, { panelAssignments, factory });
+  const bookPanelMutation = useMutation({
+    mutationFn: async ({ slotId, panelId, productionDate }: { slotId: string; panelId: string; productionDate: string }) => {
+      return apiRequest("POST", `/api/production-slots/${slotId}/assign-panels`, { 
+        panelAssignments: [{ panelId, productionDate }] 
+      });
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panel-register"] });
-      setSelectedPanelIds(new Set());
-      setPanelAssignmentDate("");
+      setBookingPanelId(null);
+      setBookingDate("");
       if (data.created > 0) {
-        toast({ title: "Success", description: `${data.created} panel(s) assigned to production schedule` });
+        toast({ title: "Booked", description: "Panel assigned to production schedule" });
       }
-      if (data.skipped > 0) {
-        toast({ title: "Note", description: `${data.skipped} panel(s) skipped (already assigned or errors)`, variant: "default" });
+      if (data.errors && data.errors.length > 0) {
+        toast({ title: "Error", description: data.errors[0], variant: "destructive" });
       }
     },
     onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to assign panels", variant: "destructive" });
+      toast({ title: "Error", description: error.message || "Failed to book panel", variant: "destructive" });
+    },
+  });
+  
+  const unbookPanelMutation = useMutation({
+    mutationFn: async (entryId: string) => {
+      return apiRequest("DELETE", `/api/production-entries/${entryId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      toast({ title: "Unbooked", description: "Panel removed from production schedule" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to unbook panel", variant: "destructive" });
     },
   });
 
@@ -329,17 +357,6 @@ export default function ProductionSlotsPage() {
     });
   };
   
-  const toggleSelectAllInType = (type: string, panels: PanelRegister[]) => {
-    const panelIds = panels.map(p => p.id);
-    const allSelected = panelIds.every(id => selectedPanelIds.has(id));
-    const newSet = new Set(selectedPanelIds);
-    if (allSelected) {
-      panelIds.forEach(id => newSet.delete(id));
-    } else {
-      panelIds.forEach(id => newSet.add(id));
-    }
-    setSelectedPanelIds(newSet);
-  };
   
   // Expand all panel type groups when dialog opens
   useEffect(() => {
@@ -914,11 +931,11 @@ export default function ProductionSlotsPage() {
       <Dialog open={showPanelBreakdownDialog} onOpenChange={(open) => {
         setShowPanelBreakdownDialog(open);
         if (!open) {
-          setSelectedPanelIds(new Set());
-          setPanelAssignmentDate("");
           setPanelSearchQuery("");
           setPanelStatusFilter("all");
           setPanelTypeFilter("all");
+          setBookingPanelId(null);
+          setBookingDate("");
         }
       }}>
         <DialogContent className="max-w-5xl max-h-[85vh]">
@@ -979,53 +996,6 @@ export default function ProductionSlotsPage() {
             </div>
           </div>
           
-          {/* Panel Assignment Controls */}
-          {selectedSlot && selectedSlot.status === "BOOKED" && isManagerOrAdmin && (
-            <Card className="bg-muted/30">
-              <CardContent className="pt-4">
-                <div className="flex flex-wrap items-end gap-4">
-                  <div className="flex-1 min-w-[200px]">
-                    <Label className="text-sm font-medium">Assign Selected Panels to Date</Label>
-                    <Input
-                      type="date"
-                      value={panelAssignmentDate}
-                      onChange={(e) => setPanelAssignmentDate(e.target.value)}
-                      min={format(subDays(new Date(selectedSlot.productionSlotDate), productionWindowDays), "yyyy-MM-dd")}
-                      max={format(new Date(selectedSlot.productionSlotDate), "yyyy-MM-dd")}
-                      className="mt-1"
-                      data-testid="input-panel-assignment-date"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Select a date within the production window
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">
-                      {selectedPanelIds.size} selected
-                    </Badge>
-                    <Button
-                      onClick={() => {
-                        if (!selectedSlot || !panelAssignmentDate || selectedPanelIds.size === 0) return;
-                        const panelAssignments = Array.from(selectedPanelIds).map(panelId => ({
-                          panelId,
-                          productionDate: panelAssignmentDate,
-                        }));
-                        assignPanelsMutation.mutate({
-                          slotId: selectedSlot.id,
-                          panelAssignments,
-                          factory: selectedSlot.job.state === "QLD" ? "QLD" : "VIC",
-                        });
-                      }}
-                      disabled={selectedPanelIds.size === 0 || !panelAssignmentDate || assignPanelsMutation.isPending}
-                      data-testid="button-assign-panels"
-                    >
-                      {assignPanelsMutation.isPending ? "Assigning..." : "Assign to Production"}
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
           
           <div className="max-h-[50vh] overflow-y-auto">
             {panelsForSlot.length === 0 ? (
@@ -1055,14 +1025,9 @@ export default function ProductionSlotsPage() {
                         <Badge variant="secondary" className="ml-auto">
                           {panels.length} panel{panels.length !== 1 ? "s" : ""}
                         </Badge>
-                        {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
-                          <Checkbox
-                            checked={panels.every(p => selectedPanelIds.has(p.id))}
-                            onCheckedChange={() => toggleSelectAllInType(type, panels)}
-                            onClick={(e) => e.stopPropagation()}
-                            data-testid={`checkbox-select-all-${type}`}
-                          />
-                        )}
+                        <Badge variant="outline" className="text-xs">
+                          {panels.filter(p => panelEntries[p.id]).length} booked
+                        </Badge>
                       </div>
                     </CollapsibleTrigger>
                     <CollapsibleContent>
@@ -1070,47 +1035,114 @@ export default function ProductionSlotsPage() {
                         <Table>
                           <TableHeader>
                             <TableRow>
-                              {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
-                                <TableHead className="w-12"></TableHead>
-                              )}
                               <TableHead>Panel Mark</TableHead>
+                              <TableHead>Production Date</TableHead>
                               <TableHead>Load Width</TableHead>
                               <TableHead>Load Height</TableHead>
                               <TableHead>Thickness</TableHead>
                               <TableHead>Status</TableHead>
+                              {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
+                                <TableHead className="w-20 text-center">Action</TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {panels.map((panel) => (
-                              <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
-                                {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
+                            {panels.map((panel) => {
+                              const entry = panelEntries[panel.id];
+                              const isBooked = !!entry;
+                              return (
+                                <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                                  <TableCell className="font-medium">{panel.panelMark || "-"}</TableCell>
                                   <TableCell>
-                                    <Checkbox
-                                      checked={selectedPanelIds.has(panel.id)}
-                                      onCheckedChange={(checked) => {
-                                        const newSet = new Set(selectedPanelIds);
-                                        if (checked) {
-                                          newSet.add(panel.id);
-                                        } else {
-                                          newSet.delete(panel.id);
-                                        }
-                                        setSelectedPanelIds(newSet);
-                                      }}
-                                      data-testid={`checkbox-panel-${panel.id}`}
-                                    />
+                                    {isBooked ? (
+                                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                                        {format(new Date(entry.productionDate), "dd/MM/yyyy")}
+                                      </span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
                                   </TableCell>
-                                )}
-                                <TableCell className="font-medium">{panel.panelMark || "-"}</TableCell>
-                                <TableCell>{panel.loadWidth || "-"}</TableCell>
-                                <TableCell>{panel.loadHeight || "-"}</TableCell>
-                                <TableCell>{panel.panelThickness || "-"}</TableCell>
-                                <TableCell>
-                                  <Badge variant={panel.status === "COMPLETED" ? "default" : "secondary"}>
-                                    {panel.status || "NOT_STARTED"}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            ))}
+                                  <TableCell>{panel.loadWidth || "-"}</TableCell>
+                                  <TableCell>{panel.loadHeight || "-"}</TableCell>
+                                  <TableCell>{panel.panelThickness || "-"}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={isBooked ? "default" : "secondary"} className={isBooked ? "bg-blue-600" : ""}>
+                                      {isBooked ? "BOOKED" : (panel.status || "NOT_STARTED")}
+                                    </Badge>
+                                  </TableCell>
+                                  {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
+                                    <TableCell className="text-center">
+                                      {isBooked ? (
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => unbookPanelMutation.mutate(entry.entryId)}
+                                          disabled={unbookPanelMutation.isPending}
+                                          title="Remove from production"
+                                          data-testid={`button-unbook-${panel.id}`}
+                                        >
+                                          <CalendarX className="h-4 w-4 text-red-500" />
+                                        </Button>
+                                      ) : (
+                                        <Popover open={bookingPanelId === panel.id} onOpenChange={(open) => {
+                                          if (open) {
+                                            setBookingPanelId(panel.id);
+                                            setBookingDate("");
+                                          } else {
+                                            setBookingPanelId(null);
+                                            setBookingDate("");
+                                          }
+                                        }}>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              title="Book for production"
+                                              data-testid={`button-book-${panel.id}`}
+                                            >
+                                              <CalendarPlus className="h-4 w-4 text-green-600" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-auto p-3" align="end">
+                                            <div className="space-y-2">
+                                              <Label className="text-sm font-medium">Select Production Date</Label>
+                                              <Input
+                                                type="date"
+                                                value={bookingDate}
+                                                onChange={(e) => setBookingDate(e.target.value)}
+                                                min={format(subDays(new Date(selectedSlot.productionSlotDate), productionWindowDays), "yyyy-MM-dd")}
+                                                max={format(new Date(selectedSlot.productionSlotDate), "yyyy-MM-dd")}
+                                                data-testid={`input-booking-date-${panel.id}`}
+                                              />
+                                              <p className="text-xs text-muted-foreground">
+                                                {format(subDays(new Date(selectedSlot.productionSlotDate), productionWindowDays), "dd/MM")} - {format(new Date(selectedSlot.productionSlotDate), "dd/MM/yyyy")}
+                                              </p>
+                                              <Button
+                                                size="sm"
+                                                className="w-full"
+                                                onClick={() => {
+                                                  if (bookingDate) {
+                                                    bookPanelMutation.mutate({
+                                                      slotId: selectedSlot.id,
+                                                      panelId: panel.id,
+                                                      productionDate: bookingDate,
+                                                    });
+                                                  }
+                                                }}
+                                                disabled={!bookingDate || bookPanelMutation.isPending}
+                                                data-testid={`button-confirm-book-${panel.id}`}
+                                              >
+                                                {bookPanelMutation.isPending ? "Booking..." : "Book Panel"}
+                                              </Button>
+                                            </div>
+                                          </PopoverContent>
+                                        </Popover>
+                                      )}
+                                    </TableCell>
+                                  )}
+                                </TableRow>
+                              );
+                            })}
                           </TableBody>
                         </Table>
                       </div>
@@ -1122,7 +1154,7 @@ export default function ProductionSlotsPage() {
           </div>
           <DialogFooter className="flex justify-between items-center gap-2">
             <div className="text-sm text-muted-foreground">
-              Total: {panelsForSlot.length} panels | Showing: {filteredPanels.length} | Types: {Object.keys(panelsByType).length}
+              Total: {panelsForSlot.length} panels | Showing: {filteredPanels.length} | Booked: {Object.keys(panelEntries).length}
             </div>
             <Button variant="outline" onClick={() => setShowPanelBreakdownDialog(false)}>Close</Button>
           </DialogFooter>

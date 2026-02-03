@@ -1646,6 +1646,50 @@ export async function registerRoutes(
     res.json({ updated: updated.length });
   });
 
+  // Get production entries for panels in a slot (job + level)
+  app.get("/api/production-slots/:slotId/panel-entries", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
+    try {
+      const { slotId } = req.params;
+      const slot = await storage.getProductionSlot(slotId);
+      if (!slot) {
+        return res.status(404).json({ error: "Production slot not found" });
+      }
+      
+      // Get all panels for this job/level
+      const panels = await storage.getPanelsByJobId(slot.jobId);
+      const levelPanels = panels.filter(p => p.level === slot.level);
+      
+      // Get production entries for these panels
+      const entries: Record<string, { productionDate: string; entryId: string }> = {};
+      for (const panel of levelPanels) {
+        const entry = await storage.getProductionEntryByPanelId(panel.id);
+        if (entry) {
+          entries[panel.id] = { productionDate: entry.productionDate, entryId: entry.id };
+        }
+      }
+      
+      res.json(entries);
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to fetch panel entries" });
+    }
+  });
+  
+  // Unbook a panel (delete production entry)
+  app.delete("/api/production-entries/:entryId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const { entryId } = req.params;
+      const entry = await storage.getProductionEntry(entryId);
+      if (!entry) {
+        return res.status(404).json({ error: "Production entry not found" });
+      }
+      
+      await storage.deleteProductionEntry(entryId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(400).json({ error: error.message || "Failed to delete production entry" });
+    }
+  });
+
   // Bulk assign panels to production dates (for Production Slots workflow)
   app.post("/api/production-slots/:slotId/assign-panels", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
