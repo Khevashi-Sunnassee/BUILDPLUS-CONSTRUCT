@@ -443,7 +443,13 @@ export default function DraftingProgramPage() {
               </TableHeader>
               <TableBody>
                 {filteredPrograms.map((entry) => (
-                  <TableRow key={entry.id}>
+                  <TableRow 
+                    key={entry.id}
+                    style={entry.job.productionSlotColor ? { 
+                      backgroundColor: `${entry.job.productionSlotColor}15`,
+                      borderLeft: `4px solid ${entry.job.productionSlotColor}` 
+                    } : undefined}
+                  >
                     <TableCell className="font-medium">{entry.panel.panelMark}</TableCell>
                     <TableCell>{entry.job.jobNumber}</TableCell>
                     <TableCell>{entry.level}</TableCell>
@@ -553,7 +559,13 @@ export default function DraftingProgramPage() {
                       </TableHeader>
                       <TableBody>
                         {group.entries.map((entry) => (
-                          <TableRow key={entry.id}>
+                          <TableRow 
+                            key={entry.id}
+                            style={entry.job.productionSlotColor ? { 
+                              backgroundColor: `${entry.job.productionSlotColor}15`,
+                              borderLeft: `4px solid ${entry.job.productionSlotColor}` 
+                            } : undefined}
+                          >
                             <TableCell className="font-medium">{entry.panel.panelMark}</TableCell>
                             <TableCell>{entry.level}</TableCell>
                             <TableCell>
