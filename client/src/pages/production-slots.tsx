@@ -419,7 +419,11 @@ export default function ProductionSlotsPage() {
                         </TableHeader>
                         <TableBody>
                           {groupSlots.map((slot) => (
-                            <TableRow key={slot.id} data-testid={`row-slot-${slot.id}`}>
+                            <TableRow 
+                              key={slot.id} 
+                              data-testid={`row-slot-${slot.id}`}
+                              style={slot.job.productionSlotColor ? { borderLeft: `4px solid ${slot.job.productionSlotColor}` } : undefined}
+                            >
                               <TableCell className={getDateColorClass(slot)}>
                                 {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
                                 {differenceInDays(new Date(slot.productionSlotDate), new Date()) < 0 && slot.status !== "COMPLETED" && (
@@ -510,7 +514,11 @@ export default function ProductionSlotsPage() {
               </TableHeader>
               <TableBody>
                 {slots.map((slot) => (
-                  <TableRow key={slot.id} data-testid={`row-slot-${slot.id}`}>
+                  <TableRow 
+                    key={slot.id} 
+                    data-testid={`row-slot-${slot.id}`}
+                    style={slot.job.productionSlotColor ? { borderLeft: `4px solid ${slot.job.productionSlotColor}` } : undefined}
+                  >
                     <TableCell className={getDateColorClass(slot)}>
                       {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
                       {differenceInDays(new Date(slot.productionSlotDate), new Date()) < 0 && slot.status !== "COMPLETED" && (
