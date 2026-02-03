@@ -73,9 +73,13 @@ interface MessageAttachment {
   id: string;
   messageId: string;
   fileName: string;
-  fileType: string;
-  fileSize: number;
-  filePath: string;
+  mimeType?: string;
+  sizeBytes?: number;
+  storageKey?: string;
+  url?: string;
+  fileType?: string;
+  fileSize?: number;
+  filePath?: string;
 }
 
 interface MessageMention {
@@ -273,6 +277,27 @@ export default function ChatPage() {
     setMessageContent(`${beforeMention}@${displayName} ${afterMention}`);
     setShowMentionDropdown(false);
     messageInputRef.current?.focus();
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          imageFiles.push(file);
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      setPendingFiles(prev => [...prev, ...imageFiles]);
+    }
   };
 
   const handleEmojiClick = (emojiData: EmojiClickData) => {
@@ -588,22 +613,44 @@ export default function ChatPage() {
                         </div>
                         <p className="text-sm mt-1 whitespace-pre-wrap">{msg.body}</p>
                         {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {msg.attachments.map(att => (
-                              <a
-                                key={att.id}
-                                href={att.filePath}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 p-2 rounded-md bg-muted hover-elevate text-sm"
-                                data-testid={`attachment-${att.id}`}
-                              >
-                                {getFileIcon(att.fileType)}
-                                <span className="truncate flex-1">{att.fileName}</span>
-                                <span className="text-xs text-muted-foreground">{formatFileSize(att.fileSize)}</span>
-                                <Download className="h-4 w-4" />
-                              </a>
-                            ))}
+                          <div className="mt-2 space-y-2">
+                            {msg.attachments.map(att => {
+                              const isImage = att.mimeType?.startsWith("image/");
+                              const fileUrl = att.url || att.filePath;
+                              const fileType = att.mimeType || att.fileType || "";
+                              const fileSize = att.sizeBytes || att.fileSize || 0;
+                              
+                              return isImage ? (
+                                <a
+                                  key={att.id}
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block"
+                                  data-testid={`attachment-${att.id}`}
+                                >
+                                  <img
+                                    src={fileUrl}
+                                    alt={att.fileName}
+                                    className="max-w-xs max-h-64 rounded-md border cursor-pointer hover:opacity-90"
+                                  />
+                                </a>
+                              ) : (
+                                <a
+                                  key={att.id}
+                                  href={fileUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 p-2 rounded-md bg-muted hover-elevate text-sm"
+                                  data-testid={`attachment-${att.id}`}
+                                >
+                                  {getFileIcon(fileType)}
+                                  <span className="truncate flex-1">{att.fileName}</span>
+                                  <span className="text-xs text-muted-foreground">{formatFileSize(fileSize)}</span>
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              );
+                            })}
                           </div>
                         )}
                         {msg.mentions && msg.mentions.length > 0 && (
@@ -627,13 +674,30 @@ export default function ChatPage() {
               {pendingFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2">
                   {pendingFiles.map((file, i) => (
-                    <Badge key={i} variant="secondary" className="flex items-center gap-1">
-                      {getFileIcon(file.type)}
-                      <span className="max-w-32 truncate">{file.name}</span>
-                      <button onClick={() => handleRemoveFile(i)} className="ml-1" data-testid={`button-remove-file-${i}`}>
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
+                    file.type.startsWith("image/") ? (
+                      <div key={i} className="relative group">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          className="h-16 w-16 object-cover rounded border"
+                        />
+                        <button
+                          onClick={() => handleRemoveFile(i)}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                          data-testid={`button-remove-file-${i}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <Badge key={i} variant="secondary" className="flex items-center gap-1">
+                        {getFileIcon(file.type)}
+                        <span className="max-w-32 truncate">{file.name}</span>
+                        <button onClick={() => handleRemoveFile(i)} className="ml-1" data-testid={`button-remove-file-${i}`}>
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    )
                   ))}
                 </div>
               )}
@@ -703,7 +767,8 @@ export default function ChatPage() {
                     value={messageContent}
                     onChange={handleTextareaChange}
                     onKeyDown={handleKeyDown}
-                    placeholder="Type a message... Use @ to mention someone"
+                    onPaste={handlePaste}
+                    placeholder="Type a message... Use @ to mention someone. Paste images directly!"
                     className="flex-1 min-h-[40px] max-h-32 resize-none"
                     data-testid="input-message"
                   />
