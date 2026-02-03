@@ -62,17 +62,6 @@ export default function ProductionSlotsPage() {
   const [dateFromFilter, setDateFromFilter] = useState<string>("");
   const [dateToFilter, setDateToFilter] = useState<string>("");
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
-  const [dateFiltersInitialized, setDateFiltersInitialized] = useState(false);
-  
-  useEffect(() => {
-    if (!dateFiltersInitialized && globalSettings) {
-      const today = new Date();
-      const { weekStart, weekEnd } = getWeekBoundaries(today, weekStartDay);
-      setDateFromFilter(format(weekStart, "yyyy-MM-dd"));
-      setDateToFilter(format(weekEnd, "yyyy-MM-dd"));
-      setDateFiltersInitialized(true);
-    }
-  }, [globalSettings, weekStartDay, dateFiltersInitialized]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
