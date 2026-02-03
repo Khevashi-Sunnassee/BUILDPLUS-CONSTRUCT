@@ -29,6 +29,7 @@ import {
   Package,
   ShoppingCart,
   ListTodo,
+  MessageSquare,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -57,6 +58,7 @@ import {
 const userNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Tasks", url: "/tasks", icon: ListTodo },
+  { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Production Slots", url: "/production-slots", icon: Calendar },
@@ -97,6 +99,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/weekly-job-logs": "weekly_job_logs",
   "/purchase-orders": "purchase_orders",
   "/tasks": "tasks",
+  "/chat": "chat",
   "/reports": "daily_reports",
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",
