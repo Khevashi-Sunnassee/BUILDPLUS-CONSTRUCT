@@ -259,6 +259,20 @@ export default function ChatPage() {
     },
   });
 
+  const markAsReadMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      return apiRequest("POST", "/api/chat/mark-read", { conversationId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    },
+  });
+
+  const handleSelectConversation = (conversationId: string) => {
+    setSelectedConversationId(conversationId);
+    markAsReadMutation.mutate(conversationId);
+  };
+
   const handleSendMessage = () => {
     if (!messageContent.trim() && pendingFiles.length === 0) return;
     sendMessageMutation.mutate({ content: messageContent, files: pendingFiles });
@@ -537,7 +551,7 @@ export default function ChatPage() {
               {filteredConversations.map(conv => (
                 <button
                   key={conv.id}
-                  onClick={() => setSelectedConversationId(conv.id)}
+                  onClick={() => handleSelectConversation(conv.id)}
                   className={cn(
                     "w-full flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors",
                     selectedConversationId === conv.id && "bg-accent"
