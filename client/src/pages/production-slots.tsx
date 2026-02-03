@@ -255,7 +255,7 @@ export default function ProductionSlotsPage() {
   const groupedSlots = (() => {
     if (groupBy === "none") return null;
     
-    const groups: Record<string, { label: string; slots: ProductionSlotWithDetails[] }> = {};
+    const groups: Record<string, { label: string; slots: ProductionSlotWithDetails[]; job?: Job }> = {};
     
     for (const slot of slots) {
       let key: string;
@@ -270,13 +270,54 @@ export default function ProductionSlotsPage() {
       }
       
       if (!groups[key]) {
-        groups[key] = { label, slots: [] };
+        groups[key] = { label, slots: [], job: slot.job };
       }
       groups[key].slots.push(slot);
     }
     
     return groups;
   })();
+
+  const getSlotForDateRange = (jobSlots: ProductionSlotWithDetails[], targetDate: Date) => {
+    const sorted = [...jobSlots].sort((a, b) => 
+      new Date(a.productionSlotDate).getTime() - new Date(b.productionSlotDate).getTime()
+    );
+    
+    for (const slot of sorted) {
+      const slotDate = new Date(slot.productionSlotDate);
+      const daysDiff = differenceInDays(slotDate, targetDate);
+      if (daysDiff >= -3 && daysDiff <= 3) {
+        return slot;
+      }
+    }
+    
+    for (const slot of sorted) {
+      const slotDate = new Date(slot.productionSlotDate);
+      if (slotDate >= targetDate) {
+        return slot;
+      }
+    }
+    return null;
+  };
+
+  const getTimelineDates = () => {
+    const today = new Date();
+    return [
+      { label: "Today", date: today, days: 0 },
+      { label: "+7 Days", date: addDays(today, 7), days: 7 },
+      { label: "+14 Days", date: addDays(today, 14), days: 14 },
+      { label: "+21 Days", date: addDays(today, 21), days: 21 },
+      { label: "+28 Days", date: addDays(today, 28), days: 28 },
+    ];
+  };
+
+  const isWithinOnsiteWindow = (slot: ProductionSlotWithDetails) => {
+    if (!slot.job.daysInAdvance) return false;
+    const slotDate = new Date(slot.productionSlotDate);
+    const today = new Date();
+    const daysUntilSlot = differenceInDays(slotDate, today);
+    return daysUntilSlot <= 10 && daysUntilSlot >= 0 && slot.status !== "COMPLETED";
+  };
 
   // Expand all groups by default when grouping changes
   useEffect(() => {
@@ -404,6 +445,48 @@ export default function ProductionSlotsPage() {
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <div className="ml-4 mt-2 border-l-2 pl-4">
+                      {groupBy === "job" && (
+                        <div className="mb-4 p-3 bg-muted/30 rounded-lg border" data-testid={`timeline-summary-${groupKey}`}>
+                          <div className="text-sm font-medium mb-2 text-muted-foreground">Production Timeline vs Onsite Requirements</div>
+                          <div className="grid grid-cols-5 gap-2">
+                            {getTimelineDates().map(({ label, date, days }) => {
+                              const nearestSlot = getSlotForDateRange(groupSlots, date);
+                              const isUrgent = nearestSlot && isWithinOnsiteWindow(nearestSlot);
+                              return (
+                                <div 
+                                  key={days} 
+                                  className={`p-2 rounded text-center text-sm ${
+                                    isUrgent 
+                                      ? "bg-amber-100 dark:bg-amber-900/30 border-2 border-amber-500" 
+                                      : "bg-background border"
+                                  }`}
+                                >
+                                  <div className="font-medium">{label}</div>
+                                  <div className="text-xs text-muted-foreground">{format(date, "dd/MM")}</div>
+                                  {nearestSlot ? (
+                                    <div className={`mt-1 font-semibold ${isUrgent ? "text-amber-700 dark:text-amber-400" : ""}`}>
+                                      Level {nearestSlot.level}
+                                    </div>
+                                  ) : (
+                                    <div className="mt-1 text-muted-foreground">-</div>
+                                  )}
+                                  {nearestSlot && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {nearestSlot.panelCount} panels
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {groupSlots.some(s => isWithinOnsiteWindow(s)) && (
+                            <div className="mt-2 flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span>Highlighted slots are within 10 days of onsite requirement</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <Table>
                         <TableHeader>
                           <TableRow>
@@ -418,16 +501,19 @@ export default function ProductionSlotsPage() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {groupSlots.map((slot) => (
+                          {groupSlots.map((slot) => {
+                            const isUrgentSlot = isWithinOnsiteWindow(slot);
+                            return (
                             <TableRow 
                               key={slot.id} 
                               data-testid={`row-slot-${slot.id}`}
+                              className={isUrgentSlot ? "ring-2 ring-amber-500 ring-inset" : ""}
                               style={slot.job.productionSlotColor ? { 
-                                backgroundColor: `${slot.job.productionSlotColor}15`,
+                                backgroundColor: isUrgentSlot ? undefined : `${slot.job.productionSlotColor}15`,
                                 borderLeft: `4px solid ${slot.job.productionSlotColor}` 
                               } : undefined}
                             >
-                              <TableCell className={getDateColorClass(slot)}>
+                              <TableCell className={isUrgentSlot ? "bg-amber-100 dark:bg-amber-900/30" : getDateColorClass(slot)}>
                                 {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
                                 {differenceInDays(new Date(slot.productionSlotDate), new Date()) < 0 && slot.status !== "COMPLETED" && (
                                   <AlertTriangle className="h-4 w-4 inline ml-1 text-red-600" />
@@ -493,7 +579,8 @@ export default function ProductionSlotsPage() {
                                 </div>
                               </TableCell>
                             </TableRow>
-                          ))}
+                            );
+                          })}
                         </TableBody>
                       </Table>
                     </div>
