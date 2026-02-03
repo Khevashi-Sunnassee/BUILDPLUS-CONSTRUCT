@@ -168,6 +168,22 @@ export async function registerRoutes(
           userId: fullLog.user.id,
           lastEntryEndTime,
           rows: fullLog.rows, // Include rows for auto-fill in Manual Entry
+          userWorkHours: {
+            mondayStartTime: (fullLog.user as any).mondayStartTime,
+            mondayHours: (fullLog.user as any).mondayHours,
+            tuesdayStartTime: (fullLog.user as any).tuesdayStartTime,
+            tuesdayHours: (fullLog.user as any).tuesdayHours,
+            wednesdayStartTime: (fullLog.user as any).wednesdayStartTime,
+            wednesdayHours: (fullLog.user as any).wednesdayHours,
+            thursdayStartTime: (fullLog.user as any).thursdayStartTime,
+            thursdayHours: (fullLog.user as any).thursdayHours,
+            fridayStartTime: (fullLog.user as any).fridayStartTime,
+            fridayHours: (fullLog.user as any).fridayHours,
+            saturdayStartTime: (fullLog.user as any).saturdayStartTime,
+            saturdayHours: (fullLog.user as any).saturdayHours,
+            sundayStartTime: (fullLog.user as any).sundayStartTime,
+            sundayHours: (fullLog.user as any).sundayHours,
+          },
         });
       }
     }
@@ -639,6 +655,36 @@ export async function registerRoutes(
   app.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     const user = await storage.updateUser(req.params.id as string, req.body);
     res.json({ ...user, passwordHash: undefined });
+  });
+
+  const workHoursSchema = z.object({
+    mondayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    mondayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+    tuesdayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    tuesdayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+    wednesdayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    wednesdayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+    thursdayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    thursdayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+    fridayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    fridayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+    saturdayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    saturdayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+    sundayStartTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+    sundayHours: z.string().refine((v) => { const n = parseFloat(v); return !isNaN(n) && n >= 0 && n <= 24; }),
+  });
+
+  app.put("/api/admin/users/:id/work-hours", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const validatedData = workHoursSchema.parse(req.body);
+      const user = await storage.updateUser(req.params.id as string, validatedData);
+      res.json({ ...user, passwordHash: undefined });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid work hours data", details: error.errors });
+      }
+      throw error;
+    }
   });
 
   app.delete("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {

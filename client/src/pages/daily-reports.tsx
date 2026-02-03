@@ -69,6 +69,23 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 
 type GroupBy = "none" | "user" | "date";
 
+interface UserWorkHours {
+  mondayStartTime?: string;
+  mondayHours?: string;
+  tuesdayStartTime?: string;
+  tuesdayHours?: string;
+  wednesdayStartTime?: string;
+  wednesdayHours?: string;
+  thursdayStartTime?: string;
+  thursdayHours?: string;
+  fridayStartTime?: string;
+  fridayHours?: string;
+  saturdayStartTime?: string;
+  saturdayHours?: string;
+  sundayStartTime?: string;
+  sundayHours?: string;
+}
+
 interface DailyLogSummary {
   id: string;
   logDay: string;
@@ -83,7 +100,31 @@ interface DailyLogSummary {
   userEmail?: string;
   userId?: string;
   lastEntryEndTime?: string | null;
+  userWorkHours?: UserWorkHours;
 }
+
+const getDayOfWeekKey = (dateString: string): keyof UserWorkHours => {
+  const date = new Date(dateString + "T00:00:00");
+  const dayOfWeek = date.getDay();
+  const dayKeys: (keyof UserWorkHours)[] = [
+    "sundayHours", "mondayHours", "tuesdayHours", "wednesdayHours",
+    "thursdayHours", "fridayHours", "saturdayHours"
+  ];
+  return dayKeys[dayOfWeek];
+};
+
+const getExpectedHoursForDay = (log: DailyLogSummary): number => {
+  if (!log.userWorkHours) return 8;
+  const dayKey = getDayOfWeekKey(log.logDay);
+  const hours = log.userWorkHours[dayKey];
+  return hours ? parseFloat(hours) : 8;
+};
+
+const getRemainingHours = (log: DailyLogSummary): number => {
+  const expectedHours = getExpectedHoursForDay(log);
+  const loggedHours = log.totalMinutes / 60;
+  return Math.max(0, expectedHours - loggedHours);
+};
 
 export default function DailyReportsPage() {
   const { user } = useAuth();
@@ -580,6 +621,8 @@ export default function DailyReportsPage() {
                                   <TableHead>User</TableHead>
                                 )}
                                 <TableHead className="text-right">Total Time</TableHead>
+                                <TableHead className="text-right">Expected</TableHead>
+                                <TableHead className="text-right">Remaining</TableHead>
                                 <TableHead className="text-right">Last Entry</TableHead>
                                 <TableHead className="text-right">Idle</TableHead>
                                 <TableHead className="text-right">Missing Panel</TableHead>
@@ -621,6 +664,18 @@ export default function DailyReportsPage() {
                                       <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                                       {formatMinutes(log.totalMinutes)}
                                     </div>
+                                  </TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    {getExpectedHoursForDay(log).toFixed(1)}h
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    {getRemainingHours(log) > 0 ? (
+                                      <span className="text-amber-600 font-medium">
+                                        {getRemainingHours(log).toFixed(1)}h
+                                      </span>
+                                    ) : (
+                                      <span className="text-green-600 font-medium">Done</span>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-right text-muted-foreground">
                                     {formatEndTime(log.lastEntryEndTime)}
@@ -693,6 +748,8 @@ export default function DailyReportsPage() {
                         <TableHead>User</TableHead>
                       )}
                       <TableHead className="text-right">Total Time</TableHead>
+                      <TableHead className="text-right">Expected</TableHead>
+                      <TableHead className="text-right">Remaining</TableHead>
                       <TableHead className="text-right">Last Entry</TableHead>
                       <TableHead className="text-right">Idle</TableHead>
                       <TableHead className="text-right">Missing Panel</TableHead>
@@ -732,6 +789,18 @@ export default function DailyReportsPage() {
                             <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                             {formatMinutes(log.totalMinutes)}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {getExpectedHoursForDay(log).toFixed(1)}h
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {getRemainingHours(log) > 0 ? (
+                            <span className="text-amber-600 font-medium">
+                              {getRemainingHours(log).toFixed(1)}h
+                            </span>
+                          ) : (
+                            <span className="text-green-600 font-medium">Done</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right text-muted-foreground">
                           {formatEndTime(log.lastEntryEndTime)}

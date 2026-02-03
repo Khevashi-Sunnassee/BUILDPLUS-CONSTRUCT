@@ -18,6 +18,7 @@ import {
   User,
   Power,
   PowerOff,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -82,12 +83,49 @@ const userSchema = z.object({
 
 type UserFormData = z.infer<typeof userSchema>;
 
+const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+const hoursValidation = z.string().refine((val) => {
+  const num = parseFloat(val);
+  return !isNaN(num) && num >= 0 && num <= 24;
+}, { message: "Must be a number between 0 and 24" });
+
+const workHoursSchema = z.object({
+  mondayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  mondayHours: hoursValidation,
+  tuesdayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  tuesdayHours: hoursValidation,
+  wednesdayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  wednesdayHours: hoursValidation,
+  thursdayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  thursdayHours: hoursValidation,
+  fridayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  fridayHours: hoursValidation,
+  saturdayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  saturdayHours: hoursValidation,
+  sundayStartTime: z.string().regex(timeRegex, "Invalid time format (HH:MM)"),
+  sundayHours: hoursValidation,
+});
+
+type WorkHoursFormData = z.infer<typeof workHoursSchema>;
+
+const DAYS_OF_WEEK = [
+  { key: "monday", label: "Monday" },
+  { key: "tuesday", label: "Tuesday" },
+  { key: "wednesday", label: "Wednesday" },
+  { key: "thursday", label: "Thursday" },
+  { key: "friday", label: "Friday" },
+  { key: "saturday", label: "Saturday" },
+  { key: "sunday", label: "Sunday" },
+] as const;
+
 export default function AdminUsersPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserType | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [workHoursDialogOpen, setWorkHoursDialogOpen] = useState(false);
+  const [workHoursUser, setWorkHoursUser] = useState<UserType | null>(null);
 
   const { data: users, isLoading } = useQuery<UserType[]>({
     queryKey: ["/api/admin/users"],
@@ -102,6 +140,26 @@ export default function AdminUsersPage() {
       role: "USER",
       poApprover: false,
       poApprovalLimit: "",
+    },
+  });
+
+  const workHoursForm = useForm<WorkHoursFormData>({
+    resolver: zodResolver(workHoursSchema),
+    defaultValues: {
+      mondayStartTime: "08:00",
+      mondayHours: "8",
+      tuesdayStartTime: "08:00",
+      tuesdayHours: "8",
+      wednesdayStartTime: "08:00",
+      wednesdayHours: "8",
+      thursdayStartTime: "08:00",
+      thursdayHours: "8",
+      fridayStartTime: "08:00",
+      fridayHours: "8",
+      saturdayStartTime: "08:00",
+      saturdayHours: "0",
+      sundayStartTime: "08:00",
+      sundayHours: "0",
     },
   });
 
@@ -163,6 +221,48 @@ export default function AdminUsersPage() {
       toast({ title: "Failed to delete user", variant: "destructive" });
     },
   });
+
+  const updateWorkHoursMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: WorkHoursFormData }) => {
+      return apiRequest("PUT", `/api/admin/users/${id}/work-hours`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      toast({ title: "Work hours updated successfully" });
+      setWorkHoursDialogOpen(false);
+      setWorkHoursUser(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to update work hours", variant: "destructive" });
+    },
+  });
+
+  const openWorkHoursDialog = (user: UserType) => {
+    setWorkHoursUser(user);
+    workHoursForm.reset({
+      mondayStartTime: (user as any).mondayStartTime || "08:00",
+      mondayHours: (user as any).mondayHours || "8",
+      tuesdayStartTime: (user as any).tuesdayStartTime || "08:00",
+      tuesdayHours: (user as any).tuesdayHours || "8",
+      wednesdayStartTime: (user as any).wednesdayStartTime || "08:00",
+      wednesdayHours: (user as any).wednesdayHours || "8",
+      thursdayStartTime: (user as any).thursdayStartTime || "08:00",
+      thursdayHours: (user as any).thursdayHours || "8",
+      fridayStartTime: (user as any).fridayStartTime || "08:00",
+      fridayHours: (user as any).fridayHours || "8",
+      saturdayStartTime: (user as any).saturdayStartTime || "08:00",
+      saturdayHours: (user as any).saturdayHours || "0",
+      sundayStartTime: (user as any).sundayStartTime || "08:00",
+      sundayHours: (user as any).sundayHours || "0",
+    });
+    setWorkHoursDialogOpen(true);
+  };
+
+  const onWorkHoursSubmit = (data: WorkHoursFormData) => {
+    if (workHoursUser) {
+      updateWorkHoursMutation.mutate({ id: workHoursUser.id, data });
+    }
+  };
 
   const openEditUser = (user: UserType) => {
     setEditingUser(user);
@@ -307,6 +407,15 @@ export default function AdminUsersPage() {
                             ) : (
                               <Power className="h-4 w-4 text-green-600" />
                             )}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openWorkHoursDialog(user)}
+                            title="Work Hours"
+                            data-testid={`button-work-hours-${user.id}`}
+                          >
+                            <Clock className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -531,6 +640,99 @@ export default function AdminUsersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={workHoursDialogOpen} onOpenChange={setWorkHoursDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>
+              Work Hours - {workHoursUser?.name || workHoursUser?.email}
+            </DialogTitle>
+            <DialogDescription>
+              Configure the work schedule for this user. Set the start time and total hours for each day.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...workHoursForm}>
+            <form onSubmit={workHoursForm.handleSubmit(onWorkHoursSubmit)} className="space-y-4">
+              <div className="grid gap-3">
+                {DAYS_OF_WEEK.map((day) => (
+                  <div key={day.key} className="grid grid-cols-[120px_1fr_1fr] gap-3 items-center">
+                    <span className="font-medium text-sm">{day.label}</span>
+                    <FormField
+                      control={workHoursForm.control}
+                      name={`${day.key}StartTime` as keyof WorkHoursFormData}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <Input
+                              type="time"
+                              {...field}
+                              className="h-9"
+                              data-testid={`input-${day.key}-start-time`}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={workHoursForm.control}
+                      name={`${day.key}Hours` as keyof WorkHoursFormData}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormControl>
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                max="24"
+                                {...field}
+                                className="h-9"
+                                data-testid={`input-${day.key}-hours`}
+                              />
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">hours</span>
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="text-sm text-muted-foreground pt-2 border-t">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>
+                    Total weekly hours:{" "}
+                    <strong>
+                      {DAYS_OF_WEEK.reduce((sum, day) => {
+                        const hours = parseFloat(workHoursForm.watch(`${day.key}Hours` as keyof WorkHoursFormData) || "0");
+                        return sum + (isNaN(hours) ? 0 : hours);
+                      }, 0).toFixed(1)}
+                    </strong>
+                  </span>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setWorkHoursDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateWorkHoursMutation.isPending}
+                  data-testid="button-save-work-hours"
+                >
+                  {updateWorkHoursMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  Save Work Hours
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
