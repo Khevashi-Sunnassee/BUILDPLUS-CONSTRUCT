@@ -748,6 +748,7 @@ export default function AdminJobsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-1 p-0" />
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -792,7 +793,7 @@ export default function AdminJobsPage() {
                 <Fragment key={stateGroup}>
                   {groupByState && stateGroup !== "All Jobs" && (
                     <TableRow className="bg-muted/50">
-                      <TableCell colSpan={7} className="py-2">
+                      <TableCell colSpan={8} className="py-2">
                         <div className="flex items-center gap-2 font-semibold">
                           <MapPin className="h-4 w-4" />
                           {stateGroup}
@@ -803,6 +804,13 @@ export default function AdminJobsPage() {
                   )}
                   {stateJobs.map((job) => (
                     <TableRow key={job.id} data-testid={`row-job-${job.id}`}>
+                      <TableCell className="w-1 p-0">
+                        <div 
+                          className="h-full w-1 min-h-[40px] rounded-r-sm"
+                          style={{ backgroundColor: job.productionSlotColor || 'transparent' }}
+                          title={`${job.jobNumber} - ${job.name}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Hash className="h-4 w-4 text-muted-foreground" />
@@ -896,7 +904,7 @@ export default function AdminJobsPage() {
               ))}
               {filteredAndSortedJobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {jobs?.length ? "No jobs match your filters." : "No jobs found. Add a job or import from Excel."}
                   </TableCell>
                 </TableRow>
