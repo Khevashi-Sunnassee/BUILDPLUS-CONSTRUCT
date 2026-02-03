@@ -15,7 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 
 interface ChatConversation {
@@ -137,8 +137,8 @@ export default function DashboardPage() {
                   );
                 })}
               </div>
-              <Link href="/chat">
-                <Button className="w-full" data-testid="button-view-messages">
+              <Link href="/chat" className="block">
+                <Button className="w-full pointer-events-none" data-testid="button-view-messages">
                   <MessageSquare className="h-4 w-4 mr-2" />
                   View All Messages
                 </Button>
