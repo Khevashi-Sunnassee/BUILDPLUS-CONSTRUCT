@@ -89,7 +89,7 @@ interface Message {
   id: string;
   conversationId: string;
   senderId: string;
-  content: string;
+  body: string | null;
   createdAt: string;
   sender?: User;
   attachments?: MessageAttachment[];
@@ -500,7 +500,7 @@ export default function ChatPage() {
                     </div>
                     {conv.lastMessage && (
                       <div className="text-xs text-muted-foreground truncate">
-                        {conv.lastMessage.content}
+                        {conv.lastMessage.body}
                       </div>
                     )}
                   </div>
@@ -586,7 +586,7 @@ export default function ChatPage() {
                             {format(new Date(msg.createdAt), "MMM d, h:mm a")}
                           </span>
                         </div>
-                        <p className="text-sm mt-1 whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-sm mt-1 whitespace-pre-wrap">{msg.body}</p>
                         {msg.attachments && msg.attachments.length > 0 && (
                           <div className="mt-2 space-y-1">
                             {msg.attachments.map(att => (
