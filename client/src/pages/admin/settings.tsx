@@ -42,6 +42,7 @@ export default function AdminSettingsPage() {
   const [companyName, setCompanyName] = useState("");
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
   const [productionWindowDays, setProductionWindowDays] = useState<number>(10);
+  const [ifcDaysInAdvance, setIfcDaysInAdvance] = useState<number>(14);
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -60,7 +61,10 @@ export default function AdminSettingsPage() {
     if (settings?.productionWindowDays !== undefined) {
       setProductionWindowDays(settings.productionWindowDays);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays]);
+    if (settings?.ifcDaysInAdvance !== undefined) {
+      setIfcDaysInAdvance(settings.ifcDaysInAdvance);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -99,6 +103,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save production window days", variant: "destructive" });
+    },
+  });
+
+  const saveIfcDaysInAdvanceMutation = useMutation({
+    mutationFn: async (days: number) => {
+      return apiRequest("PUT", "/api/admin/settings", { ifcDaysInAdvance: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "IFC days in advance saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save IFC days in advance", variant: "destructive" });
     },
   });
 
@@ -415,6 +432,40 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Number of days before the Production Due Date when production can start. This defines the production window for scheduling panels.
+            </p>
+          </div>
+          
+          <div className="space-y-2 pt-4 border-t">
+            <Label htmlFor="ifcDaysInAdvance">IFC Days in Advance</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={ifcDaysInAdvance}
+                onChange={(e) => setIfcDaysInAdvance(parseInt(e.target.value) || 14)}
+                className="w-24"
+                data-testid="input-ifc-days-in-advance"
+              />
+              <span className="text-muted-foreground">days before production</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveIfcDaysInAdvanceMutation.mutate(ifcDaysInAdvance)}
+                disabled={saveIfcDaysInAdvanceMutation.isPending || ifcDaysInAdvance === settings?.ifcDaysInAdvance}
+                data-testid="button-save-ifc-days"
+              >
+                {saveIfcDaysInAdvanceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Number of days before production that a drawing needs to reach IFC (Issued For Construction) stage. Used for scheduling and deadline tracking.
             </p>
           </div>
         </CardContent>

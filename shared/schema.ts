@@ -104,6 +104,7 @@ export const globalSettings = pgTable("global_settings", {
   companyName: text("company_name").default("LTE Precast Concrete Structures"),
   weekStartDay: integer("week_start_day").default(1).notNull(),
   productionWindowDays: integer("production_window_days").default(10).notNull(),
+  ifcDaysInAdvance: integer("ifc_days_in_advance").default(14).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
