@@ -657,6 +657,7 @@ export default function WeeklyJobLogsPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-1 p-0" />
                       <TableHead className="w-[200px]">Job</TableHead>
                       <TableHead>Current Level Onsite</TableHead>
                       <TableHead>7-Day Level</TableHead>
@@ -671,6 +672,10 @@ export default function WeeklyJobLogsPage() {
                   <TableBody>
                     {schedules.map((schedule, index) => {
                       const jobId = schedule.jobId;
+                      const statusColor = schedule.scheduleStatus === "RUNNING_BEHIND" ? "#ef4444" 
+                        : schedule.scheduleStatus === "ON_HOLD" ? "#f97316" 
+                        : schedule.scheduleStatus === "ON_TRACK" ? "#22c55e" 
+                        : "transparent";
                       const baseDate = reportDate || format(new Date(), "yyyy-MM-dd");
                       
                       const currentProdDate = getProductionSlotRawDate(jobId, schedule.currentLevelOnsite);
@@ -687,6 +692,12 @@ export default function WeeklyJobLogsPage() {
                       
                       return (
                       <TableRow key={index} data-testid={`row-schedule-${index}`}>
+                        <TableCell className="w-1 p-0">
+                          <div 
+                            className="h-full w-1 min-h-[60px] rounded-r-sm"
+                            style={{ backgroundColor: statusColor }}
+                          />
+                        </TableCell>
                         <TableCell>
                           <Select value={schedule.jobId} onValueChange={(v) => updateSchedule(index, "jobId", v)}>
                             <SelectTrigger data-testid={`select-job-${index}`}>

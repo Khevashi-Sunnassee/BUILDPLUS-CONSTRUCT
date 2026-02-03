@@ -731,9 +731,13 @@ export async function registerRoutes(
   app.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req, res) => {
     try {
       const data = { ...req.body };
-      // Convert productionStartDate string to Date if present
-      if (data.productionStartDate && typeof data.productionStartDate === 'string') {
-        data.productionStartDate = new Date(data.productionStartDate);
+      // Convert productionStartDate string to Date if present, or null if empty
+      if (data.productionStartDate !== undefined) {
+        if (data.productionStartDate && typeof data.productionStartDate === 'string') {
+          data.productionStartDate = new Date(data.productionStartDate);
+        } else {
+          data.productionStartDate = null;
+        }
       }
       const job = await storage.updateJob(req.params.id as string, data);
       res.json(job);
