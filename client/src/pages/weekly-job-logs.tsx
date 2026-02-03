@@ -647,10 +647,16 @@ export default function WeeklyJobLogsPage() {
       <Dialog open={showViewDialog} onOpenChange={(open) => { if (!open) { setShowViewDialog(false); setSelectedReport(null); } }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle data-testid="text-view-title">View Report</DialogTitle>
+            <DialogTitle data-testid="text-view-title">Weekly Job Report</DialogTitle>
           </DialogHeader>
           {selectedReport && (
             <div className="space-y-4">
+              <div className="p-3 bg-muted/50 rounded-lg border">
+                <Label className="text-muted-foreground text-sm">Report By</Label>
+                <p className="font-semibold text-lg" data-testid="text-report-author">
+                  {selectedReport.projectManager?.name || selectedReport.projectManager?.email || "Unknown User"}
+                </p>
+              </div>
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Report Date</Label>
@@ -726,11 +732,17 @@ export default function WeeklyJobLogsPage() {
       <Dialog open={showApprovalDialog} onOpenChange={(open) => { if (!open) { setShowApprovalDialog(false); setSelectedReport(null); setRejectionReason(""); } }}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle data-testid="text-approval-title">Review Report</DialogTitle>
+            <DialogTitle data-testid="text-approval-title">Review Weekly Job Report</DialogTitle>
           </DialogHeader>
           {selectedReport && (
             <div className="space-y-4">
-              <div className="grid grid-cols-4 gap-4">
+              <div className="p-3 bg-muted/50 rounded-lg border">
+                <Label className="text-muted-foreground text-sm">Report By</Label>
+                <p className="font-semibold text-lg" data-testid="text-approval-author">
+                  {selectedReport.projectManager?.name || selectedReport.projectManager?.email || "Unknown User"}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <Label className="text-muted-foreground">Report Date</Label>
                   <p className="font-medium">{formatDate(selectedReport.reportDate)}</p>
@@ -738,10 +750,6 @@ export default function WeeklyJobLogsPage() {
                 <div>
                   <Label className="text-muted-foreground">Week</Label>
                   <p className="font-medium">{formatDate(selectedReport.weekStartDate)} - {formatDate(selectedReport.weekEndDate)}</p>
-                </div>
-                <div>
-                  <Label className="text-muted-foreground">Project Manager</Label>
-                  <p className="font-medium">{selectedReport.projectManager?.name || selectedReport.projectManager?.email}</p>
                 </div>
                 <div>
                   <Label className="text-muted-foreground">Submitted</Label>
