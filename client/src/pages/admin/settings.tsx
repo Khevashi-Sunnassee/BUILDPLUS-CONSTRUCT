@@ -43,6 +43,7 @@ export default function AdminSettingsPage() {
   const [weekStartDay, setWeekStartDay] = useState<number>(1);
   const [productionWindowDays, setProductionWindowDays] = useState<number>(10);
   const [ifcDaysInAdvance, setIfcDaysInAdvance] = useState<number>(14);
+  const [daysToAchieveIfc, setDaysToAchieveIfc] = useState<number>(21);
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -64,7 +65,10 @@ export default function AdminSettingsPage() {
     if (settings?.ifcDaysInAdvance !== undefined) {
       setIfcDaysInAdvance(settings.ifcDaysInAdvance);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance]);
+    if (settings?.daysToAchieveIfc !== undefined) {
+      setDaysToAchieveIfc(settings.daysToAchieveIfc);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -116,6 +120,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save IFC days in advance", variant: "destructive" });
+    },
+  });
+
+  const saveDaysToAchieveIfcMutation = useMutation({
+    mutationFn: async (days: number) => {
+      return apiRequest("PUT", "/api/admin/settings", { daysToAchieveIfc: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Days to achieve IFC saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save days to achieve IFC", variant: "destructive" });
     },
   });
 
@@ -466,6 +483,40 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Number of days before production that a drawing needs to reach IFC (Issued For Construction) stage. Used for scheduling and deadline tracking.
+            </p>
+          </div>
+          
+          <div className="space-y-2 pt-4 border-t">
+            <Label htmlFor="daysToAchieveIfc">Days to Achieve IFC</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                type="number"
+                min={1}
+                max={60}
+                value={daysToAchieveIfc}
+                onChange={(e) => setDaysToAchieveIfc(parseInt(e.target.value) || 21)}
+                className="w-24"
+                data-testid="input-days-to-achieve-ifc"
+              />
+              <span className="text-muted-foreground">days to complete drafting</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveDaysToAchieveIfcMutation.mutate(daysToAchieveIfc)}
+                disabled={saveDaysToAchieveIfcMutation.isPending || daysToAchieveIfc === settings?.daysToAchieveIfc}
+                data-testid="button-save-days-to-achieve-ifc"
+              >
+                {saveDaysToAchieveIfcMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Number of days required to complete drafting work from start to reaching IFC stage. This defines the drafting window for scheduling resources.
             </p>
           </div>
         </CardContent>

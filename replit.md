@@ -36,6 +36,7 @@ The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/
 - **Logistics Reporting**: Provides reports on panels shipped, total deliveries, and average delivery phase timings.
 - **Weekly Wage Reports**: Tracks weekly payroll costs across various categories and compares actual wages against estimated wages based on production revenue.
 - **Timezone Management**: All times are stored and displayed in the Australia/Melbourne timezone.
+- **Drafting Program**: Panel-level drafting scheduling system that links to production slots. Calculates Drawing Due Date (Production Date - IFC Days in Advance) and Drafting Window Start (Drawing Due Date - Days to Achieve IFC). Features resource assignment with proposed start dates, status tracking (NOT_SCHEDULED, SCHEDULED, IN_PROGRESS, COMPLETED, ON_HOLD), and grouping by job/level/week/assignee. Settings configurable: IFC Days in Advance (default 14), Days to Achieve IFC (default 21).
 
 ## External Dependencies
 - **PostgreSQL**: Primary database for data storage.

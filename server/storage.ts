@@ -6,7 +6,7 @@ import {
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
-  productionSlots, productionSlotAdjustments,
+  productionSlots, productionSlotAdjustments, draftingProgram,
   suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems,
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles,
   type InsertUser, type User, type InsertDevice, type Device,
@@ -30,6 +30,7 @@ import {
   type InsertZone, type Zone,
   type InsertProductionSlot, type ProductionSlot,
   type InsertProductionSlotAdjustment, type ProductionSlotAdjustment,
+  type InsertDraftingProgram, type DraftingProgram,
   type InsertSupplier, type Supplier,
   type InsertItemCategory, type ItemCategory,
   type InsertItem, type Item,
@@ -62,6 +63,13 @@ export interface ProductionSlotWithDetails extends ProductionSlot {
 
 export interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
   changedBy: User;
+}
+
+export interface DraftingProgramWithDetails extends DraftingProgram {
+  panel: PanelRegister;
+  job: Job;
+  productionSlot?: ProductionSlot | null;
+  assignedTo?: User | null;
 }
 
 export interface PurchaseOrderWithDetails extends PurchaseOrder {
@@ -314,6 +322,16 @@ export interface IStorage {
   getJobsWithoutProductionSlots(): Promise<Job[]>;
   deleteProductionSlot(id: string): Promise<void>;
   checkAndCompleteSlotByPanelCompletion(jobId: string, level: string, buildingNumber: number): Promise<void>;
+
+  // Drafting Program
+  getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date }): Promise<DraftingProgramWithDetails[]>;
+  getDraftingProgram(id: string): Promise<DraftingProgramWithDetails | undefined>;
+  getDraftingProgramByPanelId(panelId: string): Promise<DraftingProgram | undefined>;
+  createDraftingProgram(data: InsertDraftingProgram): Promise<DraftingProgram>;
+  updateDraftingProgram(id: string, data: Partial<InsertDraftingProgram>): Promise<DraftingProgram | undefined>;
+  deleteDraftingProgram(id: string): Promise<void>;
+  generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }>;
+  assignDraftingResource(id: string, assignedToId: string, proposedStartDate: Date): Promise<DraftingProgram | undefined>;
 
   // Suppliers
   getAllSuppliers(): Promise<Supplier[]>;
@@ -2327,6 +2345,139 @@ export class DatabaseStorage implements IStorage {
         }).where(eq(productionSlots.id, slot.id));
       }
     }
+  }
+
+  // ============== Drafting Program ==============
+  async getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date }): Promise<DraftingProgramWithDetails[]> {
+    let query = db.select().from(draftingProgram).orderBy(asc(draftingProgram.drawingDueDate));
+    
+    const conditions: any[] = [];
+    if (filters?.jobId) conditions.push(eq(draftingProgram.jobId, filters.jobId));
+    if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as any));
+    if (filters?.assignedToId) conditions.push(eq(draftingProgram.assignedToId, filters.assignedToId));
+    if (filters?.dateFrom) conditions.push(gte(draftingProgram.drawingDueDate, filters.dateFrom));
+    if (filters?.dateTo) conditions.push(lte(draftingProgram.drawingDueDate, filters.dateTo));
+    
+    const results = conditions.length > 0 
+      ? await db.select().from(draftingProgram).where(and(...conditions)).orderBy(asc(draftingProgram.drawingDueDate))
+      : await db.select().from(draftingProgram).orderBy(asc(draftingProgram.drawingDueDate));
+    
+    const detailedResults: DraftingProgramWithDetails[] = [];
+    for (const dp of results) {
+      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, dp.panelId));
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, dp.jobId));
+      const slot = dp.productionSlotId ? (await db.select().from(productionSlots).where(eq(productionSlots.id, dp.productionSlotId)))[0] : null;
+      const assignedTo = dp.assignedToId ? (await db.select().from(users).where(eq(users.id, dp.assignedToId)))[0] : null;
+      
+      if (panel && job) {
+        detailedResults.push({ ...dp, panel, job, productionSlot: slot, assignedTo });
+      }
+    }
+    return detailedResults;
+  }
+
+  async getDraftingProgram(id: string): Promise<DraftingProgramWithDetails | undefined> {
+    const [dp] = await db.select().from(draftingProgram).where(eq(draftingProgram.id, id));
+    if (!dp) return undefined;
+    
+    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, dp.panelId));
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, dp.jobId));
+    const slot = dp.productionSlotId ? (await db.select().from(productionSlots).where(eq(productionSlots.id, dp.productionSlotId)))[0] : null;
+    const assignedTo = dp.assignedToId ? (await db.select().from(users).where(eq(users.id, dp.assignedToId)))[0] : null;
+    
+    if (!panel || !job) return undefined;
+    return { ...dp, panel, job, productionSlot: slot, assignedTo };
+  }
+
+  async getDraftingProgramByPanelId(panelId: string): Promise<DraftingProgram | undefined> {
+    const [dp] = await db.select().from(draftingProgram).where(eq(draftingProgram.panelId, panelId));
+    return dp;
+  }
+
+  async createDraftingProgram(data: InsertDraftingProgram): Promise<DraftingProgram> {
+    const [created] = await db.insert(draftingProgram).values(data).returning();
+    return created;
+  }
+
+  async updateDraftingProgram(id: string, data: Partial<InsertDraftingProgram>): Promise<DraftingProgram | undefined> {
+    const [updated] = await db.update(draftingProgram).set({ ...data, updatedAt: new Date() }).where(eq(draftingProgram.id, id)).returning();
+    return updated;
+  }
+
+  async deleteDraftingProgram(id: string): Promise<void> {
+    await db.delete(draftingProgram).where(eq(draftingProgram.id, id));
+  }
+
+  async generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }> {
+    // Get global settings for date calculations
+    const settings = await this.getGlobalSettings();
+    const ifcDaysInAdvance = settings?.ifcDaysInAdvance ?? 14;
+    const daysToAchieveIfc = settings?.daysToAchieveIfc ?? 21;
+    
+    // Get all production slots that are not completed
+    const slots = await db.select().from(productionSlots).where(
+      sql`${productionSlots.status} != 'COMPLETED'`
+    );
+    
+    let created = 0;
+    let updated = 0;
+    
+    for (const slot of slots) {
+      // Get all panels for this slot's job and level
+      const panels = await db.select().from(panelRegister).where(and(
+        eq(panelRegister.jobId, slot.jobId),
+        eq(panelRegister.level, slot.level)
+      ));
+      
+      for (const panel of panels) {
+        // Check if drafting program entry already exists for this panel
+        const existing = await this.getDraftingProgramByPanelId(panel.id);
+        
+        // Calculate dates
+        const productionDate = slot.productionSlotDate;
+        const drawingDueDate = new Date(productionDate);
+        drawingDueDate.setDate(drawingDueDate.getDate() - ifcDaysInAdvance);
+        
+        const draftingWindowStart = new Date(drawingDueDate);
+        draftingWindowStart.setDate(draftingWindowStart.getDate() - daysToAchieveIfc);
+        
+        if (existing) {
+          // Update existing entry with new dates if production slot dates changed
+          await this.updateDraftingProgram(existing.id, {
+            productionSlotId: slot.id,
+            productionDate,
+            drawingDueDate,
+            draftingWindowStart,
+          });
+          updated++;
+        } else {
+          // Create new entry
+          await this.createDraftingProgram({
+            panelId: panel.id,
+            jobId: slot.jobId,
+            productionSlotId: slot.id,
+            level: slot.level,
+            productionDate,
+            drawingDueDate,
+            draftingWindowStart,
+            status: "NOT_SCHEDULED",
+          });
+          created++;
+        }
+      }
+    }
+    
+    return { created, updated };
+  }
+
+  async assignDraftingResource(id: string, assignedToId: string, proposedStartDate: Date): Promise<DraftingProgram | undefined> {
+    const [updated] = await db.update(draftingProgram).set({
+      assignedToId,
+      proposedStartDate,
+      status: "SCHEDULED",
+      updatedAt: new Date(),
+    }).where(eq(draftingProgram.id, id)).returning();
+    return updated;
   }
 
   // ============== Suppliers ==============

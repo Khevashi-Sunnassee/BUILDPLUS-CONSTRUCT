@@ -36,6 +36,7 @@ import LogisticsPage from "@/pages/logistics";
 import WeeklyWageReportsPage from "@/pages/weekly-wage-reports";
 import WeeklyJobLogsPage from "@/pages/weekly-job-logs";
 import ProductionSlotsPage from "@/pages/production-slots";
+import DraftingProgramPage from "@/pages/drafting-program";
 import PurchaseOrdersPage from "@/pages/purchase-orders";
 import PurchaseOrderFormPage from "@/pages/purchase-order-form";
 import TasksPage from "@/pages/tasks";
@@ -212,6 +213,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ProductionSlotsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/drafting-program">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <DraftingProgramPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

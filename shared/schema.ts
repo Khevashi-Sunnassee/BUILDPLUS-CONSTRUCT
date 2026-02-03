@@ -14,6 +14,7 @@ export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "
 export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IFC", "APPROVED"]);
 export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHEDULED", "PENDING_UPDATE", "BOOKED", "COMPLETED"]);
 export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
+export const draftingProgramStatusEnum = pgEnum("drafting_program_status", ["NOT_SCHEDULED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
 
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -105,6 +106,7 @@ export const globalSettings = pgTable("global_settings", {
   weekStartDay: integer("week_start_day").default(1).notNull(),
   productionWindowDays: integer("production_window_days").default(10).notNull(),
   ifcDaysInAdvance: integer("ifc_days_in_advance").default(14).notNull(),
+  daysToAchieveIfc: integer("days_to_achieve_ifc").default(21).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -191,6 +193,34 @@ export const productionSlotAdjustments = pgTable("production_slot_adjustments", 
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   slotIdIdx: index("production_slot_adjustments_slot_id_idx").on(table.productionSlotId),
+}));
+
+export const draftingProgram = pgTable("drafting_program", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  productionSlotId: varchar("production_slot_id", { length: 36 }).references(() => productionSlots.id),
+  level: text("level").notNull(),
+  productionDate: timestamp("production_date"),
+  drawingDueDate: timestamp("drawing_due_date"),
+  draftingWindowStart: timestamp("drafting_window_start"),
+  proposedStartDate: timestamp("proposed_start_date"),
+  assignedToId: varchar("assigned_to_id", { length: 36 }).references(() => users.id),
+  status: draftingProgramStatusEnum("status").default("NOT_SCHEDULED").notNull(),
+  priority: integer("priority").default(0),
+  estimatedHours: decimal("estimated_hours", { precision: 6, scale: 2 }),
+  actualHours: decimal("actual_hours", { precision: 6, scale: 2 }),
+  notes: text("notes"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  panelIdIdx: index("drafting_program_panel_id_idx").on(table.panelId),
+  jobIdIdx: index("drafting_program_job_id_idx").on(table.jobId),
+  slotIdIdx: index("drafting_program_slot_id_idx").on(table.productionSlotId),
+  assignedToIdx: index("drafting_program_assigned_to_idx").on(table.assignedToId),
+  statusIdx: index("drafting_program_status_idx").on(table.status),
+  dueDateIdx: index("drafting_program_due_date_idx").on(table.drawingDueDate),
 }));
 
 export const workTypes = pgTable("work_types", {
@@ -850,6 +880,14 @@ export const insertProductionSlotAdjustmentSchema = createInsertSchema(productio
 });
 export type InsertProductionSlotAdjustment = z.infer<typeof insertProductionSlotAdjustmentSchema>;
 export type ProductionSlotAdjustment = typeof productionSlotAdjustments.$inferSelect;
+
+export const insertDraftingProgramSchema = createInsertSchema(draftingProgram).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertDraftingProgram = z.infer<typeof insertDraftingProgramSchema>;
+export type DraftingProgram = typeof draftingProgram.$inferSelect;
 
 // ============== Purchase Order Tables ==============
 
