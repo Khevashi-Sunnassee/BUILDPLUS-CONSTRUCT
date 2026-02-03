@@ -465,18 +465,19 @@ function TaskRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {!isSubtask && (
-              <DropdownMenuItem onClick={() => setShowAddSubtask(true)}>
+              <DropdownMenuItem onClick={() => setShowAddSubtask(true)} data-testid={`menu-add-subtask-${task.id}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add subtask
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={() => onOpenSidebar(task)}>
+            <DropdownMenuItem onClick={() => onOpenSidebar(task)} data-testid={`menu-view-updates-${task.id}`}>
               <MessageSquare className="h-4 w-4 mr-2" />
               View updates
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive"
               onClick={() => setShowDeleteConfirm(true)}
+              data-testid={`menu-delete-task-${task.id}`}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -689,17 +690,18 @@ function TaskGroupComponent({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`btn-group-menu-${group.id}`}>
+            <Button variant="ghost" size="icon" data-testid={`btn-group-menu-${group.id}`}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setIsEditingName(true)}>
+            <DropdownMenuItem onClick={() => setIsEditingName(true)} data-testid={`menu-rename-group-${group.id}`}>
               Rename group
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-destructive"
               onClick={() => setShowDeleteConfirm(true)}
+              data-testid={`menu-delete-group-${group.id}`}
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete group
@@ -795,24 +797,12 @@ function TaskSidebar({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: updates = [], isLoading: updatesLoading } = useQuery<TaskUpdate[]>({
-    queryKey: ["/api/tasks", task?.id, "updates"],
-    queryFn: async () => {
-      if (!task) return [];
-      const res = await fetch(`/api/tasks/${task.id}/updates`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch updates");
-      return res.json();
-    },
+    queryKey: [`/api/tasks/${task?.id}/updates`],
     enabled: !!task,
   });
 
   const { data: files = [], isLoading: filesLoading } = useQuery<TaskFile[]>({
-    queryKey: ["/api/tasks", task?.id, "files"],
-    queryFn: async () => {
-      if (!task) return [];
-      const res = await fetch(`/api/tasks/${task.id}/files`, { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch files");
-      return res.json();
-    },
+    queryKey: [`/api/tasks/${task?.id}/files`],
     enabled: !!task,
   });
 
@@ -821,7 +811,7 @@ function TaskSidebar({
       return apiRequest("POST", `/api/tasks/${task?.id}/updates`, { content });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task?.id, "updates"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/updates`] });
       queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
       setNewUpdate("");
     },
@@ -835,7 +825,7 @@ function TaskSidebar({
       return apiRequest("DELETE", `/api/task-updates/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task?.id, "updates"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/updates`] });
       queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
     },
     onError: (error: any) => {
@@ -856,7 +846,7 @@ function TaskSidebar({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task?.id, "files"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/files`] });
       queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
       toast({ title: "File uploaded" });
     },
@@ -870,7 +860,7 @@ function TaskSidebar({
       return apiRequest("DELETE", `/api/task-files/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tasks", task?.id, "files"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/files`] });
       queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
       toast({ title: "File deleted" });
     },
