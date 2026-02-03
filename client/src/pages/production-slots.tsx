@@ -14,9 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2 } from "lucide-react";
-import { format, parseISO, differenceInDays, addDays } from "date-fns";
-import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister } from "@shared/schema";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays } from "lucide-react";
+import { format, parseISO, differenceInDays, addDays, startOfWeek, endOfWeek } from "date-fns";
+import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings } from "@shared/schema";
 
 interface ProductionSlotWithDetails extends ProductionSlot {
   job: Job;
@@ -27,18 +27,52 @@ interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
 }
 
 type StatusFilter = "ALL" | "SCHEDULED" | "PENDING_UPDATE" | "BOOKED" | "COMPLETED";
-type GroupBy = "none" | "job" | "client";
+type GroupBy = "none" | "job" | "client" | "week";
+
+const getWeekBoundaries = (date: Date, weekStartDay: number) => {
+  const weekStart = startOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+  const weekEnd = endOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+  return { weekStart, weekEnd };
+};
+
+const getWeekKey = (date: Date, weekStartDay: number) => {
+  const { weekStart } = getWeekBoundaries(new Date(date), weekStartDay);
+  return format(weekStart, "yyyy-MM-dd");
+};
+
+const getWeekLabel = (weekStartStr: string) => {
+  const weekStart = parseISO(weekStartStr);
+  const weekEnd = addDays(weekStart, 6);
+  return `${format(weekStart, "dd MMM")} - ${format(weekEnd, "dd MMM yyyy")}`;
+};
 
 export default function ProductionSlotsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isManagerOrAdmin = user?.role === "MANAGER" || user?.role === "ADMIN";
   
+  const { data: globalSettings } = useQuery<GlobalSettings>({
+    queryKey: ["/api/admin/settings"],
+  });
+  
+  const weekStartDay = globalSettings?.weekStartDay ?? 1;
+  
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [dateFromFilter, setDateFromFilter] = useState<string>("");
   const [dateToFilter, setDateToFilter] = useState<string>("");
-  const [groupBy, setGroupBy] = useState<GroupBy>("none");
+  const [groupBy, setGroupBy] = useState<GroupBy>("week");
+  const [dateFiltersInitialized, setDateFiltersInitialized] = useState(false);
+  
+  useEffect(() => {
+    if (!dateFiltersInitialized && globalSettings) {
+      const today = new Date();
+      const { weekStart, weekEnd } = getWeekBoundaries(today, weekStartDay);
+      setDateFromFilter(format(weekStart, "yyyy-MM-dd"));
+      setDateToFilter(format(weekEnd, "yyyy-MM-dd"));
+      setDateFiltersInitialized(true);
+    }
+  }, [globalSettings, weekStartDay, dateFiltersInitialized]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
@@ -264,15 +298,24 @@ export default function ProductionSlotsPage() {
       if (groupBy === "job") {
         key = slot.jobId;
         label = `${slot.job.jobNumber} - ${slot.job.name || ""}`;
+      } else if (groupBy === "week") {
+        key = getWeekKey(new Date(slot.productionSlotDate), weekStartDay);
+        label = getWeekLabel(key);
       } else {
         key = slot.job.client || "No Client";
         label = slot.job.client || "No Client";
       }
       
       if (!groups[key]) {
-        groups[key] = { label, slots: [], job: slot.job };
+        groups[key] = { label, slots: [], job: groupBy === "job" ? slot.job : undefined };
       }
       groups[key].slots.push(slot);
+    }
+    
+    // Sort by week key if grouping by week
+    if (groupBy === "week") {
+      const sortedEntries = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+      return Object.fromEntries(sortedEntries);
     }
     
     return groups;
@@ -383,9 +426,10 @@ export default function ProductionSlotsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No Grouping</SelectItem>
+                  <SelectItem value="week">Group by Week</SelectItem>
                   <SelectItem value="job">Group by Job</SelectItem>
                   <SelectItem value="client">Group by Client</SelectItem>
+                  <SelectItem value="none">No Grouping</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -438,7 +482,7 @@ export default function ProductionSlotsPage() {
                       ) : (
                         <ChevronRight className="h-4 w-4" />
                       )}
-                      {groupBy === "job" ? <Briefcase className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                      {groupBy === "job" ? <Briefcase className="h-4 w-4" /> : groupBy === "week" ? <CalendarDays className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
                       <span className="font-medium">{label}</span>
                       <Badge variant="secondary" className="ml-auto">{groupSlots.length} slot{groupSlots.length !== 1 ? "s" : ""}</Badge>
                     </div>
