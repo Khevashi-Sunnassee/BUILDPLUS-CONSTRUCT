@@ -11,6 +11,10 @@ const app = express();
 // Serve public downloads folder for source code packages with directory listing
 const downloadsPath = path.join(process.cwd(), 'public/downloads');
 app.use('/downloads', express.static(downloadsPath), serveIndex(downloadsPath, { icons: true }));
+
+// Serve chat uploads
+const chatUploadsPath = path.join(process.cwd(), 'uploads', 'chat');
+app.use('/uploads/chat', express.static(chatUploadsPath));
 const httpServer = createServer(app);
 
 declare module "http" {

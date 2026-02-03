@@ -7,6 +7,7 @@ import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSch
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
+import { chatRouter } from "./chat/chat.routes";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -86,6 +87,9 @@ export async function registerRoutes(
       },
     })
   );
+
+  // Mount chat routes
+  app.use("/api/chat", chatRouter);
 
   app.post("/api/auth/login", async (req, res) => {
     try {
