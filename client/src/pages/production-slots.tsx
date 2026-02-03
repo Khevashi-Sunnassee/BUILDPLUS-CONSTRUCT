@@ -422,7 +422,10 @@ export default function ProductionSlotsPage() {
                             <TableRow 
                               key={slot.id} 
                               data-testid={`row-slot-${slot.id}`}
-                              style={slot.job.productionSlotColor ? { borderLeft: `4px solid ${slot.job.productionSlotColor}` } : undefined}
+                              style={slot.job.productionSlotColor ? { 
+                                backgroundColor: `${slot.job.productionSlotColor}15`,
+                                borderLeft: `4px solid ${slot.job.productionSlotColor}` 
+                              } : undefined}
                             >
                               <TableCell className={getDateColorClass(slot)}>
                                 {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
@@ -517,7 +520,10 @@ export default function ProductionSlotsPage() {
                   <TableRow 
                     key={slot.id} 
                     data-testid={`row-slot-${slot.id}`}
-                    style={slot.job.productionSlotColor ? { borderLeft: `4px solid ${slot.job.productionSlotColor}` } : undefined}
+                    style={slot.job.productionSlotColor ? { 
+                      backgroundColor: `${slot.job.productionSlotColor}15`,
+                      borderLeft: `4px solid ${slot.job.productionSlotColor}` 
+                    } : undefined}
                   >
                     <TableCell className={getDateColorClass(slot)}>
                       {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
