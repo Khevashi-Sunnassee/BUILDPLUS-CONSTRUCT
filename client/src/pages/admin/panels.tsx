@@ -1254,7 +1254,14 @@ export default function AdminPanelsPage() {
                           </TableCell>
                         </TableRow>
                         {!isCollapsed && typePanels.map((panel) => (
-                          <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                          <TableRow 
+                            key={panel.id} 
+                            data-testid={`row-panel-${panel.id}`}
+                            style={panel.job.productionSlotColor ? { 
+                              backgroundColor: `${panel.job.productionSlotColor}15`,
+                              borderLeft: `4px solid ${panel.job.productionSlotColor}` 
+                            } : undefined}
+                          >
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -1356,7 +1363,14 @@ export default function AdminPanelsPage() {
                           </TableCell>
                         </TableRow>
                         {!isCollapsed && jobPanels.map((panel) => (
-                          <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                          <TableRow 
+                            key={panel.id} 
+                            data-testid={`row-panel-${panel.id}`}
+                            style={panel.job.productionSlotColor ? { 
+                              backgroundColor: `${panel.job.productionSlotColor}15`,
+                              borderLeft: `4px solid ${panel.job.productionSlotColor}` 
+                            } : undefined}
+                          >
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -1433,7 +1447,14 @@ export default function AdminPanelsPage() {
                 // Flat list view
                 <>
                   {filteredPanels?.map((panel) => (
-                    <TableRow key={panel.id} data-testid={`row-panel-${panel.id}`}>
+                    <TableRow 
+                      key={panel.id} 
+                      data-testid={`row-panel-${panel.id}`}
+                      style={panel.job.productionSlotColor ? { 
+                        backgroundColor: `${panel.job.productionSlotColor}15`,
+                        borderLeft: `4px solid ${panel.job.productionSlotColor}` 
+                      } : undefined}
+                    >
                       {!filterJobId && (
                         <TableCell>
                           <span className="font-mono text-sm">{panel.job.jobNumber}</span>
