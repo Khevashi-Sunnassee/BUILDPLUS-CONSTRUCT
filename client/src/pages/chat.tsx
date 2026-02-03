@@ -439,9 +439,12 @@ export default function ChatPage() {
                   </div>
                 </div>
                 <DialogFooter>
+                  {newConversation.memberIds.length === 0 && (
+                    <p className="text-sm text-muted-foreground mr-auto">Please select at least one member</p>
+                  )}
                   <Button
                     onClick={() => createConversationMutation.mutate(newConversation)}
-                    disabled={createConversationMutation.isPending}
+                    disabled={createConversationMutation.isPending || newConversation.memberIds.length === 0}
                     data-testid="button-create-conversation"
                   >
                     Create
