@@ -23,8 +23,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2 } from "lucide-react";
-import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job } from "@shared/schema";
+import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip } from "lucide-react";
+import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
+
+interface AttachmentWithUser extends PurchaseOrderAttachment {
+  uploadedBy?: User | null;
+}
 
 interface LineItem {
   id: string;
@@ -78,6 +82,8 @@ export default function PurchaseOrderFormPage() {
   const [showJobDialog, setShowJobDialog] = useState(false);
   const [jobSearchTerm, setJobSearchTerm] = useState("");
   const [selectedLineIdForJob, setSelectedLineIdForJob] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers/active"],
@@ -107,6 +113,11 @@ export default function PurchaseOrderFormPage() {
 
   const { data: existingPO, isLoading: loadingPO } = useQuery<PurchaseOrderWithDetails>({
     queryKey: ["/api/purchase-orders", poId],
+    enabled: !!poId,
+  });
+
+  const { data: attachments = [], isLoading: loadingAttachments } = useQuery<AttachmentWithUser[]>({
+    queryKey: ["/api/purchase-orders", poId, "attachments"],
     enabled: !!poId,
   });
 
@@ -270,6 +281,70 @@ export default function PurchaseOrderFormPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const uploadAttachmentsMutation = useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach(file => formData.append("files", file));
+      const response = await fetch(`/api/purchase-orders/${poId}/attachments`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to upload files");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId, "attachments"] });
+      toast({ title: "Files uploaded successfully" });
+      setUploadingFiles(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Upload failed", description: error.message, variant: "destructive" });
+      setUploadingFiles(false);
+    },
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: async (attachmentId: string) => {
+      await apiRequest("DELETE", `/api/po-attachments/${attachmentId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId, "attachments"] });
+      toast({ title: "Attachment deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleFileDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0 && poId) {
+      setUploadingFiles(true);
+      uploadAttachmentsMutation.mutate(files);
+    }
+  }, [poId, uploadAttachmentsMutation]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0 && poId) {
+      setUploadingFiles(true);
+      uploadAttachmentsMutation.mutate(files);
+    }
+    e.target.value = "";
+  }, [poId, uploadAttachmentsMutation]);
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
 
   const handleSupplierChange = useCallback((supplierId: string) => {
     form.setValue("supplierId", supplierId);
@@ -902,6 +977,108 @@ export default function PurchaseOrderFormPage() {
               </div>
             </div>
           </div>
+
+          {!isNew && (
+            <>
+              <Separator />
+              <div className="print:hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="h-5 w-5" />
+                    <h3 className="text-lg font-medium">Attachments</h3>
+                    {attachments.length > 0 && (
+                      <Badge variant="secondary">{attachments.length}</Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div
+                  className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                    isDragging
+                      ? "border-primary bg-primary/5"
+                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleFileDrop}
+                  data-testid="dropzone-attachments"
+                >
+                  <input
+                    type="file"
+                    id="file-upload"
+                    className="hidden"
+                    multiple
+                    onChange={handleFileSelect}
+                    data-testid="input-file-upload"
+                  />
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {uploadingFiles ? "Uploading files..." : "Drag and drop files here, or"}
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById("file-upload")?.click()}
+                    disabled={uploadingFiles}
+                    data-testid="button-browse-files"
+                  >
+                    Browse Files
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    PDF, Word, Excel, Images (max 50MB each)
+                  </p>
+                </div>
+
+                {attachments.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                        data-testid={`attachment-${attachment.id}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{attachment.originalName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(attachment.fileSize)} 
+                              {attachment.uploadedBy && ` • Uploaded by ${attachment.uploadedBy.name || attachment.uploadedBy.email}`}
+                              {attachment.createdAt && ` • ${format(new Date(attachment.createdAt), "dd/MM/yyyy HH:mm")}`}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            asChild
+                            data-testid={`button-download-${attachment.id}`}
+                          >
+                            <a href={`/api/po-attachments/${attachment.id}/download`} download>
+                              <Download className="h-4 w-4" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteAttachmentMutation.mutate(attachment.id)}
+                            disabled={deleteAttachmentMutation.isPending}
+                            data-testid={`button-delete-attachment-${attachment.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {isApproved && existingPO?.approvedBy && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
