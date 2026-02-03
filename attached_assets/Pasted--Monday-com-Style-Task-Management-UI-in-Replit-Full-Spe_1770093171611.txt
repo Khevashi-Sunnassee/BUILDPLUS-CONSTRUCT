@@ -1,0 +1,212 @@
+**Monday.com-Style Task Management UI in Replit (Full Specification + Code Snippets)**
+
+---
+
+## 🔍 Overview
+
+This spec outlines the design and implementation of a **Monday.com-style task management interface** built within a Replit project using React, ShadCN, TailwindCSS, and optionally Supabase or your backend. It includes:
+
+* Grouped task boards with collapsible sections
+* Column-based single-row layout
+* Inline field editing with instant backend save
+* Multi-select controls for owners, suppliers, and customers
+* Due date picker
+* Subtask support
+* Real-time updates
+* Embedded fully into an existing Replit-based portal (like DocumentWorkflow)
+
+---
+
+## 🏗️ 1. Database Schema
+
+### `tasks` Table
+
+```json
+{
+  id: string,
+  group: string,
+  task: string,
+  ownerIds: string[],
+  consultant: string,
+  projectStage: string,
+  dueDate: Date,
+  status: string,
+  parentId: string | null,
+  isSubtask: boolean,
+  createdAt: Date,
+  updatedAt: Date
+}
+```
+
+### `users` Table (for owners, suppliers, customers)
+
+```json
+{
+  id: string,
+  name: string,
+  avatarUrl: string,
+  type: 'user' | 'supplier' | 'customer'
+}
+```
+
+---
+
+## 🖼️ 2. Grid UI Layout
+
+* Implemented in React
+* Tailwind grid structure: `grid grid-cols-[...]`
+* Sticky column headers (optional)
+* Horizontal scroll for overflow
+
+Columns:
+
+* Task name (editable input)
+* Update button
+* Owner (multi-select w/ avatars)
+* Consultant (select dropdown)
+* Project Stage (select dropdown)
+* Due Date (calendar popover)
+* Status (select or pill dropdown)
+
+---
+
+## ✍️ 3. Inline Editing + Instant Save
+
+### Local Logic
+
+```tsx
+const handleFieldChange = (field, value) => {
+  setLocalTask(prev => ({ ...prev, [field]: value }));
+  triggerSave(field, value); // Immediate commit
+};
+```
+
+### Backend Save (example with fetch or Supabase)
+
+```tsx
+const triggerSave = async (field, value) => {
+  await fetch(`/api/tasks/${task.id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ [field]: value })
+  });
+};
+```
+
+### Why Rollback Happens
+
+When local state updates are overwritten by re-renders with stale props:
+
+* Solution: Always sync props with `useEffect`
+* Avoid stale `task` props in `GridRow`
+* Use `key={task.id}` to reset correctly
+
+---
+
+## ➕ 4. Add Task Row (Always Visible)
+
+* Final row always shows `+ Add Task`
+* User types and moves focus (onBlur triggers create)
+* Optional: Pressing Enter creates instantly
+
+---
+
+## 🔗 5. Subtask (Parent/Child)
+
+* Use `parentId` to relate
+* Show child rows indented
+* Example:
+
+```tsx
+{tasks.filter(t => !t.parentId).map(main => (
+  <GridRow task={main} />
+  {tasks.filter(st => st.parentId === main.id).map(st => (
+    <GridRow task={st} isSubtask />
+  ))}
+))
+```
+
+---
+
+## 👥 6. Multi-Select for Owners/Suppliers/Customers
+
+* Use ShadCN multi-select or build one
+* Display as: small avatars or initials
+* Handle async change:
+
+```tsx
+onChange={(val) => {
+  handleFieldChange('ownerIds', val)
+}}
+```
+
+---
+
+## 📅 7. Due Date Picker
+
+* Uses `Popover + Calendar`
+
+```tsx
+<Popover>
+  <PopoverTrigger>
+    <Button>{format(task.dueDate)}</Button>
+  </PopoverTrigger>
+  <PopoverContent>
+    <Calendar selected={task.dueDate} onSelect={(date) => handleFieldChange('dueDate', date)} />
+  </PopoverContent>
+</Popover>
+```
+
+---
+
+## 📦 8. Groups
+
+* Each task row includes a `group` field
+* Group tasks by `.group` value
+* Show headers with collapsible functionality
+
+---
+
+## 🧠 9. Replit Embedding Notes
+
+* Component lives in `/components/tasks/TaskGrid.tsx`
+* Connect to existing pages using layout system
+* Use Replit’s file structure + routing
+* Add into `routes/dashboard.tsx` or `routes/tasks.tsx`
+
+---
+
+## 🧪 10. Future Features
+
+* Status colors as pills
+* Drag/drop reordering within group
+* Chat-like comment sidebar
+* File uploader
+* Row-level activity log
+* Pagination or virtual scroll
+
+---
+
+## 🔌 11. API Routes (Optional)
+
+### `GET /api/tasks`
+
+### `PATCH /api/tasks/:id`
+
+### `POST /api/tasks`
+
+* Use these for direct saves
+* Use optimistic UI to reflect saves immediately
+
+---
+
+## ✅ 12. Final Notes for Replit Team
+
+* Place `TaskGrid.tsx` where the UI is needed
+* Ensure `owners`, `consultants`, and `stages` come from backend
+* All field edits should:
+
+  * Save instantly
+  * Never rollback visibly
+  * Never require a save button
+* Add new tasks using empty row logic
+* Keep the row single-line and scrollable like Monday.com

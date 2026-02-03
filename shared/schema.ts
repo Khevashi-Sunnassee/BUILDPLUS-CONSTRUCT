@@ -64,6 +64,7 @@ export const FUNCTION_KEYS = [
   "jobs",
   "panel_register",
   "purchase_orders",
+  "tasks",
   "admin_users",
   "admin_devices",
   "admin_jobs",
@@ -989,3 +990,97 @@ export type InsertPurchaseOrderItem = z.infer<typeof insertPurchaseOrderItemSche
 export type PurchaseOrderItem = typeof purchaseOrderItems.$inferSelect;
 
 export type POStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+
+// ==================== Task Management (Monday.com-style) ====================
+
+export const taskStatusEnum = pgEnum("task_status", ["NOT_STARTED", "IN_PROGRESS", "STUCK", "DONE", "ON_HOLD"]);
+
+export const taskGroups = pgTable("task_groups", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  color: text("color").default("#6366f1"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isCollapsed: boolean("is_collapsed").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  sortOrderIdx: index("task_groups_sort_order_idx").on(table.sortOrder),
+}));
+
+export const tasks = pgTable("tasks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id", { length: 36 }).notNull().references(() => taskGroups.id, { onDelete: "cascade" }),
+  parentId: varchar("parent_id", { length: 36 }),
+  title: text("title").notNull(),
+  status: taskStatusEnum("status").default("NOT_STARTED").notNull(),
+  dueDate: timestamp("due_date"),
+  consultant: text("consultant"),
+  projectStage: text("project_stage"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  groupIdx: index("tasks_group_idx").on(table.groupId),
+  parentIdx: index("tasks_parent_idx").on(table.parentId),
+  statusIdx: index("tasks_status_idx").on(table.status),
+  sortOrderIdx: index("tasks_sort_order_idx").on(table.sortOrder),
+}));
+
+export const taskAssignees = pgTable("task_assignees", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskUserIdx: uniqueIndex("task_assignees_task_user_idx").on(table.taskId, table.userId),
+  taskIdx: index("task_assignees_task_idx").on(table.taskId),
+  userIdx: index("task_assignees_user_idx").on(table.userId),
+}));
+
+export const taskUpdates = pgTable("task_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskIdx: index("task_updates_task_idx").on(table.taskId),
+  createdAtIdx: index("task_updates_created_at_idx").on(table.createdAt),
+}));
+
+export const taskFiles = pgTable("task_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  taskId: varchar("task_id", { length: 36 }).notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  taskIdx: index("task_files_task_idx").on(table.taskId),
+}));
+
+// Task Management Insert Schemas and Types
+export const insertTaskGroupSchema = createInsertSchema(taskGroups).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTaskGroup = z.infer<typeof insertTaskGroupSchema>;
+export type TaskGroup = typeof taskGroups.$inferSelect;
+
+export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTask = z.infer<typeof insertTaskSchema>;
+export type Task = typeof tasks.$inferSelect;
+
+export const insertTaskAssigneeSchema = createInsertSchema(taskAssignees).omit({ id: true, createdAt: true });
+export type InsertTaskAssignee = z.infer<typeof insertTaskAssigneeSchema>;
+export type TaskAssignee = typeof taskAssignees.$inferSelect;
+
+export const insertTaskUpdateSchema = createInsertSchema(taskUpdates).omit({ id: true, createdAt: true });
+export type InsertTaskUpdate = z.infer<typeof insertTaskUpdateSchema>;
+export type TaskUpdate = typeof taskUpdates.$inferSelect;
+
+export const insertTaskFileSchema = createInsertSchema(taskFiles).omit({ id: true, createdAt: true });
+export type InsertTaskFile = z.infer<typeof insertTaskFileSchema>;
+export type TaskFile = typeof taskFiles.$inferSelect;
+
+export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD";
