@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import session from "express-session";
 import multer from "multer";
 import { storage, sha256Hex } from "./storage";
-import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema } from "@shared/schema";
+import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema, InsertItem } from "@shared/schema";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
@@ -4085,6 +4085,100 @@ Return ONLY valid JSON, no explanation text.`
     } catch (error: any) {
       console.error("Error deleting item:", error);
       res.status(500).json({ error: error.message || "Failed to delete item" });
+    }
+  });
+
+  // Item Import from Excel
+  app.post("/api/items/import", requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
+      const sheetName = workbook.SheetNames[0]; // Use first sheet (Products)
+      const sheet = workbook.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+
+      if (rows.length === 0) {
+        return res.status(400).json({ error: "No data found in Excel file" });
+      }
+
+      // Get all categories to map names to IDs
+      const categories = await storage.getAllItemCategories();
+      const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
+
+      // Process rows and prepare items for import
+      const itemsToImport: InsertItem[] = [];
+      const categoriesToCreate: string[] = [];
+
+      for (const row of rows) {
+        const categoryName = row["Category"] || row["category"] || "";
+        
+        // Check if we need to create the category
+        if (categoryName && !categoryMap.has(categoryName.toLowerCase())) {
+          if (!categoriesToCreate.includes(categoryName)) {
+            categoriesToCreate.push(categoryName);
+          }
+        }
+      }
+
+      // Create missing categories
+      for (const catName of categoriesToCreate) {
+        try {
+          const newCat = await storage.createItemCategory({ name: catName, isActive: true });
+          categoryMap.set(catName.toLowerCase(), newCat.id);
+        } catch (error) {
+          console.error(`Error creating category ${catName}:`, error);
+        }
+      }
+
+      // Now process items
+      for (const row of rows) {
+        const productId = row["Product Id"] || row["product_id"] || row["ProductId"] || "";
+        const description = row["Product Description"] || row["Description"] || row["description"] || row["Name"] || row["name"] || "";
+        const categoryName = row["Category"] || row["category"] || "";
+        const unitPrice = parseFloat(row["Avg Unit Price Aud"] || row["Unit Price"] || row["unit_price"] || "0") || null;
+        const hsCode = row["Hs Code Guess"] || row["HS Code"] || row["hs_code"] || "";
+        const adRisk = row["Ad Risk"] || row["AD Risk"] || row["ad_risk"] || "";
+        const adReferenceUrl = row["Ad Reference Url"] || row["ad_reference_url"] || "";
+        const complianceNotes = row["Compliance Notes"] || row["compliance_notes"] || "";
+        const supplierShortlist = row["Supplier Shortlist"] || row["supplier_shortlist"] || "";
+        const sources = row["Sources"] || row["sources"] || "";
+
+        if (!description) continue; // Skip rows without description
+
+        const categoryId = categoryName ? categoryMap.get(categoryName.toLowerCase()) || null : null;
+
+        itemsToImport.push({
+          code: productId,
+          name: description,
+          description: description,
+          categoryId,
+          unitPrice: unitPrice?.toString() || null,
+          hsCode,
+          adRisk,
+          adReferenceUrl,
+          complianceNotes,
+          supplierShortlist,
+          sources,
+          isActive: true,
+        });
+      }
+
+      const result = await storage.bulkImportItems(itemsToImport);
+
+      res.json({
+        success: true,
+        message: `Import completed: ${result.created} items created, ${result.updated} items updated`,
+        created: result.created,
+        updated: result.updated,
+        categoriesCreated: categoriesToCreate.length,
+        errors: result.errors,
+      });
+    } catch (error: any) {
+      console.error("Error importing items:", error);
+      res.status(500).json({ error: error.message || "Failed to import items" });
     }
   });
 
