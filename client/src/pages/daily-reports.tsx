@@ -22,6 +22,7 @@ import {
   Factory,
   User,
   MapPin,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -147,6 +148,24 @@ export default function DailyReportsPage() {
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
     queryKey: ["/api/daily-logs", { status: statusFilter, dateRange }],
   });
+
+  const { data: allocatedData } = useQuery<{
+    programs: any[];
+    stats: {
+      total: number;
+      completed: number;
+      inProgress: number;
+      scheduled: number;
+      notScheduled: number;
+      onHold: number;
+      totalActualHours: number;
+      totalEstimatedHours: number;
+    };
+  }>({
+    queryKey: ["/api/drafting-program/my-allocated"],
+  });
+
+  const [showAllocatedPanels, setShowAllocatedPanels] = useState(false);
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: ["/api/settings/logo"],
@@ -513,6 +532,146 @@ export default function DailyReportsPage() {
           </Dialog>
         </div>
       </div>
+
+      {allocatedData && allocatedData.stats.total > 0 && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="text-sm text-muted-foreground">Total Allocated</div>
+                <div className="text-2xl font-bold" data-testid="text-total-allocated">{allocatedData.stats.total}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="text-sm text-muted-foreground">Completed</div>
+                <div className="text-2xl font-bold text-green-600" data-testid="text-completed-count">{allocatedData.stats.completed}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="text-sm text-muted-foreground">In Progress</div>
+                <div className="text-2xl font-bold text-amber-500" data-testid="text-in-progress-count">{allocatedData.stats.inProgress}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4">
+                <div className="text-sm text-muted-foreground">Hours Spent</div>
+                <div className="text-2xl font-bold" data-testid="text-hours-spent">{allocatedData.stats.totalActualHours.toFixed(1)}h</div>
+                {allocatedData.stats.totalEstimatedHours > 0 && (
+                  <div className="text-xs text-muted-foreground">of {allocatedData.stats.totalEstimatedHours.toFixed(1)}h estimated</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  My Allocated Panels
+                </CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowAllocatedPanels(!showAllocatedPanels)}
+                  data-testid="button-toggle-allocated"
+                >
+                  {showAllocatedPanels ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {showAllocatedPanels ? "Hide" : "Show"} ({allocatedData.programs.filter(p => p.status !== "COMPLETED").length} pending)
+                </Button>
+              </div>
+            </CardHeader>
+            {showAllocatedPanels && (
+              <CardContent className="pt-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Panel</TableHead>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Level</TableHead>
+                      <TableHead>Drawing Due</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allocatedData.programs
+                      .filter(p => p.status !== "COMPLETED")
+                      .sort((a, b) => {
+                        const dateA = a.drawingDueDate ? new Date(a.drawingDueDate).getTime() : Infinity;
+                        const dateB = b.drawingDueDate ? new Date(b.drawingDueDate).getTime() : Infinity;
+                        return dateA - dateB;
+                      })
+                      .map((program) => {
+                        const dueDate = program.drawingDueDate ? new Date(program.drawingDueDate) : null;
+                        const today = new Date();
+                        const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                        const isOverdue = daysUntil !== null && daysUntil < 0;
+                        const isUrgent = daysUntil !== null && daysUntil >= 0 && daysUntil <= 5;
+                        
+                        return (
+                          <TableRow 
+                            key={program.id}
+                            style={program.job?.productionSlotColor ? { 
+                              backgroundColor: `${program.job.productionSlotColor}15`,
+                              borderLeft: `4px solid ${program.job.productionSlotColor}` 
+                            } : undefined}
+                          >
+                            <TableCell className="font-medium">{program.panel?.panelMark}</TableCell>
+                            <TableCell>{program.job?.jobNumber}</TableCell>
+                            <TableCell>{program.level}</TableCell>
+                            <TableCell className={isOverdue ? "text-red-600 font-semibold" : isUrgent ? "text-orange-500 font-medium" : ""}>
+                              {dueDate ? format(dueDate, "dd/MM/yyyy") : "-"}
+                              {isOverdue && <span className="ml-1 text-xs">({Math.abs(daysUntil!)} days overdue)</span>}
+                              {isUrgent && !isOverdue && <span className="ml-1 text-xs">({daysUntil} days)</span>}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                program.status === "IN_PROGRESS" ? "default" :
+                                program.status === "SCHEDULED" ? "outline" :
+                                program.status === "ON_HOLD" ? "destructive" : "secondary"
+                              }>
+                                {program.status.replace("_", " ")}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const params = new URLSearchParams();
+                                  params.set("date", format(new Date(), "yyyy-MM-dd"));
+                                  params.set("jobId", program.jobId);
+                                  if (program.panel?.panelMark) {
+                                    params.set("panelMark", program.panel.panelMark);
+                                  }
+                                  setLocation(`/manual-entry?${params.toString()}`);
+                                }}
+                                data-testid={`button-add-to-day-${program.id}`}
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                Add to Day
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    {allocatedData.programs.filter(p => p.status !== "COMPLETED").length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                          All your allocated panels are completed!
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            )}
+          </Card>
+        </>
+      )}
 
       <div ref={reportRef}>
       <Card>

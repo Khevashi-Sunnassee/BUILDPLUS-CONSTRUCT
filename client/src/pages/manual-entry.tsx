@@ -106,13 +106,15 @@ export default function ManualEntryPage() {
   
   const canApproveForProduction = user?.role === "MANAGER" || user?.role === "ADMIN";
   
-  // Parse date and logId from URL query parameters if present
+  // Parse date, logId, jobId and panelMark from URL query parameters if present
   const urlParams = new URLSearchParams(searchString);
   const dateFromUrl = urlParams.get("date");
   const logIdFromUrl = urlParams.get("logId");
+  const jobIdFromUrl = urlParams.get("jobId");
+  const panelMarkFromUrl = urlParams.get("panelMark");
   const initialDate = dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl) ? dateFromUrl : today;
   
-  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(jobIdFromUrl);
   const [addNewPanel, setAddNewPanel] = useState(false);
   const [newPanelMark, setNewPanelMark] = useState("");
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -310,6 +312,18 @@ export default function ManualEntryPage() {
       form.setValue("panelPrimaryLifters", "");
     }
   }, [watchedPanelRegisterId, panels, form]);
+
+  // Auto-select panel from URL parameters
+  useEffect(() => {
+    if (panelMarkFromUrl && panels && panels.length > 0 && selectedJobId) {
+      const matchingPanel = panels.find(
+        p => p.panelMark === panelMarkFromUrl && p.jobId === selectedJobId
+      );
+      if (matchingPanel && form.getValues("panelRegisterId") !== matchingPanel.id) {
+        form.setValue("panelRegisterId", matchingPanel.id);
+      }
+    }
+  }, [panelMarkFromUrl, panels, selectedJobId, form]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: ManualEntryForm) => {
