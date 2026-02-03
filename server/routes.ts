@@ -4241,6 +4241,39 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  app.get("/api/drafting-program/my-allocated", requireAuth, requirePermission("daily_reports", "VIEW"), async (req, res) => {
+    try {
+      const userId = req.session.userId!;
+      const programs = await storage.getDraftingPrograms({ assignedToId: userId });
+      
+      const completed = programs.filter(p => p.status === "COMPLETED");
+      const inProgress = programs.filter(p => p.status === "IN_PROGRESS");
+      const scheduled = programs.filter(p => p.status === "SCHEDULED");
+      const notScheduled = programs.filter(p => p.status === "NOT_SCHEDULED");
+      const onHold = programs.filter(p => p.status === "ON_HOLD");
+      
+      const totalActualHours = programs.reduce((sum, p) => sum + (parseFloat(p.actualHours || "0")), 0);
+      const totalEstimatedHours = programs.reduce((sum, p) => sum + (parseFloat(p.estimatedHours || "0")), 0);
+      
+      res.json({
+        programs,
+        stats: {
+          total: programs.length,
+          completed: completed.length,
+          inProgress: inProgress.length,
+          scheduled: scheduled.length,
+          notScheduled: notScheduled.length,
+          onHold: onHold.length,
+          totalActualHours,
+          totalEstimatedHours,
+        }
+      });
+    } catch (error: any) {
+      console.error("Error fetching my allocated panels:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch allocated panels" });
+    }
+  });
+
   app.get("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
     try {
       const program = await storage.getDraftingProgram(req.params.id);
@@ -4318,39 +4351,6 @@ Return ONLY valid JSON, no explanation text.`
     } catch (error: any) {
       console.error("Error deleting drafting program entry:", error);
       res.status(500).json({ error: error.message || "Failed to delete drafting program entry" });
-    }
-  });
-
-  app.get("/api/drafting-program/my-allocated", requireAuth, requirePermission("daily_reports", "VIEW"), async (req, res) => {
-    try {
-      const userId = req.session.userId!;
-      const programs = await storage.getDraftingPrograms({ assignedToId: userId });
-      
-      const completed = programs.filter(p => p.status === "COMPLETED");
-      const inProgress = programs.filter(p => p.status === "IN_PROGRESS");
-      const scheduled = programs.filter(p => p.status === "SCHEDULED");
-      const notScheduled = programs.filter(p => p.status === "NOT_SCHEDULED");
-      const onHold = programs.filter(p => p.status === "ON_HOLD");
-      
-      const totalActualHours = programs.reduce((sum, p) => sum + (parseFloat(p.actualHours || "0")), 0);
-      const totalEstimatedHours = programs.reduce((sum, p) => sum + (parseFloat(p.estimatedHours || "0")), 0);
-      
-      res.json({
-        programs,
-        stats: {
-          total: programs.length,
-          completed: completed.length,
-          inProgress: inProgress.length,
-          scheduled: scheduled.length,
-          notScheduled: notScheduled.length,
-          onHold: onHold.length,
-          totalActualHours,
-          totalEstimatedHours,
-        }
-      });
-    } catch (error: any) {
-      console.error("Error fetching my allocated panels:", error);
-      res.status(500).json({ error: error.message || "Failed to fetch allocated panels" });
     }
   });
 
