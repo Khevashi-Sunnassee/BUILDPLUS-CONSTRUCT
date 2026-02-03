@@ -880,6 +880,13 @@ export const items = pgTable("items", {
   unitPrice: decimal("unit_price", { precision: 12, scale: 2 }),
   minOrderQty: integer("min_order_qty").default(1),
   leadTimeDays: integer("lead_time_days"),
+  // Sourcing and compliance fields
+  hsCode: text("hs_code"),
+  adRisk: text("ad_risk"),
+  adReferenceUrl: text("ad_reference_url"),
+  complianceNotes: text("compliance_notes"),
+  supplierShortlist: text("supplier_shortlist"),
+  sources: text("sources"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
