@@ -184,11 +184,28 @@ function TaskRow({
     mutationFn: async (data: Partial<Task>) => {
       return apiRequest("PATCH", `/api/tasks/${task.id}`, data);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+    onMutate: async (newData) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/task-groups"] });
+      const previousGroups = queryClient.getQueryData(["/api/task-groups"]);
+      queryClient.setQueryData(["/api/task-groups"], (old: any) => {
+        if (!old) return old;
+        return old.map((group: any) => ({
+          ...group,
+          tasks: group.tasks.map((t: any) =>
+            t.id === task.id ? { ...t, ...newData } : t
+          ),
+        }));
+      });
+      return { previousGroups };
     },
-    onError: (error: any) => {
+    onError: (error: any, _variables, context) => {
+      if (context?.previousGroups) {
+        queryClient.setQueryData(["/api/task-groups"], context.previousGroups);
+      }
       toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
     },
   });
 
@@ -260,7 +277,12 @@ function TaskRow({
   };
 
   const handleJobChange = (jobId: string) => {
-    updateTaskMutation.mutate({ jobId: jobId === "none" ? null : jobId } as any);
+    const selectedJob = jobId === "none" ? null : jobs.find(j => j.id === jobId);
+    const updateData = { 
+      jobId: jobId === "none" ? null : jobId,
+      job: selectedJob || null 
+    };
+    updateTaskMutation.mutate(updateData as any);
   };
 
   const handleToggleAssignee = (userId: string) => {
