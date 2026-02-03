@@ -733,6 +733,7 @@ export default function PurchaseOrderFormPage() {
                               type="number"
                               value={line.quantity}
                               onChange={(e) => updateLineItem(line.id, "quantity", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               className="h-9 text-right"
                               min="0"
                               step="any"
@@ -760,6 +761,7 @@ export default function PurchaseOrderFormPage() {
                               type="number"
                               value={line.unitPrice}
                               onChange={(e) => updateLineItem(line.id, "unitPrice", e.target.value)}
+                              onFocus={(e) => e.target.select()}
                               className="h-9 text-right"
                               min="0"
                               step="0.01"
