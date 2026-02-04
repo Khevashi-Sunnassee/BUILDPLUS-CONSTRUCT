@@ -5134,11 +5134,38 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const userId = (req.session as any).userId;
+      const taskId = req.params.id;
       const update = await storage.createTaskUpdate({
-        taskId: req.params.id,
+        taskId,
         userId,
         content: req.body.content,
       });
+      
+      // Get task details for notification title
+      const taskGroups = await storage.getAllTaskGroups();
+      let taskTitle = "Task";
+      for (const group of taskGroups) {
+        const task = group.tasks.find(t => t.id === taskId);
+        if (task) {
+          taskTitle = task.title;
+          break;
+        }
+      }
+      
+      // Get user who posted the update
+      const fromUser = await storage.getUser(userId);
+      const fromName = fromUser?.name || fromUser?.email || "Someone";
+      
+      // Create notifications for all assignees (except the poster)
+      await storage.createTaskNotificationsForAssignees(
+        taskId,
+        userId,
+        "COMMENT",
+        `New comment on "${taskTitle}"`,
+        `${fromName}: ${req.body.content.substring(0, 100)}${req.body.content.length > 100 ? '...' : ''}`,
+        update.id
+      );
+      
       res.status(201).json(update);
     } catch (error: any) {
       console.error("Error creating task update:", error);
@@ -5201,6 +5228,58 @@ Return ONLY valid JSON, no explanation text.`
     } catch (error: any) {
       console.error("Error deleting task file:", error);
       res.status(500).json({ error: error.message || "Failed to delete task file" });
+    }
+  });
+
+  // Task Notifications
+  app.get("/api/task-notifications", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const notifications = await storage.getTaskNotifications(userId);
+      res.json(notifications);
+    } catch (error: any) {
+      console.error("Error fetching task notifications:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch task notifications" });
+    }
+  });
+
+  app.get("/api/task-notifications/unread-count", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const count = await storage.getUnreadTaskNotificationCount(userId);
+      res.json({ count });
+    } catch (error: any) {
+      console.error("Error fetching unread task notification count:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch count" });
+    }
+  });
+
+  app.post("/api/task-notifications/:id/read", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      const notification = await storage.getTaskNotificationById(req.params.id);
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      if (notification.userId !== userId) {
+        return res.status(403).json({ error: "Not authorized to mark this notification" });
+      }
+      await storage.markTaskNotificationRead(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error marking notification read:", error);
+      res.status(500).json({ error: error.message || "Failed to mark notification read" });
+    }
+  });
+
+  app.post("/api/task-notifications/read-all", requireAuth, async (req, res) => {
+    try {
+      const userId = (req.session as any).userId;
+      await storage.markAllTaskNotificationsRead(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error marking all notifications read:", error);
+      res.status(500).json({ error: error.message || "Failed to mark notifications read" });
     }
   });
 

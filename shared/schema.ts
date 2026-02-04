@@ -1146,6 +1146,29 @@ export type TaskFile = typeof taskFiles.$inferSelect;
 
 export type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD";
 
+// Task Notifications
+export const taskNotificationTypeEnum = pgEnum("task_notification_type", ["UPDATE", "COMMENT", "FILE"]);
+
+export const taskNotifications = pgTable("task_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id", { length: 36 }).notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  updateId: varchar("update_id", { length: 36 }).references(() => taskUpdates.id, { onDelete: "cascade" }),
+  type: taskNotificationTypeEnum("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  fromUserId: varchar("from_user_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  readAt: timestamp("read_at"),
+}, (table) => ({
+  userCreatedIdx: index("task_notif_user_created_idx").on(table.userId, table.createdAt),
+  taskIdx: index("task_notif_task_idx").on(table.taskId),
+}));
+
+export const insertTaskNotificationSchema = createInsertSchema(taskNotifications).omit({ id: true, createdAt: true });
+export type InsertTaskNotification = z.infer<typeof insertTaskNotificationSchema>;
+export type TaskNotification = typeof taskNotifications.$inferSelect;
+
 // ===============================
 // CHAT SYSTEM TABLES
 // ===============================

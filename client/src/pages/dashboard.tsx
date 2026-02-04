@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { 
   Clock, 
   Calendar, 
@@ -9,7 +10,9 @@ import {
   TrendingUp,
   Activity,
   Timer,
-  MessageSquare
+  MessageSquare,
+  ListTodo,
+  Check
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -51,6 +54,28 @@ interface DashboardStats {
   }>;
 }
 
+interface TaskNotification {
+  id: string;
+  userId: string;
+  taskId: string;
+  updateId: string | null;
+  type: string;
+  title: string;
+  body: string | null;
+  fromUserId: string | null;
+  createdAt: string;
+  readAt: string | null;
+  fromUser?: {
+    id: string;
+    name: string | null;
+    email: string;
+  } | null;
+  task?: {
+    id: string;
+    title: string;
+  } | null;
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -62,6 +87,26 @@ export default function DashboardPage() {
   const { data: conversations = [] } = useQuery<ChatConversation[]>({
     queryKey: ["/api/chat/conversations"],
   });
+
+  const { data: taskNotifications = [] } = useQuery<TaskNotification[]>({
+    queryKey: ["/api/task-notifications"],
+  });
+
+  const markTaskNotificationRead = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/task-notifications/${id}/read`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-notifications"] });
+    },
+  });
+
+  const markAllTaskNotificationsRead = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/task-notifications/read-all"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/task-notifications"] });
+    },
+  });
+
+  const unreadTaskNotifications = taskNotifications.filter(n => !n.readAt);
 
   const totalUnread = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   const totalMentions = conversations.reduce((sum, c) => sum + (c.unreadMentions || 0), 0);
@@ -145,6 +190,70 @@ export default function DashboardPage() {
                 </Button>
               </a>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {unreadTaskNotifications.length > 0 && (
+        <Card className="border-blue-500 bg-blue-500/5" data-testid="card-task-notifications">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <ListTodo className="h-5 w-5 text-blue-500" />
+              Task Updates
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="text-lg px-3 py-1 bg-blue-500">
+                {unreadTaskNotifications.length}
+              </Badge>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => markAllTaskNotificationsRead.mutate()}
+                disabled={markAllTaskNotificationsRead.isPending}
+                data-testid="button-mark-all-read"
+              >
+                <Check className="h-4 w-4 mr-1" />
+                Mark all read
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {unreadTaskNotifications.slice(0, 5).map(notif => (
+                <div 
+                  key={notif.id} 
+                  className="flex items-center justify-between p-2 rounded-md bg-background cursor-pointer hover-elevate"
+                  onClick={() => {
+                    markTaskNotificationRead.mutate(notif.id);
+                    navigate("/tasks");
+                  }}
+                  data-testid={`task-notif-${notif.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{notif.title}</p>
+                    {notif.body && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {notif.body}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(notif.createdAt), "dd/MM/yyyy HH:mm")}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {unreadTaskNotifications.length > 5 && (
+                <p className="text-xs text-muted-foreground text-center">
+                  +{unreadTaskNotifications.length - 5} more notifications
+                </p>
+              )}
+            </div>
+            <Link href="/tasks" className="block mt-3">
+              <Button className="w-full" variant="outline" data-testid="button-view-tasks">
+                <ListTodo className="h-4 w-4 mr-2" />
+                View Tasks
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}

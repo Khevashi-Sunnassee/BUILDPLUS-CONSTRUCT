@@ -8,7 +8,7 @@ import {
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
   productionSlots, productionSlotAdjustments, draftingProgram,
   suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
-  taskGroups, tasks, taskAssignees, taskUpdates, taskFiles,
+  taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -42,6 +42,7 @@ import {
   type InsertTaskAssignee, type TaskAssignee,
   type InsertTaskUpdate, type TaskUpdate,
   type InsertTaskFile, type TaskFile,
+  type InsertTaskNotification, type TaskNotification,
 } from "@shared/schema";
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -405,6 +406,13 @@ export interface IStorage {
   getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]>;
   createTaskFile(data: InsertTaskFile): Promise<TaskFile>;
   deleteTaskFile(id: string): Promise<void>;
+
+  // Task Notifications
+  getTaskNotifications(userId: string): Promise<any[]>;
+  getUnreadTaskNotificationCount(userId: string): Promise<number>;
+  markTaskNotificationRead(id: string): Promise<void>;
+  markAllTaskNotificationsRead(userId: string): Promise<void>;
+  createTaskNotificationsForAssignees(taskId: string, excludeUserId: string, type: string, title: string, body: string | null, updateId: string | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -3093,6 +3101,89 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTaskFile(id: string): Promise<void> {
     await db.delete(taskFiles).where(eq(taskFiles.id, id));
+  }
+
+  // Task Notification Implementations
+  async getTaskNotifications(userId: string): Promise<any[]> {
+    const notifications = await db.select().from(taskNotifications)
+      .where(eq(taskNotifications.userId, userId))
+      .orderBy(desc(taskNotifications.createdAt))
+      .limit(50);
+    
+    const result = [];
+    for (const notif of notifications) {
+      let fromUser: User | null = null;
+      let task: Task | null = null;
+      
+      if (notif.fromUserId) {
+        const [u] = await db.select().from(users).where(eq(users.id, notif.fromUserId));
+        fromUser = u || null;
+      }
+      const [t] = await db.select().from(tasks).where(eq(tasks.id, notif.taskId));
+      task = t || null;
+      
+      result.push({ ...notif, fromUser, task });
+    }
+    return result;
+  }
+
+  async getTaskNotificationById(id: string): Promise<any | null> {
+    const [notification] = await db.select().from(taskNotifications)
+      .where(eq(taskNotifications.id, id));
+    return notification || null;
+  }
+
+  async getUnreadTaskNotificationCount(userId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(taskNotifications)
+      .where(and(
+        eq(taskNotifications.userId, userId),
+        sql`${taskNotifications.readAt} IS NULL`
+      ));
+    return Number(result[0]?.count || 0);
+  }
+
+  async markTaskNotificationRead(id: string): Promise<void> {
+    await db.update(taskNotifications)
+      .set({ readAt: new Date() })
+      .where(eq(taskNotifications.id, id));
+  }
+
+  async markAllTaskNotificationsRead(userId: string): Promise<void> {
+    await db.update(taskNotifications)
+      .set({ readAt: new Date() })
+      .where(and(
+        eq(taskNotifications.userId, userId),
+        sql`${taskNotifications.readAt} IS NULL`
+      ));
+  }
+
+  async createTaskNotificationsForAssignees(
+    taskId: string, 
+    excludeUserId: string, 
+    type: string, 
+    title: string, 
+    body: string | null, 
+    updateId: string | null
+  ): Promise<void> {
+    // Get all assignees for this task
+    const assignees = await db.select().from(taskAssignees)
+      .where(eq(taskAssignees.taskId, taskId));
+    
+    // Create notifications for each assignee except the sender
+    for (const assignee of assignees) {
+      if (assignee.userId !== excludeUserId) {
+        await db.insert(taskNotifications).values({
+          userId: assignee.userId,
+          taskId,
+          updateId,
+          type: type as any,
+          title,
+          body,
+          fromUserId: excludeUserId,
+        });
+      }
+    }
   }
 }
 

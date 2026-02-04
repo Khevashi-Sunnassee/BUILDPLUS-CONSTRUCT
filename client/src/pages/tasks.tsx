@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -867,7 +867,9 @@ function TaskSidebar({
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<"updates" | "files" | "activity">("updates");
   const [newUpdate, setNewUpdate] = useState("");
+  const [pastedImages, setPastedImages] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: updates = [], isLoading: updatesLoading } = useQuery<TaskUpdate[]>({
     queryKey: [`/api/tasks/${task?.id}/updates`],
@@ -949,6 +951,60 @@ function TaskSidebar({
     }
   };
 
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    const imageFiles: File[] = [];
+    
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          // Rename the file using Object.defineProperty to avoid TypeScript issues with File constructor
+          const timestamp = Date.now();
+          const extension = item.type.split("/")[1] || "png";
+          const newFileName = `screenshot_${timestamp}.${extension}`;
+          Object.defineProperty(file, 'name', {
+            writable: true,
+            value: newFileName
+          });
+          imageFiles.push(file);
+        }
+      }
+    }
+    
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      setPastedImages(prev => [...prev, ...imageFiles]);
+      toast({ title: `${imageFiles.length} image(s) pasted`, description: "Click Post Update to upload" });
+    }
+  }, [toast]);
+
+  const removePastedImage = (index: number) => {
+    setPastedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePostUpdate = async () => {
+    if (!newUpdate.trim() && pastedImages.length === 0) return;
+    
+    // Upload pasted images first
+    for (const file of pastedImages) {
+      await uploadFileMutation.mutateAsync(file);
+    }
+    
+    // Post the update if there's text
+    if (newUpdate.trim()) {
+      const imageNote = pastedImages.length > 0 
+        ? `\n\n[${pastedImages.length} screenshot(s) attached]` 
+        : "";
+      await createUpdateMutation.mutateAsync(newUpdate + imageNote);
+    } else if (pastedImages.length > 0) {
+      await createUpdateMutation.mutateAsync(`[${pastedImages.length} screenshot(s) attached]`);
+    }
+    
+    setPastedImages([]);
+  };
+
   const getFileIcon = (mimeType: string | null) => {
     if (!mimeType) return <File className="h-4 w-4" />;
     if (mimeType.startsWith("image/")) return <Image className="h-4 w-4" />;
@@ -1008,23 +1064,48 @@ function TaskSidebar({
         <div className="flex-1 overflow-y-auto p-4">
           {activeTab === "updates" && (
             <div className="space-y-4">
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
                 <Textarea
+                  ref={textareaRef}
                   value={newUpdate}
                   onChange={(e) => setNewUpdate(e.target.value)}
-                  placeholder="Write an update and mention others with @"
+                  onPaste={handlePaste}
+                  placeholder="Write an update and mention others with @ - paste screenshots here"
                   className="min-h-[80px] resize-none"
                   data-testid="input-new-update"
                 />
+                {pastedImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-2 border rounded-lg bg-muted/30">
+                    {pastedImages.map((file, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={`Pasted screenshot ${index + 1}`}
+                          className="h-16 w-auto rounded border object-cover"
+                        />
+                        <button
+                          onClick={() => removePastedImage(index)}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`btn-remove-pasted-image-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <span className="text-xs text-muted-foreground self-center">
+                      {pastedImages.length} screenshot(s) ready to upload
+                    </span>
+                  </div>
+                )}
               </div>
               <Button
-                onClick={() => newUpdate.trim() && createUpdateMutation.mutate(newUpdate)}
-                disabled={!newUpdate.trim() || createUpdateMutation.isPending}
+                onClick={handlePostUpdate}
+                disabled={(!newUpdate.trim() && pastedImages.length === 0) || createUpdateMutation.isPending || uploadFileMutation.isPending}
                 className="w-full"
                 data-testid="btn-post-update"
               >
                 <Send className="h-4 w-4 mr-2" />
-                Post Update
+                {uploadFileMutation.isPending ? "Uploading..." : "Post Update"}
               </Button>
 
               {updatesLoading ? (
