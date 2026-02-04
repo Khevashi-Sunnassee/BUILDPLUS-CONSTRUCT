@@ -59,6 +59,8 @@ export default function AdminSettingsPage() {
   const [ifcDaysInAdvance, setIfcDaysInAdvance] = useState<number>(14);
   const [daysToAchieveIfc, setDaysToAchieveIfc] = useState<number>(21);
   const [productionDaysInAdvance, setProductionDaysInAdvance] = useState<number>(10);
+  const [procurementDaysInAdvance, setProcurementDaysInAdvance] = useState<number>(7);
+  const [procurementTimeDays, setProcurementTimeDays] = useState<number>(14);
   const [productionWorkDays, setProductionWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
   const [draftingWorkDays, setDraftingWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
   const [cfmeuCalendar, setCfmeuCalendar] = useState<string>("NONE");
@@ -111,6 +113,12 @@ export default function AdminSettingsPage() {
     if (settings?.productionDaysInAdvance !== undefined) {
       setProductionDaysInAdvance(settings.productionDaysInAdvance);
     }
+    if (settings?.procurementDaysInAdvance !== undefined) {
+      setProcurementDaysInAdvance(settings.procurementDaysInAdvance);
+    }
+    if (settings?.procurementTimeDays !== undefined) {
+      setProcurementTimeDays(settings.procurementTimeDays);
+    }
     if (settings?.productionWorkDays) {
       setProductionWorkDays(settings.productionWorkDays as boolean[]);
     }
@@ -120,7 +128,7 @@ export default function AdminSettingsPage() {
     if (settings?.cfmeuCalendar) {
       setCfmeuCalendar(settings.cfmeuCalendar);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar]);
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.procurementDaysInAdvance, settings?.procurementTimeDays, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -198,6 +206,35 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save production days in advance", variant: "destructive" });
+    },
+  });
+
+  const saveProcurementDaysInAdvanceMutation = useMutation({
+    mutationFn: async (days: number) => {
+      if (days >= ifcDaysInAdvance) {
+        throw new Error(`Procurement days must be less than IFC days in advance (${ifcDaysInAdvance})`);
+      }
+      return apiRequest("PUT", "/api/admin/settings", { procurementDaysInAdvance: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Procurement days in advance saved" });
+    },
+    onError: (error: Error) => {
+      toast({ title: error.message || "Failed to save procurement days in advance", variant: "destructive" });
+    },
+  });
+
+  const saveProcurementTimeDaysMutation = useMutation({
+    mutationFn: async (days: number) => {
+      return apiRequest("PUT", "/api/admin/settings", { procurementTimeDays: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Procurement time days saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save procurement time days", variant: "destructive" });
     },
   });
 
@@ -763,6 +800,80 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Number of days before panels need to be delivered to site that production should complete. This is used for production scheduling.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-4 border-t">
+            <Label htmlFor="procurementDaysInAdvance">Procurement Days in Advance</Label>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Input
+                type="number"
+                min={1}
+                max={ifcDaysInAdvance - 1}
+                value={procurementDaysInAdvance}
+                onChange={(e) => setProcurementDaysInAdvance(parseInt(e.target.value) || 7)}
+                className="w-24"
+                data-testid="input-procurement-days-in-advance"
+              />
+              <span className="text-muted-foreground">days before production</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveProcurementDaysInAdvanceMutation.mutate(procurementDaysInAdvance)}
+                disabled={saveProcurementDaysInAdvanceMutation.isPending || procurementDaysInAdvance === settings?.procurementDaysInAdvance || procurementDaysInAdvance >= ifcDaysInAdvance}
+                data-testid="button-save-procurement-days-in-advance"
+              >
+                {saveProcurementDaysInAdvanceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            {procurementDaysInAdvance >= ifcDaysInAdvance && (
+              <p className="text-sm text-destructive flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4" />
+                Must be less than IFC Days in Advance ({ifcDaysInAdvance}) - procurement occurs after IFC date
+              </p>
+            )}
+            <p className="text-sm text-muted-foreground">
+              Number of days before production when procurement orders should be issued. Must be less than IFC days to ensure procurement happens after IFC date is achieved.
+            </p>
+          </div>
+
+          <div className="space-y-2 pt-4 border-t">
+            <Label htmlFor="procurementTimeDays">Procurement Time (Days)</Label>
+            <div className="flex items-center gap-4 flex-wrap">
+              <Input
+                type="number"
+                min={1}
+                max={90}
+                value={procurementTimeDays}
+                onChange={(e) => setProcurementTimeDays(parseInt(e.target.value) || 14)}
+                className="w-24"
+                data-testid="input-procurement-time-days"
+              />
+              <span className="text-muted-foreground">days for procurement</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveProcurementTimeDaysMutation.mutate(procurementTimeDays)}
+                disabled={saveProcurementTimeDaysMutation.isPending || procurementTimeDays === settings?.procurementTimeDays}
+                data-testid="button-save-procurement-time-days"
+              >
+                {saveProcurementTimeDaysMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Number of days required to complete procurement from order placement to delivery. This defines the procurement window for scheduling.
             </p>
           </div>
         </CardContent>
