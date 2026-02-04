@@ -412,6 +412,7 @@ export const panelTypes = pgTable("panel_types", {
   sellRatePerM2: text("sell_rate_per_m2"),
   sellRatePerM3: text("sell_rate_per_m3"),
   expectedWeightPerM3: text("expected_weight_per_m3").default("2500"),
+  color: text("color"), // hex color for panel type display
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

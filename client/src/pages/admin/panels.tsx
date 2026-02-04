@@ -322,6 +322,12 @@ export default function AdminPanelsPage() {
 
   const getSourceLabel = (source: number) => sourceLabels[source] || "Unknown";
 
+  const getPanelTypeColor = (panelType: string | null | undefined): string | null => {
+    if (!panelType || !panelTypes) return null;
+    const pt = panelTypes.find(t => t.code === panelType || t.name === panelType || t.code.toUpperCase() === panelType.toUpperCase());
+    return pt?.color || null;
+  };
+
   const filteredPanels = panels?.filter(panel => {
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
@@ -1508,7 +1514,21 @@ export default function AdminPanelsPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
+                              {(() => {
+                                const typeColor = getPanelTypeColor(panel.panelType);
+                                return (
+                                  <Badge 
+                                    variant="outline"
+                                    style={typeColor ? { 
+                                      backgroundColor: `${typeColor}20`,
+                                      borderColor: typeColor,
+                                      color: typeColor
+                                    } : undefined}
+                                  >
+                                    {panel.panelType?.replace("_", " ") || "WALL"}
+                                  </Badge>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="text-sm">{panel.building || "-"}</TableCell>
                             <TableCell className="text-sm">{panel.level || "-"}</TableCell>
@@ -1631,7 +1651,21 @@ export default function AdminPanelsPage() {
                               </div>
                             </TableCell>
                             <TableCell>
-                              <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
+                              {(() => {
+                                const typeColor = getPanelTypeColor(panel.panelType);
+                                return (
+                                  <Badge 
+                                    variant="outline"
+                                    style={typeColor ? { 
+                                      backgroundColor: `${typeColor}20`,
+                                      borderColor: typeColor,
+                                      color: typeColor
+                                    } : undefined}
+                                  >
+                                    {panel.panelType?.replace("_", " ") || "WALL"}
+                                  </Badge>
+                                );
+                              })()}
                             </TableCell>
                             <TableCell className="text-sm">{panel.building || "-"}</TableCell>
                             <TableCell className="text-sm">{panel.job.jobNumber}</TableCell>
@@ -1732,7 +1766,21 @@ export default function AdminPanelsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
+                        {(() => {
+                                const typeColor = getPanelTypeColor(panel.panelType);
+                                return (
+                                  <Badge 
+                                    variant="outline"
+                                    style={typeColor ? { 
+                                      backgroundColor: `${typeColor}20`,
+                                      borderColor: typeColor,
+                                      color: typeColor
+                                    } : undefined}
+                                  >
+                                    {panel.panelType?.replace("_", " ") || "WALL"}
+                                  </Badge>
+                                );
+                              })()}
                       </TableCell>
                       <TableCell className="text-sm">{panel.building || "-"}</TableCell>
                       <TableCell className="text-sm">{panel.level || "-"}</TableCell>

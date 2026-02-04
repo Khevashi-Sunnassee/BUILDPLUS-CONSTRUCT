@@ -67,6 +67,7 @@ const panelTypeSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  color: z.string().optional(),
   supplyCostPerM2: z.string().optional(),
   supplyCostPerM3: z.string().optional(),
   installCostPerM2: z.string().optional(),
@@ -166,6 +167,7 @@ export default function AdminPanelTypesPage() {
       code: "",
       name: "",
       description: "",
+      color: "",
       supplyCostPerM2: "",
       supplyCostPerM3: "",
       installCostPerM2: "",
@@ -349,6 +351,7 @@ export default function AdminPanelTypesPage() {
       code: "",
       name: "",
       description: "",
+      color: "",
       supplyCostPerM2: "",
       supplyCostPerM3: "",
       installCostPerM2: "",
@@ -380,6 +383,7 @@ export default function AdminPanelTypesPage() {
       code: type.code,
       name: type.name,
       description: type.description || "",
+      color: type.color || "",
       supplyCostPerM2: type.supplyCostPerM2 || "",
       supplyCostPerM3: type.supplyCostPerM3 || "",
       installCostPerM2: type.installCostPerM2 || "",
@@ -485,7 +489,16 @@ export default function AdminPanelTypesPage() {
                       className={needsBreakupAdjustment ? "bg-red-50 dark:bg-red-950/30" : ""}
                     >
                       <TableCell>
-                        <Badge variant="outline">{type.code}</Badge>
+                        <div className="flex items-center gap-2">
+                          {type.color && (
+                            <div 
+                              className="w-4 h-4 rounded-sm border" 
+                              style={{ backgroundColor: type.color }}
+                              title={type.color}
+                            />
+                          )}
+                          <Badge variant="outline">{type.code}</Badge>
+                        </div>
                       </TableCell>
                       <TableCell className="font-medium">{type.name}</TableCell>
                       <TableCell>
@@ -640,6 +653,48 @@ export default function AdminPanelTypesPage() {
                             data-testid="input-panel-type-description"
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="color"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Display Color</FormLabel>
+                        <FormControl>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="color"
+                              className="w-12 h-9 p-1 cursor-pointer"
+                              value={field.value || "#6366f1"}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              data-testid="input-panel-type-color"
+                            />
+                            <Input
+                              placeholder="#6366f1"
+                              {...field}
+                              className="flex-1"
+                              data-testid="input-panel-type-color-hex"
+                            />
+                            {field.value && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => field.onChange("")}
+                                title="Clear color"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          Color used to identify this panel type in the register
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
