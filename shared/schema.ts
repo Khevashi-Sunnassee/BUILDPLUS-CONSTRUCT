@@ -212,6 +212,7 @@ export const jobs = pgTable("jobs", {
   productionWindowDays: integer("production_window_days"), // days before due date when production can start
   productionDaysInAdvance: integer("production_days_in_advance"), // days before site needs panels to cast
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id), // factory servicing this job for production
   productionSlotColor: text("production_slot_color"), // hex color for production slots display
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -221,6 +222,7 @@ export const jobs = pgTable("jobs", {
   statusIdx: index("jobs_status_idx").on(table.status),
   codeIdx: index("jobs_code_idx").on(table.code),
   projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
+  factoryIdx: index("jobs_factory_idx").on(table.factoryId),
 }));
 
 export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
