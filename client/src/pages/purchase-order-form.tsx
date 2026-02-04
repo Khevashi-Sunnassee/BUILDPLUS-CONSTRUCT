@@ -530,32 +530,49 @@ export default function PurchaseOrderFormPage() {
       return false;
     };
     
-    // Company header section
-    pdf.setFillColor(37, 99, 235); // Blue header background
-    pdf.rect(0, 0, pageWidth, 35, "F");
+    // Company header section - clean white background with logo
+    let headerTextX = margin;
+    const logoHeight = 20;
+    
+    // Add company logo if available
+    if (settings?.logoBase64) {
+      try {
+        pdf.addImage(settings.logoBase64, "PNG", margin, 5, 25, logoHeight);
+        headerTextX = margin + 30;
+      } catch (e) {
+        console.error("Failed to add logo to PDF:", e);
+      }
+    }
     
     // Company name
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(18);
+    pdf.setTextColor(31, 41, 55);
+    pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text(settings?.companyName || "LTE Precast Concrete Structures", margin, 15);
+    pdf.text(settings?.companyName || "LTE Precast Concrete Structures", headerTextX, 12);
     
     // Purchase Order title
-    pdf.setFontSize(24);
-    pdf.text("PURCHASE ORDER", margin, 28);
+    pdf.setFontSize(20);
+    pdf.setTextColor(107, 114, 128);
+    pdf.text("PURCHASE ORDER", headerTextX, 22);
     
     // PO Number box on right side
-    pdf.setFillColor(255, 255, 255);
-    pdf.roundedRect(pageWidth - margin - 55, 8, 55, 22, 2, 2, "F");
-    pdf.setTextColor(37, 99, 235);
-    pdf.setFontSize(10);
+    pdf.setFillColor(249, 250, 251);
+    pdf.setDrawColor(229, 231, 235);
+    pdf.roundedRect(pageWidth - margin - 55, 5, 55, 22, 2, 2, "FD");
+    pdf.setTextColor(107, 114, 128);
+    pdf.setFontSize(9);
     pdf.setFont("helvetica", "normal");
-    pdf.text("PO Number", pageWidth - margin - 50, 15);
-    pdf.setFontSize(14);
+    pdf.text("PO Number", pageWidth - margin - 50, 12);
+    pdf.setFontSize(12);
     pdf.setFont("helvetica", "bold");
-    pdf.text(existingPO.poNumber || "", pageWidth - margin - 50, 25);
+    pdf.setTextColor(31, 41, 55);
+    pdf.text(existingPO.poNumber || "", pageWidth - margin - 50, 21);
     
-    currentY = 45;
+    // Add a subtle line separator below header
+    pdf.setDrawColor(229, 231, 235);
+    pdf.line(margin, 32, pageWidth - margin, 32);
+    
+    currentY = 40;
     
     // Status badge
     const statusColors: Record<string, { bg: number[]; text: number[] }> = {
@@ -591,7 +608,7 @@ export default function PurchaseOrderFormPage() {
     pdf.setDrawColor(229, 231, 235);
     pdf.roundedRect(margin, currentY, colWidth, 45, 2, 2, "S");
     
-    pdf.setTextColor(37, 99, 235);
+    pdf.setTextColor(75, 85, 99);
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("SUPPLIER", margin + 5, currentY + 8);
@@ -624,7 +641,7 @@ export default function PurchaseOrderFormPage() {
     pdf.setDrawColor(229, 231, 235);
     pdf.roundedRect(rightColX, currentY, colWidth, 45, 2, 2, "S");
     
-    pdf.setTextColor(37, 99, 235);
+    pdf.setTextColor(75, 85, 99);
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "bold");
     pdf.text("DELIVER TO", rightColX + 5, currentY + 8);
@@ -657,7 +674,7 @@ export default function PurchaseOrderFormPage() {
     
     // Helper function to draw table headers
     const drawTableHeaders = () => {
-      pdf.setFillColor(37, 99, 235);
+      pdf.setFillColor(75, 85, 99);
       pdf.rect(margin, currentY, contentWidth, 8, "F");
       
       pdf.setTextColor(255, 255, 255);
@@ -767,13 +784,13 @@ export default function PurchaseOrderFormPage() {
     pdf.text(`$${gst.toFixed(2)}`, totalsX + totalsWidth - 5, currentY + 14, { align: "right" });
     
     // Total line
-    pdf.setDrawColor(37, 99, 235);
+    pdf.setDrawColor(75, 85, 99);
     pdf.setLineWidth(0.5);
     pdf.line(totalsX + 5, currentY + 17, totalsX + totalsWidth - 5, currentY + 17);
     
     pdf.setFontSize(11);
     pdf.setFont("helvetica", "bold");
-    pdf.setTextColor(37, 99, 235);
+    pdf.setTextColor(31, 41, 55);
     pdf.text("TOTAL:", totalsX + 5, currentY + 24);
     pdf.text(`$${total.toFixed(2)}`, totalsX + totalsWidth - 5, currentY + 24, { align: "right" });
     
