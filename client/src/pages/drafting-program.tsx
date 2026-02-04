@@ -252,9 +252,9 @@ export default function DraftingProgramPage() {
       } else if (groupBy === "level") {
         key = `${entry.jobId}-${entry.level}`;
         label = `${entry.job.jobNumber} - ${entry.level}`;
-      } else if (groupBy === "week" && entry.drawingDueDate) {
-        key = getWeekKey(new Date(entry.drawingDueDate), weekStartDay);
-        label = `Due: ${getWeekLabel(key)}`;
+      } else if (groupBy === "week" && entry.draftingWindowStart) {
+        key = getWeekKey(new Date(entry.draftingWindowStart), weekStartDay);
+        label = `Drafting: ${getWeekLabel(key)}`;
       } else if (groupBy === "assignee") {
         key = entry.assignedToId || "unassigned";
         label = entry.assignedTo?.name || entry.assignedTo?.email || "Unassigned";
@@ -380,7 +380,7 @@ export default function DraftingProgramPage() {
                   <SelectItem value="none">No Grouping</SelectItem>
                   <SelectItem value="job">Job</SelectItem>
                   <SelectItem value="level">Job + Level</SelectItem>
-                  <SelectItem value="week">Due Week</SelectItem>
+                  <SelectItem value="week">Drafting Week</SelectItem>
                   <SelectItem value="assignee">Assignee</SelectItem>
                 </SelectContent>
               </Select>
@@ -433,9 +433,9 @@ export default function DraftingProgramPage() {
                   <TableHead>Panel</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Level</TableHead>
-                  <TableHead>Production Date</TableHead>
-                  <TableHead>Drawing Due</TableHead>
                   <TableHead>Drafting Window</TableHead>
+                  <TableHead>Drawing Due</TableHead>
+                  <TableHead>Production Date</TableHead>
                   <TableHead>Proposed Start</TableHead>
                   <TableHead>Assigned To</TableHead>
                   <TableHead>Status</TableHead>
@@ -455,13 +455,13 @@ export default function DraftingProgramPage() {
                     <TableCell>{entry.job.jobNumber}</TableCell>
                     <TableCell>{entry.level}</TableCell>
                     <TableCell>
-                      {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
+                      {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
                     </TableCell>
                     <TableCell className={getDateColorClass(entry.drawingDueDate ? new Date(entry.drawingDueDate) : null)}>
                       {entry.drawingDueDate ? format(new Date(entry.drawingDueDate), "dd/MM/yyyy") : "-"}
                     </TableCell>
                     <TableCell>
-                      {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
+                      {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
                     </TableCell>
                     <TableCell>
                       {entry.proposedStartDate ? format(new Date(entry.proposedStartDate), "dd/MM/yyyy") : "-"}
@@ -551,9 +551,9 @@ export default function DraftingProgramPage() {
                           <TableHead>Panel</TableHead>
                           <TableHead>Job</TableHead>
                           <TableHead>Level</TableHead>
-                          <TableHead>Production Date</TableHead>
-                          <TableHead>Drawing Due</TableHead>
                           <TableHead>Drafting Window</TableHead>
+                          <TableHead>Drawing Due</TableHead>
+                          <TableHead>Production Date</TableHead>
                           <TableHead>Proposed Start</TableHead>
                           <TableHead>Assigned To</TableHead>
                           <TableHead>Status</TableHead>
@@ -573,13 +573,13 @@ export default function DraftingProgramPage() {
                             <TableCell>{entry.job.jobNumber}</TableCell>
                             <TableCell>{entry.level}</TableCell>
                             <TableCell>
-                              {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
+                              {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
                             </TableCell>
                             <TableCell className={getDateColorClass(entry.drawingDueDate ? new Date(entry.drawingDueDate) : null)}>
                               {entry.drawingDueDate ? format(new Date(entry.drawingDueDate), "dd/MM/yyyy") : "-"}
                             </TableCell>
                             <TableCell>
-                              {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
+                              {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
                             </TableCell>
                             <TableCell>
                               {entry.proposedStartDate ? format(new Date(entry.proposedStartDate), "dd/MM/yyyy") : "-"}
