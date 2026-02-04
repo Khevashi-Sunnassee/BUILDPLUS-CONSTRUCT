@@ -778,9 +778,14 @@ export default function AdminJobsPage() {
 
   const regenerateSlotsAndDraftingMutation = useMutation({
     mutationFn: async (jobId: string) => {
+      // First delete drafting program entries for this job (to remove FK references)
+      await apiRequest("DELETE", `/api/drafting-program/job/${jobId}`, {});
+      
+      // Then regenerate production slots
       const slotsRes = await apiRequest("POST", `/api/production-slots/generate/${jobId}`, {});
       const slotsData = await slotsRes.json();
       
+      // Finally regenerate drafting program
       const draftingRes = await apiRequest("POST", "/api/drafting-program/generate", { jobId });
       const draftingData = await draftingRes.json();
       

@@ -4786,6 +4786,17 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  app.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+    try {
+      const { jobId } = req.params;
+      const deleted = await storage.deleteDraftingProgramByJob(jobId);
+      res.json({ success: true, deleted });
+    } catch (error: any) {
+      console.error("Error deleting drafting program entries for job:", error);
+      res.status(500).json({ error: error.message || "Failed to delete drafting program entries" });
+    }
+  });
+
   // ============== Suppliers ==============
   app.get("/api/suppliers", requireAuth, async (req, res) => {
     try {

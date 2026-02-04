@@ -336,6 +336,7 @@ export interface IStorage {
   createDraftingProgram(data: InsertDraftingProgram): Promise<DraftingProgram>;
   updateDraftingProgram(id: string, data: Partial<InsertDraftingProgram>): Promise<DraftingProgram | undefined>;
   deleteDraftingProgram(id: string): Promise<void>;
+  deleteDraftingProgramByJob(jobId: string): Promise<number>;
   generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }>;
   assignDraftingResource(id: string, assignedToId: string, proposedStartDate: Date): Promise<DraftingProgram | undefined>;
 
@@ -2497,6 +2498,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteDraftingProgram(id: string): Promise<void> {
     await db.delete(draftingProgram).where(eq(draftingProgram.id, id));
+  }
+
+  async deleteDraftingProgramByJob(jobId: string): Promise<number> {
+    const result = await db.delete(draftingProgram).where(eq(draftingProgram.jobId, jobId)).returning();
+    return result.length;
   }
 
   async generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }> {
