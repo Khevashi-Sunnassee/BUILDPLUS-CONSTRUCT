@@ -121,6 +121,8 @@ const jobSchema = z.object({
   daysToAchieveIfc: z.number().int().min(1).optional().nullable(),
   productionWindowDays: z.number().int().min(1).optional().nullable(),
   productionDaysInAdvance: z.number().int().min(1).optional().nullable(),
+  procurementDaysInAdvance: z.number().int().min(1).optional().nullable(),
+  procurementTimeDays: z.number().int().min(1).optional().nullable(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
@@ -654,6 +656,8 @@ export default function AdminJobsPage() {
       daysToAchieveIfc: globalSettings?.daysToAchieveIfc ?? 21,
       productionWindowDays: globalSettings?.productionWindowDays ?? 10,
       productionDaysInAdvance: globalSettings?.productionDaysInAdvance ?? 10,
+      procurementDaysInAdvance: globalSettings?.procurementDaysInAdvance ?? 7,
+      procurementTimeDays: globalSettings?.procurementTimeDays ?? 14,
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -686,6 +690,8 @@ export default function AdminJobsPage() {
       daysToAchieveIfc: job.daysToAchieveIfc ?? globalSettings?.daysToAchieveIfc ?? 21,
       productionWindowDays: job.productionWindowDays ?? globalSettings?.productionWindowDays ?? 10,
       productionDaysInAdvance: job.productionDaysInAdvance ?? globalSettings?.productionDaysInAdvance ?? 10,
+      procurementDaysInAdvance: job.procurementDaysInAdvance ?? globalSettings?.procurementDaysInAdvance ?? 7,
+      procurementTimeDays: job.procurementTimeDays ?? globalSettings?.procurementTimeDays ?? 14,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
@@ -1697,6 +1703,56 @@ export default function AdminJobsPage() {
                             />
                           </FormControl>
                           <p className="text-xs text-muted-foreground">Days before site delivery</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="procurementDaysInAdvance"
+                      render={({ field }) => {
+                        const daysInAdvance = jobForm.watch("daysInAdvance") ?? globalSettings?.ifcDaysInAdvance ?? 14;
+                        const isInvalid = field.value !== null && field.value !== undefined && field.value >= daysInAdvance;
+                        return (
+                          <FormItem>
+                            <FormLabel>Procurement Days in Advance</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="number" 
+                                min="1"
+                                max={daysInAdvance - 1}
+                                placeholder="e.g., 7"
+                                value={field.value ?? ""} 
+                                onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                                data-testid="input-job-procurement-days-in-advance" 
+                              />
+                            </FormControl>
+                            {isInvalid && (
+                              <p className="text-xs text-destructive">Must be less than IFC Days ({daysInAdvance})</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">Days before production</p>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="procurementTimeDays"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Procurement Time (Days)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              placeholder="e.g., 14"
+                              value={field.value ?? ""} 
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              data-testid="input-job-procurement-time-days" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Days for procurement</p>
                           <FormMessage />
                         </FormItem>
                       )}
