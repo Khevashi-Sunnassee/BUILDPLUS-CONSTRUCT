@@ -100,6 +100,10 @@ export default function ProductionSlotsPage() {
     emptyLevels: string[];
   } | null>(null);
   const [pendingJobsForGeneration, setPendingJobsForGeneration] = useState<string[]>([]);
+  
+  // Drafting program update confirmation state
+  const [showDraftingUpdateDialog, setShowDraftingUpdateDialog] = useState(false);
+  const [showDraftingWarningDialog, setShowDraftingWarningDialog] = useState(false);
 
   const { data: slots = [], isLoading: loadingSlots } = useQuery<ProductionSlotWithDetails[]>({
     queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
@@ -169,6 +173,20 @@ export default function ProductionSlotsPage() {
     },
     onError: (error: any) => {
       toast({ title: "Error", description: error.message || "Failed to generate slots", variant: "destructive" });
+    },
+  });
+
+  const updateDraftingProgramMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/drafting-program/generate");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      toast({ title: "Success", description: "Drafting program updated successfully" });
+      setShowDraftingUpdateDialog(false);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update drafting program", variant: "destructive" });
     },
   });
 
@@ -320,10 +338,29 @@ export default function ProductionSlotsPage() {
     setSelectedJobsForGeneration([]);
     setPendingJobsForGeneration([]);
     setLevelMismatchInfo(null);
+    
+    // Show drafting program update dialog after successful generation
+    setShowDraftingUpdateDialog(true);
   };
   
   const handleLevelMismatchConfirm = (skipEmpty: boolean) => {
     handleGenerateSlots(skipEmpty);
+  };
+  
+  const handleDraftingUpdateConfirm = (update: boolean) => {
+    if (update) {
+      updateDraftingProgramMutation.mutate();
+    } else {
+      setShowDraftingUpdateDialog(false);
+      setShowDraftingWarningDialog(true);
+    }
+  };
+  
+  const handleDraftingWarningConfirm = (update: boolean) => {
+    setShowDraftingWarningDialog(false);
+    if (update) {
+      updateDraftingProgramMutation.mutate();
+    }
   };
 
   const handleAdjustSubmit = () => {
@@ -980,6 +1017,75 @@ export default function ProductionSlotsPage() {
               disabled={generateSlotsMutation.isPending}
             >
               Skip Empty Levels
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDraftingUpdateDialog} onOpenChange={setShowDraftingUpdateDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Update Drafting Program
+            </DialogTitle>
+            <DialogDescription>
+              Production slots have been created/updated
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm">
+              Would you like to update the drafting program to reflect the new production schedule?
+            </p>
+            <p className="text-sm text-muted-foreground">
+              This will update all panels with "Not Scheduled" status to match the new production dates.
+            </p>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => handleDraftingUpdateConfirm(false)}
+            >
+              No, Skip Update
+            </Button>
+            <Button 
+              onClick={() => handleDraftingUpdateConfirm(true)}
+              disabled={updateDraftingProgramMutation.isPending}
+            >
+              {updateDraftingProgramMutation.isPending ? "Updating..." : "Yes, Update Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDraftingWarningDialog} onOpenChange={setShowDraftingWarningDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Drafting Program Out of Date
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm">
+              The drafting program will not be updated and may show outdated information.
+            </p>
+            <p className="text-sm font-medium">
+              Are you sure you don't want to update the drafting program?
+            </p>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => handleDraftingWarningConfirm(false)}
+            >
+              Yes, Leave Outdated
+            </Button>
+            <Button 
+              onClick={() => handleDraftingWarningConfirm(true)}
+              disabled={updateDraftingProgramMutation.isPending}
+            >
+              {updateDraftingProgramMutation.isPending ? "Updating..." : "Update Now"}
             </Button>
           </DialogFooter>
         </DialogContent>
