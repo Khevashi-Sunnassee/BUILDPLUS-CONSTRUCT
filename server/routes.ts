@@ -907,9 +907,9 @@ export async function registerRoutes(
         );
         const defaultCycleTime = job.expectedCycleTimePerFloor;
         
-        const daysInAdvance = job.daysInAdvance || 7;
+        // Production slots start from productionStartDate
+        // Note: daysInAdvance (IFC days) is only used for drafting program calculations, not production slot dates
         const baseDate = new Date(job.productionStartDate);
-        baseDate.setDate(baseDate.getDate() - daysInAdvance);
         
         const allSlots = existingSlots.sort((a, b) => a.levelOrder - b.levelOrder);
         let cumulativeDays = 0;
