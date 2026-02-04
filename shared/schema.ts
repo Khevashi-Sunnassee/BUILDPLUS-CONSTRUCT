@@ -385,7 +385,8 @@ export const dailyLogs = pgTable("daily_logs", {
   logDay: text("log_day").notNull(),
   tz: text("tz").default("Australia/Melbourne").notNull(),
   discipline: disciplineEnum("discipline").default("DRAFTING").notNull(),
-  factory: text("factory").default("QLD").notNull(),
+  factory: text("factory").default("QLD").notNull(), // Deprecated - use factoryId
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   status: logStatusEnum("status").default("PENDING").notNull(),
   submittedAt: timestamp("submitted_at"),
   approvedAt: timestamp("approved_at"),
@@ -506,7 +507,8 @@ export const productionEntries = pgTable("production_entries", {
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   productionDate: text("production_date").notNull(),
-  factory: text("factory").default("QLD").notNull(),
+  factory: text("factory").default("QLD").notNull(), // Deprecated - use factoryId
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   status: text("status").default("PENDING").notNull(), // PENDING = scheduled, COMPLETED = produced
   bayNumber: text("bay_number"), // Bay number where the panel was cast
   volumeM3: text("volume_m3"),
@@ -526,7 +528,8 @@ export const productionEntries = pgTable("production_entries", {
 export const productionDays = pgTable("production_days", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   productionDate: text("production_date").notNull(),
-  factory: text("factory").notNull(),
+  factory: text("factory").notNull(), // Deprecated - use factoryId
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   notes: text("notes"),
   createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -584,7 +587,8 @@ export const loadLists = pgTable("load_lists", {
   loadDate: text("load_date").notNull(),
   loadTime: text("load_time").notNull(),
   trailerTypeId: varchar("trailer_type_id", { length: 36 }).references(() => trailerTypes.id),
-  factory: text("factory").default("QLD").notNull(),
+  factory: text("factory").default("QLD").notNull(), // Deprecated - use factoryId
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   uhf: text("uhf"),
   status: loadListStatusEnum("status").default("PENDING").notNull(),
   notes: text("notes"),
@@ -647,7 +651,8 @@ export const weeklyWageReports = pgTable("weekly_wage_reports", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   weekStartDate: text("week_start_date").notNull(),
   weekEndDate: text("week_end_date").notNull(),
-  factory: text("factory").default("QLD").notNull(),
+  factory: text("factory").default("QLD").notNull(), // Deprecated - use factoryId
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   productionWages: text("production_wages"),
   officeWages: text("office_wages"),
   estimatingWages: text("estimating_wages"),
