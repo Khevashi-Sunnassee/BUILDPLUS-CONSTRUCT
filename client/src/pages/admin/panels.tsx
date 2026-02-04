@@ -93,7 +93,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, FileIcon, Send, UserPlus } from "lucide-react";
+import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon } from "lucide-react";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 
 const panelSchema = z.object({
@@ -169,6 +169,7 @@ interface ChatMessage {
 function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: string }) {
   const { toast } = useToast();
   const [messageContent, setMessageContent] = useState("");
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -191,20 +192,58 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
   }, [messages]);
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
-      return apiRequest("POST", `/api/chat/conversations/${conversation?.id}/messages`, {
-        content,
-        mentionedUserIds: [],
+    mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
+      const formData = new FormData();
+      formData.append("content", content);
+      formData.append("mentionedUserIds", JSON.stringify([]));
+      files.forEach((file) => formData.append("files", file));
+      
+      const res = await fetch(`/api/chat/conversations/${conversation?.id}/messages`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: res.statusText }));
+        throw new Error(err.message || "Failed to send message");
+      }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", conversation?.id, "messages"] });
       setMessageContent("");
+      setPendingFiles([]);
     },
     onError: (error: any) => {
       toast({ title: "Failed to send message", description: error.message, variant: "destructive" });
     },
   });
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+          const newFile = new File([file], `screenshot-${timestamp}.png`, { type: file.type });
+          imageFiles.push(newFile);
+        }
+      }
+    }
+
+    if (imageFiles.length > 0) {
+      setPendingFiles((prev) => [...prev, ...imageFiles]);
+    }
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const addMembersMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
@@ -223,8 +262,8 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageContent.trim() || !conversation?.id) return;
-    sendMessageMutation.mutate(messageContent);
+    if ((!messageContent.trim() && pendingFiles.length === 0) || !conversation?.id) return;
+    sendMessageMutation.mutate({ content: messageContent, files: pendingFiles });
   };
 
   const existingMemberIds = conversation?.members?.map(m => m.userId) || [];
@@ -295,16 +334,32 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
                   {msg.attachments?.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-2">
                       {msg.attachments.map((att) => (
-                        <a
-                          key={att.id}
-                          href={att.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <FileIcon className="h-3 w-3" />
-                          {att.fileName}
-                        </a>
+                        att.mimeType?.startsWith("image/") ? (
+                          <a
+                            key={att.id}
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block"
+                          >
+                            <img
+                              src={att.url}
+                              alt={att.fileName}
+                              className="max-w-[200px] max-h-[150px] rounded border object-cover"
+                            />
+                          </a>
+                        ) : (
+                          <a
+                            key={att.id}
+                            href={att.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                          >
+                            <FileIcon className="h-3 w-3" />
+                            {att.fileName}
+                          </a>
+                        )
                       ))}
                     </div>
                   )}
@@ -317,11 +372,32 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
       </ScrollArea>
 
       <form onSubmit={handleSendMessage} className="p-3 border-t">
+        {pendingFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-2">
+            {pendingFiles.map((file, index) => (
+              <div key={index} className="relative group">
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt={file.name}
+                  className="w-16 h-16 object-cover rounded border"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePendingFile(index)}
+                  className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2">
           <Textarea
             value={messageContent}
             onChange={(e) => setMessageContent(e.target.value)}
-            placeholder="Type a message..."
+            onPaste={handlePaste}
+            placeholder="Type a message or paste a screenshot..."
             className="resize-none min-h-[40px] max-h-[80px]"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -334,7 +410,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
           <Button
             type="submit"
             size="icon"
-            disabled={!messageContent.trim() || sendMessageMutation.isPending}
+            disabled={(!messageContent.trim() && pendingFiles.length === 0) || sendMessageMutation.isPending}
             data-testid="button-send-message"
           >
             {sendMessageMutation.isPending ? (
