@@ -104,7 +104,7 @@ export default function PurchaseOrderFormPage() {
     return jobs.filter(job => 
       job.jobNumber.toLowerCase().includes(term) ||
       job.name.toLowerCase().includes(term) ||
-      job.clientName?.toLowerCase().includes(term)
+      job.client?.toLowerCase().includes(term)
     );
   }, [jobs, jobSearchTerm]);
 
@@ -1658,9 +1658,9 @@ export default function PurchaseOrderFormPage() {
                           />
                         )}
                       </div>
-                      {job.clientName && (
+                      {job.client && (
                         <div className="text-sm text-muted-foreground mt-1">
-                          {job.clientName}
+                          {job.client}
                         </div>
                       )}
                     </div>

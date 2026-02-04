@@ -22,7 +22,7 @@ export function registerChatRoutes(app: Express): void {
   // Get single conversation with messages
   app.get("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id as string);
+      const id = String(req.params.id);
       const conversation = await chatStorage.getConversation(id);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
@@ -50,7 +50,7 @@ export function registerChatRoutes(app: Express): void {
   // Delete conversation
   app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id as string);
+      const id = String(req.params.id);
       await chatStorage.deleteConversation(id);
       res.status(204).send();
     } catch (error) {
@@ -62,7 +62,7 @@ export function registerChatRoutes(app: Express): void {
   // Send message and get AI response (streaming)
   app.post("/api/conversations/:id/messages", async (req: Request, res: Response) => {
     try {
-      const conversationId = parseInt(req.params.id as string);
+      const conversationId = String(req.params.id);
       const { content } = req.body;
 
       // Save user message
@@ -70,9 +70,9 @@ export function registerChatRoutes(app: Express): void {
 
       // Get conversation history for context
       const messages = await chatStorage.getMessagesByConversation(conversationId);
-      const chatMessages = messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
+      const chatMsgs = messages.map((m) => ({
+        role: (m.senderId === "user" ? "user" : "assistant") as "user" | "assistant",
+        content: m.body || "",
       }));
 
       // Set up SSE
@@ -82,8 +82,8 @@ export function registerChatRoutes(app: Express): void {
 
       // Stream response from OpenAI
       const stream = await openai.chat.completions.create({
-        model: "gpt-5.2",
-        messages: chatMessages,
+        model: "gpt-4o-mini",
+        messages: chatMsgs,
         stream: true,
         max_completion_tokens: 2048,
       });
@@ -99,7 +99,7 @@ export function registerChatRoutes(app: Express): void {
       }
 
       // Save assistant message
-      await chatStorage.createMessage(conversationId, "assistant", fullResponse);
+      await chatStorage.createMessage(String(conversationId), "assistant", fullResponse);
 
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
       res.end();

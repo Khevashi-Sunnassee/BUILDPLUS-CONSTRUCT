@@ -67,7 +67,7 @@ const requirePermission = (functionKey: string, minimumLevel: PermissionLevel = 
       return next();
     }
     
-    const permission = await storage.getUserPermission(req.session.userId, functionKey);
+    const permission = await storage.getUserPermission(req.session.userId, functionKey as any);
     
     if (!permission || permission.permissionLevel === "HIDDEN") {
       return res.status(403).json({ error: "Access denied to this function" });
@@ -407,8 +407,8 @@ export async function registerRoutes(
 
   app.delete("/api/production-days/:date", requireRole("MANAGER", "ADMIN"), async (req, res) => {
     try {
-      const date = req.params.date;
-      const factory = (req.query.factory as string) || "QLD";
+      const date = String(req.params.date);
+      const factory = String(req.query.factory || "QLD");
       await storage.deleteProductionDayByDateAndFactory(date, factory);
       res.json({ success: true });
     } catch (error: any) {
@@ -1473,8 +1473,8 @@ export async function registerRoutes(
       
       // Only MANAGER or ADMIN can approve IFC documents for production
       if (documentStatus === "APPROVED") {
-        const user = req.user as any;
-        if (!["MANAGER", "ADMIN"].includes(user.role)) {
+        const user = (req as any).user;
+        if (!user || !["MANAGER", "ADMIN"].includes(user.role)) {
           return res.status(403).json({ error: "Only managers or admins can approve documents for production" });
         }
         // Must be in IFC status to approve
@@ -1506,7 +1506,7 @@ export async function registerRoutes(
   // Delete all panels by source (only if they have no production records)
   app.delete("/api/admin/panels/by-source/:source", requireRole("ADMIN"), async (req, res) => {
     try {
-      const source = parseInt(req.params.source);
+      const source = parseInt(String(req.params.source));
       if (![1, 2, 3].includes(source)) {
         return res.status(400).json({ error: "Invalid source. Must be 1 (Manual), 2 (Excel), or 3 (Estimate)" });
       }
@@ -1687,7 +1687,7 @@ export async function registerRoutes(
         const replace = req.body.replace === "true";
         
         // Validate job exists
-        const job = await storage.getJob(jobId);
+        const job = await storage.getJob(String(jobId));
         if (!job) {
           return res.status(404).json({ error: "Job not found" });
         }
@@ -1724,7 +1724,7 @@ export async function registerRoutes(
         
         // If replace is true, delete existing source=3 panels for this job
         if (replace) {
-          await storage.deletePanelsByJobAndSource(jobId, 3);
+          await storage.deletePanelsByJobAndSource(String(jobId), 3);
         }
         
         // Get valid panel types from the system for validation - accept both name and code, store CODE
@@ -1746,7 +1746,7 @@ export async function registerRoutes(
         
         const results: any[] = [];
         const panelsToImport: any[] = [];
-        const existingPanelSourceIds = await storage.getExistingPanelSourceIds(jobId);
+        const existingPanelSourceIds = await storage.getExistingPanelSourceIds(String(jobId));
         
         // Header mapping - normalized patterns (no #, (), ², ³ as these are stripped during header detection)
         const headerMapping: Record<string, string> = {
@@ -2121,7 +2121,7 @@ export async function registerRoutes(
   // Get job totals (m2, m3, elements)
   app.get("/api/jobs/:jobId/totals", requireAuth, async (req, res) => {
     try {
-      const { jobId } = req.params;
+      const jobId = String(req.params.jobId);
       const panels = await storage.getPanelsByJob(jobId);
       
       let totalAreaM2 = 0;
@@ -2326,8 +2326,8 @@ export async function registerRoutes(
       }
       
       // Check and complete slots for each unique level
-      for (const { jobId, level, building } of slotsToCheck.values()) {
-        await storage.checkAndCompleteSlotByPanelCompletion(jobId, level, building);
+      for (const item of Array.from(slotsToCheck.values())) {
+        await storage.checkAndCompleteSlotByPanelCompletion(item.jobId, item.level, item.building);
       }
     }
     
@@ -2337,7 +2337,7 @@ export async function registerRoutes(
   // Get production entries for panels in a slot (job + level)
   app.get("/api/production-slots/:slotId/panel-entries", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
     try {
-      const { slotId } = req.params;
+      const slotId = String(req.params.slotId);
       const slot = await storage.getProductionSlot(slotId);
       if (!slot) {
         return res.status(404).json({ error: "Production slot not found" });
@@ -2364,7 +2364,7 @@ export async function registerRoutes(
   // Unbook a panel (delete production entry)
   app.delete("/api/production-entries/:entryId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      const { entryId } = req.params;
+      const entryId = String(req.params.entryId);
       const entry = await storage.getProductionEntry(entryId);
       if (!entry) {
         return res.status(404).json({ error: "Production entry not found" });
@@ -2396,7 +2396,7 @@ export async function registerRoutes(
       }
 
       // Get the production slot and global settings for validation
-      const slot = await storage.getProductionSlot(slotId);
+      const slot = await storage.getProductionSlot(String(slotId));
       if (!slot) {
         return res.status(404).json({ error: "Production slot not found" });
       }
@@ -2865,12 +2865,12 @@ export async function registerRoutes(
   });
 
   app.get("/api/admin/user-permissions/:userId", requireRole("ADMIN"), async (req, res) => {
-    const permissions = await storage.getUserPermissions(req.params.userId);
+    const permissions = await storage.getUserPermissions(String(req.params.userId));
     res.json(permissions);
   });
 
   app.post("/api/admin/user-permissions/:userId/initialize", requireRole("ADMIN"), async (req, res) => {
-    const permissions = await storage.initializeUserPermissions(req.params.userId);
+    const permissions = await storage.initializeUserPermissions(String(req.params.userId));
     res.json(permissions);
   });
 
@@ -2880,7 +2880,7 @@ export async function registerRoutes(
       return res.status(400).json({ error: "Invalid permission level" });
     }
     const permission = await storage.setUserPermission(
-      req.params.userId,
+      String(req.params.userId),
       req.params.functionKey as any,
       permissionLevel
     );
@@ -2888,7 +2888,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/my-permissions", requireAuth, async (req, res) => {
-    const permissions = await storage.getUserPermissions(req.user!.id);
+    const permissions = await storage.getUserPermissions(req.session.userId!);
     res.json(permissions);
   });
 
@@ -4367,7 +4367,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekly_wages"), async (req, res) => {
     try {
-      const report = await storage.getWeeklyWageReport(req.params.id);
+      const report = await storage.getWeeklyWageReport(String(req.params.id));
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4388,7 +4388,7 @@ Return ONLY valid JSON, no explanation text.`
       const { weekStartDate, weekEndDate, factory } = parseResult.data;
       
       // Check if report already exists
-      const existing = await storage.getWeeklyWageReportByWeek(weekStartDate, weekEndDate, factory);
+      const existing = await storage.getWeeklyWageReportByWeek(weekStartDate, weekEndDate, factory || "");
       if (existing) {
         return res.status(400).json({ error: "Weekly wage report already exists for this week and factory" });
       }
@@ -4411,7 +4411,7 @@ Return ONLY valid JSON, no explanation text.`
         return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request data" });
       }
       
-      const report = await storage.updateWeeklyWageReport(req.params.id, parseResult.data);
+      const report = await storage.updateWeeklyWageReport(String(req.params.id), parseResult.data);
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4424,7 +4424,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), requirePermission("weekly_wages", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      await storage.deleteWeeklyWageReport(req.params.id);
+      await storage.deleteWeeklyWageReport(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting weekly wage report:", error);
@@ -4435,7 +4435,7 @@ Return ONLY valid JSON, no explanation text.`
   // Weekly Wage Analysis - compare actual wages vs estimated wages based on production
   app.get("/api/weekly-wage-reports/:id/analysis", requireAuth, async (req, res) => {
     try {
-      const report = await storage.getWeeklyWageReport(req.params.id);
+      const report = await storage.getWeeklyWageReport(String(req.params.id));
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4579,7 +4579,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
     try {
-      const report = await storage.getWeeklyJobReport(req.params.id);
+      const report = await storage.getWeeklyJobReport(String(req.params.id));
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4620,7 +4620,7 @@ Return ONLY valid JSON, no explanation text.`
   app.put("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
     try {
       const { schedules, ...reportData } = req.body;
-      const report = await storage.updateWeeklyJobReport(req.params.id, reportData, schedules);
+      const report = await storage.updateWeeklyJobReport(String(req.params.id), reportData, schedules);
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4633,7 +4633,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/weekly-job-reports/:id/submit", requireAuth, async (req, res) => {
     try {
-      const report = await storage.submitWeeklyJobReport(req.params.id);
+      const report = await storage.submitWeeklyJobReport(String(req.params.id));
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4647,7 +4647,7 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/weekly-job-reports/:id/approve", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
       const approvedById = req.session.userId!;
-      const report = await storage.approveWeeklyJobReport(req.params.id, approvedById);
+      const report = await storage.approveWeeklyJobReport(String(req.params.id), approvedById);
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4662,7 +4662,7 @@ Return ONLY valid JSON, no explanation text.`
     try {
       const approvedById = req.session.userId!;
       const { rejectionReason } = req.body;
-      const report = await storage.rejectWeeklyJobReport(req.params.id, approvedById, rejectionReason || "No reason provided");
+      const report = await storage.rejectWeeklyJobReport(String(req.params.id), approvedById, rejectionReason || "No reason provided");
       if (!report) {
         return res.status(404).json({ error: "Report not found" });
       }
@@ -4675,7 +4675,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteWeeklyJobReport(req.params.id);
+      await storage.deleteWeeklyJobReport(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting weekly job report:", error);
@@ -4739,7 +4739,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/production-slots/:id", requireAuth, async (req, res) => {
     try {
-      const slot = await storage.getProductionSlot(req.params.id);
+      const slot = await storage.getProductionSlot(String(req.params.id));
       if (!slot) {
         return res.status(404).json({ error: "Production slot not found" });
       }
@@ -4752,7 +4752,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const result = await storage.checkPanelLevelCoverage(req.params.jobId);
+      const result = await storage.checkPanelLevelCoverage(String(req.params.jobId));
       res.json(result);
     } catch (error: any) {
       console.error("Error checking panel level coverage:", error);
@@ -4763,7 +4763,7 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
       const { skipEmptyLevels } = req.body || {};
-      const slots = await storage.generateProductionSlotsForJob(req.params.jobId, skipEmptyLevels);
+      const slots = await storage.generateProductionSlotsForJob(String(req.params.jobId), skipEmptyLevels);
       res.json(slots);
     } catch (error: any) {
       console.error("Error generating production slots:", error);
@@ -4776,7 +4776,7 @@ Return ONLY valid JSON, no explanation text.`
       const { newDate, reason, clientConfirmed, cascadeToLater } = req.body;
       const changedById = req.session.userId!;
       
-      const slot = await storage.adjustProductionSlot(req.params.id, {
+      const slot = await storage.adjustProductionSlot(String(req.params.id), {
         newDate: new Date(newDate),
         reason,
         changedById,
@@ -4796,7 +4796,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/production-slots/:id/book", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const slot = await storage.bookProductionSlot(req.params.id);
+      const slot = await storage.bookProductionSlot(String(req.params.id));
       if (!slot) {
         return res.status(404).json({ error: "Production slot not found" });
       }
@@ -4809,7 +4809,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/production-slots/:id/complete", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const slot = await storage.completeProductionSlot(req.params.id);
+      const slot = await storage.completeProductionSlot(String(req.params.id));
       if (!slot) {
         return res.status(404).json({ error: "Production slot not found" });
       }
@@ -4822,7 +4822,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/production-slots/:id/adjustments", requireAuth, async (req, res) => {
     try {
-      const adjustments = await storage.getProductionSlotAdjustments(req.params.id);
+      const adjustments = await storage.getProductionSlotAdjustments(String(req.params.id));
       res.json(adjustments);
     } catch (error: any) {
       console.error("Error fetching production slot adjustments:", error);
@@ -4832,7 +4832,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/production-slots/:id", requireRole("ADMIN"), async (req, res) => {
     try {
-      await storage.deleteProductionSlot(req.params.id);
+      await storage.deleteProductionSlot(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting production slot:", error);
@@ -4907,7 +4907,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
     try {
-      const program = await storage.getDraftingProgram(req.params.id);
+      const program = await storage.getDraftingProgram(String(req.params.id));
       if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
       res.json(program);
     } catch (error: any) {
@@ -4938,7 +4938,7 @@ Return ONLY valid JSON, no explanation text.`
         return res.status(400).json({ error: parsed.error.errors.map(e => e.message).join(", ") });
       }
       const { assignedToId, proposedStartDate } = parsed.data;
-      const updated = await storage.assignDraftingResource(req.params.id, assignedToId, new Date(proposedStartDate));
+      const updated = await storage.assignDraftingResource(String(req.params.id), assignedToId, new Date(proposedStartDate));
       if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });
       res.json(updated);
     } catch (error: any) {
@@ -4966,7 +4966,7 @@ Return ONLY valid JSON, no explanation text.`
       if (updateData.completedAt) {
         updateData.completedAt = new Date(updateData.completedAt);
       }
-      const updated = await storage.updateDraftingProgram(req.params.id, updateData);
+      const updated = await storage.updateDraftingProgram(String(req.params.id), updateData);
       if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });
       res.json(updated);
     } catch (error: any) {
@@ -4977,7 +4977,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      await storage.deleteDraftingProgram(req.params.id);
+      await storage.deleteDraftingProgram(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting drafting program entry:", error);
@@ -4987,7 +4987,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      const { jobId } = req.params;
+      const jobId = String(req.params.jobId);
       const deleted = await storage.deleteDraftingProgramByJob(jobId);
       res.json({ success: true, deleted });
     } catch (error: any) {
@@ -5019,7 +5019,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/suppliers/:id", requireAuth, async (req, res) => {
     try {
-      const supplier = await storage.getSupplier(req.params.id);
+      const supplier = await storage.getSupplier(String(req.params.id));
       if (!supplier) return res.status(404).json({ error: "Supplier not found" });
       res.json(supplier);
     } catch (error: any) {
@@ -5040,7 +5040,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.patch("/api/suppliers/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const supplier = await storage.updateSupplier(req.params.id, req.body);
+      const supplier = await storage.updateSupplier(String(req.params.id), req.body);
       if (!supplier) return res.status(404).json({ error: "Supplier not found" });
       res.json(supplier);
     } catch (error: any) {
@@ -5051,7 +5051,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
     try {
-      await storage.deleteSupplier(req.params.id);
+      await storage.deleteSupplier(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting supplier:", error);
@@ -5082,7 +5082,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/item-categories/:id", requireAuth, async (req, res) => {
     try {
-      const category = await storage.getItemCategory(req.params.id);
+      const category = await storage.getItemCategory(String(req.params.id));
       if (!category) return res.status(404).json({ error: "Category not found" });
       res.json(category);
     } catch (error: any) {
@@ -5103,7 +5103,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.patch("/api/item-categories/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const category = await storage.updateItemCategory(req.params.id, req.body);
+      const category = await storage.updateItemCategory(String(req.params.id), req.body);
       if (!category) return res.status(404).json({ error: "Category not found" });
       res.json(category);
     } catch (error: any) {
@@ -5114,7 +5114,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/item-categories/:id", requireRole("ADMIN"), async (req, res) => {
     try {
-      await storage.deleteItemCategory(req.params.id);
+      await storage.deleteItemCategory(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting category:", error);
@@ -5145,7 +5145,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/items/:id", requireAuth, async (req, res) => {
     try {
-      const item = await storage.getItem(req.params.id);
+      const item = await storage.getItem(String(req.params.id));
       if (!item) return res.status(404).json({ error: "Item not found" });
       res.json(item);
     } catch (error: any) {
@@ -5166,7 +5166,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.patch("/api/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const item = await storage.updateItem(req.params.id, req.body);
+      const item = await storage.updateItem(String(req.params.id), req.body);
       if (!item) return res.status(404).json({ error: "Item not found" });
       res.json(item);
     } catch (error: any) {
@@ -5177,7 +5177,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/items/:id", requireRole("ADMIN"), async (req, res) => {
     try {
-      await storage.deleteItem(req.params.id);
+      await storage.deleteItem(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting item:", error);
@@ -5319,7 +5319,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const order = await storage.getPurchaseOrder(String(req.params.id));
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
       res.json(order);
     } catch (error: any) {
@@ -5350,7 +5350,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const order = await storage.getPurchaseOrder(String(req.params.id));
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
       
       const userId = (req.session as any).userId;
@@ -5363,7 +5363,7 @@ Return ONLY valid JSON, no explanation text.`
       if (poData.supplierId === "") {
         poData.supplierId = null;
       }
-      const updated = await storage.updatePurchaseOrder(req.params.id, poData, lineItems);
+      const updated = await storage.updatePurchaseOrder(String(req.params.id), poData, lineItems);
       res.json(updated);
     } catch (error: any) {
       console.error("Error updating purchase order:", error);
@@ -5373,7 +5373,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => {
     try {
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const order = await storage.getPurchaseOrder(String(req.params.id));
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
       
       const userId = (req.session as any).userId;
@@ -5385,7 +5385,7 @@ Return ONLY valid JSON, no explanation text.`
         return res.status(400).json({ error: "Only draft POs can be submitted" });
       }
 
-      const submitted = await storage.submitPurchaseOrder(req.params.id);
+      const submitted = await storage.submitPurchaseOrder(String(req.params.id));
       res.json(submitted);
     } catch (error: any) {
       console.error("Error submitting purchase order:", error);
@@ -5395,7 +5395,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) => {
     try {
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const order = await storage.getPurchaseOrder(String(req.params.id));
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
       
       if (order.status !== "SUBMITTED") {
@@ -5422,7 +5422,7 @@ Return ONLY valid JSON, no explanation text.`
         }
       }
 
-      const approved = await storage.approvePurchaseOrder(req.params.id, userId);
+      const approved = await storage.approvePurchaseOrder(String(req.params.id), userId);
       res.json(approved);
     } catch (error: any) {
       console.error("Error approving purchase order:", error);
@@ -5432,7 +5432,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => {
     try {
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const order = await storage.getPurchaseOrder(String(req.params.id));
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
       
       if (order.status !== "SUBMITTED") {
@@ -5453,7 +5453,7 @@ Return ONLY valid JSON, no explanation text.`
         return res.status(400).json({ error: "Rejection reason is required" });
       }
 
-      const rejected = await storage.rejectPurchaseOrder(req.params.id, userId, reason);
+      const rejected = await storage.rejectPurchaseOrder(String(req.params.id), userId, reason);
       res.json(rejected);
     } catch (error: any) {
       console.error("Error rejecting purchase order:", error);
@@ -5463,7 +5463,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     try {
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const order = await storage.getPurchaseOrder(String(req.params.id));
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
       
       const userId = (req.session as any).userId;
@@ -5478,7 +5478,7 @@ Return ONLY valid JSON, no explanation text.`
         return res.status(400).json({ error: "Only draft POs can be deleted" });
       }
 
-      await storage.deletePurchaseOrder(req.params.id);
+      await storage.deletePurchaseOrder(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting purchase order:", error);
@@ -5490,7 +5490,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res) => {
     try {
-      const attachments = await storage.getPurchaseOrderAttachments(req.params.id);
+      const attachments = await storage.getPurchaseOrderAttachments(String(req.params.id));
       res.json(attachments);
     } catch (error: any) {
       console.error("Error fetching PO attachments:", error);
@@ -5506,7 +5506,8 @@ Return ONLY valid JSON, no explanation text.`
         return res.status(400).json({ error: "No files uploaded" });
       }
 
-      const order = await storage.getPurchaseOrder(req.params.id);
+      const poId = String(req.params.id);
+      const order = await storage.getPurchaseOrder(poId);
       if (!order) return res.status(404).json({ error: "Purchase order not found" });
 
       const fs = await import("fs/promises");
@@ -5518,13 +5519,13 @@ Return ONLY valid JSON, no explanation text.`
       for (const file of files) {
         const timestamp = Date.now();
         const safeFileName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, "_");
-        const fileName = `${req.params.id}_${timestamp}_${safeFileName}`;
+        const fileName = `${poId}_${timestamp}_${safeFileName}`;
         const filePath = path.join(uploadsDir, fileName);
         
         await fs.writeFile(filePath, file.buffer);
 
         const attachment = await storage.createPurchaseOrderAttachment({
-          purchaseOrderId: req.params.id,
+          purchaseOrderId: poId,
           fileName,
           originalName: file.originalname,
           mimeType: file.mimetype,
@@ -5544,7 +5545,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => {
     try {
-      const attachment = await storage.getPurchaseOrderAttachment(req.params.id);
+      const attachment = await storage.getPurchaseOrderAttachment(String(req.params.id));
       if (!attachment) return res.status(404).json({ error: "Attachment not found" });
 
       const fs = await import("fs");
@@ -5565,7 +5566,7 @@ Return ONLY valid JSON, no explanation text.`
     try {
       const userId = (req.session as any).userId;
       const user = await storage.getUser(userId);
-      const attachment = await storage.getPurchaseOrderAttachment(req.params.id);
+      const attachment = await storage.getPurchaseOrderAttachment(String(req.params.id));
       if (!attachment) return res.status(404).json({ error: "Attachment not found" });
 
       const order = await storage.getPurchaseOrder(attachment.purchaseOrderId);
@@ -5584,7 +5585,7 @@ Return ONLY valid JSON, no explanation text.`
         console.warn("Could not delete file from disk:", e);
       }
 
-      await storage.deletePurchaseOrderAttachment(req.params.id);
+      await storage.deletePurchaseOrderAttachment(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting attachment:", error);
@@ -5607,7 +5608,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
     try {
-      const group = await storage.getTaskGroup(req.params.id);
+      const group = await storage.getTaskGroup(String(req.params.id));
       if (!group) return res.status(404).json({ error: "Task group not found" });
       res.json(group);
     } catch (error: any) {
@@ -5628,7 +5629,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      const group = await storage.updateTaskGroup(req.params.id, req.body);
+      const group = await storage.updateTaskGroup(String(req.params.id), req.body);
       if (!group) return res.status(404).json({ error: "Task group not found" });
       res.json(group);
     } catch (error: any) {
@@ -5639,7 +5640,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      await storage.deleteTaskGroup(req.params.id);
+      await storage.deleteTaskGroup(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting task group:", error);
@@ -5664,7 +5665,7 @@ Return ONLY valid JSON, no explanation text.`
   // Tasks
   app.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
     try {
-      const task = await storage.getTask(req.params.id);
+      const task = await storage.getTask(String(req.params.id));
       if (!task) return res.status(404).json({ error: "Task not found" });
       res.json(task);
     } catch (error: any) {
@@ -5694,7 +5695,7 @@ Return ONLY valid JSON, no explanation text.`
       if (updateData.dueDate !== undefined) {
         updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
       }
-      const task = await storage.updateTask(req.params.id, updateData);
+      const task = await storage.updateTask(String(req.params.id), updateData);
       if (!task) return res.status(404).json({ error: "Task not found" });
       res.json(task);
     } catch (error: any) {
@@ -5705,7 +5706,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      await storage.deleteTask(req.params.id);
+      await storage.deleteTask(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting task:", error);
@@ -5730,7 +5731,7 @@ Return ONLY valid JSON, no explanation text.`
   // Task Assignees
   app.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), async (req, res) => {
     try {
-      const assignees = await storage.getTaskAssignees(req.params.id);
+      const assignees = await storage.getTaskAssignees(String(req.params.id));
       res.json(assignees);
     } catch (error: any) {
       console.error("Error fetching task assignees:", error);
@@ -5744,7 +5745,7 @@ Return ONLY valid JSON, no explanation text.`
       if (!Array.isArray(userIds)) {
         return res.status(400).json({ error: "userIds must be an array" });
       }
-      const assignees = await storage.setTaskAssignees(req.params.id, userIds);
+      const assignees = await storage.setTaskAssignees(String(req.params.id), userIds);
       res.json(assignees);
     } catch (error: any) {
       console.error("Error setting task assignees:", error);
@@ -5755,7 +5756,7 @@ Return ONLY valid JSON, no explanation text.`
   // Task Updates (Activity Log)
   app.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), async (req, res) => {
     try {
-      const updates = await storage.getTaskUpdates(req.params.id);
+      const updates = await storage.getTaskUpdates(String(req.params.id));
       res.json(updates);
     } catch (error: any) {
       console.error("Error fetching task updates:", error);
@@ -5766,7 +5767,7 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
       const userId = (req.session as any).userId;
-      const taskId = req.params.id;
+      const taskId = String(req.params.id);
       const update = await storage.createTaskUpdate({
         taskId,
         userId,
@@ -5807,7 +5808,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      await storage.deleteTaskUpdate(req.params.id);
+      await storage.deleteTaskUpdate(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting task update:", error);
@@ -5818,7 +5819,7 @@ Return ONLY valid JSON, no explanation text.`
   // Task Files
   app.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), async (req, res) => {
     try {
-      const files = await storage.getTaskFiles(req.params.id);
+      const files = await storage.getTaskFiles(String(req.params.id));
       res.json(files);
     } catch (error: any) {
       console.error("Error fetching task files:", error);
@@ -5839,7 +5840,7 @@ Return ONLY valid JSON, no explanation text.`
       const dataUrl = `data:${file.mimetype};base64,${base64}`;
 
       const taskFile = await storage.createTaskFile({
-        taskId: req.params.id,
+        taskId: String(req.params.id),
         fileName: file.originalname,
         fileUrl: dataUrl,
         fileSize: file.size,
@@ -5855,7 +5856,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
     try {
-      await storage.deleteTaskFile(req.params.id);
+      await storage.deleteTaskFile(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error deleting task file:", error);
@@ -5889,14 +5890,14 @@ Return ONLY valid JSON, no explanation text.`
   app.post("/api/task-notifications/:id/read", requireAuth, async (req, res) => {
     try {
       const userId = (req.session as any).userId;
-      const notification = await storage.getTaskNotificationById(req.params.id);
+      const notification = await storage.getTaskNotificationById(String(req.params.id));
       if (!notification) {
         return res.status(404).json({ error: "Notification not found" });
       }
       if (notification.userId !== userId) {
         return res.status(403).json({ error: "Not authorized to mark this notification" });
       }
-      await storage.markTaskNotificationRead(req.params.id);
+      await storage.markTaskNotificationRead(String(req.params.id));
       res.json({ success: true });
     } catch (error: any) {
       console.error("Error marking notification read:", error);
@@ -6214,11 +6215,12 @@ Return ONLY valid JSON, no explanation text.`
 
   app.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
     try {
-      const factory = await db.select().from(factories).where(eq(factories.id, req.params.id)).limit(1);
+      const factoryId = String(req.params.id);
+      const factory = await db.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
       if (factory.length === 0) {
         return res.status(404).json({ error: "Factory not found" });
       }
-      const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, req.params.id)).orderBy(productionBeds.name);
+      const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, factoryId)).orderBy(productionBeds.name);
       res.json({ ...factory[0], beds });
     } catch (error: any) {
       console.error("Error fetching factory:", error);
@@ -6240,9 +6242,10 @@ Return ONLY valid JSON, no explanation text.`
   app.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
     try {
       const { beds, ...factoryData } = req.body;
+      const factoryId = String(req.params.id);
       const [updated] = await db.update(factories)
         .set({ ...factoryData, updatedAt: new Date() })
-        .where(eq(factories.id, req.params.id))
+        .where(eq(factories.id, factoryId))
         .returning();
       if (!updated) {
         return res.status(404).json({ error: "Factory not found" });
@@ -6256,7 +6259,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
     try {
-      const [deleted] = await db.delete(factories).where(eq(factories.id, req.params.id)).returning();
+      const [deleted] = await db.delete(factories).where(eq(factories.id, String(req.params.id))).returning();
       if (!deleted) {
         return res.status(404).json({ error: "Factory not found" });
       }
@@ -6270,7 +6273,7 @@ Return ONLY valid JSON, no explanation text.`
   // Production Beds Routes
   app.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
     try {
-      const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, req.params.factoryId)).orderBy(productionBeds.name);
+      const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name);
       res.json(beds);
     } catch (error: any) {
       console.error("Error fetching production beds:", error);
@@ -6280,7 +6283,7 @@ Return ONLY valid JSON, no explanation text.`
 
   app.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
     try {
-      const parsed = insertProductionBedSchema.parse({ ...req.body, factoryId: req.params.factoryId });
+      const parsed = insertProductionBedSchema.parse({ ...req.body, factoryId: String(req.params.factoryId) });
       const [created] = await db.insert(productionBeds).values(parsed).returning();
       res.json(created);
     } catch (error: any) {
@@ -6293,7 +6296,7 @@ Return ONLY valid JSON, no explanation text.`
     try {
       const [updated] = await db.update(productionBeds)
         .set({ ...req.body, updatedAt: new Date() })
-        .where(and(eq(productionBeds.id, req.params.bedId), eq(productionBeds.factoryId, req.params.factoryId)))
+        .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
         .returning();
       if (!updated) {
         return res.status(404).json({ error: "Production bed not found" });
@@ -6308,7 +6311,7 @@ Return ONLY valid JSON, no explanation text.`
   app.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
     try {
       const [deleted] = await db.delete(productionBeds)
-        .where(and(eq(productionBeds.id, req.params.bedId), eq(productionBeds.factoryId, req.params.factoryId)))
+        .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
         .returning();
       if (!deleted) {
         return res.status(404).json({ error: "Production bed not found" });
@@ -6595,7 +6598,7 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   app.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), async (req, res) => {
-    const { calendarType } = req.params;
+    const calendarType = String(req.params.calendarType);
 
     if (!["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType)) {
       return res.status(400).json({ error: "Invalid calendar type" });

@@ -20,7 +20,7 @@ export function registerAudioRoutes(app: Express): void {
   // Get single conversation with messages
   app.get("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = String(req.params.id);
       const conversation = await chatStorage.getConversation(id);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
@@ -48,7 +48,7 @@ export function registerAudioRoutes(app: Express): void {
   // Delete conversation
   app.delete("/api/conversations/:id", async (req: Request, res: Response) => {
     try {
-      const id = parseInt(req.params.id);
+      const id = String(req.params.id);
       await chatStorage.deleteConversation(id);
       res.status(204).send();
     } catch (error) {
@@ -62,7 +62,7 @@ export function registerAudioRoutes(app: Express): void {
   // Uses gpt-4o-mini-transcribe for STT, gpt-audio for voice response
   app.post("/api/conversations/:id/messages", audioBodyParser, async (req: Request, res: Response) => {
     try {
-      const conversationId = parseInt(req.params.id);
+      const conversationId = String(req.params.id);
       const { audio, voice = "alloy" } = req.body;
 
       if (!audio) {
@@ -82,8 +82,8 @@ export function registerAudioRoutes(app: Express): void {
       // 4. Get conversation history
       const existingMessages = await chatStorage.getMessagesByConversation(conversationId);
       const chatHistory = existingMessages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
+        role: (m.senderId === "user" ? "user" : "assistant") as "user" | "assistant",
+        content: m.body || "",
       }));
 
       // 5. Set up SSE
@@ -119,7 +119,7 @@ export function registerAudioRoutes(app: Express): void {
       }
 
       // 7. Save assistant message
-      await chatStorage.createMessage(conversationId, "assistant", assistantTranscript);
+      await chatStorage.createMessage(String(conversationId), "assistant", assistantTranscript);
 
       res.write(`data: ${JSON.stringify({ type: "done", transcript: assistantTranscript })}\n\n`);
       res.end();

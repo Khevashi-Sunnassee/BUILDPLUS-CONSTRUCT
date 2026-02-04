@@ -284,11 +284,11 @@ export default function DraftingProgramPage() {
     }
   }, [groupBy, filteredPrograms.length]);
 
-  const uniqueAssignees = [...new Map(
+  const uniqueAssignees = Array.from(new Map(
     programs
       .filter(p => p.assignedTo)
-      .map(p => [p.assignedToId, p.assignedTo])
-  ).values()];
+      .map(p => [p.assignedToId, p.assignedTo] as const)
+  ).values());
 
   return (
     <div className="space-y-6 p-6">

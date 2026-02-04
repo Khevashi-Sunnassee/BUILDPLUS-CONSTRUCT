@@ -1258,8 +1258,8 @@ export default function ProductionSlotsPage() {
   };
   
   // Get unique panel types and statuses for filter dropdowns
-  const uniquePanelTypes = [...new Set(panelsForSlot.map(p => p.panelType || "Unknown"))].sort();
-  const uniquePanelStatuses = [...new Set(panelsForSlot.map(p => p.status || "NOT_STARTED"))].sort();
+  const uniquePanelTypes = Array.from(new Set(panelsForSlot.map(p => p.panelType || "Unknown"))).sort();
+  const uniquePanelStatuses = Array.from(new Set(panelsForSlot.map(p => p.status || "NOT_STARTED"))).sort();
   
   // Filter and group panels
   const filteredPanels = panelsForSlot.filter(panel => {
@@ -1294,7 +1294,7 @@ export default function ProductionSlotsPage() {
   // Expand all panel type groups when dialog opens
   useEffect(() => {
     if (showPanelBreakdownDialog && panelsForSlot.length > 0) {
-      const types = [...new Set(panelsForSlot.map(p => p.panelType || "Unknown"))];
+      const types = Array.from(new Set(panelsForSlot.map(p => p.panelType || "Unknown")));
       setExpandedPanelTypes(new Set(types));
     }
   }, [showPanelBreakdownDialog, panelsForSlot]);

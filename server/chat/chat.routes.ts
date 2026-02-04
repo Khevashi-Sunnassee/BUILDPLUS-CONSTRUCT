@@ -618,7 +618,7 @@ chatRouter.post("/panels/counts", requireAuth, requireChatPermission, async (req
 chatRouter.delete("/conversations/:conversationId", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const { conversationId } = req.params;
+    const conversationId = String(req.params.conversationId);
 
     const membership = await db
       .select()
@@ -644,7 +644,8 @@ chatRouter.delete("/conversations/:conversationId", requireAuth, requireChatPerm
 chatRouter.delete("/conversations/:conversationId/messages/:messageId", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const { conversationId, messageId } = req.params;
+    const conversationId = String(req.params.conversationId);
+    const messageId = String(req.params.messageId);
 
     const message = await db
       .select()
@@ -679,7 +680,8 @@ chatRouter.delete("/conversations/:conversationId/messages/:messageId", requireA
 chatRouter.patch("/conversations/:conversationId/messages/:messageId", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const { conversationId, messageId } = req.params;
+    const conversationId = String(req.params.conversationId);
+    const messageId = String(req.params.messageId);
     const { body } = req.body;
 
     if (!body || typeof body !== "string") {

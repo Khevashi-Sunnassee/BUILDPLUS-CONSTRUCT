@@ -1854,13 +1854,13 @@ export default function AdminPanelsPage() {
                                 {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
                                   <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                                     <MessageCircle className="h-3 w-3" />
-                                    {panelCounts[panel.id].messageCount}
+                                    {panelCounts?.[panel.id]?.messageCount}
                                   </Badge>
                                 )}
                                 {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
                                   <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
                                     <FileTextIcon className="h-3 w-3" />
-                                    {panelCounts[panel.id].documentCount}
+                                    {panelCounts?.[panel.id]?.documentCount}
                                   </Badge>
                                 )}
                               </div>
@@ -1990,13 +1990,13 @@ export default function AdminPanelsPage() {
                                 {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
                                   <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                                     <MessageCircle className="h-3 w-3" />
-                                    {panelCounts[panel.id].messageCount}
+                                    {panelCounts?.[panel.id]?.messageCount}
                                   </Badge>
                                 )}
                                 {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
                                   <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
                                     <FileTextIcon className="h-3 w-3" />
-                                    {panelCounts[panel.id].documentCount}
+                                    {panelCounts?.[panel.id]?.documentCount}
                                   </Badge>
                                 )}
                               </div>
@@ -2145,13 +2145,13 @@ export default function AdminPanelsPage() {
                                 {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
                                   <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                                     <MessageCircle className="h-3 w-3" />
-                                    {panelCounts[panel.id].messageCount}
+                                    {panelCounts?.[panel.id]?.messageCount}
                                   </Badge>
                                 )}
                                 {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
                                   <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
                                     <FileTextIcon className="h-3 w-3" />
-                                    {panelCounts[panel.id].documentCount}
+                                    {panelCounts?.[panel.id]?.documentCount}
                                   </Badge>
                                 )}
                               </div>
@@ -2273,13 +2273,13 @@ export default function AdminPanelsPage() {
                           {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
                             <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                               <MessageCircle className="h-3 w-3" />
-                              {panelCounts[panel.id].messageCount}
+                              {panelCounts?.[panel.id]?.messageCount}
                             </Badge>
                           )}
                           {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
                             <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
                               <FileTextIcon className="h-3 w-3" />
-                              {panelCounts[panel.id].documentCount}
+                              {panelCounts?.[panel.id]?.documentCount}
                             </Badge>
                           )}
                         </div>
@@ -3486,7 +3486,7 @@ export default function AdminPanelsPage() {
                       const svgData = new XMLSerializer().serializeToString(svg);
                       const canvas = document.createElement('canvas');
                       const ctx = canvas.getContext('2d');
-                      const img = new Image();
+                      const img = document.createElement('img');
                       img.onload = () => {
                         canvas.width = img.width;
                         canvas.height = img.height;

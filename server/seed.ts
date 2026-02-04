@@ -40,14 +40,12 @@ export async function seedDatabase() {
   if (existingTrailerTypes.length === 0) {
     await db.insert(trailerTypes).values([
       {
-        code: "LAYOVER",
         name: "Layover",
         description: "Flat deck trailer with panels laying flat",
         sortOrder: 1,
         isActive: true,
       },
       {
-        code: "A_FRAME",
         name: "A-Frame",
         description: "A-frame trailer with panels standing upright",
         sortOrder: 2,

@@ -3,5 +3,5 @@ export function extractMentionUserIds(body: string): string[] {
   const ids = new Set<string>();
   let match: RegExpExecArray | null;
   while ((match = regex.exec(body)) !== null) ids.add(match[1]);
-  return [...ids];
+  return Array.from(ids);
 }
