@@ -4857,7 +4857,14 @@ Return ONLY valid JSON, no explanation text.`
   app.get("/api/drafting-program/my-allocated", requireAuth, requirePermission("daily_reports", "VIEW"), async (req, res) => {
     try {
       const userId = req.session.userId!;
-      const programs = await storage.getDraftingPrograms({ assignedToId: userId });
+      
+      // Get user's selected factory IDs for filtering
+      const user = await storage.getUser(userId);
+      const factoryIds = (user?.selectedFactoryIds && user.selectedFactoryIds.length > 0) 
+        ? user.selectedFactoryIds 
+        : undefined;
+      
+      const programs = await storage.getDraftingPrograms({ assignedToId: userId, factoryIds });
       
       const completed = programs.filter(p => p.status === "COMPLETED");
       const inProgress = programs.filter(p => p.status === "IN_PROGRESS");
