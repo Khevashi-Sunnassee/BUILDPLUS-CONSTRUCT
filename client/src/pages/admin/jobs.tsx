@@ -212,6 +212,10 @@ export default function AdminJobsPage() {
   const [originalDaysInAdvance, setOriginalDaysInAdvance] = useState<number | null>(null);
   const [daysInAdvanceChanged, setDaysInAdvanceChanged] = useState(false);
   const [daysInAdvanceConfirmOpen, setDaysInAdvanceConfirmOpen] = useState(false);
+  
+  // Onsite date change confirmation state
+  const [originalOnsiteDate, setOriginalOnsiteDate] = useState<string | null>(null);
+  const [onsiteDateChanged, setOnsiteDateChanged] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -338,11 +342,12 @@ export default function AdminJobsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       toast({ title: "Job updated successfully" });
       
-      // Check if we need to show days in advance regeneration dialog
-      if (daysInAdvanceChanged && productionSlotStatus?.hasSlots) {
+      // Check if we need to show days in advance or onsite date regeneration dialog
+      if ((daysInAdvanceChanged || onsiteDateChanged) && productionSlotStatus?.hasSlots) {
         setPendingJobId(variables.id);
         setDaysInAdvanceConfirmOpen(true);
         setDaysInAdvanceChanged(false);
+        setOnsiteDateChanged(false);
         return;
       }
       
@@ -689,6 +694,10 @@ export default function AdminJobsPage() {
     // Capture original days in advance for change detection
     setOriginalDaysInAdvance(job.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14);
     setDaysInAdvanceChanged(false);
+    
+    // Capture original onsite date for change detection
+    setOriginalOnsiteDate(job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : null);
+    setOnsiteDateChanged(false);
     
     // Load level cycle times in background
     setLevelCycleTimes([]);
@@ -1505,7 +1514,20 @@ export default function AdminJobsPage() {
                       <FormItem>
                         <FormLabel>Onsite Start Date</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} data-testid="input-job-production-start-date" />
+                          <Input 
+                            type="date" 
+                            {...field} 
+                            onBlur={(e) => {
+                              field.onBlur();
+                              if (editingJob) {
+                                const newValue = e.target.value || null;
+                                if (newValue !== originalOnsiteDate) {
+                                  setOnsiteDateChanged(true);
+                                }
+                              }
+                            }}
+                            data-testid="input-job-production-start-date" 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -2335,7 +2357,7 @@ export default function AdminJobsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  Changing the "Days in Advance" setting will affect how production slots relate to site delivery dates.
+                  Changing production settings (Onsite Start Date or IFC Days in Advance) will affect all production and drafting dates.
                 </p>
                 <p>
                   This will regenerate the production slots and update the drafting program dates accordingly.
