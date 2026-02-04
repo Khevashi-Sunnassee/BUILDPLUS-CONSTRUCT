@@ -768,17 +768,30 @@ export default function AdminJobsPage() {
   // Regenerate levels based on job settings
   const regenerateLevelsMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      const response = await fetch(`/api/admin/jobs/${jobId}/generate-levels`);
-      if (!response.ok) {
-        const error = await response.json();
+      // First generate the levels
+      const generateResponse = await fetch(`/api/admin/jobs/${jobId}/generate-levels`);
+      if (!generateResponse.ok) {
+        const error = await generateResponse.json();
         throw new Error(error.error || "Failed to generate levels");
       }
-      return response.json();
+      const generatedLevels = await generateResponse.json();
+      
+      // Then save them to the database
+      const saveResponse = await apiRequest("POST", `/api/admin/jobs/${jobId}/level-cycle-times`, { 
+        cycleTimes: generatedLevels 
+      });
+      if (!saveResponse.ok) {
+        const error = await saveResponse.json();
+        throw new Error(error.error || "Failed to save level cycle times");
+      }
+      
+      return generatedLevels;
     },
     onSuccess: (data) => {
       setLevelCycleTimes(data);
+      setHasExistingLevelCycleTimes(true);
       setLevelChangeConfirmOpen(false);
-      toast({ title: "Level cycle times updated" });
+      toast({ title: "Level cycle times regenerated and saved" });
       
       // Check if we also need to show production slots dialog
       if (productionSlotStatus?.hasSlots) {
