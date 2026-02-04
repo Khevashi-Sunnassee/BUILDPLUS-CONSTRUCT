@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -168,7 +168,7 @@ export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
   buildingNumber: integer("building_number").notNull().default(1),
   level: text("level").notNull(),
-  levelOrder: integer("level_order").notNull(),
+  levelOrder: real("level_order").notNull(),
   cycleDays: integer("cycle_days").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -182,7 +182,7 @@ export const productionSlots = pgTable("production_slots", {
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   buildingNumber: integer("building_number").default(1),
   level: text("level").notNull(),
-  levelOrder: integer("level_order").notNull(),
+  levelOrder: real("level_order").notNull(),
   panelCount: integer("panel_count").default(0),
   productionSlotDate: timestamp("production_slot_date").notNull(),
   status: productionSlotStatusEnum("status").default("SCHEDULED").notNull(),
