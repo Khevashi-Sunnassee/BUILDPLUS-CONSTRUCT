@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, addDays } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -705,28 +705,50 @@ export default function PurchaseOrderFormPage() {
                 <div>
                   <Label className="text-sm font-medium">Required By Date</Label>
                   {canEdit ? (
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                          data-testid="button-required-date"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {form.watch("requiredByDate") 
-                            ? format(form.watch("requiredByDate")!, "dd/MM/yyyy")
-                            : "Select date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={form.watch("requiredByDate") || undefined}
-                          onSelect={(date) => form.setValue("requiredByDate", date || null)}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                    <>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal"
+                            data-testid="button-required-date"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {form.watch("requiredByDate") 
+                              ? format(form.watch("requiredByDate")!, "dd/MM/yyyy")
+                              : "Select date"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={form.watch("requiredByDate") || undefined}
+                            onSelect={(date) => form.setValue("requiredByDate", date || null)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {[7, 14, 30, 45].map((days) => {
+                          const targetDate = addDays(new Date(), days);
+                          const currentDate = form.watch("requiredByDate");
+                          const isSelected = currentDate && 
+                            format(currentDate, "yyyy-MM-dd") === format(targetDate, "yyyy-MM-dd");
+                          return (
+                            <Button
+                              key={days}
+                              type="button"
+                              variant={isSelected ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => form.setValue("requiredByDate", targetDate)}
+                              data-testid={`button-quick-date-${days}`}
+                            >
+                              {days} days
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    </>
                   ) : (
                     <p className="mt-1">
                       {existingPO?.requiredByDate 
@@ -978,20 +1000,27 @@ export default function PurchaseOrderFormPage() {
             </div>
           </div>
 
-          {!isNew && (
-            <>
-              <Separator />
-              <div className="print:hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="h-5 w-5" />
-                    <h3 className="text-lg font-medium">Attachments</h3>
-                    {attachments.length > 0 && (
-                      <Badge variant="secondary">{attachments.length}</Badge>
-                    )}
-                  </div>
-                </div>
+          <Separator />
+          <div className="print:hidden">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                <h3 className="text-lg font-medium">Attachments</h3>
+                {!isNew && attachments.length > 0 && (
+                  <Badge variant="secondary">{attachments.length}</Badge>
+                )}
+              </div>
+            </div>
 
+            {isNew ? (
+              <div className="border-2 border-dashed rounded-lg p-6 text-center border-muted-foreground/25">
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  Save the purchase order first to upload attachments
+                </p>
+              </div>
+            ) : (
+              <>
                 <div
                   className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
                     isDragging
@@ -1076,9 +1105,9 @@ export default function PurchaseOrderFormPage() {
                     ))}
                   </div>
                 )}
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
 
           {isApproved && existingPO?.approvedBy && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
