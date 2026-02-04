@@ -787,7 +787,7 @@ export async function registerRoutes(
       const cycleTimeSchema = z.object({
         buildingNumber: z.number().int().min(1),
         level: z.string().min(1),
-        levelOrder: z.number().int().min(0),
+        levelOrder: z.number().min(0),
         cycleDays: z.number().int().min(1),
       });
       
