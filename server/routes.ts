@@ -6344,6 +6344,72 @@ Return ONLY valid JSON, no explanation text.`
     ],
   };
 
+  // Function to sync all CFMEU calendars (used for startup and scheduled sync)
+  async function syncAllCfmeuCalendars(): Promise<Record<string, { imported: number; skipped: number }>> {
+    const results: Record<string, { imported: number; skipped: number }> = {};
+    console.log("[CFMEU] Starting automatic calendar sync...");
+
+    for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
+      const urls = CFMEU_CALENDAR_URLS[calendarType];
+      let totalImported = 0;
+      let totalSkipped = 0;
+
+      for (const { url, years } of urls) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.error(`[CFMEU] Failed to fetch ${calendarType} from ${url}: ${response.status}`);
+            continue;
+          }
+          const icsContent = await response.text();
+          const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+          totalImported += result.imported;
+          totalSkipped += result.skipped;
+        } catch (err) {
+          console.error(`[CFMEU] Error fetching ${calendarType}:`, err);
+        }
+      }
+
+      results[calendarType] = { imported: totalImported, skipped: totalSkipped };
+      console.log(`[CFMEU] Synced ${calendarType}: ${totalImported} holidays imported, ${totalSkipped} skipped`);
+    }
+
+    console.log("[CFMEU] Automatic calendar sync complete");
+    return results;
+  }
+
+  // Schedule monthly calendar sync (runs on the 1st of each month at midnight)
+  function scheduleMonthlyCalendarSync() {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+    const msUntilNextMonth = nextMonth.getTime() - now.getTime();
+
+    console.log(`[CFMEU] Next scheduled sync: ${nextMonth.toISOString()}`);
+
+    setTimeout(async () => {
+      try {
+        await syncAllCfmeuCalendars();
+      } catch (err) {
+        console.error("[CFMEU] Scheduled sync failed:", err);
+      }
+      // Schedule the next month's sync
+      scheduleMonthlyCalendarSync();
+    }, msUntilNextMonth);
+  }
+
+  // Sync calendars on startup (with a short delay to allow server to initialize)
+  setTimeout(async () => {
+    try {
+      await syncAllCfmeuCalendars();
+      // Start the monthly schedule after initial sync
+      scheduleMonthlyCalendarSync();
+    } catch (err) {
+      console.error("[CFMEU] Startup sync failed:", err);
+      // Still schedule monthly sync even if startup fails
+      scheduleMonthlyCalendarSync();
+    }
+  }, 5000); // 5 second delay after startup
+
   async function parseIcsAndSaveHolidays(
     calendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD",
     icsContent: string,
