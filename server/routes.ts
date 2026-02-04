@@ -4695,7 +4695,7 @@ Return ONLY valid JSON, no explanation text.`
   // Production Slots Routes
   app.get("/api/production-slots", requireAuth, async (req, res) => {
     try {
-      const { jobId, status, dateFrom, dateTo } = req.query;
+      const { jobId, status, dateFrom, dateTo, factoryId } = req.query;
       const filters: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] } = {};
       if (jobId) filters.jobId = jobId as string;
       if (status) filters.status = status as string;
@@ -4704,8 +4704,28 @@ Return ONLY valid JSON, no explanation text.`
       
       // Get user's selected factory IDs for filtering
       const user = await storage.getUser(req.session.userId!);
-      if (user?.selectedFactoryIds && user.selectedFactoryIds.length > 0) {
-        filters.factoryIds = user.selectedFactoryIds;
+      const userFactoryIds = user?.selectedFactoryIds && user.selectedFactoryIds.length > 0 
+        ? user.selectedFactoryIds 
+        : undefined;
+      
+      // If specific factoryId is provided in query, use it (within user's allowed factories)
+      if (factoryId) {
+        const requestedFactoryId = factoryId as string;
+        // If user has factory preferences, only allow filtering to their selected factories
+        if (userFactoryIds) {
+          if (userFactoryIds.includes(requestedFactoryId)) {
+            filters.factoryIds = [requestedFactoryId];
+          } else {
+            // Factory not in user's allowed list - return empty
+            filters.factoryIds = [];
+          }
+        } else {
+          // No user preferences - allow any factory
+          filters.factoryIds = [requestedFactoryId];
+        }
+      } else if (userFactoryIds) {
+        // No specific factory filter, but apply user's preferences
+        filters.factoryIds = userFactoryIds;
       }
       
       const slots = await storage.getProductionSlots(filters);

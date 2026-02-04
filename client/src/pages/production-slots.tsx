@@ -61,6 +61,7 @@ export default function ProductionSlotsPage() {
   
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [jobFilter, setJobFilter] = useState<string>("all");
+  const [factoryFilter, setFactoryFilter] = useState<string>("all");
   const [dateFromFilter, setDateFromFilter] = useState<string>("");
   const [dateToFilter, setDateToFilter] = useState<string>("");
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
@@ -106,11 +107,12 @@ export default function ProductionSlotsPage() {
   const [showDraftingWarningDialog, setShowDraftingWarningDialog] = useState(false);
 
   const { data: slots = [], isLoading: loadingSlots } = useQuery<ProductionSlotWithDetails[]>({
-    queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
+    queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, factoryId: factoryFilter !== "all" ? factoryFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter !== "ALL") params.append("status", statusFilter);
       if (jobFilter !== "all") params.append("jobId", jobFilter);
+      if (factoryFilter !== "all") params.append("factoryId", factoryFilter);
       if (dateFromFilter) params.append("dateFrom", dateFromFilter);
       if (dateToFilter) params.append("dateTo", dateToFilter);
       const response = await fetch(`/api/production-slots?${params.toString()}`);
@@ -604,7 +606,7 @@ export default function ProductionSlotsPage() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <Label>Status</Label>
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
@@ -630,6 +632,20 @@ export default function ProductionSlotsPage() {
                   <SelectItem value="all">All Jobs</SelectItem>
                   {allJobs.map((job: any) => (
                     <SelectItem key={job.id} value={job.id}>{job.jobNumber} - {job.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Factory</Label>
+              <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+                <SelectTrigger data-testid="select-factory-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Factories</SelectItem>
+                  {factories.filter(f => f.isActive).map((factory) => (
+                    <SelectItem key={factory.id} value={factory.id}>{factory.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
