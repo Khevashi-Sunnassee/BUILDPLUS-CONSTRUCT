@@ -1329,39 +1329,7 @@ export default function AdminJobsPage() {
                       )}
                     />
                   </div>
-                  <FormField
-                    control={jobForm.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea placeholder="Job description" {...field} data-testid="input-job-description" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="production" className="mt-4">
-              <div className="space-y-4">
-                <h3 className="font-medium text-sm text-muted-foreground">Production Configuration</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={jobForm.control}
-                      name="craneCapacity"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Crane Capacity</FormLabel>
-                          <FormControl>
-                            <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                     <FormField
                       control={jobForm.control}
                       name="numberOfBuildings"
@@ -1383,32 +1351,90 @@ export default function AdminJobsPage() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={jobForm.control}
+                      name="levels"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Levels</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="e.g. Ground,L1,L2,L3,Roof" 
+                              {...field} 
+                              onChange={(e) => {
+                                field.onChange(e);
+                                const levelsValue = e.target.value;
+                                const levelsCount = parseInt(levelsValue, 10);
+                                const lowestLevel = parseInt(jobForm.getValues("lowestLevel") || "0", 10);
+                                if (!isNaN(levelsCount) && levelsCount > 0 && !isNaN(lowestLevel)) {
+                                  const calculatedHighest = lowestLevel + levelsCount - 1;
+                                  jobForm.setValue("highestLevel", String(calculatedHighest));
+                                }
+                                handleLevelFieldChange();
+                              }}
+                              data-testid="input-job-levels" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Comma-separated list of level names</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                   <FormField
                     control={jobForm.control}
-                    name="levels"
+                    name="projectManagerId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Levels</FormLabel>
+                        <FormLabel>Project Manager</FormLabel>
+                        <Select 
+                          onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                          value={field.value || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-job-project-manager">
+                              <SelectValue placeholder="Select project manager" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No Project Manager</SelectItem>
+                            {users?.map((user) => (
+                              <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={jobForm.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Description</FormLabel>
                         <FormControl>
-                          <Input 
-                            placeholder="e.g. Ground,L1,L2,L3,Roof" 
-                            {...field} 
-                            onChange={(e) => {
-                              field.onChange(e);
-                              const levelsValue = e.target.value;
-                              const levelsCount = parseInt(levelsValue, 10);
-                              const lowestLevel = parseInt(jobForm.getValues("lowestLevel") || "0", 10);
-                              if (!isNaN(levelsCount) && levelsCount > 0 && !isNaN(lowestLevel)) {
-                                const calculatedHighest = lowestLevel + levelsCount - 1;
-                                jobForm.setValue("highestLevel", String(calculatedHighest));
-                              }
-                              handleLevelFieldChange();
-                            }}
-                            data-testid="input-job-levels" 
-                          />
+                          <Textarea placeholder="Job description" {...field} data-testid="input-job-description" />
                         </FormControl>
-                        <p className="text-xs text-muted-foreground">Comma-separated list of level names</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="production" className="mt-4">
+              <div className="space-y-4">
+                <h3 className="font-medium text-sm text-muted-foreground">Production Configuration</h3>
+                  <FormField
+                    control={jobForm.control}
+                    name="craneCapacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Crane Capacity</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. 50T" {...field} data-testid="input-job-crane-capacity" />
+                        </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -1603,32 +1629,6 @@ export default function AdminJobsPage() {
                       )}
                     />
                   </div>
-                  <FormField
-                    control={jobForm.control}
-                    name="projectManagerId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Project Manager</FormLabel>
-                        <Select 
-                          onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
-                          value={field.value || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-job-project-manager">
-                              <SelectValue placeholder="Select project manager" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">No Project Manager</SelectItem>
-                            {users?.map((user) => (
-                              <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={jobForm.control}
                     name="productionSlotColor"
