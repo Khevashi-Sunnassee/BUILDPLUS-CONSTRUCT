@@ -404,7 +404,7 @@ export interface IStorage {
   getWeeklyWageReport(id: string): Promise<WeeklyWageReport | undefined>;
   getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string): Promise<WeeklyWageReport | undefined>;
   getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string): Promise<WeeklyWageReport | undefined>;
-  createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport>;
+  createWeeklyWageReport(data: InsertWeeklyWageReport & { createdById: string }): Promise<WeeklyWageReport>;
   updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined>;
   deleteWeeklyWageReport(id: string): Promise<void>;
 
@@ -2017,7 +2017,7 @@ export class DatabaseStorage implements IStorage {
     return report;
   }
 
-  async createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport> {
+  async createWeeklyWageReport(data: InsertWeeklyWageReport & { createdById: string }): Promise<WeeklyWageReport> {
     const [report] = await db.insert(weeklyWageReports).values(data).returning();
     return report;
   }

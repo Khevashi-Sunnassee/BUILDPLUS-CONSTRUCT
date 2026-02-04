@@ -1165,8 +1165,7 @@ export async function registerRoutes(
         });
       
       // Add existing cycle days or default (use expectedCycleTimePerFloor to match slot generation)
-      const globalSettings = await storage.getGlobalSettings();
-      const defaultCycleDays = job?.expectedCycleTimePerFloor ?? globalSettings?.productionCycleDays ?? 3;
+      const defaultCycleDays = job?.expectedCycleTimePerFloor ?? 3;
       
       const result = levels.map(l => ({
         ...l,
@@ -1203,8 +1202,7 @@ export async function registerRoutes(
         existingCycleTimes.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays])
       );
       
-      const globalSettings = await storage.getGlobalSettings();
-      const defaultCycleDays = job.expectedCycleTimePerFloor ?? globalSettings?.productionCycleDays ?? 3;
+      const defaultCycleDays = job.expectedCycleTimePerFloor ?? 3;
       
       // Generate levels for each building
       const result: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[] = [];
@@ -1333,7 +1331,6 @@ export async function registerRoutes(
       // Get related data
       const job = panel.jobId ? await storage.getJob(panel.jobId) : null;
       const panelType = panel.panelType ? await storage.getPanelType(panel.panelType) : null;
-      const zone = panel.currentZone ? await storage.getZone(panel.currentZone) : null;
       
       // Get production entry if exists
       const productionEntry = await storage.getProductionEntryByPanelId(panel.id);
@@ -1350,8 +1347,8 @@ export async function registerRoutes(
         createdBy: null,
       });
       
-      // Document validation - only if documentStatus indicates it was validated
-      if (panel.documentStatus === "VALIDATED" || panel.documentStatus === "APPROVED") {
+      // Document validation - only if documentStatus indicates it was approved
+      if (panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED") {
         history.push({
           id: `${panel.id}-validated`,
           action: "STATUS_CHANGED",
@@ -1383,17 +1380,6 @@ export async function registerRoutes(
         }
       }
       
-      // Zone assignment - only if there's actually a zone assigned
-      if (zone && panel.currentZone) {
-        history.push({
-          id: `${panel.id}-zone`,
-          action: "ZONE_CHANGED",
-          description: `Assigned to zone: ${zone.name}`,
-          createdAt: panel.updatedAt?.toISOString() || new Date().toISOString(),
-          createdBy: null,
-        });
-      }
-      
       // Sort history by date
       history.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       
@@ -1404,14 +1390,14 @@ export async function registerRoutes(
         panelTypeName: panelType?.name || null,
         status: panel.status,
         documentStatus: panel.documentStatus,
-        currentZone: panel.currentZone,
-        zoneName: zone?.name || null,
+        currentZone: null,
+        zoneName: null,
         level: panel.level,
         loadWidth: panel.loadWidth,
         loadHeight: panel.loadHeight,
         panelThickness: panel.panelThickness,
-        estimatedVolume: panel.estimatedVolume,
-        estimatedWeight: panel.estimatedWeight,
+        estimatedVolume: panel.panelVolume,
+        estimatedWeight: panel.panelMass,
         jobNumber: job?.jobNumber || null,
         jobName: job?.name || null,
         productionDate: productionEntry?.productionDate || null,
@@ -2483,8 +2469,8 @@ export async function registerRoutes(
             userId: req.session.userId!,
           });
           
-          // Update panel status to BOOKED
-          await storage.updatePanelRegisterItem(assignment.panelId, { status: "BOOKED" });
+          // Update panel status to IN_PROGRESS (booked for production)
+          await storage.updatePanelRegisterItem(assignment.panelId, { status: "IN_PROGRESS" });
           
           results.created++;
         } catch (err: any) {
