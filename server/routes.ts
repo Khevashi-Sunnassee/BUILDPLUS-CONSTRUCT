@@ -10,7 +10,7 @@ import {
   conversations, conversationMembers, chatMessages, chatMessageAttachments, chatMessageReactions, chatMessageMentions, chatNotifications, userChatSettings,
   tasks, taskGroups, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   productionSlotAdjustments, jobLevelCycleTimes, mappingRules, approvalEvents, productionDays, jobPanelRates, deliveryRecords,
-  cfmeuHolidays
+  cfmeuHolidays, factories, productionBeds, insertFactorySchema, insertProductionBedSchema
 } from "@shared/schema";
 import ICAL from "ical.js";
 import { z } from "zod";
@@ -6043,6 +6043,135 @@ Return ONLY valid JSON, no explanation text.`
     } catch (error: any) {
       console.error("Error performing deletion:", error);
       res.status(500).json({ error: error.message || "Failed to delete data" });
+    }
+  });
+
+  // Factory Management Routes
+  app.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const allFactories = await db.select().from(factories).orderBy(factories.name);
+      res.json(allFactories);
+    } catch (error: any) {
+      console.error("Error fetching factories:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch factories" });
+    }
+  });
+
+  app.get("/api/factories", requireAuth, async (req, res) => {
+    try {
+      const activeFactories = await db.select().from(factories).where(eq(factories.isActive, true)).orderBy(factories.name);
+      res.json(activeFactories);
+    } catch (error: any) {
+      console.error("Error fetching factories:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch factories" });
+    }
+  });
+
+  app.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const factory = await db.select().from(factories).where(eq(factories.id, req.params.id)).limit(1);
+      if (factory.length === 0) {
+        return res.status(404).json({ error: "Factory not found" });
+      }
+      const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, req.params.id)).orderBy(productionBeds.name);
+      res.json({ ...factory[0], beds });
+    } catch (error: any) {
+      console.error("Error fetching factory:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch factory" });
+    }
+  });
+
+  app.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const parsed = insertFactorySchema.parse(req.body);
+      const [created] = await db.insert(factories).values(parsed).returning();
+      res.json(created);
+    } catch (error: any) {
+      console.error("Error creating factory:", error);
+      res.status(500).json({ error: error.message || "Failed to create factory" });
+    }
+  });
+
+  app.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const { beds, ...factoryData } = req.body;
+      const [updated] = await db.update(factories)
+        .set({ ...factoryData, updatedAt: new Date() })
+        .where(eq(factories.id, req.params.id))
+        .returning();
+      if (!updated) {
+        return res.status(404).json({ error: "Factory not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating factory:", error);
+      res.status(500).json({ error: error.message || "Failed to update factory" });
+    }
+  });
+
+  app.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const [deleted] = await db.delete(factories).where(eq(factories.id, req.params.id)).returning();
+      if (!deleted) {
+        return res.status(404).json({ error: "Factory not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting factory:", error);
+      res.status(500).json({ error: error.message || "Failed to delete factory" });
+    }
+  });
+
+  // Production Beds Routes
+  app.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, req.params.factoryId)).orderBy(productionBeds.name);
+      res.json(beds);
+    } catch (error: any) {
+      console.error("Error fetching production beds:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch production beds" });
+    }
+  });
+
+  app.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const parsed = insertProductionBedSchema.parse({ ...req.body, factoryId: req.params.factoryId });
+      const [created] = await db.insert(productionBeds).values(parsed).returning();
+      res.json(created);
+    } catch (error: any) {
+      console.error("Error creating production bed:", error);
+      res.status(500).json({ error: error.message || "Failed to create production bed" });
+    }
+  });
+
+  app.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const [updated] = await db.update(productionBeds)
+        .set({ ...req.body, updatedAt: new Date() })
+        .where(and(eq(productionBeds.id, req.params.bedId), eq(productionBeds.factoryId, req.params.factoryId)))
+        .returning();
+      if (!updated) {
+        return res.status(404).json({ error: "Production bed not found" });
+      }
+      res.json(updated);
+    } catch (error: any) {
+      console.error("Error updating production bed:", error);
+      res.status(500).json({ error: error.message || "Failed to update production bed" });
+    }
+  });
+
+  app.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const [deleted] = await db.delete(productionBeds)
+        .where(and(eq(productionBeds.id, req.params.bedId), eq(productionBeds.factoryId, req.params.factoryId)))
+        .returning();
+      if (!deleted) {
+        return res.status(404).json({ error: "Production bed not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Error deleting production bed:", error);
+      res.status(500).json({ error: error.message || "Failed to delete production bed" });
     }
   });
 
