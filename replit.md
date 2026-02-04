@@ -135,6 +135,54 @@ client/src/pages/feature-name/
 4. **All new API endpoints require tests** - At minimum, happy path test
 5. **TypeScript strict mode** - No `any` types without justification
 
+### API STABILITY RULES (CRITICAL - PREVENTS DATA DISPLAY ISSUES)
+
+**PROBLEM**: Frontend components using wrong API paths (e.g., `/api/items` instead of `/api/procurement/items`) causes data not to display. This is a critical issue that must be prevented.
+
+**SOLUTION**: Centralized API route constants in `shared/api-routes.ts`
+
+**MANDATORY RULES:**
+
+1. **NEVER hardcode API paths in frontend components**
+   ```typescript
+   // BAD - Hardcoded path that can mismatch backend
+   const { data } = useQuery({ queryKey: ["/api/items"] });
+   
+   // GOOD - Uses centralized constant
+   import { PROCUREMENT_ROUTES } from '@shared/api-routes';
+   const { data } = useQuery({ queryKey: [PROCUREMENT_ROUTES.ITEMS] });
+   ```
+
+2. **When adding NEW endpoints:**
+   - Step 1: Add path to `shared/api-routes.ts` FIRST
+   - Step 2: Implement backend route matching that path
+   - Step 3: Use the constant in frontend components
+   - Step 4: Run `npx tsx scripts/validate-endpoints.ts` to verify
+
+3. **Route prefixes by domain:**
+   | Domain | Prefix | Example |
+   |--------|--------|---------|
+   | Authentication | `/api/auth/` | `/api/auth/login` |
+   | Procurement | `/api/procurement/` | `/api/procurement/items` |
+   | Admin | `/api/admin/` | `/api/admin/users` |
+   | Reports | `/api/reports/` | `/api/reports/production-daily` |
+   | Chat | `/api/chat/` | `/api/chat/conversations` |
+
+4. **Before any deployment, run:**
+   ```bash
+   npx tsx scripts/validate-endpoints.ts
+   ```
+
+5. **When moving/renaming routes:**
+   - Update `shared/api-routes.ts` FIRST
+   - Update backend route file
+   - Frontend automatically gets new path via import
+   - Run validation script
+
+**REFERENCE FILES:**
+- `shared/api-routes.ts` - Single source of truth for all API paths
+- `scripts/validate-endpoints.ts` - Validates frontend calls match backend routes
+
 ### Database Rules
 1. **All tables must have**: `id`, `createdAt`, `updatedAt` fields
 2. **Use UUID for all IDs** - varchar(36) with gen_random_uuid()

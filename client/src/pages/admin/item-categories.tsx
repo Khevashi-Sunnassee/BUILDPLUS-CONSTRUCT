@@ -55,6 +55,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { ItemCategory } from "@shared/schema";
+import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 
 const itemCategorySchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -72,7 +73,7 @@ export default function AdminItemCategoriesPage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   const { data: categories, isLoading } = useQuery<ItemCategory[]>({
-    queryKey: ["/api/procurement/item-categories"],
+    queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES],
   });
 
   const form = useForm<ItemCategoryFormData>({
@@ -86,10 +87,10 @@ export default function AdminItemCategoriesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ItemCategoryFormData) => {
-      return apiRequest("POST", "/api/procurement/item-categories", data);
+      return apiRequest("POST", PROCUREMENT_ROUTES.ITEM_CATEGORIES, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES] });
       toast({ title: "Category created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -101,10 +102,10 @@ export default function AdminItemCategoriesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ItemCategoryFormData }) => {
-      return apiRequest("PATCH", `/api/procurement/item-categories/${id}`, data);
+      return apiRequest("PATCH", PROCUREMENT_ROUTES.ITEM_CATEGORY_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES] });
       toast({ title: "Category updated successfully" });
       setDialogOpen(false);
       setEditingCategory(null);
@@ -117,10 +118,10 @@ export default function AdminItemCategoriesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/procurement/item-categories/${id}`, {});
+      return apiRequest("DELETE", PROCUREMENT_ROUTES.ITEM_CATEGORY_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES] });
       toast({ title: "Category deleted" });
       setDeleteDialogOpen(false);
       setDeletingCategoryId(null);
