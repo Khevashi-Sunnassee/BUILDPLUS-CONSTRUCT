@@ -877,9 +877,27 @@ export default function ProductionSlotsPage() {
     
     currentY += rowHeight;
     
+    // Helper function to draw column separators
+    const drawColumnSeparators = (startY: number, endY: number) => {
+      pdf.setDrawColor(200, 200, 200);
+      let x = margin;
+      colWidths.forEach((width) => {
+        x += width;
+        if (x < pageWidth - margin) {
+          pdf.line(x, startY, x, endY);
+        }
+      });
+    };
+    
+    // Track page sections for column borders
+    let pageStartY = currentY;
+    
     // Draw data rows
     slots.forEach((slot) => {
       if (currentY + rowHeight > pageHeight - margin) {
+        // Draw column separators for this page before adding new page
+        drawColumnSeparators(pageStartY, currentY);
+        
         pdf.addPage();
         currentY = margin;
         
@@ -897,6 +915,7 @@ export default function ProductionSlotsPage() {
         pdf.setDrawColor(200, 200, 200);
         pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight);
         currentY += rowHeight;
+        pageStartY = currentY - rowHeight; // Reset page start after header
       }
       
       const factory = getFactory(slot.job.factoryId);
@@ -942,15 +961,8 @@ export default function ProductionSlotsPage() {
       currentY += rowHeight;
     });
     
-    // Draw column borders
-    pdf.setDrawColor(200, 200, 200);
-    currentX = margin;
-    colWidths.forEach((width) => {
-      currentX += width;
-      if (currentX < pageWidth - margin) {
-        pdf.line(currentX, margin + 18, currentX, currentY);
-      }
-    });
+    // Draw column separators for the last page
+    drawColumnSeparators(pageStartY, currentY);
     
     // Footer
     pdf.setFontSize(8);
