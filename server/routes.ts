@@ -1290,8 +1290,9 @@ export async function registerRoutes(
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const documentStatus = req.query.documentStatus as string | undefined;
+    const factoryId = req.query.factoryId as string | undefined;
     
-    const result = await storage.getPaginatedPanelRegisterItems({ page, limit, jobId, search, status, documentStatus });
+    const result = await storage.getPaginatedPanelRegisterItems({ page, limit, jobId, search, status, documentStatus, factoryId });
     res.json(result);
   });
 

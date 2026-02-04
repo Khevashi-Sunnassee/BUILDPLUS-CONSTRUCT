@@ -89,7 +89,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation, useSearch } from "wouter";
-import type { Job, PanelRegister, PanelTypeConfig } from "@shared/schema";
+import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 
 const panelSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
@@ -144,6 +144,7 @@ export default function AdminPanelsPage() {
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
+  const [factoryFilter, setFactoryFilter] = useState<string>("all");
   const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
@@ -220,6 +221,7 @@ export default function AdminPanelsPage() {
     limit: pageSize.toString(),
   });
   if (jobFilter !== "all") queryParams.set("jobId", jobFilter);
+  if (factoryFilter !== "all") queryParams.set("factoryId", factoryFilter);
   if (debouncedSearch) queryParams.set("search", debouncedSearch);
   if (statusFilter !== "all") queryParams.set("status", statusFilter);
 
@@ -232,7 +234,7 @@ export default function AdminPanelsPage() {
   }
 
   const { data: panelData, isLoading: panelsLoading } = useQuery<PaginatedResponse>({
-    queryKey: ["/api/admin/panels", currentPage, pageSize, jobFilter, debouncedSearch, statusFilter],
+    queryKey: ["/api/admin/panels", currentPage, pageSize, jobFilter, factoryFilter, debouncedSearch, statusFilter],
     queryFn: async () => {
       const res = await fetch(`/api/admin/panels?${queryParams.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch panels");
@@ -246,6 +248,10 @@ export default function AdminPanelsPage() {
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/admin/jobs"],
+  });
+
+  const { data: factories } = useQuery<Factory[]>({
+    queryKey: ["/api/admin/factories"],
   });
 
   const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
@@ -328,9 +334,16 @@ export default function AdminPanelsPage() {
     return pt?.color || null;
   };
 
+  const getFactoryName = (factoryId: string | null | undefined): string => {
+    if (!factoryId || !factories) return "-";
+    const factory = factories.find(f => f.id === factoryId);
+    return factory?.name || "-";
+  };
+
   const filteredPanels = panels?.filter(panel => {
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
+    if (factoryFilter !== "all" && panel.job.factoryId !== factoryFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
     if (panelTypeFilter !== "all" && panel.panelType !== panelTypeFilter) return false;
     if (levelFilter !== "all" && panel.level !== levelFilter) return false;
@@ -1168,6 +1181,19 @@ export default function AdminPanelsPage() {
               )}
               <div className="flex items-center gap-2">
                 <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={factoryFilter} onValueChange={setFactoryFilter}>
+                  <SelectTrigger className="w-[140px]" data-testid="select-factory-filter">
+                    <SelectValue placeholder="All Factories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Factories</SelectItem>
+                    {factories?.filter(f => f.isActive).map(factory => (
+                      <SelectItem key={factory.id} value={factory.id}>
+                        {factory.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 {!filterJobId && (
                   <Select value={jobFilter} onValueChange={setJobFilter}>
                     <SelectTrigger className="w-[180px]" data-testid="select-job-filter">
@@ -1332,6 +1358,7 @@ export default function AdminPanelsPage() {
             <TableHeader>
               <TableRow>
                 {!filterJobId && !groupByJob && !groupByPanelType && <TableHead>Job</TableHead>}
+                <TableHead>Factory</TableHead>
                 <TableHead>Panel Mark</TableHead>
                 <TableHead>{groupByPanelType ? "Job" : "Type"}</TableHead>
                 <TableHead>Building</TableHead>
@@ -1359,7 +1386,7 @@ export default function AdminPanelsPage() {
                           onClick={() => togglePanelTypeCollapse(panelType)}
                           data-testid={`row-type-group-${panelType}`}
                         >
-                          <TableCell colSpan={13}>
+                          <TableCell colSpan={14}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -1383,6 +1410,7 @@ export default function AdminPanelsPage() {
                               borderLeft: `4px solid ${panel.job.productionSlotColor}` 
                             } : undefined}
                           >
+                            <TableCell className="text-sm">{getFactoryName(panel.job.factoryId)}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -1465,7 +1493,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1482,7 +1510,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={13}>
+                          <TableCell colSpan={14}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -1603,7 +1631,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1620,7 +1648,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleLevelCollapse(level)}
                           data-testid={`row-level-group-${level}`}
                         >
-                          <TableCell colSpan={13}>
+                          <TableCell colSpan={14}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -1649,6 +1677,7 @@ export default function AdminPanelsPage() {
                                 <span className="font-mono text-sm">{panel.job.jobNumber}</span>
                               </TableCell>
                             )}
+                            <TableCell className="text-sm">{getFactoryName(panel.job.factoryId)}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -1742,7 +1771,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -1764,6 +1793,7 @@ export default function AdminPanelsPage() {
                           <span className="font-mono text-sm">{panel.job.jobNumber}</span>
                         </TableCell>
                       )}
+                      <TableCell className="text-sm">{getFactoryName(panel.job.factoryId)}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Hash className="h-4 w-4 text-muted-foreground" />
@@ -1855,7 +1885,7 @@ export default function AdminPanelsPage() {
                   ))}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? 12 : 13} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? 13 : 14} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>

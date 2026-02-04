@@ -288,7 +288,7 @@ export interface IStorage {
   updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined>;
   deletePanelRegisterItem(id: string): Promise<void>;
   getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
-  getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }>;
+  getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string; factoryId?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }>;
   importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }>;
   updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
   getPanelCountsBySource(): Promise<{ source: number; count: number }[]>;
@@ -1125,14 +1125,17 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 
-  async getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }> {
-    const { page, limit, jobId, search, status, documentStatus } = options;
+  async getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string; factoryId?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }> {
+    const { page, limit, jobId, search, status, documentStatus, factoryId } = options;
     const offset = (page - 1) * limit;
     
     // Build conditions array
     const conditions = [];
     if (jobId) {
       conditions.push(eq(panelRegister.jobId, jobId));
+    }
+    if (factoryId) {
+      conditions.push(eq(jobs.factoryId, factoryId));
     }
     if (status) {
       conditions.push(eq(panelRegister.status, status));
