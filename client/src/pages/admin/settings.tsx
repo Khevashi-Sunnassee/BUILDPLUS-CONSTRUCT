@@ -175,6 +175,8 @@ export default function AdminSettingsPage() {
   const { data: dataCounts, refetch: refetchCounts } = useQuery<Record<string, number>>({
     queryKey: ["/api/admin/data-deletion/counts"],
     enabled: showDeletePanel,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const validateDeletionMutation = useMutation({
@@ -780,7 +782,10 @@ export default function AdminSettingsPage() {
           {!showDeletePanel ? (
             <Button
               variant="destructive"
-              onClick={() => setShowDeletePanel(true)}
+              onClick={() => {
+                setShowDeletePanel(true);
+                setTimeout(() => refetchCounts(), 100);
+              }}
               data-testid="button-show-delete-panel"
             >
               <Trash2 className="h-4 w-4 mr-2" />
