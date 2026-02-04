@@ -1381,14 +1381,20 @@ export async function registerRoutes(
         jobsByNumber[job.jobNumber.toLowerCase()] = job;
       });
       
-      // Get valid panel types from the system - accept both name and code
+      // Get valid panel types from the system - accept both name and code, store CODE
       const panelTypeConfigs = await storage.getAllPanelTypes();
+      if (panelTypeConfigs.length === 0) {
+        return res.status(400).json({ 
+          error: "No panel types configured in system. Please add panel types in Settings before importing." 
+        });
+      }
       const panelTypesByNameOrCode = new Map<string, string>();
       panelTypeConfigs.forEach(pt => {
         const normalizedName = pt.name.toUpperCase().replace(/ /g, "_");
         const normalizedCode = pt.code.toUpperCase().replace(/ /g, "_");
-        panelTypesByNameOrCode.set(normalizedName, normalizedName);
-        panelTypesByNameOrCode.set(normalizedCode, normalizedName);
+        // Map both name and code to the CODE (which is what the dropdown uses)
+        panelTypesByNameOrCode.set(normalizedName, pt.code);
+        panelTypesByNameOrCode.set(normalizedCode, pt.code);
       });
       const panelTypesList = panelTypeConfigs.map(pt => `${pt.name} (${pt.code})`).join(", ");
       
@@ -1398,12 +1404,19 @@ export async function registerRoutes(
         fallbackJob = await storage.getJob(jobId);
       }
       
-      const panelsToImport: any[] = [];
+      // PHASE 1: Validate ALL rows first - collect all errors before importing anything
+      const validatedRows: Array<{
+        row: any;
+        rowNumber: number;
+        resolvedJob: any;
+        panelType: string;
+      }> = [];
       const errors: string[] = [];
       
       for (let i = 0; i < data.length; i++) {
         const row = data[i];
         const rowNumber = i + 2; // Excel row (1-indexed + header row)
+        const rowErrors: string[] = [];
         
         // Get job number from Excel row
         const jobNumber = String(row.jobNumber || row["Job Number"] || row.job_number || row["Job"] || "").trim();
@@ -1413,35 +1426,54 @@ export async function registerRoutes(
         if (jobNumber) {
           resolvedJob = jobsByNumber[jobNumber.toLowerCase()];
           if (!resolvedJob) {
-            errors.push(`Row ${rowNumber}: Job "${jobNumber}" not found`);
-            continue;
+            rowErrors.push(`Job "${jobNumber}" not found`);
           }
         } else if (fallbackJob) {
           resolvedJob = fallbackJob;
         } else {
-          errors.push(`Row ${rowNumber}: No job specified and no fallback job selected`);
-          continue;
+          rowErrors.push(`No job specified and no fallback job selected`);
         }
         
         const panelMark = String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim();
         if (!panelMark) {
-          errors.push(`Row ${rowNumber}: Missing panel mark`);
-          continue;
+          rowErrors.push(`Missing panel mark`);
         }
         
-        const typeRaw = (row.panelType || row["Panel Type"] || row.panel_type || row["Type"] || "").toUpperCase().replace(/ /g, "_");
+        const typeRaw = String(row.panelType || row["Panel Type"] || row.panel_type || row["Type"] || "").toUpperCase().replace(/ /g, "_");
+        let resolvedPanelType: string | undefined;
         if (!typeRaw) {
-          errors.push(`Row ${rowNumber}: Missing panel type`);
-          continue;
+          rowErrors.push(`Missing panel type`);
+        } else {
+          resolvedPanelType = panelTypesByNameOrCode.get(typeRaw);
+          if (!resolvedPanelType) {
+            rowErrors.push(`Invalid panel type "${typeRaw}". Valid types are: ${panelTypesList}`);
+          }
         }
-        const resolvedPanelType = panelTypesByNameOrCode.get(typeRaw);
-        if (!resolvedPanelType) {
-          errors.push(`Row ${rowNumber}: Invalid panel type "${typeRaw}". Valid types are: ${panelTypesList}`);
-          continue;
-        }
-        const panelType = resolvedPanelType as any;
         
-        // Parse numeric fields matching estimate import format
+        // Collect all errors for this row
+        if (rowErrors.length > 0) {
+          errors.push(`Row ${rowNumber}: ${rowErrors.join("; ")}`);
+        } else if (resolvedJob && resolvedPanelType) {
+          validatedRows.push({ row, rowNumber, resolvedJob, panelType: resolvedPanelType });
+        }
+      }
+      
+      // PHASE 2: If ANY errors, fail the entire import - don't import anything
+      if (errors.length > 0) {
+        return res.status(400).json({ 
+          error: `Import failed: ${errors.length} row(s) have errors. No panels were imported.`,
+          details: errors.slice(0, 20) // Show first 20 errors
+        });
+      }
+      
+      if (validatedRows.length === 0) {
+        return res.status(400).json({ 
+          error: "No panels found in the file to import" 
+        });
+      }
+      
+      // PHASE 3: All rows validated - now build import data
+      const panelsToImport = validatedRows.map(({ row, resolvedJob, panelType }) => {
         const widthRaw = row.width || row["Width"] || row["Width (mm)"] || row.loadWidth || row["Load Width"] || null;
         const heightRaw = row.height || row["Height"] || row["Height (mm)"] || row.loadHeight || row["Load Height"] || null;
         const thicknessRaw = row.thickness || row["Thickness"] || row["Thickness (mm)"] || row.panelThickness || row["Panel Thickness"] || null;
@@ -1449,8 +1481,9 @@ export async function registerRoutes(
         const volumeRaw = row.volume || row["Volume"] || row["Volume (m³)"] || row["Volume (m3)"] || row.panelVolume || row["Panel Volume"] || null;
         const weightRaw = row.weight || row["Weight"] || row["Weight (kg)"] || row.mass || row["Mass"] || row.panelMass || row["Panel Mass"] || null;
         const qtyRaw = row.qty || row["Qty"] || row.quantity || row["Quantity"] || 1;
+        const panelMark = String(row.panelMark || row["Panel Mark"] || row.panel_mark || row["Mark"] || "").trim();
         
-        panelsToImport.push({
+        return {
           jobId: resolvedJob.id,
           panelMark,
           panelType,
@@ -1474,21 +1507,11 @@ export async function registerRoutes(
           source: 2, // Excel Template import
           estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
           status: "NOT_STARTED" as const,
-        });
-      }
-      
-      if (panelsToImport.length === 0) {
-        return res.status(400).json({ 
-          error: "No valid panels to import", 
-          details: errors.slice(0, 10) // Show first 10 errors
-        });
-      }
+        };
+      });
       
       const result = await storage.importPanelRegister(panelsToImport);
-      res.json({ 
-        ...result, 
-        errors: errors.length > 0 ? errors.slice(0, 10) : undefined 
-      });
+      res.json(result);
     } catch (error: any) {
       res.status(400).json({ error: error.message || "Import failed" });
     }
@@ -1545,16 +1568,22 @@ export async function registerRoutes(
           await storage.deletePanelsByJobAndSource(jobId, 3);
         }
         
-        // Get valid panel types from the system for validation - accept both name and code
+        // Get valid panel types from the system for validation - accept both name and code, store CODE
         const panelTypeConfigs = await storage.getAllPanelTypes();
+        if (panelTypeConfigs.length === 0) {
+          return res.status(400).json({ 
+            error: "No panel types configured in system. Please add panel types in Settings before importing." 
+          });
+        }
         const panelTypesByNameOrCode = new Map<string, string>();
         panelTypeConfigs.forEach(pt => {
           const normalizedName = pt.name.toUpperCase().replace(/ /g, "_");
           const normalizedCode = pt.code.toUpperCase().replace(/ /g, "_");
-          panelTypesByNameOrCode.set(normalizedName, normalizedName);
-          panelTypesByNameOrCode.set(normalizedCode, normalizedName);
+          // Map both name and code to the CODE (which is what the dropdown uses)
+          panelTypesByNameOrCode.set(normalizedName, pt.code);
+          panelTypesByNameOrCode.set(normalizedCode, pt.code);
         });
-        const panelTypesList = panelTypeConfigs.map(pt => pt.name).join(", ");
+        const panelTypesList = panelTypeConfigs.map(pt => `${pt.name} (${pt.code})`).join(", ");
         
         const results: any[] = [];
         const panelsToImport: any[] = [];
@@ -1803,20 +1832,17 @@ export async function registerRoutes(
             const typeRaw = String(rowData.panelType || category || "").toUpperCase().replace(/\s+/g, "_");
             let panelType: string | undefined;
             
-            if (panelTypesByNameOrCode.size === 0) {
-              sheetResult.errors.push(`Row ${sourceRowNum}: No panel types configured in system`);
-              continue;
-            }
-            
             // First check if the exact type (name or code) is in the valid panel types
             if (panelTypesByNameOrCode.has(typeRaw)) {
               panelType = panelTypesByNameOrCode.get(typeRaw);
             } else {
-              // Try to match by keyword from configured panel types
-              const validNames = Array.from(new Set(panelTypesByNameOrCode.values()));
-              const matchedType = validNames.find(pt => typeRaw.includes(pt) || pt.includes(typeRaw));
-              if (matchedType) {
-                panelType = matchedType;
+              // Try to match by keyword from configured panel type NAMES (not codes)
+              // The map values are codes, so we need to search the keys (which include names)
+              const matchedKey = Array.from(panelTypesByNameOrCode.keys()).find(key => 
+                typeRaw.includes(key) || key.includes(typeRaw)
+              );
+              if (matchedKey) {
+                panelType = panelTypesByNameOrCode.get(matchedKey);
               } else {
                 // Error on unrecognized panel type - don't silently default
                 sheetResult.errors.push(`Row ${sourceRowNum}: Invalid panel type "${typeRaw}". Valid types are: ${panelTypesList}`);
@@ -1874,18 +1900,41 @@ export async function registerRoutes(
           results.push(sheetResult);
         }
         
-        // Import all panels
+        // ALL-OR-NOTHING: Check if any sheet has errors before importing anything
+        const allErrors: string[] = [];
+        for (const sheetResult of results) {
+          for (const err of sheetResult.errors) {
+            allErrors.push(`[${sheetResult.sheetName}] ${err}`);
+          }
+        }
+        
+        if (allErrors.length > 0) {
+          return res.status(400).json({
+            error: `Import failed: ${allErrors.length} error(s) found. No panels were imported.`,
+            details: allErrors.slice(0, 20),
+            sheets: results.map(r => ({
+              sheetName: r.sheetName,
+              errors: r.errors,
+            })),
+          });
+        }
+        
+        if (panelsToImport.length === 0) {
+          return res.status(400).json({
+            error: "No panels found to import. Check that the file has valid TakeOff data.",
+          });
+        }
+        
+        // No errors - proceed with import
         let imported = 0;
         let importErrors: string[] = [];
         
-        if (panelsToImport.length > 0) {
-          try {
-            const importResult = await storage.importEstimatePanels(panelsToImport);
-            imported = importResult.imported;
-            importErrors = importResult.errors || [];
-          } catch (err: any) {
-            importErrors.push(err.message);
-          }
+        try {
+          const importResult = await storage.importEstimatePanels(panelsToImport);
+          imported = importResult.imported;
+          importErrors = importResult.errors || [];
+        } catch (err: any) {
+          importErrors.push(err.message);
         }
         
         // Calculate totals

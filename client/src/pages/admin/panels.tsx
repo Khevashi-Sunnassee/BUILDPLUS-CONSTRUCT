@@ -249,6 +249,34 @@ export default function AdminPanelsPage() {
   const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
     queryKey: ["/api/panel-types"],
   });
+  
+  // Helper function to normalize panel type for dropdown compatibility
+  // Handles both old format (normalized name like "WALL_PANEL") and new format (code like "WP")
+  const normalizePanelType = useCallback((storedValue: string | null | undefined): string => {
+    if (!storedValue || !panelTypes || panelTypes.length === 0) return "";
+    
+    // First check if it matches a code directly
+    const matchByCode = panelTypes.find(pt => pt.code === storedValue);
+    if (matchByCode) return matchByCode.code;
+    
+    // Normalize the stored value for comparison
+    const normalizedStored = storedValue.toUpperCase().replace(/ /g, "_");
+    
+    // Check if it matches a normalized name
+    const matchByName = panelTypes.find(pt => 
+      pt.name.toUpperCase().replace(/ /g, "_") === normalizedStored
+    );
+    if (matchByName) return matchByName.code;
+    
+    // Check if stored value matches a normalized code  
+    const matchByNormalizedCode = panelTypes.find(pt => 
+      pt.code.toUpperCase().replace(/ /g, "_") === normalizedStored
+    );
+    if (matchByNormalizedCode) return matchByNormalizedCode.code;
+    
+    // Fallback - return first panel type code or empty
+    return panelTypes[0]?.code || "";
+  }, [panelTypes]);
 
   const { data: sourceCounts } = useQuery<{ source: number; count: number }[]>({
     queryKey: ["/api/admin/panels/source-counts"],
@@ -719,7 +747,7 @@ export default function AdminPanelsPage() {
     const template = panelTypes.map((pt, index) => ({
       "Job Number": jobs[0]?.jobNumber || "JOB-001", 
       "Panel Mark": `PM-${String(index + 1).padStart(3, '0')}`, 
-      "Panel Type": pt.name, 
+      "Panel Type": pt.code, 
       "Description": `${pt.name} panel example`, 
       "Drawing Code": `DWG-${String(index + 1).padStart(3, '0')}`, 
       "Sheet Number": `A${String(index + 1).padStart(3, '0')}`, 
@@ -802,7 +830,7 @@ export default function AdminPanelsPage() {
     panelForm.reset({
       jobId: panel.jobId,
       panelMark: panel.panelMark,
-      panelType: panel.panelType || "WALL",
+      panelType: normalizePanelType(panel.panelType),
       description: panel.description || "",
       drawingCode: panel.drawingCode || "",
       sheetNumber: panel.sheetNumber || "",
