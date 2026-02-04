@@ -393,18 +393,29 @@ function CalendarView({
                     {/* The bar */}
                     <div
                       onClick={() => onSlotClick(item.slot)}
-                      className="absolute top-2 h-10 rounded cursor-pointer hover-elevate flex items-center px-2 text-xs font-medium shadow-sm"
+                      className="absolute top-2 h-10 rounded cursor-pointer hover-elevate flex items-center text-xs font-medium shadow-sm overflow-hidden"
                       style={{
                         left: barStyle.left,
                         width: barStyle.width,
-                        backgroundColor: `${item.levelColor}40`,
-                        borderLeft: `4px solid ${item.jobColor}`,
+                        backgroundColor: `${item.levelColor}30`,
+                        border: `1px solid ${item.jobColor}40`,
                         color: item.jobColor,
                       }}
                       title={`${item.slot.job.jobNumber} - Level ${item.slot.level}\nProduction: ${format(item.startDate, "dd MMM")} → Onsite: ${format(item.endDate, "dd MMM")}\n${item.slot.panelCount} panels`}
                       data-testid={`calendar-slot-${item.slot.id}`}
                     >
-                      <span className="truncate">
+                      {/* Green production date indicator */}
+                      <div 
+                        className="h-full flex items-center justify-center px-2 text-white font-semibold shrink-0"
+                        style={{
+                          backgroundColor: "#22c55e",
+                          minWidth: "fit-content",
+                        }}
+                        title={`Production Date: ${format(item.startDate, "dd MMM yyyy")}`}
+                      >
+                        {format(item.startDate, "dd")}
+                      </div>
+                      <span className="truncate px-2">
                         {item.slot.panelCount} panels
                       </span>
                     </div>
@@ -418,6 +429,10 @@ function CalendarView({
 
       {/* Legend */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t flex-wrap">
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "#22c55e" }} />
+          <span>Production Date</span>
+        </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 bg-primary/10 border border-primary rounded" />
           <span>Today</span>
