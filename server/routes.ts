@@ -6479,6 +6479,37 @@ Return ONLY valid JSON, no explanation text.`
     return { imported, skipped };
   }
 
+  // Public endpoint to get CFMEU holidays for calendar display
+  app.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
+    try {
+      const { calendarType, startDate, endDate } = req.query;
+      
+      if (!calendarType || !startDate || !endDate) {
+        return res.status(400).json({ error: "calendarType, startDate, and endDate are required" });
+      }
+      
+      if (!["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType as string)) {
+        return res.status(400).json({ error: "Invalid calendar type" });
+      }
+      
+      const holidays = await db.select()
+        .from(cfmeuHolidays)
+        .where(
+          and(
+            eq(cfmeuHolidays.calendarType, calendarType as any),
+            gte(cfmeuHolidays.date, new Date(startDate as string)),
+            lte(cfmeuHolidays.date, new Date(endDate as string))
+          )
+        )
+        .orderBy(cfmeuHolidays.date);
+      
+      res.json(holidays);
+    } catch (error: any) {
+      console.error("Error fetching CFMEU holidays:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch holidays" });
+    }
+  });
+
   app.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) => {
     try {
       const holidays = await db.select().from(cfmeuHolidays).orderBy(cfmeuHolidays.date);

@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon, LayoutGrid, ChevronLeft } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, getDay } from "date-fns";
-import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory } from "@shared/schema";
+import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory, CfmeuHoliday } from "@shared/schema";
 
 interface ProductionSlotWithDetails extends ProductionSlot {
   job: Job;
@@ -57,6 +57,13 @@ const stringToColor = (str: string): string => {
   return `hsl(${h}, 70%, 45%)`;
 };
 
+// Holiday type colors
+const HOLIDAY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  RDO: { bg: "#FEF3C7", text: "#92400E", border: "#F59E0B" },
+  PUBLIC_HOLIDAY: { bg: "#FEE2E2", text: "#991B1B", border: "#EF4444" },
+  OTHER: { bg: "#E0E7FF", text: "#3730A3", border: "#6366F1" },
+};
+
 interface CalendarViewProps {
   slots: ProductionSlotWithDetails[];
   factories: Factory[];
@@ -67,6 +74,7 @@ interface CalendarViewProps {
   setCalendarViewMode: (mode: "week" | "month") => void;
   weekStartDay: number;
   onSlotClick: (slot: ProductionSlotWithDetails) => void;
+  selectedFactoryId: string | null;
 }
 
 function CalendarView({
@@ -79,7 +87,16 @@ function CalendarView({
   setCalendarViewMode,
   weekStartDay,
   onSlotClick,
+  selectedFactoryId,
 }: CalendarViewProps) {
+  // Get selected factory and its CFMEU calendar type
+  const selectedFactory = useMemo(() => {
+    if (!selectedFactoryId) return null;
+    return factories.find(f => f.id === selectedFactoryId) || null;
+  }, [selectedFactoryId, factories]);
+
+  const cfmeuCalendarType = selectedFactory?.cfmeuCalendar || null;
+
   // Memoize date range calculation
   const { start, end, days } = useMemo(() => {
     let start: Date, end: Date;
@@ -92,6 +109,28 @@ function CalendarView({
     }
     return { start, end, days: eachDayOfInterval({ start, end }) };
   }, [currentDate, calendarViewMode, weekStartDay]);
+
+  // Fetch CFMEU holidays for the current date range
+  const { data: cfmeuHolidays = [] } = useQuery<CfmeuHoliday[]>({
+    queryKey: ["/api/cfmeu-holidays", cfmeuCalendarType, format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")],
+    queryFn: async () => {
+      if (!cfmeuCalendarType) return [];
+      const res = await fetch(`/api/cfmeu-holidays?calendarType=${cfmeuCalendarType}&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: !!cfmeuCalendarType,
+  });
+
+  // Create a map of holidays by date for quick lookup
+  const holidaysByDate = useMemo(() => {
+    const map: Record<string, CfmeuHoliday> = {};
+    for (const holiday of cfmeuHolidays) {
+      const dateKey = format(new Date(holiday.date), "yyyy-MM-dd");
+      map[dateKey] = holiday;
+    }
+    return map;
+  }, [cfmeuHolidays]);
 
   // Memoize color cache to avoid recalculating on every render
   const colorCache = useMemo(() => {
@@ -215,16 +254,31 @@ function CalendarView({
             {days.map((day) => {
               const isToday = isSameDay(day, today);
               const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+              const dateKey = format(day, "yyyy-MM-dd");
+              const holiday = holidaysByDate[dateKey];
+              const holidayColors = holiday ? HOLIDAY_COLORS[holiday.holidayType] || HOLIDAY_COLORS.OTHER : null;
+              
               return (
                 <div
                   key={day.toISOString()}
-                  className={`flex-1 text-center py-2 text-xs border-r last:border-r-0 ${
-                    isToday ? "bg-primary/10 font-bold text-primary" : isWeekend ? "bg-muted/50" : ""
+                  className={`flex-1 text-center py-1 text-xs border-r last:border-r-0 ${
+                    isToday ? "font-bold" : ""
                   }`}
+                  style={{
+                    backgroundColor: holiday ? holidayColors?.bg : isToday ? "hsl(var(--primary) / 0.1)" : isWeekend ? "hsl(var(--muted) / 0.5)" : undefined,
+                    color: holiday ? holidayColors?.text : isToday ? "hsl(var(--primary))" : undefined,
+                    borderBottom: holiday ? `2px solid ${holidayColors?.border}` : undefined,
+                  }}
+                  title={holiday ? `${holiday.name} (${holiday.holidayType.replace("_", " ")})` : undefined}
                 >
                   <div>{format(day, calendarViewMode === "week" ? "EEE" : "d")}</div>
                   {calendarViewMode === "week" && (
-                    <div className="text-muted-foreground">{format(day, "d")}</div>
+                    <div className={holiday ? "" : "text-muted-foreground"}>{format(day, "d")}</div>
+                  )}
+                  {holiday && calendarViewMode === "week" && (
+                    <div className="text-[9px] font-medium truncate px-0.5" title={holiday.name}>
+                      {holiday.holidayType === "RDO" ? "RDO" : holiday.holidayType === "PUBLIC_HOLIDAY" ? "PH" : "OFF"}
+                    </div>
                   )}
                 </div>
               );
@@ -278,12 +332,17 @@ function CalendarView({
                       {days.map((day) => {
                         const isToday = isSameDay(day, today);
                         const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+                        const dateKey = format(day, "yyyy-MM-dd");
+                        const holiday = holidaysByDate[dateKey];
+                        const holidayColors = holiday ? HOLIDAY_COLORS[holiday.holidayType] || HOLIDAY_COLORS.OTHER : null;
+                        
                         return (
                           <div
                             key={day.toISOString()}
-                            className={`flex-1 border-r last:border-r-0 ${
-                              isToday ? "bg-primary/5" : isWeekend ? "bg-muted/30" : ""
-                            }`}
+                            className="flex-1 border-r last:border-r-0"
+                            style={{
+                              backgroundColor: holiday ? `${holidayColors?.bg}80` : isToday ? "hsl(var(--primary) / 0.05)" : isWeekend ? "hsl(var(--muted) / 0.3)" : undefined,
+                            }}
                           />
                         );
                       })}
@@ -321,7 +380,18 @@ function CalendarView({
           <div className="w-3 h-3 bg-primary/10 border border-primary rounded" />
           <span>Today</span>
         </div>
-        <span>Bars show production window from Production Date to Onsite Date. Click a bar to view panel details.</span>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: HOLIDAY_COLORS.RDO.bg, border: `1px solid ${HOLIDAY_COLORS.RDO.border}` }} />
+          <span>RDO</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: HOLIDAY_COLORS.PUBLIC_HOLIDAY.bg, border: `1px solid ${HOLIDAY_COLORS.PUBLIC_HOLIDAY.border}` }} />
+          <span>Public Holiday</span>
+        </div>
+        {cfmeuCalendarType && (
+          <span className="text-primary font-medium">Calendar: {cfmeuCalendarType.replace("_", " ")}</span>
+        )}
+        <span className="ml-auto">Bars show production window. Click a bar to view panel details.</span>
       </div>
     </div>
   );
@@ -1016,6 +1086,7 @@ export default function ProductionSlotsPage() {
                 setSelectedSlot(slot);
                 setShowPanelBreakdownDialog(true);
               }}
+              selectedFactoryId={factoryFilter !== "all" ? factoryFilter : (factories.length === 1 ? factories[0].id : null)}
             />
           ) : loadingSlots ? (
             <div className="text-center py-8">Loading...</div>
