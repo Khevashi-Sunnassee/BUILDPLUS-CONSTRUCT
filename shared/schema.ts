@@ -112,6 +112,8 @@ export const globalSettings = pgTable("global_settings", {
   ifcDaysInAdvance: integer("ifc_days_in_advance").default(14).notNull(),
   daysToAchieveIfc: integer("days_to_achieve_ifc").default(21).notNull(),
   productionDaysInAdvance: integer("production_days_in_advance").default(10).notNull(),
+  procurementDaysInAdvance: integer("procurement_days_in_advance").default(7).notNull(),
+  procurementTimeDays: integer("procurement_time_days").default(14).notNull(),
   productionWorkDays: json("production_work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
   draftingWorkDays: json("drafting_work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
   cfmeuCalendar: cfmeuCalendarEnum("cfmeu_calendar").default("NONE").notNull(),
@@ -211,6 +213,8 @@ export const jobs = pgTable("jobs", {
   daysToAchieveIfc: integer("days_to_achieve_ifc"), // days to complete drafting work
   productionWindowDays: integer("production_window_days"), // days before due date when production can start
   productionDaysInAdvance: integer("production_days_in_advance"), // days before site needs panels to cast
+  procurementDaysInAdvance: integer("procurement_days_in_advance"), // days before production window start for procurement
+  procurementTimeDays: integer("procurement_time_days"), // time required for procurement
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id), // factory servicing this job for production
   productionSlotColor: text("production_slot_color"), // hex color for production slots display
