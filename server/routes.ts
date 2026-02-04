@@ -1415,6 +1415,15 @@ export async function registerRoutes(
         const validTypes = ["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"];
         const panelType = validTypes.includes(typeRaw) ? typeRaw as any : "OTHER";
         
+        // Parse numeric fields matching estimate import format
+        const widthRaw = row.width || row["Width"] || row["Width (mm)"] || row.loadWidth || row["Load Width"] || null;
+        const heightRaw = row.height || row["Height"] || row["Height (mm)"] || row.loadHeight || row["Load Height"] || null;
+        const thicknessRaw = row.thickness || row["Thickness"] || row["Thickness (mm)"] || row.panelThickness || row["Panel Thickness"] || null;
+        const areaRaw = row.area || row["Area"] || row["Area (m²)"] || row["Area (m2)"] || row.panelArea || row["Panel Area"] || null;
+        const volumeRaw = row.volume || row["Volume"] || row["Volume (m³)"] || row["Volume (m3)"] || row.panelVolume || row["Panel Volume"] || null;
+        const weightRaw = row.weight || row["Weight"] || row["Weight (kg)"] || row.mass || row["Mass"] || row.panelMass || row["Panel Mass"] || null;
+        const qtyRaw = row.qty || row["Qty"] || row.quantity || row["Quantity"] || 1;
+        
         panelsToImport.push({
           jobId: resolvedJob.id,
           panelMark,
@@ -1423,9 +1432,19 @@ export async function registerRoutes(
           drawingCode: row.drawingCode || row["Drawing Code"] || row.drawing_code || null,
           sheetNumber: row.sheetNumber || row["Sheet Number"] || row.sheet_number || null,
           building: row.building || row["Building"] || null,
+          zone: row.zone || row["Zone"] || null,
           level: row.level || row["Level"] || null,
           structuralElevation: row.structuralElevation || row["Structural Elevation"] || row.structural_elevation || null,
           reckliDetail: row.reckliDetail || row["Reckli Detail"] || row.reckli_detail || null,
+          qty: parseInt(String(qtyRaw)) || 1,
+          loadWidth: widthRaw ? String(widthRaw) : null,
+          loadHeight: heightRaw ? String(heightRaw) : null,
+          panelThickness: thicknessRaw ? String(thicknessRaw) : null,
+          panelArea: areaRaw ? String(areaRaw) : null,
+          panelVolume: volumeRaw ? String(volumeRaw) : null,
+          panelMass: weightRaw ? String(weightRaw) : null,
+          concreteStrengthMpa: row.concreteStrength || row["Concrete Strength"] || row["Concrete Strength (MPa)"] || row.concreteStrengthMpa || null,
+          takeoffCategory: row.takeoffCategory || row["Takeoff Category"] || row["TakeOff Category"] || null,
           source: 2, // Excel Template import
           estimatedHours: row.estimatedHours || row["Estimated Hours"] || row.estimated_hours ? Number(row.estimatedHours || row["Estimated Hours"] || row.estimated_hours) : null,
           status: "NOT_STARTED" as const,

@@ -705,10 +705,54 @@ export default function AdminPanelsPage() {
       return;
     }
     
-    // Create panels template sheet with example rows
+    // Create panels template sheet with example rows - matching estimate import fields
     const template = [
-      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-001", "Panel Type": "WALL", "Description": "Panel description", "Drawing Code": "DWG-001", "Sheet Number": "A001", "Building": "Building A", "Level": "Level 1", "Structural Elevation": "RL 10.500", "Reckli Detail": "", "Estimated Hours": 8 },
-      { "Job Number": jobs[0]?.jobNumber || "JOB-001", "Panel Mark": "PM-002", "Panel Type": "COLUMN", "Description": "Column panel", "Drawing Code": "DWG-001", "Sheet Number": "A002", "Building": "Building B", "Level": "Ground", "Structural Elevation": "RL 0.000", "Reckli Detail": "Reckli Pattern 1", "Estimated Hours": 6 },
+      { 
+        "Job Number": jobs[0]?.jobNumber || "JOB-001", 
+        "Panel Mark": "PM-001", 
+        "Panel Type": "WALL", 
+        "Description": "Panel description", 
+        "Drawing Code": "DWG-001", 
+        "Sheet Number": "A001", 
+        "Building": "1", 
+        "Zone": "", 
+        "Level": "1", 
+        "Structural Elevation": "CCB", 
+        "Reckli Detail": "", 
+        "Qty": 1,
+        "Width (mm)": 3000,
+        "Height (mm)": 2800,
+        "Thickness (mm)": 200,
+        "Area (m²)": 8.4,
+        "Volume (m³)": 1.68,
+        "Weight (kg)": 4200,
+        "Concrete Strength (MPa)": "40",
+        "Takeoff Category": "Walls TakeOff",
+        "Estimated Hours": 8 
+      },
+      { 
+        "Job Number": jobs[0]?.jobNumber || "JOB-001", 
+        "Panel Mark": "PM-002", 
+        "Panel Type": "COLUMN", 
+        "Description": "Column panel", 
+        "Drawing Code": "DWG-002", 
+        "Sheet Number": "A002", 
+        "Building": "1", 
+        "Zone": "", 
+        "Level": "Ground", 
+        "Structural Elevation": "RL 0.000", 
+        "Reckli Detail": "Reckli Pattern 1", 
+        "Qty": 1,
+        "Width (mm)": 600,
+        "Height (mm)": 3200,
+        "Thickness (mm)": 600,
+        "Area (m²)": 1.92,
+        "Volume (m³)": 1.15,
+        "Weight (kg)": 2880,
+        "Concrete Strength (MPa)": "50",
+        "Takeoff Category": "Columns TakeOff",
+        "Estimated Hours": 6 
+      },
     ];
     const panelsSheet = XLSX.utils.json_to_sheet(template);
     
