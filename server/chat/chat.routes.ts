@@ -99,10 +99,11 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
     const userMap = new Map(allUsers.map(u => [u.id, u]));
 
     // Batch fetch last messages for all conversations using window function
+    const convIdsArray = sql`${sql.raw(`ARRAY[${convIds.map(id => `'${id}'`).join(",")}]::varchar[]`)}`;
     const lastMessages = await db.execute(sql`
       SELECT DISTINCT ON (conversation_id) *
       FROM chat_messages
-      WHERE conversation_id = ANY(${convIds})
+      WHERE conversation_id = ANY(${convIdsArray})
         AND deleted_at IS NULL
       ORDER BY conversation_id, created_at DESC
     `);
@@ -113,7 +114,7 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
     const unreadCounts = await db.execute(sql`
       SELECT conversation_id, COUNT(*) as count
       FROM chat_messages
-      WHERE conversation_id = ANY(${convIds})
+      WHERE conversation_id = ANY(${convIdsArray})
         AND deleted_at IS NULL
       GROUP BY conversation_id
     `);
