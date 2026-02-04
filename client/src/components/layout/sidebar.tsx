@@ -158,7 +158,7 @@ export function AppSidebar() {
           <img 
             src={logoSrc} 
             alt="LTE Precast Concrete Structures" 
-            className="h-[60px]"
+            className="h-[60px] w-auto max-w-full object-contain"
             data-testid="img-sidebar-logo"
           />
         </div>
