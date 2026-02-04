@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,9 +11,23 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert";
 import {
   Form,
   FormControl,
@@ -44,6 +58,28 @@ export default function AdminSettingsPage() {
   const [productionWindowDays, setProductionWindowDays] = useState<number>(10);
   const [ifcDaysInAdvance, setIfcDaysInAdvance] = useState<number>(14);
   const [daysToAchieveIfc, setDaysToAchieveIfc] = useState<number>(21);
+  const [showDeletePanel, setShowDeletePanel] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [validationResult, setValidationResult] = useState<{
+    valid: boolean;
+    errors: string[];
+    warnings: string[];
+  } | null>(null);
+
+  const deletionCategories = [
+    { key: "panels", label: "Panels", description: "Panel register entries" },
+    { key: "production_slots", label: "Production Slots", description: "Scheduled production slots" },
+    { key: "drafting_program", label: "Drafting Program", description: "Drafting program entries" },
+    { key: "daily_logs", label: "Daily Logs", description: "Time tracking logs and entries" },
+    { key: "purchase_orders", label: "Purchase Orders", description: "All purchase orders and line items" },
+    { key: "logistics", label: "Logistics", description: "Load lists and delivery records" },
+    { key: "weekly_wages", label: "Weekly Wages", description: "Weekly wage reports" },
+    { key: "chats", label: "Chats", description: "All conversations and messages" },
+    { key: "tasks", label: "Tasks", description: "Task groups and tasks" },
+    { key: "suppliers", label: "Suppliers", description: "Suppliers and item catalog" },
+    { key: "jobs", label: "Jobs", description: "All job records" },
+  ];
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -136,6 +172,68 @@ export default function AdminSettingsPage() {
     },
   });
 
+  const { data: dataCounts, refetch: refetchCounts } = useQuery<Record<string, number>>({
+    queryKey: ["/api/admin/data-deletion/counts"],
+    enabled: showDeletePanel,
+  });
+
+  const validateDeletionMutation = useMutation({
+    mutationFn: async (categories: string[]) => {
+      const response = await apiRequest("POST", "/api/admin/data-deletion/validate", { categories });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setValidationResult(data);
+      if (data.valid) {
+        setShowConfirmDialog(true);
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to validate deletion", variant: "destructive" });
+    },
+  });
+
+  const performDeletionMutation = useMutation({
+    mutationFn: async (categories: string[]) => {
+      const response = await apiRequest("POST", "/api/admin/data-deletion/delete", { categories });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setShowConfirmDialog(false);
+      setSelectedCategories(new Set());
+      setValidationResult(null);
+      refetchCounts();
+      const totalDeleted = Object.values(data.deleted as Record<string, number>).reduce((a, b) => a + b, 0);
+      toast({ title: `Successfully deleted ${totalDeleted} records` });
+      queryClient.invalidateQueries();
+    },
+    onError: () => {
+      toast({ title: "Failed to delete data", variant: "destructive" });
+    },
+  });
+
+  const handleCategoryToggle = (key: string, checked: boolean) => {
+    const newSet = new Set(selectedCategories);
+    if (checked) {
+      newSet.add(key);
+    } else {
+      newSet.delete(key);
+    }
+    setSelectedCategories(newSet);
+    setValidationResult(null);
+  };
+
+  const handleValidateAndDelete = () => {
+    if (selectedCategories.size === 0) {
+      toast({ title: "Please select at least one category", variant: "destructive" });
+      return;
+    }
+    validateDeletionMutation.mutate(Array.from(selectedCategories));
+  };
+
+  const handleConfirmDelete = () => {
+    performDeletionMutation.mutate(Array.from(selectedCategories));
+  };
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (logoBase64: string) => {
@@ -666,6 +764,190 @@ export default function AdminSettingsPage() {
           </div>
         </form>
       </Form>
+
+      {/* Data Management Section */}
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-destructive">
+            <Database className="h-5 w-5" />
+            Data Management
+          </CardTitle>
+          <CardDescription>
+            Delete data from the system. This action cannot be undone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!showDeletePanel ? (
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeletePanel(true)}
+              data-testid="button-show-delete-panel"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Data
+            </Button>
+          ) : (
+            <div className="space-y-4">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Warning</AlertTitle>
+                <AlertDescription>
+                  Deleting data is permanent and cannot be undone. Please review your selections carefully.
+                </AlertDescription>
+              </Alert>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {deletionCategories.map((category) => {
+                  const count = dataCounts?.[category.key] ?? 0;
+                  return (
+                    <div
+                      key={category.key}
+                      className="flex items-start space-x-3 rounded-lg border p-3"
+                    >
+                      <Checkbox
+                        id={`delete-${category.key}`}
+                        checked={selectedCategories.has(category.key)}
+                        onCheckedChange={(checked) =>
+                          handleCategoryToggle(category.key, checked === true)
+                        }
+                        disabled={count === 0}
+                        data-testid={`checkbox-delete-${category.key}`}
+                      />
+                      <div className="flex-1 space-y-1">
+                        <Label
+                          htmlFor={`delete-${category.key}`}
+                          className={`font-medium ${count === 0 ? "text-muted-foreground" : ""}`}
+                        >
+                          {category.label}
+                          <span className="ml-2 text-sm font-normal text-muted-foreground">
+                            ({count} records)
+                          </span>
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          {category.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {validationResult && !validationResult.valid && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Validation Errors</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                      {validationResult.errors.map((error, i) => (
+                        <li key={i}>{error}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {validationResult && validationResult.warnings.length > 0 && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Warnings</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc pl-4 mt-2 space-y-1">
+                      {validationResult.warnings.map((warning, i) => (
+                        <li key={i}>{warning}</li>
+                      ))}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowDeletePanel(false);
+                    setSelectedCategories(new Set());
+                    setValidationResult(null);
+                  }}
+                  data-testid="button-cancel-delete"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleValidateAndDelete}
+                  disabled={selectedCategories.size === 0 || validateDeletionMutation.isPending}
+                  data-testid="button-validate-delete"
+                >
+                  {validateDeletionMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 mr-2" />
+                  )}
+                  Delete Selected Data
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Confirm Deletion</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete the selected data? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="font-medium mb-2">You are about to delete:</p>
+            <ul className="list-disc pl-6 space-y-1">
+              {Array.from(selectedCategories).map((key) => {
+                const category = deletionCategories.find((c) => c.key === key);
+                const count = dataCounts?.[key] ?? 0;
+                return (
+                  <li key={key}>
+                    {category?.label} ({count} records)
+                  </li>
+                );
+              })}
+            </ul>
+            {validationResult && validationResult.warnings.length > 0 && (
+              <div className="mt-4">
+                <p className="font-medium text-amber-600 mb-1">Warnings:</p>
+                <ul className="list-disc pl-6 text-sm text-muted-foreground">
+                  {validationResult.warnings.map((warning, i) => (
+                    <li key={i}>{warning}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmDialog(false)}
+              data-testid="button-cancel-confirm"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={performDeletionMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {performDeletionMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Yes, Delete Data
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
