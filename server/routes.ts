@@ -572,6 +572,27 @@ export async function registerRoutes(
       }
       req.body.productionWindowDays = productionWindowDays;
     }
+    if (req.body.ifcDaysInAdvance !== undefined) {
+      const ifcDaysInAdvance = parseInt(req.body.ifcDaysInAdvance, 10);
+      if (isNaN(ifcDaysInAdvance) || ifcDaysInAdvance < 1 || ifcDaysInAdvance > 60) {
+        return res.status(400).json({ error: "ifcDaysInAdvance must be a number between 1 and 60" });
+      }
+      req.body.ifcDaysInAdvance = ifcDaysInAdvance;
+    }
+    if (req.body.daysToAchieveIfc !== undefined) {
+      const daysToAchieveIfc = parseInt(req.body.daysToAchieveIfc, 10);
+      if (isNaN(daysToAchieveIfc) || daysToAchieveIfc < 1 || daysToAchieveIfc > 90) {
+        return res.status(400).json({ error: "daysToAchieveIfc must be a number between 1 and 90" });
+      }
+      req.body.daysToAchieveIfc = daysToAchieveIfc;
+    }
+    if (req.body.productionDaysInAdvance !== undefined) {
+      const productionDaysInAdvance = parseInt(req.body.productionDaysInAdvance, 10);
+      if (isNaN(productionDaysInAdvance) || productionDaysInAdvance < 1 || productionDaysInAdvance > 60) {
+        return res.status(400).json({ error: "productionDaysInAdvance must be a number between 1 and 60" });
+      }
+      req.body.productionDaysInAdvance = productionDaysInAdvance;
+    }
     const settings = await storage.updateGlobalSettings(req.body);
     res.json(settings);
   });
@@ -756,6 +777,28 @@ export async function registerRoutes(
         } else {
           data.productionStartDate = null;
         }
+      }
+      // Validate and parse production configuration fields
+      if (data.daysToAchieveIfc !== undefined && data.daysToAchieveIfc !== null) {
+        const val = parseInt(data.daysToAchieveIfc, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "daysToAchieveIfc must be a positive number" });
+        }
+        data.daysToAchieveIfc = val;
+      }
+      if (data.productionWindowDays !== undefined && data.productionWindowDays !== null) {
+        const val = parseInt(data.productionWindowDays, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "productionWindowDays must be a positive number" });
+        }
+        data.productionWindowDays = val;
+      }
+      if (data.productionDaysInAdvance !== undefined && data.productionDaysInAdvance !== null) {
+        const val = parseInt(data.productionDaysInAdvance, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "productionDaysInAdvance must be a positive number" });
+        }
+        data.productionDaysInAdvance = val;
       }
       const job = await storage.updateJob(req.params.id as string, data);
       res.json(job);
@@ -2253,8 +2296,9 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Job not found for production slot" });
       }
       
+      // Use job-level productionWindowDays or fall back to global settings
       const settings = await storage.getGlobalSettings();
-      const productionWindowDays = settings?.productionWindowDays ?? 10;
+      const productionWindowDays = job.productionWindowDays ?? settings?.productionWindowDays ?? 10;
       
       // Calculate production window boundaries
       const dueDate = new Date(slot.productionSlotDate);

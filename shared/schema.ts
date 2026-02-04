@@ -108,6 +108,7 @@ export const globalSettings = pgTable("global_settings", {
   productionWindowDays: integer("production_window_days").default(10).notNull(),
   ifcDaysInAdvance: integer("ifc_days_in_advance").default(14).notNull(),
   daysToAchieveIfc: integer("days_to_achieve_ifc").default(21).notNull(),
+  productionDaysInAdvance: integer("production_days_in_advance").default(10).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -150,7 +151,10 @@ export const jobs = pgTable("jobs", {
   highestLevel: text("highest_level"), // e.g., "L5", "Roof"
   productionStartDate: timestamp("production_start_date"),
   expectedCycleTimePerFloor: integer("expected_cycle_time_per_floor"), // days per floor for production scheduling
-  daysInAdvance: integer("days_in_advance").default(7), // days before site needs panels to cast
+  daysInAdvance: integer("days_in_advance").default(7), // IFC days before production (days before production when drawings need to reach IFC stage)
+  daysToAchieveIfc: integer("days_to_achieve_ifc"), // days to complete drafting work
+  productionWindowDays: integer("production_window_days"), // days before due date when production can start
+  productionDaysInAdvance: integer("production_days_in_advance"), // days before site needs panels to cast
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   productionSlotColor: text("production_slot_color"), // hex color for production slots display
   status: jobStatusEnum("status").default("ACTIVE").notNull(),

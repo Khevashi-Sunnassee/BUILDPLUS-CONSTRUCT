@@ -83,7 +83,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, PanelRegister, User as UserType } from "@shared/schema";
+import type { Job, PanelRegister, User as UserType, GlobalSettings } from "@shared/schema";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -118,6 +118,9 @@ const jobSchema = z.object({
   productionStartDate: z.string().optional(),
   expectedCycleTimePerFloor: z.number().int().min(1).optional().nullable(),
   daysInAdvance: z.number().int().min(1).optional().nullable(),
+  daysToAchieveIfc: z.number().int().min(1).optional().nullable(),
+  productionWindowDays: z.number().int().min(1).optional().nullable(),
+  productionDaysInAdvance: z.number().int().min(1).optional().nullable(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
@@ -216,6 +219,10 @@ export default function AdminJobsPage() {
 
   const { data: users } = useQuery<UserType[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: globalSettings } = useQuery<GlobalSettings>({
+    queryKey: ["/api/admin/settings"],
   });
 
   // Filter and sort jobs
@@ -632,7 +639,10 @@ export default function AdminJobsPage() {
       highestLevel: "",
       productionStartDate: "",
       expectedCycleTimePerFloor: null,
-      daysInAdvance: 7,
+      daysInAdvance: globalSettings?.ifcDaysInAdvance ?? 14,
+      daysToAchieveIfc: globalSettings?.daysToAchieveIfc ?? 21,
+      productionWindowDays: globalSettings?.productionWindowDays ?? 10,
+      productionDaysInAdvance: globalSettings?.productionDaysInAdvance ?? 10,
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -660,7 +670,10 @@ export default function AdminJobsPage() {
       highestLevel: job.highestLevel || "",
       productionStartDate: job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : "",
       expectedCycleTimePerFloor: job.expectedCycleTimePerFloor ?? null,
-      daysInAdvance: job.daysInAdvance ?? 7,
+      daysInAdvance: job.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14,
+      daysToAchieveIfc: job.daysToAchieveIfc ?? globalSettings?.daysToAchieveIfc ?? 21,
+      productionWindowDays: job.productionWindowDays ?? globalSettings?.productionWindowDays ?? 10,
+      productionDaysInAdvance: job.productionDaysInAdvance ?? globalSettings?.productionDaysInAdvance ?? 10,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
@@ -674,7 +687,7 @@ export default function AdminJobsPage() {
     setPendingJobId(null);
     
     // Capture original days in advance for change detection
-    setOriginalDaysInAdvance(job.daysInAdvance ?? 7);
+    setOriginalDaysInAdvance(job.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14);
     setDaysInAdvanceChanged(false);
     
     // Load level cycle times in background
@@ -1494,12 +1507,12 @@ export default function AdminJobsPage() {
                       name="daysInAdvance"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Days in Advance</FormLabel>
+                          <FormLabel>IFC Days in Advance</FormLabel>
                           <FormControl>
                             <Input 
                               type="number" 
                               min="1"
-                              placeholder="e.g., 7"
+                              placeholder="e.g., 14"
                               value={field.value ?? ""} 
                               onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
                               onBlur={(e) => {
@@ -1514,7 +1527,72 @@ export default function AdminJobsPage() {
                               data-testid="input-job-days-in-advance" 
                             />
                           </FormControl>
-                          <p className="text-xs text-muted-foreground">Lead time before site</p>
+                          <p className="text-xs text-muted-foreground">Days before production for IFC</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="daysToAchieveIfc"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Days to Achieve IFC</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              placeholder="e.g., 21"
+                              value={field.value ?? ""} 
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              data-testid="input-job-days-to-achieve-ifc" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Days to complete drafting</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="productionWindowDays"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Production Window Days</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              placeholder="e.g., 10"
+                              value={field.value ?? ""} 
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              data-testid="input-job-production-window-days" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Days before due date for production start</p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="productionDaysInAdvance"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Production Days in Advance</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min="1"
+                              placeholder="e.g., 10"
+                              value={field.value ?? ""} 
+                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              data-testid="input-job-production-days-in-advance" 
+                            />
+                          </FormControl>
+                          <p className="text-xs text-muted-foreground">Days before site delivery</p>
                           <FormMessage />
                         </FormItem>
                       )}

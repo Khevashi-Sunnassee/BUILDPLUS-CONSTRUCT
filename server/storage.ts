@@ -2199,10 +2199,11 @@ export class DatabaseStorage implements IStorage {
     );
     const defaultCycleTime = job.expectedCycleTimePerFloor;
 
-    // Calculate base date (productionStartDate - daysInAdvance)
-    const daysInAdvance = job.daysInAdvance || 7;
+    // Calculate base date (productionStartDate - productionDaysInAdvance)
+    // Use job-level productionDaysInAdvance, fall back to legacy daysInAdvance, then default to 10
+    const productionDaysInAdvance = job.productionDaysInAdvance ?? job.daysInAdvance ?? 10;
     const baseDate = new Date(job.productionStartDate);
-    baseDate.setDate(baseDate.getDate() - daysInAdvance);
+    baseDate.setDate(baseDate.getDate() - productionDaysInAdvance);
 
     const createdSlots: ProductionSlot[] = [];
     let cumulativeDays = 0;
@@ -2506,20 +2507,37 @@ export class DatabaseStorage implements IStorage {
   }
 
   async generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }> {
-    // Get global settings for date calculations
+    // Get global settings as fallback defaults
     const settings = await this.getGlobalSettings();
-    const ifcDaysInAdvance = settings?.ifcDaysInAdvance ?? 14;
-    const daysToAchieveIfc = settings?.daysToAchieveIfc ?? 21;
+    const defaultIfcDaysInAdvance = settings?.ifcDaysInAdvance ?? 14;
+    const defaultDaysToAchieveIfc = settings?.daysToAchieveIfc ?? 21;
     
     // Get all production slots that are not completed
     const slots = await db.select().from(productionSlots).where(
       sql`${productionSlots.status} != 'COMPLETED'`
     );
     
+    // Cache job data to avoid repeated queries
+    const jobCache = new Map<string, Job>();
+    
     let created = 0;
     let updated = 0;
     
     for (const slot of slots) {
+      // Get job data for job-level settings (use cache)
+      let job = jobCache.get(slot.jobId);
+      if (!job) {
+        const [jobData] = await db.select().from(jobs).where(eq(jobs.id, slot.jobId));
+        if (jobData) {
+          job = jobData;
+          jobCache.set(slot.jobId, jobData);
+        }
+      }
+      
+      // Use job-level settings or fall back to global defaults
+      const ifcDaysInAdvance = job?.daysInAdvance ?? defaultIfcDaysInAdvance;
+      const daysToAchieveIfc = job?.daysToAchieveIfc ?? defaultDaysToAchieveIfc;
+      
       // Get all panels for this slot's job and level
       const panels = await db.select().from(panelRegister).where(and(
         eq(panelRegister.jobId, slot.jobId),
@@ -2530,7 +2548,7 @@ export class DatabaseStorage implements IStorage {
         // Check if drafting program entry already exists for this panel
         const existing = await this.getDraftingProgramByPanelId(panel.id);
         
-        // Calculate dates
+        // Calculate dates using job-level settings
         const productionDate = slot.productionSlotDate;
         const drawingDueDate = new Date(productionDate);
         drawingDueDate.setDate(drawingDueDate.getDate() - ifcDaysInAdvance);

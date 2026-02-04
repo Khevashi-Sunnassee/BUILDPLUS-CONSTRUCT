@@ -58,6 +58,7 @@ export default function AdminSettingsPage() {
   const [productionWindowDays, setProductionWindowDays] = useState<number>(10);
   const [ifcDaysInAdvance, setIfcDaysInAdvance] = useState<number>(14);
   const [daysToAchieveIfc, setDaysToAchieveIfc] = useState<number>(21);
+  const [productionDaysInAdvance, setProductionDaysInAdvance] = useState<number>(10);
   const [showDeletePanel, setShowDeletePanel] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -104,7 +105,10 @@ export default function AdminSettingsPage() {
     if (settings?.daysToAchieveIfc !== undefined) {
       setDaysToAchieveIfc(settings.daysToAchieveIfc);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc]);
+    if (settings?.productionDaysInAdvance !== undefined) {
+      setProductionDaysInAdvance(settings.productionDaysInAdvance);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -169,6 +173,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save days to achieve IFC", variant: "destructive" });
+    },
+  });
+
+  const saveProductionDaysInAdvanceMutation = useMutation({
+    mutationFn: async (days: number) => {
+      return apiRequest("PUT", "/api/admin/settings", { productionDaysInAdvance: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Production days in advance saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save production days in advance", variant: "destructive" });
     },
   });
 
@@ -617,6 +634,40 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Number of days required to complete drafting work from start to reaching IFC stage. This defines the drafting window for scheduling resources.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="productionDaysInAdvance">Production Days in Advance of Site</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                type="number"
+                min={1}
+                max={90}
+                value={productionDaysInAdvance}
+                onChange={(e) => setProductionDaysInAdvance(parseInt(e.target.value) || 10)}
+                className="w-24"
+                data-testid="input-production-days-in-advance"
+              />
+              <span className="text-muted-foreground">days before site delivery</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveProductionDaysInAdvanceMutation.mutate(productionDaysInAdvance)}
+                disabled={saveProductionDaysInAdvanceMutation.isPending || productionDaysInAdvance === settings?.productionDaysInAdvance}
+                data-testid="button-save-production-days-in-advance"
+              >
+                {saveProductionDaysInAdvanceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Number of days before panels need to be delivered to site that production should complete. This is used for production scheduling.
             </p>
           </div>
         </CardContent>
