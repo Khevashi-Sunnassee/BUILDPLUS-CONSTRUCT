@@ -579,6 +579,11 @@ export async function registerRoutes(
       if (isNaN(ifcDaysInAdvance) || ifcDaysInAdvance < 1 || ifcDaysInAdvance > 60) {
         return res.status(400).json({ error: "ifcDaysInAdvance must be a number between 1 and 60" });
       }
+      const currentSettings = await storage.getGlobalSettings();
+      const effectiveProcurementDays = req.body.procurementDaysInAdvance ?? currentSettings?.procurementDaysInAdvance ?? 7;
+      if (ifcDaysInAdvance <= effectiveProcurementDays) {
+        return res.status(400).json({ error: `ifcDaysInAdvance must be greater than procurementDaysInAdvance (${effectiveProcurementDays})` });
+      }
       req.body.ifcDaysInAdvance = ifcDaysInAdvance;
     }
     if (req.body.daysToAchieveIfc !== undefined) {
@@ -594,6 +599,25 @@ export async function registerRoutes(
         return res.status(400).json({ error: "productionDaysInAdvance must be a number between 1 and 60" });
       }
       req.body.productionDaysInAdvance = productionDaysInAdvance;
+    }
+    if (req.body.procurementDaysInAdvance !== undefined) {
+      const procurementDaysInAdvance = parseInt(req.body.procurementDaysInAdvance, 10);
+      if (isNaN(procurementDaysInAdvance) || procurementDaysInAdvance < 1 || procurementDaysInAdvance > 60) {
+        return res.status(400).json({ error: "procurementDaysInAdvance must be a number between 1 and 60" });
+      }
+      const currentSettings = await storage.getGlobalSettings();
+      const effectiveIfcDays = req.body.ifcDaysInAdvance ?? currentSettings?.ifcDaysInAdvance ?? 14;
+      if (procurementDaysInAdvance >= effectiveIfcDays) {
+        return res.status(400).json({ error: `procurementDaysInAdvance must be less than ifcDaysInAdvance (${effectiveIfcDays})` });
+      }
+      req.body.procurementDaysInAdvance = procurementDaysInAdvance;
+    }
+    if (req.body.procurementTimeDays !== undefined) {
+      const procurementTimeDays = parseInt(req.body.procurementTimeDays, 10);
+      if (isNaN(procurementTimeDays) || procurementTimeDays < 1 || procurementTimeDays > 90) {
+        return res.status(400).json({ error: "procurementTimeDays must be a number between 1 and 90" });
+      }
+      req.body.procurementTimeDays = procurementTimeDays;
     }
     const settings = await storage.updateGlobalSettings(req.body);
     res.json(settings);
@@ -762,6 +786,26 @@ export async function registerRoutes(
       if (data.productionStartDate && typeof data.productionStartDate === 'string') {
         data.productionStartDate = new Date(data.productionStartDate);
       }
+      // Validate procurement settings - get global settings for default IFC days
+      const globalSettings = await storage.getGlobalSettings();
+      if (data.procurementDaysInAdvance !== undefined && data.procurementDaysInAdvance !== null) {
+        const val = parseInt(data.procurementDaysInAdvance, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "procurementDaysInAdvance must be a positive number" });
+        }
+        const ifcDays = data.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14;
+        if (val >= ifcDays) {
+          return res.status(400).json({ error: `procurementDaysInAdvance must be less than IFC days in advance (${ifcDays})` });
+        }
+        data.procurementDaysInAdvance = val;
+      }
+      if (data.procurementTimeDays !== undefined && data.procurementTimeDays !== null) {
+        const val = parseInt(data.procurementTimeDays, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "procurementTimeDays must be a positive number" });
+        }
+        data.procurementTimeDays = val;
+      }
       const job = await storage.createJob(data);
       res.json(job);
     } catch (error: any) {
@@ -801,6 +845,37 @@ export async function registerRoutes(
           return res.status(400).json({ error: "productionDaysInAdvance must be a positive number" });
         }
         data.productionDaysInAdvance = val;
+      }
+      // Validate procurement settings - get global settings and existing job for defaults
+      const globalSettings = await storage.getGlobalSettings();
+      const existingJob = await storage.getJob(req.params.id as string);
+      
+      // Cross-validate when daysInAdvance is updated
+      if (data.daysInAdvance !== undefined && data.daysInAdvance !== null) {
+        const newIfcDays = parseInt(data.daysInAdvance, 10);
+        const effectiveProcurementDays = data.procurementDaysInAdvance ?? existingJob?.procurementDaysInAdvance ?? globalSettings?.procurementDaysInAdvance ?? 7;
+        if (!isNaN(newIfcDays) && newIfcDays <= effectiveProcurementDays) {
+          return res.status(400).json({ error: `daysInAdvance must be greater than procurementDaysInAdvance (${effectiveProcurementDays})` });
+        }
+      }
+      
+      if (data.procurementDaysInAdvance !== undefined && data.procurementDaysInAdvance !== null) {
+        const val = parseInt(data.procurementDaysInAdvance, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "procurementDaysInAdvance must be a positive number" });
+        }
+        const ifcDays = data.daysInAdvance ?? existingJob?.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14;
+        if (val >= ifcDays) {
+          return res.status(400).json({ error: `procurementDaysInAdvance must be less than IFC days in advance (${ifcDays})` });
+        }
+        data.procurementDaysInAdvance = val;
+      }
+      if (data.procurementTimeDays !== undefined && data.procurementTimeDays !== null) {
+        const val = parseInt(data.procurementTimeDays, 10);
+        if (isNaN(val) || val < 1) {
+          return res.status(400).json({ error: "procurementTimeDays must be a positive number" });
+        }
+        data.procurementTimeDays = val;
       }
       const job = await storage.updateJob(req.params.id as string, data);
       res.json(job);
