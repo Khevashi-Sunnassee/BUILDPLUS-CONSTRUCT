@@ -98,6 +98,27 @@ function CalendarView({
 
   const cfmeuCalendarType = selectedFactory?.cfmeuCalendar || null;
 
+  // If no factory is selected, show a message
+  const activeFactories = factories.filter(f => f.isActive);
+  if (!selectedFactoryId && activeFactories.length > 1) {
+    return (
+      <div className="p-8 text-center space-y-4">
+        <FactoryIcon className="h-12 w-12 mx-auto text-muted-foreground" />
+        <div>
+          <h3 className="font-semibold text-lg">Select a Factory</h3>
+          <p className="text-muted-foreground">
+            Please select a specific factory from the filter above to view the production calendar with CFMEU holidays and RDOs.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Filter slots to only show those for the selected factory
+  const filteredSlots = selectedFactoryId 
+    ? slots.filter(slot => slot.job.factoryId === selectedFactoryId)
+    : slots;
+
   // Memoize date range calculation
   const { start, end, days } = useMemo(() => {
     let start: Date, end: Date;
@@ -147,7 +168,7 @@ function CalendarView({
 
   // Calculate slots with their production window (start date to onsite date)
   const slotsWithWindows = useMemo(() => {
-    return slots.map(slot => {
+    return filteredSlots.map(slot => {
       const productionDate = new Date(slot.productionSlotDate);
       const productionDaysInAdvance = slot.job.productionDaysInAdvance ?? 10;
       const onsiteDate = addDays(productionDate, productionDaysInAdvance);
@@ -168,7 +189,7 @@ function CalendarView({
       }
       return a.slot.level.localeCompare(b.slot.level);
     });
-  }, [slots, start, end, colorCache]);
+  }, [filteredSlots, start, end, colorCache]);
 
   // Navigate to previous/next period
   const navigate = useCallback((direction: "prev" | "next") => {
