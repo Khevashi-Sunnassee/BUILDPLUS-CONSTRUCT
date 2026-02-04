@@ -56,6 +56,7 @@ export default function DraftingProgramPage() {
   const weekStartDay = globalSettings?.weekStartDay ?? 1;
   const ifcDaysInAdvance = globalSettings?.ifcDaysInAdvance ?? 14;
   const daysToAchieveIfc = globalSettings?.daysToAchieveIfc ?? 21;
+  const productionWindowDays = globalSettings?.productionWindowDays ?? 10;
   
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [jobFilter, setJobFilter] = useState<string>("all");
@@ -295,8 +296,8 @@ export default function DraftingProgramPage() {
           <h1 className="text-2xl font-semibold">Drafting Program</h1>
           <p className="text-muted-foreground">
             Schedule and assign drafting resources to panels. 
-            Drawing Due = Production Date - {ifcDaysInAdvance} days, 
-            Drafting Window = {daysToAchieveIfc} days
+            Drawing Due = Production Date - {productionWindowDays} - {ifcDaysInAdvance} days, 
+            Drafting Start = Drawing Due - {daysToAchieveIfc} days
           </p>
         </div>
         {isManagerOrAdmin && (
@@ -552,6 +553,7 @@ export default function DraftingProgramPage() {
                           <TableHead>Level</TableHead>
                           <TableHead>Production Date</TableHead>
                           <TableHead>Drawing Due</TableHead>
+                          <TableHead>Drafting Window</TableHead>
                           <TableHead>Proposed Start</TableHead>
                           <TableHead>Assigned To</TableHead>
                           <TableHead>Status</TableHead>
@@ -575,6 +577,9 @@ export default function DraftingProgramPage() {
                             </TableCell>
                             <TableCell className={getDateColorClass(entry.drawingDueDate ? new Date(entry.drawingDueDate) : null)}>
                               {entry.drawingDueDate ? format(new Date(entry.drawingDueDate), "dd/MM/yyyy") : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
                             </TableCell>
                             <TableCell>
                               {entry.proposedStartDate ? format(new Date(entry.proposedStartDate), "dd/MM/yyyy") : "-"}
