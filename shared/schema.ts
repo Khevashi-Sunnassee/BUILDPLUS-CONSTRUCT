@@ -78,6 +78,7 @@ export const FUNCTION_KEYS = [
   "admin_zones",
   "admin_suppliers",
   "admin_item_catalog",
+  "admin_factories",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -134,6 +135,39 @@ export const cfmeuHolidays = pgTable("cfmeu_holidays", {
 }, (table) => ({
   calendarDateIdx: uniqueIndex("cfmeu_holidays_calendar_date_idx").on(table.calendarType, table.date),
   yearIdx: index("cfmeu_holidays_year_idx").on(table.year),
+}));
+
+export const factories = pgTable("factories", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  address: text("address"),
+  state: australianStateEnum("state").default("VIC").notNull(),
+  latitude: decimal("latitude", { precision: 10, scale: 7 }),
+  longitude: decimal("longitude", { precision: 10, scale: 7 }),
+  cfmeuCalendar: cfmeuCalendarTypeEnum("cfmeu_calendar"),
+  workDays: json("work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
+  color: text("color").default("#3B82F6"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: uniqueIndex("factories_code_idx").on(table.code),
+  activeIdx: index("factories_active_idx").on(table.isActive),
+}));
+
+export const productionBeds = pgTable("production_beds", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  factoryId: varchar("factory_id", { length: 36 }).notNull().references(() => factories.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  lengthMm: integer("length_mm").notNull(),
+  widthMm: integer("width_mm").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  factoryIdx: index("production_beds_factory_idx").on(table.factoryId),
+  activeIdx: index("production_beds_active_idx").on(table.isActive),
 }));
 
 export const zones = pgTable("zones", {
@@ -697,6 +731,18 @@ export const insertCfmeuHolidaySchema = createInsertSchema(cfmeuHolidays).omit({
   createdAt: true,
 });
 
+export const insertFactorySchema = createInsertSchema(factories).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertProductionBedSchema = createInsertSchema(productionBeds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertProductionEntrySchema = createInsertSchema(productionEntries).omit({
   id: true,
   createdAt: true,
@@ -874,6 +920,10 @@ export type InsertGlobalSettings = z.infer<typeof insertGlobalSettingsSchema>;
 export type GlobalSettings = typeof globalSettings.$inferSelect;
 export type InsertCfmeuHoliday = z.infer<typeof insertCfmeuHolidaySchema>;
 export type CfmeuHoliday = typeof cfmeuHolidays.$inferSelect;
+export type InsertFactory = z.infer<typeof insertFactorySchema>;
+export type Factory = typeof factories.$inferSelect;
+export type InsertProductionBed = z.infer<typeof insertProductionBedSchema>;
+export type ProductionBed = typeof productionBeds.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type InsertProductionEntry = z.infer<typeof insertProductionEntrySchema>;
 export type ProductionEntry = typeof productionEntries.$inferSelect;
