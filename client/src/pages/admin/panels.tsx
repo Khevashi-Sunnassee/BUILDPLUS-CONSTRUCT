@@ -1644,6 +1644,11 @@ export default function AdminPanelsPage() {
                               borderLeft: `4px solid ${panel.job.productionSlotColor}` 
                             } : undefined}
                           >
+                            {!filterJobId && (
+                              <TableCell>
+                                <span className="font-mono text-sm">{panel.job.jobNumber}</span>
+                              </TableCell>
+                            )}
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -1668,7 +1673,7 @@ export default function AdminPanelsPage() {
                               })()}
                             </TableCell>
                             <TableCell className="text-sm">{panel.building || "-"}</TableCell>
-                            <TableCell className="text-sm">{panel.job.jobNumber}</TableCell>
+                            <TableCell className="text-sm">{panel.level || "-"}</TableCell>
                             <TableCell className="text-center">{panel.qty || 1}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadWidth)}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
