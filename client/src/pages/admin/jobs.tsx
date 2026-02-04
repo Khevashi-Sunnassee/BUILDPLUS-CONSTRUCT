@@ -1479,6 +1479,13 @@ export default function AdminJobsPage() {
             <TabsContent value="production" className="mt-4">
               <div className="space-y-4">
                 <h3 className="font-medium text-sm text-muted-foreground">Production Configuration</h3>
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-3 text-sm">
+                  <p className="text-blue-800 dark:text-blue-200">
+                    <strong>Note:</strong> All day values (cycle times, days in advance, etc.) are calculated as <strong>working days</strong>. 
+                    Working days are determined by the assigned factory's work schedule (Mon-Fri by default) and CFMEU calendar (if configured). 
+                    Non-work days and public holidays/RDOs are automatically excluded from calculations.
+                  </p>
+                </div>
                   <FormField
                     control={jobForm.control}
                     name="craneCapacity"

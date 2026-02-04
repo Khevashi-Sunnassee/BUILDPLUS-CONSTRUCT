@@ -106,6 +106,7 @@ export async function getCfmeuHolidaysInRange(
 
 /**
  * Check if a date is a working day based on work days config and holidays.
+ * Uses local date comparison to avoid timezone issues (dates stored in Australia/Melbourne timezone).
  */
 export function isWorkingDay(date: Date, workDays: boolean[], holidays: Date[]): boolean {
   const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
@@ -113,9 +114,14 @@ export function isWorkingDay(date: Date, workDays: boolean[], holidays: Date[]):
   // Check if this day of week is a work day
   if (!workDays[dayOfWeek]) return false;
   
-  // Check if this date is a holiday
-  const dateStr = date.toISOString().split('T')[0];
-  const isHoliday = holidays.some(h => h.toISOString().split('T')[0] === dateStr);
+  // Check if this date is a holiday using local date comparison (avoid UTC conversion issues)
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  const day = date.getDate();
+  
+  const isHoliday = holidays.some(h => 
+    h.getFullYear() === year && h.getMonth() === month && h.getDate() === day
+  );
   
   return !isHoliday;
 }
@@ -2651,6 +2657,11 @@ export class DatabaseStorage implements IStorage {
     const defaultIfcDaysInAdvance = settings?.ifcDaysInAdvance ?? 14;
     const defaultDaysToAchieveIfc = settings?.daysToAchieveIfc ?? 21;
     
+    // Drafting uses GLOBAL drafting work days only (no CFMEU calendar)
+    // This is different from production which uses factory-specific work days + CFMEU calendar
+    const draftingWorkDays = (settings?.draftingWorkDays as boolean[]) ?? [false, true, true, true, true, true, false];
+    const noHolidays: Date[] = []; // Drafting doesn't use CFMEU calendar
+    
     // Get all production slots that are not completed
     const slots = await db.select().from(productionSlots).where(
       sql`${productionSlots.status} != 'COMPLETED'`
@@ -2674,6 +2685,7 @@ export class DatabaseStorage implements IStorage {
       }
       
       // Use job-level settings or fall back to global defaults
+      // All day values are now WORKING DAYS
       const ifcDaysInAdvance = job?.daysInAdvance ?? defaultIfcDaysInAdvance;
       const daysToAchieveIfc = job?.daysToAchieveIfc ?? defaultDaysToAchieveIfc;
       const productionWindowDays = job?.productionWindowDays ?? settings?.productionWindowDays ?? 10;
@@ -2688,24 +2700,23 @@ export class DatabaseStorage implements IStorage {
         // Check if drafting program entry already exists for this panel
         const existing = await this.getDraftingProgramByPanelId(panel.id);
         
-        // Date calculation flow (working backwards):
+        // Date calculation flow (working backwards using WORKING DAYS):
+        // Drafting uses global draftingWorkDays (no CFMEU calendar)
         // 1. productionSlotDate = Panel Production Due
-        // 2. Production Window Start = Panel Production Due - production_window_days
-        // 3. Drawing Due (IFC) = Production Window Start - ifc_days_in_advance
-        // 4. Drafting Start = Drawing Due - days_to_achieve_ifc
+        // 2. Production Window Start = Panel Production Due - production_window_days WORKING DAYS
+        // 3. Drawing Due (IFC) = Production Window Start - ifc_days_in_advance WORKING DAYS
+        // 4. Drafting Start = Drawing Due - days_to_achieve_ifc WORKING DAYS
         
         const productionDate = slot.productionSlotDate;
         
-        // Calculate production window start (when production CAN begin)
-        const productionWindowStart = new Date(productionDate);
-        productionWindowStart.setDate(productionWindowStart.getDate() - productionWindowDays);
+        // Calculate production window start using working days
+        const productionWindowStart = subtractWorkingDays(productionDate, productionWindowDays, draftingWorkDays, noHolidays);
         
-        // Drawing due date is calculated from production window start
-        const drawingDueDate = new Date(productionWindowStart);
-        drawingDueDate.setDate(drawingDueDate.getDate() - ifcDaysInAdvance);
+        // Drawing due date is calculated from production window start using working days
+        const drawingDueDate = subtractWorkingDays(productionWindowStart, ifcDaysInAdvance, draftingWorkDays, noHolidays);
         
-        const draftingWindowStart = new Date(drawingDueDate);
-        draftingWindowStart.setDate(draftingWindowStart.getDate() - daysToAchieveIfc);
+        // Drafting window start using working days
+        const draftingWindowStart = subtractWorkingDays(drawingDueDate, daysToAchieveIfc, draftingWorkDays, noHolidays);
         
         if (existing) {
           // Update existing entry with new dates if production slot dates changed
