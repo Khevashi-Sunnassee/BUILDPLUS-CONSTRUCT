@@ -93,17 +93,6 @@ function CalendarView({
     return { start, end, days: eachDayOfInterval({ start, end }) };
   }, [currentDate, calendarViewMode, weekStartDay]);
 
-  // Pre-group slots by date key for O(1) lookup instead of O(n) filtering per day
-  const slotsByDate = useMemo(() => {
-    const grouped: Record<string, ProductionSlotWithDetails[]> = {};
-    for (const slot of slots) {
-      const dateKey = format(new Date(slot.productionSlotDate), "yyyy-MM-dd");
-      if (!grouped[dateKey]) grouped[dateKey] = [];
-      grouped[dateKey].push(slot);
-    }
-    return grouped;
-  }, [slots]);
-
   // Memoize color cache to avoid recalculating on every render
   const colorCache = useMemo(() => {
     const cache: Record<string, string> = {};
@@ -116,11 +105,30 @@ function CalendarView({
     return cache;
   }, [slots]);
 
-  // O(1) lookup for slots on a specific day
-  const getSlotsForDay = useCallback((day: Date) => {
-    const dateKey = format(day, "yyyy-MM-dd");
-    return slotsByDate[dateKey] || [];
-  }, [slotsByDate]);
+  // Calculate slots with their production window (start date to onsite date)
+  const slotsWithWindows = useMemo(() => {
+    return slots.map(slot => {
+      const productionDate = new Date(slot.productionSlotDate);
+      const productionDaysInAdvance = slot.job.productionDaysInAdvance ?? 10;
+      const onsiteDate = addDays(productionDate, productionDaysInAdvance);
+      return {
+        slot,
+        startDate: productionDate,
+        endDate: onsiteDate,
+        jobColor: colorCache[slot.job.jobNumber] || stringToColor(slot.job.jobNumber),
+        levelColor: colorCache[`${slot.job.jobNumber}-${slot.level}`] || stringToColor(`${slot.job.jobNumber}-${slot.level}`),
+      };
+    }).filter(item => {
+      // Only include slots that overlap with the current view
+      return item.endDate >= start && item.startDate <= end;
+    }).sort((a, b) => {
+      // Sort by job number, then level
+      if (a.slot.job.jobNumber !== b.slot.job.jobNumber) {
+        return a.slot.job.jobNumber.localeCompare(b.slot.job.jobNumber);
+      }
+      return a.slot.level.localeCompare(b.slot.level);
+    });
+  }, [slots, start, end, colorCache]);
 
   // Navigate to previous/next period
   const navigate = useCallback((direction: "prev" | "next") => {
@@ -136,14 +144,29 @@ function CalendarView({
     return format(currentDate, "MMMM yyyy");
   }, [calendarViewMode, start, end, currentDate]);
 
-  // Day names for header - memoized
-  const orderedDayNames = useMemo(() => {
-    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    return [...dayNames.slice(weekStartDay), ...dayNames.slice(0, weekStartDay)];
-  }, [weekStartDay]);
-
   // Memoize today's date to avoid creating new Date objects in render
   const today = useMemo(() => new Date(), []);
+
+  // Calculate bar position and width for a slot
+  const getBarStyle = useCallback((startDate: Date, endDate: Date) => {
+    const totalDays = days.length;
+    const viewStart = start.getTime();
+    const viewEnd = end.getTime();
+    const dayWidth = 100 / totalDays;
+    
+    // Clamp dates to view bounds
+    const barStart = Math.max(startDate.getTime(), viewStart);
+    const barEnd = Math.min(endDate.getTime(), viewEnd);
+    
+    // Calculate position as percentage
+    const startDayIndex = Math.floor((barStart - viewStart) / (1000 * 60 * 60 * 24));
+    const endDayIndex = Math.ceil((barEnd - viewStart) / (1000 * 60 * 60 * 24));
+    
+    const left = startDayIndex * dayWidth;
+    const width = (endDayIndex - startDayIndex) * dayWidth;
+    
+    return { left: `${left}%`, width: `${Math.max(width, dayWidth)}%` };
+  }, [days.length, start, end]);
 
   return (
     <div className="space-y-4">
@@ -181,138 +204,124 @@ function CalendarView({
         </div>
       </div>
 
-      {/* Calendar Grid */}
-      {calendarViewMode === "week" ? (
-        <div className="grid grid-cols-7 gap-2">
-          {/* Day headers */}
-          {orderedDayNames.map((name, i) => (
-            <div key={i} className="text-center text-sm font-medium text-muted-foreground py-2">
-              {name}
-            </div>
-          ))}
-          {/* Day cells */}
-          {days.map((day) => {
-            const daySlots = getSlotsForDay(day);
-            const isToday = isSameDay(day, today);
-            return (
-              <div
-                key={day.toISOString()}
-                className={`min-h-32 p-2 border rounded-lg ${isToday ? "border-primary bg-primary/5" : "bg-muted/20"}`}
-              >
-                <div className={`text-sm font-medium mb-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
-                  {format(day, "d")}
-                </div>
-                <div className="space-y-1 overflow-y-auto max-h-28">
-                  {daySlots.map((slot) => {
-                    const factory = getFactory(slot.job.factoryId);
-                    const jobColor = colorCache[slot.job.jobNumber] || stringToColor(slot.job.jobNumber);
-                    const levelColor = colorCache[`${slot.job.jobNumber}-${slot.level}`] || stringToColor(`${slot.job.jobNumber}-${slot.level}`);
-                    return (
-                      <div
-                        key={slot.id}
-                        onClick={() => onSlotClick(slot)}
-                        className="p-1.5 rounded text-xs cursor-pointer hover-elevate"
-                        style={{
-                          backgroundColor: `${levelColor}20`,
-                          borderLeft: `3px solid ${jobColor}`,
-                        }}
-                        title={`${slot.job.jobNumber} - ${slot.job.name} | Level ${slot.level} | ${slot.panelCount} panels`}
-                        data-testid={`calendar-slot-${slot.id}`}
-                      >
-                        <div className="font-medium truncate" style={{ color: jobColor }}>
-                          {slot.job.jobNumber}
-                        </div>
-                        <div className="text-muted-foreground truncate">
-                          Lvl {slot.level}
-                        </div>
-                        {factory && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] px-1 py-0 mt-0.5"
-                            style={{
-                              backgroundColor: factory.color ? `${factory.color}20` : undefined,
-                              borderColor: factory.color || undefined,
-                              color: factory.color || undefined,
-                            }}
-                          >
-                            {factory.code}
-                          </Badge>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div>
-          {/* Month view header */}
-          <div className="grid grid-cols-7 gap-1 mb-1">
-            {orderedDayNames.map((name, i) => (
-              <div key={i} className="text-center text-sm font-medium text-muted-foreground py-2">
-                {name}
-              </div>
-            ))}
+      {/* Gantt-style Timeline */}
+      <div className="border rounded-lg overflow-hidden">
+        {/* Day headers */}
+        <div className="flex border-b bg-muted/30">
+          <div className="w-48 shrink-0 p-2 border-r font-medium text-sm">
+            Job / Level
           </div>
-          {/* Month grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {/* Padding for days before the start of month */}
-            {Array.from({ length: (getDay(start) - weekStartDay + 7) % 7 }).map((_, i) => (
-              <div key={`pad-${i}`} className="min-h-24 p-1 bg-muted/10 rounded" />
-            ))}
-            {/* Day cells */}
+          <div className="flex-1 flex">
             {days.map((day) => {
-              const daySlots = getSlotsForDay(day);
               const isToday = isSameDay(day, today);
-              const isCurrentMonth = isSameMonth(day, currentDate);
+              const isWeekend = getDay(day) === 0 || getDay(day) === 6;
               return (
                 <div
                   key={day.toISOString()}
-                  className={`min-h-24 p-1 border rounded ${
-                    isToday ? "border-primary bg-primary/5" : isCurrentMonth ? "bg-background" : "bg-muted/30"
+                  className={`flex-1 text-center py-2 text-xs border-r last:border-r-0 ${
+                    isToday ? "bg-primary/10 font-bold text-primary" : isWeekend ? "bg-muted/50" : ""
                   }`}
                 >
-                  <div className={`text-xs font-medium mb-0.5 ${isToday ? "text-primary" : isCurrentMonth ? "" : "text-muted-foreground"}`}>
-                    {format(day, "d")}
-                  </div>
-                  <div className="space-y-0.5 overflow-y-auto max-h-20">
-                    {daySlots.slice(0, 3).map((slot) => {
-                      const jobColor = colorCache[slot.job.jobNumber] || stringToColor(slot.job.jobNumber);
-                      return (
-                        <div
-                          key={slot.id}
-                          onClick={() => onSlotClick(slot)}
-                          className="p-0.5 rounded text-[10px] cursor-pointer hover-elevate truncate"
-                          style={{
-                            backgroundColor: `${jobColor}20`,
-                            borderLeft: `2px solid ${jobColor}`,
-                          }}
-                          title={`${slot.job.jobNumber} - Level ${slot.level}`}
-                          data-testid={`calendar-slot-${slot.id}`}
-                        >
-                          <span style={{ color: jobColor }}>{slot.job.jobNumber}</span>
-                          <span className="text-muted-foreground ml-1">L{slot.level}</span>
-                        </div>
-                      );
-                    })}
-                    {daySlots.length > 3 && (
-                      <div className="text-[10px] text-muted-foreground text-center">
-                        +{daySlots.length - 3} more
-                      </div>
-                    )}
-                  </div>
+                  <div>{format(day, calendarViewMode === "week" ? "EEE" : "d")}</div>
+                  {calendarViewMode === "week" && (
+                    <div className="text-muted-foreground">{format(day, "d")}</div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
-      )}
+
+        {/* Slot rows with Gantt bars */}
+        <div className="max-h-[500px] overflow-y-auto">
+          {slotsWithWindows.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">
+              No production slots in this period
+            </div>
+          ) : (
+            slotsWithWindows.map((item) => {
+              const factory = getFactory(item.slot.job.factoryId);
+              const barStyle = getBarStyle(item.startDate, item.endDate);
+              
+              return (
+                <div
+                  key={item.slot.id}
+                  className="flex border-b last:border-b-0 hover:bg-muted/10"
+                >
+                  {/* Job/Level label */}
+                  <div className="w-48 shrink-0 p-2 border-r flex flex-col justify-center">
+                    <div className="font-medium text-sm truncate" style={{ color: item.jobColor }}>
+                      {item.slot.job.jobNumber}
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                      Level {item.slot.level}
+                      {factory && (
+                        <Badge
+                          variant="outline"
+                          className="text-[9px] px-1 py-0 ml-1"
+                          style={{
+                            backgroundColor: factory.color ? `${factory.color}20` : undefined,
+                            borderColor: factory.color || undefined,
+                            color: factory.color || undefined,
+                          }}
+                        >
+                          {factory.code}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Timeline area with bar */}
+                  <div className="flex-1 relative h-14">
+                    {/* Day column backgrounds */}
+                    <div className="absolute inset-0 flex">
+                      {days.map((day) => {
+                        const isToday = isSameDay(day, today);
+                        const isWeekend = getDay(day) === 0 || getDay(day) === 6;
+                        return (
+                          <div
+                            key={day.toISOString()}
+                            className={`flex-1 border-r last:border-r-0 ${
+                              isToday ? "bg-primary/5" : isWeekend ? "bg-muted/30" : ""
+                            }`}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* The bar */}
+                    <div
+                      onClick={() => onSlotClick(item.slot)}
+                      className="absolute top-2 h-10 rounded cursor-pointer hover-elevate flex items-center px-2 text-xs font-medium shadow-sm"
+                      style={{
+                        left: barStyle.left,
+                        width: barStyle.width,
+                        backgroundColor: `${item.levelColor}40`,
+                        borderLeft: `4px solid ${item.jobColor}`,
+                        color: item.jobColor,
+                      }}
+                      title={`${item.slot.job.jobNumber} - Level ${item.slot.level}\nProduction: ${format(item.startDate, "dd MMM")} → Onsite: ${format(item.endDate, "dd MMM")}\n${item.slot.panelCount} panels`}
+                      data-testid={`calendar-slot-${item.slot.id}`}
+                    >
+                      <span className="truncate">
+                        {item.slot.panelCount} panels
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
-        <span>Colors represent job numbers and levels. Click on a slot to view panel details.</span>
+      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t flex-wrap">
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 bg-primary/10 border border-primary rounded" />
+          <span>Today</span>
+        </div>
+        <span>Bars show production window from Production Date to Onsite Date. Click a bar to view panel details.</span>
       </div>
     </div>
   );
