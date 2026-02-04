@@ -191,6 +191,7 @@ export default function AdminJobsPage() {
   
   // Cycle times confirmation dialog state
   const [cycleTimesConfirmOpen, setCycleTimesConfirmOpen] = useState(false);
+  const [hasExistingLevelCycleTimes, setHasExistingLevelCycleTimes] = useState(false);
   const [productionSlotStatus, setProductionSlotStatus] = useState<{
     hasSlots: boolean;
     hasNonStartedSlots: boolean;
@@ -643,17 +644,30 @@ export default function AdminJobsPage() {
     
     // Load level cycle times in background
     setLevelCycleTimes([]);
+    setHasExistingLevelCycleTimes(false);
     setIsLoadingLevelData(true);
     try {
       const response = await fetch(`/api/admin/jobs/${job.id}/build-levels`);
       if (response.ok) {
         const data = await response.json();
         setLevelCycleTimes(data);
+        setHasExistingLevelCycleTimes(data.length > 0);
       }
     } catch (error) {
       console.error("Failed to load level cycle times:", error);
     } finally {
       setIsLoadingLevelData(false);
+    }
+    
+    // Check production slot status
+    try {
+      const slotResponse = await fetch(`/api/admin/jobs/${job.id}/production-slot-status`);
+      if (slotResponse.ok) {
+        const status = await slotResponse.json();
+        setProductionSlotStatus(status);
+      }
+    } catch (error) {
+      console.error("Failed to load production slot status:", error);
     }
   };
 
@@ -750,8 +764,16 @@ export default function AdminJobsPage() {
 
   // Handler to show confirmation when level fields change
   const handleLevelFieldChange = () => {
-    if (editingJob && levelCycleTimes.length > 0) {
+    if (!editingJob) return;
+    
+    // Show level cycle times regeneration dialog if they exist
+    if (hasExistingLevelCycleTimes) {
       setLevelChangeConfirmOpen(true);
+    }
+    
+    // Show production slots dialog if slots exist
+    if (productionSlotStatus?.hasSlots) {
+      setCycleTimesConfirmOpen(true);
     }
   };
 
