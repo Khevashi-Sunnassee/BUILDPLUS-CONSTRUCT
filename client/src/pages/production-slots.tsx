@@ -156,7 +156,7 @@ export default function ProductionSlotsPage() {
           color: factory.color || undefined,
         }}
       >
-        {factory.name}
+        {factory.code}
       </Badge>
     );
   };
