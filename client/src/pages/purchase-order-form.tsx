@@ -87,11 +87,11 @@ export default function PurchaseOrderFormPage() {
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers/active"],
+    queryKey: ["/api/procurement/suppliers/active"],
   });
 
   const { data: items = [], isLoading: loadingItems } = useQuery<Item[]>({
-    queryKey: ["/api/items/active"],
+    queryKey: ["/api/procurement/items/active"],
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({

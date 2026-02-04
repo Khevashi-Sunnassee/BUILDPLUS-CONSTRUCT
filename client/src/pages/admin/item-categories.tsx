@@ -72,7 +72,7 @@ export default function AdminItemCategoriesPage() {
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   const { data: categories, isLoading } = useQuery<ItemCategory[]>({
-    queryKey: ["/api/item-categories"],
+    queryKey: ["/api/procurement/item-categories"],
   });
 
   const form = useForm<ItemCategoryFormData>({
@@ -86,10 +86,10 @@ export default function AdminItemCategoriesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ItemCategoryFormData) => {
-      return apiRequest("POST", "/api/item-categories", data);
+      return apiRequest("POST", "/api/procurement/item-categories", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
       toast({ title: "Category created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -101,10 +101,10 @@ export default function AdminItemCategoriesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ItemCategoryFormData }) => {
-      return apiRequest("PATCH", `/api/item-categories/${id}`, data);
+      return apiRequest("PATCH", `/api/procurement/item-categories/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
       toast({ title: "Category updated successfully" });
       setDialogOpen(false);
       setEditingCategory(null);
@@ -117,10 +117,10 @@ export default function AdminItemCategoriesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/item-categories/${id}`, {});
+      return apiRequest("DELETE", `/api/procurement/item-categories/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
       toast({ title: "Category deleted" });
       setDeleteDialogOpen(false);
       setDeletingCategoryId(null);

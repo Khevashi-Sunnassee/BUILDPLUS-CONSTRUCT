@@ -101,7 +101,7 @@ export default function AdminSuppliersPage() {
   const [deletingSupplierId, setDeletingSupplierId] = useState<string | null>(null);
 
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/procurement/suppliers"],
   });
 
   const form = useForm<SupplierFormData>({
@@ -126,10 +126,10 @@ export default function AdminSuppliersPage() {
 
   const createSupplierMutation = useMutation({
     mutationFn: async (data: SupplierFormData) => {
-      return apiRequest("POST", "/api/suppliers", data);
+      return apiRequest("POST", "/api/procurement/suppliers", data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
       toast({ title: "Supplier created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -141,10 +141,10 @@ export default function AdminSuppliersPage() {
 
   const updateSupplierMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: SupplierFormData }) => {
-      return apiRequest("PATCH", `/api/suppliers/${id}`, data);
+      return apiRequest("PATCH", `/api/procurement/suppliers/${id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
       toast({ title: "Supplier updated successfully" });
       setDialogOpen(false);
       setEditingSupplier(null);
@@ -157,10 +157,10 @@ export default function AdminSuppliersPage() {
 
   const deleteSupplierMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/suppliers/${id}`, {});
+      return apiRequest("DELETE", `/api/procurement/suppliers/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
       toast({ title: "Supplier deleted" });
       setDeleteDialogOpen(false);
       setDeletingSupplierId(null);

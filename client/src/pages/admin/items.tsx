@@ -100,15 +100,15 @@ export default function AdminItemsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: items, isLoading } = useQuery<Item[]>({
-    queryKey: ["/api/items"],
+    queryKey: ["/api/procurement/items"],
   });
 
   const { data: categories } = useQuery<ItemCategory[]>({
-    queryKey: ["/api/item-categories/active"],
+    queryKey: ["/api/procurement/item-categories/active"],
   });
 
   const { data: suppliers } = useQuery<Supplier[]>({
-    queryKey: ["/api/suppliers/active"],
+    queryKey: ["/api/procurement/suppliers/active"],
   });
 
   const form = useForm<ItemFormData>({
@@ -137,10 +137,10 @@ export default function AdminItemsPage() {
         categoryId: data.categoryId || null,
         supplierId: data.supplierId || null,
       };
-      return apiRequest("POST", "/api/items", payload);
+      return apiRequest("POST", "/api/procurement/items", payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/items"] });
       toast({ title: "Item created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -160,10 +160,10 @@ export default function AdminItemsPage() {
         categoryId: data.categoryId || null,
         supplierId: data.supplierId || null,
       };
-      return apiRequest("PATCH", `/api/items/${id}`, payload);
+      return apiRequest("PATCH", `/api/procurement/items/${id}`, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/items"] });
       toast({ title: "Item updated successfully" });
       setDialogOpen(false);
       setEditingItem(null);
@@ -176,10 +176,10 @@ export default function AdminItemsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/items/${id}`, {});
+      return apiRequest("DELETE", `/api/procurement/items/${id}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/items"] });
       toast({ title: "Item deleted" });
       setDeleteDialogOpen(false);
       setDeletingItemId(null);
@@ -193,7 +193,7 @@ export default function AdminItemsPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const response = await fetch("/api/items/import", {
+      const response = await fetch("/api/procurement/items/import", {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -205,9 +205,9 @@ export default function AdminItemsPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/items"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/item-categories"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/item-categories/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/items"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/procurement/item-categories/active"] });
       toast({ 
         title: "Import Successful", 
         description: `${data.created} items created, ${data.updated} updated${data.categoriesCreated ? `, ${data.categoriesCreated} categories created` : ""}` 
