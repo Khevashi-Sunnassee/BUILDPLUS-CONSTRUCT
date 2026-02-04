@@ -24,6 +24,7 @@ import AdminPanelsPage from "@/pages/admin/panels";
 import AdminPanelTypesPage from "@/pages/admin/panel-types";
 import AdminUserPermissionsPage from "@/pages/admin/user-permissions";
 import AdminZonesPage from "@/pages/admin/zones";
+import AdminFactoriesPage from "@/pages/admin/factories";
 import AdminSuppliersPage from "@/pages/admin/suppliers";
 import AdminItemCategoriesPage from "@/pages/admin/item-categories";
 import AdminItemsPage from "@/pages/admin/items";
@@ -334,6 +335,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminZonesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/factories">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminFactoriesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

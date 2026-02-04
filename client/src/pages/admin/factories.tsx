@@ -1,0 +1,1051 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import {
+  Factory,
+  Plus,
+  Edit2,
+  Trash2,
+  Save,
+  Loader2,
+  MapPin,
+  Bed,
+  Calendar,
+  X,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import type { Factory as FactoryType, ProductionBed } from "@shared/schema";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
+
+const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const factorySchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  code: z.string().min(1, "Code is required").max(10, "Code must be 10 characters or less"),
+  address: z.string().optional(),
+  state: z.string().optional(),
+  latitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
+  longitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
+  cfmeuCalendar: z.enum(["NONE", "VIC_ONSITE", "VIC_OFFSITE", "QLD"]).default("NONE"),
+  workDays: z.array(z.boolean()).length(7),
+  color: z.string().default("#3B82F6"),
+  isActive: z.boolean().default(true),
+});
+
+type FactoryFormData = z.infer<typeof factorySchema>;
+
+const bedSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  lengthMm: z.number().nullable().optional(),
+  widthMm: z.number().nullable().optional(),
+  isActive: z.boolean().default(true),
+});
+
+type BedFormData = z.infer<typeof bedSchema>;
+
+interface FactoryWithBeds extends FactoryType {
+  beds?: ProductionBed[];
+}
+
+function LocationPicker({ onChange }: { onChange: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onChange(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+function MapCenterUpdater({ center }: { center: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    map.setView(center, map.getZoom());
+  }, [center, map]);
+  return null;
+}
+
+export default function AdminFactoriesPage() {
+  const { toast } = useToast();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingFactory, setEditingFactory] = useState<FactoryWithBeds | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingFactoryId, setDeletingFactoryId] = useState<string | null>(null);
+  const [bedDialogOpen, setBedDialogOpen] = useState(false);
+  const [editingBed, setEditingBed] = useState<ProductionBed | null>(null);
+  const [deleteBedDialogOpen, setDeleteBedDialogOpen] = useState(false);
+  const [deletingBedId, setDeletingBedId] = useState<string | null>(null);
+  const [viewingFactory, setViewingFactory] = useState<FactoryWithBeds | null>(null);
+
+  const { data: factories, isLoading } = useQuery<FactoryType[]>({
+    queryKey: ["/api/admin/factories"],
+  });
+
+  const form = useForm<FactoryFormData>({
+    resolver: zodResolver(factorySchema),
+    defaultValues: {
+      name: "",
+      code: "",
+      address: "",
+      state: "",
+      latitude: null,
+      longitude: null,
+      cfmeuCalendar: "NONE",
+      workDays: [false, true, true, true, true, true, false],
+      color: "#3B82F6",
+      isActive: true,
+    },
+  });
+
+  const bedForm = useForm<BedFormData>({
+    resolver: zodResolver(bedSchema),
+    defaultValues: {
+      name: "",
+      lengthMm: null,
+      widthMm: null,
+      isActive: true,
+    },
+  });
+
+  const createFactoryMutation = useMutation({
+    mutationFn: async (data: FactoryFormData) => {
+      return apiRequest("POST", "/api/admin/factories", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/factories"] });
+      toast({ title: "Factory created successfully" });
+      setDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create factory", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateFactoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: FactoryFormData }) => {
+      return apiRequest("PATCH", `/api/admin/factories/${id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/factories"] });
+      toast({ title: "Factory updated successfully" });
+      setDialogOpen(false);
+      setEditingFactory(null);
+      form.reset();
+    },
+    onError: () => {
+      toast({ title: "Failed to update factory", variant: "destructive" });
+    },
+  });
+
+  const deleteFactoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/admin/factories/${id}`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/factories"] });
+      toast({ title: "Factory deleted" });
+      setDeleteDialogOpen(false);
+      setDeletingFactoryId(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to delete factory", variant: "destructive" });
+    },
+  });
+
+  const createBedMutation = useMutation({
+    mutationFn: async ({ factoryId, data }: { factoryId: string; data: BedFormData }) => {
+      return apiRequest("POST", `/api/admin/factories/${factoryId}/beds`, data);
+    },
+    onSuccess: () => {
+      if (viewingFactory) {
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/factories", viewingFactory.id] });
+        fetchFactoryDetails(viewingFactory.id);
+      }
+      toast({ title: "Production bed created" });
+      setBedDialogOpen(false);
+      bedForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create production bed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateBedMutation = useMutation({
+    mutationFn: async ({ factoryId, bedId, data }: { factoryId: string; bedId: string; data: BedFormData }) => {
+      return apiRequest("PATCH", `/api/admin/factories/${factoryId}/beds/${bedId}`, data);
+    },
+    onSuccess: () => {
+      if (viewingFactory) {
+        fetchFactoryDetails(viewingFactory.id);
+      }
+      toast({ title: "Production bed updated" });
+      setBedDialogOpen(false);
+      setEditingBed(null);
+      bedForm.reset();
+    },
+    onError: () => {
+      toast({ title: "Failed to update production bed", variant: "destructive" });
+    },
+  });
+
+  const deleteBedMutation = useMutation({
+    mutationFn: async ({ factoryId, bedId }: { factoryId: string; bedId: string }) => {
+      return apiRequest("DELETE", `/api/admin/factories/${factoryId}/beds/${bedId}`, {});
+    },
+    onSuccess: () => {
+      if (viewingFactory) {
+        fetchFactoryDetails(viewingFactory.id);
+      }
+      toast({ title: "Production bed deleted" });
+      setDeleteBedDialogOpen(false);
+      setDeletingBedId(null);
+    },
+    onError: () => {
+      toast({ title: "Failed to delete production bed", variant: "destructive" });
+    },
+  });
+
+  const fetchFactoryDetails = async (id: string) => {
+    const response = await fetch(`/api/admin/factories/${id}`, { credentials: "include" });
+    if (response.ok) {
+      const data = await response.json();
+      setViewingFactory(data);
+    }
+  };
+
+  const openCreateDialog = () => {
+    setEditingFactory(null);
+    form.reset({
+      name: "",
+      code: "",
+      address: "",
+      state: "",
+      latitude: null,
+      longitude: null,
+      cfmeuCalendar: "NONE",
+      workDays: [false, true, true, true, true, true, false],
+      color: "#3B82F6",
+      isActive: true,
+    });
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (factory: FactoryType) => {
+    setEditingFactory(factory);
+    form.reset({
+      name: factory.name,
+      code: factory.code,
+      address: factory.address || "",
+      state: factory.state || "",
+      latitude: factory.latitude ? parseFloat(String(factory.latitude)) : null,
+      longitude: factory.longitude ? parseFloat(String(factory.longitude)) : null,
+      cfmeuCalendar: factory.cfmeuCalendar || "NONE",
+      workDays: (factory.workDays as boolean[]) || [false, true, true, true, true, true, false],
+      color: factory.color || "#3B82F6",
+      isActive: factory.isActive,
+    });
+    setDialogOpen(true);
+  };
+
+  const onSubmit = (data: FactoryFormData) => {
+    if (editingFactory) {
+      updateFactoryMutation.mutate({ id: editingFactory.id, data });
+    } else {
+      createFactoryMutation.mutate(data);
+    }
+  };
+
+  const openBedCreateDialog = () => {
+    setEditingBed(null);
+    bedForm.reset({
+      name: "",
+      lengthMm: null,
+      widthMm: null,
+      isActive: true,
+    });
+    setBedDialogOpen(true);
+  };
+
+  const openBedEditDialog = (bed: ProductionBed) => {
+    setEditingBed(bed);
+    bedForm.reset({
+      name: bed.name,
+      lengthMm: bed.lengthMm,
+      widthMm: bed.widthMm,
+      isActive: bed.isActive,
+    });
+    setBedDialogOpen(true);
+  };
+
+  const onBedSubmit = (data: BedFormData) => {
+    if (!viewingFactory) return;
+    if (editingBed) {
+      updateBedMutation.mutate({ factoryId: viewingFactory.id, bedId: editingBed.id, data });
+    } else {
+      createBedMutation.mutate({ factoryId: viewingFactory.id, data });
+    }
+  };
+
+  const factoriesWithCoords = factories?.filter(f => f.latitude && f.longitude) || [];
+  const mapCenter: [number, number] = factoriesWithCoords.length > 0
+    ? [
+        factoriesWithCoords.reduce((sum, f) => sum + parseFloat(String(f.latitude)), 0) / factoriesWithCoords.length,
+        factoriesWithCoords.reduce((sum, f) => sum + parseFloat(String(f.longitude)), 0) / factoriesWithCoords.length,
+      ]
+    : [-37.8136, 144.9631];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6 p-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <Factory className="h-8 w-8 text-primary" />
+          <div>
+            <h1 className="text-2xl font-semibold">Factory Management</h1>
+            <p className="text-sm text-muted-foreground">Manage production facilities and their beds</p>
+          </div>
+        </div>
+        <Button onClick={openCreateDialog} data-testid="button-add-factory">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Factory
+        </Button>
+      </div>
+
+      {factories && factories.length > 0 && factories.some(f => f.latitude && f.longitude) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Factory Locations
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[400px] rounded-md overflow-hidden">
+              <MapContainer
+                center={mapCenter}
+                zoom={5}
+                style={{ height: "100%", width: "100%" }}
+                scrollWheelZoom={true}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {factories.filter(f => f.latitude && f.longitude).map(factory => (
+                  <Marker
+                    key={factory.id}
+                    position={[parseFloat(String(factory.latitude)), parseFloat(String(factory.longitude))]}
+                    eventHandlers={{
+                      click: () => fetchFactoryDetails(factory.id),
+                    }}
+                  >
+                    <Popup>
+                      <div className="text-center">
+                        <strong>{factory.name}</strong>
+                        <br />
+                        <span className="text-muted-foreground">{factory.code}</span>
+                        {factory.address && (
+                          <>
+                            <br />
+                            <span className="text-xs">{factory.address}</span>
+                          </>
+                        )}
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Factories</CardTitle>
+          <CardDescription>All production facilities</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!factories || factories.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No factories configured. Click "Add Factory" to create one.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Code</TableHead>
+                  <TableHead>State</TableHead>
+                  <TableHead>CFMEU Calendar</TableHead>
+                  <TableHead>Work Days</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {factories.map(factory => (
+                  <TableRow 
+                    key={factory.id} 
+                    className="hover-elevate cursor-pointer"
+                    onClick={() => fetchFactoryDetails(factory.id)}
+                    data-testid={`row-factory-${factory.id}`}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: factory.color || "#3B82F6" }}
+                        />
+                        <span className="font-medium">{factory.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{factory.code}</TableCell>
+                    <TableCell>{factory.state || "-"}</TableCell>
+                    <TableCell>
+                      {factory.cfmeuCalendar ? (
+                        <Badge variant="outline">{factory.cfmeuCalendar.replace("_", " ")}</Badge>
+                      ) : (
+                        <span className="text-muted-foreground">None</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-0.5">
+                        {dayNames.map((day, i) => (
+                          <span
+                            key={day}
+                            className={`text-xs px-1 rounded ${
+                              (factory.workDays as boolean[])?.[i]
+                                ? "bg-primary/20 text-primary"
+                                : "bg-muted text-muted-foreground"
+                            }`}
+                          >
+                            {day[0]}
+                          </span>
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={factory.isActive ? "default" : "secondary"}>
+                        {factory.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEditDialog(factory)}
+                          data-testid={`button-edit-factory-${factory.id}`}
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setDeletingFactoryId(factory.id);
+                            setDeleteDialogOpen(true);
+                          }}
+                          data-testid={`button-delete-factory-${factory.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingFactory ? "Edit Factory" : "Add Factory"}</DialogTitle>
+            <DialogDescription>
+              {editingFactory ? "Update factory details" : "Add a new production facility"}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Melbourne Factory" data-testid="input-factory-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Code</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="MEL" data-testid="input-factory-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="123 Industrial Ave, Suburb VIC 3000" data-testid="input-factory-address" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-factory-state">
+                            <SelectValue placeholder="Select state" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="VIC">Victoria</SelectItem>
+                          <SelectItem value="NSW">New South Wales</SelectItem>
+                          <SelectItem value="QLD">Queensland</SelectItem>
+                          <SelectItem value="WA">Western Australia</SelectItem>
+                          <SelectItem value="SA">South Australia</SelectItem>
+                          <SelectItem value="TAS">Tasmania</SelectItem>
+                          <SelectItem value="NT">Northern Territory</SelectItem>
+                          <SelectItem value="ACT">Australian Capital Territory</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="color"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Color</FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-2">
+                          <Input type="color" {...field} className="w-12 h-9 p-1" data-testid="input-factory-color" />
+                          <Input {...field} placeholder="#3B82F6" className="flex-1" />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="latitude"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Latitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          placeholder="-37.8136"
+                          data-testid="input-factory-latitude"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="longitude"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Longitude</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="any"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                          placeholder="144.9631"
+                          data-testid="input-factory-longitude"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <Card className="p-0">
+                <CardContent className="p-2">
+                  <p className="text-xs text-muted-foreground mb-2">Click on the map to set location</p>
+                  <div className="h-[200px] rounded-md overflow-hidden">
+                    <MapContainer
+                      center={[form.watch("latitude") || -37.8136, form.watch("longitude") || 144.9631]}
+                      zoom={form.watch("latitude") ? 10 : 4}
+                      style={{ height: "100%", width: "100%" }}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      <LocationPicker
+                        onChange={(lat, lng) => {
+                          form.setValue("latitude", lat);
+                          form.setValue("longitude", lng);
+                        }}
+                      />
+                      <MapCenterUpdater center={[form.watch("latitude") || -37.8136, form.watch("longitude") || 144.9631]} />
+                      {form.watch("latitude") && form.watch("longitude") && (
+                        <Marker position={[form.watch("latitude")!, form.watch("longitude")!]} />
+                      )}
+                    </MapContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <FormField
+                control={form.control}
+                name="cfmeuCalendar"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>CFMEU Calendar</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-cfmeu-calendar">
+                          <SelectValue placeholder="Select CFMEU calendar" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="NONE">None</SelectItem>
+                        <SelectItem value="VIC_ONSITE">VIC Onsite (36hr)</SelectItem>
+                        <SelectItem value="VIC_OFFSITE">VIC Offsite (38hr)</SelectItem>
+                        <SelectItem value="QLD">QLD</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      RDO and public holiday calendar for working day calculations
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="workDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Work Days</FormLabel>
+                    <div className="flex gap-2">
+                      {dayNames.map((day, index) => (
+                        <div key={day} className="flex flex-col items-center gap-1">
+                          <span className="text-xs text-muted-foreground">{day}</span>
+                          <Checkbox
+                            checked={field.value[index]}
+                            onCheckedChange={checked => {
+                              const newDays = [...field.value];
+                              newDays[index] = !!checked;
+                              field.onChange(newDays);
+                            }}
+                            data-testid={`checkbox-workday-${index}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <FormDescription>Factory is available for selection</FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-factory-active" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createFactoryMutation.isPending || updateFactoryMutation.isPending}
+                  data-testid="button-save-factory"
+                >
+                  {(createFactoryMutation.isPending || updateFactoryMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  <Save className="h-4 w-4 mr-2" />
+                  {editingFactory ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingFactory} onOpenChange={open => !open && setViewingFactory(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div
+                className="w-4 h-4 rounded-full"
+                style={{ backgroundColor: viewingFactory?.color || "#3B82F6" }}
+              />
+              {viewingFactory?.name}
+              <Badge variant="outline" className="ml-2">{viewingFactory?.code}</Badge>
+            </DialogTitle>
+            <DialogDescription>{viewingFactory?.address || "No address"}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <span className="text-muted-foreground">State:</span>
+                <span className="ml-2 font-medium">{viewingFactory?.state || "-"}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">CFMEU:</span>
+                <span className="ml-2 font-medium">
+                  {viewingFactory?.cfmeuCalendar?.replace("_", " ") || "None"}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Status:</span>
+                <Badge variant={viewingFactory?.isActive ? "default" : "secondary"} className="ml-2">
+                  {viewingFactory?.isActive ? "Active" : "Inactive"}
+                </Badge>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Bed className="h-4 w-4" />
+                  Production Beds
+                </h4>
+                <Button size="sm" onClick={openBedCreateDialog} data-testid="button-add-bed">
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Bed
+                </Button>
+              </div>
+
+              {!viewingFactory?.beds || viewingFactory.beds.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground border rounded-md">
+                  No production beds configured
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Length (mm)</TableHead>
+                      <TableHead>Width (mm)</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewingFactory.beds.map(bed => (
+                      <TableRow key={bed.id} data-testid={`row-bed-${bed.id}`}>
+                        <TableCell className="font-medium">{bed.name}</TableCell>
+                        <TableCell>{bed.lengthMm?.toLocaleString() || "-"}</TableCell>
+                        <TableCell>{bed.widthMm?.toLocaleString() || "-"}</TableCell>
+                        <TableCell>
+                          <Badge variant={bed.isActive ? "default" : "secondary"}>
+                            {bed.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openBedEditDialog(bed)}
+                              data-testid={`button-edit-bed-${bed.id}`}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setDeletingBedId(bed.id);
+                                setDeleteBedDialogOpen(true);
+                              }}
+                              data-testid={`button-delete-bed-${bed.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewingFactory(null)}>
+              Close
+            </Button>
+            <Button onClick={() => viewingFactory && openEditDialog(viewingFactory)} data-testid="button-edit-viewing-factory">
+              <Edit2 className="h-4 w-4 mr-2" />
+              Edit Factory
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bedDialogOpen} onOpenChange={setBedDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingBed ? "Edit Production Bed" : "Add Production Bed"}</DialogTitle>
+            <DialogDescription>
+              Configure a production bed for {viewingFactory?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...bedForm}>
+            <form onSubmit={bedForm.handleSubmit(onBedSubmit)} className="space-y-4">
+              <FormField
+                control={bedForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Bed 1" data-testid="input-bed-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={bedForm.control}
+                  name="lengthMm"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Length (mm)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          placeholder="12000"
+                          data-testid="input-bed-length"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={bedForm.control}
+                  name="widthMm"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Width (mm)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          {...field}
+                          value={field.value ?? ""}
+                          onChange={e => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                          placeholder="3600"
+                          data-testid="input-bed-width"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={bedForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div>
+                      <FormLabel>Active</FormLabel>
+                      <FormDescription>Bed is available for scheduling</FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-bed-active" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setBedDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createBedMutation.isPending || updateBedMutation.isPending}
+                  data-testid="button-save-bed"
+                >
+                  {(createBedMutation.isPending || updateBedMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  <Save className="h-4 w-4 mr-2" />
+                  {editingBed ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Factory</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this factory? This action cannot be undone.
+              All production beds associated with this factory will also be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingFactoryId && deleteFactoryMutation.mutate(deletingFactoryId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-factory"
+            >
+              {deleteFactoryMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteBedDialogOpen} onOpenChange={setDeleteBedDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Production Bed</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this production bed? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => viewingFactory && deletingBedId && deleteBedMutation.mutate({ factoryId: viewingFactory.id, bedId: deletingBedId })}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-bed"
+            >
+              {deleteBedMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
