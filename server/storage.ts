@@ -2199,18 +2199,30 @@ export class DatabaseStorage implements IStorage {
     );
     const defaultCycleTime = job.expectedCycleTimePerFloor;
 
-    // Production slots start from productionStartDate (when production begins)
-    // Each level's slot date represents when production for that level is DUE
-    // slotDate = productionStartDate + cumulativeDays (based on cycle times)
-    const baseDate = new Date(job.productionStartDate);
+    // Date calculation logic:
+    // 1. productionStartDate = Site Delivery Date (when panels go to site)
+    // 2. Each level's site delivery = productionStartDate + cumulativeDays
+    // 3. productionSlotDate = Site Delivery - production_days_in_advance (Panel Production Due)
+    // 
+    // Timeline (working backwards from site delivery):
+    // Drafting Start → Drawing Due (IFC) → Panel Production Due → Site Delivery
+    
+    const siteDeliveryBaseDate = new Date(job.productionStartDate);
+    const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
 
     const createdSlots: ProductionSlot[] = [];
     let cumulativeDays = 0;
     
     for (let i = 0; i < levelsToProcess.length; i++) {
       const level = levelsToProcess[i];
-      const slotDate = new Date(baseDate);
-      slotDate.setDate(slotDate.getDate() + cumulativeDays);
+      
+      // Calculate site delivery date for this level
+      const siteDeliveryDate = new Date(siteDeliveryBaseDate);
+      siteDeliveryDate.setDate(siteDeliveryDate.getDate() + cumulativeDays);
+      
+      // Calculate panel production due date (when panel must be cast)
+      const panelProductionDue = new Date(siteDeliveryDate);
+      panelProductionDue.setDate(panelProductionDue.getDate() - productionDaysInAdvance);
       
       // Get level-specific cycle time or fall back to job default
       const levelCycleTime = cycleTimeMap.get(`1-${level}`) ?? defaultCycleTime;
@@ -2221,7 +2233,7 @@ export class DatabaseStorage implements IStorage {
         level,
         levelOrder: i,
         panelCount: panelCountByLevel[level] || 0,
-        productionSlotDate: slotDate,
+        productionSlotDate: panelProductionDue,
         status: "SCHEDULED",
         isBooked: false,
       }).returning();

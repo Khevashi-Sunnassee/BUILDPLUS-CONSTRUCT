@@ -907,23 +907,31 @@ export async function registerRoutes(
         );
         const defaultCycleTime = job.expectedCycleTimePerFloor;
         
-        // Production slots start from productionStartDate
-        // Note: daysInAdvance (IFC days) is only used for drafting program calculations, not production slot dates
-        const baseDate = new Date(job.productionStartDate);
+        // Date calculation logic:
+        // 1. productionStartDate = Site Delivery Date (when panels go to site)
+        // 2. Each level's site delivery = productionStartDate + cumulativeDays
+        // 3. productionSlotDate = Site Delivery - production_days_in_advance (Panel Production Due)
+        const siteDeliveryBaseDate = new Date(job.productionStartDate);
+        const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
         
         const allSlots = existingSlots.sort((a, b) => a.levelOrder - b.levelOrder);
         let cumulativeDays = 0;
         let updatedCount = 0;
         
         for (const slot of allSlots) {
-          const newSlotDate = new Date(baseDate);
-          newSlotDate.setDate(newSlotDate.getDate() + cumulativeDays);
+          // Calculate site delivery date for this level
+          const siteDeliveryDate = new Date(siteDeliveryBaseDate);
+          siteDeliveryDate.setDate(siteDeliveryDate.getDate() + cumulativeDays);
+          
+          // Calculate panel production due date
+          const panelProductionDue = new Date(siteDeliveryDate);
+          panelProductionDue.setDate(panelProductionDue.getDate() - productionDaysInAdvance);
           
           const levelCycleTime = cycleTimeMap.get(`${slot.buildingNumber || 1}-${slot.level}`) ?? defaultCycleTime;
           
           if (slot.status === "SCHEDULED" || slot.status === "PENDING_UPDATE") {
             await db.update(productionSlots)
-              .set({ productionSlotDate: newSlotDate, updatedAt: new Date() })
+              .set({ productionSlotDate: panelProductionDue, updatedAt: new Date() })
               .where(eq(productionSlots.id, slot.id));
             updatedCount++;
           }
