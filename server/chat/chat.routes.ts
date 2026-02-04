@@ -428,6 +428,101 @@ chatRouter.post("/conversations", requireAuth, requireChatPermission, async (req
   }
 });
 
+chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const panelId = String(req.params.panelId);
+
+    const existingConv = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.panelId, panelId))
+      .limit(1);
+
+    if (existingConv.length > 0) {
+      const conv = existingConv[0];
+      
+      const membership = await db
+        .select()
+        .from(conversationMembers)
+        .where(and(eq(conversationMembers.conversationId, conv.id), eq(conversationMembers.userId, userId)))
+        .limit(1);
+      
+      if (!membership.length) {
+        await db.insert(conversationMembers).values({
+          id: createId(),
+          conversationId: conv.id,
+          userId,
+          role: "MEMBER",
+        });
+      }
+      
+      const members = await db
+        .select({
+          id: conversationMembers.id,
+          conversationId: conversationMembers.conversationId,
+          userId: conversationMembers.userId,
+          role: conversationMembers.role,
+          joinedAt: conversationMembers.joinedAt,
+        })
+        .from(conversationMembers)
+        .where(eq(conversationMembers.conversationId, conv.id));
+      
+      const membersWithUsers = await Promise.all(members.map(async (m) => {
+        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(eq(users.id, m.userId)).limit(1);
+        return { ...m, user: userRows[0] || null };
+      }));
+      
+      return res.json({ ...conv, members: membersWithUsers });
+    }
+    
+    const panel = await db.select().from(panelRegister).where(eq(panelRegister.id, panelId)).limit(1);
+    if (!panel.length) {
+      return res.status(404).json({ error: "Panel not found" });
+    }
+    
+    const convId = createId();
+    await db.insert(conversations).values({
+      id: convId,
+      type: "GROUP",
+      name: `Panel: ${panel[0].panelMark}`,
+      panelId,
+      jobId: panel[0].jobId,
+    });
+    
+    await db.insert(conversationMembers).values({
+      id: createId(),
+      conversationId: convId,
+      userId,
+      role: "OWNER",
+    });
+    
+    const conv = await db.select().from(conversations).where(eq(conversations.id, convId)).limit(1);
+    
+    const members = await db
+      .select({
+        id: conversationMembers.id,
+        conversationId: conversationMembers.conversationId,
+        userId: conversationMembers.userId,
+        role: conversationMembers.role,
+        joinedAt: conversationMembers.joinedAt,
+      })
+      .from(conversationMembers)
+      .where(eq(conversationMembers.conversationId, convId));
+    
+    const membersWithUsers = await Promise.all(members.map(async (m) => {
+      const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
+        .from(users).where(eq(users.id, m.userId)).limit(1);
+      return { ...m, user: userRows[0] || null };
+    }));
+    
+    res.json({ ...conv[0], members: membersWithUsers });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
 chatRouter.delete("/conversations/:conversationId", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
