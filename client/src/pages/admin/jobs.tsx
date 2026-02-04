@@ -127,6 +127,8 @@ type JobFormData = z.infer<typeof jobSchema>;
 
 interface JobWithPanels extends Job {
   panels: PanelRegister[];
+  panelCount?: number;
+  completedPanelCount?: number;
 }
 
 interface CostOverride {
@@ -849,9 +851,9 @@ export default function AdminJobsPage() {
                           onClick={() => navigate(`/admin/panels?jobId=${job.id}`)}
                           data-testid={`button-view-panels-${job.id}`}
                         >
-                          <span className="text-green-500">{job.panels.filter(p => p.status === "COMPLETED").length}</span>
+                          <span className="text-green-500">{job.completedPanelCount || 0}</span>
                           <span className="mx-1">/</span>
-                          <span>{job.panels.length}</span>
+                          <span>{job.panelCount || 0}</span>
                           <span className="ml-1 text-muted-foreground">panels</span>
                           <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
@@ -889,7 +891,7 @@ export default function AdminJobsPage() {
                             size="icon"
                             onClick={() => {
                               setDeletingJobId(job.id);
-                              setDeletingJobPanelCount(job.panels.length);
+                              setDeletingJobPanelCount(job.panelCount || 0);
                               setDeleteDialogOpen(true);
                             }}
                             data-testid={`button-delete-job-${job.id}`}

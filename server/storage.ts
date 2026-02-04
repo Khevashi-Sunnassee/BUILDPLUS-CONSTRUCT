@@ -890,17 +890,19 @@ export class DatabaseStorage implements IStorage {
     await db.delete(jobs).where(eq(jobs.id, id));
   }
 
-  async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[] })[]> {
+  async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[]; panelCount: number; completedPanelCount: number })[]> {
     const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
-    const allPanels = await db.select().from(panelRegister);
     const allRules = await db.select().from(mappingRules);
     
-    const panelsByJob = new Map<string, PanelRegister[]>();
-    for (const panel of allPanels) {
-      if (!panelsByJob.has(panel.jobId)) {
-        panelsByJob.set(panel.jobId, []);
-      }
-      panelsByJob.get(panel.jobId)!.push(panel);
+    const panelCounts = await db.select({
+      jobId: panelRegister.jobId,
+      total: sql<number>`count(*)`,
+      completed: sql<number>`count(*) filter (where ${panelRegister.status} = 'COMPLETED')`
+    }).from(panelRegister).groupBy(panelRegister.jobId);
+    
+    const countsByJob = new Map<string, { total: number; completed: number }>();
+    for (const row of panelCounts) {
+      countsByJob.set(row.jobId, { total: Number(row.total), completed: Number(row.completed) });
     }
     
     const rulesByJob = new Map<string, MappingRule[]>();
@@ -911,11 +913,16 @@ export class DatabaseStorage implements IStorage {
       rulesByJob.get(rule.jobId)!.push(rule);
     }
     
-    return allJobs.map(job => ({
-      ...job,
-      panels: panelsByJob.get(job.id) || [],
-      mappingRules: rulesByJob.get(job.id) || [],
-    }));
+    return allJobs.map(job => {
+      const counts = countsByJob.get(job.id) || { total: 0, completed: 0 };
+      return {
+        ...job,
+        panels: [],
+        mappingRules: rulesByJob.get(job.id) || [],
+        panelCount: counts.total,
+        completedPanelCount: counts.completed,
+      };
+    });
   }
 
   async importJobs(data: InsertJob[]): Promise<{ imported: number; skipped: number }> {
