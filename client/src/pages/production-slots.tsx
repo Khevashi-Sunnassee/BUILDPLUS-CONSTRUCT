@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -80,47 +80,70 @@ function CalendarView({
   weekStartDay,
   onSlotClick,
 }: CalendarViewProps) {
-  // Get date range for current view
-  const getDateRange = () => {
+  // Memoize date range calculation
+  const { start, end, days } = useMemo(() => {
+    let start: Date, end: Date;
     if (calendarViewMode === "week") {
-      const start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      const end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
-      return { start, end };
+      start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
     } else {
-      const start = startOfMonth(currentDate);
-      const end = endOfMonth(currentDate);
-      return { start, end };
+      start = startOfMonth(currentDate);
+      end = endOfMonth(currentDate);
     }
-  };
+    return { start, end, days: eachDayOfInterval({ start, end }) };
+  }, [currentDate, calendarViewMode, weekStartDay]);
 
-  const { start, end } = getDateRange();
-  const days = eachDayOfInterval({ start, end });
+  // Pre-group slots by date key for O(1) lookup instead of O(n) filtering per day
+  const slotsByDate = useMemo(() => {
+    const grouped: Record<string, ProductionSlotWithDetails[]> = {};
+    for (const slot of slots) {
+      const dateKey = format(new Date(slot.productionSlotDate), "yyyy-MM-dd");
+      if (!grouped[dateKey]) grouped[dateKey] = [];
+      grouped[dateKey].push(slot);
+    }
+    return grouped;
+  }, [slots]);
 
-  // Get slots for a specific day
-  const getSlotsForDay = (day: Date) => {
-    return slots.filter(slot => {
-      const slotDate = new Date(slot.productionSlotDate);
-      return isSameDay(slotDate, day);
-    });
-  };
+  // Memoize color cache to avoid recalculating on every render
+  const colorCache = useMemo(() => {
+    const cache: Record<string, string> = {};
+    for (const slot of slots) {
+      const jobKey = slot.job.jobNumber;
+      const levelKey = `${slot.job.jobNumber}-${slot.level}`;
+      if (!cache[jobKey]) cache[jobKey] = stringToColor(jobKey);
+      if (!cache[levelKey]) cache[levelKey] = stringToColor(levelKey);
+    }
+    return cache;
+  }, [slots]);
+
+  // O(1) lookup for slots on a specific day
+  const getSlotsForDay = useCallback((day: Date) => {
+    const dateKey = format(day, "yyyy-MM-dd");
+    return slotsByDate[dateKey] || [];
+  }, [slotsByDate]);
 
   // Navigate to previous/next period
-  const navigate = (direction: "prev" | "next") => {
+  const navigate = useCallback((direction: "prev" | "next") => {
     const amount = calendarViewMode === "week" ? 7 : 30;
     setCurrentDate(direction === "prev" ? subDays(currentDate, amount) : addDays(currentDate, amount));
-  };
+  }, [calendarViewMode, currentDate, setCurrentDate]);
 
   // Get header label
-  const getHeaderLabel = () => {
+  const headerLabel = useMemo(() => {
     if (calendarViewMode === "week") {
       return `${format(start, "dd MMM")} - ${format(end, "dd MMM yyyy")}`;
     }
     return format(currentDate, "MMMM yyyy");
-  };
+  }, [calendarViewMode, start, end, currentDate]);
 
-  // Day names for header
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const orderedDayNames = [...dayNames.slice(weekStartDay), ...dayNames.slice(0, weekStartDay)];
+  // Day names for header - memoized
+  const orderedDayNames = useMemo(() => {
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    return [...dayNames.slice(weekStartDay), ...dayNames.slice(0, weekStartDay)];
+  }, [weekStartDay]);
+
+  // Memoize today's date to avoid creating new Date objects in render
+  const today = useMemo(() => new Date(), []);
 
   return (
     <div className="space-y-4">
@@ -133,7 +156,7 @@ function CalendarView({
           <Button variant="outline" size="icon" onClick={() => navigate("next")} data-testid="button-calendar-next">
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <span className="font-semibold text-lg ml-2">{getHeaderLabel()}</span>
+          <span className="font-semibold text-lg ml-2">{headerLabel}</span>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -170,7 +193,7 @@ function CalendarView({
           {/* Day cells */}
           {days.map((day) => {
             const daySlots = getSlotsForDay(day);
-            const isToday = isSameDay(day, new Date());
+            const isToday = isSameDay(day, today);
             return (
               <div
                 key={day.toISOString()}
@@ -182,8 +205,8 @@ function CalendarView({
                 <div className="space-y-1 overflow-y-auto max-h-28">
                   {daySlots.map((slot) => {
                     const factory = getFactory(slot.job.factoryId);
-                    const jobColor = stringToColor(slot.job.jobNumber);
-                    const levelColor = stringToColor(`${slot.job.jobNumber}-${slot.level}`);
+                    const jobColor = colorCache[slot.job.jobNumber] || stringToColor(slot.job.jobNumber);
+                    const levelColor = colorCache[`${slot.job.jobNumber}-${slot.level}`] || stringToColor(`${slot.job.jobNumber}-${slot.level}`);
                     return (
                       <div
                         key={slot.id}
@@ -242,7 +265,7 @@ function CalendarView({
             {/* Day cells */}
             {days.map((day) => {
               const daySlots = getSlotsForDay(day);
-              const isToday = isSameDay(day, new Date());
+              const isToday = isSameDay(day, today);
               const isCurrentMonth = isSameMonth(day, currentDate);
               return (
                 <div
@@ -256,7 +279,7 @@ function CalendarView({
                   </div>
                   <div className="space-y-0.5 overflow-y-auto max-h-20">
                     {daySlots.slice(0, 3).map((slot) => {
-                      const jobColor = stringToColor(slot.job.jobNumber);
+                      const jobColor = colorCache[slot.job.jobNumber] || stringToColor(slot.job.jobNumber);
                       return (
                         <div
                           key={slot.id}
