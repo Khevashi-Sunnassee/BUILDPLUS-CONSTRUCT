@@ -523,6 +523,57 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
   }
 });
 
+chatRouter.post("/panels/counts", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const schema = z.object({
+      panelIds: z.array(z.string()).min(1),
+    });
+    const { panelIds } = schema.parse(req.body);
+
+    const panelConversations = await db
+      .select({ id: conversations.id, panelId: conversations.panelId })
+      .from(conversations)
+      .where(inArray(conversations.panelId, panelIds));
+
+    const conversationMap = new Map<string, string>();
+    for (const conv of panelConversations) {
+      if (conv.panelId) {
+        conversationMap.set(conv.panelId, conv.id);
+      }
+    }
+
+    const result: Record<string, { messageCount: number; documentCount: number }> = {};
+
+    for (const panelId of panelIds) {
+      const convId = conversationMap.get(panelId);
+      if (!convId) {
+        result[panelId] = { messageCount: 0, documentCount: 0 };
+        continue;
+      }
+
+      const messageCountResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(chatMessages)
+        .where(eq(chatMessages.conversationId, convId));
+
+      const documentCountResult = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(chatMessageAttachments)
+        .innerJoin(chatMessages, eq(chatMessageAttachments.messageId, chatMessages.id))
+        .where(eq(chatMessages.conversationId, convId));
+
+      result[panelId] = {
+        messageCount: Number(messageCountResult[0]?.count || 0),
+        documentCount: Number(documentCountResult[0]?.count || 0),
+      };
+    }
+
+    res.json(result);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
 chatRouter.delete("/conversations/:conversationId", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
