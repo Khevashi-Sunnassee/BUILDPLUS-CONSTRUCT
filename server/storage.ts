@@ -2199,11 +2199,10 @@ export class DatabaseStorage implements IStorage {
     );
     const defaultCycleTime = job.expectedCycleTimePerFloor;
 
-    // Calculate base date (productionStartDate - productionDaysInAdvance)
-    // Use job-level productionDaysInAdvance, fall back to legacy daysInAdvance, then default to 10
-    const productionDaysInAdvance = job.productionDaysInAdvance ?? job.daysInAdvance ?? 10;
+    // Production slots start from productionStartDate (when production begins)
+    // Each level's slot date represents when production for that level is DUE
+    // slotDate = productionStartDate + cumulativeDays (based on cycle times)
     const baseDate = new Date(job.productionStartDate);
-    baseDate.setDate(baseDate.getDate() - productionDaysInAdvance);
 
     const createdSlots: ProductionSlot[] = [];
     let cumulativeDays = 0;
