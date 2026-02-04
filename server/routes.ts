@@ -6057,7 +6057,7 @@ Return ONLY valid JSON, no explanation text.`
       { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/38hr-offsite-rdo-calendar.ics", years: [2026] },
     ],
     QLD: [
-      { url: "https://qnt.cfmeu.org/wp-content/uploads/2025/02/export.ics", years: [2025, 2026] },
+      { url: "https://qnt.cfmeu.org/rdo-calendar/?ical=1", years: [2025, 2026] },
     ],
   };
 
