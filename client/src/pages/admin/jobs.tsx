@@ -1273,8 +1273,8 @@ export default function AdminJobsPage() {
                                 const calculatedHighest = lowestLevel + levelsCount - 1;
                                 jobForm.setValue("highestLevel", String(calculatedHighest));
                               }
-                              handleLevelFieldChange();
                             }}
+                            onBlur={() => handleLevelFieldChange()}
                             data-testid="input-job-levels" 
                           />
                         </FormControl>
@@ -1303,8 +1303,8 @@ export default function AdminJobsPage() {
                                   const calculatedHighest = lowestLevel + levelsCount - 1;
                                   jobForm.setValue("highestLevel", String(calculatedHighest));
                                 }
-                                handleLevelFieldChange();
                               }}
+                              onBlur={() => handleLevelFieldChange()}
                               data-testid="input-job-lowest-level" 
                             />
                           </FormControl>
@@ -1331,8 +1331,8 @@ export default function AdminJobsPage() {
                                   const calculatedLevels = highestLevel - lowestLevel + 1;
                                   jobForm.setValue("levels", String(calculatedLevels));
                                 }
-                                handleLevelFieldChange();
                               }}
+                              onBlur={() => handleLevelFieldChange()}
                               data-testid="input-job-highest-level" 
                             />
                           </FormControl>
