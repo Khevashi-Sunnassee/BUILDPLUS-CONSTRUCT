@@ -705,56 +705,52 @@ export default function AdminPanelsPage() {
       return;
     }
     
-    // Create panels template sheet with example rows - matching estimate import fields
-    const template = [
-      { 
-        "Job Number": jobs[0]?.jobNumber || "JOB-001", 
-        "Panel Mark": "PM-001", 
-        "Panel Type": "WALL", 
-        "Description": "Panel description", 
-        "Drawing Code": "DWG-001", 
-        "Sheet Number": "A001", 
-        "Building": "1", 
-        "Zone": "", 
-        "Level": "1", 
-        "Structural Elevation": "CCB", 
-        "Reckli Detail": "", 
-        "Qty": 1,
-        "Width (mm)": 3000,
-        "Height (mm)": 2800,
-        "Thickness (mm)": 200,
-        "Area (m²)": 8.4,
-        "Volume (m³)": 1.68,
-        "Weight (kg)": 4200,
-        "Concrete Strength (MPa)": "40",
-        "Takeoff Category": "Walls TakeOff",
-        "Estimated Hours": 8 
-      },
-      { 
-        "Job Number": jobs[0]?.jobNumber || "JOB-001", 
-        "Panel Mark": "PM-002", 
-        "Panel Type": "COLUMN", 
-        "Description": "Column panel", 
-        "Drawing Code": "DWG-002", 
-        "Sheet Number": "A002", 
-        "Building": "1", 
-        "Zone": "", 
-        "Level": "Ground", 
-        "Structural Elevation": "RL 0.000", 
-        "Reckli Detail": "Reckli Pattern 1", 
-        "Qty": 1,
-        "Width (mm)": 600,
-        "Height (mm)": 3200,
-        "Thickness (mm)": 600,
-        "Area (m²)": 1.92,
-        "Volume (m³)": 1.15,
-        "Weight (kg)": 2880,
-        "Concrete Strength (MPa)": "50",
-        "Takeoff Category": "Columns TakeOff",
-        "Estimated Hours": 6 
-      },
-    ];
+    // Check if panel types exist
+    if (!panelTypes || panelTypes.length === 0) {
+      toast({
+        title: "No Panel Types Configured",
+        description: "Please configure panel types in the system before importing panels.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Create panels template sheet with one example row for each panel type
+    const template = panelTypes.map((pt, index) => ({
+      "Job Number": jobs[0]?.jobNumber || "JOB-001", 
+      "Panel Mark": `PM-${String(index + 1).padStart(3, '0')}`, 
+      "Panel Type": pt.name, 
+      "Description": `${pt.name} panel example`, 
+      "Drawing Code": `DWG-${String(index + 1).padStart(3, '0')}`, 
+      "Sheet Number": `A${String(index + 1).padStart(3, '0')}`, 
+      "Building": "1", 
+      "Zone": "", 
+      "Level": "1", 
+      "Structural Elevation": "CCB", 
+      "Reckli Detail": "", 
+      "Qty": 1,
+      "Width (mm)": 3000,
+      "Height (mm)": 2800,
+      "Thickness (mm)": 200,
+      "Area (m²)": 8.4,
+      "Volume (m³)": 1.68,
+      "Weight (kg)": pt.expectedWeightPerM3 ? Number(pt.expectedWeightPerM3) * 1.68 : 4200,
+      "Concrete Strength (MPa)": "40",
+      "Takeoff Category": `${pt.name} TakeOff`,
+      "Estimated Hours": 8 
+    }));
     const panelsSheet = XLSX.utils.json_to_sheet(template);
+    
+    // Create panel types reference sheet
+    const panelTypesData = panelTypes.map(pt => ({
+      "Panel Type": pt.name,
+      "Code": pt.code,
+      "Supply Cost ($/m²)": pt.supplyCostPerM2 || "",
+      "Install Cost ($/m²)": pt.installCostPerM2 || "",
+      "Sell Rate ($/m²)": pt.sellRatePerM2 || "",
+      "Expected Weight (kg/m³)": pt.expectedWeightPerM3 || "",
+    }));
+    const panelTypesSheet = XLSX.utils.json_to_sheet(panelTypesData);
     
     // Create jobs reference sheet with existing jobs
     const jobsData = jobs.map(j => ({
@@ -768,6 +764,7 @@ export default function AdminPanelsPage() {
     
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, panelsSheet, "Panels");
+    XLSX.utils.book_append_sheet(wb, panelTypesSheet, "Panel Types Reference");
     XLSX.utils.book_append_sheet(wb, jobsSheet, "Jobs Reference");
     XLSX.writeFile(wb, "panels_import_template.xlsx");
     

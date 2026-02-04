@@ -1381,6 +1381,17 @@ export async function registerRoutes(
         jobsByNumber[job.jobNumber.toLowerCase()] = job;
       });
       
+      // Get valid panel types from the system - accept both name and code
+      const panelTypeConfigs = await storage.getAllPanelTypes();
+      const panelTypesByNameOrCode = new Map<string, string>();
+      panelTypeConfigs.forEach(pt => {
+        const normalizedName = pt.name.toUpperCase().replace(/ /g, "_");
+        const normalizedCode = pt.code.toUpperCase().replace(/ /g, "_");
+        panelTypesByNameOrCode.set(normalizedName, normalizedName);
+        panelTypesByNameOrCode.set(normalizedCode, normalizedName);
+      });
+      const panelTypesList = panelTypeConfigs.map(pt => `${pt.name} (${pt.code})`).join(", ");
+      
       // If a specific jobId is provided, use it as fallback
       let fallbackJob = null;
       if (jobId) {
@@ -1418,9 +1429,17 @@ export async function registerRoutes(
           continue;
         }
         
-        const typeRaw = (row.panelType || row["Panel Type"] || row.panel_type || row["Type"] || "WALL").toUpperCase().replace(/ /g, "_");
-        const validTypes = ["WALL", "COLUMN", "CUBE_BASE", "CUBE_RING", "LANDING_WALL", "OTHER"];
-        const panelType = validTypes.includes(typeRaw) ? typeRaw as any : "OTHER";
+        const typeRaw = (row.panelType || row["Panel Type"] || row.panel_type || row["Type"] || "").toUpperCase().replace(/ /g, "_");
+        if (!typeRaw) {
+          errors.push(`Row ${rowNumber}: Missing panel type`);
+          continue;
+        }
+        const resolvedPanelType = panelTypesByNameOrCode.get(typeRaw);
+        if (!resolvedPanelType) {
+          errors.push(`Row ${rowNumber}: Invalid panel type "${typeRaw}". Valid types are: ${panelTypesList}`);
+          continue;
+        }
+        const panelType = resolvedPanelType as any;
         
         // Parse numeric fields matching estimate import format
         const widthRaw = row.width || row["Width"] || row["Width (mm)"] || row.loadWidth || row["Load Width"] || null;
@@ -1525,6 +1544,17 @@ export async function registerRoutes(
         if (replace) {
           await storage.deletePanelsByJobAndSource(jobId, 3);
         }
+        
+        // Get valid panel types from the system for validation - accept both name and code
+        const panelTypeConfigs = await storage.getAllPanelTypes();
+        const panelTypesByNameOrCode = new Map<string, string>();
+        panelTypeConfigs.forEach(pt => {
+          const normalizedName = pt.name.toUpperCase().replace(/ /g, "_");
+          const normalizedCode = pt.code.toUpperCase().replace(/ /g, "_");
+          panelTypesByNameOrCode.set(normalizedName, normalizedName);
+          panelTypesByNameOrCode.set(normalizedCode, normalizedName);
+        });
+        const panelTypesList = panelTypeConfigs.map(pt => pt.name).join(", ");
         
         const results: any[] = [];
         const panelsToImport: any[] = [];
@@ -1770,14 +1800,29 @@ export async function registerRoutes(
             }
             
             // Determine panel type from column type or category
-            let panelType = "WALL";
             const typeRaw = String(rowData.panelType || category || "").toUpperCase().replace(/\s+/g, "_");
-            if (typeRaw.includes("COLUMN")) panelType = "COLUMN";
-            else if (typeRaw.includes("CUBE")) panelType = "CUBE_BASE";
-            else if (typeRaw.includes("LID")) panelType = "OTHER";
-            else if (typeRaw.includes("BEAM")) panelType = "OTHER";
-            else if (typeRaw.includes("SLAB")) panelType = "OTHER";
-            else if (typeRaw.includes("BALUSTRADE")) panelType = "OTHER";
+            let panelType: string | undefined;
+            
+            if (panelTypesByNameOrCode.size === 0) {
+              sheetResult.errors.push(`Row ${sourceRowNum}: No panel types configured in system`);
+              continue;
+            }
+            
+            // First check if the exact type (name or code) is in the valid panel types
+            if (panelTypesByNameOrCode.has(typeRaw)) {
+              panelType = panelTypesByNameOrCode.get(typeRaw);
+            } else {
+              // Try to match by keyword from configured panel types
+              const validNames = Array.from(new Set(panelTypesByNameOrCode.values()));
+              const matchedType = validNames.find(pt => typeRaw.includes(pt) || pt.includes(typeRaw));
+              if (matchedType) {
+                panelType = matchedType;
+              } else {
+                // Error on unrecognized panel type - don't silently default
+                sheetResult.errors.push(`Row ${sourceRowNum}: Invalid panel type "${typeRaw}". Valid types are: ${panelTypesList}`);
+                continue;
+              }
+            }
             
             // Default building to "1" if no building and no zone provided
             const buildingValue = rowData.building ? String(rowData.building) : (rowData.zone ? "" : "1");
