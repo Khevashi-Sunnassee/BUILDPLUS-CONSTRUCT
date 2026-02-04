@@ -1461,30 +1461,59 @@ export default function AdminJobsPage() {
                       Configure different production cycle times for each building level
                     </p>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      if (!editingJob) return;
-                      setIsLoadingLevelData(true);
-                      try {
-                        const response = await fetch(`/api/admin/jobs/${editingJob.id}/build-levels`);
-                        if (response.ok) {
-                          const data = await response.json();
-                          setLevelCycleTimes(data);
-                          toast({ title: "Levels refreshed" });
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        if (!editingJob) return;
+                        setIsLoadingLevelData(true);
+                        try {
+                          const response = await fetch(`/api/admin/jobs/${editingJob.id}/generate-levels`);
+                          if (response.ok) {
+                            const data = await response.json();
+                            setLevelCycleTimes(data);
+                            toast({ title: "Levels generated from job settings" });
+                          } else {
+                            const error = await response.json();
+                            toast({ title: "Error", description: error.error || "Failed to generate levels", variant: "destructive" });
+                          }
+                        } catch (error) {
+                          toast({ title: "Error", description: "Failed to generate levels", variant: "destructive" });
+                        } finally {
+                          setIsLoadingLevelData(false);
                         }
-                      } catch (error) {
-                        toast({ title: "Error", description: "Failed to refresh levels", variant: "destructive" });
-                      } finally {
-                        setIsLoadingLevelData(false);
-                      }
-                    }}
-                    disabled={isLoadingLevelData}
-                    data-testid="button-refresh-levels"
-                  >
-                    {isLoadingLevelData ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh from Panels"}
-                  </Button>
+                      }}
+                      disabled={isLoadingLevelData}
+                      data-testid="button-generate-from-settings"
+                    >
+                      {isLoadingLevelData ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate from Job Settings"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        if (!editingJob) return;
+                        setIsLoadingLevelData(true);
+                        try {
+                          const response = await fetch(`/api/admin/jobs/${editingJob.id}/build-levels`);
+                          if (response.ok) {
+                            const data = await response.json();
+                            setLevelCycleTimes(data);
+                            toast({ title: "Levels refreshed from panels" });
+                          }
+                        } catch (error) {
+                          toast({ title: "Error", description: "Failed to refresh levels", variant: "destructive" });
+                        } finally {
+                          setIsLoadingLevelData(false);
+                        }
+                      }}
+                      disabled={isLoadingLevelData}
+                      data-testid="button-refresh-levels"
+                    >
+                      {isLoadingLevelData ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh from Panels"}
+                    </Button>
+                  </div>
                 </div>
                 
                 {isLoadingLevelData ? (

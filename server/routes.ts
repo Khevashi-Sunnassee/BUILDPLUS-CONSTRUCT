@@ -958,16 +958,31 @@ export async function registerRoutes(
         return isNaN(num) ? 500 : num; // Unknown levels in middle
       };
       
+      // Get job settings for filtering
+      const job = await storage.getJob(jobId);
+      const lowestLevel = parseInt(job?.lowestLevel || '0', 10);
+      const highestLevel = parseInt(job?.highestLevel || '999', 10);
+      const hasValidRange = !isNaN(lowestLevel) && !isNaN(highestLevel) && highestLevel >= lowestLevel;
+      
       // Sort by building number then level order (lowest to highest)
+      // Filter to only include numeric levels within the lowest/highest range
       const levels = Array.from(levelMap.values())
         .map(l => ({ ...l, levelOrder: parseLevelOrder(l.level) }))
+        .filter(l => {
+          // If we have a valid numeric range, filter out non-numeric levels and levels outside range
+          if (hasValidRange) {
+            const levelNum = parseInt(l.level, 10);
+            if (isNaN(levelNum)) return false; // Skip Ground, Mezzanine, Roof, etc.
+            return levelNum >= lowestLevel && levelNum <= highestLevel;
+          }
+          return true; // No valid range, include all levels
+        })
         .sort((a, b) => {
           if (a.buildingNumber !== b.buildingNumber) return a.buildingNumber - b.buildingNumber;
           return a.levelOrder - b.levelOrder;
         });
       
       // Add existing cycle days or default (use expectedCycleTimePerFloor to match slot generation)
-      const job = await storage.getJob(jobId);
       const globalSettings = await storage.getGlobalSettings();
       const defaultCycleDays = job?.expectedCycleTimePerFloor ?? globalSettings?.productionCycleDays ?? 3;
       
@@ -979,6 +994,54 @@ export async function registerRoutes(
       res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to build levels" });
+    }
+  });
+
+  // Generate levels from job settings (lowest/highest level) without needing panels
+  app.get("/api/admin/jobs/:id/generate-levels", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const jobId = req.params.id as string;
+      const job = await storage.getJob(jobId);
+      
+      if (!job) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const lowestLevel = parseInt(job.lowestLevel || '1', 10);
+      const highestLevel = parseInt(job.highestLevel || '1', 10);
+      const numberOfBuildings = job.numberOfBuildings || 1;
+      
+      if (isNaN(lowestLevel) || isNaN(highestLevel) || highestLevel < lowestLevel) {
+        return res.status(400).json({ error: "Invalid lowest/highest level values. Please set numeric values in Production Details." });
+      }
+      
+      // Get existing cycle times
+      const existingCycleTimes = await storage.getJobLevelCycleTimes(jobId);
+      const existingMap = new Map(
+        existingCycleTimes.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays])
+      );
+      
+      const globalSettings = await storage.getGlobalSettings();
+      const defaultCycleDays = job.expectedCycleTimePerFloor ?? globalSettings?.productionCycleDays ?? 3;
+      
+      // Generate levels for each building
+      const result: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[] = [];
+      
+      for (let building = 1; building <= numberOfBuildings; building++) {
+        for (let level = lowestLevel; level <= highestLevel; level++) {
+          const key = `${building}-${level}`;
+          result.push({
+            buildingNumber: building,
+            level: String(level),
+            levelOrder: level,
+            cycleDays: existingMap.get(key) ?? defaultCycleDays,
+          });
+        }
+      }
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to generate levels" });
     }
   });
 
