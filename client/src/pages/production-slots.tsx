@@ -15,9 +15,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon, LayoutGrid, ChevronLeft } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon, LayoutGrid, ChevronLeft, FileDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, getDay } from "date-fns";
+import jsPDF from "jspdf";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory, CfmeuHoliday } from "@shared/schema";
 
 interface ProductionSlotWithDetails extends ProductionSlot {
@@ -270,6 +271,179 @@ function CalendarView({
     return { left: `${left}%`, width: `${Math.max(width, dayWidth)}%` };
   }, [days.length, start, end]);
 
+  // Vector-based PDF export function
+  const exportCalendarToPDF = useCallback(() => {
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a3",
+    });
+    
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const headerHeight = 20;
+    const rowHeight = 8;
+    const labelWidth = 50;
+    const dayColumnWidth = (pageWidth - margin * 2 - labelWidth) / days.length;
+    
+    // Title
+    pdf.setFontSize(16);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(`Production Schedule - ${headerLabel}`, margin, margin + 6);
+    
+    // Factory and calendar info
+    pdf.setFontSize(10);
+    pdf.setTextColor(100, 100, 100);
+    const factoryText = selectedFactory ? `Factory: ${selectedFactory.name}` : "All Factories";
+    const calendarText = cfmeuCalendarType ? ` | Calendar: ${cfmeuCalendarType.replace("_", " ")}` : "";
+    pdf.text(`${factoryText}${calendarText}`, margin, margin + 12);
+    
+    // Column headers (days)
+    const gridTop = margin + headerHeight;
+    pdf.setFontSize(8);
+    pdf.setTextColor(0, 0, 0);
+    
+    // Draw header row
+    days.forEach((day, index) => {
+      const x = margin + labelWidth + (index * dayColumnWidth);
+      const dayOfWeek = getDay(day);
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const holiday = cfmeuHolidays.find(h => isSameDay(new Date(h.date), day));
+      
+      // Background for weekends/holidays
+      if (holiday) {
+        pdf.setFillColor(254, 226, 226); // Light red for holidays
+        pdf.rect(x, gridTop, dayColumnWidth, rowHeight, "F");
+      } else if (isWeekend) {
+        pdf.setFillColor(229, 231, 235); // Light gray for weekends
+        pdf.rect(x, gridTop, dayColumnWidth, rowHeight, "F");
+      }
+      
+      // Day number
+      pdf.setTextColor(0, 0, 0);
+      pdf.text(format(day, "d"), x + dayColumnWidth / 2, gridTop + 5, { align: "center" });
+    });
+    
+    // Draw "Job / Level" header
+    pdf.setFillColor(243, 244, 246);
+    pdf.rect(margin, gridTop, labelWidth, rowHeight, "F");
+    pdf.setTextColor(0, 0, 0);
+    pdf.text("Job / Level", margin + 2, gridTop + 5);
+    
+    // Draw grid lines for header
+    pdf.setDrawColor(200, 200, 200);
+    pdf.setLineWidth(0.2);
+    pdf.rect(margin, gridTop, pageWidth - margin * 2, rowHeight);
+    
+    // Draw slot rows
+    let currentY = gridTop + rowHeight;
+    
+    slotsWithWindows.forEach((item) => {
+      if (currentY + rowHeight > pageHeight - margin) {
+        pdf.addPage();
+        currentY = margin;
+      }
+      
+      // Row background
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+      
+      // Job/Level label
+      pdf.setFontSize(7);
+      pdf.setTextColor(0, 0, 0);
+      const label = `${item.slot.job.jobNumber} - L${item.slot.level}`;
+      pdf.text(label, margin + 2, currentY + 5);
+      
+      // Draw day backgrounds
+      days.forEach((day, index) => {
+        const x = margin + labelWidth + (index * dayColumnWidth);
+        const dayOfWeek = getDay(day);
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const holiday = cfmeuHolidays.find(h => isSameDay(new Date(h.date), day));
+        
+        if (holiday) {
+          pdf.setFillColor(254, 243, 199); // Light yellow for RDO/holiday
+          pdf.rect(x, currentY, dayColumnWidth, rowHeight, "F");
+        } else if (isWeekend) {
+          pdf.setFillColor(243, 244, 246); // Light gray
+          pdf.rect(x, currentY, dayColumnWidth, rowHeight, "F");
+        }
+      });
+      
+      // Draw production window bar
+      const startDayIndex = days.findIndex(d => isSameDay(d, item.startDate));
+      const endDayIndex = days.findIndex(d => isSameDay(d, item.endDate));
+      
+      if (startDayIndex >= 0 || endDayIndex >= 0) {
+        const barStartIndex = Math.max(0, startDayIndex >= 0 ? startDayIndex : 0);
+        const barEndIndex = Math.min(days.length - 1, endDayIndex >= 0 ? endDayIndex : days.length - 1);
+        
+        const barX = margin + labelWidth + (barStartIndex * dayColumnWidth);
+        const barWidth = (barEndIndex - barStartIndex + 1) * dayColumnWidth;
+        const barY = currentY + 1;
+        const barHeight = rowHeight - 2;
+        
+        // Green border (production window)
+        pdf.setFillColor(22, 163, 74); // Green
+        pdf.rect(barX, barY, barWidth, barHeight, "F");
+        
+        // Inner bar color
+        pdf.setFillColor(59, 130, 246); // Blue inner
+        pdf.rect(barX + 0.5, barY + 0.5, barWidth - 1, barHeight - 1, "F");
+        
+        // Start date indicator (green)
+        if (startDayIndex >= 0) {
+          pdf.setFillColor(22, 163, 74);
+          pdf.rect(barX + 0.5, barY + 0.5, dayColumnWidth * 0.8, barHeight - 1, "F");
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(6);
+          pdf.text(format(item.startDate, "d"), barX + dayColumnWidth * 0.4, currentY + 5, { align: "center" });
+        }
+        
+        // End date indicator (red)
+        if (endDayIndex >= 0 && endDayIndex !== startDayIndex) {
+          const endX = margin + labelWidth + (barEndIndex * dayColumnWidth);
+          pdf.setFillColor(220, 38, 38); // Red
+          pdf.rect(endX + 0.2, barY + 0.5, dayColumnWidth * 0.8, barHeight - 1, "F");
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(6);
+          pdf.text(format(item.endDate, "d"), endX + dayColumnWidth * 0.4, currentY + 5, { align: "center" });
+        }
+        
+        // Panel count in middle
+        if (barWidth > dayColumnWidth * 2.5) {
+          const midX = barX + barWidth / 2;
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(6);
+          pdf.text(`${item.slot.panelCount}p`, midX, currentY + 5, { align: "center" });
+        }
+      }
+      
+      // Draw row border
+      pdf.setDrawColor(200, 200, 200);
+      pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight);
+      
+      currentY += rowHeight;
+    });
+    
+    // Draw vertical grid lines for columns
+    pdf.setDrawColor(220, 220, 220);
+    for (let i = 0; i <= days.length; i++) {
+      const x = margin + labelWidth + (i * dayColumnWidth);
+      pdf.line(x, gridTop, x, currentY);
+    }
+    
+    // Footer
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, margin, pageHeight - 5);
+    pdf.text("Green = Start Date | Red = End Date | Bars span full production window (working days)", pageWidth - margin, pageHeight - 5, { align: "right" });
+    
+    // Save the PDF
+    pdf.save(`production-schedule-${format(start, "yyyy-MM-dd")}.pdf`);
+  }, [days, slotsWithWindows, headerLabel, selectedFactory, cfmeuCalendarType, cfmeuHolidays, start]);
+
   // If no factory is selected, show a message
   if (needsFactorySelection) {
     return (
@@ -332,6 +506,17 @@ function CalendarView({
           <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} data-testid="button-calendar-today">
             Today
           </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="sm" onClick={exportCalendarToPDF} data-testid="button-export-calendar-pdf">
+                <FileDown className="h-4 w-4 mr-1" />
+                Export PDF
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Export calendar as vector PDF</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -448,7 +633,7 @@ function CalendarView({
                         left: barStyle.left,
                         width: barStyle.width,
                         backgroundColor: `${item.jobColor}60`,
-                        border: `2px solid ${item.jobColor}`,
+                        border: `3px solid #16a34a`,
                         color: "white",
                       }}
                       title={`${item.slot.job.jobNumber} - Level ${item.slot.level}\nProduction Start: ${format(item.startDate, "dd MMM")} → End: ${format(item.endDate, "dd MMM")}\n${item.cycleDays} working days\n${item.slot.panelCount} panels`}
@@ -642,6 +827,138 @@ export default function ProductionSlotsPage() {
       </Badge>
     );
   };
+
+  // Vector-based PDF export for grid view
+  const exportGridToPDF = useCallback(() => {
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
+    });
+    
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 10;
+    const rowHeight = 7;
+    const colWidths = [35, 25, 20, 25, 30, 25, 25, 25, 40]; // Job, Level, Panels, Status, Factory, Prod Date, Delivery, Days, Notes
+    
+    // Title
+    pdf.setFontSize(14);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text("Production Slots Report", margin, margin + 6);
+    
+    // Date range info
+    pdf.setFontSize(9);
+    pdf.setTextColor(100, 100, 100);
+    const dateInfo = dateFromFilter || dateToFilter 
+      ? `Date Range: ${dateFromFilter || "Start"} to ${dateToFilter || "End"}`
+      : `Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`;
+    pdf.text(dateInfo, margin, margin + 12);
+    
+    // Table headers
+    const headers = ["Job", "Level", "Panels", "Status", "Factory", "Prod Date", "Delivery", "Days", "Notes"];
+    let currentY = margin + 18;
+    
+    // Draw header row
+    pdf.setFillColor(243, 244, 246);
+    pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+    pdf.setFontSize(8);
+    pdf.setTextColor(0, 0, 0);
+    
+    let currentX = margin;
+    headers.forEach((header, i) => {
+      pdf.text(header, currentX + 1, currentY + 5);
+      currentX += colWidths[i];
+    });
+    
+    // Draw header border
+    pdf.setDrawColor(200, 200, 200);
+    pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight);
+    
+    currentY += rowHeight;
+    
+    // Draw data rows
+    slots.forEach((slot) => {
+      if (currentY + rowHeight > pageHeight - margin) {
+        pdf.addPage();
+        currentY = margin;
+        
+        // Redraw headers on new page
+        pdf.setFillColor(243, 244, 246);
+        pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+        pdf.setFontSize(8);
+        pdf.setTextColor(0, 0, 0);
+        
+        let hx = margin;
+        headers.forEach((header, i) => {
+          pdf.text(header, hx + 1, currentY + 5);
+          hx += colWidths[i];
+        });
+        pdf.setDrawColor(200, 200, 200);
+        pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight);
+        currentY += rowHeight;
+      }
+      
+      const factory = getFactory(slot.job.factoryId);
+      const prodDate = format(new Date(slot.productionSlotDate), "dd/MM/yyyy");
+      const cycleDays = slot.levelCycleTime ?? slot.job.productionDaysInAdvance ?? 10;
+      const deliveryDate = format(addDays(new Date(slot.productionSlotDate), cycleDays), "dd/MM/yyyy");
+      
+      const rowData = [
+        slot.job.jobNumber,
+        `Level ${slot.level}`,
+        String(slot.panelCount),
+        slot.status,
+        factory?.code || "-",
+        prodDate,
+        deliveryDate,
+        `${cycleDays}d`,
+        ""
+      ];
+      
+      // Status-based row color
+      if (slot.status === "COMPLETED") {
+        pdf.setFillColor(220, 252, 231); // Light green
+        pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+      } else if (slot.status === "BOOKED") {
+        pdf.setFillColor(254, 243, 199); // Light yellow
+        pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight, "F");
+      }
+      
+      pdf.setFontSize(7);
+      pdf.setTextColor(0, 0, 0);
+      
+      currentX = margin;
+      rowData.forEach((data, i) => {
+        const text = data.length > 12 ? data.substring(0, 11) + "..." : data;
+        pdf.text(text, currentX + 1, currentY + 5);
+        currentX += colWidths[i];
+      });
+      
+      // Row border
+      pdf.setDrawColor(220, 220, 220);
+      pdf.rect(margin, currentY, pageWidth - margin * 2, rowHeight);
+      
+      currentY += rowHeight;
+    });
+    
+    // Draw column borders
+    pdf.setDrawColor(200, 200, 200);
+    currentX = margin;
+    colWidths.forEach((width) => {
+      currentX += width;
+      if (currentX < pageWidth - margin) {
+        pdf.line(currentX, margin + 18, currentX, currentY);
+      }
+    });
+    
+    // Footer
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text(`Total: ${slots.length} production slots`, margin, pageHeight - 5);
+    
+    pdf.save(`production-slots-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+  }, [slots, dateFromFilter, dateToFilter, getFactory]);
 
   const { data: slotAdjustments = [] } = useQuery<ProductionSlotAdjustmentWithDetails[]>({
     queryKey: ["/api/production-slots", selectedSlot?.id, "adjustments"],
@@ -1195,6 +1512,19 @@ export default function ProductionSlotsPage() {
                 <Calendar className="h-4 w-4 mr-1" />
                 Calendar
               </Button>
+              {viewMode === "grid" && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={exportGridToPDF} data-testid="button-export-grid-pdf">
+                      <FileDown className="h-4 w-4 mr-1" />
+                      Export PDF
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Export grid as vector PDF</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
           </div>
         </CardHeader>
