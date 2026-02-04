@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
@@ -68,6 +68,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 interface ProductionReportSummary {
   date: string;
   factory: string;
+  factoryId?: string;
   entryCount: number;
   panelCount: number;
   totalVolumeM3: number;
@@ -75,6 +76,13 @@ interface ProductionReportSummary {
   jobCount: number;
   draftCount: number;
   completedCount: number;
+}
+
+interface Factory {
+  id: string;
+  name: string;
+  code: string;
+  isActive: boolean;
 }
 
 export default function ProductionReportPage() {
@@ -106,15 +114,16 @@ export default function ProductionReportPage() {
   });
 
   const createProductionDayMutation = useMutation({
-    mutationFn: async (data: { productionDate: string; factory: string }) => {
+    mutationFn: async (data: { productionDate: string; factory: string; factoryId?: string }) => {
       return await apiRequest("POST", "/api/production-days", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
       setIsNewDayDialogOpen(false);
+      const factoryName = activeFactories.find(f => f.id === newDayFactory)?.name || newDayFactory;
       toast({
         title: "Production day created",
-        description: `Created ${format(new Date(newDayDate + "T00:00:00"), "dd/MM/yyyy")} - ${newDayFactory}`,
+        description: `Created ${format(new Date(newDayDate + "T00:00:00"), "dd/MM/yyyy")} - ${factoryName}`,
       });
     },
     onError: (error: any) => {
@@ -168,6 +177,35 @@ export default function ProductionReportPage() {
     },
   });
 
+  const { data: factories } = useQuery<Factory[]>({
+    queryKey: ["/api/admin/factories"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/factories");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const activeFactories = useMemo(() => 
+    factories?.filter(f => f.isActive) || [], 
+    [factories]
+  );
+
+  // Set default factory when factories load
+  useEffect(() => {
+    if (activeFactories.length > 0 && newDayFactory === "QLD") {
+      setNewDayFactory(activeFactories[0].id);
+    }
+  }, [activeFactories, newDayFactory]);
+
+  const getFactoryDisplayName = (report: ProductionReportSummary) => {
+    if (report.factoryId && factories) {
+      const factory = factories.find(f => f.id === report.factoryId);
+      if (factory) return factory.name;
+    }
+    return report.factory;
+  };
+
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: ["/api/settings/logo"],
   });
@@ -175,9 +213,13 @@ export default function ProductionReportPage() {
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
   const filteredReports = reports?.filter((report) => {
-    // Filter by factory
-    if (factoryFilter !== "all" && report.factory !== factoryFilter) {
-      return false;
+    // Filter by factory (supports both factoryId and legacy factory text)
+    if (factoryFilter !== "all") {
+      const matchesFactoryId = report.factoryId === factoryFilter;
+      const matchesFactoryText = report.factory === factoryFilter;
+      if (!matchesFactoryId && !matchesFactoryText) {
+        return false;
+      }
     }
     // Filter by search query
     if (searchQuery) {
@@ -427,8 +469,16 @@ export default function ProductionReportPage() {
                       <SelectValue placeholder="Select factory" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="QLD">QLD</SelectItem>
-                      <SelectItem value="VIC">Victoria</SelectItem>
+                      {activeFactories.length > 0 ? (
+                        activeFactories.map((f) => (
+                          <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                        ))
+                      ) : (
+                        <>
+                          <SelectItem value="QLD">QLD</SelectItem>
+                          <SelectItem value="VIC">Victoria</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -442,12 +492,14 @@ export default function ProductionReportPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={() =>
+                  onClick={() => {
+                    const factoryObj = activeFactories.find(f => f.id === newDayFactory);
                     createProductionDayMutation.mutate({
                       productionDate: newDayDate,
-                      factory: newDayFactory,
-                    })
-                  }
+                      factory: factoryObj?.code || newDayFactory,
+                      factoryId: activeFactories.length > 0 ? newDayFactory : undefined,
+                    });
+                  }}
                   disabled={createProductionDayMutation.isPending}
                   data-testid="button-create-new-day"
                 >
@@ -498,8 +550,16 @@ export default function ProductionReportPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Factories</SelectItem>
-                  <SelectItem value="QLD">QLD</SelectItem>
-                  <SelectItem value="VIC">Victoria</SelectItem>
+                  {activeFactories.length > 0 ? (
+                    activeFactories.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                    ))
+                  ) : (
+                    <>
+                      <SelectItem value="QLD">QLD</SelectItem>
+                      <SelectItem value="VIC">Victoria</SelectItem>
+                    </>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -537,7 +597,7 @@ export default function ProductionReportPage() {
                       data-testid={`row-report-${report.date}-${report.factory}`}
                     >
                       <TableCell>
-                        <Link href={`/production-report/${report.date}?factory=${report.factory}`}>
+                        <Link href={`/production-report/${report.date}?factory=${report.factoryId || report.factory}`}>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-muted-foreground" />
                             <span className="font-medium">
@@ -549,8 +609,8 @@ export default function ProductionReportPage() {
                       <TableCell>
                         <div className="flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                          <Badge variant={report.factory === "QLD" ? "default" : "secondary"}>
-                            {report.factory}
+                          <Badge variant="secondary">
+                            {getFactoryDisplayName(report)}
                           </Badge>
                         </div>
                       </TableCell>
@@ -580,7 +640,7 @@ export default function ProductionReportPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">
-                          <Link href={`/production-report/${report.date}?factory=${report.factory}`}>
+                          <Link href={`/production-report/${report.date}?factory=${report.factoryId || report.factory}`}>
                             <Button variant="ghost" size="icon" data-testid={`button-view-${report.date}-${report.factory}`}>
                               <ChevronRight className="h-4 w-4" />
                             </Button>
@@ -590,7 +650,7 @@ export default function ProductionReportPage() {
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setDeletingDay({ date: report.date, factory: report.factory });
+                              setDeletingDay({ date: report.date, factory: report.factoryId || report.factory });
                               setDeleteDialogOpen(true);
                             }}
                             data-testid={`button-delete-${report.date}-${report.factory}`}
