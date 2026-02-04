@@ -219,6 +219,9 @@ export default function AdminJobsPage() {
   // Onsite date change confirmation state
   const [originalOnsiteDate, setOriginalOnsiteDate] = useState<string | null>(null);
   const [onsiteDateChanged, setOnsiteDateChanged] = useState(false);
+  
+  // Scheduling settings change confirmation state
+  const [schedulingSettingsChanged, setSchedulingSettingsChanged] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -350,12 +353,13 @@ export default function AdminJobsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       toast({ title: "Job updated successfully" });
       
-      // Check if we need to show days in advance or onsite date regeneration dialog
-      if ((daysInAdvanceChanged || onsiteDateChanged) && productionSlotStatus?.hasSlots) {
+      // Check if we need to show days in advance, onsite date, or scheduling settings regeneration dialog
+      if ((daysInAdvanceChanged || onsiteDateChanged || schedulingSettingsChanged) && productionSlotStatus?.hasSlots) {
         setPendingJobId(variables.id);
         setDaysInAdvanceConfirmOpen(true);
         setDaysInAdvanceChanged(false);
         setOnsiteDateChanged(false);
+        setSchedulingSettingsChanged(false);
         return;
       }
       
@@ -712,6 +716,9 @@ export default function AdminJobsPage() {
     // Capture original onsite date for change detection
     setOriginalOnsiteDate(job.productionStartDate ? new Date(job.productionStartDate).toISOString().split('T')[0] : null);
     setOnsiteDateChanged(false);
+    
+    // Reset scheduling settings change flag
+    setSchedulingSettingsChanged(false);
     
     // Load level cycle times in background
     setLevelCycleTimes([]);
@@ -1656,7 +1663,12 @@ export default function AdminJobsPage() {
                               min="1"
                               placeholder="e.g., 21"
                               value={field.value ?? ""} 
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              onChange={(e) => {
+                                field.onChange(e.target.value ? parseInt(e.target.value) : null);
+                                if (editingJob) {
+                                  setSchedulingSettingsChanged(true);
+                                }
+                              }}
                               data-testid="input-job-days-to-achieve-ifc" 
                             />
                           </FormControl>
@@ -1679,7 +1691,12 @@ export default function AdminJobsPage() {
                               min="1"
                               placeholder="e.g., 10"
                               value={field.value ?? ""} 
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              onChange={(e) => {
+                                field.onChange(e.target.value ? parseInt(e.target.value) : null);
+                                if (editingJob) {
+                                  setSchedulingSettingsChanged(true);
+                                }
+                              }}
                               data-testid="input-job-production-window-days" 
                             />
                           </FormControl>
@@ -1700,7 +1717,12 @@ export default function AdminJobsPage() {
                               min="1"
                               placeholder="e.g., 10"
                               value={field.value ?? ""} 
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              onChange={(e) => {
+                                field.onChange(e.target.value ? parseInt(e.target.value) : null);
+                                if (editingJob) {
+                                  setSchedulingSettingsChanged(true);
+                                }
+                              }}
                               data-testid="input-job-production-days-in-advance" 
                             />
                           </FormControl>
@@ -1725,7 +1747,12 @@ export default function AdminJobsPage() {
                                 max={daysInAdvance - 1}
                                 placeholder="e.g., 7"
                                 value={field.value ?? ""} 
-                                onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                                onChange={(e) => {
+                                  field.onChange(e.target.value ? parseInt(e.target.value) : null);
+                                  if (editingJob) {
+                                    setSchedulingSettingsChanged(true);
+                                  }
+                                }}
                                 data-testid="input-job-procurement-days-in-advance" 
                               />
                             </FormControl>
@@ -1750,7 +1777,12 @@ export default function AdminJobsPage() {
                               min="1"
                               placeholder="e.g., 14"
                               value={field.value ?? ""} 
-                              onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              onChange={(e) => {
+                                field.onChange(e.target.value ? parseInt(e.target.value) : null);
+                                if (editingJob) {
+                                  setSchedulingSettingsChanged(true);
+                                }
+                              }}
                               data-testid="input-job-procurement-time-days" 
                             />
                           </FormControl>
@@ -1930,7 +1962,10 @@ export default function AdminJobsPage() {
           
           {editDialogTab !== "levelCycleTimes" && (
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setJobDialogOpen(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                setJobDialogOpen(false);
+                setSchedulingSettingsChanged(false);
+              }}>
                 Cancel
               </Button>
               <Button
