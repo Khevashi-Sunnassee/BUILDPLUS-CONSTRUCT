@@ -1233,6 +1233,16 @@ export default function AdminJobsPage() {
                           <Input 
                             placeholder="e.g. Ground,L1,L2,L3,Roof" 
                             {...field} 
+                            onChange={(e) => {
+                              field.onChange(e);
+                              const levelsValue = e.target.value;
+                              const levelsCount = parseInt(levelsValue, 10);
+                              const lowestLevel = parseInt(jobForm.getValues("lowestLevel") || "0", 10);
+                              if (!isNaN(levelsCount) && levelsCount > 0 && !isNaN(lowestLevel)) {
+                                const calculatedHighest = lowestLevel + levelsCount - 1;
+                                jobForm.setValue("highestLevel", String(calculatedHighest));
+                              }
+                            }}
                             data-testid="input-job-levels" 
                           />
                         </FormControl>
@@ -1252,6 +1262,16 @@ export default function AdminJobsPage() {
                             <Input 
                               placeholder="e.g. Ground" 
                               {...field} 
+                              onChange={(e) => {
+                                field.onChange(e);
+                                const lowestLevel = parseInt(e.target.value, 10);
+                                const levelsValue = jobForm.getValues("levels");
+                                const levelsCount = parseInt(levelsValue || "0", 10);
+                                if (!isNaN(lowestLevel) && !isNaN(levelsCount) && levelsCount > 0) {
+                                  const calculatedHighest = lowestLevel + levelsCount - 1;
+                                  jobForm.setValue("highestLevel", String(calculatedHighest));
+                                }
+                              }}
                               data-testid="input-job-lowest-level" 
                             />
                           </FormControl>
@@ -1270,6 +1290,15 @@ export default function AdminJobsPage() {
                             <Input 
                               placeholder="e.g. Roof" 
                               {...field} 
+                              onChange={(e) => {
+                                field.onChange(e);
+                                const highestLevel = parseInt(e.target.value, 10);
+                                const lowestLevel = parseInt(jobForm.getValues("lowestLevel") || "0", 10);
+                                if (!isNaN(highestLevel) && !isNaN(lowestLevel) && highestLevel >= lowestLevel) {
+                                  const calculatedLevels = highestLevel - lowestLevel + 1;
+                                  jobForm.setValue("levels", String(calculatedLevels));
+                                }
+                              }}
                               data-testid="input-job-highest-level" 
                             />
                           </FormControl>
