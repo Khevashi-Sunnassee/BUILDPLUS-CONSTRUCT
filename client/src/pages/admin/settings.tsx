@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -237,6 +237,50 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save CFMEU calendar", variant: "destructive" });
+    },
+  });
+
+  interface CfmeuCalendarData {
+    holidays: Array<{
+      id: string;
+      calendarType: string;
+      date: string;
+      name: string;
+      holidayType: string;
+      year: number;
+    }>;
+    summary: Record<string, { count: number; years: number[] }>;
+  }
+
+  const { data: cfmeuCalendarData, isLoading: cfmeuLoading } = useQuery<CfmeuCalendarData>({
+    queryKey: ["/api/admin/cfmeu-calendars"],
+  });
+
+  const syncCfmeuCalendarMutation = useMutation({
+    mutationFn: async (calendarType: string) => {
+      const response = await apiRequest("POST", "/api/admin/cfmeu-calendars/sync", { calendarType });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cfmeu-calendars"] });
+      toast({ title: data.message || "Calendar synced successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to sync calendar", variant: "destructive" });
+    },
+  });
+
+  const syncAllCfmeuCalendarsMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/cfmeu-calendars/sync-all", {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/cfmeu-calendars"] });
+      toast({ title: "All calendars synced successfully" });
+    },
+    onError: () => {
+      toast({ title: "Failed to sync calendars", variant: "destructive" });
     },
   });
 
@@ -843,6 +887,84 @@ export default function AdminSettingsPage() {
             <p className="text-sm text-muted-foreground">
               Select a CFMEU calendar to exclude public holidays from work day calculations
             </p>
+          </div>
+
+          <div className="space-y-4 pt-4 border-t">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-medium">CFMEU Calendar Data</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => syncAllCfmeuCalendarsMutation.mutate()}
+                disabled={syncAllCfmeuCalendarsMutation.isPending}
+                data-testid="button-sync-all-cfmeu"
+              >
+                {syncAllCfmeuCalendarsMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Sync All Calendars
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Import RDOs and public holidays from CFMEU websites for accurate work day calculations.
+            </p>
+
+            {cfmeuLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {[
+                  { type: "VIC_ONSITE", label: "VIC On-Site (36hr)", description: "Victoria on-site construction RDOs" },
+                  { type: "VIC_OFFSITE", label: "VIC Off-Site (38hr)", description: "Victoria off-site/factory RDOs" },
+                  { type: "QLD", label: "QLD", description: "Queensland construction RDOs" },
+                ].map((cal) => {
+                  const summary = cfmeuCalendarData?.summary?.[cal.type];
+                  return (
+                    <div key={cal.type} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{cal.label}</span>
+                          {summary && summary.count > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-green-600">
+                              <CheckCircle className="h-3 w-3" />
+                              {summary.count} holidays
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">{cal.description}</p>
+                        {summary && summary.years.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Years: {summary.years.sort().join(", ")}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => syncCfmeuCalendarMutation.mutate(cal.type)}
+                        disabled={syncCfmeuCalendarMutation.isPending}
+                        data-testid={`button-sync-${cal.type.toLowerCase()}`}
+                      >
+                        {syncCfmeuCalendarMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                        )}
+                        Sync
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
