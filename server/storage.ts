@@ -1149,10 +1149,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(eq(jobs.factoryId, factoryId));
     }
     if (status) {
-      conditions.push(eq(panelRegister.status, status));
+      conditions.push(eq(panelRegister.status, status as typeof panelRegister.status.enumValues[number]));
     }
     if (documentStatus) {
-      conditions.push(eq(panelRegister.documentStatus, documentStatus));
+      conditions.push(eq(panelRegister.documentStatus, documentStatus as typeof panelRegister.documentStatus.enumValues[number]));
     }
     if (search) {
       conditions.push(sql`(
@@ -2284,7 +2284,7 @@ export class DatabaseStorage implements IStorage {
       : await query;
     
     // Fetch level cycle times for all jobs in the results
-    const jobIds = [...new Set(results.map(r => r.job.id))];
+    const jobIds = Array.from(new Set(results.map(r => r.job.id)));
     const levelCycleTimes = jobIds.length > 0 
       ? await db.select().from(jobLevelCycleTimes).where(inArray(jobLevelCycleTimes.jobId, jobIds))
       : [];
