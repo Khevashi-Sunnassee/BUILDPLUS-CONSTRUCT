@@ -57,3 +57,102 @@ The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/
 - **Drizzle ORM**: TypeScript ORM for PostgreSQL.
 - **bcrypt**: Library for hashing passwords.
 - **express-session**: Middleware for managing user sessions.
+
+## Coding Standards (MANDATORY - ALL SESSIONS MUST FOLLOW)
+
+### File Size Limits
+- **HARD LIMIT**: No file should exceed 500 lines of code
+- **SOFT LIMIT**: Start considering splitting at 400 lines
+- If adding code would push a file over 500 lines, refactor FIRST before adding new code
+
+### Backend Architecture Rules
+Routes must be split by domain:
+```
+server/routes/
+├── index.ts              (router aggregator - imports and mounts all domain routes)
+├── auth.routes.ts        (login, logout, session, password)
+├── users.routes.ts       (user CRUD, permissions)
+├── jobs.routes.ts        (jobs CRUD, job settings, import/export)
+├── panels.routes.ts      (panel register, approval workflow)
+├── production.routes.ts  (slots, entries, days, scheduling)
+├── drafting.routes.ts    (drafting program)
+├── logistics.routes.ts   (load lists, deliveries, trailers)
+├── reports.routes.ts     (KPI, weekly wages, analytics)
+├── procurement.routes.ts (purchase orders, items, suppliers)
+├── tasks.routes.ts       (task management)
+├── factories.routes.ts   (factories, beds, CFMEU holidays)
+├── settings.routes.ts    (global settings)
+├── agent.routes.ts       (Windows agent data ingest)
+└── middleware/
+    ├── auth.middleware.ts      (requireAuth, requireRole)
+    └── permissions.middleware.ts (requirePermission)
+```
+
+Storage/Repositories must be split by domain:
+```
+server/repositories/
+├── index.ts
+├── user.repository.ts
+├── job.repository.ts
+├── panel.repository.ts
+├── production.repository.ts
+├── logistics.repository.ts
+├── procurement.repository.ts
+├── task.repository.ts
+└── factory.repository.ts
+```
+
+### Frontend Architecture Rules
+- Page components exceeding 500 lines must be split into sub-components
+- Extract reusable logic into custom hooks in a `hooks/` folder
+- Extract complex UI sections into separate component files
+- Structure for large features:
+```
+client/src/pages/feature-name/
+├── index.tsx           (main page - orchestrator only)
+├── FeatureTable.tsx    (data display)
+├── FeatureForm.tsx     (create/edit forms)
+├── FeatureFilters.tsx  (filter controls)
+├── FeatureDialogs.tsx  (modals/dialogs)
+└── hooks/
+    └── useFeatureData.ts
+```
+
+### Code Quality Rules
+1. **No console.log in production code** - Use proper logger (Winston/Pino)
+2. **All API endpoints must have input validation** - Use Zod schemas
+3. **Consistent error response format**:
+   ```typescript
+   { error: string, code?: string, details?: object }
+   ```
+4. **All new API endpoints require tests** - At minimum, happy path test
+5. **TypeScript strict mode** - No `any` types without justification
+
+### Database Rules
+1. **All tables must have**: `id`, `createdAt`, `updatedAt` fields
+2. **Use UUID for all IDs** - varchar(36) with gen_random_uuid()
+3. **Use enums for status fields** - Never plain text for statuses
+4. **Foreign keys must specify onDelete behavior**
+5. **Never change ID column types** - Breaks migrations
+
+### Before Adding New Features Checklist
+1. [ ] Will this push any file over 500 lines? If yes, refactor first
+2. [ ] Does the database schema follow all rules?
+3. [ ] Is input validation in place?
+4. [ ] Are error responses consistent?
+5. [ ] Is there a test for the happy path?
+
+### Security Requirements
+1. All endpoints behind authentication (except /api/auth/*)
+2. Rate limiting on auth endpoints
+3. Input sanitization for user-provided content
+4. File upload size limits (max 10MB)
+5. File type validation for uploads
+
+### Naming Conventions
+- **Routes**: kebab-case URLs (`/api/panel-types`)
+- **Files**: kebab-case (`panel-types.routes.ts`)
+- **Functions**: camelCase (`getPanelTypes`)
+- **Types/Interfaces**: PascalCase (`PanelType`)
+- **Database tables**: camelCase (`panelTypes`)
+- **Database columns**: camelCase (`createdAt`)

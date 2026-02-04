@@ -1,0 +1,421 @@
+import { Router } from "express";
+import { db } from "../storage";
+import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { factories, productionBeds, cfmeuHolidays, insertFactorySchema, insertProductionBedSchema } from "@shared/schema";
+import { eq, and, gte, lte } from "drizzle-orm";
+import ICAL from "ical.js";
+
+const router = Router();
+
+const CFMEU_CALENDAR_URLS: Record<string, { url: string; years: number[] }[]> = {
+  VIC_ONSITE: [
+    { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-onsite-2025.ics", years: [2025] },
+    { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/36hr-onsite-rdo-calendar.ics", years: [2026] },
+  ],
+  VIC_OFFSITE: [
+    { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-offsite-2025.ics", years: [2025] },
+    { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/38hr-offsite-rdo-calendar.ics", years: [2026] },
+  ],
+};
+
+async function parseIcsAndSaveHolidays(
+  calendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD",
+  icsContent: string,
+  targetYears: number[]
+): Promise<{ imported: number; skipped: number }> {
+  let imported = 0;
+  let skipped = 0;
+
+  try {
+    const jcalData = ICAL.parse(icsContent);
+    const comp = new ICAL.Component(jcalData);
+    const events = comp.getAllSubcomponents("vevent");
+
+    for (const event of events) {
+      const icalEvent = new ICAL.Event(event);
+      const dtstart = icalEvent.startDate;
+      if (!dtstart) continue;
+
+      const eventDate = dtstart.toJSDate();
+      const eventYear = eventDate.getFullYear();
+
+      if (!targetYears.includes(eventYear)) continue;
+
+      const summary = icalEvent.summary || "Unnamed Holiday";
+      
+      let holidayType: "RDO" | "PUBLIC_HOLIDAY" | "OTHER" = "RDO";
+      const lowerSummary = summary.toLowerCase();
+      if (lowerSummary.includes("public holiday") || 
+          lowerSummary.includes("australia day") || 
+          lowerSummary.includes("anzac") ||
+          lowerSummary.includes("christmas") ||
+          lowerSummary.includes("good friday") ||
+          lowerSummary.includes("easter") ||
+          lowerSummary.includes("queen") ||
+          lowerSummary.includes("king") ||
+          lowerSummary.includes("labour day") ||
+          lowerSummary.includes("melbourne cup")) {
+        holidayType = "PUBLIC_HOLIDAY";
+      } else if (lowerSummary.includes("branch meeting") || lowerSummary.includes("school")) {
+        holidayType = "OTHER";
+      }
+
+      try {
+        await db.insert(cfmeuHolidays).values({
+          calendarType,
+          date: eventDate,
+          name: summary,
+          holidayType,
+          year: eventYear,
+        }).onConflictDoUpdate({
+          target: [cfmeuHolidays.calendarType, cfmeuHolidays.date],
+          set: {
+            name: summary,
+            holidayType,
+            year: eventYear,
+          },
+        });
+        imported++;
+      } catch (err) {
+        skipped++;
+      }
+    }
+  } catch (err) {
+    console.error("Error parsing ICS:", err);
+    throw new Error("Failed to parse ICS file");
+  }
+
+  return { imported, skipped };
+}
+
+export async function syncAllCfmeuCalendars(): Promise<Record<string, { imported: number; skipped: number }>> {
+  const results: Record<string, { imported: number; skipped: number }> = {};
+  console.log("[CFMEU] Starting automatic calendar sync...");
+
+  for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
+    const urls = CFMEU_CALENDAR_URLS[calendarType];
+    let totalImported = 0;
+    let totalSkipped = 0;
+
+    for (const { url, years } of urls) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          console.error(`[CFMEU] Failed to fetch ${calendarType} from ${url}: ${response.status}`);
+          continue;
+        }
+        const icsContent = await response.text();
+        const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+        totalImported += result.imported;
+        totalSkipped += result.skipped;
+      } catch (err) {
+        console.error(`[CFMEU] Error fetching ${calendarType}:`, err);
+      }
+    }
+
+    results[calendarType] = { imported: totalImported, skipped: totalSkipped };
+    console.log(`[CFMEU] Synced ${calendarType}: ${totalImported} holidays imported, ${totalSkipped} skipped`);
+  }
+
+  console.log("[CFMEU] Automatic calendar sync complete");
+  return results;
+}
+
+export function scheduleMonthlyCalendarSync() {
+  const now = new Date();
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+  const msUntilNextMonth = nextMonth.getTime() - now.getTime();
+
+  console.log(`[CFMEU] Next scheduled sync: ${nextMonth.toISOString()}`);
+
+  setTimeout(async () => {
+    try {
+      await syncAllCfmeuCalendars();
+    } catch (err) {
+      console.error("[CFMEU] Scheduled sync failed:", err);
+    }
+    scheduleMonthlyCalendarSync();
+  }, msUntilNextMonth);
+}
+
+export function initializeCfmeuSync() {
+  setTimeout(async () => {
+    try {
+      await syncAllCfmeuCalendars();
+      scheduleMonthlyCalendarSync();
+    } catch (err) {
+      console.error("[CFMEU] Startup sync failed:", err);
+      scheduleMonthlyCalendarSync();
+    }
+  }, 5000);
+}
+
+router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const allFactories = await db.select().from(factories).orderBy(factories.name);
+    res.json(allFactories);
+  } catch (error: any) {
+    console.error("Error fetching factories:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch factories" });
+  }
+});
+
+router.get("/api/factories", requireAuth, async (req, res) => {
+  try {
+    const activeFactories = await db.select().from(factories).where(eq(factories.isActive, true)).orderBy(factories.name);
+    res.json(activeFactories);
+  } catch (error: any) {
+    console.error("Error fetching factories:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch factories" });
+  }
+});
+
+router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const factoryId = String(req.params.id);
+    const factory = await db.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
+    if (factory.length === 0) {
+      return res.status(404).json({ error: "Factory not found" });
+    }
+    const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, factoryId)).orderBy(productionBeds.name);
+    res.json({ ...factory[0], beds });
+  } catch (error: any) {
+    console.error("Error fetching factory:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch factory" });
+  }
+});
+
+router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const parsed = insertFactorySchema.parse(req.body);
+    const [created] = await db.insert(factories).values(parsed).returning();
+    res.json(created);
+  } catch (error: any) {
+    console.error("Error creating factory:", error);
+    res.status(500).json({ error: error.message || "Failed to create factory" });
+  }
+});
+
+router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { beds, ...factoryData } = req.body;
+    const factoryId = String(req.params.id);
+    const [updated] = await db.update(factories)
+      .set({ ...factoryData, updatedAt: new Date() })
+      .where(eq(factories.id, factoryId))
+      .returning();
+    if (!updated) {
+      return res.status(404).json({ error: "Factory not found" });
+    }
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Error updating factory:", error);
+    res.status(500).json({ error: error.message || "Failed to update factory" });
+  }
+});
+
+router.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const [deleted] = await db.delete(factories).where(eq(factories.id, String(req.params.id))).returning();
+    if (!deleted) {
+      return res.status(404).json({ error: "Factory not found" });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting factory:", error);
+    res.status(500).json({ error: error.message || "Failed to delete factory" });
+  }
+});
+
+router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name);
+    res.json(beds);
+  } catch (error: any) {
+    console.error("Error fetching production beds:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch production beds" });
+  }
+});
+
+router.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const parsed = insertProductionBedSchema.parse({ ...req.body, factoryId: String(req.params.factoryId) });
+    const [created] = await db.insert(productionBeds).values(parsed).returning();
+    res.json(created);
+  } catch (error: any) {
+    console.error("Error creating production bed:", error);
+    res.status(500).json({ error: error.message || "Failed to create production bed" });
+  }
+});
+
+router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const [updated] = await db.update(productionBeds)
+      .set({ ...req.body, updatedAt: new Date() })
+      .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
+      .returning();
+    if (!updated) {
+      return res.status(404).json({ error: "Production bed not found" });
+    }
+    res.json(updated);
+  } catch (error: any) {
+    console.error("Error updating production bed:", error);
+    res.status(500).json({ error: error.message || "Failed to update production bed" });
+  }
+});
+
+router.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const [deleted] = await db.delete(productionBeds)
+      .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
+      .returning();
+    if (!deleted) {
+      return res.status(404).json({ error: "Production bed not found" });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting production bed:", error);
+    res.status(500).json({ error: error.message || "Failed to delete production bed" });
+  }
+});
+
+router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
+  try {
+    const { calendarType, startDate, endDate } = req.query;
+    
+    if (!calendarType || !startDate || !endDate) {
+      return res.status(400).json({ error: "calendarType, startDate, and endDate are required" });
+    }
+    
+    if (!["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType as string)) {
+      return res.status(400).json({ error: "Invalid calendar type" });
+    }
+    
+    const holidays = await db.select()
+      .from(cfmeuHolidays)
+      .where(
+        and(
+          eq(cfmeuHolidays.calendarType, calendarType as any),
+          gte(cfmeuHolidays.date, new Date(startDate as string)),
+          lte(cfmeuHolidays.date, new Date(endDate as string))
+        )
+      )
+      .orderBy(cfmeuHolidays.date);
+    
+    res.json(holidays);
+  } catch (error: any) {
+    console.error("Error fetching CFMEU holidays:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch holidays" });
+  }
+});
+
+router.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const holidays = await db.select().from(cfmeuHolidays).orderBy(cfmeuHolidays.date);
+    
+    const summary: Record<string, { count: number; years: number[] }> = {};
+    for (const h of holidays) {
+      if (!summary[h.calendarType]) {
+        summary[h.calendarType] = { count: 0, years: [] };
+      }
+      summary[h.calendarType].count++;
+      if (!summary[h.calendarType].years.includes(h.year)) {
+        summary[h.calendarType].years.push(h.year);
+      }
+    }
+
+    res.json({ holidays, summary });
+  } catch (error: any) {
+    console.error("Error fetching CFMEU calendars:", error);
+    res.status(500).json({ error: error.message || "Failed to fetch calendars" });
+  }
+});
+
+router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req, res) => {
+  const { calendarType } = req.body;
+
+  if (!calendarType || !["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType)) {
+    return res.status(400).json({ error: "Invalid calendar type" });
+  }
+
+  try {
+    const urls = CFMEU_CALENDAR_URLS[calendarType];
+    let totalImported = 0;
+    let totalSkipped = 0;
+
+    for (const { url, years } of urls) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.error(`Failed to fetch ${url}: ${response.status}`);
+        continue;
+      }
+      const icsContent = await response.text();
+      const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+      totalImported += result.imported;
+      totalSkipped += result.skipped;
+    }
+
+    res.json({ 
+      success: true, 
+      imported: totalImported, 
+      skipped: totalSkipped,
+      message: `Synced ${calendarType} calendar: ${totalImported} holidays imported`
+    });
+  } catch (error: any) {
+    console.error("Error syncing CFMEU calendar:", error);
+    res.status(500).json({ error: error.message || "Failed to sync calendar" });
+  }
+});
+
+router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const results: Record<string, { imported: number; skipped: number }> = {};
+
+    for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
+      const urls = CFMEU_CALENDAR_URLS[calendarType];
+      let totalImported = 0;
+      let totalSkipped = 0;
+
+      for (const { url, years } of urls) {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            console.error(`Failed to fetch ${url}: ${response.status}`);
+            continue;
+          }
+          const icsContent = await response.text();
+          const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+          totalImported += result.imported;
+          totalSkipped += result.skipped;
+        } catch (err) {
+          console.error(`Error fetching ${url}:`, err);
+        }
+      }
+
+      results[calendarType] = { imported: totalImported, skipped: totalSkipped };
+    }
+
+    res.json({ success: true, results });
+  } catch (error: any) {
+    console.error("Error syncing all CFMEU calendars:", error);
+    res.status(500).json({ error: error.message || "Failed to sync calendars" });
+  }
+});
+
+router.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), async (req, res) => {
+  const calendarType = String(req.params.calendarType);
+
+  if (!["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType)) {
+    return res.status(400).json({ error: "Invalid calendar type" });
+  }
+
+  try {
+    const result = await db.delete(cfmeuHolidays).where(eq(cfmeuHolidays.calendarType, calendarType as any));
+    res.json({ success: true, deleted: result.rowCount || 0 });
+  } catch (error: any) {
+    console.error("Error deleting CFMEU calendar:", error);
+    res.status(500).json({ error: error.message || "Failed to delete calendar" });
+  }
+});
+
+export const factoriesRouter = router;
