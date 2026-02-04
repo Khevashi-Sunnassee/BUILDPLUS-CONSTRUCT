@@ -91,16 +91,21 @@ server/routes/
 Storage/Repositories must be split by domain:
 ```
 server/repositories/
-├── index.ts
-├── user.repository.ts
-├── job.repository.ts
-├── panel.repository.ts
-├── production.repository.ts
-├── logistics.repository.ts
-├── procurement.repository.ts
-├── task.repository.ts
-└── factory.repository.ts
+├── index.ts              (repository aggregator - exports all repositories)
+├── user.repository.ts    (users, auth, permissions, devices)
+├── settings.repository.ts (global settings, mapping rules, zones)
+├── factory.repository.ts (factories, CFMEU holidays, working day utils)
+├── job.repository.ts     (jobs, work types, level cycle times)
+├── panel.repository.ts   (panels, panel types, cost components, job rates)
+├── production.repository.ts (entries, days, slots, adjustments)
+├── drafting.repository.ts   (drafting program management)
+├── logistics.repository.ts  (trailer types, load lists, deliveries)
+├── reports.repository.ts    (daily logs, log rows, weekly reports)
+├── procurement.repository.ts (suppliers, items, purchase orders)
+└── task.repository.ts       (task groups, tasks, assignees, updates)
 ```
+
+**Repository Migration Status**: Repositories are created but storage.ts remains the primary implementation for backward compatibility. Future work should gradually delegate storage.ts methods to the corresponding repositories.
 
 ### Frontend Architecture Rules
 - Page components exceeding 500 lines must be split into sub-components
