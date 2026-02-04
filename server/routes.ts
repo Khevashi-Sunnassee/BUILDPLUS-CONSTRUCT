@@ -908,10 +908,10 @@ export async function registerRoutes(
         const defaultCycleTime = job.expectedCycleTimePerFloor;
         
         // Date calculation logic:
-        // 1. productionStartDate = Site Delivery Date (when panels go to site)
-        // 2. Each level's site delivery = productionStartDate + cumulativeDays
-        // 3. productionSlotDate = Site Delivery - production_days_in_advance (Panel Production Due)
-        const siteDeliveryBaseDate = new Date(job.productionStartDate);
+        // 1. productionStartDate = Onsite Start Date (when builder wants us on site)
+        // 2. Each level's onsite date = productionStartDate + cumulativeDays
+        // 3. productionSlotDate = Onsite Date - production_days_in_advance (Panel Production Due)
+        const onsiteStartBaseDate = new Date(job.productionStartDate);
         const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
         
         const allSlots = existingSlots.sort((a, b) => a.levelOrder - b.levelOrder);
@@ -919,12 +919,12 @@ export async function registerRoutes(
         let updatedCount = 0;
         
         for (const slot of allSlots) {
-          // Calculate site delivery date for this level
-          const siteDeliveryDate = new Date(siteDeliveryBaseDate);
-          siteDeliveryDate.setDate(siteDeliveryDate.getDate() + cumulativeDays);
+          // Calculate onsite date for this level
+          const onsiteDate = new Date(onsiteStartBaseDate);
+          onsiteDate.setDate(onsiteDate.getDate() + cumulativeDays);
           
           // Calculate panel production due date
-          const panelProductionDue = new Date(siteDeliveryDate);
+          const panelProductionDue = new Date(onsiteDate);
           panelProductionDue.setDate(panelProductionDue.getDate() - productionDaysInAdvance);
           
           const levelCycleTime = cycleTimeMap.get(`${slot.buildingNumber || 1}-${slot.level}`) ?? defaultCycleTime;

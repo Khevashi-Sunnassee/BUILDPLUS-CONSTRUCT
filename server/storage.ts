@@ -2200,14 +2200,14 @@ export class DatabaseStorage implements IStorage {
     const defaultCycleTime = job.expectedCycleTimePerFloor;
 
     // Date calculation logic:
-    // 1. productionStartDate = Site Delivery Date (when panels go to site)
-    // 2. Each level's site delivery = productionStartDate + cumulativeDays
-    // 3. productionSlotDate = Site Delivery - production_days_in_advance (Panel Production Due)
+    // 1. productionStartDate = Onsite Start Date (when builder wants us to start on site)
+    // 2. Each level's onsite date = productionStartDate + cumulativeDays
+    // 3. productionSlotDate = Onsite Date - production_days_in_advance (Panel Production Due)
     // 
-    // Timeline (working backwards from site delivery):
-    // Drafting Start → Drawing Due (IFC) → Panel Production Due → Site Delivery
+    // Full timeline (working backwards from Onsite Start Date):
+    // Drafting Start → Drawing Due (IFC) → Production Window Start → Panel Production Due → Onsite Start
     
-    const siteDeliveryBaseDate = new Date(job.productionStartDate);
+    const onsiteStartBaseDate = new Date(job.productionStartDate);
     const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
 
     const createdSlots: ProductionSlot[] = [];
@@ -2216,12 +2216,12 @@ export class DatabaseStorage implements IStorage {
     for (let i = 0; i < levelsToProcess.length; i++) {
       const level = levelsToProcess[i];
       
-      // Calculate site delivery date for this level
-      const siteDeliveryDate = new Date(siteDeliveryBaseDate);
-      siteDeliveryDate.setDate(siteDeliveryDate.getDate() + cumulativeDays);
+      // Calculate onsite start date for this level
+      const onsiteDate = new Date(onsiteStartBaseDate);
+      onsiteDate.setDate(onsiteDate.getDate() + cumulativeDays);
       
       // Calculate panel production due date (when panel must be cast)
-      const panelProductionDue = new Date(siteDeliveryDate);
+      const panelProductionDue = new Date(onsiteDate);
       panelProductionDue.setDate(panelProductionDue.getDate() - productionDaysInAdvance);
       
       // Get level-specific cycle time or fall back to job default
@@ -2548,6 +2548,7 @@ export class DatabaseStorage implements IStorage {
       // Use job-level settings or fall back to global defaults
       const ifcDaysInAdvance = job?.daysInAdvance ?? defaultIfcDaysInAdvance;
       const daysToAchieveIfc = job?.daysToAchieveIfc ?? defaultDaysToAchieveIfc;
+      const productionWindowDays = job?.productionWindowDays ?? settings?.productionWindowDays ?? 10;
       
       // Get all panels for this slot's job and level
       const panels = await db.select().from(panelRegister).where(and(
@@ -2559,9 +2560,20 @@ export class DatabaseStorage implements IStorage {
         // Check if drafting program entry already exists for this panel
         const existing = await this.getDraftingProgramByPanelId(panel.id);
         
-        // Calculate dates using job-level settings
+        // Date calculation flow (working backwards):
+        // 1. productionSlotDate = Panel Production Due
+        // 2. Production Window Start = Panel Production Due - production_window_days
+        // 3. Drawing Due (IFC) = Production Window Start - ifc_days_in_advance
+        // 4. Drafting Start = Drawing Due - days_to_achieve_ifc
+        
         const productionDate = slot.productionSlotDate;
-        const drawingDueDate = new Date(productionDate);
+        
+        // Calculate production window start (when production CAN begin)
+        const productionWindowStart = new Date(productionDate);
+        productionWindowStart.setDate(productionWindowStart.getDate() - productionWindowDays);
+        
+        // Drawing due date is calculated from production window start
+        const drawingDueDate = new Date(productionWindowStart);
         drawingDueDate.setDate(drawingDueDate.getDate() - ifcDaysInAdvance);
         
         const draftingWindowStart = new Date(drawingDueDate);
