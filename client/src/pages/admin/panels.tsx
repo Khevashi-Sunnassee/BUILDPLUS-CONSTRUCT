@@ -1806,7 +1806,7 @@ export default function AdminPanelsPage() {
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">{panel.panelMark}</span>
                                 {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
-                                  <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                                  <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                                     <MessageCircle className="h-3 w-3" />
                                     {panelCounts[panel.id].messageCount}
                                   </Badge>
@@ -1942,7 +1942,7 @@ export default function AdminPanelsPage() {
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">{panel.panelMark}</span>
                                 {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
-                                  <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                                  <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                                     <MessageCircle className="h-3 w-3" />
                                     {panelCounts[panel.id].messageCount}
                                   </Badge>
@@ -2097,7 +2097,7 @@ export default function AdminPanelsPage() {
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">{panel.panelMark}</span>
                                 {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
-                                  <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                                  <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                                     <MessageCircle className="h-3 w-3" />
                                     {panelCounts[panel.id].messageCount}
                                   </Badge>
@@ -2225,7 +2225,7 @@ export default function AdminPanelsPage() {
                           <Hash className="h-4 w-4 text-muted-foreground" />
                           <span className="font-mono font-medium">{panel.panelMark}</span>
                           {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
-                            <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                            <Badge className="text-xs gap-0.5 px-1.5 py-0 bg-blue-500 text-white hover:bg-blue-600">
                               <MessageCircle className="h-3 w-3" />
                               {panelCounts[panel.id].messageCount}
                             </Badge>
