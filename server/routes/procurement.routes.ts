@@ -13,7 +13,7 @@ const upload = multer({
 });
 
 // ============== Suppliers ==============
-router.get("/suppliers", requireAuth, async (req, res) => {
+router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
   try {
     const suppliersData = await storage.getAllSuppliers();
     res.json(suppliersData);
@@ -23,7 +23,7 @@ router.get("/suppliers", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/suppliers/active", requireAuth, async (req, res) => {
+router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) => {
   try {
     const suppliersData = await storage.getActiveSuppliers();
     res.json(suppliersData);
@@ -33,7 +33,7 @@ router.get("/suppliers/active", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/suppliers/:id", requireAuth, async (req, res) => {
+router.get("/api/procurement/suppliers/:id", requireAuth, async (req, res) => {
   try {
     const supplier = await storage.getSupplier(String(req.params.id));
     if (!supplier) return res.status(404).json({ error: "Supplier not found" });
@@ -44,7 +44,7 @@ router.get("/suppliers/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/suppliers", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const supplier = await storage.createSupplier(req.body);
     res.json(supplier);
@@ -54,7 +54,7 @@ router.post("/suppliers", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   }
 });
 
-router.patch("/suppliers/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const supplier = await storage.updateSupplier(String(req.params.id), req.body);
     if (!supplier) return res.status(404).json({ error: "Supplier not found" });
@@ -65,7 +65,7 @@ router.patch("/suppliers/:id", requireRole("ADMIN", "MANAGER"), async (req, res)
   }
 });
 
-router.delete("/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
   try {
     await storage.deleteSupplier(String(req.params.id));
     res.json({ success: true });
@@ -76,7 +76,7 @@ router.delete("/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
 });
 
 // ============== Item Categories ==============
-router.get("/item-categories", requireAuth, async (req, res) => {
+router.get("/api/procurement/item-categories", requireAuth, async (req, res) => {
   try {
     const categories = await storage.getAllItemCategories();
     res.json(categories);
@@ -86,7 +86,7 @@ router.get("/item-categories", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/item-categories/active", requireAuth, async (req, res) => {
+router.get("/api/procurement/item-categories/active", requireAuth, async (req, res) => {
   try {
     const categories = await storage.getActiveItemCategories();
     res.json(categories);
@@ -96,7 +96,7 @@ router.get("/item-categories/active", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/item-categories/:id", requireAuth, async (req, res) => {
+router.get("/api/procurement/item-categories/:id", requireAuth, async (req, res) => {
   try {
     const category = await storage.getItemCategory(String(req.params.id));
     if (!category) return res.status(404).json({ error: "Category not found" });
@@ -107,7 +107,7 @@ router.get("/item-categories/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/item-categories", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const category = await storage.createItemCategory(req.body);
     res.json(category);
@@ -117,7 +117,7 @@ router.post("/item-categories", requireRole("ADMIN", "MANAGER"), async (req, res
   }
 });
 
-router.patch("/item-categories/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const category = await storage.updateItemCategory(String(req.params.id), req.body);
     if (!category) return res.status(404).json({ error: "Category not found" });
@@ -128,7 +128,7 @@ router.patch("/item-categories/:id", requireRole("ADMIN", "MANAGER"), async (req
   }
 });
 
-router.delete("/item-categories/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), async (req, res) => {
   try {
     await storage.deleteItemCategory(String(req.params.id));
     res.json({ success: true });
@@ -139,7 +139,7 @@ router.delete("/item-categories/:id", requireRole("ADMIN"), async (req, res) => 
 });
 
 // ============== Items ==============
-router.get("/items", requireAuth, async (req, res) => {
+router.get("/api/procurement/items", requireAuth, async (req, res) => {
   try {
     const itemsData = await storage.getAllItems();
     res.json(itemsData);
@@ -149,7 +149,7 @@ router.get("/items", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/items/active", requireAuth, async (req, res) => {
+router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
   try {
     const itemsData = await storage.getActiveItems();
     res.json(itemsData);
@@ -159,7 +159,7 @@ router.get("/items/active", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/items/:id", requireAuth, async (req, res) => {
+router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
   try {
     const item = await storage.getItem(String(req.params.id));
     if (!item) return res.status(404).json({ error: "Item not found" });
@@ -170,7 +170,7 @@ router.get("/items/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const item = await storage.createItem(req.body);
     res.json(item);
@@ -180,7 +180,7 @@ router.post("/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   }
 });
 
-router.patch("/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const item = await storage.updateItem(String(req.params.id), req.body);
     if (!item) return res.status(404).json({ error: "Item not found" });
@@ -191,7 +191,7 @@ router.patch("/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => 
   }
 });
 
-router.delete("/items/:id", requireRole("ADMIN"), async (req, res) => {
+router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, res) => {
   try {
     await storage.deleteItem(String(req.params.id));
     res.json({ success: true });
@@ -202,7 +202,7 @@ router.delete("/items/:id", requireRole("ADMIN"), async (req, res) => {
 });
 
 // Item Import from Excel
-router.post("/items/import", requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
+router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -291,7 +291,7 @@ router.post("/items/import", requireRole("ADMIN", "MANAGER"), upload.single("fil
 });
 
 // ============== Purchase Orders ==============
-router.get("/purchase-orders", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders", requireAuth, async (req, res) => {
   try {
     const status = req.query.status as string | undefined;
     let orders;
@@ -307,7 +307,7 @@ router.get("/purchase-orders", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/purchase-orders/my", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const orders = await storage.getPurchaseOrdersByUser(userId);
@@ -318,7 +318,7 @@ router.get("/purchase-orders/my", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/purchase-orders/next-number", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
   try {
     const poNumber = await storage.getNextPONumber();
     res.json({ poNumber });
@@ -328,7 +328,7 @@ router.get("/purchase-orders/next-number", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/purchase-orders/:id", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
   try {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
@@ -339,7 +339,7 @@ router.get("/purchase-orders/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/purchase-orders", requireAuth, async (req, res) => {
+router.post("/api/purchase-orders", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const { items: lineItems, ...poData } = req.body;
@@ -358,7 +358,7 @@ router.post("/purchase-orders", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/purchase-orders/:id", requireAuth, async (req, res) => {
+router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
   try {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
@@ -380,7 +380,7 @@ router.patch("/purchase-orders/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/purchase-orders/:id/submit", requireAuth, async (req, res) => {
+router.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => {
   try {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
@@ -402,7 +402,7 @@ router.post("/purchase-orders/:id/submit", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/purchase-orders/:id/approve", requireAuth, async (req, res) => {
+router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) => {
   try {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
@@ -437,7 +437,7 @@ router.post("/purchase-orders/:id/approve", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/purchase-orders/:id/reject", requireAuth, async (req, res) => {
+router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => {
   try {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
@@ -467,7 +467,7 @@ router.post("/purchase-orders/:id/reject", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/purchase-orders/:id", requireAuth, async (req, res) => {
+router.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
   try {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
@@ -493,7 +493,7 @@ router.delete("/purchase-orders/:id", requireAuth, async (req, res) => {
 
 // ==================== PO Attachments ====================
 
-router.get("/purchase-orders/:id/attachments", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res) => {
   try {
     const attachments = await storage.getPurchaseOrderAttachments(String(req.params.id));
     res.json(attachments);
@@ -503,7 +503,7 @@ router.get("/purchase-orders/:id/attachments", requireAuth, async (req, res) => 
   }
 });
 
-router.post("/purchase-orders/:id/attachments", requireAuth, upload.array("files", 10), async (req, res) => {
+router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("files", 10), async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const files = req.files as Express.Multer.File[];
@@ -548,7 +548,7 @@ router.post("/purchase-orders/:id/attachments", requireAuth, upload.array("files
   }
 });
 
-router.get("/po-attachments/:id/download", requireAuth, async (req, res) => {
+router.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => {
   try {
     const attachment = await storage.getPurchaseOrderAttachment(String(req.params.id));
     if (!attachment) return res.status(404).json({ error: "Attachment not found" });
@@ -567,7 +567,7 @@ router.get("/po-attachments/:id/download", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/po-attachments/:id", requireAuth, async (req, res) => {
+router.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const user = await storage.getUser(userId);

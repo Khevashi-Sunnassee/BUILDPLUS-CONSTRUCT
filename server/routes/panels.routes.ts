@@ -12,7 +12,7 @@ const upload = multer({
 });
 
 // GET /api/panels - Get panels with filters
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/panels", requireAuth, async (req: Request, res: Response) => {
   const jobId = req.query.jobId as string | undefined;
   const level = req.query.level as string | undefined;
   
@@ -29,13 +29,13 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 });
 
 // GET /api/panels/by-job/:jobId - Get panels by job
-router.get("/by-job/:jobId", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/panels/by-job/:jobId", requireAuth, async (req: Request, res: Response) => {
   const panels = await storage.getPanelsByJob(req.params.jobId as string);
   res.json(panels);
 });
 
 // GET /api/panels/approved-for-production - Get panels approved for production
-router.get("/approved-for-production", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/panels/approved-for-production", requireAuth, async (req: Request, res: Response) => {
   try {
     const { jobId } = req.query;
     const panels = await storage.getPanelsApprovedForProduction(jobId as string | undefined);
@@ -47,7 +47,7 @@ router.get("/approved-for-production", requireAuth, async (req: Request, res: Re
 });
 
 // PUT /api/panels/:id/document-status - Update panel document status
-router.put("/:id/document-status", requireAuth, async (req: Request, res: Response) => {
+router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, res: Response) => {
   try {
     const { documentStatus } = req.body;
     if (!documentStatus || !["DRAFT", "IFA", "IFC", "APPROVED"].includes(documentStatus)) {
@@ -81,14 +81,14 @@ router.put("/:id/document-status", requireAuth, async (req: Request, res: Respon
 // =============== ADMIN PANEL ENDPOINTS ===============
 
 // GET /api/admin/panels/:id - Get single panel
-router.get("/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const panel = await storage.getPanelRegisterItem(req.params.id as string);
   if (!panel) return res.status(404).json({ error: "Panel not found" });
   res.json(panel);
 });
 
 // POST /api/admin/panels - Create panel
-router.post("/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const panel = await storage.createPanelRegisterItem(req.body);
     res.json(panel);
@@ -101,13 +101,13 @@ router.post("/admin", requireRole("ADMIN"), async (req: Request, res: Response) 
 });
 
 // PUT /api/admin/panels/:id - Update panel
-router.put("/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const panel = await storage.updatePanelRegisterItem(req.params.id as string, req.body);
   res.json(panel);
 });
 
 // POST /api/admin/panels/:id/validate - Validate panel
-router.post("/admin/:id/validate", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+router.post("/api/panels/admin/:id/validate", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const panel = await storage.getPanelRegisterItem(req.params.id as string);
     if (!panel) {
@@ -126,19 +126,19 @@ router.post("/admin/:id/validate", requireRole("ADMIN", "MANAGER"), async (req: 
 });
 
 // DELETE /api/admin/panels/:id - Delete panel
-router.delete("/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.delete("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   await storage.deletePanelRegisterItem(req.params.id as string);
   res.json({ ok: true });
 });
 
 // GET /api/admin/panels/source-counts - Get panel counts by source
-router.get("/admin/source-counts", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/panels/admin/source-counts", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const counts = await storage.getPanelCountsBySource();
   res.json(counts);
 });
 
 // DELETE /api/admin/panels/by-source/:source - Delete all panels by source
-router.delete("/admin/by-source/:source", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.delete("/api/panels/admin/by-source/:source", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const source = parseInt(String(req.params.source));
     if (![1, 2, 3].includes(source)) {
@@ -160,7 +160,7 @@ router.delete("/admin/by-source/:source", requireRole("ADMIN"), async (req: Requ
 });
 
 // POST /api/admin/panels/import - Import panels from Excel
-router.post("/admin/import", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const { data, jobId } = req.body;
     if (!data || !Array.isArray(data)) {
@@ -301,7 +301,7 @@ router.post("/admin/import", requireRole("ADMIN"), async (req: Request, res: Res
 });
 
 // POST /api/jobs/:jobId/panels/import-estimate - Import estimate from Excel file
-router.post("/jobs/:jobId/import-estimate", 
+router.post("/api/jobs/:jobId/import-estimate", 
   requireAuth, 
   requireRole("ADMIN", "MANAGER"),
   upload.single("file"),
@@ -703,7 +703,7 @@ router.post("/jobs/:jobId/import-estimate",
 // =============== PANEL AI/PRODUCTION APPROVAL ===============
 
 // POST /api/admin/panels/:id/analyze-pdf - AI PDF analysis
-router.post("/admin/:id/analyze-pdf", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+router.post("/api/panels/admin/:id/analyze-pdf", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { pdfBase64 } = req.body;
@@ -787,7 +787,7 @@ Return ONLY valid JSON, no explanation text.`
 });
 
 // POST /api/admin/panels/:id/approve-production - Approve panel for production
-router.post("/admin/:id/approve-production", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const userId = req.session.userId!;
@@ -834,7 +834,7 @@ router.post("/admin/:id/approve-production", requireRole("ADMIN", "MANAGER"), as
 });
 
 // POST /api/admin/panels/:id/revoke-production - Revoke production approval
-router.post("/admin/:id/revoke-production", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     
@@ -855,13 +855,13 @@ router.post("/admin/:id/revoke-production", requireRole("ADMIN", "MANAGER"), asy
 // =============== PANEL TYPES ENDPOINTS ===============
 
 // GET /api/admin/panel-types - Get all panel types (admin)
-router.get("/types/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const types = await storage.getAllPanelTypes();
   res.json(types);
 });
 
 // GET /api/admin/panel-types/cost-summaries - Get cost summaries
-router.get("/types/admin/cost-summaries", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/panel-types/admin/cost-summaries", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const types = await storage.getAllPanelTypes();
     const summaries: Record<string, { totalCostPercent: number; profitMargin: number }> = {};
@@ -882,14 +882,14 @@ router.get("/types/admin/cost-summaries", requireRole("ADMIN"), async (req: Requ
 });
 
 // GET /api/admin/panel-types/:id - Get single panel type (admin)
-router.get("/types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.get("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const type = await storage.getPanelType(req.params.id as string);
   if (!type) return res.status(404).json({ error: "Panel type not found" });
   res.json(type);
 });
 
 // POST /api/admin/panel-types - Create panel type
-router.post("/types/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.post("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const type = await storage.createPanelType(req.body);
     res.json(type);
@@ -899,26 +899,26 @@ router.post("/types/admin", requireRole("ADMIN"), async (req: Request, res: Resp
 });
 
 // PUT /api/admin/panel-types/:id - Update panel type
-router.put("/types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.put("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const type = await storage.updatePanelType(req.params.id as string, req.body);
   if (!type) return res.status(404).json({ error: "Panel type not found" });
   res.json(type);
 });
 
 // DELETE /api/admin/panel-types/:id - Delete panel type
-router.delete("/types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.delete("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   await storage.deletePanelType(req.params.id as string);
   res.json({ ok: true });
 });
 
 // GET /api/panel-types/:id/cost-components - Get cost components for panel type
-router.get("/types/:id/cost-components", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/panel-types/:id/cost-components", requireAuth, async (req: Request, res: Response) => {
   const components = await storage.getCostComponentsByPanelType(req.params.id as string);
   res.json(components);
 });
 
 // PUT /api/panel-types/:id/cost-components - Update cost components
-router.put("/types/:id/cost-components", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const { components } = req.body;
     if (!Array.isArray(components)) {
@@ -943,7 +943,7 @@ router.put("/types/:id/cost-components", requireRole("ADMIN"), async (req: Reque
 });
 
 // GET /api/panel-types - Get active panel types
-router.get("/types", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/panel-types", requireAuth, async (req: Request, res: Response) => {
   const types = await storage.getAllPanelTypes();
   res.json(types.filter(t => t.isActive));
 });

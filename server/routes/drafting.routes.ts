@@ -6,7 +6,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 
 const router = Router();
 
-router.get("/", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
+router.get("/api/drafting-program", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
   try {
     const { jobId, status, assignedToId, dateFrom, dateTo } = req.query;
     const filters: any = {};
@@ -29,7 +29,7 @@ router.get("/", requireAuth, requirePermission("production_report", "VIEW"), asy
   }
 });
 
-router.get("/my-allocated", requireAuth, requirePermission("daily_reports", "VIEW"), async (req, res) => {
+router.get("/api/drafting-program/my-allocated", requireAuth, requirePermission("daily_reports", "VIEW"), async (req, res) => {
   try {
     const userId = req.session.userId!;
     
@@ -68,7 +68,7 @@ router.get("/my-allocated", requireAuth, requirePermission("daily_reports", "VIE
   }
 });
 
-router.get("/:id", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
+router.get("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
   try {
     const program = await storage.getDraftingProgram(String(req.params.id));
     if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
@@ -79,7 +79,7 @@ router.get("/:id", requireAuth, requirePermission("production_report", "VIEW"), 
   }
 });
 
-router.post("/generate", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/drafting-program/generate", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const result = await storage.generateDraftingProgramFromProductionSlots();
     res.json({ success: true, ...result });
@@ -94,7 +94,7 @@ const assignDraftingResourceSchema = z.object({
   proposedStartDate: z.string().min(1, "proposedStartDate is required"),
 });
 
-router.post("/:id/assign", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/drafting-program/:id/assign", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const parsed = assignDraftingResourceSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -119,7 +119,7 @@ const updateDraftingProgramSchema = z.object({
   completedAt: z.string().nullable().optional(),
 });
 
-router.patch("/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+router.patch("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const parsed = updateDraftingProgramSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -138,7 +138,7 @@ router.patch("/:id", requireAuth, requirePermission("production_report", "VIEW_A
   }
 });
 
-router.delete("/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+router.delete("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     await storage.deleteDraftingProgram(String(req.params.id));
     res.json({ success: true });
@@ -148,7 +148,7 @@ router.delete("/:id", requireAuth, requirePermission("production_report", "VIEW_
   }
 });
 
-router.delete("/job/:jobId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
+router.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const jobId = String(req.params.jobId);
     const deleted = await storage.deleteDraftingProgramByJob(jobId);

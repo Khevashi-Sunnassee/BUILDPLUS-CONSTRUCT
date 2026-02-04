@@ -11,7 +11,7 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-router.get("/task-groups", requireAuth, requirePermission("tasks"), async (req, res) => {
+router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const groups = await storage.getAllTaskGroups();
     res.json(groups);
@@ -21,7 +21,7 @@ router.get("/task-groups", requireAuth, requirePermission("tasks"), async (req, 
   }
 });
 
-router.get("/task-groups/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
+router.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const group = await storage.getTaskGroup(String(req.params.id));
     if (!group) return res.status(404).json({ error: "Task group not found" });
@@ -32,7 +32,7 @@ router.get("/task-groups/:id", requireAuth, requirePermission("tasks"), async (r
   }
 });
 
-router.post("/task-groups", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const group = await storage.createTaskGroup(req.body);
     res.status(201).json(group);
@@ -42,7 +42,7 @@ router.post("/task-groups", requireAuth, requirePermission("tasks", "VIEW_AND_UP
   }
 });
 
-router.patch("/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const group = await storage.updateTaskGroup(String(req.params.id), req.body);
     if (!group) return res.status(404).json({ error: "Task group not found" });
@@ -53,7 +53,7 @@ router.patch("/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_A
   }
 });
 
-router.delete("/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     await storage.deleteTaskGroup(String(req.params.id));
     res.json({ success: true });
@@ -63,7 +63,7 @@ router.delete("/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_
   }
 });
 
-router.post("/task-groups/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const { groupIds } = req.body;
     if (!Array.isArray(groupIds)) {
@@ -77,7 +77,7 @@ router.post("/task-groups/reorder", requireAuth, requirePermission("tasks", "VIE
   }
 });
 
-router.get("/tasks/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
+router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const task = await storage.getTask(String(req.params.id));
     if (!task) return res.status(404).json({ error: "Task not found" });
@@ -88,7 +88,7 @@ router.get("/tasks/:id", requireAuth, requirePermission("tasks"), async (req, re
   }
 });
 
-router.post("/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const task = await storage.createTask({
@@ -102,7 +102,7 @@ router.post("/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE")
   }
 });
 
-router.patch("/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const updateData = { ...req.body };
     if (updateData.dueDate !== undefined) {
@@ -117,7 +117,7 @@ router.patch("/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPD
   }
 });
 
-router.delete("/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     await storage.deleteTask(String(req.params.id));
     res.json({ success: true });
@@ -127,7 +127,7 @@ router.delete("/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UP
   }
 });
 
-router.post("/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const { groupId, taskIds } = req.body;
     if (!groupId || !Array.isArray(taskIds)) {
@@ -141,7 +141,7 @@ router.post("/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_
   }
 });
 
-router.get("/tasks/:id/assignees", requireAuth, requirePermission("tasks"), async (req, res) => {
+router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const assignees = await storage.getTaskAssignees(String(req.params.id));
     res.json(assignees);
@@ -151,7 +151,7 @@ router.get("/tasks/:id/assignees", requireAuth, requirePermission("tasks"), asyn
   }
 });
 
-router.put("/tasks/:id/assignees", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const { userIds } = req.body;
     if (!Array.isArray(userIds)) {
@@ -165,7 +165,7 @@ router.put("/tasks/:id/assignees", requireAuth, requirePermission("tasks", "VIEW
   }
 });
 
-router.get("/tasks/:id/updates", requireAuth, requirePermission("tasks"), async (req, res) => {
+router.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const updates = await storage.getTaskUpdates(String(req.params.id));
     res.json(updates);
@@ -175,7 +175,7 @@ router.get("/tasks/:id/updates", requireAuth, requirePermission("tasks"), async 
   }
 });
 
-router.post("/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const taskId = String(req.params.id);
@@ -214,7 +214,7 @@ router.post("/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_
   }
 });
 
-router.delete("/task-updates/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     await storage.deleteTaskUpdate(String(req.params.id));
     res.json({ success: true });
@@ -224,7 +224,7 @@ router.delete("/task-updates/:id", requireAuth, requirePermission("tasks", "VIEW
   }
 });
 
-router.get("/tasks/:id/files", requireAuth, requirePermission("tasks"), async (req, res) => {
+router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const files = await storage.getTaskFiles(String(req.params.id));
     res.json(files);
@@ -234,7 +234,7 @@ router.get("/tasks/:id/files", requireAuth, requirePermission("tasks"), async (r
   }
 });
 
-router.post("/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), upload.single("file"), async (req, res) => {
+router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), upload.single("file"), async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const file = req.file;
@@ -260,7 +260,7 @@ router.post("/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AN
   }
 });
 
-router.delete("/task-files/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+router.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     await storage.deleteTaskFile(String(req.params.id));
     res.json({ success: true });
@@ -270,7 +270,7 @@ router.delete("/task-files/:id", requireAuth, requirePermission("tasks", "VIEW_A
   }
 });
 
-router.get("/task-notifications", requireAuth, async (req, res) => {
+router.get("/api/task-notifications", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const notifications = await storage.getTaskNotifications(userId);
@@ -281,7 +281,7 @@ router.get("/task-notifications", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/task-notifications/unread-count", requireAuth, async (req, res) => {
+router.get("/api/task-notifications/unread-count", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const count = await storage.getUnreadTaskNotificationCount(userId);
@@ -292,7 +292,7 @@ router.get("/task-notifications/unread-count", requireAuth, async (req, res) => 
   }
 });
 
-router.post("/task-notifications/:id/read", requireAuth, async (req, res) => {
+router.post("/api/task-notifications/:id/read", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     const notification = await storage.getTaskNotificationById(String(req.params.id));
@@ -310,7 +310,7 @@ router.post("/task-notifications/:id/read", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/task-notifications/read-all", requireAuth, async (req, res) => {
+router.post("/api/task-notifications/read-all", requireAuth, async (req, res) => {
   try {
     const userId = (req.session as any).userId;
     await storage.markAllTaskNotificationsRead(userId);
