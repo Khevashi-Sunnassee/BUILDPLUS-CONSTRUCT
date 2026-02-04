@@ -10,6 +10,7 @@ import {
   productionSlots, productionSlotAdjustments, draftingProgram,
   suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
+  factories, cfmeuHolidays,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -45,7 +46,115 @@ import {
   type InsertTaskFile, type TaskFile,
   type InsertTaskNotification, type TaskNotification,
   type InsertJobLevelCycleTime, type JobLevelCycleTime,
+  type Factory, type CfmeuHoliday,
 } from "@shared/schema";
+
+// Working days calculation utilities
+export interface WorkingDaysConfig {
+  workDays: boolean[]; // [Sun, Mon, Tue, Wed, Thu, Fri, Sat]
+  holidays: Date[]; // Array of dates that are holidays
+}
+
+/**
+ * Get the effective work days for a factory.
+ * If factory inherits, uses global productionWorkDays; otherwise uses factory's workDays.
+ */
+export async function getFactoryWorkDays(factoryId: string | null): Promise<boolean[]> {
+  const defaultWorkDays = [false, true, true, true, true, true, false]; // Mon-Fri default
+  
+  if (!factoryId) {
+    const settings = await db.select().from(globalSettings).limit(1);
+    return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
+  }
+  
+  const [factory] = await db.select().from(factories).where(eq(factories.id, factoryId));
+  if (!factory) {
+    const settings = await db.select().from(globalSettings).limit(1);
+    return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
+  }
+  
+  if (factory.inheritWorkDays) {
+    const settings = await db.select().from(globalSettings).limit(1);
+    return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
+  }
+  
+  return (factory.workDays as boolean[]) ?? defaultWorkDays;
+}
+
+/**
+ * Get holidays for a CFMEU calendar type within a date range.
+ */
+export async function getCfmeuHolidaysInRange(
+  calendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD" | null,
+  startDate: Date,
+  endDate: Date
+): Promise<Date[]> {
+  if (!calendarType) return [];
+  
+  const holidays = await db.select()
+    .from(cfmeuHolidays)
+    .where(
+      and(
+        eq(cfmeuHolidays.calendarType, calendarType),
+        gte(cfmeuHolidays.date, startDate),
+        lte(cfmeuHolidays.date, endDate)
+      )
+    );
+  
+  return holidays.map(h => new Date(h.date));
+}
+
+/**
+ * Check if a date is a working day based on work days config and holidays.
+ */
+export function isWorkingDay(date: Date, workDays: boolean[], holidays: Date[]): boolean {
+  const dayOfWeek = date.getDay(); // 0 = Sunday, 6 = Saturday
+  
+  // Check if this day of week is a work day
+  if (!workDays[dayOfWeek]) return false;
+  
+  // Check if this date is a holiday
+  const dateStr = date.toISOString().split('T')[0];
+  const isHoliday = holidays.some(h => h.toISOString().split('T')[0] === dateStr);
+  
+  return !isHoliday;
+}
+
+/**
+ * Add working days to a date (positive = forward, negative = backward).
+ * This accounts for work days of the week and CFMEU holidays.
+ */
+export function addWorkingDays(
+  startDate: Date,
+  workingDays: number,
+  workDays: boolean[],
+  holidays: Date[]
+): Date {
+  const result = new Date(startDate);
+  const direction = workingDays >= 0 ? 1 : -1;
+  let remaining = Math.abs(workingDays);
+  
+  while (remaining > 0) {
+    result.setDate(result.getDate() + direction);
+    if (isWorkingDay(result, workDays, holidays)) {
+      remaining--;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Subtract working days from a date (convenience function).
+ */
+export function subtractWorkingDays(
+  startDate: Date,
+  workingDays: number,
+  workDays: boolean[],
+  holidays: Date[]
+): Date {
+  return addWorkingDays(startDate, -workingDays, workDays, holidays);
+}
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   projectManager: User;
@@ -2199,30 +2308,49 @@ export class DatabaseStorage implements IStorage {
     );
     const defaultCycleTime = job.expectedCycleTimePerFloor;
 
-    // Date calculation logic:
+    // Get factory work days and CFMEU holidays for working day calculations
+    const workDays = await getFactoryWorkDays(job.factoryId);
+    
+    // Get factory's CFMEU calendar type (if any)
+    let cfmeuCalendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD" | null = null;
+    if (job.factoryId) {
+      const [factory] = await db.select().from(factories).where(eq(factories.id, job.factoryId));
+      if (factory?.cfmeuCalendar) {
+        cfmeuCalendarType = factory.cfmeuCalendar;
+      }
+    }
+    
+    // Calculate date range for fetching holidays (2 years forward/back from onsite start)
+    const onsiteStartBaseDate = new Date(job.productionStartDate);
+    const holidayRangeStart = new Date(onsiteStartBaseDate);
+    holidayRangeStart.setFullYear(holidayRangeStart.getFullYear() - 2);
+    const holidayRangeEnd = new Date(onsiteStartBaseDate);
+    holidayRangeEnd.setFullYear(holidayRangeEnd.getFullYear() + 2);
+    
+    const holidays = await getCfmeuHolidaysInRange(cfmeuCalendarType, holidayRangeStart, holidayRangeEnd);
+
+    // Date calculation logic using WORKING DAYS:
     // 1. productionStartDate = Onsite Start Date (when builder wants us to start on site)
-    // 2. Each level's onsite date = productionStartDate + cumulativeDays
-    // 3. productionSlotDate = Onsite Date - production_days_in_advance (Panel Production Due)
+    // 2. Each level's onsite date = productionStartDate + cumulative WORKING days
+    // 3. productionSlotDate = Onsite Date - production_days_in_advance WORKING days (Panel Production Due)
     // 
     // Full timeline (working backwards from Onsite Start Date):
     // Drafting Start → Drawing Due (IFC) → Production Window Start → Panel Production Due → Onsite Start
+    // All day values are now WORKING DAYS (excludes weekends per factory config and CFMEU holidays)
     
-    const onsiteStartBaseDate = new Date(job.productionStartDate);
     const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
 
     const createdSlots: ProductionSlot[] = [];
-    let cumulativeDays = 0;
+    let cumulativeWorkingDays = 0;
     
     for (let i = 0; i < levelsToProcess.length; i++) {
       const level = levelsToProcess[i];
       
-      // Calculate onsite start date for this level
-      const onsiteDate = new Date(onsiteStartBaseDate);
-      onsiteDate.setDate(onsiteDate.getDate() + cumulativeDays);
+      // Calculate onsite start date for this level using working days
+      const onsiteDate = addWorkingDays(onsiteStartBaseDate, cumulativeWorkingDays, workDays, holidays);
       
-      // Calculate panel production due date (when panel must be cast)
-      const panelProductionDue = new Date(onsiteDate);
-      panelProductionDue.setDate(panelProductionDue.getDate() - productionDaysInAdvance);
+      // Calculate panel production due date (when panel must be cast) using working days
+      const panelProductionDue = subtractWorkingDays(onsiteDate, productionDaysInAdvance, workDays, holidays);
       
       // Get level-specific cycle time or fall back to job default
       const levelCycleTime = cycleTimeMap.get(`1-${level}`) ?? defaultCycleTime;
@@ -2239,8 +2367,8 @@ export class DatabaseStorage implements IStorage {
       }).returning();
       createdSlots.push(slot);
       
-      // Add this level's cycle time to cumulative total for next level
-      cumulativeDays += levelCycleTime;
+      // Add this level's cycle time (in working days) to cumulative total for next level
+      cumulativeWorkingDays += levelCycleTime;
     }
     return createdSlots;
   }

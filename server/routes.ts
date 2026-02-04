@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import multer from "multer";
-import { storage, sha256Hex, db } from "./storage";
+import { storage, sha256Hex, db, getFactoryWorkDays, getCfmeuHolidaysInRange, addWorkingDays, subtractWorkingDays } from "./storage";
 import { 
   loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema, InsertItem, 
   jobs, productionSlots, panelRegister, draftingProgram, dailyLogs, logRows, productionEntries, weeklyWageReports, weeklyJobReports, weeklyJobReportSchedules,
@@ -909,25 +909,43 @@ export async function registerRoutes(
         );
         const defaultCycleTime = job.expectedCycleTimePerFloor;
         
-        // Date calculation logic:
-        // 1. productionStartDate = Onsite Start Date (when builder wants us on site)
-        // 2. Each level's onsite date = productionStartDate + cumulativeDays
-        // 3. productionSlotDate = Onsite Date - production_days_in_advance (Panel Production Due)
+        // Get factory work days and CFMEU holidays for working day calculations
+        const workDays = await getFactoryWorkDays(job.factoryId);
+        
+        // Get factory's CFMEU calendar type (if any)
+        let cfmeuCalendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD" | null = null;
+        if (job.factoryId) {
+          const [factory] = await db.select().from(factories).where(eq(factories.id, job.factoryId));
+          if (factory?.cfmeuCalendar) {
+            cfmeuCalendarType = factory.cfmeuCalendar;
+          }
+        }
+        
+        // Calculate date range for fetching holidays (2 years forward/back from onsite start)
         const onsiteStartBaseDate = new Date(job.productionStartDate);
+        const holidayRangeStart = new Date(onsiteStartBaseDate);
+        holidayRangeStart.setFullYear(holidayRangeStart.getFullYear() - 2);
+        const holidayRangeEnd = new Date(onsiteStartBaseDate);
+        holidayRangeEnd.setFullYear(holidayRangeEnd.getFullYear() + 2);
+        
+        const holidays = await getCfmeuHolidaysInRange(cfmeuCalendarType, holidayRangeStart, holidayRangeEnd);
+        
+        // Date calculation logic using WORKING DAYS:
+        // 1. productionStartDate = Onsite Start Date (when builder wants us on site)
+        // 2. Each level's onsite date = productionStartDate + cumulative WORKING days
+        // 3. productionSlotDate = Onsite Date - production_days_in_advance WORKING days (Panel Production Due)
         const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
         
         const allSlots = existingSlots.sort((a, b) => a.levelOrder - b.levelOrder);
-        let cumulativeDays = 0;
+        let cumulativeWorkingDays = 0;
         let updatedCount = 0;
         
         for (const slot of allSlots) {
-          // Calculate onsite date for this level
-          const onsiteDate = new Date(onsiteStartBaseDate);
-          onsiteDate.setDate(onsiteDate.getDate() + cumulativeDays);
+          // Calculate onsite date for this level using working days
+          const onsiteDate = addWorkingDays(onsiteStartBaseDate, cumulativeWorkingDays, workDays, holidays);
           
-          // Calculate panel production due date
-          const panelProductionDue = new Date(onsiteDate);
-          panelProductionDue.setDate(panelProductionDue.getDate() - productionDaysInAdvance);
+          // Calculate panel production due date using working days
+          const panelProductionDue = subtractWorkingDays(onsiteDate, productionDaysInAdvance, workDays, holidays);
           
           const levelCycleTime = cycleTimeMap.get(`${slot.buildingNumber || 1}-${slot.level}`) ?? defaultCycleTime;
           
@@ -938,7 +956,7 @@ export async function registerRoutes(
             updatedCount++;
           }
           
-          cumulativeDays += levelCycleTime;
+          cumulativeWorkingDays += levelCycleTime;
         }
         
         res.json({ ok: true, action: "updated", count: updatedCount });
