@@ -803,6 +803,8 @@ export default function AdminJobsPage() {
         toast({ title: "Success", description: `Updated ${data.count} production slots` });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
       
       // Close everything after production slots are updated
       setPendingJobId(null);
