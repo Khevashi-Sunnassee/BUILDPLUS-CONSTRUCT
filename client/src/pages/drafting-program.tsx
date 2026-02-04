@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { DRAFTING_ROUTES, JOBS_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -51,7 +52,7 @@ export default function DraftingProgramPage() {
   const isManagerOrAdmin = user?.role === "MANAGER" || user?.role === "ADMIN";
   
   const { data: globalSettings } = useQuery<GlobalSettings>({
-    queryKey: ["/api/admin/settings"],
+    queryKey: [ADMIN_ROUTES.SETTINGS],
   });
   
   const weekStartDay = globalSettings?.weekStartDay ?? 1;
@@ -74,7 +75,7 @@ export default function DraftingProgramPage() {
   const [newStatus, setNewStatus] = useState<string>("");
 
   const { data: programs = [], isLoading: loadingPrograms } = useQuery<DraftingProgramWithDetails[]>({
-    queryKey: ["/api/drafting-program", { 
+    queryKey: [DRAFTING_ROUTES.PROGRAM, { 
       status: statusFilter !== "ALL" ? statusFilter : undefined, 
       jobId: jobFilter !== "all" ? jobFilter : undefined, 
       assignedToId: assigneeFilter !== "all" ? assigneeFilter : undefined 
@@ -82,21 +83,21 @@ export default function DraftingProgramPage() {
   });
 
   const { data: allJobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
     select: (data: any) => data.map((j: any) => ({ id: j.id, jobNumber: j.jobNumber, name: j.name })),
   });
 
   const { data: allUsers = [] } = useQuery<UserType[]>({
-    queryKey: ["/api/admin/users"],
+    queryKey: [ADMIN_ROUTES.USERS],
     select: (data: any) => data.filter((u: UserType) => u.isActive),
   });
 
   const generateProgramMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/drafting-program/generate");
+      return apiRequest("POST", DRAFTING_ROUTES.GENERATE);
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
       toast({ 
         title: "Success", 
         description: `Created ${data.created} new entries, updated ${data.updated} existing entries` 
@@ -109,13 +110,13 @@ export default function DraftingProgramPage() {
 
   const assignMutation = useMutation({
     mutationFn: async (data: { id: string; assignedToId: string; proposedStartDate: string }) => {
-      return apiRequest("POST", `/api/drafting-program/${data.id}/assign`, {
+      return apiRequest("POST", DRAFTING_ROUTES.ASSIGN(data.id), {
         assignedToId: data.assignedToId,
         proposedStartDate: data.proposedStartDate,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
       setShowAssignDialog(false);
       resetAssignForm();
       toast({ title: "Success", description: "Resource assigned successfully" });
@@ -127,13 +128,13 @@ export default function DraftingProgramPage() {
 
   const updateStatusMutation = useMutation({
     mutationFn: async (data: { id: string; status: string }) => {
-      return apiRequest("PATCH", `/api/drafting-program/${data.id}`, {
+      return apiRequest("PATCH", DRAFTING_ROUTES.BY_PANEL(data.id), {
         status: data.status,
         completedAt: data.status === "COMPLETED" ? new Date().toISOString() : null,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
       setShowUpdateStatusDialog(false);
       setSelectedEntry(null);
       toast({ title: "Success", description: "Status updated successfully" });

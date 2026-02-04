@@ -55,6 +55,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Zone } from "@shared/schema";
+import { ADMIN_ROUTES } from "@shared/api-routes";
 
 const zoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -74,7 +75,7 @@ export default function AdminZonesPage() {
   const [deletingZoneId, setDeletingZoneId] = useState<string | null>(null);
 
   const { data: zones, isLoading } = useQuery<Zone[]>({
-    queryKey: ["/api/admin/zones"],
+    queryKey: [ADMIN_ROUTES.ZONES],
   });
 
   const form = useForm<ZoneFormData>({
@@ -90,10 +91,10 @@ export default function AdminZonesPage() {
 
   const createZoneMutation = useMutation({
     mutationFn: async (data: ZoneFormData) => {
-      return apiRequest("POST", "/api/admin/zones", data);
+      return apiRequest("POST", ADMIN_ROUTES.ZONES, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/zones"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.ZONES] });
       toast({ title: "Zone created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -105,10 +106,10 @@ export default function AdminZonesPage() {
 
   const updateZoneMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ZoneFormData }) => {
-      return apiRequest("PUT", `/api/admin/zones/${id}`, data);
+      return apiRequest("PUT", ADMIN_ROUTES.ZONE_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/zones"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.ZONES] });
       toast({ title: "Zone updated successfully" });
       setDialogOpen(false);
       setEditingZone(null);
@@ -121,10 +122,10 @@ export default function AdminZonesPage() {
 
   const deleteZoneMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/zones/${id}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.ZONE_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/zones"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.ZONES] });
       toast({ title: "Zone deleted" });
       setDeleteDialogOpen(false);
       setDeletingZoneId(null);

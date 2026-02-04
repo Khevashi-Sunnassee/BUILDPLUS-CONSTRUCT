@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/collapsible";
 import type { User, UserPermission, PermissionLevel } from "@shared/schema";
 import { FUNCTION_KEYS } from "@shared/schema";
+import { ADMIN_ROUTES } from "@shared/api-routes";
 
 interface UserWithPermissions {
   user: User;
@@ -81,15 +82,15 @@ export default function UserPermissionsPage() {
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
 
   const { data: usersWithPermissions, isLoading, refetch } = useQuery<UserWithPermissions[]>({
-    queryKey: ["/api/admin/user-permissions"],
+    queryKey: [ADMIN_ROUTES.USER_PERMISSIONS],
   });
 
   const initializeMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return apiRequest("POST", `/api/admin/user-permissions/${userId}/initialize`, {});
+      return apiRequest("POST", ADMIN_ROUTES.USER_PERMISSION_INITIALIZE(userId), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/user-permissions"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
       toast({ title: "Permissions initialized", description: "All function permissions have been set up for this user." });
     },
     onError: () => {
@@ -99,10 +100,10 @@ export default function UserPermissionsPage() {
 
   const updatePermissionMutation = useMutation({
     mutationFn: async ({ userId, functionKey, permissionLevel }: { userId: string; functionKey: string; permissionLevel: PermissionLevel }) => {
-      return apiRequest("PUT", `/api/admin/user-permissions/${userId}/${functionKey}`, { permissionLevel });
+      return apiRequest("PUT", ADMIN_ROUTES.USER_PERMISSION_UPDATE(userId, functionKey), { permissionLevel });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/user-permissions"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USER_PERMISSIONS] });
       toast({ title: "Permission updated", description: "User permission has been updated." });
     },
     onError: () => {

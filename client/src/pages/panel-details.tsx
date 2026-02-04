@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { PANELS_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -61,7 +62,7 @@ export default function PanelDetailsPage() {
   const { id } = useParams<{ id: string }>();
 
   const { data: panel, isLoading, error } = useQuery<PanelDetails>({
-    queryKey: [`/api/panels/${id}/details`],
+    queryKey: [PANELS_ROUTES.DETAILS(id!)],
     enabled: !!id,
   });
 

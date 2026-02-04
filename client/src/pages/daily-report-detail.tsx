@@ -56,6 +56,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { DailyLog, LogRow, Job, WorkType } from "@shared/schema";
+import { DAILY_LOGS_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, MANUAL_ENTRY_ROUTES } from "@shared/api-routes";
 
 interface DailyLogDetail extends DailyLog {
   rows: (LogRow & { job?: Job })[];
@@ -74,30 +75,30 @@ export default function DailyReportDetailPage() {
   const logId = params?.id;
 
   const { data: log, isLoading } = useQuery<DailyLogDetail>({
-    queryKey: ["/api/daily-logs", logId],
+    queryKey: [DAILY_LOGS_ROUTES.LIST, logId],
     enabled: !!logId,
   });
 
   const { data: jobs } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   const { data: workTypes } = useQuery<WorkType[]>({
-    queryKey: ["/api/work-types"],
+    queryKey: [SETTINGS_ROUTES.WORK_TYPES],
   });
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
   const updateRowMutation = useMutation({
     mutationFn: async ({ rowId, updates }: { rowId: string; updates: any }) => {
-      return apiRequest("PATCH", `/api/log-rows/${rowId}`, updates);
+      return apiRequest("PATCH", MANUAL_ENTRY_ROUTES.LOG_ROW_BY_ID(rowId), updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs", logId] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST, logId] });
       toast({ title: "Row updated successfully" });
       setEditingRowId(null);
       setEditValues({});
@@ -109,10 +110,10 @@ export default function DailyReportDetailPage() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/daily-logs/${logId}/submit`, {});
+      return apiRequest("POST", DAILY_LOGS_ROUTES.SUBMIT(logId!), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs", logId] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST, logId] });
       toast({ title: "Daily log submitted for approval" });
     },
     onError: () => {
@@ -122,10 +123,10 @@ export default function DailyReportDetailPage() {
 
   const mergeMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", `/api/daily-logs/${logId}/merge`, {});
+      return apiRequest("POST", DAILY_LOGS_ROUTES.MERGE(logId!), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs", logId] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST, logId] });
       toast({ title: "Similar rows merged successfully" });
     },
     onError: () => {
@@ -135,10 +136,10 @@ export default function DailyReportDetailPage() {
 
   const deleteRowMutation = useMutation({
     mutationFn: async (rowId: string) => {
-      return apiRequest("DELETE", `/api/log-rows/${rowId}`, {});
+      return apiRequest("DELETE", MANUAL_ENTRY_ROUTES.LOG_ROW_BY_ID(rowId), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs", logId] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST, logId] });
       toast({ title: "Entry deleted successfully" });
     },
     onError: () => {
@@ -148,10 +149,10 @@ export default function DailyReportDetailPage() {
 
   const deleteLogMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("DELETE", `/api/daily-logs/${logId}`, {});
+      return apiRequest("DELETE", DAILY_LOGS_ROUTES.BY_ID(logId!), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       toast({ title: "Daily log deleted successfully" });
       setLocation("/daily-reports");
     },

@@ -5,6 +5,7 @@ import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, star
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
+import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import {
   Calendar,
   ChevronRight,
@@ -100,10 +101,10 @@ export default function ProductionReportPage() {
 
   const deleteProductionDayMutation = useMutation({
     mutationFn: async ({ date, factory }: { date: string; factory: string }) => {
-      return await apiRequest("DELETE", `/api/production-days/${date}?factory=${factory}`, {});
+      return await apiRequest("DELETE", `${PRODUCTION_ROUTES.DAY_BY_ID(date)}?factory=${factory}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
       setDeleteDialogOpen(false);
       setDeletingDay(null);
       toast({ title: "Production day deleted" });
@@ -115,10 +116,10 @@ export default function ProductionReportPage() {
 
   const createProductionDayMutation = useMutation({
     mutationFn: async (data: { productionDate: string; factory: string; factoryId?: string }) => {
-      return await apiRequest("POST", "/api/production-days", data);
+      return await apiRequest("POST", PRODUCTION_ROUTES.DAYS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
       setIsNewDayDialogOpen(false);
       const factoryName = activeFactories.find(f => f.id === newDayFactory)?.name || newDayFactory;
       toast({
@@ -169,18 +170,18 @@ export default function ProductionReportPage() {
   }, [dateRange]);
 
   const { data: reports, isLoading } = useQuery<ProductionReportSummary[]>({
-    queryKey: ["/api/production-reports", { startDate, endDate }],
+    queryKey: [PRODUCTION_ROUTES.REPORTS, { startDate, endDate }],
     queryFn: async () => {
-      const res = await fetch(`/api/production-reports?startDate=${startDate}&endDate=${endDate}`);
+      const res = await fetch(`${PRODUCTION_ROUTES.REPORTS}?startDate=${startDate}&endDate=${endDate}`);
       if (!res.ok) throw new Error("Failed to fetch reports");
       return res.json();
     },
   });
 
   const { data: factories } = useQuery<Factory[]>({
-    queryKey: ["/api/admin/factories"],
+    queryKey: [ADMIN_ROUTES.FACTORIES],
     queryFn: async () => {
-      const res = await fetch("/api/admin/factories");
+      const res = await fetch(ADMIN_ROUTES.FACTORIES);
       if (!res.ok) return [];
       return res.json();
     },
@@ -207,7 +208,7 @@ export default function ProductionReportPage() {
   };
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";

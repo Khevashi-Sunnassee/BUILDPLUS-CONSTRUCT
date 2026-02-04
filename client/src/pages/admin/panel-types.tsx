@@ -62,6 +62,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { PanelTypeConfig } from "@shared/schema";
+import { ADMIN_ROUTES, PANEL_TYPES_ROUTES } from "@shared/api-routes";
 
 const panelTypeSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
@@ -100,12 +101,12 @@ export default function AdminPanelTypesPage() {
   const [costComponents, setCostComponents] = useState<CostComponent[]>([]);
 
   const { data: panelTypes, isLoading } = useQuery<PanelTypeConfig[]>({
-    queryKey: ["/api/admin/panel-types"],
+    queryKey: [ADMIN_ROUTES.PANEL_TYPES],
   });
 
   // Fetch cost summaries for margin validation
   const { data: costSummaries, refetch: refetchCostSummaries } = useQuery<Record<string, { totalCostPercent: number; profitMargin: number }>>({
-    queryKey: ["/api/admin/panel-types/cost-summaries"],
+    queryKey: [ADMIN_ROUTES.PANEL_TYPES_COST_SUMMARIES],
   });
 
   // Helper to check if margin matches breakup
@@ -125,10 +126,10 @@ export default function AdminPanelTypesPage() {
   };
 
   const { data: currentCostComponents, refetch: refetchCostComponents } = useQuery<CostComponent[]>({
-    queryKey: ["/api/panel-types", costBreakupType?.id, "cost-components"],
+    queryKey: [PANEL_TYPES_ROUTES.LIST, costBreakupType?.id, "cost-components"],
     queryFn: async () => {
       if (!costBreakupType?.id) return [];
-      const res = await fetch(`/api/panel-types/${costBreakupType.id}/cost-components`, { credentials: "include" });
+      const res = await fetch(PANEL_TYPES_ROUTES.COST_COMPONENTS(costBreakupType.id), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch cost components");
       return res.json();
     },
@@ -249,11 +250,11 @@ export default function AdminPanelTypesPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: PanelTypeFormData) => {
-      return apiRequest("POST", "/api/admin/panel-types", data);
+      return apiRequest("POST", ADMIN_ROUTES.PANEL_TYPES, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panel-types"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panel-types"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANEL_TYPES] });
+      queryClient.invalidateQueries({ queryKey: [PANEL_TYPES_ROUTES.LIST] });
       toast({ title: "Panel type created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -265,11 +266,11 @@ export default function AdminPanelTypesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: PanelTypeFormData }) => {
-      return apiRequest("PUT", `/api/admin/panel-types/${id}`, data);
+      return apiRequest("PUT", ADMIN_ROUTES.PANEL_TYPE_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panel-types"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panel-types"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANEL_TYPES] });
+      queryClient.invalidateQueries({ queryKey: [PANEL_TYPES_ROUTES.LIST] });
       toast({ title: "Panel type updated successfully" });
       setDialogOpen(false);
       setEditingType(null);
@@ -282,11 +283,11 @@ export default function AdminPanelTypesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/panel-types/${id}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.PANEL_TYPE_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panel-types"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panel-types"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANEL_TYPES] });
+      queryClient.invalidateQueries({ queryKey: [PANEL_TYPES_ROUTES.LIST] });
       toast({ title: "Panel type deleted" });
       setDeleteDialogOpen(false);
       setDeletingTypeId(null);
@@ -298,13 +299,13 @@ export default function AdminPanelTypesPage() {
 
   const saveCostComponentsMutation = useMutation({
     mutationFn: async ({ panelTypeId, components }: { panelTypeId: string; components: CostComponent[] }) => {
-      return apiRequest("PUT", `/api/panel-types/${panelTypeId}/cost-components`, { components });
+      return apiRequest("PUT", PANEL_TYPES_ROUTES.COST_COMPONENTS(panelTypeId), { components });
     },
     onSuccess: async () => {
       toast({ title: "Cost breakup saved successfully" });
       // Invalidate and refetch to ensure status updates immediately
-      await queryClient.invalidateQueries({ queryKey: ["/api/admin/panel-types/cost-summaries"] });
-      await queryClient.invalidateQueries({ queryKey: ["/api/panel-types", costBreakupType?.id, "cost-components"] });
+      await queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANEL_TYPES_COST_SUMMARIES] });
+      await queryClient.invalidateQueries({ queryKey: [PANEL_TYPES_ROUTES.LIST, costBreakupType?.id, "cost-components"] });
       setCostBreakupDialogOpen(false);
     },
     onError: (error: any) => {

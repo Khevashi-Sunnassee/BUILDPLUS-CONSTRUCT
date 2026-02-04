@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { DAILY_LOGS_ROUTES } from "@shared/api-routes";
 import {
   CheckCircle2,
   XCircle,
@@ -57,15 +58,15 @@ export default function ManagerReviewPage() {
   const [rejectComment, setRejectComment] = useState("");
 
   const { data: logs, isLoading } = useQuery<SubmittedLog[]>({
-    queryKey: ["/api/daily-logs/submitted"],
+    queryKey: [DAILY_LOGS_ROUTES.SUBMITTED],
   });
 
   const approveMutation = useMutation({
     mutationFn: async (logId: string) => {
-      return apiRequest("POST", `/api/daily-logs/${logId}/approve`, { approve: true });
+      return apiRequest("POST", DAILY_LOGS_ROUTES.APPROVE(logId), { approve: true });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs/submitted"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.SUBMITTED] });
       toast({ title: "Log approved successfully" });
     },
     onError: () => {
@@ -75,10 +76,10 @@ export default function ManagerReviewPage() {
 
   const rejectMutation = useMutation({
     mutationFn: async ({ logId, comment }: { logId: string; comment: string }) => {
-      return apiRequest("POST", `/api/daily-logs/${logId}/approve`, { approve: false, comment });
+      return apiRequest("POST", DAILY_LOGS_ROUTES.APPROVE(logId), { approve: false, comment });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs/submitted"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.SUBMITTED] });
       toast({ title: "Log rejected" });
       setRejectDialogOpen(false);
       setRejectComment("");

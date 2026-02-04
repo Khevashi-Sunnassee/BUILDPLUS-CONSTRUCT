@@ -8,6 +8,7 @@ import { loginSchema } from "@shared/schema";
 import { z } from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
+import { SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +26,7 @@ export default function LoginPage() {
 
   // Fetch dynamic logo from settings
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const logoSrc = logoData?.logoBase64 || defaultLogo;
 

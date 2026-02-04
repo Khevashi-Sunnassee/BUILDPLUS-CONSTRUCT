@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
+import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import {
   Truck,
   Plus,
@@ -174,23 +175,23 @@ export default function LogisticsPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: loadLists, isLoading: loadListsLoading } = useQuery<LoadListWithDetails[]>({
-    queryKey: ["/api/load-lists"],
+    queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
   });
 
   const { data: jobs } = useQuery<Job[]>({
-    queryKey: ["/api/admin/jobs"],
+    queryKey: [ADMIN_ROUTES.JOBS],
   });
 
   const { data: trailerTypes } = useQuery<TrailerType[]>({
-    queryKey: ["/api/trailer-types"],
+    queryKey: [LOGISTICS_ROUTES.TRAILER_TYPES],
   });
 
   const { data: approvedPanels } = useQuery<(PanelRegister & { job: Job })[]>({
-    queryKey: ["/api/panels/approved-for-production", selectedJobId],
+    queryKey: [PANELS_ROUTES.APPROVED_FOR_PRODUCTION, selectedJobId],
     queryFn: async () => {
       const url = selectedJobId 
-        ? `/api/panels/approved-for-production?jobId=${selectedJobId}`
-        : "/api/panels/approved-for-production";
+        ? `${PANELS_ROUTES.APPROVED_FOR_PRODUCTION}?jobId=${selectedJobId}`
+        : PANELS_ROUTES.APPROVED_FOR_PRODUCTION;
       const res = await fetch(url, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch panels");
       return res.json();
@@ -199,7 +200,7 @@ export default function LogisticsPage() {
   });
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
@@ -244,10 +245,10 @@ export default function LogisticsPage() {
 
   const createLoadListMutation = useMutation({
     mutationFn: async (data: LoadListFormData) => {
-      return apiRequest("POST", "/api/load-lists", data);
+      return apiRequest("POST", LOGISTICS_ROUTES.LOAD_LISTS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/load-lists"] });
+      queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
       toast({ title: "Load list created successfully" });
       setCreateDialogOpen(false);
       loadListForm.reset();
@@ -260,10 +261,10 @@ export default function LogisticsPage() {
 
   const deleteLoadListMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/load-lists/${id}`, {});
+      return apiRequest("DELETE", LOGISTICS_ROUTES.LOAD_LIST_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/load-lists"] });
+      queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
       toast({ title: "Load list deleted successfully" });
       setDeleteDialogOpen(false);
       setDeletingId(null);
@@ -275,10 +276,10 @@ export default function LogisticsPage() {
 
   const createDeliveryMutation = useMutation({
     mutationFn: async ({ loadListId, data }: { loadListId: string; data: DeliveryFormData }) => {
-      return apiRequest("POST", `/api/load-lists/${loadListId}/delivery`, data);
+      return apiRequest("POST", LOGISTICS_ROUTES.LOAD_LIST_DELIVERY(loadListId), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/load-lists"] });
+      queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
       toast({ title: "Delivery record created successfully" });
       setDeliveryDialogOpen(false);
       deliveryForm.reset();

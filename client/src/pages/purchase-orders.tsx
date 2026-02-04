@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Eye, Edit, Paperclip } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { PurchaseOrder, User, Supplier } from "@shared/schema";
+import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 
 interface PurchaseOrderWithDetails extends PurchaseOrder {
   requestedBy: User;
@@ -23,11 +24,11 @@ export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
 
   const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrderWithDetails[]>({
-    queryKey: ["/api/purchase-orders", { status: statusFilter !== "ALL" ? statusFilter : undefined }],
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, { status: statusFilter !== "ALL" ? statusFilter : undefined }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter !== "ALL") params.append("status", statusFilter);
-      const response = await fetch(`/api/purchase-orders?${params.toString()}`);
+      const response = await fetch(`${PROCUREMENT_ROUTES.PURCHASE_ORDERS}?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch purchase orders");
       return response.json();
     },

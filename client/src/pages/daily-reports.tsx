@@ -67,6 +67,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
 type GroupBy = "none" | "user" | "date";
 
@@ -146,7 +147,7 @@ export default function DailyReportsPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
-    queryKey: ["/api/daily-logs", { status: statusFilter, dateRange }],
+    queryKey: [DAILY_LOGS_ROUTES.LIST, { status: statusFilter, dateRange }],
   });
 
   const { data: allocatedData } = useQuery<{
@@ -162,13 +163,13 @@ export default function DailyReportsPage() {
       totalEstimatedHours: number;
     };
   }>({
-    queryKey: ["/api/drafting-program/my-allocated"],
+    queryKey: [DRAFTING_ROUTES.MY_ALLOCATED],
   });
 
   const [showAllocatedPanels, setShowAllocatedPanels] = useState(true);
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
@@ -188,10 +189,10 @@ export default function DailyReportsPage() {
 
   const createDailyLogMutation = useMutation({
     mutationFn: async (data: { logDay: string; factory: string }) => {
-      return await apiRequest("POST", "/api/daily-logs", data);
+      return await apiRequest("POST", DAILY_LOGS_ROUTES.LIST, data);
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       setIsNewDayDialogOpen(false);
       toast({
         title: "Daily log created",
@@ -212,10 +213,10 @@ export default function DailyReportsPage() {
 
   const deleteDailyLogMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest("DELETE", `/api/daily-logs/${id}`, {});
+      return await apiRequest("DELETE", DAILY_LOGS_ROUTES.BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       setDeleteDialogOpen(false);
       setDeletingLogId(null);
       toast({ title: "Daily log deleted" });

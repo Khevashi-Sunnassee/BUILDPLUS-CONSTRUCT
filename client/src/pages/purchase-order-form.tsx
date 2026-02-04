@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip } from "lucide-react";
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
+import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
 
 interface AttachmentWithUser extends PurchaseOrderAttachment {
   uploadedBy?: User | null;
@@ -87,15 +88,15 @@ export default function PurchaseOrderFormPage() {
   const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
-    queryKey: ["/api/procurement/suppliers/active"],
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
   });
 
   const { data: items = [], isLoading: loadingItems } = useQuery<Item[]>({
-    queryKey: ["/api/procurement/items/active"],
+    queryKey: [PROCUREMENT_ROUTES.ITEMS_ACTIVE],
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   const filteredJobs = useMemo(() => {
@@ -109,16 +110,16 @@ export default function PurchaseOrderFormPage() {
   }, [jobs, jobSearchTerm]);
 
   const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
   const { data: existingPO, isLoading: loadingPO } = useQuery<PurchaseOrderWithDetails>({
-    queryKey: ["/api/purchase-orders", poId],
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId],
     enabled: !!poId,
   });
 
   const { data: attachments = [], isLoading: loadingAttachments } = useQuery<AttachmentWithUser[]>({
-    queryKey: ["/api/purchase-orders", poId, "attachments"],
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId, "attachments"],
     enabled: !!poId,
   });
 
@@ -169,7 +170,7 @@ export default function PurchaseOrderFormPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: { po: FormValues; items: LineItem[] }) => {
-      const response = await apiRequest("POST", "/api/purchase-orders", {
+      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDERS, {
         ...data.po,
         requiredByDate: data.po.requiredByDate?.toISOString(),
         items: data.items.map((item, index) => ({
@@ -186,7 +187,7 @@ export default function PurchaseOrderFormPage() {
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
       toast({ title: "Purchase order created successfully" });
       navigate(`/purchase-orders/${data.id}`);
     },
@@ -197,7 +198,7 @@ export default function PurchaseOrderFormPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: { po: FormValues; items: LineItem[] }) => {
-      const response = await apiRequest("PATCH", `/api/purchase-orders/${poId}`, {
+      const response = await apiRequest("PATCH", PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(poId!), {
         ...data.po,
         requiredByDate: data.po.requiredByDate?.toISOString(),
         items: data.items.map((item, index) => ({
@@ -214,8 +215,8 @@ export default function PurchaseOrderFormPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId] });
       toast({ title: "Purchase order updated successfully" });
     },
     onError: (error: Error) => {
@@ -225,12 +226,12 @@ export default function PurchaseOrderFormPage() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/purchase-orders/${poId}/submit`);
+      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_SUBMIT(poId!));
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId] });
       toast({ title: "Purchase order submitted for approval" });
     },
     onError: (error: Error) => {
@@ -240,12 +241,12 @@ export default function PurchaseOrderFormPage() {
 
   const approveMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", `/api/purchase-orders/${poId}/approve`);
+      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_APPROVE(poId!));
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId] });
       toast({ title: "Purchase order approved" });
     },
     onError: (error: Error) => {
@@ -255,12 +256,12 @@ export default function PurchaseOrderFormPage() {
 
   const rejectMutation = useMutation({
     mutationFn: async (reason: string) => {
-      const response = await apiRequest("POST", `/api/purchase-orders/${poId}/reject`, { reason });
+      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_REJECT(poId!), { reason });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId] });
       setShowRejectDialog(false);
       toast({ title: "Purchase order rejected" });
     },
@@ -271,10 +272,10 @@ export default function PurchaseOrderFormPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("DELETE", `/api/purchase-orders/${poId}`);
+      await apiRequest("DELETE", PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(poId!));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
       toast({ title: "Purchase order deleted" });
       navigate("/purchase-orders");
     },
@@ -287,7 +288,7 @@ export default function PurchaseOrderFormPage() {
     mutationFn: async (files: File[]) => {
       const formData = new FormData();
       files.forEach(file => formData.append("files", file));
-      const response = await fetch(`/api/purchase-orders/${poId}/attachments`, {
+      const response = await fetch(PROCUREMENT_ROUTES.PURCHASE_ORDER_ATTACHMENTS(poId!), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -299,7 +300,7 @@ export default function PurchaseOrderFormPage() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId, "attachments"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId, "attachments"] });
       toast({ title: "Files uploaded successfully" });
       setUploadingFiles(false);
     },
@@ -311,10 +312,10 @@ export default function PurchaseOrderFormPage() {
 
   const deleteAttachmentMutation = useMutation({
     mutationFn: async (attachmentId: string) => {
-      await apiRequest("DELETE", `/api/po-attachments/${attachmentId}`);
+      await apiRequest("DELETE", PO_ATTACHMENTS_ROUTES.BY_ID(attachmentId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders", poId, "attachments"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId, "attachments"] });
       toast({ title: "Attachment deleted" });
     },
     onError: (error: Error) => {
@@ -1446,7 +1447,7 @@ export default function PurchaseOrderFormPage() {
                             asChild
                             data-testid={`button-download-${attachment.id}`}
                           >
-                            <a href={`/api/po-attachments/${attachment.id}/download`} download>
+                            <a href={`${PO_ATTACHMENTS_ROUTES.BY_ID(attachment.id)}/download`} download>
                               <Download className="h-4 w-4" />
                             </a>
                           </Button>

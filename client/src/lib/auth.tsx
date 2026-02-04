@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { User } from "@shared/schema";
+import { AUTH_ROUTES } from "@shared/api-routes";
 
 interface AuthContextType {
   user: User | null;
@@ -17,7 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchUser = async () => {
     try {
-      const res = await fetch("/api/auth/me", { credentials: "include" });
+      const res = await fetch(AUTH_ROUTES.ME, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user);
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
+    const res = await fetch(AUTH_ROUTES.LOGIN, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -50,7 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    await fetch(AUTH_ROUTES.LOGOUT, { method: "POST", credentials: "include" });
     setUser(null);
   };
 

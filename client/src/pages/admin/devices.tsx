@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Key,
 } from "lucide-react";
+import { ADMIN_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -90,11 +91,11 @@ export default function AdminDevicesPage() {
   const [copied, setCopied] = useState(false);
 
   const { data: devices, isLoading } = useQuery<DeviceWithUser[]>({
-    queryKey: ["/api/admin/devices"],
+    queryKey: [ADMIN_ROUTES.DEVICES],
   });
 
   const { data: users } = useQuery<UserType[]>({
-    queryKey: ["/api/admin/users"],
+    queryKey: [ADMIN_ROUTES.USERS],
   });
 
   const form = useForm<DeviceFormData>({
@@ -107,11 +108,11 @@ export default function AdminDevicesPage() {
 
   const createDeviceMutation = useMutation({
     mutationFn: async (data: DeviceFormData) => {
-      const res = await apiRequest("POST", "/api/admin/devices", data);
+      const res = await apiRequest("POST", ADMIN_ROUTES.DEVICES, data);
       return res;
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/devices"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEVICES] });
       setDialogOpen(false);
       form.reset();
       if (data.deviceKey) {
@@ -126,10 +127,10 @@ export default function AdminDevicesPage() {
 
   const toggleDeviceMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest("PATCH", `/api/admin/devices/${id}`, { isActive });
+      return apiRequest("PATCH", ADMIN_ROUTES.DEVICE_BY_ID(id), { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/devices"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEVICES] });
       toast({ title: "Device status updated" });
     },
     onError: () => {
@@ -139,10 +140,10 @@ export default function AdminDevicesPage() {
 
   const deleteDeviceMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/devices/${id}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.DEVICE_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/devices"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEVICES] });
       toast({ title: "Device deleted" });
       setDeleteDialogOpen(false);
       setDeletingDeviceId(null);

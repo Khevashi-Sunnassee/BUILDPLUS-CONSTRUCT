@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { WEEKLY_REPORTS_ROUTES, JOBS_ROUTES, PRODUCTION_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -55,21 +56,21 @@ export default function WeeklyJobLogsPage() {
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   
   const { data: myReports = [], isLoading: loadingMyReports } = useQuery<WeeklyJobReportWithDetails[]>({
-    queryKey: ["/api/weekly-job-reports/my-reports"],
+    queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY],
   });
 
   const { data: allReports = [], isLoading: loadingAllReports } = useQuery<WeeklyJobReportWithDetails[]>({
-    queryKey: ["/api/weekly-job-reports"],
+    queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS],
     enabled: isManagerOrAdmin,
   });
 
   const { data: pendingReports = [], isLoading: loadingPending } = useQuery<WeeklyJobReportWithDetails[]>({
-    queryKey: ["/api/weekly-job-reports/pending-approval"],
+    queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING],
     enabled: isManagerOrAdmin,
   });
 
   const { data: globalSettings } = useQuery<GlobalSettings>({
-    queryKey: ["/api/admin/settings"],
+    queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
   const configuredWeekStartDay = globalSettings?.weekStartDay ?? 1;
@@ -136,7 +137,7 @@ export default function WeeklyJobLogsPage() {
   }, [allReports.length]);
 
   const { data: allJobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   interface ProductionSlotWithJob extends ProductionSlot {
@@ -144,7 +145,7 @@ export default function WeeklyJobLogsPage() {
   }
 
   const { data: productionSlots = [] } = useQuery<ProductionSlotWithJob[]>({
-    queryKey: ["/api/production-slots"],
+    queryKey: [PRODUCTION_ROUTES.SLOTS],
   });
 
   const getProductionSlotDate = (jobId: string, level: string | null): string | null => {
@@ -176,13 +177,13 @@ export default function WeeklyJobLogsPage() {
 
   const createReportMutation = useMutation({
     mutationFn: async (data: { reportDate: string; weekStartDate: string; weekEndDate: string; notes: string; schedules: ScheduleItem[] }) => {
-      const response = await apiRequest("POST", "/api/weekly-job-reports", data);
+      const response = await apiRequest("POST", WEEKLY_REPORTS_ROUTES.JOB_REPORTS, data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
       toast({ title: "Report created successfully" });
       resetForm();
     },
@@ -193,13 +194,13 @@ export default function WeeklyJobLogsPage() {
 
   const updateReportMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: { reportDate?: string; weekStartDate?: string; weekEndDate?: string; notes?: string; schedules?: ScheduleItem[] } }) => {
-      const response = await apiRequest("PUT", `/api/weekly-job-reports/${id}`, data);
+      const response = await apiRequest("PUT", WEEKLY_REPORTS_ROUTES.JOB_REPORT_BY_ID(id), data);
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
       toast({ title: "Report updated successfully" });
       resetForm();
     },
@@ -210,13 +211,13 @@ export default function WeeklyJobLogsPage() {
 
   const submitReportMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/weekly-job-reports/${id}/submit`, {});
+      const response = await apiRequest("POST", WEEKLY_REPORTS_ROUTES.JOB_REPORT_SUBMIT(id), {});
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
       toast({ title: "Report submitted for approval" });
     },
     onError: (error: Error) => {
@@ -226,14 +227,14 @@ export default function WeeklyJobLogsPage() {
 
   const approveReportMutation = useMutation({
     mutationFn: async (id: string) => {
-      const response = await apiRequest("POST", `/api/weekly-job-reports/${id}/approve`, {});
+      const response = await apiRequest("POST", WEEKLY_REPORTS_ROUTES.JOB_REPORT_APPROVE(id), {});
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/approved"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_APPROVED] });
       toast({ title: "Report approved" });
       setShowApprovalDialog(false);
       setSelectedReport(null);
@@ -245,13 +246,13 @@ export default function WeeklyJobLogsPage() {
 
   const rejectReportMutation = useMutation({
     mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
-      const response = await apiRequest("POST", `/api/weekly-job-reports/${id}/reject`, { rejectionReason: reason });
+      const response = await apiRequest("POST", WEEKLY_REPORTS_ROUTES.JOB_REPORT_REJECT(id), { rejectionReason: reason });
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
       toast({ title: "Report rejected" });
       setShowApprovalDialog(false);
       setSelectedReport(null);
@@ -264,12 +265,12 @@ export default function WeeklyJobLogsPage() {
 
   const deleteReportMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/weekly-job-reports/${id}`, {});
+      await apiRequest("DELETE", WEEKLY_REPORTS_ROUTES.JOB_REPORT_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/my-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-job-reports/pending-approval"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
       toast({ title: "Report deleted" });
     },
     onError: (error: Error) => {

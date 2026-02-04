@@ -7,6 +7,7 @@ import { format, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "da
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
+import { WEEKLY_REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import {
   DollarSign,
   Plus,
@@ -221,19 +222,19 @@ export default function WeeklyWageReportsPage() {
   );
 
   const { data: reports, isLoading } = useQuery<WeeklyWageReport[]>({
-    queryKey: ["/api/weekly-wage-reports"],
+    queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS],
   });
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
   const { data: analysisData, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery<WageAnalysis>({
-    queryKey: ["/api/weekly-wage-reports", selectedReport?.id, "analysis"],
+    queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS, selectedReport?.id, "analysis"],
     queryFn: async () => {
-      const res = await fetch(`/api/weekly-wage-reports/${selectedReport?.id}/analysis`, {
+      const res = await fetch(WEEKLY_REPORTS_ROUTES.WAGE_REPORT_ANALYSIS(selectedReport?.id!), {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to fetch analysis");
@@ -264,11 +265,11 @@ export default function WeeklyWageReportsPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: WageReportFormData) => {
-      const res = await apiRequest("POST", "/api/weekly-wage-reports", data);
+      const res = await apiRequest("POST", WEEKLY_REPORTS_ROUTES.WAGE_REPORTS, data);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-wage-reports"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS] });
       setCreateDialogOpen(false);
       createForm.reset();
       toast({ title: "Weekly wage report created" });
@@ -281,11 +282,11 @@ export default function WeeklyWageReportsPage() {
   const updateMutation = useMutation({
     mutationFn: async (data: WageReportFormData & { id: string }) => {
       const { id, ...rest } = data;
-      const res = await apiRequest("PUT", `/api/weekly-wage-reports/${id}`, rest);
+      const res = await apiRequest("PUT", WEEKLY_REPORTS_ROUTES.WAGE_REPORT_BY_ID(id), rest);
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-wage-reports"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS] });
       setEditDialogOpen(false);
       setSelectedReport(null);
       toast({ title: "Weekly wage report updated" });
@@ -297,10 +298,10 @@ export default function WeeklyWageReportsPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/weekly-wage-reports/${id}`);
+      await apiRequest("DELETE", WEEKLY_REPORTS_ROUTES.WAGE_REPORT_BY_ID(id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/weekly-wage-reports"] });
+      queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS] });
       setDeleteDialogOpen(false);
       setDeletingId(null);
       toast({ title: "Weekly wage report deleted" });

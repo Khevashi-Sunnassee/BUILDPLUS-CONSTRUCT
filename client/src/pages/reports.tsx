@@ -56,6 +56,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
 interface SheetData {
   sheetNumber: string;
@@ -135,11 +136,11 @@ export default function ReportsPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: report, isLoading } = useQuery<ReportData>({
-    queryKey: ["/api/reports", { period }],
+    queryKey: [REPORTS_ROUTES.LIST, { period }],
   });
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
@@ -182,7 +183,7 @@ export default function ReportsPage() {
   const { startDate, endDate } = getDateRange();
 
   const { data: logistics, isLoading: logisticsLoading } = useQuery<LogisticsData>({
-    queryKey: ["/api/reports/logistics", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.LOGISTICS, { startDate, endDate }],
   });
 
   const formatMinutes = (minutes: number) => {

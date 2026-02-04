@@ -46,6 +46,7 @@ import {
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
+import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
 interface ProductionDailyData {
   date: string;
@@ -268,37 +269,37 @@ export default function KPIDashboardPage() {
   const { startDate, endDate } = getDateRange();
 
   const { data: productionData, isLoading: productionLoading } = useQuery<ProductionReportResponse>({
-    queryKey: ["/api/reports/production-daily", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.PRODUCTION_DAILY, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
   const { data: productionCostsData, isLoading: costsLoading } = useQuery<ProductionCostsReportResponse>({
-    queryKey: ["/api/reports/production-with-costs", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.PRODUCTION_WITH_COSTS, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
   const { data: draftingData, isLoading: draftingLoading } = useQuery<DraftingReportResponse>({
-    queryKey: ["/api/reports/drafting-daily", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.DRAFTING_DAILY, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
   const { data: costAnalysisData, isLoading: costAnalysisLoading } = useQuery<CostAnalysisResponse>({
-    queryKey: ["/api/reports/cost-analysis", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.COST_ANALYSIS, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
   const { data: costDailyData, isLoading: costDailyLoading } = useQuery<CostAnalysisDailyResponse>({
-    queryKey: ["/api/reports/cost-analysis-daily", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.COST_ANALYSIS_DAILY, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
   const { data: labourCostData, isLoading: labourCostLoading } = useQuery<LabourCostAnalysisResponse>({
-    queryKey: ["/api/reports/labour-cost-analysis", { startDate, endDate }],
+    queryKey: [REPORTS_ROUTES.LABOUR_COST_ANALYSIS, { startDate, endDate }],
     enabled: !!startDate && !!endDate,
   });
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";

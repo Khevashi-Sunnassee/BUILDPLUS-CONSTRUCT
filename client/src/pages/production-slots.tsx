@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { PRODUCTION_ROUTES, DRAFTING_ROUTES, JOBS_ROUTES, ADMIN_ROUTES, FACTORIES_ROUTES, CFMEU_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -168,10 +169,10 @@ function CalendarView({
 
   // Fetch CFMEU holidays for the current date range
   const { data: cfmeuHolidays = [] } = useQuery<CfmeuHoliday[]>({
-    queryKey: ["/api/cfmeu-holidays", cfmeuCalendarType, format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")],
+    queryKey: [CFMEU_ROUTES.HOLIDAYS, cfmeuCalendarType, format(start, "yyyy-MM-dd"), format(end, "yyyy-MM-dd")],
     queryFn: async () => {
       if (!cfmeuCalendarType) return [];
-      const res = await fetch(`/api/cfmeu-holidays?calendarType=${cfmeuCalendarType}&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`);
+      const res = await fetch(`${CFMEU_ROUTES.HOLIDAYS}?calendarType=${cfmeuCalendarType}&startDate=${format(start, "yyyy-MM-dd")}&endDate=${format(end, "yyyy-MM-dd")}`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -715,7 +716,7 @@ export default function ProductionSlotsPage() {
   const isManagerOrAdmin = user?.role === "MANAGER" || user?.role === "ADMIN";
   
   const { data: globalSettings } = useQuery<GlobalSettings>({
-    queryKey: ["/api/admin/settings"],
+    queryKey: [ADMIN_ROUTES.SETTINGS],
   });
   
   const weekStartDay = globalSettings?.weekStartDay ?? 1;
@@ -774,7 +775,7 @@ export default function ProductionSlotsPage() {
   const [showDraftingWarningDialog, setShowDraftingWarningDialog] = useState(false);
 
   const { data: slots = [], isLoading: loadingSlots } = useQuery<ProductionSlotWithDetails[]>({
-    queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, factoryId: factoryFilter !== "all" ? factoryFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
+    queryKey: [PRODUCTION_ROUTES.SLOTS, { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, factoryId: factoryFilter !== "all" ? factoryFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (statusFilter !== "ALL") params.append("status", statusFilter);
@@ -782,23 +783,23 @@ export default function ProductionSlotsPage() {
       if (factoryFilter !== "all") params.append("factoryId", factoryFilter);
       if (dateFromFilter) params.append("dateFrom", dateFromFilter);
       if (dateToFilter) params.append("dateTo", dateToFilter);
-      const response = await fetch(`/api/production-slots?${params.toString()}`);
+      const response = await fetch(`${PRODUCTION_ROUTES.SLOTS}?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch production slots");
       return response.json();
     },
   });
 
   const { data: jobsWithoutSlots = [], isLoading: loadingJobsWithoutSlots } = useQuery<Job[]>({
-    queryKey: ["/api/production-slots/jobs-without-slots"],
+    queryKey: [PRODUCTION_ROUTES.SLOTS_JOBS_WITHOUT],
   });
 
   const { data: allJobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
     select: (data: any) => data.map((j: any) => ({ id: j.id, jobNumber: j.jobNumber, name: j.name, client: j.client, factoryId: j.factoryId })),
   });
 
   const { data: factories = [] } = useQuery<Factory[]>({
-    queryKey: ["/api/admin/factories"],
+    queryKey: [ADMIN_ROUTES.FACTORIES],
   });
 
   const getFactory = (factoryId: string | null | undefined): Factory | undefined => {
@@ -973,10 +974,10 @@ export default function ProductionSlotsPage() {
   }, [slots, dateFromFilter, dateToFilter, getFactory]);
 
   const { data: slotAdjustments = [] } = useQuery<ProductionSlotAdjustmentWithDetails[]>({
-    queryKey: ["/api/production-slots", selectedSlot?.id, "adjustments"],
+    queryKey: [PRODUCTION_ROUTES.SLOTS, selectedSlot?.id, "adjustments"],
     queryFn: async () => {
       if (!selectedSlot) return [];
-      const response = await fetch(`/api/production-slots/${selectedSlot.id}/adjustments`);
+      const response = await fetch(PRODUCTION_ROUTES.SLOT_ADJUSTMENTS(selectedSlot.id));
       if (!response.ok) throw new Error("Failed to fetch adjustments");
       return response.json();
     },
@@ -984,10 +985,10 @@ export default function ProductionSlotsPage() {
   });
 
   const { data: panelsForSlot = [] } = useQuery<PanelRegister[]>({
-    queryKey: ["/api/panels", { jobId: selectedSlot?.jobId, level: selectedSlot?.level }],
+    queryKey: [PANELS_ROUTES.LIST, { jobId: selectedSlot?.jobId, level: selectedSlot?.level }],
     queryFn: async () => {
       if (!selectedSlot) return [];
-      const response = await fetch(`/api/panels?jobId=${selectedSlot.jobId}&level=${encodeURIComponent(selectedSlot.level)}`);
+      const response = await fetch(`${PANELS_ROUTES.LIST}?jobId=${selectedSlot.jobId}&level=${encodeURIComponent(selectedSlot.level)}`);
       if (!response.ok) throw new Error("Failed to fetch panels");
       return response.json();
     },
@@ -996,10 +997,10 @@ export default function ProductionSlotsPage() {
   
   // Fetch production entries for panels in this slot
   const { data: panelEntries = {} } = useQuery<Record<string, { productionDate: string; entryId: string }>>({
-    queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"],
+    queryKey: [PRODUCTION_ROUTES.SLOTS, selectedSlot?.id, "panel-entries"],
     queryFn: async () => {
       if (!selectedSlot) return {};
-      const response = await fetch(`/api/production-slots/${selectedSlot.id}/panel-entries`);
+      const response = await fetch(PRODUCTION_ROUTES.SLOT_PANEL_ENTRIES(selectedSlot.id));
       if (!response.ok) throw new Error("Failed to fetch panel entries");
       return response.json();
     },
@@ -1008,11 +1009,11 @@ export default function ProductionSlotsPage() {
 
   const generateSlotsMutation = useMutation({
     mutationFn: async ({ jobId, skipEmptyLevels }: { jobId: string; skipEmptyLevels?: boolean }) => {
-      return apiRequest("POST", `/api/production-slots/generate/${jobId}`, { skipEmptyLevels });
+      return apiRequest("POST", PRODUCTION_ROUTES.SLOTS_GENERATE_FOR_JOB(jobId), { skipEmptyLevels });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots/jobs-without-slots"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS_JOBS_WITHOUT] });
       toast({ title: "Success", description: "Production slots generated successfully" });
     },
     onError: (error: any) => {
@@ -1022,10 +1023,10 @@ export default function ProductionSlotsPage() {
 
   const updateDraftingProgramMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/drafting-program/generate");
+      return apiRequest("POST", DRAFTING_ROUTES.GENERATE);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
       toast({ title: "Success", description: "Drafting program updated successfully" });
       setShowDraftingUpdateDialog(false);
     },
@@ -1036,7 +1037,7 @@ export default function ProductionSlotsPage() {
 
   const adjustSlotMutation = useMutation({
     mutationFn: async (data: { id: string; newDate: string; reason: string; clientConfirmed: boolean; cascadeToLater: boolean }) => {
-      return apiRequest("POST", `/api/production-slots/${data.id}/adjust`, {
+      return apiRequest("POST", PRODUCTION_ROUTES.SLOT_ADJUST(data.id), {
         newDate: data.newDate,
         reason: data.reason,
         clientConfirmed: data.clientConfirmed,
@@ -1044,7 +1045,7 @@ export default function ProductionSlotsPage() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
       setShowAdjustDialog(false);
       resetAdjustForm();
       toast({ title: "Success", description: "Production slot adjusted successfully" });
@@ -1056,10 +1057,10 @@ export default function ProductionSlotsPage() {
 
   const bookSlotMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/production-slots/${id}/book`);
+      return apiRequest("POST", PRODUCTION_ROUTES.SLOT_BOOK(id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
       toast({ title: "Success", description: "Production slot booked successfully" });
     },
     onError: (error: any) => {
@@ -1069,10 +1070,10 @@ export default function ProductionSlotsPage() {
 
   const completeSlotMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/production-slots/${id}/complete`);
+      return apiRequest("POST", PRODUCTION_ROUTES.SLOT_COMPLETE(id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
       toast({ title: "Success", description: "Production slot marked as completed" });
     },
     onError: (error: any) => {
@@ -1082,14 +1083,14 @@ export default function ProductionSlotsPage() {
 
   const bookPanelMutation = useMutation({
     mutationFn: async ({ slotId, panelId, productionDate }: { slotId: string; panelId: string; productionDate: string }) => {
-      return apiRequest("POST", `/api/production-slots/${slotId}/assign-panels`, { 
+      return apiRequest("POST", PRODUCTION_ROUTES.SLOT_ASSIGN_PANELS(slotId), { 
         panelAssignments: [{ panelId, productionDate }] 
       });
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS, selectedSlot?.id, "panel-entries"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
       setBookingPanelId(null);
       setBookingDate("");
       if (data.created > 0) {
@@ -1106,12 +1107,12 @@ export default function ProductionSlotsPage() {
   
   const unbookPanelMutation = useMutation({
     mutationFn: async (entryId: string) => {
-      return apiRequest("DELETE", `/api/production-entries/${entryId}`);
+      return apiRequest("DELETE", PRODUCTION_ROUTES.ENTRY_BY_ID(entryId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots", selectedSlot?.id, "panel-entries"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS, selectedSlot?.id, "panel-entries"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
       toast({ title: "Unbooked", description: "Panel removed from production schedule" });
     },
     onError: (error: any) => {
@@ -1150,7 +1151,7 @@ export default function ProductionSlotsPage() {
       // Check for level mismatch if not already confirmed
       if (!skipEmptyLevels && pendingJobsForGeneration.length === 0) {
         try {
-          const response = await fetch(`/api/production-slots/check-levels/${jobId}`);
+          const response = await fetch(PRODUCTION_ROUTES.SLOTS_CHECK_LEVELS(jobId));
           if (response.ok) {
             const coverage = await response.json();
             if (coverage.hasMismatch) {

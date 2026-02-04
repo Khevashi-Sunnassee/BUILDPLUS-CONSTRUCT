@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { USER_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import {
   LayoutDashboard,
   FileText,
@@ -124,13 +125,13 @@ export function AppSidebar() {
   const [adminExpanded, setAdminExpanded] = useState(false);
 
   const { data: myPermissions = [] } = useQuery<UserPermission[]>({
-    queryKey: ["/api/permissions/my-permissions"],
+    queryKey: [USER_ROUTES.PERMISSIONS],
     enabled: !!user,
   });
 
   // Fetch dynamic logo from settings
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const logoSrc = logoData?.logoBase64 || defaultLogo;
 

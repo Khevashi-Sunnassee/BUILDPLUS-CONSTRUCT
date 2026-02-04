@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { DASHBOARD_ROUTES, CHAT_ROUTES, TASKS_ROUTES } from "@shared/api-routes";
 import { 
   Clock, 
   Calendar, 
@@ -81,28 +82,28 @@ export default function DashboardPage() {
   const [, navigate] = useLocation();
 
   const { data: stats, isLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/dashboard/stats"],
+    queryKey: [DASHBOARD_ROUTES.STATS],
   });
 
   const { data: conversations = [] } = useQuery<ChatConversation[]>({
-    queryKey: ["/api/chat/conversations"],
+    queryKey: [CHAT_ROUTES.CONVERSATIONS],
   });
 
   const { data: taskNotifications = [] } = useQuery<TaskNotification[]>({
-    queryKey: ["/api/task-notifications"],
+    queryKey: [TASKS_ROUTES.NOTIFICATIONS],
   });
 
   const markTaskNotificationRead = useMutation({
-    mutationFn: (id: string) => apiRequest("POST", `/api/task-notifications/${id}/read`),
+    mutationFn: (id: string) => apiRequest("POST", TASKS_ROUTES.NOTIFICATION_READ(id)),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-notifications"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.NOTIFICATIONS] });
     },
   });
 
   const markAllTaskNotificationsRead = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/task-notifications/read-all"),
+    mutationFn: () => apiRequest("POST", TASKS_ROUTES.NOTIFICATIONS_READ_ALL),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-notifications"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.NOTIFICATIONS] });
     },
   });
 

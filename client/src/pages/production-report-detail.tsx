@@ -8,6 +8,7 @@ import { useRoute, useLocation } from "wouter";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
+import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import {
   Factory,
   Plus,
@@ -142,9 +143,9 @@ export default function ProductionReportDetailPage() {
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: summaryData, isLoading: entriesLoading } = useQuery<ProductionSummaryWithCosts>({
-    queryKey: ["/api/production-summary-with-costs", selectedDate, factory],
+    queryKey: [PRODUCTION_ROUTES.SUMMARY_WITH_COSTS, selectedDate, factory],
     queryFn: async () => {
-      const res = await fetch(`/api/production-summary-with-costs?date=${selectedDate}&factory=${factory}`);
+      const res = await fetch(`${PRODUCTION_ROUTES.SUMMARY_WITH_COSTS}?date=${selectedDate}&factory=${factory}`);
       if (!res.ok) throw new Error("Failed to fetch entries");
       return res.json();
     },
@@ -154,11 +155,11 @@ export default function ProductionReportDetailPage() {
   const totals = summaryData?.totals;
 
   const { data: jobs } = useQuery<(Job & { panels: PanelRegister[] })[]>({
-    queryKey: ["/api/admin/jobs"],
+    queryKey: [ADMIN_ROUTES.JOBS],
   });
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
-    queryKey: ["/api/settings/logo"],
+    queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
@@ -200,13 +201,13 @@ export default function ProductionReportDetailPage() {
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: ProductionEntryFormData) => {
-      return apiRequest("POST", "/api/production-entries", data);
+      return apiRequest("POST", PRODUCTION_ROUTES.ENTRIES, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SUMMARY_WITH_COSTS, selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       toast({ title: "Production entry created successfully" });
       setEntryDialogOpen(false);
       entryForm.reset();
@@ -220,13 +221,13 @@ export default function ProductionReportDetailPage() {
 
   const updateEntryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ProductionEntryFormData }) => {
-      return apiRequest("PUT", `/api/production-entries/${id}`, data);
+      return apiRequest("PUT", PRODUCTION_ROUTES.ENTRY_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SUMMARY_WITH_COSTS, selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       toast({ title: "Production entry updated successfully" });
       setEntryDialogOpen(false);
       setEditingEntry(null);
@@ -241,11 +242,11 @@ export default function ProductionReportDetailPage() {
 
   const deleteEntryMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/production-entries/${id}`, {});
+      return apiRequest("DELETE", PRODUCTION_ROUTES.ENTRY_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SUMMARY_WITH_COSTS, selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
       toast({ title: "Entry deleted" });
       setDeleteDialogOpen(false);
       setDeletingEntryId(null);
@@ -257,10 +258,10 @@ export default function ProductionReportDetailPage() {
 
   const deleteDayMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("DELETE", `/api/production-days/${selectedDate}?factory=${factory}`, {});
+      return apiRequest("DELETE", `${PRODUCTION_ROUTES.DAY_BY_ID(selectedDate)}?factory=${factory}`, {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
       toast({ title: "Production day deleted" });
       setDeleteDayDialogOpen(false);
       setLocation("/production-report");
@@ -273,11 +274,11 @@ export default function ProductionReportDetailPage() {
   // Update single entry status
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return apiRequest("PUT", `/api/production-entries/${id}`, { status });
+      return apiRequest("PUT", PRODUCTION_ROUTES.ENTRY_BY_ID(id), { status });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SUMMARY_WITH_COSTS, selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
       toast({ title: "Status updated" });
     },
     onError: () => {
@@ -288,11 +289,11 @@ export default function ProductionReportDetailPage() {
   // Batch update all entries to COMPLETED
   const markAllCompletedMutation = useMutation({
     mutationFn: async (entryIds: string[]) => {
-      return apiRequest("PUT", "/api/production-entries/batch-status", { entryIds, status: "COMPLETED" });
+      return apiRequest("PUT", PRODUCTION_ROUTES.ENTRIES_BATCH_STATUS, { entryIds, status: "COMPLETED" });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/production-summary-with-costs", selectedDate, factory] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-reports"] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SUMMARY_WITH_COSTS, selectedDate, factory] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.REPORTS] });
       toast({ title: "All entries marked as completed" });
     },
     onError: () => {

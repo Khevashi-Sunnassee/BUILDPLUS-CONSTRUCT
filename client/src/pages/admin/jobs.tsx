@@ -84,6 +84,7 @@ import {
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
 import type { Job, PanelRegister, User as UserType, GlobalSettings, Factory } from "@shared/schema";
+import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES } from "@shared/api-routes";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -224,19 +225,19 @@ export default function AdminJobsPage() {
   const [schedulingSettingsChanged, setSchedulingSettingsChanged] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
-    queryKey: ["/api/admin/jobs"],
+    queryKey: [ADMIN_ROUTES.JOBS],
   });
 
   const { data: users } = useQuery<UserType[]>({
-    queryKey: ["/api/admin/users"],
+    queryKey: [ADMIN_ROUTES.USERS],
   });
 
   const { data: factories } = useQuery<Factory[]>({
-    queryKey: ["/api/factories"],
+    queryKey: [FACTORIES_ROUTES.LIST],
   });
 
   const { data: globalSettings } = useQuery<GlobalSettings>({
-    queryKey: ["/api/admin/settings"],
+    queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
   // Filter and sort jobs
@@ -332,10 +333,10 @@ export default function AdminJobsPage() {
 
   const createJobMutation = useMutation({
     mutationFn: async (data: JobFormData) => {
-      return apiRequest("POST", "/api/admin/jobs", data);
+      return apiRequest("POST", ADMIN_ROUTES.JOBS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Job created successfully" });
       setJobDialogOpen(false);
       jobForm.reset();
@@ -347,10 +348,10 @@ export default function AdminJobsPage() {
 
   const updateJobMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: JobFormData }) => {
-      return apiRequest("PUT", `/api/admin/jobs/${id}`, data);
+      return apiRequest("PUT", ADMIN_ROUTES.JOB_BY_ID(id), data);
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Job updated successfully" });
       
       // Check if we need to show days in advance, onsite date, or scheduling settings regeneration dialog
@@ -385,7 +386,7 @@ export default function AdminJobsPage() {
 
   const deleteJobMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("DELETE", `/api/admin/jobs/${id}`, {});
+      const res = await apiRequest("DELETE", ADMIN_ROUTES.JOB_BY_ID(id), {});
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.message || data.error || "Failed to delete job");
@@ -393,7 +394,7 @@ export default function AdminJobsPage() {
       return res;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Job deleted successfully" });
       setDeleteDialogOpen(false);
       setDeletingJobId(null);
@@ -417,10 +418,10 @@ export default function AdminJobsPage() {
     validatedCount: number;
     panelCount: number;
   }>({
-    queryKey: ["/api/jobs", estimateJob?.id, "totals"],
+    queryKey: [JOBS_ROUTES.LIST, estimateJob?.id, "totals"],
     queryFn: async () => {
       if (!estimateJob?.id) return null;
-      const res = await fetch(`/api/jobs/${estimateJob.id}/totals`, { credentials: "include" });
+      const res = await fetch(JOBS_ROUTES.TOTALS(estimateJob.id), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch totals");
       return res.json();
     },
@@ -434,7 +435,7 @@ export default function AdminJobsPage() {
       formData.append("file", file);
       formData.append("replace", String(replace));
       
-      const res = await fetch(`/api/jobs/${jobId}/panels/import-estimate`, {
+      const res = await fetch(JOBS_ROUTES.PANELS_IMPORT_ESTIMATE(jobId), {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -448,8 +449,8 @@ export default function AdminJobsPage() {
     },
     onSuccess: (data) => {
       setImportResult(data);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       refetchJobTotals();
       toast({ 
         title: "Estimate imported successfully",
@@ -499,14 +500,14 @@ export default function AdminJobsPage() {
   };
 
   const { data: panelTypes } = useQuery<PanelTypeInfo[]>({
-    queryKey: ["/api/panel-types"],
+    queryKey: [PANEL_TYPES_ROUTES.LIST],
   });
 
   const { data: costOverrides, refetch: refetchCostOverrides } = useQuery<CostOverride[]>({
-    queryKey: ["/api/jobs", costOverridesJob?.id, "cost-overrides"],
+    queryKey: [JOBS_ROUTES.LIST, costOverridesJob?.id, "cost-overrides"],
     queryFn: async () => {
       if (!costOverridesJob?.id) return [];
-      const res = await fetch(`/api/jobs/${costOverridesJob.id}/cost-overrides`, { credentials: "include" });
+      const res = await fetch(JOBS_ROUTES.COST_OVERRIDES(costOverridesJob.id), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch cost overrides");
       return res.json();
     },
@@ -521,7 +522,7 @@ export default function AdminJobsPage() {
 
   const initializeCostOverridesMutation = useMutation({
     mutationFn: async (jobId: string) => {
-      return apiRequest("POST", `/api/jobs/${jobId}/cost-overrides/initialize`, {});
+      return apiRequest("POST", JOBS_ROUTES.COST_OVERRIDES_INITIALIZE(jobId), {});
     },
     onSuccess: () => {
       refetchCostOverrides();
@@ -534,7 +535,7 @@ export default function AdminJobsPage() {
 
   const updateCostOverrideMutation = useMutation({
     mutationFn: async ({ jobId, id, data }: { jobId: string; id: string; data: { revisedPercentage: string | null; notes: string | null } }) => {
-      return apiRequest("PUT", `/api/jobs/${jobId}/cost-overrides/${id}`, data);
+      return apiRequest("PUT", JOBS_ROUTES.COST_OVERRIDE_BY_ID(jobId, id), data);
     },
     onSuccess: () => {
       refetchCostOverrides();
@@ -578,11 +579,11 @@ export default function AdminJobsPage() {
 
   const importJobsMutation = useMutation({
     mutationFn: async (data: any[]) => {
-      return apiRequest("POST", "/api/admin/jobs/import", { data });
+      return apiRequest("POST", ADMIN_ROUTES.JOBS_IMPORT, { data });
     },
     onSuccess: async (response) => {
       const result = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: `Imported ${result.imported} jobs, ${result.skipped} skipped` });
       setImportDialogOpen(false);
       setImportData([]);
@@ -725,7 +726,7 @@ export default function AdminJobsPage() {
     setHasExistingLevelCycleTimes(false);
     setIsLoadingLevelData(true);
     try {
-      const response = await fetch(`/api/admin/jobs/${job.id}/build-levels`);
+      const response = await fetch(ADMIN_ROUTES.JOB_BUILD_LEVELS(job.id));
       if (response.ok) {
         const data = await response.json();
         setLevelCycleTimes(data);
@@ -739,7 +740,7 @@ export default function AdminJobsPage() {
     
     // Check production slot status
     try {
-      const slotResponse = await fetch(`/api/admin/jobs/${job.id}/production-slot-status`);
+      const slotResponse = await fetch(ADMIN_ROUTES.JOB_PRODUCTION_SLOT_STATUS(job.id));
       if (slotResponse.ok) {
         const status = await slotResponse.json();
         setProductionSlotStatus(status);
@@ -773,7 +774,7 @@ export default function AdminJobsPage() {
   // Level cycle times functions
   const saveLevelCycleTimesMutation = useMutation({
     mutationFn: async ({ jobId, cycleTimes }: { jobId: string; cycleTimes: typeof levelCycleTimes }) => {
-      const res = await apiRequest("POST", `/api/admin/jobs/${jobId}/level-cycle-times`, { cycleTimes });
+      const res = await apiRequest("POST", ADMIN_ROUTES.JOB_LEVEL_CYCLE_TIMES(jobId), { cycleTimes });
       return res.json();
     },
     onSuccess: async () => {
@@ -782,7 +783,7 @@ export default function AdminJobsPage() {
       if (!editingJob) return;
       
       try {
-        const res = await fetch(`/api/admin/jobs/${editingJob.id}/production-slot-status`);
+        const res = await fetch(ADMIN_ROUTES.JOB_PRODUCTION_SLOT_STATUS(editingJob.id));
         if (res.ok) {
           const status = await res.json();
           setProductionSlotStatus(status);
@@ -799,7 +800,7 @@ export default function AdminJobsPage() {
 
   const updateProductionSlotsMutation = useMutation({
     mutationFn: async ({ jobId, action }: { jobId: string; action: "create" | "update" }) => {
-      const res = await apiRequest("POST", `/api/admin/jobs/${jobId}/update-production-slots`, { action });
+      const res = await apiRequest("POST", ADMIN_ROUTES.JOB_UPDATE_PRODUCTION_SLOTS(jobId), { action });
       return res.json();
     },
     onSuccess: (data) => {
@@ -809,9 +810,9 @@ export default function AdminJobsPage() {
       } else if (data.action === "updated") {
         toast({ title: "Success", description: `Updated ${data.count} production slots` });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
       
       // Close everything after production slots are updated
       setPendingJobId(null);
@@ -827,14 +828,14 @@ export default function AdminJobsPage() {
   const regenerateSlotsAndDraftingMutation = useMutation({
     mutationFn: async (jobId: string) => {
       // First delete drafting program entries for this job (to remove FK references)
-      await apiRequest("DELETE", `/api/drafting-program/job/${jobId}`, {});
+      await apiRequest("DELETE", DRAFTING_ROUTES.BY_JOB(jobId), {});
       
       // Then regenerate production slots
-      const slotsRes = await apiRequest("POST", `/api/production-slots/generate/${jobId}`, {});
+      const slotsRes = await apiRequest("POST", PRODUCTION_ROUTES.SLOTS_GENERATE(jobId), {});
       const slotsData = await slotsRes.json();
       
       // Finally regenerate drafting program
-      const draftingRes = await apiRequest("POST", "/api/drafting-program/generate", { jobId });
+      const draftingRes = await apiRequest("POST", DRAFTING_ROUTES.GENERATE, { jobId });
       const draftingData = await draftingRes.json();
       
       return { slots: slotsData, drafting: draftingData };
@@ -845,9 +846,9 @@ export default function AdminJobsPage() {
         title: "Success", 
         description: `Updated ${Array.isArray(data.slots) ? data.slots.length : 0} production slots and ${data.drafting.created + data.drafting.updated} drafting entries` 
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
       
       setPendingJobId(null);
       setJobDialogOpen(false);
@@ -869,7 +870,7 @@ export default function AdminJobsPage() {
   const regenerateLevelsMutation = useMutation({
     mutationFn: async (jobId: string) => {
       // First generate the levels
-      const generateResponse = await fetch(`/api/admin/jobs/${jobId}/generate-levels`);
+      const generateResponse = await fetch(ADMIN_ROUTES.JOB_GENERATE_LEVELS(jobId));
       if (!generateResponse.ok) {
         const error = await generateResponse.json();
         throw new Error(error.error || "Failed to generate levels");
@@ -877,7 +878,7 @@ export default function AdminJobsPage() {
       const generatedLevels = await generateResponse.json();
       
       // Then save them to the database
-      const saveResponse = await apiRequest("POST", `/api/admin/jobs/${jobId}/level-cycle-times`, { 
+      const saveResponse = await apiRequest("POST", ADMIN_ROUTES.JOB_LEVEL_CYCLE_TIMES(jobId), { 
         cycleTimes: generatedLevels 
       });
       if (!saveResponse.ok) {
@@ -1851,7 +1852,7 @@ export default function AdminJobsPage() {
                         if (!editingJob) return;
                         setIsLoadingLevelData(true);
                         try {
-                          const response = await fetch(`/api/admin/jobs/${editingJob.id}/generate-levels`);
+                          const response = await fetch(ADMIN_ROUTES.JOB_GENERATE_LEVELS(editingJob.id));
                           if (response.ok) {
                             const data = await response.json();
                             setLevelCycleTimes(data);
@@ -1878,7 +1879,7 @@ export default function AdminJobsPage() {
                         if (!editingJob) return;
                         setIsLoadingLevelData(true);
                         try {
-                          const response = await fetch(`/api/admin/jobs/${editingJob.id}/build-levels`);
+                          const response = await fetch(ADMIN_ROUTES.JOB_BUILD_LEVELS(editingJob.id));
                           if (response.ok) {
                             const data = await response.json();
                             setLevelCycleTimes(data);

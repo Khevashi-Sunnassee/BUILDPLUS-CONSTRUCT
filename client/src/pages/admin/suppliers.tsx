@@ -62,6 +62,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Supplier } from "@shared/schema";
+import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 
 const supplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -101,7 +102,7 @@ export default function AdminSuppliersPage() {
   const [deletingSupplierId, setDeletingSupplierId] = useState<string | null>(null);
 
   const { data: suppliers, isLoading } = useQuery<Supplier[]>({
-    queryKey: ["/api/procurement/suppliers"],
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS],
   });
 
   const form = useForm<SupplierFormData>({
@@ -126,10 +127,10 @@ export default function AdminSuppliersPage() {
 
   const createSupplierMutation = useMutation({
     mutationFn: async (data: SupplierFormData) => {
-      return apiRequest("POST", "/api/procurement/suppliers", data);
+      return apiRequest("POST", PROCUREMENT_ROUTES.SUPPLIERS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS] });
       toast({ title: "Supplier created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -141,10 +142,10 @@ export default function AdminSuppliersPage() {
 
   const updateSupplierMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: SupplierFormData }) => {
-      return apiRequest("PATCH", `/api/procurement/suppliers/${id}`, data);
+      return apiRequest("PATCH", PROCUREMENT_ROUTES.SUPPLIER_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS] });
       toast({ title: "Supplier updated successfully" });
       setDialogOpen(false);
       setEditingSupplier(null);
@@ -157,10 +158,10 @@ export default function AdminSuppliersPage() {
 
   const deleteSupplierMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/procurement/suppliers/${id}`, {});
+      return apiRequest("DELETE", PROCUREMENT_ROUTES.SUPPLIER_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/procurement/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS] });
       toast({ title: "Supplier deleted" });
       setDeleteDialogOpen(false);
       setDeletingSupplierId(null);

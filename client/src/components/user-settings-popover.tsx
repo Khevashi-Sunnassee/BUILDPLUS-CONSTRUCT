@@ -9,6 +9,7 @@ import { Settings2, Factory as FactoryIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { Factory } from "@shared/schema";
+import { ADMIN_ROUTES, USER_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES } from "@shared/api-routes";
 
 interface UserSettings {
   selectedFactoryIds: string[];
@@ -21,11 +22,11 @@ export function UserSettingsPopover() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const { data: factories = [] } = useQuery<Factory[]>({
-    queryKey: ["/api/admin/factories"],
+    queryKey: [ADMIN_ROUTES.FACTORIES],
   });
 
   const { data: settings, isLoading } = useQuery<UserSettings>({
-    queryKey: ["/api/user/settings"],
+    queryKey: [USER_ROUTES.SETTINGS],
   });
 
   useEffect(() => {
@@ -36,13 +37,13 @@ export function UserSettingsPopover() {
 
   const updateSettingsMutation = useMutation({
     mutationFn: async (selectedFactoryIds: string[]) => {
-      return apiRequest("PUT", "/api/user/settings", { selectedFactoryIds });
+      return apiRequest("PUT", USER_ROUTES.SETTINGS, { selectedFactoryIds });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [USER_ROUTES.SETTINGS] });
+      queryClient.invalidateQueries({ queryKey: [PRODUCTION_ROUTES.SLOTS] });
+      queryClient.invalidateQueries({ queryKey: [DRAFTING_ROUTES.PROGRAM] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       toast({
         title: "Settings saved",
         description: "Your factory view preferences have been updated.",

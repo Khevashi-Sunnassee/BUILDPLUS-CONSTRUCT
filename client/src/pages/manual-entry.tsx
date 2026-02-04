@@ -6,6 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { format } from "date-fns";
+import { JOBS_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES, DAILY_LOGS_ROUTES, MANUAL_ENTRY_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import {
   Plus,
   Clock,
@@ -120,20 +121,20 @@ export default function ManualEntryPage() {
   const [selectedDate, setSelectedDate] = useState(initialDate);
 
   const { data: jobs } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   const { data: panels } = useQuery<PanelWithJob[]>({
-    queryKey: ["/api/panels"],
+    queryKey: [PANELS_ROUTES.LIST],
   });
 
   const { data: workTypes } = useQuery<WorkType[]>({
-    queryKey: ["/api/work-types"],
+    queryKey: [SETTINGS_ROUTES.WORK_TYPES],
   });
 
   // Fetch existing daily logs to find the latest end time
   const { data: dailyLogs } = useQuery<DailyLogWithRows[]>({
-    queryKey: ["/api/daily-logs"],
+    queryKey: [DAILY_LOGS_ROUTES.LIST],
   });
 
   // Calculate the latest end time from existing entries for the selected date
@@ -327,7 +328,7 @@ export default function ManualEntryPage() {
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: ManualEntryForm) => {
-      const res = await apiRequest("POST", "/api/manual-entry", data);
+      const res = await apiRequest("POST", MANUAL_ENTRY_ROUTES.ENTRY, data);
       return res.json();
     },
     onSuccess: (data) => {
@@ -339,9 +340,9 @@ export default function ManualEntryPage() {
       } else {
         toast({ title: "Time entry created successfully" });
       }
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
       // Navigate back to the daily report detail if we came from there, otherwise to the list
       if (logIdFromUrl) {
         navigate(`/daily-reports/${logIdFromUrl}`);
@@ -356,13 +357,13 @@ export default function ManualEntryPage() {
 
   const updateDocumentStatusMutation = useMutation({
     mutationFn: async ({ panelId, documentStatus }: { panelId: string; documentStatus: string }) => {
-      const res = await apiRequest("PUT", `/api/panels/${panelId}/document-status`, { documentStatus });
+      const res = await apiRequest("PUT", PANELS_ROUTES.DOCUMENT_STATUS(panelId), { documentStatus });
       return res.json();
     },
     onSuccess: () => {
       toast({ title: "Document status updated successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });

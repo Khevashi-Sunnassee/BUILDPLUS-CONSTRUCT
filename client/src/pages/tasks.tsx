@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { TASKS_ROUTES, USER_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -182,12 +183,12 @@ function TaskRow({
 
   const updateTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
-      return apiRequest("PATCH", `/api/tasks/${task.id}`, data);
+      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(task.id), data);
     },
     onMutate: async (newData) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/task-groups"] });
-      const previousGroups = queryClient.getQueryData(["/api/task-groups"]);
-      queryClient.setQueryData(["/api/task-groups"], (old: any) => {
+      await queryClient.cancelQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      const previousGroups = queryClient.getQueryData([TASKS_ROUTES.GROUPS]);
+      queryClient.setQueryData([TASKS_ROUTES.GROUPS], (old: any) => {
         if (!old) return old;
         return old.map((group: any) => ({
           ...group,
@@ -200,21 +201,21 @@ function TaskRow({
     },
     onError: (error: any, _variables, context) => {
       if (context?.previousGroups) {
-        queryClient.setQueryData(["/api/task-groups"], context.previousGroups);
+        queryClient.setQueryData([TASKS_ROUTES.GROUPS], context.previousGroups);
       }
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
     },
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("DELETE", `/api/tasks/${task.id}`);
+      return apiRequest("DELETE", TASKS_ROUTES.BY_ID(task.id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       toast({ title: "Task deleted" });
     },
     onError: (error: any) => {
@@ -224,10 +225,10 @@ function TaskRow({
 
   const setAssigneesMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
-      return apiRequest("PUT", `/api/tasks/${task.id}/assignees`, { userIds });
+      return apiRequest("PUT", TASKS_ROUTES.ASSIGNEES(task.id), { userIds });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -236,14 +237,14 @@ function TaskRow({
 
   const createSubtaskMutation = useMutation({
     mutationFn: async (title: string) => {
-      return apiRequest("POST", "/api/tasks", {
+      return apiRequest("POST", TASKS_ROUTES.LIST, {
         groupId: task.groupId,
         parentId: task.id,
         title,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewSubtaskTitle("");
       setShowAddSubtask(false);
     },
@@ -658,10 +659,10 @@ function TaskGroupComponent({
 
   const updateGroupMutation = useMutation({
     mutationFn: async (data: Partial<TaskGroup>) => {
-      return apiRequest("PATCH", `/api/task-groups/${group.id}`, data);
+      return apiRequest("PATCH", TASKS_ROUTES.GROUP_BY_ID(group.id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -670,10 +671,10 @@ function TaskGroupComponent({
 
   const deleteGroupMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("DELETE", `/api/task-groups/${group.id}`);
+      return apiRequest("DELETE", TASKS_ROUTES.GROUP_BY_ID(group.id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       toast({ title: "Group deleted" });
     },
     onError: (error: any) => {
@@ -683,13 +684,13 @@ function TaskGroupComponent({
 
   const createTaskMutation = useMutation({
     mutationFn: async (title: string) => {
-      return apiRequest("POST", "/api/tasks", {
+      return apiRequest("POST", TASKS_ROUTES.LIST, {
         groupId: group.id,
         title,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewTaskTitle("");
     },
     onError: (error: any) => {
@@ -872,22 +873,22 @@ function TaskSidebar({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: updates = [], isLoading: updatesLoading } = useQuery<TaskUpdate[]>({
-    queryKey: [`/api/tasks/${task?.id}/updates`],
+    queryKey: [TASKS_ROUTES.UPDATES(task?.id || "")],
     enabled: !!task,
   });
 
   const { data: files = [], isLoading: filesLoading } = useQuery<TaskFile[]>({
-    queryKey: [`/api/tasks/${task?.id}/files`],
+    queryKey: [TASKS_ROUTES.FILES(task?.id || "")],
     enabled: !!task,
   });
 
   const createUpdateMutation = useMutation({
     mutationFn: async (content: string) => {
-      return apiRequest("POST", `/api/tasks/${task?.id}/updates`, { content });
+      return apiRequest("POST", TASKS_ROUTES.UPDATES(task?.id || ""), { content });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/updates`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.UPDATES(task?.id || "")] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewUpdate("");
     },
     onError: (error: any) => {
@@ -897,11 +898,11 @@ function TaskSidebar({
 
   const deleteUpdateMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/task-updates/${id}`);
+      return apiRequest("DELETE", TASKS_ROUTES.UPDATE_BY_ID(id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/updates`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.UPDATES(task?.id || "")] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -912,7 +913,7 @@ function TaskSidebar({
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch(`/api/tasks/${task?.id}/files`, {
+      const res = await fetch(TASKS_ROUTES.FILES(task?.id || ""), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -921,8 +922,8 @@ function TaskSidebar({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/files`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.FILES(task?.id || "")] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       toast({ title: "File uploaded" });
     },
     onError: (error: any) => {
@@ -932,11 +933,11 @@ function TaskSidebar({
 
   const deleteFileMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/task-files/${id}`);
+      return apiRequest("DELETE", TASKS_ROUTES.FILE_BY_ID(id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/tasks/${task?.id}/files`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.FILES(task?.id || "")] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       toast({ title: "File deleted" });
     },
     onError: (error: any) => {
@@ -1235,15 +1236,15 @@ export default function TasksPage() {
   const [jobFilter, setJobFilter] = useState<string>("all");
 
   const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
-    queryKey: ["/api/task-groups"],
+    queryKey: [TASKS_ROUTES.GROUPS],
   });
 
   const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+    queryKey: [USER_ROUTES.LIST],
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   const filteredGroups = groups.map((group) => ({
@@ -1257,10 +1258,10 @@ export default function TasksPage() {
 
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
-      return apiRequest("POST", "/api/task-groups", { name });
+      return apiRequest("POST", TASKS_ROUTES.GROUPS, { name });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/task-groups"] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewGroupName("");
       setShowNewGroupInput(false);
       toast({ title: "Group created" });

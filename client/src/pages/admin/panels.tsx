@@ -96,6 +96,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon, Smile } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
+import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES } from "@shared/api-routes";
 
 const panelSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
@@ -190,16 +191,16 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
   };
 
   const { data: conversation, isLoading: conversationLoading } = useQuery<PanelConversation>({
-    queryKey: ["/api/chat/panels", panelId, "conversation"],
+    queryKey: [CHAT_ROUTES.PANEL_CONVERSATION(panelId), panelId, "conversation"],
   });
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/chat/conversations", conversation?.id, "messages"],
+    queryKey: [CHAT_ROUTES.CONVERSATION_MESSAGES(conversation?.id || ""), conversation?.id, "messages"],
     enabled: !!conversation?.id,
   });
 
   const { data: allUsers = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+    queryKey: [USER_ROUTES.LIST],
   });
 
   useEffect(() => {
@@ -213,7 +214,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
       formData.append("mentionedUserIds", JSON.stringify([]));
       files.forEach((file) => formData.append("files", file));
       
-      const res = await fetch(`/api/chat/conversations/${conversation?.id}/messages`, {
+      const res = await fetch(CHAT_ROUTES.CONVERSATION_MESSAGES(conversation?.id || ""), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -225,8 +226,8 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", conversation?.id, "messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/panels/counts"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATION_MESSAGES(conversation?.id || ""), conversation?.id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.PANEL_COUNTS] });
       setMessageContent("");
       setPendingFiles([]);
     },
@@ -264,10 +265,10 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
 
   const addMembersMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
-      return apiRequest("POST", `/api/chat/conversations/${conversation?.id}/members`, { userIds });
+      return apiRequest("POST", CHAT_ROUTES.CONVERSATION_MEMBERS(conversation?.id || ""), { userIds });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/panels", panelId, "conversation"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.PANEL_CONVERSATION(panelId), panelId, "conversation"] });
       setShowAddMembersDialog(false);
       setSelectedMemberIds([]);
       toast({ title: "Members added" });
@@ -653,9 +654,9 @@ export default function AdminPanelsPage() {
   }
 
   const { data: panelData, isLoading: panelsLoading } = useQuery<PaginatedResponse>({
-    queryKey: ["/api/admin/panels", currentPage, pageSize, jobFilter, factoryFilter, debouncedSearch, statusFilter],
+    queryKey: [ADMIN_ROUTES.PANELS, currentPage, pageSize, jobFilter, factoryFilter, debouncedSearch, statusFilter],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/panels?${queryParams.toString()}`, { credentials: "include" });
+      const res = await fetch(`${ADMIN_ROUTES.PANELS}?${queryParams.toString()}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch panels");
       return res.json();
     },
@@ -667,10 +668,10 @@ export default function AdminPanelsPage() {
 
   const panelIds = panels?.map(p => p.id) || [];
   const { data: panelCounts } = useQuery<Record<string, { messageCount: number; documentCount: number }>>({
-    queryKey: ["/api/chat/panels/counts", panelIds],
+    queryKey: [CHAT_ROUTES.PANEL_COUNTS, panelIds],
     queryFn: async () => {
       if (panelIds.length === 0) return {};
-      const res = await fetch("/api/chat/panels/counts", {
+      const res = await fetch(CHAT_ROUTES.PANEL_COUNTS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ panelIds }),
@@ -683,15 +684,15 @@ export default function AdminPanelsPage() {
   });
 
   const { data: jobs } = useQuery<Job[]>({
-    queryKey: ["/api/admin/jobs"],
+    queryKey: [ADMIN_ROUTES.JOBS],
   });
 
   const { data: factories } = useQuery<Factory[]>({
-    queryKey: ["/api/admin/factories"],
+    queryKey: [ADMIN_ROUTES.FACTORIES],
   });
 
   const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
-    queryKey: ["/api/panel-types"],
+    queryKey: [PANEL_TYPES_ROUTES.LIST],
   });
   
   // Helper function to normalize panel type for dropdown compatibility
@@ -723,7 +724,7 @@ export default function AdminPanelsPage() {
   }, [panelTypes]);
 
   const { data: sourceCounts } = useQuery<{ source: number; count: number }[]>({
-    queryKey: ["/api/admin/panels/source-counts"],
+    queryKey: [ADMIN_ROUTES.PANELS_SOURCE_COUNTS],
   });
 
   const [deleteSourceDialogOpen, setDeleteSourceDialogOpen] = useState(false);
@@ -736,12 +737,12 @@ export default function AdminPanelsPage() {
 
   const deleteBySourceMutation = useMutation({
     mutationFn: async (source: number) => {
-      return apiRequest("DELETE", `/api/admin/panels/by-source/${source}`);
+      return apiRequest("DELETE", ADMIN_ROUTES.PANELS_BY_SOURCE(source));
     },
     onSuccess: async (response) => {
       const result = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels/source-counts"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS_SOURCE_COUNTS] });
       toast({ title: `Deleted ${result.deleted} panels` });
       setDeleteSourceDialogOpen(false);
       setSourceToDelete(null);
@@ -899,11 +900,11 @@ export default function AdminPanelsPage() {
 
   const createPanelMutation = useMutation({
     mutationFn: async (data: PanelFormData) => {
-      return apiRequest("POST", "/api/admin/panels", data);
+      return apiRequest("POST", ADMIN_ROUTES.PANELS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Panel created successfully" });
       setPanelDialogOpen(false);
       panelForm.reset();
@@ -915,11 +916,11 @@ export default function AdminPanelsPage() {
 
   const updatePanelMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: PanelFormData }) => {
-      return apiRequest("PUT", `/api/admin/panels/${id}`, data);
+      return apiRequest("PUT", ADMIN_ROUTES.PANEL_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Panel updated successfully" });
       setPanelDialogOpen(false);
       setEditingPanel(null);
@@ -932,11 +933,11 @@ export default function AdminPanelsPage() {
 
   const validatePanelMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("POST", `/api/admin/panels/${id}/validate`, {});
+      return apiRequest("POST", ADMIN_ROUTES.PANEL_VALIDATE(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Panel validated successfully", description: "Panel is now available for drafting work" });
       setPanelDialogOpen(false);
       setEditingPanel(null);
@@ -949,11 +950,11 @@ export default function AdminPanelsPage() {
 
   const deletePanelMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/panels/${id}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.PANEL_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Panel deleted" });
       setDeleteDialogOpen(false);
       setDeletingPanelId(null);
@@ -965,12 +966,12 @@ export default function AdminPanelsPage() {
 
   const importPanelsMutation = useMutation({
     mutationFn: async ({ data, jobId }: { data: any[]; jobId?: string }) => {
-      return apiRequest("POST", "/api/admin/panels/import", { data, jobId: jobId || undefined });
+      return apiRequest("POST", ADMIN_ROUTES.PANELS_IMPORT, { data, jobId: jobId || undefined });
     },
     onSuccess: async (response) => {
       const result = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       
       // Handle errors (job not found, missing fields, etc.)
       if (result.errors && result.errors.length > 0) {
@@ -1011,7 +1012,7 @@ export default function AdminPanelsPage() {
   // PDF analysis mutation
   const analyzePdfMutation = useMutation({
     mutationFn: async ({ panelId, pdfBase64 }: { panelId: string; pdfBase64: string }) => {
-      return apiRequest("POST", `/api/admin/panels/${panelId}/analyze-pdf`, { pdfBase64 });
+      return apiRequest("POST", ADMIN_ROUTES.PANEL_ANALYZE_PDF(panelId), { pdfBase64 });
     },
     onSuccess: async (response) => {
       const result = await response.json();
@@ -1042,12 +1043,12 @@ export default function AdminPanelsPage() {
   // Approve for production mutation
   const approveProductionMutation = useMutation({
     mutationFn: async ({ panelId, data }: { panelId: string; data: typeof buildFormData }) => {
-      return apiRequest("POST", `/api/admin/panels/${panelId}/approve-production`, data);
+      return apiRequest("POST", ADMIN_ROUTES.PANEL_APPROVE_PRODUCTION(panelId), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       // Also invalidate jobs cache since Production Report uses it to get panel data
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Panel approved for production" });
       closeBuildDialog();
     },
@@ -1059,12 +1060,12 @@ export default function AdminPanelsPage() {
   // Revoke production approval mutation
   const revokeApprovalMutation = useMutation({
     mutationFn: async (panelId: string) => {
-      return apiRequest("POST", `/api/admin/panels/${panelId}/revoke-production`, {});
+      return apiRequest("POST", ADMIN_ROUTES.PANEL_REVOKE_PRODUCTION(panelId), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
       // Also invalidate jobs cache since Production Report uses it to get panel data
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.JOBS] });
       toast({ title: "Production approval revoked" });
     },
     onError: (error: any) => {

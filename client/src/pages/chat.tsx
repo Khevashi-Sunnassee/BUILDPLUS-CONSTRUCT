@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
+import { CHAT_ROUTES, USER_ROUTES, JOBS_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
 import {
   Plus,
   Send,
@@ -126,25 +127,25 @@ export default function ChatPage() {
   });
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
-    queryKey: ["/api/chat/conversations"],
+    queryKey: [CHAT_ROUTES.CONVERSATIONS],
   });
 
   const { data: users = [] } = useQuery<User[]>({
-    queryKey: ["/api/users"],
+    queryKey: [USER_ROUTES.LIST],
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/jobs"],
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   const { data: panels = [] } = useQuery<PanelRegister[]>({
-    queryKey: ["/api/panels"],
+    queryKey: [PANELS_ROUTES.LIST],
   });
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
-    queryKey: ["/api/chat/conversations", selectedConversationId, "messages"],
+    queryKey: [CHAT_ROUTES.CONVERSATIONS, selectedConversationId, "messages"],
     enabled: !!selectedConversationId,
   });
 
@@ -158,10 +159,10 @@ export default function ChatPage() {
 
   const createConversationMutation = useMutation({
     mutationFn: async (data: typeof newConversation) => {
-      return apiRequest("POST", "/api/chat/conversations", data);
+      return apiRequest("POST", CHAT_ROUTES.CONVERSATIONS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       setShowNewConversationDialog(false);
       setNewConversation({
         name: "",
@@ -195,7 +196,7 @@ export default function ChatPage() {
         formData.append("mentionedUserIds", JSON.stringify(mentionedUserIds));
         files.forEach(f => formData.append("files", f));
 
-        const res = await fetch(`/api/chat/conversations/${selectedConversationId}/messages`, {
+        const res = await fetch(CHAT_ROUTES.MESSAGES(selectedConversationId!), {
           method: "POST",
           body: formData,
           credentials: "include",
@@ -203,15 +204,15 @@ export default function ChatPage() {
         if (!res.ok) throw new Error(await res.text());
         return res.json();
       } else {
-        return apiRequest("POST", `/api/chat/conversations/${selectedConversationId}/messages`, {
+        return apiRequest("POST", CHAT_ROUTES.MESSAGES(selectedConversationId!), {
           content,
           mentionedUserIds,
         });
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", selectedConversationId, "messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS, selectedConversationId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       setMessageContent("");
       setPendingFiles([]);
     },
@@ -222,10 +223,10 @@ export default function ChatPage() {
 
   const addMembersMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
-      return apiRequest("POST", `/api/chat/conversations/${selectedConversationId}/members`, { userIds });
+      return apiRequest("POST", CHAT_ROUTES.MEMBERS(selectedConversationId!), { userIds });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       setShowAddMembersDialog(false);
       toast({ title: "Members added" });
     },
@@ -236,10 +237,10 @@ export default function ChatPage() {
 
   const deleteConversationMutation = useMutation({
     mutationFn: async (conversationId: string) => {
-      return apiRequest("DELETE", `/api/chat/conversations/${conversationId}`);
+      return apiRequest("DELETE", CHAT_ROUTES.CONVERSATION_BY_ID(conversationId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       setSelectedConversationId(null);
       toast({ title: "Conversation deleted" });
     },
@@ -250,11 +251,11 @@ export default function ChatPage() {
 
   const deleteMessageMutation = useMutation({
     mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
-      return apiRequest("DELETE", `/api/chat/conversations/${conversationId}/messages/${messageId}`);
+      return apiRequest("DELETE", CHAT_ROUTES.MESSAGE_BY_ID(conversationId, messageId));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", selectedConversationId, "messages"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS, selectedConversationId, "messages"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       toast({ title: "Message deleted" });
     },
     onError: (error: any) => {
@@ -264,10 +265,10 @@ export default function ChatPage() {
 
   const markAsReadMutation = useMutation({
     mutationFn: async (conversationId: string) => {
-      return apiRequest("POST", "/api/chat/mark-read", { conversationId });
+      return apiRequest("POST", CHAT_ROUTES.MARK_READ, { conversationId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
     },
   });
 

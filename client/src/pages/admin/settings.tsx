@@ -38,6 +38,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import type { GlobalSettings } from "@shared/schema";
+import { ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
 const settingsSchema = z.object({
   tz: z.string().min(1, "Timezone is required"),
@@ -90,7 +91,7 @@ export default function AdminSettingsPage() {
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
   const { data: settings, isLoading } = useQuery<GlobalSettings>({
-    queryKey: ["/api/admin/settings"],
+    queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
   // Sync company name, week start day, and production window days from settings
@@ -132,11 +133,11 @@ export default function AdminSettingsPage() {
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
-      return apiRequest("POST", "/api/admin/settings/company-name", { companyName: name });
+      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_COMPANY_NAME, { companyName: name });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
+      queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.LOGO] });
       toast({ title: "Company name saved" });
     },
     onError: () => {
@@ -146,10 +147,10 @@ export default function AdminSettingsPage() {
 
   const saveWeekStartDayMutation = useMutation({
     mutationFn: async (day: number) => {
-      return apiRequest("PUT", "/api/admin/settings", { weekStartDay: day });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { weekStartDay: day });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Week start day saved" });
     },
     onError: () => {
@@ -159,10 +160,10 @@ export default function AdminSettingsPage() {
 
   const saveProductionWindowDaysMutation = useMutation({
     mutationFn: async (days: number) => {
-      return apiRequest("PUT", "/api/admin/settings", { productionWindowDays: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { productionWindowDays: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Production window days saved" });
     },
     onError: () => {
@@ -172,10 +173,10 @@ export default function AdminSettingsPage() {
 
   const saveIfcDaysInAdvanceMutation = useMutation({
     mutationFn: async (days: number) => {
-      return apiRequest("PUT", "/api/admin/settings", { ifcDaysInAdvance: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { ifcDaysInAdvance: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "IFC days in advance saved" });
     },
     onError: () => {
@@ -185,10 +186,10 @@ export default function AdminSettingsPage() {
 
   const saveDaysToAchieveIfcMutation = useMutation({
     mutationFn: async (days: number) => {
-      return apiRequest("PUT", "/api/admin/settings", { daysToAchieveIfc: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { daysToAchieveIfc: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Days to achieve IFC saved" });
     },
     onError: () => {
@@ -198,10 +199,10 @@ export default function AdminSettingsPage() {
 
   const saveProductionDaysInAdvanceMutation = useMutation({
     mutationFn: async (days: number) => {
-      return apiRequest("PUT", "/api/admin/settings", { productionDaysInAdvance: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { productionDaysInAdvance: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Production days in advance saved" });
     },
     onError: () => {
@@ -214,10 +215,10 @@ export default function AdminSettingsPage() {
       if (days >= ifcDaysInAdvance) {
         throw new Error(`Procurement days must be less than IFC days in advance (${ifcDaysInAdvance})`);
       }
-      return apiRequest("PUT", "/api/admin/settings", { procurementDaysInAdvance: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { procurementDaysInAdvance: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Procurement days in advance saved" });
     },
     onError: (error: Error) => {
@@ -227,10 +228,10 @@ export default function AdminSettingsPage() {
 
   const saveProcurementTimeDaysMutation = useMutation({
     mutationFn: async (days: number) => {
-      return apiRequest("PUT", "/api/admin/settings", { procurementTimeDays: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { procurementTimeDays: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Procurement time days saved" });
     },
     onError: () => {
@@ -240,10 +241,10 @@ export default function AdminSettingsPage() {
 
   const saveProductionWorkDaysMutation = useMutation({
     mutationFn: async (days: boolean[]) => {
-      return apiRequest("PUT", "/api/admin/settings", { productionWorkDays: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { productionWorkDays: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Production work days saved" });
     },
     onError: () => {
@@ -253,10 +254,10 @@ export default function AdminSettingsPage() {
 
   const saveDraftingWorkDaysMutation = useMutation({
     mutationFn: async (days: boolean[]) => {
-      return apiRequest("PUT", "/api/admin/settings", { draftingWorkDays: days });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { draftingWorkDays: days });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Drafting work days saved" });
     },
     onError: () => {
@@ -266,10 +267,10 @@ export default function AdminSettingsPage() {
 
   const saveCfmeuCalendarMutation = useMutation({
     mutationFn: async (calendar: string) => {
-      return apiRequest("PUT", "/api/admin/settings", { cfmeuCalendar: calendar });
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { cfmeuCalendar: calendar });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "CFMEU calendar saved" });
     },
     onError: () => {
@@ -290,16 +291,16 @@ export default function AdminSettingsPage() {
   }
 
   const { data: cfmeuCalendarData, isLoading: cfmeuLoading } = useQuery<CfmeuCalendarData>({
-    queryKey: ["/api/admin/cfmeu-calendars"],
+    queryKey: [ADMIN_ROUTES.CFMEU_CALENDARS],
   });
 
   const syncCfmeuCalendarMutation = useMutation({
     mutationFn: async (calendarType: string) => {
-      const response = await apiRequest("POST", "/api/admin/cfmeu-calendars/sync", { calendarType });
+      const response = await apiRequest("POST", ADMIN_ROUTES.CFMEU_SYNC, { calendarType });
       return response.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/cfmeu-calendars"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.CFMEU_CALENDARS] });
       toast({ title: data.message || "Calendar synced successfully" });
     },
     onError: () => {
@@ -309,11 +310,11 @@ export default function AdminSettingsPage() {
 
   const syncAllCfmeuCalendarsMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/admin/cfmeu-calendars/sync-all", {});
+      const response = await apiRequest("POST", ADMIN_ROUTES.CFMEU_SYNC_ALL, {});
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/cfmeu-calendars"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.CFMEU_CALENDARS] });
       toast({ title: "All calendars synced successfully" });
     },
     onError: () => {
@@ -322,7 +323,7 @@ export default function AdminSettingsPage() {
   });
 
   const { data: dataCounts, refetch: refetchCounts } = useQuery<Record<string, number>>({
-    queryKey: ["/api/admin/data-deletion/counts"],
+    queryKey: [ADMIN_ROUTES.DATA_DELETION_COUNTS],
     enabled: showDeletePanel,
     staleTime: 0,
     refetchOnMount: "always",
@@ -330,7 +331,7 @@ export default function AdminSettingsPage() {
 
   const validateDeletionMutation = useMutation({
     mutationFn: async (categories: string[]) => {
-      const response = await apiRequest("POST", "/api/admin/data-deletion/validate", { categories });
+      const response = await apiRequest("POST", ADMIN_ROUTES.DATA_DELETION_VALIDATE, { categories });
       return response.json();
     },
     onSuccess: (data) => {
@@ -346,7 +347,7 @@ export default function AdminSettingsPage() {
 
   const performDeletionMutation = useMutation({
     mutationFn: async (categories: string[]) => {
-      const response = await apiRequest("POST", "/api/admin/data-deletion/delete", { categories });
+      const response = await apiRequest("POST", ADMIN_ROUTES.DATA_DELETION_DELETE, { categories });
       return response.json();
     },
     onSuccess: (data) => {
@@ -388,11 +389,11 @@ export default function AdminSettingsPage() {
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (logoBase64: string) => {
-      return apiRequest("POST", "/api/admin/settings/logo", { logoBase64 });
+      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_LOGO, { logoBase64 });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
+      queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.LOGO] });
       toast({ title: "Logo uploaded successfully" });
     },
     onError: () => {
@@ -402,12 +403,12 @@ export default function AdminSettingsPage() {
 
   const removeLogoMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest("POST", "/api/admin/settings/logo", { logoBase64: "" });
+      return apiRequest("POST", ADMIN_ROUTES.SETTINGS_LOGO, { logoBase64: "" });
     },
     onSuccess: () => {
       setLogoPreview(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/logo"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
+      queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.LOGO] });
       toast({ title: "Logo removed" });
     },
     onError: () => {
@@ -461,10 +462,10 @@ export default function AdminSettingsPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (data: SettingsFormData) => {
-      return apiRequest("PUT", "/api/admin/settings", data);
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
       toast({ title: "Settings saved successfully" });
     },
     onError: () => {

@@ -15,6 +15,7 @@ import {
   Calendar,
   X,
 } from "lucide-react";
+import { ADMIN_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -134,11 +135,11 @@ export default function AdminFactoriesPage() {
   const [viewingFactory, setViewingFactory] = useState<FactoryWithBeds | null>(null);
 
   const { data: factories, isLoading } = useQuery<FactoryType[]>({
-    queryKey: ["/api/admin/factories"],
+    queryKey: [ADMIN_ROUTES.FACTORIES],
   });
 
   const { data: globalSettings } = useQuery<{ productionWorkDays?: boolean[] }>({
-    queryKey: ["/api/admin/settings"],
+    queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
   const globalWorkDays = (globalSettings?.productionWorkDays as boolean[]) || [false, true, true, true, true, true, false];
@@ -174,10 +175,10 @@ export default function AdminFactoriesPage() {
 
   const createFactoryMutation = useMutation({
     mutationFn: async (data: FactoryFormData) => {
-      return apiRequest("POST", "/api/admin/factories", data);
+      return apiRequest("POST", ADMIN_ROUTES.FACTORIES, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/factories"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.FACTORIES] });
       toast({ title: "Factory created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -189,10 +190,10 @@ export default function AdminFactoriesPage() {
 
   const updateFactoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: FactoryFormData }) => {
-      return apiRequest("PATCH", `/api/admin/factories/${id}`, data);
+      return apiRequest("PATCH", ADMIN_ROUTES.FACTORY_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/factories"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.FACTORIES] });
       toast({ title: "Factory updated successfully" });
       setDialogOpen(false);
       setEditingFactory(null);
@@ -205,10 +206,10 @@ export default function AdminFactoriesPage() {
 
   const deleteFactoryMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/factories/${id}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.FACTORY_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/factories"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.FACTORIES] });
       toast({ title: "Factory deleted" });
       setDeleteDialogOpen(false);
       setDeletingFactoryId(null);
@@ -220,11 +221,11 @@ export default function AdminFactoriesPage() {
 
   const createBedMutation = useMutation({
     mutationFn: async ({ factoryId, data }: { factoryId: string; data: BedFormData }) => {
-      return apiRequest("POST", `/api/admin/factories/${factoryId}/beds`, data);
+      return apiRequest("POST", ADMIN_ROUTES.FACTORY_BEDS(factoryId), data);
     },
     onSuccess: () => {
       if (viewingFactory) {
-        queryClient.invalidateQueries({ queryKey: ["/api/admin/factories", viewingFactory.id] });
+        queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.FACTORIES, viewingFactory.id] });
         fetchFactoryDetails(viewingFactory.id);
       }
       toast({ title: "Production bed created" });
@@ -238,7 +239,7 @@ export default function AdminFactoriesPage() {
 
   const updateBedMutation = useMutation({
     mutationFn: async ({ factoryId, bedId, data }: { factoryId: string; bedId: string; data: BedFormData }) => {
-      return apiRequest("PATCH", `/api/admin/factories/${factoryId}/beds/${bedId}`, data);
+      return apiRequest("PATCH", ADMIN_ROUTES.FACTORY_BED_BY_ID(factoryId, bedId), data);
     },
     onSuccess: () => {
       if (viewingFactory) {
@@ -256,7 +257,7 @@ export default function AdminFactoriesPage() {
 
   const deleteBedMutation = useMutation({
     mutationFn: async ({ factoryId, bedId }: { factoryId: string; bedId: string }) => {
-      return apiRequest("DELETE", `/api/admin/factories/${factoryId}/beds/${bedId}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.FACTORY_BED_BY_ID(factoryId, bedId), {});
     },
     onSuccess: () => {
       if (viewingFactory) {
@@ -272,7 +273,7 @@ export default function AdminFactoriesPage() {
   });
 
   const fetchFactoryDetails = async (id: string) => {
-    const response = await fetch(`/api/admin/factories/${id}`, { credentials: "include" });
+    const response = await fetch(ADMIN_ROUTES.FACTORY_BY_ID(id), { credentials: "include" });
     if (response.ok) {
       const data = await response.json();
       setViewingFactory(data);

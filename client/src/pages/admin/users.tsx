@@ -20,6 +20,7 @@ import {
   PowerOff,
   Clock,
 } from "lucide-react";
+import { ADMIN_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -128,7 +129,7 @@ export default function AdminUsersPage() {
   const [workHoursUser, setWorkHoursUser] = useState<UserType | null>(null);
 
   const { data: users, isLoading } = useQuery<UserType[]>({
-    queryKey: ["/api/admin/users"],
+    queryKey: [ADMIN_ROUTES.USERS],
   });
 
   const form = useForm<UserFormData>({
@@ -165,10 +166,10 @@ export default function AdminUsersPage() {
 
   const createUserMutation = useMutation({
     mutationFn: async (data: UserFormData) => {
-      return apiRequest("POST", "/api/admin/users", data);
+      return apiRequest("POST", ADMIN_ROUTES.USERS, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
       toast({ title: "User created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -180,10 +181,10 @@ export default function AdminUsersPage() {
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<UserFormData> }) => {
-      return apiRequest("PUT", `/api/admin/users/${id}`, data);
+      return apiRequest("PUT", ADMIN_ROUTES.USER_BY_ID(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
       toast({ title: "User updated successfully" });
       setDialogOpen(false);
       setEditingUser(null);
@@ -196,10 +197,10 @@ export default function AdminUsersPage() {
 
   const toggleUserMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      return apiRequest("PUT", `/api/admin/users/${id}`, { isActive });
+      return apiRequest("PUT", ADMIN_ROUTES.USER_BY_ID(id), { isActive });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
       toast({ title: "User status updated" });
     },
     onError: () => {
@@ -209,10 +210,10 @@ export default function AdminUsersPage() {
 
   const deleteUserMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/admin/users/${id}`, {});
+      return apiRequest("DELETE", ADMIN_ROUTES.USER_BY_ID(id), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
       toast({ title: "User deleted" });
       setDeleteDialogOpen(false);
       setDeletingUserId(null);
@@ -224,10 +225,10 @@ export default function AdminUsersPage() {
 
   const updateWorkHoursMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: WorkHoursFormData }) => {
-      return apiRequest("PUT", `/api/admin/users/${id}/work-hours`, data);
+      return apiRequest("PUT", ADMIN_ROUTES.USER_WORK_HOURS(id), data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
       toast({ title: "Work hours updated successfully" });
       setWorkHoursDialogOpen(false);
       setWorkHoursUser(null);
