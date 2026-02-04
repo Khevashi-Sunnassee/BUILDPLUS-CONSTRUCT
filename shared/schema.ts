@@ -120,6 +120,22 @@ export const globalSettings = pgTable("global_settings", {
 
 export const australianStateEnum = pgEnum("australian_state", ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"]);
 
+export const cfmeuCalendarTypeEnum = pgEnum("cfmeu_calendar_type", ["VIC_ONSITE", "VIC_OFFSITE", "QLD"]);
+export const cfmeuHolidayTypeEnum = pgEnum("cfmeu_holiday_type", ["RDO", "PUBLIC_HOLIDAY", "OTHER"]);
+
+export const cfmeuHolidays = pgTable("cfmeu_holidays", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  calendarType: cfmeuCalendarTypeEnum("calendar_type").notNull(),
+  date: timestamp("date").notNull(),
+  name: text("name").notNull(),
+  holidayType: cfmeuHolidayTypeEnum("holiday_type").default("RDO").notNull(),
+  year: integer("year").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  calendarDateIdx: uniqueIndex("cfmeu_holidays_calendar_date_idx").on(table.calendarType, table.date),
+  yearIdx: index("cfmeu_holidays_year_idx").on(table.year),
+}));
+
 export const zones = pgTable("zones", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -676,6 +692,11 @@ export const insertGlobalSettingsSchema = createInsertSchema(globalSettings).omi
   updatedAt: true,
 });
 
+export const insertCfmeuHolidaySchema = createInsertSchema(cfmeuHolidays).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertProductionEntrySchema = createInsertSchema(productionEntries).omit({
   id: true,
   createdAt: true,
@@ -851,6 +872,8 @@ export type InsertApprovalEvent = z.infer<typeof insertApprovalEventSchema>;
 export type ApprovalEvent = typeof approvalEvents.$inferSelect;
 export type InsertGlobalSettings = z.infer<typeof insertGlobalSettingsSchema>;
 export type GlobalSettings = typeof globalSettings.$inferSelect;
+export type InsertCfmeuHoliday = z.infer<typeof insertCfmeuHolidaySchema>;
+export type CfmeuHoliday = typeof cfmeuHolidays.$inferSelect;
 export type AuditEvent = typeof auditEvents.$inferSelect;
 export type InsertProductionEntry = z.infer<typeof insertProductionEntrySchema>;
 export type ProductionEntry = typeof productionEntries.$inferSelect;
