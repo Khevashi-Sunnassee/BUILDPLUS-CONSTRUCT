@@ -98,26 +98,17 @@ function CalendarView({
 
   const cfmeuCalendarType = selectedFactory?.cfmeuCalendar || null;
 
-  // If no factory is selected, show a message
-  const activeFactories = factories.filter(f => f.isActive);
-  if (!selectedFactoryId && activeFactories.length > 1) {
-    return (
-      <div className="p-8 text-center space-y-4">
-        <FactoryIcon className="h-12 w-12 mx-auto text-muted-foreground" />
-        <div>
-          <h3 className="font-semibold text-lg">Select a Factory</h3>
-          <p className="text-muted-foreground">
-            Please select a specific factory from the filter above to view the production calendar with CFMEU holidays and RDOs.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Check if we need to show factory selection message
+  const activeFactories = useMemo(() => factories.filter(f => f.isActive), [factories]);
+  const needsFactorySelection = !selectedFactoryId && activeFactories.length > 1;
 
   // Filter slots to only show those for the selected factory
-  const filteredSlots = selectedFactoryId 
-    ? slots.filter(slot => slot.job.factoryId === selectedFactoryId)
-    : slots;
+  const filteredSlots = useMemo(() => {
+    if (selectedFactoryId) {
+      return slots.filter(slot => slot.job.factoryId === selectedFactoryId);
+    }
+    return slots;
+  }, [slots, selectedFactoryId]);
 
   // Memoize date range calculation
   const { start, end, days } = useMemo(() => {
@@ -228,6 +219,21 @@ function CalendarView({
     
     return { left: `${left}%`, width: `${Math.max(width, dayWidth)}%` };
   }, [days.length, start, end]);
+
+  // If no factory is selected, show a message
+  if (needsFactorySelection) {
+    return (
+      <div className="p-8 text-center space-y-4">
+        <FactoryIcon className="h-12 w-12 mx-auto text-muted-foreground" />
+        <div>
+          <h3 className="font-semibold text-lg">Select a Factory</h3>
+          <p className="text-muted-foreground">
+            Please select a specific factory from the filter above to view the production calendar with CFMEU holidays and RDOs.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
