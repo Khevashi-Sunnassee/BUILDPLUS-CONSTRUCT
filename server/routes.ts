@@ -135,6 +135,27 @@ export async function registerRoutes(
     res.json({ user: { ...user, passwordHash: undefined } });
   });
 
+  app.get("/api/user/settings", requireAuth, async (req, res) => {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user) {
+      return res.status(401).json({ error: "User not found" });
+    }
+    res.json({
+      selectedFactoryIds: user.selectedFactoryIds || []
+    });
+  });
+
+  app.put("/api/user/settings", requireAuth, async (req, res) => {
+    const { selectedFactoryIds } = req.body;
+    if (selectedFactoryIds !== undefined && !Array.isArray(selectedFactoryIds)) {
+      return res.status(400).json({ error: "selectedFactoryIds must be an array" });
+    }
+    await storage.updateUserSettings(req.session.userId!, {
+      selectedFactoryIds: selectedFactoryIds || null
+    });
+    res.json({ success: true });
+  });
+
   app.get("/api/dashboard/stats", requireAuth, async (req, res) => {
     const stats = await storage.getDashboardStats(req.session.userId!);
     res.json(stats);
@@ -4675,11 +4696,17 @@ Return ONLY valid JSON, no explanation text.`
   app.get("/api/production-slots", requireAuth, async (req, res) => {
     try {
       const { jobId, status, dateFrom, dateTo } = req.query;
-      const filters: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date } = {};
+      const filters: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] } = {};
       if (jobId) filters.jobId = jobId as string;
       if (status) filters.status = status as string;
       if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
       if (dateTo) filters.dateTo = new Date(dateTo as string);
+      
+      // Get user's selected factory IDs for filtering
+      const user = await storage.getUser(req.session.userId!);
+      if (user?.selectedFactoryIds && user.selectedFactoryIds.length > 0) {
+        filters.factoryIds = user.selectedFactoryIds;
+      }
       
       const slots = await storage.getProductionSlots(filters);
       res.json(slots);
@@ -4812,6 +4839,12 @@ Return ONLY valid JSON, no explanation text.`
       if (assignedToId) filters.assignedToId = assignedToId as string;
       if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
       if (dateTo) filters.dateTo = new Date(dateTo as string);
+      
+      // Get user's selected factory IDs for filtering
+      const user = await storage.getUser(req.session.userId!);
+      if (user?.selectedFactoryIds && user.selectedFactoryIds.length > 0) {
+        filters.factoryIds = user.selectedFactoryIds;
+      }
       
       const programs = await storage.getDraftingPrograms(Object.keys(filters).length > 0 ? filters : undefined);
       res.json(programs);

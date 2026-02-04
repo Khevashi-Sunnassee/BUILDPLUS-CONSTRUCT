@@ -1,0 +1,180 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Settings2, Factory as FactoryIcon } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import type { Factory } from "@shared/schema";
+
+interface UserSettings {
+  selectedFactoryIds: string[];
+}
+
+export function UserSettingsPopover() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const { data: factories = [] } = useQuery<Factory[]>({
+    queryKey: ["/api/admin/factories"],
+  });
+
+  const { data: settings, isLoading } = useQuery<UserSettings>({
+    queryKey: ["/api/user/settings"],
+  });
+
+  useEffect(() => {
+    if (settings?.selectedFactoryIds) {
+      setSelectedIds(settings.selectedFactoryIds);
+    }
+  }, [settings]);
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (selectedFactoryIds: string[]) => {
+      return apiRequest("PUT", "/api/user/settings", { selectedFactoryIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/panels"] });
+      toast({
+        title: "Settings saved",
+        description: "Your factory view preferences have been updated.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to save settings.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleToggleFactory = (factoryId: string) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(factoryId)) {
+        return prev.filter((id) => id !== factoryId);
+      }
+      return [...prev, factoryId];
+    });
+  };
+
+  const handleSelectAll = () => {
+    setSelectedIds(factories.map((f) => f.id));
+  };
+
+  const handleSelectNone = () => {
+    setSelectedIds([]);
+  };
+
+  const handleSave = () => {
+    updateSettingsMutation.mutate(selectedIds);
+    setOpen(false);
+  };
+
+  const activeFactories = factories.filter((f) => f.isActive);
+  const selectedCount = selectedIds.length;
+  const allSelected = selectedCount === 0 || selectedCount === activeFactories.length;
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          data-testid="button-user-settings"
+          className="relative"
+        >
+          <Settings2 className="h-5 w-5" />
+          {!allSelected && (
+            <Badge 
+              variant="secondary" 
+              className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-xs"
+            >
+              {selectedCount}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80" align="end">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <FactoryIcon className="h-5 w-5" />
+            <h4 className="font-medium">Factory View Settings</h4>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Select which factories to show across production slots, drafting program, and other views. 
+            Leave all unchecked to show all factories.
+          </p>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSelectAll}
+              data-testid="button-select-all-factories"
+            >
+              All
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSelectNone}
+              data-testid="button-select-none-factories"
+            >
+              None
+            </Button>
+          </div>
+
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {activeFactories.map((factory) => (
+              <div key={factory.id} className="flex items-center gap-2">
+                <Checkbox
+                  id={`factory-${factory.id}`}
+                  checked={selectedIds.includes(factory.id)}
+                  onCheckedChange={() => handleToggleFactory(factory.id)}
+                  data-testid={`checkbox-factory-${factory.id}`}
+                />
+                <Label 
+                  htmlFor={`factory-${factory.id}`} 
+                  className="flex items-center gap-2 cursor-pointer flex-1"
+                >
+                  <Badge
+                    variant="outline"
+                    style={{
+                      backgroundColor: factory.color ? `${factory.color}20` : undefined,
+                      borderColor: factory.color || undefined,
+                      color: factory.color || undefined,
+                    }}
+                  >
+                    {factory.name}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">({factory.code})</span>
+                </Label>
+              </div>
+            ))}
+            {activeFactories.length === 0 && (
+              <p className="text-sm text-muted-foreground italic">No factories configured.</p>
+            )}
+          </div>
+
+          <Button 
+            onClick={handleSave} 
+            className="w-full"
+            disabled={updateSettingsMutation.isPending}
+            data-testid="button-save-factory-settings"
+          >
+            {updateSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

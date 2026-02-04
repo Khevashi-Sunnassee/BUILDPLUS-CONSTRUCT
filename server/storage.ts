@@ -236,6 +236,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   validatePassword(user: User, password: string): Promise<boolean>;
+  updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null }): Promise<void>;
 
   getDevice(id: string): Promise<(Device & { user: User }) | undefined>;
   getDeviceByApiKey(apiKeyHash: string): Promise<(Device & { user: User }) | undefined>;
@@ -436,7 +437,7 @@ export interface IStorage {
   deleteZone(id: string): Promise<void>;
 
   // Production Slots
-  getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date }): Promise<ProductionSlotWithDetails[]>;
+  getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<ProductionSlotWithDetails[]>;
   getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined>;
   checkPanelLevelCoverage(jobId: string): Promise<{ jobLevels: number; panelLevels: number; highestJobLevel: string; highestPanelLevel: string; hasMismatch: boolean; emptyLevels: string[] }>;
   generateProductionSlotsForJob(jobId: string, skipEmptyLevels?: boolean): Promise<ProductionSlot[]>;
@@ -449,7 +450,7 @@ export interface IStorage {
   checkAndCompleteSlotByPanelCompletion(jobId: string, level: string, buildingNumber: number): Promise<void>;
 
   // Drafting Program
-  getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date }): Promise<DraftingProgramWithDetails[]>;
+  getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<DraftingProgramWithDetails[]>;
   getDraftingProgram(id: string): Promise<DraftingProgramWithDetails | undefined>;
   getDraftingProgramByPanelId(panelId: string): Promise<DraftingProgram | undefined>;
   createDraftingProgram(data: InsertDraftingProgram): Promise<DraftingProgram>;
@@ -586,6 +587,15 @@ export class DatabaseStorage implements IStorage {
   async validatePassword(user: User, password: string): Promise<boolean> {
     if (!user.passwordHash) return false;
     return bcrypt.compare(password, user.passwordHash);
+  }
+
+  async updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null }): Promise<void> {
+    await db.update(users)
+      .set({
+        selectedFactoryIds: settings.selectedFactoryIds,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
   }
 
   async getDevice(id: string): Promise<(Device & { user: User }) | undefined> {
@@ -2247,25 +2257,32 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Production Slots
-  async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date }): Promise<ProductionSlotWithDetails[]> {
+  async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<ProductionSlotWithDetails[]> {
     const conditions: any[] = [];
     if (filters?.jobId) conditions.push(eq(productionSlots.jobId, filters.jobId));
     if (filters?.status) conditions.push(eq(productionSlots.status, filters.status as any));
     if (filters?.dateFrom) conditions.push(gte(productionSlots.productionSlotDate, filters.dateFrom));
     if (filters?.dateTo) conditions.push(lte(productionSlots.productionSlotDate, filters.dateTo));
     
-    const slots = conditions.length > 0
-      ? await db.select().from(productionSlots).where(and(...conditions)).orderBy(asc(productionSlots.productionSlotDate), asc(productionSlots.levelOrder))
-      : await db.select().from(productionSlots).orderBy(asc(productionSlots.productionSlotDate), asc(productionSlots.levelOrder));
-    
-    const slotsWithDetails: ProductionSlotWithDetails[] = [];
-    for (const slot of slots) {
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, slot.jobId));
-      if (job) {
-        slotsWithDetails.push({ ...slot, job });
-      }
+    // Join with jobs to filter by factory
+    if (filters?.factoryIds && filters.factoryIds.length > 0) {
+      conditions.push(inArray(jobs.factoryId, filters.factoryIds));
     }
-    return slotsWithDetails;
+    
+    // Use join to filter by factory
+    const query = db.select({
+      productionSlot: productionSlots,
+      job: jobs
+    })
+      .from(productionSlots)
+      .innerJoin(jobs, eq(productionSlots.jobId, jobs.id))
+      .orderBy(asc(productionSlots.productionSlotDate), asc(productionSlots.levelOrder));
+    
+    const results = conditions.length > 0
+      ? await query.where(and(...conditions))
+      : await query;
+    
+    return results.map(r => ({ ...r.productionSlot, job: r.job }));
   }
 
   async getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined> {
@@ -2642,9 +2659,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============== Drafting Program ==============
-  async getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date }): Promise<DraftingProgramWithDetails[]> {
-    let query = db.select().from(draftingProgram).orderBy(asc(draftingProgram.drawingDueDate));
-    
+  async getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<DraftingProgramWithDetails[]> {
     const conditions: any[] = [];
     if (filters?.jobId) conditions.push(eq(draftingProgram.jobId, filters.jobId));
     if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as any));
@@ -2652,18 +2667,33 @@ export class DatabaseStorage implements IStorage {
     if (filters?.dateFrom) conditions.push(gte(draftingProgram.drawingDueDate, filters.dateFrom));
     if (filters?.dateTo) conditions.push(lte(draftingProgram.drawingDueDate, filters.dateTo));
     
+    // Filter by factory IDs through job
+    if (filters?.factoryIds && filters.factoryIds.length > 0) {
+      conditions.push(inArray(jobs.factoryId, filters.factoryIds));
+    }
+    
+    // Use join to filter by factory
+    const query = db.select({
+      draftingProgram: draftingProgram,
+      job: jobs
+    })
+      .from(draftingProgram)
+      .innerJoin(jobs, eq(draftingProgram.jobId, jobs.id))
+      .orderBy(asc(draftingProgram.drawingDueDate));
+    
     const results = conditions.length > 0 
-      ? await db.select().from(draftingProgram).where(and(...conditions)).orderBy(asc(draftingProgram.drawingDueDate))
-      : await db.select().from(draftingProgram).orderBy(asc(draftingProgram.drawingDueDate));
+      ? await query.where(and(...conditions))
+      : await query;
     
     const detailedResults: DraftingProgramWithDetails[] = [];
-    for (const dp of results) {
+    for (const r of results) {
+      const dp = r.draftingProgram;
+      const job = r.job;
       const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, dp.panelId));
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, dp.jobId));
       const slot = dp.productionSlotId ? (await db.select().from(productionSlots).where(eq(productionSlots.id, dp.productionSlotId)))[0] : null;
       const assignedTo = dp.assignedToId ? (await db.select().from(users).where(eq(users.id, dp.assignedToId)))[0] : null;
       
-      if (panel && job) {
+      if (panel) {
         detailedResults.push({ ...dp, panel, job, productionSlot: slot, assignedTo });
       }
     }

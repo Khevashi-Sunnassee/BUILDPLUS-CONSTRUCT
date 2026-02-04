@@ -132,10 +132,31 @@ export default function ProductionSlotsPage() {
     queryKey: ["/api/admin/factories"],
   });
 
+  const getFactory = (factoryId: string | null | undefined): Factory | undefined => {
+    if (!factoryId || !factories) return undefined;
+    return factories.find(f => f.id === factoryId);
+  };
+
   const getFactoryName = (factoryId: string | null | undefined): string => {
-    if (!factoryId || !factories) return "-";
-    const factory = factories.find(f => f.id === factoryId);
+    const factory = getFactory(factoryId);
     return factory?.name || "-";
+  };
+
+  const FactoryBadge = ({ factoryId }: { factoryId: string | null | undefined }) => {
+    const factory = getFactory(factoryId);
+    if (!factory) return <span>-</span>;
+    return (
+      <Badge
+        variant="outline"
+        style={{
+          backgroundColor: factory.color ? `${factory.color}20` : undefined,
+          borderColor: factory.color || undefined,
+          color: factory.color || undefined,
+        }}
+      >
+        {factory.name}
+      </Badge>
+    );
   };
 
   const { data: slotAdjustments = [] } = useQuery<ProductionSlotAdjustmentWithDetails[]>({
@@ -764,7 +785,7 @@ export default function ProductionSlotsPage() {
                                 {format(addDays(new Date(slot.productionSlotDate), slot.job.productionDaysInAdvance ?? 10), "dd/MM/yyyy")}
                               </TableCell>
                               {groupBy !== "job" && <TableCell>{slot.job.jobNumber}</TableCell>}
-                              {groupBy !== "factory" && <TableCell>{getFactoryName(slot.job.factoryId)}</TableCell>}
+                              {groupBy !== "factory" && <TableCell><FactoryBadge factoryId={slot.job.factoryId} /></TableCell>}
                               {groupBy !== "client" && <TableCell>{slot.job.client || "-"}</TableCell>}
                               <TableCell>{slot.buildingNumber}</TableCell>
                               <TableCell>{slot.level}</TableCell>
@@ -869,7 +890,7 @@ export default function ProductionSlotsPage() {
                       {format(addDays(new Date(slot.productionSlotDate), slot.job.productionDaysInAdvance ?? 10), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell>{slot.job.jobNumber}</TableCell>
-                    <TableCell>{getFactoryName(slot.job.factoryId)}</TableCell>
+                    <TableCell><FactoryBadge factoryId={slot.job.factoryId} /></TableCell>
                     <TableCell>{slot.job.client || "-"}</TableCell>
                     <TableCell>{slot.buildingNumber}</TableCell>
                     <TableCell>{slot.level}</TableCell>
