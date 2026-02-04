@@ -720,6 +720,9 @@ export default function AdminJobsPage() {
   };
 
   const onSubmit = (data: JobFormData) => {
+    if (editDialogTab === "levelCycleTimes") {
+      return;
+    }
     if (editingJob) {
       updateJobMutation.mutate({ id: editingJob.id, data });
     } else {
@@ -1166,20 +1169,20 @@ export default function AdminJobsPage() {
             </DialogDescription>
           </DialogHeader>
           
+          <Form {...jobForm}>
+            <form onSubmit={jobForm.handleSubmit(onSubmit)} className="space-y-4">
           <Tabs value={editDialogTab} onValueChange={setEditDialogTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details" data-testid="tab-job-details">Job Details</TabsTrigger>
+              <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
               <TabsTrigger value="levelCycleTimes" disabled={!editingJob} data-testid="tab-level-cycle-times">
                 Level Cycle Times
               </TabsTrigger>
             </TabsList>
             
             <TabsContent value="details" className="mt-4">
-          <Form {...jobForm}>
-            <form onSubmit={jobForm.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <h3 className="font-medium text-sm text-muted-foreground">Basic Information</h3>
+              <div className="space-y-4">
+                <h3 className="font-medium text-sm text-muted-foreground">Basic Information</h3>
                   <FormField
                     control={jobForm.control}
                     name="jobNumber"
@@ -1339,10 +1342,12 @@ export default function AdminJobsPage() {
                       </FormItem>
                     )}
                   />
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="font-medium text-sm text-muted-foreground">Production Details</h3>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="production" className="mt-4">
+              <div className="space-y-4">
+                <h3 className="font-medium text-sm text-muted-foreground">Production Configuration</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={jobForm.control}
@@ -1663,26 +1668,7 @@ export default function AdminJobsPage() {
                       </FormItem>
                     )}
                   />
-                </div>
               </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setJobDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createJobMutation.isPending || updateJobMutation.isPending}
-                  data-testid="button-save-job"
-                >
-                  {(createJobMutation.isPending || updateJobMutation.isPending) && (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  )}
-                  <Save className="h-4 w-4 mr-2" />
-                  {editingJob ? "Update" : "Create"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
             </TabsContent>
             
             <TabsContent value="levelCycleTimes" className="mt-4">
@@ -1810,6 +1796,27 @@ export default function AdminJobsPage() {
               </div>
             </TabsContent>
           </Tabs>
+          
+          {editDialogTab !== "levelCycleTimes" && (
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setJobDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={createJobMutation.isPending || updateJobMutation.isPending}
+                data-testid="button-save-job"
+              >
+                {(createJobMutation.isPending || updateJobMutation.isPending) && (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                )}
+                <Save className="h-4 w-4 mr-2" />
+                {editingJob ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
+          )}
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
 
