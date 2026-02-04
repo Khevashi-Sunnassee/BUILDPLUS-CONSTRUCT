@@ -93,7 +93,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon } from "lucide-react";
+import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon, Smile } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 
 const panelSchema = z.object({
@@ -166,13 +167,27 @@ interface ChatMessage {
   mentions: Array<{ id: string; mentionedUserId: string; user: User | null }>;
 }
 
+const COMMON_EMOJIS = [
+  "😀", "😂", "😊", "🙂", "😍", "🤔", "😮", "😢", "😡", "👍",
+  "👎", "👏", "🙌", "💪", "🎉", "🔥", "⭐", "❤️", "💯", "✅",
+  "❌", "⚠️", "📌", "📎", "🔧", "🔨", "📐", "📏", "🏗️", "🧱",
+];
+
 function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: string }) {
   const { toast } = useToast();
   const [messageContent, setMessageContent] = useState("");
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
   const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const insertEmoji = (emoji: string) => {
+    setMessageContent((prev) => prev + emoji);
+    setEmojiOpen(false);
+    textareaRef.current?.focus();
+  };
 
   const { data: conversation, isLoading: conversationLoading } = useQuery<PanelConversation>({
     queryKey: ["/api/chat/panels", panelId, "conversation"],
@@ -395,20 +410,51 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
           </div>
         )}
         <div className="flex gap-2">
-          <Textarea
-            value={messageContent}
-            onChange={(e) => setMessageContent(e.target.value)}
-            onPaste={handlePaste}
-            placeholder="Type a message or paste a screenshot..."
-            className="resize-none min-h-[40px] max-h-[80px]"
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage(e);
-              }
-            }}
-            data-testid="input-chat-message"
-          />
+          <div className="flex-1 relative">
+            <Textarea
+              ref={textareaRef}
+              value={messageContent}
+              onChange={(e) => setMessageContent(e.target.value)}
+              onPaste={handlePaste}
+              placeholder="Type a message or paste a screenshot..."
+              className="resize-none min-h-[40px] max-h-[80px] pr-10"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(e);
+                }
+              }}
+              data-testid="input-chat-message"
+            />
+            <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1 h-7 w-7"
+                  data-testid="button-emoji-picker"
+                >
+                  <Smile className="h-4 w-4 text-muted-foreground" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-2" align="end">
+                <div className="grid grid-cols-10 gap-1">
+                  {COMMON_EMOJIS.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => insertEmoji(emoji)}
+                      className="text-lg hover:bg-muted rounded p-1 transition-colors"
+                      data-testid={`emoji-${emoji}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
           <Button
             type="submit"
             size="icon"
