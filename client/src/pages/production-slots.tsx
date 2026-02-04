@@ -715,8 +715,8 @@ export default function ProductionSlotsPage() {
                       <Table>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Production Due Date</TableHead>
                             <TableHead>Prod. Start Date</TableHead>
+                            <TableHead>Production Due Date</TableHead>
                             {groupBy !== "job" && <TableHead>Job</TableHead>}
                             {groupBy !== "client" && <TableHead>Client</TableHead>}
                             <TableHead>Building</TableHead>
@@ -739,14 +739,14 @@ export default function ProductionSlotsPage() {
                                 borderLeft: `4px solid ${slot.job.productionSlotColor}` 
                               } : undefined}
                             >
+                              <TableCell className="text-muted-foreground">
+                                {format(subDays(new Date(slot.productionSlotDate), productionWindowDays), "dd/MM/yyyy")}
+                              </TableCell>
                               <TableCell className={isUrgentSlot ? "bg-amber-100 dark:bg-amber-900/30" : getDateColorClass(slot)}>
                                 {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
                                 {differenceInDays(new Date(slot.productionSlotDate), new Date()) < 0 && slot.status !== "COMPLETED" && (
                                   <AlertTriangle className="h-4 w-4 inline ml-1 text-red-600" />
                                 )}
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {format(subDays(new Date(slot.productionSlotDate), productionWindowDays), "dd/MM/yyyy")}
                               </TableCell>
                               {groupBy !== "job" && <TableCell>{slot.job.jobNumber}</TableCell>}
                               {groupBy !== "client" && <TableCell>{slot.job.client || "-"}</TableCell>}
@@ -821,8 +821,8 @@ export default function ProductionSlotsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Production Due Date</TableHead>
                   <TableHead>Prod. Start Date</TableHead>
+                  <TableHead>Production Due Date</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Building</TableHead>
@@ -842,14 +842,14 @@ export default function ProductionSlotsPage() {
                       borderLeft: `4px solid ${slot.job.productionSlotColor}` 
                     } : undefined}
                   >
+                    <TableCell className="text-muted-foreground">
+                      {format(subDays(new Date(slot.productionSlotDate), productionWindowDays), "dd/MM/yyyy")}
+                    </TableCell>
                     <TableCell className={getDateColorClass(slot)}>
                       {format(new Date(slot.productionSlotDate), "dd/MM/yyyy")}
                       {differenceInDays(new Date(slot.productionSlotDate), new Date()) < 0 && slot.status !== "COMPLETED" && (
                         <AlertTriangle className="h-4 w-4 inline ml-1 text-red-600" />
                       )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(subDays(new Date(slot.productionSlotDate), productionWindowDays), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell>{slot.job.jobNumber}</TableCell>
                     <TableCell>{slot.job.client || "-"}</TableCell>
@@ -1167,9 +1167,9 @@ export default function ProductionSlotsPage() {
                   {selectedSlot.job.jobNumber} - Level {selectedSlot.level} ({selectedSlot.panelCount} panels)
                   <br />
                   <span className="text-xs">
-                    Production Window: {format(subDays(new Date(selectedSlot.productionSlotDate), productionWindowDays), "dd/MM/yyyy")} 
+                    Production Window: {format(subDays(new Date(selectedSlot.productionSlotDate), productionWindowDays), "dd/MM/yyyy")} (Start)
                     {" → "}
-                    {format(new Date(selectedSlot.productionSlotDate), "dd/MM/yyyy")} (Due Date)
+                    {format(new Date(selectedSlot.productionSlotDate), "dd/MM/yyyy")} (Due)
                   </span>
                 </span>
               )}
