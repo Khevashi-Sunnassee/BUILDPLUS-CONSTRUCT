@@ -204,6 +204,11 @@ export default function AdminJobsPage() {
   const [levelChangeConfirmOpen, setLevelChangeConfirmOpen] = useState(false);
   const [levelsChanged, setLevelsChanged] = useState(false);
   const [pendingJobId, setPendingJobId] = useState<string | null>(null);
+  
+  // Days in advance change confirmation state
+  const [originalDaysInAdvance, setOriginalDaysInAdvance] = useState<number | null>(null);
+  const [daysInAdvanceChanged, setDaysInAdvanceChanged] = useState(false);
+  const [daysInAdvanceConfirmOpen, setDaysInAdvanceConfirmOpen] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -325,6 +330,14 @@ export default function AdminJobsPage() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       toast({ title: "Job updated successfully" });
+      
+      // Check if we need to show days in advance regeneration dialog
+      if (daysInAdvanceChanged && productionSlotStatus?.hasSlots) {
+        setPendingJobId(variables.id);
+        setDaysInAdvanceConfirmOpen(true);
+        setDaysInAdvanceChanged(false);
+        return;
+      }
       
       // Check if we need to show level regeneration dialogs
       if (levelsChanged && (hasExistingLevelCycleTimes || productionSlotStatus?.hasSlots)) {
@@ -660,6 +673,10 @@ export default function AdminJobsPage() {
     setLevelsChanged(false);
     setPendingJobId(null);
     
+    // Capture original days in advance for change detection
+    setOriginalDaysInAdvance(job.daysInAdvance ?? 7);
+    setDaysInAdvanceChanged(false);
+    
     // Load level cycle times in background
     setLevelCycleTimes([]);
     setHasExistingLevelCycleTimes(false);
@@ -749,6 +766,36 @@ export default function AdminJobsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       
       // Close everything after production slots are updated
+      setPendingJobId(null);
+      setJobDialogOpen(false);
+      setEditingJob(null);
+      jobForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const regenerateSlotsAndDraftingMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const slotsRes = await apiRequest("POST", `/api/production-slots/generate/${jobId}`, {});
+      const slotsData = await slotsRes.json();
+      
+      const draftingRes = await apiRequest("POST", "/api/drafting-program/generate", { jobId });
+      const draftingData = await draftingRes.json();
+      
+      return { slots: slotsData, drafting: draftingData };
+    },
+    onSuccess: (data) => {
+      setDaysInAdvanceConfirmOpen(false);
+      toast({ 
+        title: "Success", 
+        description: `Updated ${Array.isArray(data.slots) ? data.slots.length : 0} production slots and ${data.drafting.created + data.drafting.updated} drafting entries` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/drafting-program"] });
+      
       setPendingJobId(null);
       setJobDialogOpen(false);
       setEditingJob(null);
@@ -1450,6 +1497,15 @@ export default function AdminJobsPage() {
                               placeholder="e.g., 7"
                               value={field.value ?? ""} 
                               onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : null)}
+                              onBlur={(e) => {
+                                field.onBlur();
+                                if (editingJob) {
+                                  const newValue = e.target.value ? parseInt(e.target.value) : null;
+                                  if (newValue !== originalDaysInAdvance) {
+                                    setDaysInAdvanceChanged(true);
+                                  }
+                                }
+                              }}
                               data-testid="input-job-days-in-advance" 
                             />
                           </FormControl>
@@ -2177,6 +2233,49 @@ export default function AdminJobsPage() {
             >
               {regenerateLevelsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Regenerate Levels
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={daysInAdvanceConfirmOpen} onOpenChange={setDaysInAdvanceConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Production Slots and Drafting Program?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Changing the "Days in Advance" setting will affect how production slots relate to site delivery dates.
+                </p>
+                <p>
+                  This will regenerate the production slots and update the drafting program dates accordingly.
+                </p>
+                <p className="font-medium">Do you want to continue?</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              onClick={() => {
+                setPendingJobId(null);
+                setJobDialogOpen(false);
+                setEditingJob(null);
+                jobForm.reset();
+              }}
+              data-testid="button-skip-days-in-advance-update"
+            >
+              Skip Update
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!pendingJobId) return;
+                regenerateSlotsAndDraftingMutation.mutate(pendingJobId);
+              }}
+              disabled={regenerateSlotsAndDraftingMutation.isPending}
+              data-testid="button-confirm-days-in-advance-update"
+            >
+              {regenerateSlotsAndDraftingMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Update Both
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
