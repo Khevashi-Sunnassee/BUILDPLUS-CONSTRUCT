@@ -319,7 +319,8 @@ export interface IStorage {
   // Production Slots
   getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date }): Promise<ProductionSlotWithDetails[]>;
   getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined>;
-  generateProductionSlotsForJob(jobId: string): Promise<ProductionSlot[]>;
+  checkPanelLevelCoverage(jobId: string): Promise<{ jobLevels: number; panelLevels: number; highestJobLevel: string; highestPanelLevel: string; hasMismatch: boolean; emptyLevels: string[] }>;
+  generateProductionSlotsForJob(jobId: string, skipEmptyLevels?: boolean): Promise<ProductionSlot[]>;
   adjustProductionSlot(id: string, data: { newDate: Date; reason: string; changedById: string; clientConfirmed?: boolean; cascadeToLater?: boolean }): Promise<ProductionSlot | undefined>;
   bookProductionSlot(id: string): Promise<ProductionSlot | undefined>;
   completeProductionSlot(id: string): Promise<ProductionSlot | undefined>;
@@ -2103,7 +2104,53 @@ export class DatabaseStorage implements IStorage {
     return { ...slot, job };
   }
 
-  async generateProductionSlotsForJob(jobId: string): Promise<ProductionSlot[]> {
+  async checkPanelLevelCoverage(jobId: string): Promise<{ jobLevels: number; panelLevels: number; highestJobLevel: string; highestPanelLevel: string; hasMismatch: boolean; emptyLevels: string[] }> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
+    if (!job) throw new Error("Job not found");
+    
+    // Determine job levels
+    let jobLevelList: string[] = [];
+    if (job.lowestLevel && job.highestLevel) {
+      jobLevelList = this.generateLevelRange(job.lowestLevel, job.highestLevel);
+    } else if (job.levels) {
+      jobLevelList = job.levels.split(",").map(l => l.trim()).filter(l => l);
+    }
+    
+    // Get panels and their levels
+    const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId));
+    const panelLevelSet = new Set<string>();
+    for (const panel of panels) {
+      if (panel.level) {
+        panelLevelSet.add(panel.level);
+      }
+    }
+    const panelLevels = Array.from(panelLevelSet);
+    
+    // Sort job levels
+    const sortedJobLevels = this.sortLevelsIntelligently(jobLevelList, job.lowestLevel, job.highestLevel);
+    const sortedPanelLevels = this.sortLevelsIntelligently(panelLevels);
+    
+    // Find empty levels (job levels with no panels)
+    const emptyLevels = sortedJobLevels.filter(level => !panelLevelSet.has(level));
+    
+    // Determine highest levels
+    const highestJobLevel = sortedJobLevels.length > 0 ? sortedJobLevels[sortedJobLevels.length - 1] : "";
+    const highestPanelLevel = sortedPanelLevels.length > 0 ? sortedPanelLevels[sortedPanelLevels.length - 1] : "";
+    
+    // Check if there's a mismatch (panels don't cover all job levels)
+    const hasMismatch = emptyLevels.length > 0 && sortedPanelLevels.length > 0;
+    
+    return {
+      jobLevels: sortedJobLevels.length,
+      panelLevels: sortedPanelLevels.length,
+      highestJobLevel,
+      highestPanelLevel,
+      hasMismatch,
+      emptyLevels
+    };
+  }
+
+  async generateProductionSlotsForJob(jobId: string, skipEmptyLevels: boolean = false): Promise<ProductionSlot[]> {
     const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
     if (!job) throw new Error("Job not found");
     if (!job.productionStartDate || !job.expectedCycleTimePerFloor) {
@@ -2138,6 +2185,11 @@ export class DatabaseStorage implements IStorage {
       const level = panel.level || "Unknown";
       panelCountByLevel[level] = (panelCountByLevel[level] || 0) + 1;
     }
+    
+    // Filter out empty levels if skipEmptyLevels is true
+    const levelsToProcess = skipEmptyLevels 
+      ? sortedLevels.filter(level => (panelCountByLevel[level] || 0) > 0)
+      : sortedLevels;
 
     // Get level-specific cycle times
     const levelCycleTimes = await this.getJobLevelCycleTimes(jobId);
@@ -2154,8 +2206,8 @@ export class DatabaseStorage implements IStorage {
     const createdSlots: ProductionSlot[] = [];
     let cumulativeDays = 0;
     
-    for (let i = 0; i < sortedLevels.length; i++) {
-      const level = sortedLevels[i];
+    for (let i = 0; i < levelsToProcess.length; i++) {
+      const level = levelsToProcess[i];
       const slotDate = new Date(baseDate);
       slotDate.setDate(slotDate.getDate() + cumulativeDays);
       

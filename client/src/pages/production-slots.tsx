@@ -87,6 +87,19 @@ export default function ProductionSlotsPage() {
   // Per-panel booking state
   const [bookingPanelId, setBookingPanelId] = useState<string | null>(null);
   const [bookingDate, setBookingDate] = useState<string>("");
+  
+  // Level mismatch confirmation state
+  const [showLevelMismatchDialog, setShowLevelMismatchDialog] = useState(false);
+  const [levelMismatchInfo, setLevelMismatchInfo] = useState<{
+    jobId: string;
+    jobName: string;
+    jobLevels: number;
+    panelLevels: number;
+    highestJobLevel: string;
+    highestPanelLevel: string;
+    emptyLevels: string[];
+  } | null>(null);
+  const [pendingJobsForGeneration, setPendingJobsForGeneration] = useState<string[]>([]);
 
   const { data: slots = [], isLoading: loadingSlots } = useQuery<ProductionSlotWithDetails[]>({
     queryKey: ["/api/production-slots", { status: statusFilter !== "ALL" ? statusFilter : undefined, jobId: jobFilter !== "all" ? jobFilter : undefined, dateFrom: dateFromFilter || undefined, dateTo: dateToFilter || undefined }],
@@ -146,8 +159,8 @@ export default function ProductionSlotsPage() {
   });
 
   const generateSlotsMutation = useMutation({
-    mutationFn: async (jobId: string) => {
-      return apiRequest("POST", `/api/production-slots/generate/${jobId}`);
+    mutationFn: async ({ jobId, skipEmptyLevels }: { jobId: string; skipEmptyLevels?: boolean }) => {
+      return apiRequest("POST", `/api/production-slots/generate/${jobId}`, { skipEmptyLevels });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/production-slots"] });
@@ -268,12 +281,49 @@ export default function ProductionSlotsPage() {
     setShowHistoryDialog(true);
   };
 
-  const handleGenerateSlots = async () => {
-    for (const jobId of selectedJobsForGeneration) {
-      await generateSlotsMutation.mutateAsync(jobId);
+  const handleGenerateSlots = async (skipEmptyLevels: boolean = false) => {
+    const jobsToProcess = pendingJobsForGeneration.length > 0 ? pendingJobsForGeneration : selectedJobsForGeneration;
+    
+    for (const jobId of jobsToProcess) {
+      // Check for level mismatch if not already confirmed
+      if (!skipEmptyLevels && pendingJobsForGeneration.length === 0) {
+        try {
+          const response = await fetch(`/api/production-slots/check-levels/${jobId}`);
+          if (response.ok) {
+            const coverage = await response.json();
+            if (coverage.hasMismatch) {
+              const job = jobsWithoutSlots.find(j => j.id === jobId) || allJobs.find(j => j.id === jobId);
+              setLevelMismatchInfo({
+                jobId,
+                jobName: job?.name || job?.jobNumber || "Unknown Job",
+                jobLevels: coverage.jobLevels,
+                panelLevels: coverage.panelLevels,
+                highestJobLevel: coverage.highestJobLevel,
+                highestPanelLevel: coverage.highestPanelLevel,
+                emptyLevels: coverage.emptyLevels,
+              });
+              setPendingJobsForGeneration([jobId]);
+              setShowLevelMismatchDialog(true);
+              return; // Stop and wait for user confirmation
+            }
+          }
+        } catch (error) {
+          console.error("Error checking level coverage:", error);
+        }
+      }
+      
+      await generateSlotsMutation.mutateAsync({ jobId, skipEmptyLevels });
     }
+    
     setShowGenerateDialog(false);
+    setShowLevelMismatchDialog(false);
     setSelectedJobsForGeneration([]);
+    setPendingJobsForGeneration([]);
+    setLevelMismatchInfo(null);
+  };
+  
+  const handleLevelMismatchConfirm = (skipEmpty: boolean) => {
+    handleGenerateSlots(skipEmpty);
   };
 
   const handleAdjustSubmit = () => {
@@ -863,11 +913,73 @@ export default function ProductionSlotsPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>Cancel</Button>
             <Button 
-              onClick={handleGenerateSlots} 
+              onClick={() => handleGenerateSlots()} 
               disabled={selectedJobsForGeneration.length === 0 || generateSlotsMutation.isPending}
               data-testid="button-confirm-generate"
             >
               Generate for {selectedJobsForGeneration.length} Job(s)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLevelMismatchDialog} onOpenChange={(open) => { 
+        if (!open) { 
+          setPendingJobsForGeneration([]); 
+          setLevelMismatchInfo(null); 
+        }
+        setShowLevelMismatchDialog(open); 
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Panel Level Mismatch Detected
+            </DialogTitle>
+            <DialogDescription>
+              The job has more levels configured than panels registered
+            </DialogDescription>
+          </DialogHeader>
+          {levelMismatchInfo && (
+            <div className="space-y-4">
+              <div className="bg-muted p-4 rounded-lg space-y-2">
+                <p className="font-medium">{levelMismatchInfo.jobName}</p>
+                <p className="text-sm">
+                  The job contains <span className="font-semibold text-primary">{levelMismatchInfo.jobLevels} levels</span> (up to Level {levelMismatchInfo.highestJobLevel}) 
+                  but you have only added panels to <span className="font-semibold text-primary">{levelMismatchInfo.panelLevels} levels</span> (up to Level {levelMismatchInfo.highestPanelLevel}).
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Empty levels: {levelMismatchInfo.emptyLevels.join(", ")}
+                </p>
+              </div>
+              <p className="text-sm">
+                Do you wish to create production slots for only the panel levels (skip empty levels)?
+              </p>
+            </div>
+          )}
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowLevelMismatchDialog(false);
+                setPendingJobsForGeneration([]);
+                setLevelMismatchInfo(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              variant="secondary"
+              onClick={() => handleLevelMismatchConfirm(false)}
+              disabled={generateSlotsMutation.isPending}
+            >
+              Create All Slots
+            </Button>
+            <Button 
+              onClick={() => handleLevelMismatchConfirm(true)}
+              disabled={generateSlotsMutation.isPending}
+            >
+              Skip Empty Levels
             </Button>
           </DialogFooter>
         </DialogContent>

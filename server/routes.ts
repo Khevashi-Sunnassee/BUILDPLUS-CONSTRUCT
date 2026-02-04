@@ -4564,9 +4564,20 @@ Return ONLY valid JSON, no explanation text.`
     }
   });
 
+  app.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+    try {
+      const result = await storage.checkPanelLevelCoverage(req.params.jobId);
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error checking panel level coverage:", error);
+      res.status(500).json({ error: error.message || "Failed to check level coverage" });
+    }
+  });
+
   app.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAGER"), async (req, res) => {
     try {
-      const slots = await storage.generateProductionSlotsForJob(req.params.jobId);
+      const { skipEmptyLevels } = req.body || {};
+      const slots = await storage.generateProductionSlotsForJob(req.params.jobId, skipEmptyLevels);
       res.json(slots);
     } catch (error: any) {
       console.error("Error generating production slots:", error);
