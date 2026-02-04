@@ -1,7 +1,7 @@
 # LTE Performance Management System
 
 ## Overview
-The LTE Performance Management System is a comprehensive platform designed for CAD and Revit time management. It provides tools for daily log management, manager approval workflows, reporting, and analytics. The system tracks work against specific jobs and panels, offers a KPI dashboard for performance monitoring, and includes a logistics system for managing load lists and delivery tracking. Its core purpose is to streamline operational efficiency, provide insights into production and financial performance, and manage the lifecycle of panel production and delivery.
+The LTE Performance Management System is a comprehensive platform designed for CAD and Revit time management. Its core purpose is to streamline operational efficiency, provide insights into production and financial performance, and manage the lifecycle of panel production and delivery. Key capabilities include daily log management, manager approval workflows, reporting, analytics, KPI dashboards, and a logistics system for managing load lists and delivery tracking. The system tracks work against specific jobs and panels.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -11,101 +11,106 @@ Do not make changes to the folder `node_modules/`.
 Do not make changes to the file `package-lock.json`.
 
 ## System Architecture
-The system employs a client-server architecture with a React-based frontend and an Express.js backend. Data persistence is managed by PostgreSQL through Drizzle ORM. Authentication is standalone using email/password with bcrypt hashing and `express-session`, implementing Role-Based Access Control (RBAC) with USER, MANAGER, and ADMIN roles.
+The system employs a client-server architecture with a React-based frontend and an Express.js backend. Data persistence is managed by PostgreSQL through Drizzle ORM. Authentication is standalone using email/password with bcrypt hashing and `express-session`, implementing Role-Based Access Control (RBAC) with USER, MANAGER, and ADMIN roles, augmented by a granular per-user permission system.
 
 **UI/UX Decisions:**
-The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/ui` for UI components, and Tailwind CSS for styling. It features a KPI Dashboard with selectable date periods, visual charts, and PDF export capabilities.
+The frontend utilizes React + Vite, TanStack Query, Wouter for routing, `shadcn/ui` for UI components, and Tailwind CSS for styling. It features a KPI Dashboard with selectable date periods, visual charts, and PDF export capabilities. Interactive maps are used for factory location management.
 
 **Technical Implementations & Features:**
-- **Authentication**: Standalone email/password authentication with bcrypt and `express-session`.
-- **Authorization**: RBAC roles (USER, MANAGER, ADMIN) combined with granular per-user permission system.
-- **User Permissions System**: Admin-configurable permission levels (HIDDEN, VIEW, VIEW_AND_UPDATE) for each function per user. Functions include drafting_register (daily_reports), production_schedule (production_report), logistics, weekly_wages, kpi_dashboard, jobs, panel_register, and various admin sections. Sidebar navigation respects permissions, and API routes enforce access levels.
-- **Data Ingestion**: Idempotent API endpoint (`POST /api/agent/ingest`) for Windows Agent data ingestion, secured by device key authentication.
-- **Time Management**: Daily log management with viewing, editing, and submission for approval. Includes manual time entry with on-the-fly panel registration and automatic start time defaulting.
-- **Approval Workflow**: Managers can review, approve, or reject submitted logs with comments.
-- **Reporting & Analytics**: Comprehensive reports on time by user, job, and application.
+- **Authentication & Authorization**: Standalone email/password authentication with bcrypt and `express-session`, RBAC, and admin-configurable per-user permission levels (HIDDEN, VIEW, VIEW_AND_UPDATE) for various functions.
+- **Data Ingestion**: Idempotent API endpoint for Windows Agent data ingestion, secured by device key authentication.
+- **Time & Approval Management**: Daily log management with submission for approval, manual entry, and manager review/approval workflow.
+- **Reporting & Analytics**: Comprehensive reports on time, production, logistics, weekly wages, and cost analysis.
 - **Admin Provisioning**: Centralized management for users, jobs, devices, global settings, panel types, and work types.
-- **Jobs & Panel Management**: Creation and tracking of jobs (with Excel import/export), panel registration with dynamic types, estimated/actual hours, and a production approval workflow.
-- **Estimate Import System**: Drag & drop Excel file upload for importing panels from estimate TakeOff sheets. Features include dynamic sheet detection, header row parsing, column mapping, idempotent import using panelSourceId hash, and PENDING status for validation workflow. Imported panels can be validated before use in drafting.
-- **AI Integration**: AI-powered PDF analysis using OpenAI for extracting panel specifications from shop drawings during the production approval process.
-- **Configurable Rates**: Panel types are configurable with rates (supply cost, install cost, sell rate) and expected weight. Job-specific rate overrides are supported.
-- **Production Tracking**: Production reports grouped by date, showing summaries of panels, volume, area, financial metrics (cost, revenue, profit, margin), with edit/delete functionality.
-- **Cost Analysis**: Tracks expected costs by component (labor, concrete, steel) as percentages of revenue, with job-level overrides and detailed daily breakdowns.
-- **Work Type Categorization**: Allows categorization of drafting work (General Drafting, Client Changes, Errors/Redrafting) for both manual and automated entries.
-- **Logistics System**: Manages load list creation, assignment of trailer types, and comprehensive delivery recording including driver times and truck information. Load lists automatically complete upon delivery recording.
-- **Logistics Reporting**: Provides reports on panels shipped, total deliveries, and average delivery phase timings.
-- **Weekly Wage Reports**: Tracks weekly payroll costs across various categories and compares actual wages against estimated wages based on production revenue.
-- **Timezone Management**: All times are stored and displayed in the Australia/Melbourne timezone.
-- **Drafting Program**: Panel-level drafting scheduling system that links to production slots. Calculates Drawing Due Date (Production Date - IFC Days in Advance) and Drafting Window Start (Drawing Due Date - Days to Achieve IFC). Features resource assignment with proposed start dates, status tracking (NOT_SCHEDULED, SCHEDULED, IN_PROGRESS, COMPLETED, ON_HOLD), and grouping by job/level/week/assignee. Settings configurable: IFC Days in Advance (default 14), Days to Achieve IFC (default 21).
-- **Procurement Scheduling**: Configurable procurement timing with two settings: Procurement Days in Advance (default 7) and Procurement Time Days (default 14). Available at both global (Admin Settings) and job-specific levels. Critical validation: Procurement Days in Advance must be less than IFC Days in Advance, ensuring procurement orders are issued after IFC date is achieved. Both UI and server-side validation enforce this constraint.
-- **Level-Specific Cycle Times**: Per-level production cycle time configuration allowing different cycle days for each building/level combination. Accessible via clock icon in job register. Automatically builds levels from registered panels and uses level-specific times when generating production slots (falls back to job default if not configured).
-- **Chat System**: Teams-style messaging with conversations (DM, GROUP, CHANNEL types). Features include @mentions with notification system, file attachments (up to 10 files per message stored at /uploads/chat), optional job/panel linking for context, read receipts, and per-user notification settings. Uses session-based authentication and respects "chat" permission from userPermissions table.
-- **Factory Management**: Multi-factory support with location tracking. Factories include: name, unique code, address, Australian state (VIC/NSW/QLD/etc), GPS coordinates (lat/long), CFMEU calendar assignment (VIC_ONSITE, VIC_OFFSITE, QLD), configurable work days (boolean array for Sun-Sat), color coding, and active status. Each factory can have multiple production beds with dimensions (length/width in mm). Admin UI includes an interactive map (Leaflet/OpenStreetMap) showing factory locations with click-to-set coordinates. Tables (dailyLogs, productionEntries, productionDays, loadLists, weeklyWageReports) now have factoryId foreign key columns referencing factories.id for proper factory linking (legacy factory text fields retained for backward compatibility).
-- **User Factory Preferences**: Users can select which factories to view via settings in the header. The selectedFactoryIds field on the user record filters production slots, drafting program, and other factory-dependent views. Empty selection shows all factories. Factory badges display with their configured colors across the UI.
-- **Working Days Calculation**: All day values (cycle times, days in advance, production windows) are calculated as WORKING DAYS, not calendar days. Production slots use the assigned factory's work schedule (Mon-Fri by default) combined with the factory's CFMEU calendar (if configured) to exclude public holidays and RDOs. If no CFMEU calendar is selected at the factory level, only the factory's work days are used (weekends excluded). Drafting program uses global drafting work days from settings (no CFMEU calendar integration). Jobs can now be assigned to a factory for production scheduling purposes.
+- **Jobs & Panel Management**: Creation and tracking of jobs, panel registration, production approval workflow, and an estimate import system supporting drag & drop Excel uploads with dynamic parsing and idempotent imports.
+- **AI Integration**: AI-powered PDF analysis using OpenAI for extracting panel specifications from shop drawings during production approval.
+- **Configurable Rates & Cost Analysis**: Panel types and jobs support configurable rates (supply, install, sell) and track expected costs by component (labor, concrete, steel) with job-level overrides.
+- **Production Tracking**: Production reports grouped by date, showing financial metrics and production metrics.
+- **Logistics System**: Manages load list creation, trailer assignment, delivery recording, and logistics reporting.
+- **Drafting & Procurement Scheduling**: Panel-level drafting scheduling linked to production slots with status tracking and resource assignment. Configurable procurement timing with critical validation to ensure procurement orders are issued after IFC date.
+- **Factory Management**: Multi-factory support with location tracking, CFMEU calendar assignment, configurable work days, production beds, and user-specific factory preferences for filtering views.
+- **Working Days Calculation**: All date-related calculations (cycle times, production windows) use working days based on factory work schedules and CFMEU calendars, excluding public holidays and RDOs.
+- **Chat System**: Teams-style messaging with DM, GROUP, CHANNEL types, @mentions, notifications, file attachments, job/panel linking, and read receipts.
 
 ## External Dependencies
-- **PostgreSQL**: Primary database for data storage.
-- **OpenAI**: Utilized for AI-powered PDF analysis to extract panel specifications.
-- **React**: Frontend JavaScript library.
+- **PostgreSQL**: Primary database.
+- **OpenAI**: AI-powered PDF analysis.
+- **React**: Frontend framework.
 - **Vite**: Frontend build tool.
-- **TanStack Query**: Data fetching and caching library.
-- **Wouter**: React routing library.
-- **shadcn/ui**: UI component library.
-- **Tailwind CSS**: Utility-first CSS framework.
-- **Express.js**: Backend web application framework.
-- **Drizzle ORM**: TypeScript ORM for PostgreSQL.
-- **bcrypt**: Library for hashing passwords.
-- **express-session**: Middleware for managing user sessions.
+- **TanStack Query**: Data fetching.
+- **Wouter**: Routing library.
+- **shadcn/ui**: UI components.
+- **Tailwind CSS**: Styling.
+- **Express.js**: Backend framework.
+- **Drizzle ORM**: PostgreSQL ORM.
+- **bcrypt**: Password hashing.
+- **express-session**: Session management.
 
 ## Coding Standards (MANDATORY - ALL SESSIONS MUST FOLLOW)
 
 ### File Size Limits
 - **HARD LIMIT**: No file should exceed 500 lines of code
-- **SOFT LIMIT**: Start considering splitting at 400 lines
-- If adding code would push a file over 500 lines, refactor FIRST before adding new code
+- **SOFT LIMIT**: Start considering splitting at 350 lines
+- **WARNING THRESHOLD**: At 400 lines, create new domain-specific file before adding more code
+- If adding code would push a file over 400 lines, split FIRST before adding new code
 
 ### Backend Architecture Rules
-Routes must be split by domain:
+
+**CRITICAL: Before adding ANY new route or endpoint:**
+1. Check the target file's line count with `wc -l filename`
+2. If file is over 350 lines, create a new domain-specific file FIRST
+3. Never add code to a file that would push it over 400 lines
+
+Routes are split by domain - current structure:
 ```
 server/routes/
-├── index.ts              (router aggregator - imports and mounts all domain routes)
-├── auth.routes.ts        (login, logout, session, password)
-├── users.routes.ts       (user CRUD, permissions)
-├── jobs.routes.ts        (jobs CRUD, job settings, import/export)
-├── panels.routes.ts      (panel register, approval workflow)
-├── production.routes.ts  (slots, entries, days, scheduling)
-├── drafting.routes.ts    (drafting program)
-├── logistics.routes.ts   (load lists, deliveries, trailers)
-├── reports.routes.ts     (KPI, weekly wages, analytics)
-├── procurement.routes.ts (purchase orders, items, suppliers)
-├── tasks.routes.ts       (task management)
-├── factories.routes.ts   (factories, beds, CFMEU holidays)
-├── settings.routes.ts    (global settings)
-├── agent.routes.ts       (Windows agent data ingest)
+├── index.ts                    (router aggregator - imports and mounts all domain routes)
+├── auth.routes.ts              (login, logout, session, password)
+├── users.routes.ts             (user CRUD, permissions)
+├── jobs.routes.ts              (jobs CRUD, job settings, import/export)
+│
+├── # Panel Management (split from panels.routes.ts)
+├── panels.routes.ts            (panel CRUD - base operations only)
+├── panel-import.routes.ts      (Excel import, estimate import)
+├── panel-approval.routes.ts    (approval workflow, status changes)
+├── panel-types.routes.ts       (panel type management)
+│
+├── # Production Management (split from production.routes.ts)
+├── production.routes.ts        (summary, reports, days management)
+├── production-entries.routes.ts (production entry CRUD)
+├── production-slots.routes.ts  (slot generation, slot management)
+│
+├── # Reports & Analytics (split from reports.routes.ts)
+├── reports.routes.ts           (aggregator - just imports sub-routers)
+├── daily-logs.routes.ts        (daily log CRUD, submissions)
+├── weekly-reports.routes.ts    (weekly wage reports)
+├── production-analytics.routes.ts (KPI, production reports)
+├── drafting-logistics.routes.ts   (drafting program, logistics reports)
+├── cost-analytics.routes.ts    (cost analysis, job cost breakdowns)
+│
+├── # Procurement (split from procurement.routes.ts)
+├── procurement.routes.ts       (suppliers, categories, items)
+├── procurement-orders.routes.ts (purchase orders, attachments)
+│
+├── drafting.routes.ts          (drafting program scheduling)
+├── logistics.routes.ts         (load lists, deliveries, trailers)
+├── tasks.routes.ts             (task management)
+├── factories.routes.ts         (factories, beds, CFMEU holidays)
+├── admin.routes.ts             (admin settings, work types)
+├── agent.routes.ts             (Windows agent data ingest)
 └── middleware/
     ├── auth.middleware.ts      (requireAuth, requireRole)
     └── permissions.middleware.ts (requirePermission)
 ```
 
-Storage/Repositories must be split by domain:
-```
-server/repositories/
-├── index.ts              (repository aggregator - exports all repositories)
-├── user.repository.ts    (users, auth, permissions, devices)
-├── settings.repository.ts (global settings, mapping rules, zones)
-├── factory.repository.ts (factories, CFMEU holidays, working day utils)
-├── job.repository.ts     (jobs, work types, level cycle times)
-├── panel.repository.ts   (panels, panel types, cost components, job rates)
-├── production.repository.ts (entries, days, slots, adjustments)
-├── drafting.repository.ts   (drafting program management)
-├── logistics.repository.ts  (trailer types, load lists, deliveries)
-├── reports.repository.ts    (daily logs, log rows, weekly reports)
-├── procurement.repository.ts (suppliers, items, purchase orders)
-└── task.repository.ts       (task groups, tasks, assignees, updates)
-```
+**When to create a new route file:**
+- Adding 5+ new endpoints to a domain
+- File would exceed 350 lines
+- New subdomain emerges (e.g., panel-import vs panel-approval)
 
-**Repository Migration Status**: Repositories are created but storage.ts remains the primary implementation for backward compatibility. Future work should gradually delegate storage.ts methods to the corresponding repositories.
+**Route file naming convention:**
+- Base domain: `{domain}.routes.ts` (e.g., `panels.routes.ts`)
+- Sub-domain: `{domain}-{subdomain}.routes.ts` (e.g., `panel-import.routes.ts`)
 
 ### Frontend Architecture Rules
 - Page components exceeding 500 lines must be split into sub-components
@@ -126,10 +131,7 @@ client/src/pages/feature-name/
 ### Code Quality Rules
 1. **No console.log in production code** - Use proper logger (Winston/Pino)
 2. **All API endpoints must have input validation** - Use Zod schemas
-3. **Consistent error response format**:
-   ```typescript
-   { error: string, code?: string, details?: object }
-   ```
+3. **Consistent error response format**: `{ error: string, code?: string, details?: object }`
 4. **All new API endpoints require tests** - At minimum, happy path test
 5. **TypeScript strict mode** - No `any` types without justification
 
@@ -140,12 +142,50 @@ client/src/pages/feature-name/
 4. **Foreign keys must specify onDelete behavior**
 5. **Never change ID column types** - Breaks migrations
 
+### Development Workflow (MUST FOLLOW)
+
+**Before starting any feature:**
+```bash
+# Check current file sizes in routes
+wc -l server/routes/*.ts | sort -n | tail -10
+
+# Check storage.ts size
+wc -l server/storage.ts
+
+# Check any page you'll modify
+wc -l client/src/pages/target-page/*.tsx
+```
+
+**When adding routes to an existing file:**
+1. If target file > 350 lines → Create new sub-domain file first
+2. If target file > 400 lines → STOP and split before proceeding
+3. Add new router to `server/routes/index.ts` with proper import
+
+**File splitting pattern:**
+```typescript
+// Original: panels.routes.ts (too large)
+// Split into:
+// - panels.routes.ts (base CRUD)
+// - panel-import.routes.ts (import functionality)
+// - panel-approval.routes.ts (approval workflow)
+
+// In index.ts:
+import { panelsRouter } from "./panels.routes";
+import { panelImportRouter } from "./panel-import.routes";
+import { panelApprovalRouter } from "./panel-approval.routes";
+
+// Mount all:
+app.use(panelsRouter);
+app.use(panelImportRouter);
+app.use(panelApprovalRouter);
+```
+
 ### Before Adding New Features Checklist
-1. [ ] Will this push any file over 500 lines? If yes, refactor first
-2. [ ] Does the database schema follow all rules?
-3. [ ] Is input validation in place?
-4. [ ] Are error responses consistent?
-5. [ ] Is there a test for the happy path?
+1. [ ] **Line count check**: Run `wc -l` on files you'll modify - if over 350 lines, split first
+2. [ ] Will this push any file over 400 lines? If yes, refactor first
+3. [ ] Does the database schema follow all rules?
+4. [ ] Is input validation in place?
+5. [ ] Are error responses consistent?
 
 ### Security Requirements
 1. All endpoints behind authentication (except /api/auth/*)
@@ -161,3 +201,8 @@ client/src/pages/feature-name/
 - **Types/Interfaces**: PascalCase (`PanelType`)
 - **Database tables**: camelCase (`panelTypes`)
 - **Database columns**: camelCase (`createdAt`)
+
+### Technical Debt Tracking
+- [ ] Replace console.log/console.error with Winston/Pino logger
+- [ ] Add test coverage for API endpoints
+- [ ] Complete repository migration (storage.ts → repositories)
