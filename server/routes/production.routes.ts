@@ -480,6 +480,22 @@ router.get("/api/production-reports", requireAuth, async (req: Request, res: Res
 
 // ============== Production Days ==============
 
+router.get("/api/production-days", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({ error: "startDate and endDate are required" });
+    }
+    
+    const productionDaysData = await storage.getProductionDays(startDate, endDate);
+    res.json(productionDaysData);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to fetch production days" });
+  }
+});
+
 router.post("/api/production-days", requireAuth, async (req: Request, res: Response) => {
   try {
     const { productionDate, factory, notes } = req.body;
