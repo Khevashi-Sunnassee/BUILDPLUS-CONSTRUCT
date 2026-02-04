@@ -83,7 +83,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, PanelRegister, User as UserType, GlobalSettings } from "@shared/schema";
+import type { Job, PanelRegister, User as UserType, GlobalSettings, Factory } from "@shared/schema";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -125,6 +125,7 @@ const jobSchema = z.object({
   siteContactPhone: z.string().optional(),
   status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
   projectManagerId: z.string().optional().nullable(),
+  factoryId: z.string().optional().nullable(),
   productionSlotColor: z.string().optional().nullable(),
 });
 
@@ -225,6 +226,10 @@ export default function AdminJobsPage() {
     queryKey: ["/api/admin/users"],
   });
 
+  const { data: factories } = useQuery<Factory[]>({
+    queryKey: ["/api/factories"],
+  });
+
   const { data: globalSettings } = useQuery<GlobalSettings>({
     queryKey: ["/api/admin/settings"],
   });
@@ -315,6 +320,7 @@ export default function AdminJobsPage() {
       siteContactPhone: "",
       status: "ACTIVE",
       projectManagerId: null,
+      factoryId: null,
       productionSlotColor: null,
     },
   });
@@ -652,6 +658,7 @@ export default function AdminJobsPage() {
       siteContactPhone: "",
       status: "ACTIVE",
       projectManagerId: null,
+      factoryId: null,
       productionSlotColor: getNextAvailableColor(),
     });
     setJobDialogOpen(true);
@@ -683,6 +690,7 @@ export default function AdminJobsPage() {
       siteContactPhone: job.siteContactPhone || "",
       status: job.status,
       projectManagerId: job.projectManagerId || null,
+      factoryId: job.factoryId || null,
       productionSlotColor: job.productionSlotColor || getNextAvailableColor(),
     });
     setJobDialogOpen(true);
@@ -1390,32 +1398,68 @@ export default function AdminJobsPage() {
                       )}
                     />
                   </div>
-                  <FormField
-                    control={jobForm.control}
-                    name="projectManagerId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Project Manager</FormLabel>
-                        <Select 
-                          onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
-                          value={field.value || "none"}
-                        >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-job-project-manager">
-                              <SelectValue placeholder="Select project manager" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">No Project Manager</SelectItem>
-                            {users?.map((user) => (
-                              <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <FormField
+                      control={jobForm.control}
+                      name="projectManagerId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Project Manager</FormLabel>
+                          <Select 
+                            onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                            value={field.value || "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job-project-manager">
+                                <SelectValue placeholder="Select project manager" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No Project Manager</SelectItem>
+                              {users?.map((user) => (
+                                <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="factoryId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Production Factory</FormLabel>
+                          <Select 
+                            onValueChange={(val) => field.onChange(val === "none" ? null : val)} 
+                            value={field.value || "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job-factory">
+                                <SelectValue placeholder="Select factory" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No Factory Assigned</SelectItem>
+                              {factories?.map((factory) => (
+                                <SelectItem key={factory.id} value={factory.id}>
+                                  <div className="flex items-center gap-2">
+                                    <div 
+                                      className="w-3 h-3 rounded-full" 
+                                      style={{ backgroundColor: factory.color || '#3B82F6' }}
+                                    />
+                                    {factory.name} ({factory.code})
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={jobForm.control}
                     name="description"
