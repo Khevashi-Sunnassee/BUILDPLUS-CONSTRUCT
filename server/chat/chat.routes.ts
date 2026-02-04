@@ -72,80 +72,115 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
     const convIds = memberships.map((m) => m.conversationId);
     if (!convIds.length) return res.json([]);
 
+    // Batch fetch conversations
     const convRows = await db
       .select()
       .from(conversations)
       .where(inArray(conversations.id, convIds));
 
-    const results = [];
-    for (const conv of convRows) {
-      const membership = memberships.find((m) => m.conversationId === conv.id);
-      const lastReadAt = membership?.lastReadAt ?? new Date(0);
+    // Batch fetch all members for all conversations
+    const allMembers = await db
+      .select({
+        id: conversationMembers.id,
+        conversationId: conversationMembers.conversationId,
+        userId: conversationMembers.userId,
+        role: conversationMembers.role,
+        joinedAt: conversationMembers.joinedAt,
+      })
+      .from(conversationMembers)
+      .where(inArray(conversationMembers.conversationId, convIds));
 
-      const lastMsg = await db
-        .select()
+    // Batch fetch all unique users
+    const memberUserIds = Array.from(new Set(allMembers.map(m => m.userId)));
+    const allUsers = memberUserIds.length > 0 
+      ? await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(inArray(users.id, memberUserIds))
+      : [];
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+
+    // Batch fetch last messages for all conversations using window function
+    const lastMessages = await db.execute(sql`
+      SELECT DISTINCT ON (conversation_id) *
+      FROM chat_messages
+      WHERE conversation_id = ANY(${convIds})
+        AND deleted_at IS NULL
+      ORDER BY conversation_id, created_at DESC
+    `);
+    const lastMsgMap = new Map((lastMessages.rows as any[]).map(m => [m.conversation_id, m]));
+
+    // Batch fetch unread counts per conversation
+    const membershipMap = new Map(memberships.map(m => [m.conversationId, m.lastReadAt ?? new Date(0)]));
+    const unreadCounts = await db.execute(sql`
+      SELECT conversation_id, COUNT(*) as count
+      FROM chat_messages
+      WHERE conversation_id = ANY(${convIds})
+        AND deleted_at IS NULL
+      GROUP BY conversation_id
+    `);
+    
+    // Calculate unread per conversation based on lastReadAt
+    const unreadCountMap = new Map<string, number>();
+    for (const convId of convIds) {
+      const lastReadAt = membershipMap.get(convId) ?? new Date(0);
+      const [result] = await db
+        .select({ count: sql<number>`count(*)` })
         .from(chatMessages)
-        .where(and(eq(chatMessages.conversationId, conv.id), isNull(chatMessages.deletedAt)))
-        .orderBy(desc(chatMessages.createdAt))
-        .limit(1);
+        .where(and(
+          eq(chatMessages.conversationId, convId),
+          gt(chatMessages.createdAt, lastReadAt),
+          isNull(chatMessages.deletedAt)
+        ));
+      unreadCountMap.set(convId, Number(result?.count || 0));
+    }
 
-      const unreadCount = await db
-        .select({ id: chatMessages.id })
-        .from(chatMessages)
-        .where(and(eq(chatMessages.conversationId, conv.id), gt(chatMessages.createdAt, lastReadAt), isNull(chatMessages.deletedAt)));
+    // Batch fetch unread mentions
+    const unreadMentionsResult = await db
+      .select({ 
+        conversationId: chatNotifications.conversationId,
+        count: sql<number>`count(*)` 
+      })
+      .from(chatNotifications)
+      .where(and(
+        eq(chatNotifications.userId, userId),
+        eq(chatNotifications.type, "MENTION"),
+        inArray(chatNotifications.conversationId, convIds),
+        isNull(chatNotifications.readAt),
+      ))
+      .groupBy(chatNotifications.conversationId);
+    const unreadMentionsMap = new Map(unreadMentionsResult.map(r => [r.conversationId, Number(r.count)]));
 
-      const unreadMentions = await db
-        .select({ id: chatNotifications.id })
-        .from(chatNotifications)
-        .where(
-          and(
-            eq(chatNotifications.userId, userId),
-            eq(chatNotifications.type, "MENTION"),
-            eq(chatNotifications.conversationId, conv.id),
-            isNull(chatNotifications.readAt),
-          )
-        );
+    // Batch fetch jobs
+    const jobIds = convRows.filter(c => c.jobId).map(c => c.jobId!);
+    const allJobs = jobIds.length > 0 
+      ? await db.select().from(jobs).where(inArray(jobs.id, jobIds))
+      : [];
+    const jobMap = new Map(allJobs.map(j => [j.id, j]));
 
-      let job = null;
-      let panel = null;
+    // Batch fetch panels
+    const panelIds = convRows.filter(c => c.panelId).map(c => c.panelId!);
+    const allPanels = panelIds.length > 0 
+      ? await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds))
+      : [];
+    const panelMap = new Map(allPanels.map(p => [p.id, p]));
 
-      if (conv.jobId) {
-        const jobRows = await db.select().from(jobs).where(eq(jobs.id, conv.jobId)).limit(1);
-        job = jobRows[0] || null;
-      }
-
-      if (conv.panelId) {
-        const panelRows = await db.select().from(panelRegister).where(eq(panelRegister.id, conv.panelId)).limit(1);
-        panel = panelRows[0] || null;
-      }
-
-      const members = await db
-        .select({
-          id: conversationMembers.id,
-          conversationId: conversationMembers.conversationId,
-          userId: conversationMembers.userId,
-          role: conversationMembers.role,
-          joinedAt: conversationMembers.joinedAt,
-        })
-        .from(conversationMembers)
-        .where(eq(conversationMembers.conversationId, conv.id));
-
-      const membersWithUsers = await Promise.all(members.map(async (m) => {
-        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(eq(users.id, m.userId)).limit(1);
-        return { ...m, user: userRows[0] || null };
+    // Build results
+    const results = convRows.map(conv => {
+      const convMembers = allMembers.filter(m => m.conversationId === conv.id);
+      const membersWithUsers = convMembers.map(m => ({
+        ...m,
+        user: userMap.get(m.userId) || null,
       }));
 
-      results.push({
+      return {
         ...conv,
         members: membersWithUsers,
-        lastMessage: lastMsg[0] || null,
-        unreadCount: unreadCount.length,
-        unreadMentions: unreadMentions.length,
-        job,
-        panel,
-      });
-    }
+        lastMessage: lastMsgMap.get(conv.id) || null,
+        unreadCount: unreadCountMap.get(conv.id) || 0,
+        unreadMentions: unreadMentionsMap.get(conv.id) || 0,
+        job: conv.jobId ? jobMap.get(conv.jobId) || null : null,
+        panel: conv.panelId ? panelMap.get(conv.panelId) || null : null,
+      };
+    });
 
     res.json(results);
   } catch (e: any) {
@@ -224,6 +259,12 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
     await assertMember(userId, conversationId);
 
     const content = String(req.body.content || "");
+    
+    // Validate message body length (max 10,000 characters)
+    if (content.length > 10000) {
+      return res.status(400).json({ error: "Message too long (max 10,000 characters)" });
+    }
+    
     let mentionedUserIds: string[] = [];
     const rawMentions = req.body.mentionedUserIds;
     if (Array.isArray(rawMentions)) {
@@ -629,6 +670,70 @@ chatRouter.delete("/conversations/:conversationId/messages/:messageId", requireA
 
     await db.delete(chatMessages).where(eq(chatMessages.id, messageId));
     res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+// Edit a message
+chatRouter.patch("/conversations/:conversationId/messages/:messageId", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const { conversationId, messageId } = req.params;
+    const { body } = req.body;
+
+    if (!body || typeof body !== "string") {
+      return res.status(400).json({ error: "Message body is required" });
+    }
+    
+    // Validate message body length (max 10,000 characters)
+    if (body.length > 10000) {
+      return res.status(400).json({ error: "Message too long (max 10,000 characters)" });
+    }
+
+    const message = await db
+      .select()
+      .from(chatMessages)
+      .where(and(eq(chatMessages.id, messageId), eq(chatMessages.conversationId, conversationId)))
+      .limit(1);
+
+    if (!message.length) {
+      return res.status(404).json({ error: "Message not found" });
+    }
+
+    // Only the message sender can edit their own messages
+    if (message[0].senderId !== userId) {
+      return res.status(403).json({ error: "Only the message sender can edit messages" });
+    }
+
+    // Update the message
+    const [updatedMessage] = await db
+      .update(chatMessages)
+      .set({ 
+        body, 
+        editedAt: new Date(),
+      })
+      .where(eq(chatMessages.id, messageId))
+      .returning();
+
+    // Fetch sender info
+    const senderRows = await db
+      .select({ id: users.id, name: users.name, email: users.email })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    // Fetch attachments
+    const attachments = await db
+      .select()
+      .from(chatMessageAttachments)
+      .where(eq(chatMessageAttachments.messageId, messageId));
+
+    res.json({ 
+      ...updatedMessage, 
+      sender: senderRows[0] || null, 
+      attachments 
+    });
   } catch (e: any) {
     res.status(400).json({ error: e.message || String(e) });
   }

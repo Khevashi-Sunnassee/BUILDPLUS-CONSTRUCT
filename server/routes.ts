@@ -85,9 +85,14 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET environment variable is required");
+  }
+  
   app.use(
     session({
-      secret: process.env.SESSION_SECRET || "lte-time-tracking-secret-key-change-in-production",
+      secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
       cookie: {
