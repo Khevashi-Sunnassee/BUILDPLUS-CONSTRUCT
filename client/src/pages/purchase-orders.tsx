@@ -7,13 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Eye, Edit } from "lucide-react";
+import { Plus, Eye, Edit, Paperclip } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { PurchaseOrder, User, Supplier } from "@shared/schema";
 
 interface PurchaseOrderWithDetails extends PurchaseOrder {
   requestedBy: User;
   supplier?: Supplier | null;
+  attachmentCount?: number;
 }
 
 type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
@@ -144,7 +145,15 @@ export default function PurchaseOrdersPage() {
                       {formatCurrency(po.total)}
                     </TableCell>
                     <TableCell data-testid={`cell-status-${po.id}`}>
-                      {getStatusBadge(po.status)}
+                      <div className="flex items-center gap-2">
+                        {getStatusBadge(po.status)}
+                        {(po.attachmentCount ?? 0) > 0 && (
+                          <span className="inline-flex items-center gap-1 text-muted-foreground" data-testid={`badge-attachments-${po.id}`}>
+                            <Paperclip className="h-3.5 w-3.5" />
+                            <span className="text-xs">{po.attachmentCount}</span>
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell data-testid={`cell-created-date-${po.id}`}>
                       {formatDate(po.createdAt)}

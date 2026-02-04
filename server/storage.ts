@@ -79,6 +79,7 @@ export interface PurchaseOrderWithDetails extends PurchaseOrder {
   rejectedBy?: User | null;
   supplier?: Supplier | null;
   items: PurchaseOrderItem[];
+  attachmentCount?: number;
 }
 
 export interface ItemWithDetails extends Item {
@@ -2653,6 +2654,12 @@ export class DatabaseStorage implements IStorage {
       rejectedBy = u || null;
     }
 
+    // Get attachment count
+    const attachmentCountResult = await db.select({ count: sql<number>`count(*)` })
+      .from(purchaseOrderAttachments)
+      .where(eq(purchaseOrderAttachments.purchaseOrderId, poId));
+    const attachmentCount = Number(attachmentCountResult[0]?.count || 0);
+
     return {
       ...poRow.purchase_orders,
       requestedBy: poRow.users!,
@@ -2660,6 +2667,7 @@ export class DatabaseStorage implements IStorage {
       rejectedBy,
       supplier: poRow.suppliers,
       items: lineItems,
+      attachmentCount,
     };
   }
 
