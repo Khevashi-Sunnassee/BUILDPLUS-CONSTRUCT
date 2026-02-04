@@ -148,6 +148,7 @@ export default function AdminPanelsPage() {
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
   const [groupByPanelType, setGroupByPanelType] = useState<boolean>(true);
+  const [groupByLevel, setGroupByLevel] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [debouncedSearch, setDebouncedSearch] = useState<string>("");
   const [viewMode, setViewMode] = useState<"list" | "summary">("list");
@@ -155,6 +156,7 @@ export default function AdminPanelsPage() {
   const [pageSize, setPageSize] = useState(100);
   const [collapsedJobs, setCollapsedJobs] = useState<Set<string>>(new Set());
   const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
+  const [collapsedLevels, setCollapsedLevels] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Build dialog state
@@ -361,6 +363,16 @@ export default function AdminPanelsPage() {
     return acc;
   }, {} as Record<string, PanelWithJob[]>) || {};
 
+  // Group panels by level for grouped view
+  const panelsByLevel = filteredPanels?.reduce((acc, panel) => {
+    const level = panel.level || "No Level";
+    if (!acc[level]) {
+      acc[level] = [];
+    }
+    acc[level].push(panel);
+    return acc;
+  }, {} as Record<string, PanelWithJob[]>) || {};
+
   // Get unique panel types from current data for filter dropdown
   const uniquePanelTypes = Array.from(new Set(panels?.map(p => p.panelType).filter(Boolean) || [])).sort();
 
@@ -388,6 +400,18 @@ export default function AdminPanelsPage() {
         next.delete(panelType);
       } else {
         next.add(panelType);
+      }
+      return next;
+    });
+  };
+
+  const toggleLevelCollapse = (level: string) => {
+    setCollapsedLevels(prev => {
+      const next = new Set(prev);
+      if (next.has(level)) {
+        next.delete(level);
+      } else {
+        next.add(level);
       }
       return next;
     });
@@ -1198,11 +1222,23 @@ export default function AdminPanelsPage() {
                     checked={groupByPanelType}
                     onCheckedChange={(checked) => {
                       setGroupByPanelType(checked);
-                      if (checked) setGroupByJob(false);
+                      if (checked) { setGroupByJob(false); setGroupByLevel(false); }
                     }}
                     data-testid="switch-group-by-type"
                   />
                   <Label htmlFor="group-by-type" className="text-sm whitespace-nowrap">Group by Type</Label>
+                </div>
+                <div className="flex items-center gap-2 ml-2">
+                  <Switch
+                    id="group-by-level"
+                    checked={groupByLevel}
+                    onCheckedChange={(checked) => {
+                      setGroupByLevel(checked);
+                      if (checked) { setGroupByJob(false); setGroupByPanelType(false); }
+                    }}
+                    data-testid="switch-group-by-level"
+                  />
+                  <Label htmlFor="group-by-level" className="text-sm whitespace-nowrap">Group by Level</Label>
                 </div>
               </div>
             </div>
@@ -1537,6 +1573,126 @@ export default function AdminPanelsPage() {
                                   data-testid={`button-delete-panel-${panel.id}`}
                                 >
                                   <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </Fragment>
+                    );
+                  })
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={13} className="text-center py-8 text-muted-foreground">
+                      No panels found. Add a panel or import from Excel.
+                    </TableCell>
+                  </TableRow>
+                )
+              ) : groupByLevel ? (
+                // Grouped by level view
+                Object.entries(panelsByLevel).length > 0 ? (
+                  Object.entries(panelsByLevel).sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true })).map(([level, levelPanels]) => {
+                    const isCollapsed = collapsedLevels.has(level);
+                    return (
+                      <Fragment key={level}>
+                        <TableRow 
+                          className="bg-muted/50 hover:bg-muted cursor-pointer"
+                          onClick={() => toggleLevelCollapse(level)}
+                          data-testid={`row-level-group-${level}`}
+                        >
+                          <TableCell colSpan={13}>
+                            <div className="flex items-center gap-2">
+                              {isCollapsed ? (
+                                <ChevronRight className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
+                              <Layers className="h-4 w-4 text-primary" />
+                              <span className="font-semibold">Level: {level}</span>
+                              <Badge variant="secondary" className="ml-2">
+                                {levelPanels.length} panel{levelPanels.length !== 1 ? 's' : ''}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {!isCollapsed && levelPanels.map((panel) => (
+                          <TableRow 
+                            key={panel.id} 
+                            data-testid={`row-panel-${panel.id}`}
+                            style={panel.job.productionSlotColor ? { 
+                              backgroundColor: `${panel.job.productionSlotColor}15`,
+                              borderLeft: `4px solid ${panel.job.productionSlotColor}` 
+                            } : undefined}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2 pl-6">
+                                <Hash className="h-4 w-4 text-muted-foreground" />
+                                <span className="font-mono font-medium">{panel.panelMark}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{panel.panelType?.replace("_", " ") || "WALL"}</Badge>
+                            </TableCell>
+                            <TableCell className="text-sm">{panel.building || "-"}</TableCell>
+                            <TableCell className="text-sm">{panel.job.jobNumber}</TableCell>
+                            <TableCell className="text-center">{panel.qty || 1}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadWidth)}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{panel.panelArea ? `${parseFloat(panel.panelArea).toFixed(2)}` : "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)}` : "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {getSourceLabel(panel.source)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{getStatusBadge(panel.status)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                {panel.approvedForProduction ? (
+                                  <Badge variant="secondary" className="gap-1 mr-2">
+                                    <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                    Approved
+                                  </Badge>
+                                ) : null}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); openBuildDialog(panel); }}
+                                  title={panel.approvedForProduction ? "Edit production details" : "Set up for production"}
+                                  data-testid={`button-build-panel-${panel.id}`}
+                                >
+                                  <Hammer className="h-4 w-4 text-primary" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const job = jobs?.find(j => j.id === panel.jobId);
+                                    setQrCodePanel({ id: panel.id, panelMark: panel.panelMark, jobNumber: job?.jobNumber });
+                                    setQrCodeDialogOpen(true);
+                                  }}
+                                  title="View QR Code"
+                                  data-testid={`button-qr-panel-${panel.id}`}
+                                >
+                                  <QrCode className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); openEditDialog(panel); }}
+                                  data-testid={`button-edit-panel-${panel.id}`}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={(e) => { e.stopPropagation(); setDeletingPanelId(panel.id); }}
+                                  className="text-red-500 hover:text-red-700"
+                                  data-testid={`button-delete-panel-${panel.id}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </TableCell>
