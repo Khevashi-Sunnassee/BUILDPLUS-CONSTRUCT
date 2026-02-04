@@ -78,11 +78,11 @@ const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const factorySchema = z.object({
   name: z.string().min(1, "Name is required"),
   code: z.string().min(1, "Code is required").max(10, "Code must be 10 characters or less"),
-  address: z.string().optional(),
-  state: z.string().optional(),
+  address: z.string().optional().nullable(),
+  state: z.string().optional().nullable(),
   latitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
   longitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
-  cfmeuCalendar: z.enum(["NONE", "VIC_ONSITE", "VIC_OFFSITE", "QLD"]).default("NONE"),
+  cfmeuCalendar: z.enum(["VIC_ONSITE", "VIC_OFFSITE", "QLD"]).nullable().optional(),
   workDays: z.array(z.boolean()).length(7),
   color: z.string().default("#3B82F6"),
   isActive: z.boolean().default(true),
@@ -145,7 +145,7 @@ export default function AdminFactoriesPage() {
       state: "",
       latitude: null,
       longitude: null,
-      cfmeuCalendar: "NONE",
+      cfmeuCalendar: null,
       workDays: [false, true, true, true, true, true, false],
       color: "#3B82F6",
       isActive: true,
@@ -278,7 +278,7 @@ export default function AdminFactoriesPage() {
       state: "",
       latitude: null,
       longitude: null,
-      cfmeuCalendar: "NONE",
+      cfmeuCalendar: null,
       workDays: [false, true, true, true, true, true, false],
       color: "#3B82F6",
       isActive: true,
@@ -295,7 +295,7 @@ export default function AdminFactoriesPage() {
       state: factory.state || "",
       latitude: factory.latitude ? parseFloat(String(factory.latitude)) : null,
       longitude: factory.longitude ? parseFloat(String(factory.longitude)) : null,
-      cfmeuCalendar: factory.cfmeuCalendar || "NONE",
+      cfmeuCalendar: factory.cfmeuCalendar || null,
       workDays: (factory.workDays as boolean[]) || [false, true, true, true, true, true, false],
       color: factory.color || "#3B82F6",
       isActive: factory.isActive,
@@ -572,7 +572,7 @@ export default function AdminFactoriesPage() {
                   <FormItem>
                     <FormLabel>Address</FormLabel>
                     <FormControl>
-                      <Textarea {...field} placeholder="123 Industrial Ave, Suburb VIC 3000" data-testid="input-factory-address" />
+                      <Textarea {...field} value={field.value || ""} placeholder="123 Industrial Ave, Suburb VIC 3000" data-testid="input-factory-address" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -701,14 +701,17 @@ export default function AdminFactoriesPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>CFMEU Calendar</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={v => field.onChange(v === "__NONE__" ? null : v)} 
+                      value={field.value || "__NONE__"}
+                    >
                       <FormControl>
                         <SelectTrigger data-testid="select-cfmeu-calendar">
                           <SelectValue placeholder="Select CFMEU calendar" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="NONE">None</SelectItem>
+                        <SelectItem value="__NONE__">None</SelectItem>
                         <SelectItem value="VIC_ONSITE">VIC Onsite (36hr)</SelectItem>
                         <SelectItem value="VIC_OFFSITE">VIC Offsite (38hr)</SelectItem>
                         <SelectItem value="QLD">QLD</SelectItem>
