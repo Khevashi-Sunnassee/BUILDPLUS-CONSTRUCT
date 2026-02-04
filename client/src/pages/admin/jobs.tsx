@@ -202,6 +202,8 @@ export default function AdminJobsPage() {
   
   // Level change confirmation dialog state
   const [levelChangeConfirmOpen, setLevelChangeConfirmOpen] = useState(false);
+  const [levelsChanged, setLevelsChanged] = useState(false);
+  const [pendingJobId, setPendingJobId] = useState<string | null>(null);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -320,12 +322,24 @@ export default function AdminJobsPage() {
     mutationFn: async ({ id, data }: { id: string; data: JobFormData }) => {
       return apiRequest("PUT", `/api/admin/jobs/${id}`, data);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
       toast({ title: "Job updated successfully" });
-      setJobDialogOpen(false);
-      setEditingJob(null);
-      jobForm.reset();
+      
+      // Check if we need to show level regeneration dialogs
+      if (levelsChanged && (hasExistingLevelCycleTimes || productionSlotStatus?.hasSlots)) {
+        setPendingJobId(variables.id);
+        if (hasExistingLevelCycleTimes) {
+          setLevelChangeConfirmOpen(true);
+        } else if (productionSlotStatus?.hasSlots) {
+          setCycleTimesConfirmOpen(true);
+        }
+        setLevelsChanged(false);
+      } else {
+        setJobDialogOpen(false);
+        setEditingJob(null);
+        jobForm.reset();
+      }
     },
     onError: (error: any) => {
       toast({ title: "Failed to update job", description: error.message, variant: "destructive" });
@@ -642,6 +656,10 @@ export default function AdminJobsPage() {
     });
     setJobDialogOpen(true);
     
+    // Reset state for level changes
+    setLevelsChanged(false);
+    setPendingJobId(null);
+    
     // Load level cycle times in background
     setLevelCycleTimes([]);
     setHasExistingLevelCycleTimes(false);
@@ -729,6 +747,12 @@ export default function AdminJobsPage() {
         toast({ title: "Success", description: `Updated ${data.count} production slots` });
       }
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
+      
+      // Close everything after production slots are updated
+      setPendingJobId(null);
+      setJobDialogOpen(false);
+      setEditingJob(null);
+      jobForm.reset();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -755,6 +779,17 @@ export default function AdminJobsPage() {
       setLevelCycleTimes(data);
       setLevelChangeConfirmOpen(false);
       toast({ title: "Level cycle times updated" });
+      
+      // Check if we also need to show production slots dialog
+      if (productionSlotStatus?.hasSlots) {
+        setCycleTimesConfirmOpen(true);
+      } else {
+        // Close everything
+        setPendingJobId(null);
+        setJobDialogOpen(false);
+        setEditingJob(null);
+        jobForm.reset();
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -762,19 +797,9 @@ export default function AdminJobsPage() {
     },
   });
 
-  // Handler to show confirmation when level fields change
+  // Handler to mark that level fields have changed
   const handleLevelFieldChange = () => {
-    if (!editingJob) return;
-    
-    // Show level cycle times regeneration dialog if they exist
-    if (hasExistingLevelCycleTimes) {
-      setLevelChangeConfirmOpen(true);
-    }
-    
-    // Show production slots dialog if slots exist
-    if (productionSlotStatus?.hasSlots) {
-      setCycleTimesConfirmOpen(true);
-    }
+    setLevelsChanged(true);
   };
 
   if (isLoading) {
@@ -1295,8 +1320,8 @@ export default function AdminJobsPage() {
                                 const calculatedHighest = lowestLevel + levelsCount - 1;
                                 jobForm.setValue("highestLevel", String(calculatedHighest));
                               }
+                              handleLevelFieldChange();
                             }}
-                            onBlur={() => handleLevelFieldChange()}
                             data-testid="input-job-levels" 
                           />
                         </FormControl>
@@ -1325,8 +1350,8 @@ export default function AdminJobsPage() {
                                   const calculatedHighest = lowestLevel + levelsCount - 1;
                                   jobForm.setValue("highestLevel", String(calculatedHighest));
                                 }
+                                handleLevelFieldChange();
                               }}
-                              onBlur={() => handleLevelFieldChange()}
                               data-testid="input-job-lowest-level" 
                             />
                           </FormControl>
@@ -1353,8 +1378,8 @@ export default function AdminJobsPage() {
                                   const calculatedLevels = highestLevel - lowestLevel + 1;
                                   jobForm.setValue("levels", String(calculatedLevels));
                                 }
+                                handleLevelFieldChange();
                               }}
-                              onBlur={() => handleLevelFieldChange()}
                               data-testid="input-job-highest-level" 
                             />
                           </FormControl>
@@ -2072,15 +2097,25 @@ export default function AdminJobsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-skip-production-update">
+            <AlertDialogCancel 
+              onClick={() => {
+                // Close everything
+                setPendingJobId(null);
+                setJobDialogOpen(false);
+                setEditingJob(null);
+                jobForm.reset();
+              }}
+              data-testid="button-skip-production-update"
+            >
               {productionSlotStatus?.hasSlots && !productionSlotStatus?.hasNonStartedSlots ? "Close" : "Skip"}
             </AlertDialogCancel>
             {productionSlotStatus && (!productionSlotStatus.hasSlots || productionSlotStatus.hasNonStartedSlots) && (
               <AlertDialogAction
                 onClick={() => {
-                  if (!editingJob) return;
+                  const jobId = pendingJobId || editingJob?.id;
+                  if (!jobId) return;
                   const action = productionSlotStatus.hasSlots ? "update" : "create";
-                  updateProductionSlotsMutation.mutate({ jobId: editingJob.id, action });
+                  updateProductionSlotsMutation.mutate({ jobId, action });
                 }}
                 disabled={updateProductionSlotsMutation.isPending}
                 data-testid="button-confirm-production-update"
@@ -2102,13 +2137,27 @@ export default function AdminJobsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-skip-level-regenerate">
+            <AlertDialogCancel 
+              onClick={() => {
+                // Check if we also need to show production slots dialog
+                if (productionSlotStatus?.hasSlots) {
+                  setCycleTimesConfirmOpen(true);
+                } else {
+                  // Close everything
+                  setPendingJobId(null);
+                  setJobDialogOpen(false);
+                  setEditingJob(null);
+                  jobForm.reset();
+                }
+              }}
+              data-testid="button-skip-level-regenerate"
+            >
               Keep Existing
             </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                if (!editingJob) return;
-                regenerateLevelsMutation.mutate(editingJob.id);
+                if (!pendingJobId) return;
+                regenerateLevelsMutation.mutate(pendingJobId);
               }}
               disabled={regenerateLevelsMutation.isPending}
               data-testid="button-confirm-level-regenerate"
