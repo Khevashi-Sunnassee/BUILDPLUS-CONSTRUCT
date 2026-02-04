@@ -17,7 +17,7 @@ import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
 import { chatRouter } from "./chat/chat.routes";
-import { eq, sql, inArray, and, isNotNull } from "drizzle-orm";
+import { eq, sql, inArray, and, isNotNull, gte, lte } from "drizzle-orm";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
