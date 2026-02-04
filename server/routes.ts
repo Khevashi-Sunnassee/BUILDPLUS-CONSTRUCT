@@ -820,24 +820,41 @@ export async function registerRoutes(
       );
       
       // Extract unique building/level combinations
-      const levelMap = new Map<string, { buildingNumber: number; level: string; levelOrder: number }>();
+      const levelMap = new Map<string, { buildingNumber: number; level: string }>();
       
       for (const panel of panels) {
-        const buildingNumber = panel.buildingNumber || 1;
-        const level = panel.level || 'Ground';
-        const levelOrder = panel.levelOrder ?? 0;
+        const buildingNumber = parseInt(panel.building || '1', 10) || 1;
+        let level = panel.level || 'Ground';
+        
+        // Extract lowest level from ranges (e.g., "5-L6" -> "5", "3-L4" -> "3")
+        const rangeMatch = level.match(/^(\d+|L\d+|Ground)-?(L?\d+|Roof)?$/i);
+        if (rangeMatch && rangeMatch[2]) {
+          level = rangeMatch[1].replace(/^L/i, '');
+        }
+        
         const key = `${buildingNumber}-${level}`;
         
         if (!levelMap.has(key)) {
-          levelMap.set(key, { buildingNumber, level, levelOrder });
+          levelMap.set(key, { buildingNumber, level });
         }
       }
       
-      // Sort by building number then level order
-      const levels = Array.from(levelMap.values()).sort((a, b) => {
-        if (a.buildingNumber !== b.buildingNumber) return a.buildingNumber - b.buildingNumber;
-        return a.levelOrder - b.levelOrder;
-      });
+      // Helper to parse level for sorting (Ground=0, numbers as-is, Roof=999)
+      const parseLevelOrder = (level: string): number => {
+        const lowerLevel = level.toLowerCase().replace(/^l/i, '');
+        if (lowerLevel === 'ground' || lowerLevel === 'g') return 0;
+        if (lowerLevel === 'roof' || lowerLevel === 'r') return 999;
+        const num = parseInt(lowerLevel, 10);
+        return isNaN(num) ? 500 : num; // Unknown levels in middle
+      };
+      
+      // Sort by building number then level order (lowest to highest)
+      const levels = Array.from(levelMap.values())
+        .map(l => ({ ...l, levelOrder: parseLevelOrder(l.level) }))
+        .sort((a, b) => {
+          if (a.buildingNumber !== b.buildingNumber) return a.buildingNumber - b.buildingNumber;
+          return a.levelOrder - b.levelOrder;
+        });
       
       // Add existing cycle days or default (use expectedCycleTimePerFloor to match slot generation)
       const job = await storage.getJob(jobId);
@@ -1558,9 +1575,19 @@ export async function registerRoutes(
             // Default building to "1" if no building and no zone provided
             const buildingValue = rowData.building ? String(rowData.building) : (rowData.zone ? "" : "1");
             
-            // Normalize level by stripping "L" prefix (e.g., "L1" -> "1", "L10" -> "10")
+            // Normalize level: extract lowest level from ranges like "5-L6" -> "5", "3-L4" -> "3"
+            // Also strip "L" prefix (e.g., "L1" -> "1", "L10" -> "10")
             const rawLevel = String(rowData.level || "").trim();
-            const normalizedLevel = rawLevel.replace(/^L/i, "");
+            let normalizedLevel = rawLevel;
+            
+            // Check for range format like "5-L6", "3-L4", "7-L8"
+            const rangeMatch = rawLevel.match(/^(\d+|L\d+|Ground)-?(L?\d+|Roof)?$/i);
+            if (rangeMatch && rangeMatch[2]) {
+              // It's a range - take the first (lowest) part
+              normalizedLevel = rangeMatch[1];
+            }
+            // Strip "L" prefix from the result
+            normalizedLevel = normalizedLevel.replace(/^L/i, "");
             
             panelsToImport.push({
               jobId,
