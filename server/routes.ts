@@ -772,6 +772,89 @@ export async function registerRoutes(
     res.json({ ok: true });
   });
 
+  // Job Level Cycle Times
+  app.get("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const cycleTimes = await storage.getJobLevelCycleTimes(req.params.id as string);
+      res.json(cycleTimes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to get level cycle times" });
+    }
+  });
+
+  app.post("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const cycleTimeSchema = z.object({
+        buildingNumber: z.number().int().min(1),
+        level: z.string().min(1),
+        levelOrder: z.number().int().min(0),
+        cycleDays: z.number().int().min(1),
+      });
+      
+      const bodySchema = z.object({
+        cycleTimes: z.array(cycleTimeSchema),
+      });
+      
+      const parseResult = bodySchema.safeParse(req.body);
+      if (!parseResult.success) {
+        return res.status(400).json({ error: "Invalid cycle times data", details: parseResult.error.format() });
+      }
+      
+      await storage.saveJobLevelCycleTimes(req.params.id as string, parseResult.data.cycleTimes);
+      res.json({ ok: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to save level cycle times" });
+    }
+  });
+
+  // Build levels from panels for a job
+  app.get("/api/admin/jobs/:id/build-levels", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const jobId = req.params.id as string;
+      const panels = await storage.getPanelsByJob(jobId);
+      
+      // Get existing cycle times
+      const existingCycleTimes = await storage.getJobLevelCycleTimes(jobId);
+      const existingMap = new Map(
+        existingCycleTimes.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays])
+      );
+      
+      // Extract unique building/level combinations
+      const levelMap = new Map<string, { buildingNumber: number; level: string; levelOrder: number }>();
+      
+      for (const panel of panels) {
+        const buildingNumber = panel.buildingNumber || 1;
+        const level = panel.level || 'Ground';
+        const levelOrder = panel.levelOrder ?? 0;
+        const key = `${buildingNumber}-${level}`;
+        
+        if (!levelMap.has(key)) {
+          levelMap.set(key, { buildingNumber, level, levelOrder });
+        }
+      }
+      
+      // Sort by building number then level order
+      const levels = Array.from(levelMap.values()).sort((a, b) => {
+        if (a.buildingNumber !== b.buildingNumber) return a.buildingNumber - b.buildingNumber;
+        return a.levelOrder - b.levelOrder;
+      });
+      
+      // Add existing cycle days or default (use expectedCycleTimePerFloor to match slot generation)
+      const job = await storage.getJob(jobId);
+      const globalSettings = await storage.getGlobalSettings();
+      const defaultCycleDays = job?.expectedCycleTimePerFloor ?? globalSettings?.productionCycleDays ?? 3;
+      
+      const result = levels.map(l => ({
+        ...l,
+        cycleDays: existingMap.get(`${l.buildingNumber}-${l.level}`) ?? defaultCycleDays,
+      }));
+      
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to build levels" });
+    }
+  });
+
   app.post("/api/admin/jobs/import", requireRole("ADMIN"), async (req, res) => {
     try {
       const { data } = req.body;

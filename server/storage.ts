@@ -2,7 +2,7 @@ import { eq, and, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
 import {
   users, devices, mappingRules, dailyLogs, logRows,
-  approvalEvents, auditEvents, globalSettings, jobs, panelRegister, productionEntries,
+  approvalEvents, auditEvents, globalSettings, jobs, jobLevelCycleTimes, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
@@ -43,6 +43,7 @@ import {
   type InsertTaskUpdate, type TaskUpdate,
   type InsertTaskFile, type TaskFile,
   type InsertTaskNotification, type TaskNotification,
+  type InsertJobLevelCycleTime, type JobLevelCycleTime,
 } from "@shared/schema";
 
 export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
@@ -2137,17 +2138,28 @@ export class DatabaseStorage implements IStorage {
       panelCountByLevel[level] = (panelCountByLevel[level] || 0) + 1;
     }
 
+    // Get level-specific cycle times
+    const levelCycleTimes = await this.getJobLevelCycleTimes(jobId);
+    const cycleTimeMap = new Map<string, number>(
+      levelCycleTimes.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays])
+    );
+    const defaultCycleTime = job.expectedCycleTimePerFloor;
+
     // Calculate base date (productionStartDate - daysInAdvance)
     const daysInAdvance = job.daysInAdvance || 7;
-    const cycleTime = job.expectedCycleTimePerFloor;
     const baseDate = new Date(job.productionStartDate);
     baseDate.setDate(baseDate.getDate() - daysInAdvance);
 
     const createdSlots: ProductionSlot[] = [];
+    let cumulativeDays = 0;
+    
     for (let i = 0; i < sortedLevels.length; i++) {
       const level = sortedLevels[i];
       const slotDate = new Date(baseDate);
-      slotDate.setDate(slotDate.getDate() + (i * cycleTime));
+      slotDate.setDate(slotDate.getDate() + cumulativeDays);
+      
+      // Get level-specific cycle time or fall back to job default
+      const levelCycleTime = cycleTimeMap.get(`1-${level}`) ?? defaultCycleTime;
 
       const [slot] = await db.insert(productionSlots).values({
         jobId,
@@ -2160,6 +2172,9 @@ export class DatabaseStorage implements IStorage {
         isBooked: false,
       }).returning();
       createdSlots.push(slot);
+      
+      // Add this level's cycle time to cumulative total for next level
+      cumulativeDays += levelCycleTime;
     }
     return createdSlots;
   }
@@ -3191,6 +3206,39 @@ export class DatabaseStorage implements IStorage {
         });
       }
     }
+  }
+
+  // Job Level Cycle Times
+  async getJobLevelCycleTimes(jobId: string): Promise<JobLevelCycleTime[]> {
+    return db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.buildingNumber), asc(jobLevelCycleTimes.levelOrder));
+  }
+
+  async saveJobLevelCycleTimes(jobId: string, cycleTimes: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[]): Promise<void> {
+    await db.delete(jobLevelCycleTimes).where(eq(jobLevelCycleTimes.jobId, jobId));
+    
+    if (cycleTimes.length > 0) {
+      await db.insert(jobLevelCycleTimes).values(
+        cycleTimes.map(ct => ({
+          jobId,
+          buildingNumber: ct.buildingNumber,
+          level: ct.level,
+          levelOrder: ct.levelOrder,
+          cycleDays: ct.cycleDays,
+        }))
+      );
+    }
+  }
+
+  async getJobLevelCycleTime(jobId: string, buildingNumber: number, level: string): Promise<JobLevelCycleTime | null> {
+    const [result] = await db.select().from(jobLevelCycleTimes)
+      .where(and(
+        eq(jobLevelCycleTimes.jobId, jobId),
+        eq(jobLevelCycleTimes.buildingNumber, buildingNumber),
+        eq(jobLevelCycleTimes.level, level)
+      ));
+    return result || null;
   }
 }
 

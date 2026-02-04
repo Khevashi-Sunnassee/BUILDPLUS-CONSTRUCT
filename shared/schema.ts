@@ -163,6 +163,20 @@ export const jobs = pgTable("jobs", {
   projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
 }));
 
+export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  buildingNumber: integer("building_number").notNull().default(1),
+  level: text("level").notNull(),
+  levelOrder: integer("level_order").notNull(),
+  cycleDays: integer("cycle_days").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("job_level_cycle_times_job_id_idx").on(table.jobId),
+  uniqueJobBuildingLevel: index("job_level_cycle_times_unique_idx").on(table.jobId, table.buildingNumber, table.level),
+}));
+
 export const productionSlots = pgTable("production_slots", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
@@ -605,6 +619,12 @@ export const insertMappingRuleSchema = createInsertSchema(mappingRules).omit({
   updatedAt: true,
 });
 
+export const insertJobLevelCycleTimeSchema = createInsertSchema(jobLevelCycleTimes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertJobSchema = createInsertSchema(jobs).omit({
   id: true,
   createdAt: true,
@@ -809,6 +829,8 @@ export type InsertMappingRule = z.infer<typeof insertMappingRuleSchema>;
 export type MappingRule = typeof mappingRules.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+export type JobLevelCycleTime = typeof jobLevelCycleTimes.$inferSelect;
+export type InsertJobLevelCycleTime = typeof jobLevelCycleTimes.$inferInsert;
 export type InsertPanelRegister = z.infer<typeof insertPanelRegisterSchema>;
 export type PanelRegister = typeof panelRegister.$inferSelect;
 export type InsertDailyLog = z.infer<typeof insertDailyLogSchema>;

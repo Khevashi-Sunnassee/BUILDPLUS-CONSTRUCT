@@ -30,6 +30,7 @@ import {
   CheckCircle2,
   XCircle,
   BarChart3,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -181,6 +182,12 @@ export default function AdminJobsPage() {
   const [sortField, setSortField] = useState<SortField>("jobNumber");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
   const [groupByState, setGroupByState] = useState(true);
+  
+  // Level cycle times state
+  const [levelCycleTimesDialogOpen, setLevelCycleTimesDialogOpen] = useState(false);
+  const [levelCycleTimesJob, setLevelCycleTimesJob] = useState<JobWithPanels | null>(null);
+  const [levelCycleTimes, setLevelCycleTimes] = useState<{ buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[]>([]);
+  const [isLoadingLevelData, setIsLoadingLevelData] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -639,6 +646,53 @@ export default function AdminJobsPage() {
     return <Badge variant={variants[status] || "default"}>{status}</Badge>;
   };
 
+  // Level cycle times functions
+  const openLevelCycleTimesDialog = async (job: JobWithPanels) => {
+    setLevelCycleTimesJob(job);
+    setIsLoadingLevelData(true);
+    setLevelCycleTimesDialogOpen(true);
+    
+    try {
+      const response = await fetch(`/api/admin/jobs/${job.id}/build-levels`);
+      if (!response.ok) throw new Error("Failed to build levels");
+      const data = await response.json();
+      setLevelCycleTimes(data);
+    } catch (error) {
+      console.error("Error building levels:", error);
+      toast({ title: "Error", description: "Failed to load level data", variant: "destructive" });
+    } finally {
+      setIsLoadingLevelData(false);
+    }
+  };
+
+  const saveLevelCycleTimesMutation = useMutation({
+    mutationFn: async ({ jobId, cycleTimes }: { jobId: string; cycleTimes: typeof levelCycleTimes }) => {
+      const res = await apiRequest("POST", `/api/admin/jobs/${jobId}/level-cycle-times`, { cycleTimes });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Saved", description: "Level cycle times updated successfully" });
+      setLevelCycleTimesDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleLevelCycleTimeChange = (index: number, value: number) => {
+    setLevelCycleTimes(prev => prev.map((item, i) => 
+      i === index ? { ...item, cycleDays: value } : item
+    ));
+  };
+
+  const saveLevelCycleTimes = () => {
+    if (!levelCycleTimesJob) return;
+    saveLevelCycleTimesMutation.mutate({
+      jobId: levelCycleTimesJob.id,
+      cycleTimes: levelCycleTimes,
+    });
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -877,6 +931,15 @@ export default function AdminJobsPage() {
                             data-testid={`button-cost-overrides-${job.id}`}
                           >
                             <DollarSign className="h-4 w-4 text-green-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openLevelCycleTimesDialog(job)}
+                            title="Level Cycle Times"
+                            data-testid={`button-level-cycle-times-${job.id}`}
+                          >
+                            <Clock className="h-4 w-4 text-blue-600" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -1741,6 +1804,76 @@ export default function AdminJobsPage() {
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Level Cycle Times Dialog */}
+      <Dialog open={levelCycleTimesDialogOpen} onOpenChange={setLevelCycleTimesDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Level Cycle Times</DialogTitle>
+            <DialogDescription>
+              Configure production cycle times for each level in {levelCycleTimesJob?.name}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isLoadingLevelData ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : levelCycleTimes.length === 0 ? (
+            <div className="py-8 text-center text-muted-foreground">
+              <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>No panels found for this job.</p>
+              <p className="text-sm">Add panels to configure level-specific cycle times.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Building</TableHead>
+                    <TableHead>Level</TableHead>
+                    <TableHead className="w-32">Cycle Days</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {levelCycleTimes.map((item, index) => (
+                    <TableRow key={`${item.buildingNumber}-${item.level}`}>
+                      <TableCell>
+                        <Badge variant="outline">B{item.buildingNumber}</Badge>
+                      </TableCell>
+                      <TableCell>{item.level}</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={item.cycleDays}
+                          onChange={(e) => handleLevelCycleTimeChange(index, parseInt(e.target.value) || 1)}
+                          className="w-20"
+                          data-testid={`input-cycle-days-${item.buildingNumber}-${item.level}`}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLevelCycleTimesDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={saveLevelCycleTimes} 
+              disabled={saveLevelCycleTimesMutation.isPending || levelCycleTimes.length === 0}
+              data-testid="button-save-level-cycle-times"
+            >
+              {saveLevelCycleTimesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Save Cycle Times
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
