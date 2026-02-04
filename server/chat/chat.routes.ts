@@ -530,42 +530,42 @@ chatRouter.post("/panels/counts", requireAuth, requireChatPermission, async (req
     });
     const { panelIds } = schema.parse(req.body);
 
-    const panelConversations = await db
-      .select({ id: conversations.id, panelId: conversations.panelId })
-      .from(conversations)
-      .where(inArray(conversations.panelId, panelIds));
+    const result: Record<string, { messageCount: number; documentCount: number }> = {};
+    for (const panelId of panelIds) {
+      result[panelId] = { messageCount: 0, documentCount: 0 };
+    }
 
-    const conversationMap = new Map<string, string>();
-    for (const conv of panelConversations) {
-      if (conv.panelId) {
-        conversationMap.set(conv.panelId, conv.id);
+    const messageCounts = await db
+      .select({
+        panelId: conversations.panelId,
+        messageCount: sql<number>`count(${chatMessages.id})`,
+      })
+      .from(conversations)
+      .leftJoin(chatMessages, eq(chatMessages.conversationId, conversations.id))
+      .where(inArray(conversations.panelId, panelIds))
+      .groupBy(conversations.panelId);
+
+    for (const row of messageCounts) {
+      if (row.panelId) {
+        result[row.panelId].messageCount = Number(row.messageCount || 0);
       }
     }
 
-    const result: Record<string, { messageCount: number; documentCount: number }> = {};
+    const documentCounts = await db
+      .select({
+        panelId: conversations.panelId,
+        documentCount: sql<number>`count(${chatMessageAttachments.id})`,
+      })
+      .from(conversations)
+      .leftJoin(chatMessages, eq(chatMessages.conversationId, conversations.id))
+      .leftJoin(chatMessageAttachments, eq(chatMessageAttachments.messageId, chatMessages.id))
+      .where(inArray(conversations.panelId, panelIds))
+      .groupBy(conversations.panelId);
 
-    for (const panelId of panelIds) {
-      const convId = conversationMap.get(panelId);
-      if (!convId) {
-        result[panelId] = { messageCount: 0, documentCount: 0 };
-        continue;
+    for (const row of documentCounts) {
+      if (row.panelId) {
+        result[row.panelId].documentCount = Number(row.documentCount || 0);
       }
-
-      const messageCountResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(chatMessages)
-        .where(eq(chatMessages.conversationId, convId));
-
-      const documentCountResult = await db
-        .select({ count: sql<number>`count(*)` })
-        .from(chatMessageAttachments)
-        .innerJoin(chatMessages, eq(chatMessageAttachments.messageId, chatMessages.id))
-        .where(eq(chatMessages.conversationId, convId));
-
-      result[panelId] = {
-        messageCount: Number(messageCountResult[0]?.count || 0),
-        documentCount: Number(documentCountResult[0]?.count || 0),
-      };
     }
 
     res.json(result);

@@ -211,6 +211,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", conversation?.id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/panels/counts"] });
       setMessageContent("");
       setPendingFiles([]);
     },
@@ -227,6 +228,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.type.startsWith("image/")) {
+        e.preventDefault();
         const file = item.getAsFile();
         if (file) {
           const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -616,6 +618,23 @@ export default function AdminPanelsPage() {
   const panels = panelData?.panels;
   const totalPages = panelData?.totalPages || 1;
   const totalPanels = panelData?.total || 0;
+
+  const panelIds = panels?.map(p => p.id) || [];
+  const { data: panelCounts } = useQuery<Record<string, { messageCount: number; documentCount: number }>>({
+    queryKey: ["/api/chat/panels/counts", panelIds],
+    queryFn: async () => {
+      if (panelIds.length === 0) return {};
+      const res = await fetch("/api/chat/panels/counts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ panelIds }),
+        credentials: "include",
+      });
+      if (!res.ok) return {};
+      return res.json();
+    },
+    enabled: panelIds.length > 0,
+  });
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: ["/api/admin/jobs"],
@@ -1786,6 +1805,18 @@ export default function AdminPanelsPage() {
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">{panel.panelMark}</span>
+                                {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
+                                  <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                                    <MessageCircle className="h-3 w-3" />
+                                    {panelCounts[panel.id].messageCount}
+                                  </Badge>
+                                )}
+                                {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
+                                  <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
+                                    <FileTextIcon className="h-3 w-3" />
+                                    {panelCounts[panel.id].documentCount}
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -1910,6 +1941,18 @@ export default function AdminPanelsPage() {
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">{panel.panelMark}</span>
+                                {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
+                                  <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                                    <MessageCircle className="h-3 w-3" />
+                                    {panelCounts[panel.id].messageCount}
+                                  </Badge>
+                                )}
+                                {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
+                                  <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
+                                    <FileTextIcon className="h-3 w-3" />
+                                    {panelCounts[panel.id].documentCount}
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -2053,6 +2096,18 @@ export default function AdminPanelsPage() {
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
                                 <span className="font-mono font-medium">{panel.panelMark}</span>
+                                {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
+                                  <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                                    <MessageCircle className="h-3 w-3" />
+                                    {panelCounts[panel.id].messageCount}
+                                  </Badge>
+                                )}
+                                {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
+                                  <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
+                                    <FileTextIcon className="h-3 w-3" />
+                                    {panelCounts[panel.id].documentCount}
+                                  </Badge>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>
@@ -2169,6 +2224,18 @@ export default function AdminPanelsPage() {
                         <div className="flex items-center gap-2">
                           <Hash className="h-4 w-4 text-muted-foreground" />
                           <span className="font-mono font-medium">{panel.panelMark}</span>
+                          {(panelCounts?.[panel.id]?.messageCount || 0) > 0 && (
+                            <Badge variant="secondary" className="text-xs gap-0.5 px-1.5 py-0">
+                              <MessageCircle className="h-3 w-3" />
+                              {panelCounts[panel.id].messageCount}
+                            </Badge>
+                          )}
+                          {(panelCounts?.[panel.id]?.documentCount || 0) > 0 && (
+                            <Badge variant="outline" className="text-xs gap-0.5 px-1.5 py-0">
+                              <FileTextIcon className="h-3 w-3" />
+                              {panelCounts[panel.id].documentCount}
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>
