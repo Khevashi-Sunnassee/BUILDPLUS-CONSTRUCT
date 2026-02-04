@@ -14,10 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
-import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings } from "@shared/schema";
+import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory } from "@shared/schema";
 
 interface ProductionSlotWithDetails extends ProductionSlot {
   job: Job;
@@ -28,7 +28,7 @@ interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
 }
 
 type StatusFilter = "ALL" | "SCHEDULED" | "PENDING_UPDATE" | "BOOKED" | "COMPLETED";
-type GroupBy = "none" | "job" | "client" | "week";
+type GroupBy = "none" | "job" | "client" | "week" | "factory";
 
 const getWeekBoundaries = (date: Date, weekStartDay: number) => {
   const weekStart = startOfWeek(date, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
@@ -125,8 +125,18 @@ export default function ProductionSlotsPage() {
 
   const { data: allJobs = [] } = useQuery<Job[]>({
     queryKey: ["/api/jobs"],
-    select: (data: any) => data.map((j: any) => ({ id: j.id, jobNumber: j.jobNumber, name: j.name, client: j.client })),
+    select: (data: any) => data.map((j: any) => ({ id: j.id, jobNumber: j.jobNumber, name: j.name, client: j.client, factoryId: j.factoryId })),
   });
+
+  const { data: factories = [] } = useQuery<Factory[]>({
+    queryKey: ["/api/admin/factories"],
+  });
+
+  const getFactoryName = (factoryId: string | null | undefined): string => {
+    if (!factoryId || !factories) return "-";
+    const factory = factories.find(f => f.id === factoryId);
+    return factory?.name || "-";
+  };
 
   const { data: slotAdjustments = [] } = useQuery<ProductionSlotAdjustmentWithDetails[]>({
     queryKey: ["/api/production-slots", selectedSlot?.id, "adjustments"],
@@ -482,6 +492,9 @@ export default function ProductionSlotsPage() {
       } else if (groupBy === "week") {
         key = getWeekKey(new Date(slot.productionSlotDate), weekStartDay);
         label = getWeekLabel(key);
+      } else if (groupBy === "factory") {
+        key = slot.job.factoryId || "no-factory";
+        label = getFactoryName(slot.job.factoryId);
       } else {
         key = slot.job.client || "No Client";
         label = slot.job.client || "No Client";
@@ -609,6 +622,7 @@ export default function ProductionSlotsPage() {
                 <SelectContent>
                   <SelectItem value="week">Group by Week</SelectItem>
                   <SelectItem value="job">Group by Job</SelectItem>
+                  <SelectItem value="factory">Group by Factory</SelectItem>
                   <SelectItem value="client">Group by Client</SelectItem>
                   <SelectItem value="none">No Grouping</SelectItem>
                 </SelectContent>
@@ -663,7 +677,7 @@ export default function ProductionSlotsPage() {
                       ) : (
                         <ChevronRight className="h-4 w-4" />
                       )}
-                      {groupBy === "job" ? <Briefcase className="h-4 w-4" /> : groupBy === "week" ? <CalendarDays className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
+                      {groupBy === "job" ? <Briefcase className="h-4 w-4" /> : groupBy === "week" ? <CalendarDays className="h-4 w-4" /> : groupBy === "factory" ? <FactoryIcon className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
                       <span className="font-medium">{label}</span>
                       <Badge variant="secondary" className="ml-auto">{groupSlots.length} slot{groupSlots.length !== 1 ? "s" : ""}</Badge>
                     </div>
@@ -718,6 +732,7 @@ export default function ProductionSlotsPage() {
                             <TableHead>Panel Production Due</TableHead>
                             <TableHead>Onsite Start Date</TableHead>
                             {groupBy !== "job" && <TableHead>Job</TableHead>}
+                            {groupBy !== "factory" && <TableHead>Factory</TableHead>}
                             {groupBy !== "client" && <TableHead>Client</TableHead>}
                             <TableHead>Building</TableHead>
                             <TableHead>Level</TableHead>
@@ -749,6 +764,7 @@ export default function ProductionSlotsPage() {
                                 {format(addDays(new Date(slot.productionSlotDate), slot.job.productionDaysInAdvance ?? 10), "dd/MM/yyyy")}
                               </TableCell>
                               {groupBy !== "job" && <TableCell>{slot.job.jobNumber}</TableCell>}
+                              {groupBy !== "factory" && <TableCell>{getFactoryName(slot.job.factoryId)}</TableCell>}
                               {groupBy !== "client" && <TableCell>{slot.job.client || "-"}</TableCell>}
                               <TableCell>{slot.buildingNumber}</TableCell>
                               <TableCell>{slot.level}</TableCell>
@@ -824,6 +840,7 @@ export default function ProductionSlotsPage() {
                   <TableHead>Panel Production Due</TableHead>
                   <TableHead>Onsite Start Date</TableHead>
                   <TableHead>Job</TableHead>
+                  <TableHead>Factory</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Building</TableHead>
                   <TableHead>Level</TableHead>
@@ -852,6 +869,7 @@ export default function ProductionSlotsPage() {
                       {format(addDays(new Date(slot.productionSlotDate), slot.job.productionDaysInAdvance ?? 10), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell>{slot.job.jobNumber}</TableCell>
+                    <TableCell>{getFactoryName(slot.job.factoryId)}</TableCell>
                     <TableCell>{slot.job.client || "-"}</TableCell>
                     <TableCell>{slot.buildingNumber}</TableCell>
                     <TableCell>{slot.level}</TableCell>
