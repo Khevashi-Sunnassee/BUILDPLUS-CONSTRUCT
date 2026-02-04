@@ -9,8 +9,10 @@ import {
   loadLists, loadListPanels, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments, suppliers, items, itemCategories,
   conversations, conversationMembers, chatMessages, chatMessageAttachments, chatMessageReactions, chatMessageMentions, chatNotifications, userChatSettings,
   tasks, taskGroups, taskAssignees, taskUpdates, taskFiles, taskNotifications,
-  productionSlotAdjustments, jobLevelCycleTimes, mappingRules, approvalEvents, productionDays, jobPanelRates, deliveryRecords
+  productionSlotAdjustments, jobLevelCycleTimes, mappingRules, approvalEvents, productionDays, jobPanelRates, deliveryRecords,
+  cfmeuHolidays
 } from "@shared/schema";
+import ICAL from "ical.js";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
@@ -6041,6 +6043,200 @@ Return ONLY valid JSON, no explanation text.`
     } catch (error: any) {
       console.error("Error performing deletion:", error);
       res.status(500).json({ error: error.message || "Failed to delete data" });
+    }
+  });
+
+  // CFMEU Calendar Routes
+  const CFMEU_CALENDAR_URLS: Record<string, { url: string; years: number[] }[]> = {
+    VIC_ONSITE: [
+      { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-onsite-2025.ics", years: [2025] },
+      { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/36hr-onsite-rdo-calendar.ics", years: [2026] },
+    ],
+    VIC_OFFSITE: [
+      { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-offsite-2025.ics", years: [2025] },
+      { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/38hr-offsite-rdo-calendar.ics", years: [2026] },
+    ],
+    QLD: [
+      { url: "https://qnt.cfmeu.org/wp-content/uploads/2025/02/export.ics", years: [2025, 2026] },
+    ],
+  };
+
+  async function parseIcsAndSaveHolidays(
+    calendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD",
+    icsContent: string,
+    targetYears: number[]
+  ): Promise<{ imported: number; skipped: number }> {
+    let imported = 0;
+    let skipped = 0;
+
+    try {
+      const jcalData = ICAL.parse(icsContent);
+      const comp = new ICAL.Component(jcalData);
+      const events = comp.getAllSubcomponents("vevent");
+
+      for (const event of events) {
+        const icalEvent = new ICAL.Event(event);
+        const dtstart = icalEvent.startDate;
+        if (!dtstart) continue;
+
+        const eventDate = dtstart.toJSDate();
+        const eventYear = eventDate.getFullYear();
+
+        if (!targetYears.includes(eventYear)) continue;
+
+        const summary = icalEvent.summary || "Unnamed Holiday";
+        
+        let holidayType: "RDO" | "PUBLIC_HOLIDAY" | "OTHER" = "RDO";
+        const lowerSummary = summary.toLowerCase();
+        if (lowerSummary.includes("public holiday") || 
+            lowerSummary.includes("australia day") || 
+            lowerSummary.includes("anzac") ||
+            lowerSummary.includes("christmas") ||
+            lowerSummary.includes("good friday") ||
+            lowerSummary.includes("easter") ||
+            lowerSummary.includes("queen") ||
+            lowerSummary.includes("king") ||
+            lowerSummary.includes("labour day") ||
+            lowerSummary.includes("melbourne cup")) {
+          holidayType = "PUBLIC_HOLIDAY";
+        } else if (lowerSummary.includes("branch meeting") || lowerSummary.includes("school")) {
+          holidayType = "OTHER";
+        }
+
+        try {
+          await db.insert(cfmeuHolidays).values({
+            calendarType,
+            date: eventDate,
+            name: summary,
+            holidayType,
+            year: eventYear,
+          }).onConflictDoUpdate({
+            target: [cfmeuHolidays.calendarType, cfmeuHolidays.date],
+            set: {
+              name: summary,
+              holidayType,
+              year: eventYear,
+            },
+          });
+          imported++;
+        } catch (err) {
+          skipped++;
+        }
+      }
+    } catch (err) {
+      console.error("Error parsing ICS:", err);
+      throw new Error("Failed to parse ICS file");
+    }
+
+    return { imported, skipped };
+  }
+
+  app.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const holidays = await db.select().from(cfmeuHolidays).orderBy(cfmeuHolidays.date);
+      
+      const summary: Record<string, { count: number; years: number[] }> = {};
+      for (const h of holidays) {
+        if (!summary[h.calendarType]) {
+          summary[h.calendarType] = { count: 0, years: [] };
+        }
+        summary[h.calendarType].count++;
+        if (!summary[h.calendarType].years.includes(h.year)) {
+          summary[h.calendarType].years.push(h.year);
+        }
+      }
+
+      res.json({ holidays, summary });
+    } catch (error: any) {
+      console.error("Error fetching CFMEU calendars:", error);
+      res.status(500).json({ error: error.message || "Failed to fetch calendars" });
+    }
+  });
+
+  app.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req, res) => {
+    const { calendarType } = req.body;
+
+    if (!calendarType || !["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType)) {
+      return res.status(400).json({ error: "Invalid calendar type" });
+    }
+
+    try {
+      const urls = CFMEU_CALENDAR_URLS[calendarType];
+      let totalImported = 0;
+      let totalSkipped = 0;
+
+      for (const { url, years } of urls) {
+        const response = await fetch(url);
+        if (!response.ok) {
+          console.error(`Failed to fetch ${url}: ${response.status}`);
+          continue;
+        }
+        const icsContent = await response.text();
+        const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+        totalImported += result.imported;
+        totalSkipped += result.skipped;
+      }
+
+      res.json({ 
+        success: true, 
+        imported: totalImported, 
+        skipped: totalSkipped,
+        message: `Synced ${calendarType} calendar: ${totalImported} holidays imported`
+      });
+    } catch (error: any) {
+      console.error("Error syncing CFMEU calendar:", error);
+      res.status(500).json({ error: error.message || "Failed to sync calendar" });
+    }
+  });
+
+  app.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const results: Record<string, { imported: number; skipped: number }> = {};
+
+      for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
+        const urls = CFMEU_CALENDAR_URLS[calendarType];
+        let totalImported = 0;
+        let totalSkipped = 0;
+
+        for (const { url, years } of urls) {
+          try {
+            const response = await fetch(url);
+            if (!response.ok) {
+              console.error(`Failed to fetch ${url}: ${response.status}`);
+              continue;
+            }
+            const icsContent = await response.text();
+            const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+            totalImported += result.imported;
+            totalSkipped += result.skipped;
+          } catch (err) {
+            console.error(`Error fetching ${url}:`, err);
+          }
+        }
+
+        results[calendarType] = { imported: totalImported, skipped: totalSkipped };
+      }
+
+      res.json({ success: true, results });
+    } catch (error: any) {
+      console.error("Error syncing all CFMEU calendars:", error);
+      res.status(500).json({ error: error.message || "Failed to sync calendars" });
+    }
+  });
+
+  app.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), async (req, res) => {
+    const { calendarType } = req.params;
+
+    if (!["VIC_ONSITE", "VIC_OFFSITE", "QLD"].includes(calendarType)) {
+      return res.status(400).json({ error: "Invalid calendar type" });
+    }
+
+    try {
+      const result = await db.delete(cfmeuHolidays).where(eq(cfmeuHolidays.calendarType, calendarType as any));
+      res.json({ success: true, deleted: result.rowCount || 0 });
+    } catch (error: any) {
+      console.error("Error deleting CFMEU calendar:", error);
+      res.status(500).json({ error: error.message || "Failed to delete calendar" });
     }
   });
 
