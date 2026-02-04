@@ -6,11 +6,22 @@ import { usersRouter } from "./users.routes";
 import { settingsRouter } from "./settings.routes";
 import { jobsRouter } from "./jobs.routes";
 import { panelsRouter } from "./panels.routes";
+import { panelImportRouter } from "./panel-import.routes";
+import { panelApprovalRouter } from "./panel-approval.routes";
+import { panelTypesRouter } from "./panel-types.routes";
 import { productionRouter } from "./production.routes";
+import { productionEntriesRouter } from "./production-entries.routes";
+import { productionSlotsRouter } from "./production-slots.routes";
 import { draftingRouter } from "./drafting.routes";
 import { logisticsRouter } from "./logistics.routes";
 import { reportsRouter } from "./reports.routes";
+import { dailyLogsRouter } from "./daily-logs.routes";
+import { weeklyReportsRouter } from "./weekly-reports.routes";
+import { productionAnalyticsRouter } from "./production-analytics.routes";
+import { draftingLogisticsRouter } from "./drafting-logistics.routes";
+import { costAnalyticsRouter } from "./cost-analytics.routes";
 import { procurementRouter } from "./procurement.routes";
+import { procurementOrdersRouter } from "./procurement-orders.routes";
 import { tasksRouter } from "./tasks.routes";
 import { factoriesRouter, initializeCfmeuSync } from "./factories.routes";
 import { adminRouter } from "./admin.routes";
@@ -51,16 +62,27 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(settingsRouter);
   app.use(jobsRouter);
   app.use(panelsRouter);
+  app.use(panelImportRouter);
+  app.use(panelApprovalRouter);
+  app.use(panelTypesRouter);
   app.use(productionRouter);
+  app.use(productionEntriesRouter);
+  app.use(productionSlotsRouter);
   app.use(draftingRouter);
   app.use(logisticsRouter);
   app.use(procurementRouter);
+  app.use(procurementOrdersRouter);
   app.use(tasksRouter);
   app.use(factoriesRouter);
   app.use(adminRouter);
   
-  // Reports router has full paths starting with /api/
+  // Reports routers (split by domain) - all have full paths starting with /api/
   app.use(reportsRouter);
+  app.use(dailyLogsRouter);
+  app.use(weeklyReportsRouter);
+  app.use(productionAnalyticsRouter);
+  app.use(draftingLogisticsRouter);
+  app.use(costAnalyticsRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);
