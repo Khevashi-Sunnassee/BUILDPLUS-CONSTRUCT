@@ -146,6 +146,7 @@ export const factories = pgTable("factories", {
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
   longitude: decimal("longitude", { precision: 10, scale: 7 }),
   cfmeuCalendar: cfmeuCalendarTypeEnum("cfmeu_calendar"),
+  inheritWorkDays: boolean("inherit_work_days").default(true).notNull(),
   workDays: json("work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
   color: text("color").default("#3B82F6"),
   isActive: boolean("is_active").default(true).notNull(),

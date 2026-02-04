@@ -83,6 +83,7 @@ const factorySchema = z.object({
   latitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
   longitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
   cfmeuCalendar: z.enum(["VIC_ONSITE", "VIC_OFFSITE", "QLD"]).nullable().optional(),
+  inheritWorkDays: z.boolean().default(true),
   workDays: z.array(z.boolean()).length(7),
   color: z.string().default("#3B82F6"),
   isActive: z.boolean().default(true),
@@ -136,6 +137,12 @@ export default function AdminFactoriesPage() {
     queryKey: ["/api/admin/factories"],
   });
 
+  const { data: globalSettings } = useQuery<{ productionWorkDays?: boolean[] }>({
+    queryKey: ["/api/admin/settings"],
+  });
+
+  const globalWorkDays = (globalSettings?.productionWorkDays as boolean[]) || [false, true, true, true, true, true, false];
+
   const form = useForm<FactoryFormData>({
     resolver: zodResolver(factorySchema),
     defaultValues: {
@@ -146,11 +153,14 @@ export default function AdminFactoriesPage() {
       latitude: null,
       longitude: null,
       cfmeuCalendar: null,
+      inheritWorkDays: true,
       workDays: [false, true, true, true, true, true, false],
       color: "#3B82F6",
       isActive: true,
     },
   });
+
+  const inheritWorkDays = form.watch("inheritWorkDays");
 
   const bedForm = useForm<BedFormData>({
     resolver: zodResolver(bedSchema),
@@ -279,6 +289,7 @@ export default function AdminFactoriesPage() {
       latitude: null,
       longitude: null,
       cfmeuCalendar: null,
+      inheritWorkDays: true,
       workDays: [false, true, true, true, true, true, false],
       color: "#3B82F6",
       isActive: true,
@@ -296,6 +307,7 @@ export default function AdminFactoriesPage() {
       latitude: factory.latitude ? parseFloat(String(factory.latitude)) : null,
       longitude: factory.longitude ? parseFloat(String(factory.longitude)) : null,
       cfmeuCalendar: factory.cfmeuCalendar || null,
+      inheritWorkDays: factory.inheritWorkDays ?? true,
       workDays: (factory.workDays as boolean[]) || [false, true, true, true, true, true, false],
       color: factory.color || "#3B82F6",
       isActive: factory.isActive,
@@ -475,19 +487,27 @@ export default function AdminFactoriesPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex gap-0.5">
-                        {dayNames.map((day, i) => (
-                          <span
-                            key={day}
-                            className={`text-xs px-1 rounded ${
-                              (factory.workDays as boolean[])?.[i]
-                                ? "bg-primary/20 text-primary"
-                                : "bg-muted text-muted-foreground"
-                            }`}
-                          >
-                            {day[0]}
-                          </span>
-                        ))}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex gap-0.5">
+                          {dayNames.map((day, i) => {
+                            const displayDays = factory.inheritWorkDays ? globalWorkDays : (factory.workDays as boolean[]);
+                            return (
+                              <span
+                                key={day}
+                                className={`text-xs px-1 rounded ${
+                                  displayDays?.[i]
+                                    ? "bg-primary/20 text-primary"
+                                    : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {day[0]}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        {factory.inheritWorkDays && (
+                          <span className="text-xs text-muted-foreground">(inherited)</span>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -725,32 +745,71 @@ export default function AdminFactoriesPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="workDays"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Work Days</FormLabel>
-                    <div className="flex gap-2">
-                      {dayNames.map((day, index) => (
-                        <div key={day} className="flex flex-col items-center gap-1">
-                          <span className="text-xs text-muted-foreground">{day}</span>
-                          <Checkbox
-                            checked={field.value[index]}
-                            onCheckedChange={checked => {
-                              const newDays = [...field.value];
-                              newDays[index] = !!checked;
-                              field.onChange(newDays);
-                            }}
-                            data-testid={`checkbox-workday-${index}`}
-                          />
+              <Card className="p-0">
+                <CardContent className="p-4 space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="inheritWorkDays"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between">
+                        <div>
+                          <FormLabel>Production Staff Work Days</FormLabel>
+                          <FormDescription>
+                            {field.value ? "Using global settings" : "Using custom work days for this factory"}
+                          </FormDescription>
                         </div>
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Inherit from global</span>
+                          <FormControl>
+                            <Switch 
+                              checked={field.value} 
+                              onCheckedChange={field.onChange} 
+                              data-testid="switch-inherit-workdays" 
+                            />
+                          </FormControl>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="workDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex gap-2">
+                          {dayNames.map((day, index) => {
+                            const displayDays = inheritWorkDays ? globalWorkDays : field.value;
+                            return (
+                              <div key={day} className="flex flex-col items-center gap-1">
+                                <span className="text-xs text-muted-foreground">{day}</span>
+                                <Checkbox
+                                  checked={displayDays[index]}
+                                  disabled={inheritWorkDays}
+                                  onCheckedChange={checked => {
+                                    if (!inheritWorkDays) {
+                                      const newDays = [...field.value];
+                                      newDays[index] = !!checked;
+                                      field.onChange(newDays);
+                                    }
+                                  }}
+                                  data-testid={`checkbox-workday-${index}`}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        {inheritWorkDays && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Work days inherited from global settings. Turn off "Inherit from global" to customize.
+                          </p>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
 
               <FormField
                 control={form.control}
