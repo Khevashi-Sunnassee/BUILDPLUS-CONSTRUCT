@@ -965,6 +965,51 @@ export default function AdminSettingsPage() {
                 })}
               </div>
             )}
+
+            {cfmeuCalendarData?.holidays && cfmeuCalendarData.holidays.length > 0 && (
+              <details className="pt-4">
+                <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
+                  View imported holidays ({cfmeuCalendarData.holidays.length} total)
+                </summary>
+                <div className="mt-3 max-h-64 overflow-y-auto border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-muted">
+                      <tr>
+                        <th className="text-left p-2">Date</th>
+                        <th className="text-left p-2">Name</th>
+                        <th className="text-left p-2">Calendar</th>
+                        <th className="text-left p-2">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {cfmeuCalendarData.holidays.slice(0, 100).map((h, i) => (
+                        <tr key={h.id || i} className="border-t">
+                          <td className="p-2">{new Date(h.date).toLocaleDateString()}</td>
+                          <td className="p-2">{h.name}</td>
+                          <td className="p-2">{h.calendarType}</td>
+                          <td className="p-2">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              h.holidayType === 'PUBLIC_HOLIDAY' 
+                                ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' 
+                                : h.holidayType === 'RDO' 
+                                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300' 
+                                  : 'bg-gray-100 text-gray-700 dark:bg-gray-900 dark:text-gray-300'
+                            }`}>
+                              {h.holidayType}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {cfmeuCalendarData.holidays.length > 100 && (
+                    <p className="text-xs text-muted-foreground p-2 text-center border-t">
+                      Showing first 100 of {cfmeuCalendarData.holidays.length} holidays
+                    </p>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
         </CardContent>
       </Card>
