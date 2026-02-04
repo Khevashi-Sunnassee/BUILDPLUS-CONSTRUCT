@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -95,6 +95,8 @@ export const devices = pgTable("devices", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const cfmeuCalendarEnum = pgEnum("cfmeu_calendar", ["NONE", "CFMEU_QLD", "CFMEU_VIC"]);
+
 export const globalSettings = pgTable("global_settings", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   tz: text("tz").default("Australia/Melbourne").notNull(),
@@ -109,6 +111,9 @@ export const globalSettings = pgTable("global_settings", {
   ifcDaysInAdvance: integer("ifc_days_in_advance").default(14).notNull(),
   daysToAchieveIfc: integer("days_to_achieve_ifc").default(21).notNull(),
   productionDaysInAdvance: integer("production_days_in_advance").default(10).notNull(),
+  productionWorkDays: json("production_work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
+  draftingWorkDays: json("drafting_work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
+  cfmeuCalendar: cfmeuCalendarEnum("cfmeu_calendar").default("NONE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

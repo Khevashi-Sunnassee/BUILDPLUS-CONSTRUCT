@@ -59,6 +59,9 @@ export default function AdminSettingsPage() {
   const [ifcDaysInAdvance, setIfcDaysInAdvance] = useState<number>(14);
   const [daysToAchieveIfc, setDaysToAchieveIfc] = useState<number>(21);
   const [productionDaysInAdvance, setProductionDaysInAdvance] = useState<number>(10);
+  const [productionWorkDays, setProductionWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
+  const [draftingWorkDays, setDraftingWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
+  const [cfmeuCalendar, setCfmeuCalendar] = useState<string>("NONE");
   const [showDeletePanel, setShowDeletePanel] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -108,7 +111,16 @@ export default function AdminSettingsPage() {
     if (settings?.productionDaysInAdvance !== undefined) {
       setProductionDaysInAdvance(settings.productionDaysInAdvance);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance]);
+    if (settings?.productionWorkDays) {
+      setProductionWorkDays(settings.productionWorkDays as boolean[]);
+    }
+    if (settings?.draftingWorkDays) {
+      setDraftingWorkDays(settings.draftingWorkDays as boolean[]);
+    }
+    if (settings?.cfmeuCalendar) {
+      setCfmeuCalendar(settings.cfmeuCalendar);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -186,6 +198,45 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save production days in advance", variant: "destructive" });
+    },
+  });
+
+  const saveProductionWorkDaysMutation = useMutation({
+    mutationFn: async (days: boolean[]) => {
+      return apiRequest("PUT", "/api/admin/settings", { productionWorkDays: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Production work days saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save production work days", variant: "destructive" });
+    },
+  });
+
+  const saveDraftingWorkDaysMutation = useMutation({
+    mutationFn: async (days: boolean[]) => {
+      return apiRequest("PUT", "/api/admin/settings", { draftingWorkDays: days });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "Drafting work days saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save drafting work days", variant: "destructive" });
+    },
+  });
+
+  const saveCfmeuCalendarMutation = useMutation({
+    mutationFn: async (calendar: string) => {
+      return apiRequest("PUT", "/api/admin/settings", { cfmeuCalendar: calendar });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      toast({ title: "CFMEU calendar saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save CFMEU calendar", variant: "destructive" });
     },
   });
 
@@ -668,6 +719,129 @@ export default function AdminSettingsPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Number of days before panels need to be delivered to site that production should complete. This is used for production scheduling.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Work Days Settings
+          </CardTitle>
+          <CardDescription>
+            Configure work days for production and drafting staff
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <Label>Production Staff Work Days</Label>
+            <div className="flex flex-wrap gap-4">
+              {dayNames.map((day, index) => (
+                <div key={`production-${day}`} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`production-day-${index}`}
+                    checked={productionWorkDays[index]}
+                    onCheckedChange={(checked) => {
+                      const newDays = [...productionWorkDays];
+                      newDays[index] = !!checked;
+                      setProductionWorkDays(newDays);
+                    }}
+                    data-testid={`checkbox-production-${day.toLowerCase()}`}
+                  />
+                  <Label htmlFor={`production-day-${index}`} className="text-sm font-normal cursor-pointer">
+                    {day}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => saveProductionWorkDaysMutation.mutate(productionWorkDays)}
+              disabled={saveProductionWorkDaysMutation.isPending || JSON.stringify(productionWorkDays) === JSON.stringify(settings?.productionWorkDays)}
+              data-testid="button-save-production-work-days"
+            >
+              {saveProductionWorkDaysMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Production Days
+            </Button>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t">
+            <Label>Drafting Staff Work Days</Label>
+            <div className="flex flex-wrap gap-4">
+              {dayNames.map((day, index) => (
+                <div key={`drafting-${day}`} className="flex items-center gap-2">
+                  <Checkbox
+                    id={`drafting-day-${index}`}
+                    checked={draftingWorkDays[index]}
+                    onCheckedChange={(checked) => {
+                      const newDays = [...draftingWorkDays];
+                      newDays[index] = !!checked;
+                      setDraftingWorkDays(newDays);
+                    }}
+                    data-testid={`checkbox-drafting-${day.toLowerCase()}`}
+                  />
+                  <Label htmlFor={`drafting-day-${index}`} className="text-sm font-normal cursor-pointer">
+                    {day}
+                  </Label>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => saveDraftingWorkDaysMutation.mutate(draftingWorkDays)}
+              disabled={saveDraftingWorkDaysMutation.isPending || JSON.stringify(draftingWorkDays) === JSON.stringify(settings?.draftingWorkDays)}
+              data-testid="button-save-drafting-work-days"
+            >
+              {saveDraftingWorkDaysMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-2" />
+              )}
+              Save Drafting Days
+            </Button>
+          </div>
+
+          <div className="space-y-3 pt-4 border-t">
+            <Label>CFMEU Calendar</Label>
+            <div className="flex items-center gap-4">
+              <Select value={cfmeuCalendar} onValueChange={setCfmeuCalendar}>
+                <SelectTrigger className="w-[200px]" data-testid="select-cfmeu-calendar">
+                  <SelectValue placeholder="Select calendar" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="NONE">None</SelectItem>
+                  <SelectItem value="CFMEU_QLD">CFMEU QLD</SelectItem>
+                  <SelectItem value="CFMEU_VIC">CFMEU VIC</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => saveCfmeuCalendarMutation.mutate(cfmeuCalendar)}
+                disabled={saveCfmeuCalendarMutation.isPending || cfmeuCalendar === settings?.cfmeuCalendar}
+                data-testid="button-save-cfmeu-calendar"
+              >
+                {saveCfmeuCalendarMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Select a CFMEU calendar to exclude public holidays from work day calculations
             </p>
           </div>
         </CardContent>
