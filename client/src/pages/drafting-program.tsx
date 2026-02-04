@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, AlertTriangle, Check, RefreshCw, Pencil, User, ChevronDown, ChevronRight, Briefcase, CalendarDays, Search, Layers, Play, Pause } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays, startOfWeek, endOfWeek } from "date-fns";
@@ -481,24 +482,36 @@ export default function DraftingProgramPage() {
                       <div className="flex items-center gap-1">
                         {isManagerOrAdmin && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openAssignDialog(entry)}
-                              title="Assign Resource"
-                              data-testid={`button-assign-${entry.id}`}
-                            >
-                              <User className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openUpdateStatusDialog(entry)}
-                              title="Update Status"
-                              data-testid={`button-status-${entry.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openAssignDialog(entry)}
+                                  data-testid={`button-assign-${entry.id}`}
+                                >
+                                  <User className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Assign a drafter to this panel</p>
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => openUpdateStatusDialog(entry)}
+                                  data-testid={`button-status-${entry.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Update drafting status</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </>
                         )}
                       </div>
@@ -599,24 +612,36 @@ export default function DraftingProgramPage() {
                               <div className="flex items-center gap-1">
                                 {isManagerOrAdmin && (
                                   <>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => openAssignDialog(entry)}
-                                      title="Assign Resource"
-                                      data-testid={`button-assign-${entry.id}`}
-                                    >
-                                      <User className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => openUpdateStatusDialog(entry)}
-                                      title="Update Status"
-                                      data-testid={`button-status-${entry.id}`}
-                                    >
-                                      <Pencil className="h-4 w-4" />
-                                    </Button>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => openAssignDialog(entry)}
+                                          data-testid={`button-assign-${entry.id}`}
+                                        >
+                                          <User className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Assign a drafter to this panel</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => openUpdateStatusDialog(entry)}
+                                          data-testid={`button-status-${entry.id}`}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Update drafting status</p>
+                                      </TooltipContent>
+                                    </Tooltip>
                                   </>
                                 )}
                               </div>

@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon, LayoutGrid, ChevronLeft } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -212,12 +213,26 @@ function CalendarView({
       {/* Calendar Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={() => navigate("prev")} data-testid="button-calendar-prev">
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => navigate("next")} data-testid="button-calendar-next">
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={() => navigate("prev")} data-testid="button-calendar-prev">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Previous {calendarViewMode === "week" ? "week" : "month"}</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" onClick={() => navigate("next")} data-testid="button-calendar-next">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Next {calendarViewMode === "week" ? "week" : "month"}</p>
+            </TooltipContent>
+          </Tooltip>
           <span className="font-semibold text-lg ml-2">{headerLabel}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -1215,44 +1230,72 @@ export default function ProductionSlotsPage() {
                                 <div className="flex gap-1">
                                   {isManagerOrAdmin && slot.status !== "COMPLETED" && (
                                     <>
-                                      <Button 
-                                        size="sm" 
-                                        variant="outline"
-                                        onClick={() => openAdjustDialog(slot)}
-                                        data-testid={`button-adjust-${slot.id}`}
-                                      >
-                                        <Calendar className="h-4 w-4" />
-                                      </Button>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline"
+                                            onClick={() => openAdjustDialog(slot)}
+                                            data-testid={`button-adjust-${slot.id}`}
+                                          >
+                                            <Calendar className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Adjust production date</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                       {slot.status !== "BOOKED" && (
-                                        <Button 
-                                          size="sm" 
-                                          variant="default"
-                                          onClick={() => bookSlotMutation.mutate(slot.id)}
-                                          disabled={bookSlotMutation.isPending}
-                                          data-testid={`button-book-${slot.id}`}
-                                        >
-                                          <BookOpen className="h-4 w-4" />
-                                        </Button>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button 
+                                              size="sm" 
+                                              variant="default"
+                                              onClick={() => bookSlotMutation.mutate(slot.id)}
+                                              disabled={bookSlotMutation.isPending}
+                                              data-testid={`button-book-${slot.id}`}
+                                            >
+                                              <BookOpen className="h-4 w-4" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Book slot for production</p>
+                                          </TooltipContent>
+                                        </Tooltip>
                                       )}
-                                      <Button 
-                                        size="sm" 
-                                        variant="outline"
-                                        onClick={() => completeSlotMutation.mutate(slot.id)}
-                                        disabled={completeSlotMutation.isPending}
-                                        data-testid={`button-complete-${slot.id}`}
-                                      >
-                                        <Check className="h-4 w-4" />
-                                      </Button>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button 
+                                            size="sm" 
+                                            variant="outline"
+                                            onClick={() => completeSlotMutation.mutate(slot.id)}
+                                            disabled={completeSlotMutation.isPending}
+                                            data-testid={`button-complete-${slot.id}`}
+                                          >
+                                            <Check className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Mark slot as completed</p>
+                                        </TooltipContent>
+                                      </Tooltip>
                                     </>
                                   )}
-                                  <Button 
-                                    size="sm" 
-                                    variant="ghost"
-                                    onClick={() => openHistory(slot)}
-                                    data-testid={`button-history-${slot.id}`}
-                                  >
-                                    <History className="h-4 w-4" />
-                                  </Button>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button 
+                                        size="sm" 
+                                        variant="ghost"
+                                        onClick={() => openHistory(slot)}
+                                        data-testid={`button-history-${slot.id}`}
+                                      >
+                                        <History className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>View change history</p>
+                                    </TooltipContent>
+                                  </Tooltip>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1320,44 +1363,72 @@ export default function ProductionSlotsPage() {
                       <div className="flex gap-1">
                         {isManagerOrAdmin && slot.status !== "COMPLETED" && (
                           <>
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => openAdjustDialog(slot)}
-                              data-testid={`button-adjust-${slot.id}`}
-                            >
-                              <Calendar className="h-4 w-4" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => openAdjustDialog(slot)}
+                                  data-testid={`button-adjust-${slot.id}`}
+                                >
+                                  <Calendar className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Adjust production date</p>
+                              </TooltipContent>
+                            </Tooltip>
                             {slot.status !== "BOOKED" && (
-                              <Button 
-                                size="sm" 
-                                variant="default"
-                                onClick={() => bookSlotMutation.mutate(slot.id)}
-                                disabled={bookSlotMutation.isPending}
-                                data-testid={`button-book-${slot.id}`}
-                              >
-                                <BookOpen className="h-4 w-4" />
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button 
+                                    size="sm" 
+                                    variant="default"
+                                    onClick={() => bookSlotMutation.mutate(slot.id)}
+                                    disabled={bookSlotMutation.isPending}
+                                    data-testid={`button-book-${slot.id}`}
+                                  >
+                                    <BookOpen className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Book slot for production</p>
+                                </TooltipContent>
+                              </Tooltip>
                             )}
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => completeSlotMutation.mutate(slot.id)}
-                              disabled={completeSlotMutation.isPending}
-                              data-testid={`button-complete-${slot.id}`}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => completeSlotMutation.mutate(slot.id)}
+                                  disabled={completeSlotMutation.isPending}
+                                  data-testid={`button-complete-${slot.id}`}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Mark slot as completed</p>
+                              </TooltipContent>
+                            </Tooltip>
                           </>
                         )}
-                        <Button 
-                          size="sm" 
-                          variant="ghost"
-                          onClick={() => openHistory(slot)}
-                          data-testid={`button-history-${slot.id}`}
-                        >
-                          <History className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button 
+                              size="sm" 
+                              variant="ghost"
+                              onClick={() => openHistory(slot)}
+                              data-testid={`button-history-${slot.id}`}
+                            >
+                              <History className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View change history</p>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1743,16 +1814,22 @@ export default function ProductionSlotsPage() {
                                   {selectedSlot?.status === "BOOKED" && isManagerOrAdmin && (
                                     <TableCell className="text-center">
                                       {isBooked ? (
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => unbookPanelMutation.mutate(entry.entryId)}
-                                          disabled={unbookPanelMutation.isPending}
-                                          title="Remove from production"
-                                          data-testid={`button-unbook-${panel.id}`}
-                                        >
-                                          <CalendarX className="h-4 w-4 text-red-500" />
-                                        </Button>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <Button
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => unbookPanelMutation.mutate(entry.entryId)}
+                                              disabled={unbookPanelMutation.isPending}
+                                              data-testid={`button-unbook-${panel.id}`}
+                                            >
+                                              <CalendarX className="h-4 w-4 text-red-500" />
+                                            </Button>
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            <p>Remove panel from production schedule</p>
+                                          </TooltipContent>
+                                        </Tooltip>
                                       ) : (
                                         <Popover open={bookingPanelId === panel.id} onOpenChange={(open) => {
                                           if (open) {
@@ -1763,16 +1840,22 @@ export default function ProductionSlotsPage() {
                                             setBookingDate("");
                                           }
                                         }}>
-                                          <PopoverTrigger asChild>
-                                            <Button
-                                              size="icon"
-                                              variant="ghost"
-                                              title="Book for production"
-                                              data-testid={`button-book-${panel.id}`}
-                                            >
-                                              <CalendarPlus className="h-4 w-4 text-green-600" />
-                                            </Button>
-                                          </PopoverTrigger>
+                                          <Tooltip>
+                                            <TooltipTrigger asChild>
+                                              <PopoverTrigger asChild>
+                                                <Button
+                                                  size="icon"
+                                                  variant="ghost"
+                                                  data-testid={`button-book-${panel.id}`}
+                                                >
+                                                  <CalendarPlus className="h-4 w-4 text-green-600" />
+                                                </Button>
+                                              </PopoverTrigger>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <p>Book panel for production</p>
+                                            </TooltipContent>
+                                          </Tooltip>
                                           <PopoverContent className="w-auto p-3" align="end">
                                             <div className="space-y-2">
                                               <Label className="text-sm font-medium">Select Production Date</Label>
