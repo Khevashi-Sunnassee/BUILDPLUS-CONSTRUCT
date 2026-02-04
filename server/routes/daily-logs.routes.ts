@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -91,7 +92,7 @@ router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "
     
     res.status(201).json(newLog);
   } catch (error: any) {
-    console.error("Error creating daily log:", error);
+    logger.error({ err: error }, "Error creating daily log");
     res.status(500).json({ error: error.message || "Failed to create daily log" });
   }
 });
@@ -210,7 +211,7 @@ router.delete("/api/log-rows/:id", requireAuth, async (req, res) => {
     await storage.deleteLogRow(req.params.id as string);
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting log row:", error);
+    logger.error({ err: error }, "Error deleting log row");
     res.status(500).json({ error: error.message || "Failed to delete log row" });
   }
 });
@@ -232,7 +233,7 @@ router.delete("/api/daily-logs/:id", requireAuth, requirePermission("daily_repor
     await storage.deleteDailyLog(req.params.id as string);
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting daily log:", error);
+    logger.error({ err: error }, "Error deleting daily log");
     res.status(500).json({ error: error.message || "Failed to delete daily log" });
   }
 });
@@ -340,7 +341,7 @@ router.post("/api/manual-entry", requireAuth, async (req, res) => {
 
     res.json({ ok: true, dailyLogId: dailyLog.id, newPanelCreated: createNewPanel && newPanelMark ? true : false });
   } catch (error) {
-    console.error("Manual entry error:", error);
+    logger.error({ err: error }, "Manual entry error");
     res.status(500).json({ error: "Failed to create time entry" });
   }
 });

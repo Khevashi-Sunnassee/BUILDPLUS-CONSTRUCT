@@ -14,6 +14,7 @@ import {
   deliveryRecords, jobLevelCycleTimes
 } from "@shared/schema";
 import { sql, isNotNull } from "drizzle-orm";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -140,7 +141,7 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     
     res.json(counts);
   } catch (error: any) {
-    console.error("Error fetching data counts:", error);
+    logger.error({ err: error }, "Error fetching data counts");
     res.status(500).json({ error: error.message || "Failed to fetch data counts" });
   }
 });
@@ -245,7 +246,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       warnings
     });
   } catch (error: any) {
-    console.error("Error validating deletion:", error);
+    logger.error({ err: error }, "Error validating deletion");
     res.status(500).json({ error: error.message || "Failed to validate deletion" });
   }
 });
@@ -354,7 +355,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       deleted: deletedCounts
     });
   } catch (error: any) {
-    console.error("Error performing deletion:", error);
+    logger.error({ err: error }, "Error performing deletion");
     res.status(500).json({ error: error.message || "Failed to delete data" });
   }
 });

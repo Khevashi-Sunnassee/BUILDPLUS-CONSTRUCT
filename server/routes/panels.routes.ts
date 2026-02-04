@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -31,7 +32,7 @@ router.get("/api/panels/approved-for-production", requireAuth, async (req: Reque
     const panels = await storage.getPanelsApprovedForProduction(jobId as string | undefined);
     res.json(panels);
   } catch (error: any) {
-    console.error("Error fetching approved panels:", error);
+    logger.error({ err: error }, "Error fetching approved panels");
     res.status(500).json({ error: "Failed to fetch approved panels" });
   }
 });

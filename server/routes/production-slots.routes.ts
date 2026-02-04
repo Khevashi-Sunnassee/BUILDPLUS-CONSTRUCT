@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -36,7 +37,7 @@ router.get("/api/production-slots", requireAuth, async (req: Request, res: Respo
     const slots = await storage.getProductionSlots(filters);
     res.json(slots);
   } catch (error: any) {
-    console.error("Error fetching production slots:", error);
+    logger.error({ err: error }, "Error fetching production slots");
     res.status(500).json({ error: error.message || "Failed to fetch production slots" });
   }
 });
@@ -46,7 +47,7 @@ router.get("/api/production-slots/jobs-without-slots", requireAuth, async (req: 
     const jobsWithoutSlots = await storage.getJobsWithoutProductionSlots();
     res.json(jobsWithoutSlots);
   } catch (error: any) {
-    console.error("Error fetching jobs without slots:", error);
+    logger.error({ err: error }, "Error fetching jobs without slots");
     res.status(500).json({ error: error.message || "Failed to fetch jobs" });
   }
 });
@@ -59,7 +60,7 @@ router.get("/api/production-slots/:id", requireAuth, async (req: Request, res: R
     }
     res.json(slot);
   } catch (error: any) {
-    console.error("Error fetching production slot:", error);
+    logger.error({ err: error }, "Error fetching production slot");
     res.status(500).json({ error: error.message || "Failed to fetch production slot" });
   }
 });
@@ -69,7 +70,7 @@ router.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MA
     const result = await storage.checkPanelLevelCoverage(String(req.params.jobId));
     res.json(result);
   } catch (error: any) {
-    console.error("Error checking panel level coverage:", error);
+    logger.error({ err: error }, "Error checking panel level coverage");
     res.status(500).json({ error: error.message || "Failed to check level coverage" });
   }
 });
@@ -80,7 +81,7 @@ router.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAG
     const slots = await storage.generateProductionSlotsForJob(String(req.params.jobId), skipEmptyLevels);
     res.json(slots);
   } catch (error: any) {
-    console.error("Error generating production slots:", error);
+    logger.error({ err: error }, "Error generating production slots");
     res.status(500).json({ error: error.message || "Failed to generate production slots" });
   }
 });
@@ -103,7 +104,7 @@ router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"),
     }
     res.json(slot);
   } catch (error: any) {
-    console.error("Error adjusting production slot:", error);
+    logger.error({ err: error }, "Error adjusting production slot");
     res.status(500).json({ error: error.message || "Failed to adjust production slot" });
   }
 });
@@ -116,7 +117,7 @@ router.post("/api/production-slots/:id/book", requireRole("ADMIN", "MANAGER"), a
     }
     res.json(slot);
   } catch (error: any) {
-    console.error("Error booking production slot:", error);
+    logger.error({ err: error }, "Error booking production slot");
     res.status(500).json({ error: error.message || "Failed to book production slot" });
   }
 });
@@ -129,7 +130,7 @@ router.post("/api/production-slots/:id/complete", requireRole("ADMIN", "MANAGER"
     }
     res.json(slot);
   } catch (error: any) {
-    console.error("Error completing production slot:", error);
+    logger.error({ err: error }, "Error completing production slot");
     res.status(500).json({ error: error.message || "Failed to complete production slot" });
   }
 });
@@ -139,7 +140,7 @@ router.get("/api/production-slots/:id/adjustments", requireAuth, async (req: Req
     const adjustments = await storage.getProductionSlotAdjustments(String(req.params.id));
     res.json(adjustments);
   } catch (error: any) {
-    console.error("Error fetching production slot adjustments:", error);
+    logger.error({ err: error }, "Error fetching production slot adjustments");
     res.status(500).json({ error: error.message || "Failed to fetch adjustments" });
   }
 });
@@ -149,7 +150,7 @@ router.delete("/api/production-slots/:id", requireRole("ADMIN"), async (req: Req
     await storage.deleteProductionSlot(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting production slot:", error);
+    logger.error({ err: error }, "Error deleting production slot");
     res.status(500).json({ error: error.message || "Failed to delete production slot" });
   }
 });

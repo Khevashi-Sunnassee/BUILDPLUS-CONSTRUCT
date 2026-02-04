@@ -4,6 +4,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { factories, productionBeds, cfmeuHolidays, insertFactorySchema, insertProductionBedSchema } from "@shared/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import ICAL from "ical.js";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -81,7 +82,7 @@ async function parseIcsAndSaveHolidays(
       }
     }
   } catch (err) {
-    console.error("Error parsing ICS:", err);
+    logger.error({ err }, "Error parsing ICS");
     throw new Error("Failed to parse ICS file");
   }
 
@@ -90,7 +91,7 @@ async function parseIcsAndSaveHolidays(
 
 export async function syncAllCfmeuCalendars(): Promise<Record<string, { imported: number; skipped: number }>> {
   const results: Record<string, { imported: number; skipped: number }> = {};
-  console.log("[CFMEU] Starting automatic calendar sync...");
+  logger.info("[CFMEU] Starting automatic calendar sync...");
 
   for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
     const urls = CFMEU_CALENDAR_URLS[calendarType];
@@ -101,7 +102,7 @@ export async function syncAllCfmeuCalendars(): Promise<Record<string, { imported
       try {
         const response = await fetch(url);
         if (!response.ok) {
-          console.error(`[CFMEU] Failed to fetch ${calendarType} from ${url}: ${response.status}`);
+          logger.error(`[CFMEU] Failed to fetch ${calendarType} from ${url}: ${response.status}`);
           continue;
         }
         const icsContent = await response.text();
@@ -109,15 +110,15 @@ export async function syncAllCfmeuCalendars(): Promise<Record<string, { imported
         totalImported += result.imported;
         totalSkipped += result.skipped;
       } catch (err) {
-        console.error(`[CFMEU] Error fetching ${calendarType}:`, err);
+        logger.error({ err }, `[CFMEU] Error fetching ${calendarType}`);
       }
     }
 
     results[calendarType] = { imported: totalImported, skipped: totalSkipped };
-    console.log(`[CFMEU] Synced ${calendarType}: ${totalImported} holidays imported, ${totalSkipped} skipped`);
+    logger.info(`[CFMEU] Synced ${calendarType}: ${totalImported} holidays imported, ${totalSkipped} skipped`);
   }
 
-  console.log("[CFMEU] Automatic calendar sync complete");
+  logger.info("[CFMEU] Automatic calendar sync complete");
   return results;
 }
 
@@ -126,13 +127,13 @@ export function scheduleMonthlyCalendarSync() {
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
   const msUntilNextMonth = nextMonth.getTime() - now.getTime();
 
-  console.log(`[CFMEU] Next scheduled sync: ${nextMonth.toISOString()}`);
+  logger.info(`[CFMEU] Next scheduled sync: ${nextMonth.toISOString()}`);
 
   setTimeout(async () => {
     try {
       await syncAllCfmeuCalendars();
     } catch (err) {
-      console.error("[CFMEU] Scheduled sync failed:", err);
+      logger.error({ err }, "[CFMEU] Scheduled sync failed");
     }
     scheduleMonthlyCalendarSync();
   }, msUntilNextMonth);
@@ -144,7 +145,7 @@ export function initializeCfmeuSync() {
       await syncAllCfmeuCalendars();
       scheduleMonthlyCalendarSync();
     } catch (err) {
-      console.error("[CFMEU] Startup sync failed:", err);
+      logger.error({ err }, "[CFMEU] Startup sync failed");
       scheduleMonthlyCalendarSync();
     }
   }, 5000);
@@ -155,7 +156,7 @@ router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
     const allFactories = await db.select().from(factories).orderBy(factories.name);
     res.json(allFactories);
   } catch (error: any) {
-    console.error("Error fetching factories:", error);
+    logger.error({ err: error }, "Error fetching factories");
     res.status(500).json({ error: error.message || "Failed to fetch factories" });
   }
 });
@@ -165,7 +166,7 @@ router.get("/api/factories", requireAuth, async (req, res) => {
     const activeFactories = await db.select().from(factories).where(eq(factories.isActive, true)).orderBy(factories.name);
     res.json(activeFactories);
   } catch (error: any) {
-    console.error("Error fetching factories:", error);
+    logger.error({ err: error }, "Error fetching factories");
     res.status(500).json({ error: error.message || "Failed to fetch factories" });
   }
 });
@@ -180,7 +181,7 @@ router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) =>
     const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, factoryId)).orderBy(productionBeds.name);
     res.json({ ...factory[0], beds });
   } catch (error: any) {
-    console.error("Error fetching factory:", error);
+    logger.error({ err: error }, "Error fetching factory");
     res.status(500).json({ error: error.message || "Failed to fetch factory" });
   }
 });
@@ -191,7 +192,7 @@ router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
     const [created] = await db.insert(factories).values(parsed).returning();
     res.json(created);
   } catch (error: any) {
-    console.error("Error creating factory:", error);
+    logger.error({ err: error }, "Error creating factory");
     res.status(500).json({ error: error.message || "Failed to create factory" });
   }
 });
@@ -209,7 +210,7 @@ router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) 
     }
     res.json(updated);
   } catch (error: any) {
-    console.error("Error updating factory:", error);
+    logger.error({ err: error }, "Error updating factory");
     res.status(500).json({ error: error.message || "Failed to update factory" });
   }
 });
@@ -222,7 +223,7 @@ router.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res)
     }
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting factory:", error);
+    logger.error({ err: error }, "Error deleting factory");
     res.status(500).json({ error: error.message || "Failed to delete factory" });
   }
 });
@@ -232,7 +233,7 @@ router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (
     const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name);
     res.json(beds);
   } catch (error: any) {
-    console.error("Error fetching production beds:", error);
+    logger.error({ err: error }, "Error fetching production beds");
     res.status(500).json({ error: error.message || "Failed to fetch production beds" });
   }
 });
@@ -243,7 +244,7 @@ router.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async 
     const [created] = await db.insert(productionBeds).values(parsed).returning();
     res.json(created);
   } catch (error: any) {
-    console.error("Error creating production bed:", error);
+    logger.error({ err: error }, "Error creating production bed");
     res.status(500).json({ error: error.message || "Failed to create production bed" });
   }
 });
@@ -259,7 +260,7 @@ router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN")
     }
     res.json(updated);
   } catch (error: any) {
-    console.error("Error updating production bed:", error);
+    logger.error({ err: error }, "Error updating production bed");
     res.status(500).json({ error: error.message || "Failed to update production bed" });
   }
 });
@@ -274,7 +275,7 @@ router.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"
     }
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting production bed:", error);
+    logger.error({ err: error }, "Error deleting production bed");
     res.status(500).json({ error: error.message || "Failed to delete production bed" });
   }
 });
@@ -304,7 +305,7 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
     
     res.json(holidays);
   } catch (error: any) {
-    console.error("Error fetching CFMEU holidays:", error);
+    logger.error({ err: error }, "Error fetching CFMEU holidays");
     res.status(500).json({ error: error.message || "Failed to fetch holidays" });
   }
 });
@@ -326,7 +327,7 @@ router.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) 
 
     res.json({ holidays, summary });
   } catch (error: any) {
-    console.error("Error fetching CFMEU calendars:", error);
+    logger.error({ err: error }, "Error fetching CFMEU calendars");
     res.status(500).json({ error: error.message || "Failed to fetch calendars" });
   }
 });
@@ -346,7 +347,7 @@ router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req,
     for (const { url, years } of urls) {
       const response = await fetch(url);
       if (!response.ok) {
-        console.error(`Failed to fetch ${url}: ${response.status}`);
+        logger.error(`Failed to fetch ${url}: ${response.status}`);
         continue;
       }
       const icsContent = await response.text();
@@ -362,7 +363,7 @@ router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req,
       message: `Synced ${calendarType} calendar: ${totalImported} holidays imported`
     });
   } catch (error: any) {
-    console.error("Error syncing CFMEU calendar:", error);
+    logger.error({ err: error }, "Error syncing CFMEU calendar");
     res.status(500).json({ error: error.message || "Failed to sync calendar" });
   }
 });
@@ -380,7 +381,7 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
         try {
           const response = await fetch(url);
           if (!response.ok) {
-            console.error(`Failed to fetch ${url}: ${response.status}`);
+            logger.error(`Failed to fetch ${url}: ${response.status}`);
             continue;
           }
           const icsContent = await response.text();
@@ -388,7 +389,7 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
           totalImported += result.imported;
           totalSkipped += result.skipped;
         } catch (err) {
-          console.error(`Error fetching ${url}:`, err);
+          logger.error({ err }, `Error fetching ${url}`);
         }
       }
 
@@ -397,7 +398,7 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
 
     res.json({ success: true, results });
   } catch (error: any) {
-    console.error("Error syncing all CFMEU calendars:", error);
+    logger.error({ err: error }, "Error syncing all CFMEU calendars");
     res.status(500).json({ error: error.message || "Failed to sync calendars" });
   }
 });
@@ -413,7 +414,7 @@ router.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), 
     const result = await db.delete(cfmeuHolidays).where(eq(cfmeuHolidays.calendarType, calendarType as any));
     res.json({ success: true, deleted: result.rowCount || 0 });
   } catch (error: any) {
-    console.error("Error deleting CFMEU calendar:", error);
+    logger.error({ err: error }, "Error deleting CFMEU calendar");
     res.status(500).json({ error: error.message || "Failed to delete calendar" });
   }
 });

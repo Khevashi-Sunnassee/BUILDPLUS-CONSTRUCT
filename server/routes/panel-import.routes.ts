@@ -3,6 +3,7 @@ import multer from "multer";
 import * as XLSX from "xlsx";
 import { storage, sha256Hex } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 const upload = multer({ 
@@ -470,7 +471,7 @@ router.post("/api/jobs/:jobId/import-estimate",
         errors: importErrors.length > 0 ? importErrors.slice(0, 10) : undefined,
       });
     } catch (error: any) {
-      console.error("Estimate import error:", error);
+      logger.error({ err: error }, "Estimate import error");
       res.status(500).json({ error: error.message || "Failed to import estimate" });
     }
   }

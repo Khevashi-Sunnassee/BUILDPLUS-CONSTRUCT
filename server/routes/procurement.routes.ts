@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { InsertItem } from "@shared/schema";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -17,7 +18,7 @@ router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
     const suppliersData = await storage.getAllSuppliers();
     res.json(suppliersData);
   } catch (error: any) {
-    console.error("Error fetching suppliers:", error);
+    logger.error({ err: error }, "Error fetching suppliers");
     res.status(500).json({ error: error.message || "Failed to fetch suppliers" });
   }
 });
@@ -27,7 +28,7 @@ router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) =>
     const suppliersData = await storage.getActiveSuppliers();
     res.json(suppliersData);
   } catch (error: any) {
-    console.error("Error fetching active suppliers:", error);
+    logger.error({ err: error }, "Error fetching active suppliers");
     res.status(500).json({ error: error.message || "Failed to fetch suppliers" });
   }
 });
@@ -38,7 +39,7 @@ router.get("/api/procurement/suppliers/:id", requireAuth, async (req, res) => {
     if (!supplier) return res.status(404).json({ error: "Supplier not found" });
     res.json(supplier);
   } catch (error: any) {
-    console.error("Error fetching supplier:", error);
+    logger.error({ err: error }, "Error fetching supplier");
     res.status(500).json({ error: error.message || "Failed to fetch supplier" });
   }
 });
@@ -48,7 +49,7 @@ router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async
     const supplier = await storage.createSupplier(req.body);
     res.json(supplier);
   } catch (error: any) {
-    console.error("Error creating supplier:", error);
+    logger.error({ err: error }, "Error creating supplier");
     res.status(500).json({ error: error.message || "Failed to create supplier" });
   }
 });
@@ -59,7 +60,7 @@ router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), 
     if (!supplier) return res.status(404).json({ error: "Supplier not found" });
     res.json(supplier);
   } catch (error: any) {
-    console.error("Error updating supplier:", error);
+    logger.error({ err: error }, "Error updating supplier");
     res.status(500).json({ error: error.message || "Failed to update supplier" });
   }
 });
@@ -69,7 +70,7 @@ router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req
     await storage.deleteSupplier(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting supplier:", error);
+    logger.error({ err: error }, "Error deleting supplier");
     res.status(500).json({ error: error.message || "Failed to delete supplier" });
   }
 });
@@ -79,7 +80,7 @@ router.get("/api/procurement/item-categories", requireAuth, async (req, res) => 
     const categories = await storage.getAllItemCategories();
     res.json(categories);
   } catch (error: any) {
-    console.error("Error fetching item categories:", error);
+    logger.error({ err: error }, "Error fetching item categories");
     res.status(500).json({ error: error.message || "Failed to fetch categories" });
   }
 });
@@ -89,7 +90,7 @@ router.get("/api/procurement/item-categories/active", requireAuth, async (req, r
     const categories = await storage.getActiveItemCategories();
     res.json(categories);
   } catch (error: any) {
-    console.error("Error fetching active item categories:", error);
+    logger.error({ err: error }, "Error fetching active item categories");
     res.status(500).json({ error: error.message || "Failed to fetch categories" });
   }
 });
@@ -100,7 +101,7 @@ router.get("/api/procurement/item-categories/:id", requireAuth, async (req, res)
     if (!category) return res.status(404).json({ error: "Category not found" });
     res.json(category);
   } catch (error: any) {
-    console.error("Error fetching category:", error);
+    logger.error({ err: error }, "Error fetching category");
     res.status(500).json({ error: error.message || "Failed to fetch category" });
   }
 });
@@ -110,7 +111,7 @@ router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"),
     const category = await storage.createItemCategory(req.body);
     res.json(category);
   } catch (error: any) {
-    console.error("Error creating category:", error);
+    logger.error({ err: error }, "Error creating category");
     res.status(500).json({ error: error.message || "Failed to create category" });
   }
 });
@@ -121,7 +122,7 @@ router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAG
     if (!category) return res.status(404).json({ error: "Category not found" });
     res.json(category);
   } catch (error: any) {
-    console.error("Error updating category:", error);
+    logger.error({ err: error }, "Error updating category");
     res.status(500).json({ error: error.message || "Failed to update category" });
   }
 });
@@ -131,7 +132,7 @@ router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), asyn
     await storage.deleteItemCategory(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting category:", error);
+    logger.error({ err: error }, "Error deleting category");
     res.status(500).json({ error: error.message || "Failed to delete category" });
   }
 });
@@ -141,7 +142,7 @@ router.get("/api/procurement/items", requireAuth, async (req, res) => {
     const itemsData = await storage.getAllItems();
     res.json(itemsData);
   } catch (error: any) {
-    console.error("Error fetching items:", error);
+    logger.error({ err: error }, "Error fetching items");
     res.status(500).json({ error: error.message || "Failed to fetch items" });
   }
 });
@@ -151,7 +152,7 @@ router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
     const itemsData = await storage.getActiveItems();
     res.json(itemsData);
   } catch (error: any) {
-    console.error("Error fetching active items:", error);
+    logger.error({ err: error }, "Error fetching active items");
     res.status(500).json({ error: error.message || "Failed to fetch items" });
   }
 });
@@ -162,7 +163,7 @@ router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
     if (!item) return res.status(404).json({ error: "Item not found" });
     res.json(item);
   } catch (error: any) {
-    console.error("Error fetching item:", error);
+    logger.error({ err: error }, "Error fetching item");
     res.status(500).json({ error: error.message || "Failed to fetch item" });
   }
 });
@@ -172,7 +173,7 @@ router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (re
     const item = await storage.createItem(req.body);
     res.json(item);
   } catch (error: any) {
-    console.error("Error creating item:", error);
+    logger.error({ err: error }, "Error creating item");
     res.status(500).json({ error: error.message || "Failed to create item" });
   }
 });
@@ -183,7 +184,7 @@ router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), asyn
     if (!item) return res.status(404).json({ error: "Item not found" });
     res.json(item);
   } catch (error: any) {
-    console.error("Error updating item:", error);
+    logger.error({ err: error }, "Error updating item");
     res.status(500).json({ error: error.message || "Failed to update item" });
   }
 });
@@ -193,7 +194,7 @@ router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, re
     await storage.deleteItem(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting item:", error);
+    logger.error({ err: error }, "Error deleting item");
     res.status(500).json({ error: error.message || "Failed to delete item" });
   }
 });
@@ -234,7 +235,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
         const newCat = await storage.createItemCategory({ name: catName, isActive: true });
         categoryMap.set(catName.toLowerCase(), newCat.id);
       } catch (error) {
-        console.error(`Error creating category ${catName}:`, error);
+        logger.error({ err: error }, `Error creating category ${catName}`);
       }
     }
 
@@ -281,7 +282,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
       errors: result.errors,
     });
   } catch (error: any) {
-    console.error("Error importing items:", error);
+    logger.error({ err: error }, "Error importing items");
     res.status(500).json({ error: error.message || "Failed to import items" });
   }
 });

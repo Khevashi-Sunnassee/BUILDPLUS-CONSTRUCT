@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { format, subDays } from "date-fns";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -233,7 +234,7 @@ router.delete("/api/production-days/:date", requireRole("MANAGER", "ADMIN"), asy
     await storage.deleteProductionDayByDateAndFactory(date, factory);
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting production day:", error);
+    logger.error({ err: error }, "Error deleting production day");
     res.status(500).json({ error: error.message || "Failed to delete production day" });
   }
 });

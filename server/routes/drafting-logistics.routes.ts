@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -326,7 +327,7 @@ router.get("/api/reports/logistics", requireAuth, async (req, res) => {
       phaseAverages,
     });
   } catch (error: any) {
-    console.error("Logistics report error:", error);
+    logger.error({ err: error }, "Logistics report error");
     res.status(500).json({ error: error.message || "Failed to generate logistics report" });
   }
 });

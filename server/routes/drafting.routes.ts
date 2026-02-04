@@ -3,6 +3,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.get("/api/drafting-program", requireAuth, requirePermission("production_r
     const programs = await storage.getDraftingPrograms(Object.keys(filters).length > 0 ? filters : undefined);
     res.json(programs);
   } catch (error: any) {
-    console.error("Error fetching drafting program:", error);
+    logger.error({ err: error }, "Error fetching drafting program");
     res.status(500).json({ error: error.message || "Failed to fetch drafting program" });
   }
 });
@@ -63,7 +64,7 @@ router.get("/api/drafting-program/my-allocated", requireAuth, requirePermission(
       }
     });
   } catch (error: any) {
-    console.error("Error fetching my allocated panels:", error);
+    logger.error({ err: error }, "Error fetching my allocated panels");
     res.status(500).json({ error: error.message || "Failed to fetch allocated panels" });
   }
 });
@@ -74,7 +75,7 @@ router.get("/api/drafting-program/:id", requireAuth, requirePermission("producti
     if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
     res.json(program);
   } catch (error: any) {
-    console.error("Error fetching drafting program entry:", error);
+    logger.error({ err: error }, "Error fetching drafting program entry");
     res.status(500).json({ error: error.message || "Failed to fetch drafting program entry" });
   }
 });
@@ -84,7 +85,7 @@ router.post("/api/drafting-program/generate", requireAuth, requirePermission("pr
     const result = await storage.generateDraftingProgramFromProductionSlots();
     res.json({ success: true, ...result });
   } catch (error: any) {
-    console.error("Error generating drafting program:", error);
+    logger.error({ err: error }, "Error generating drafting program");
     res.status(500).json({ error: error.message || "Failed to generate drafting program" });
   }
 });
@@ -105,7 +106,7 @@ router.post("/api/drafting-program/:id/assign", requireAuth, requirePermission("
     if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });
     res.json(updated);
   } catch (error: any) {
-    console.error("Error assigning drafting resource:", error);
+    logger.error({ err: error }, "Error assigning drafting resource");
     res.status(500).json({ error: error.message || "Failed to assign drafting resource" });
   }
 });
@@ -133,7 +134,7 @@ router.patch("/api/drafting-program/:id", requireAuth, requirePermission("produc
     if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });
     res.json(updated);
   } catch (error: any) {
-    console.error("Error updating drafting program:", error);
+    logger.error({ err: error }, "Error updating drafting program");
     res.status(500).json({ error: error.message || "Failed to update drafting program" });
   }
 });
@@ -143,7 +144,7 @@ router.delete("/api/drafting-program/:id", requireAuth, requirePermission("produ
     await storage.deleteDraftingProgram(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting drafting program entry:", error);
+    logger.error({ err: error }, "Error deleting drafting program entry");
     res.status(500).json({ error: error.message || "Failed to delete drafting program entry" });
   }
 });
@@ -154,7 +155,7 @@ router.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission
     const deleted = await storage.deleteDraftingProgramByJob(jobId);
     res.json({ success: true, deleted });
   } catch (error: any) {
-    console.error("Error deleting drafting program entries for job:", error);
+    logger.error({ err: error }, "Error deleting drafting program entries for job");
     res.status(500).json({ error: error.message || "Failed to delete drafting program entries" });
   }
 });

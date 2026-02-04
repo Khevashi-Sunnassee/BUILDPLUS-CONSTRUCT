@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireRole } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -69,7 +70,7 @@ Return ONLY valid JSON, no explanation text.`
       const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       extractedData = JSON.parse(cleanContent);
     } catch (e) {
-      console.error("Failed to parse OpenAI response:", content);
+      logger.error("Failed to parse OpenAI response");
       extractedData = {};
     }
     
@@ -79,7 +80,7 @@ Return ONLY valid JSON, no explanation text.`
       panelId: id,
     });
   } catch (error: any) {
-    console.error("PDF analysis error:", error);
+    logger.error({ err: error }, "PDF analysis error");
     res.status(500).json({ 
       error: "Failed to analyze PDF", 
       details: error.message 
@@ -128,7 +129,7 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
     
     res.json({ success: true, panel: updated });
   } catch (error: any) {
-    console.error("Approval error:", error);
+    logger.error({ err: error }, "Approval error");
     res.status(500).json({ error: "Failed to approve panel", details: error.message });
   }
 });
@@ -146,7 +147,7 @@ router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MAN
     
     res.json({ success: true, panel: updated });
   } catch (error: any) {
-    console.error("Revoke error:", error);
+    logger.error({ err: error }, "Revoke error");
     res.status(500).json({ error: "Failed to revoke approval", details: error.message });
   }
 });

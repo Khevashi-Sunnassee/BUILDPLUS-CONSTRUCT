@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -21,7 +22,7 @@ router.get("/api/purchase-orders", requireAuth, async (req, res) => {
     }
     res.json(orders);
   } catch (error: any) {
-    console.error("Error fetching purchase orders:", error);
+    logger.error({ err: error }, "Error fetching purchase orders");
     res.status(500).json({ error: error.message || "Failed to fetch purchase orders" });
   }
 });
@@ -32,7 +33,7 @@ router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
     const orders = await storage.getPurchaseOrdersByUser(userId);
     res.json(orders);
   } catch (error: any) {
-    console.error("Error fetching my purchase orders:", error);
+    logger.error({ err: error }, "Error fetching my purchase orders");
     res.status(500).json({ error: error.message || "Failed to fetch purchase orders" });
   }
 });
@@ -42,7 +43,7 @@ router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => 
     const poNumber = await storage.getNextPONumber();
     res.json({ poNumber });
   } catch (error: any) {
-    console.error("Error getting next PO number:", error);
+    logger.error({ err: error }, "Error getting next PO number");
     res.status(500).json({ error: error.message || "Failed to get next PO number" });
   }
 });
@@ -53,7 +54,7 @@ router.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     if (!order) return res.status(404).json({ error: "Purchase order not found" });
     res.json(order);
   } catch (error: any) {
-    console.error("Error fetching purchase order:", error);
+    logger.error({ err: error }, "Error fetching purchase order");
     res.status(500).json({ error: error.message || "Failed to fetch purchase order" });
   }
 });
@@ -72,7 +73,7 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
     );
     res.json(order);
   } catch (error: any) {
-    console.error("Error creating purchase order:", error);
+    logger.error({ err: error }, "Error creating purchase order");
     res.status(500).json({ error: error.message || "Failed to create purchase order" });
   }
 });
@@ -94,7 +95,7 @@ router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     const updated = await storage.updatePurchaseOrder(String(req.params.id), poData, lineItems);
     res.json(updated);
   } catch (error: any) {
-    console.error("Error updating purchase order:", error);
+    logger.error({ err: error }, "Error updating purchase order");
     res.status(500).json({ error: error.message || "Failed to update purchase order" });
   }
 });
@@ -116,7 +117,7 @@ router.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => 
     const submitted = await storage.submitPurchaseOrder(String(req.params.id));
     res.json(submitted);
   } catch (error: any) {
-    console.error("Error submitting purchase order:", error);
+    logger.error({ err: error }, "Error submitting purchase order");
     res.status(500).json({ error: error.message || "Failed to submit purchase order" });
   }
 });
@@ -151,7 +152,7 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
     const approved = await storage.approvePurchaseOrder(String(req.params.id), userId);
     res.json(approved);
   } catch (error: any) {
-    console.error("Error approving purchase order:", error);
+    logger.error({ err: error }, "Error approving purchase order");
     res.status(500).json({ error: error.message || "Failed to approve purchase order" });
   }
 });
@@ -181,7 +182,7 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
     const rejected = await storage.rejectPurchaseOrder(String(req.params.id), userId, reason);
     res.json(rejected);
   } catch (error: any) {
-    console.error("Error rejecting purchase order:", error);
+    logger.error({ err: error }, "Error rejecting purchase order");
     res.status(500).json({ error: error.message || "Failed to reject purchase order" });
   }
 });
@@ -205,7 +206,7 @@ router.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     await storage.deletePurchaseOrder(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting purchase order:", error);
+    logger.error({ err: error }, "Error deleting purchase order");
     res.status(500).json({ error: error.message || "Failed to delete purchase order" });
   }
 });
@@ -215,7 +216,7 @@ router.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res)
     const attachments = await storage.getPurchaseOrderAttachments(String(req.params.id));
     res.json(attachments);
   } catch (error: any) {
-    console.error("Error fetching PO attachments:", error);
+    logger.error({ err: error }, "Error fetching PO attachments");
     res.status(500).json({ error: error.message || "Failed to fetch attachments" });
   }
 });
@@ -260,7 +261,7 @@ router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("f
 
     res.status(201).json(attachments);
   } catch (error: any) {
-    console.error("Error uploading PO attachments:", error);
+    logger.error({ err: error }, "Error uploading PO attachments");
     res.status(500).json({ error: error.message || "Failed to upload attachments" });
   }
 });
@@ -279,7 +280,7 @@ router.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => 
     res.setHeader("Content-Type", attachment.mimeType);
     fs.createReadStream(attachment.filePath).pipe(res);
   } catch (error: any) {
-    console.error("Error downloading attachment:", error);
+    logger.error({ err: error }, "Error downloading attachment");
     res.status(500).json({ error: error.message || "Failed to download attachment" });
   }
 });
@@ -302,13 +303,13 @@ router.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
     try {
       await fs.unlink(attachment.filePath);
     } catch (e) {
-      console.warn("Could not delete file from disk:", e);
+      logger.warn({ err: e }, "Could not delete file from disk");
     }
 
     await storage.deletePurchaseOrderAttachment(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
-    console.error("Error deleting attachment:", error);
+    logger.error({ err: error }, "Error deleting attachment");
     res.status(500).json({ error: error.message || "Failed to delete attachment" });
   }
 });

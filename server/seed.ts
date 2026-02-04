@@ -2,9 +2,10 @@ import { db } from "./db";
 import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
+import logger from "./lib/logger";
 
 export async function seedDatabase() {
-  console.log("Checking if seed data exists...");
+  logger.info("Checking if seed data exists...");
 
   // Always seed work types (idempotent)
   const existingWorkTypes = await db.select().from(workTypes);
@@ -32,7 +33,7 @@ export async function seedDatabase() {
         isActive: true,
       },
     ]);
-    console.log("Work types seeded");
+    logger.info("Work types seeded");
   }
 
   // Always seed trailer types (idempotent)
@@ -52,16 +53,16 @@ export async function seedDatabase() {
         isActive: true,
       },
     ]);
-    console.log("Trailer types seeded");
+    logger.info("Trailer types seeded");
   }
 
   const existingUsers = await db.select().from(users);
   if (existingUsers.length > 0) {
-    console.log("User data already exists, skipping user seed...");
+    logger.info("User data already exists, skipping user seed...");
     return;
   }
 
-  console.log("Seeding database with initial data...");
+  logger.info("Seeding database with initial data...");
 
   const adminPasswordHash = await bcrypt.hash("admin123", 10);
   const managerPasswordHash = await bcrypt.hash("manager123", 10);
@@ -319,9 +320,6 @@ export async function seedDatabase() {
     },
   ]);
 
-  console.log("Seed data created successfully!");
-  console.log("Demo accounts:");
-  console.log("  Admin: admin@lte.com.au / admin123");
-  console.log("  Manager: manager@lte.com.au / manager123");
-  console.log("  User: drafter@lte.com.au / user123");
+  logger.info("Seed data created successfully!");
+  logger.info("Demo accounts: Admin: admin@lte.com.au / admin123, Manager: manager@lte.com.au / manager123, User: drafter@lte.com.au / user123");
 }

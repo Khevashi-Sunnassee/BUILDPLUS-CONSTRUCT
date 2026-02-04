@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage, sha256Hex } from "../storage";
 import { agentIngestSchema } from "@shared/schema";
 import { z } from "zod";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -77,7 +78,7 @@ router.post("/ingest", async (req, res) => {
 
     res.json({ ok: true, count: createdOrUpdated.length });
   } catch (error) {
-    console.error("Agent ingest error:", error);
+    logger.error({ err: error }, "Agent ingest error");
     res.status(500).json({ error: "Internal server error" });
   }
 });
