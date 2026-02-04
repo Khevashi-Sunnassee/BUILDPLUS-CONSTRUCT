@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO, addDays } from "date-fns";
+import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -504,9 +505,350 @@ export default function PurchaseOrderFormPage() {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = useCallback(() => {
+    if (!existingPO) return;
+    
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+    
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const margin = 15;
+    const contentWidth = pageWidth - margin * 2;
+    let currentY = margin;
+    
+    // Helper function to add a new page if needed
+    const checkPageBreak = (requiredHeight: number) => {
+      if (currentY + requiredHeight > pageHeight - margin) {
+        pdf.addPage();
+        currentY = margin;
+        return true;
+      }
+      return false;
+    };
+    
+    // Company header section
+    pdf.setFillColor(37, 99, 235); // Blue header background
+    pdf.rect(0, 0, pageWidth, 35, "F");
+    
+    // Company name
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(18);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(settings?.companyName || "LTE Precast Concrete Structures", margin, 15);
+    
+    // Purchase Order title
+    pdf.setFontSize(24);
+    pdf.text("PURCHASE ORDER", margin, 28);
+    
+    // PO Number box on right side
+    pdf.setFillColor(255, 255, 255);
+    pdf.roundedRect(pageWidth - margin - 55, 8, 55, 22, 2, 2, "F");
+    pdf.setTextColor(37, 99, 235);
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "normal");
+    pdf.text("PO Number", pageWidth - margin - 50, 15);
+    pdf.setFontSize(14);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(existingPO.poNumber || "", pageWidth - margin - 50, 25);
+    
+    currentY = 45;
+    
+    // Status badge
+    const statusColors: Record<string, { bg: number[]; text: number[] }> = {
+      DRAFT: { bg: [156, 163, 175], text: [255, 255, 255] },
+      SUBMITTED: { bg: [59, 130, 246], text: [255, 255, 255] },
+      APPROVED: { bg: [34, 197, 94], text: [255, 255, 255] },
+      REJECTED: { bg: [239, 68, 68], text: [255, 255, 255] },
+    };
+    const statusStyle = statusColors[existingPO.status] || statusColors.DRAFT;
+    pdf.setFillColor(statusStyle.bg[0], statusStyle.bg[1], statusStyle.bg[2]);
+    const statusText = existingPO.status.charAt(0) + existingPO.status.slice(1).toLowerCase();
+    const statusWidth = pdf.getTextWidth(statusText) + 8;
+    pdf.roundedRect(margin, currentY, statusWidth, 7, 1.5, 1.5, "F");
+    pdf.setTextColor(statusStyle.text[0], statusStyle.text[1], statusStyle.text[2]);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "bold");
+    pdf.text(statusText, margin + 4, currentY + 5);
+    
+    // Date on right
+    pdf.setTextColor(100, 100, 100);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(`Date: ${format(new Date(existingPO.createdAt), "dd MMMM yyyy")}`, pageWidth - margin - 40, currentY + 5);
+    
+    currentY += 15;
+    
+    // Two column layout for supplier and delivery info
+    const colWidth = (contentWidth - 10) / 2;
+    
+    // Supplier details box
+    pdf.setFillColor(249, 250, 251);
+    pdf.roundedRect(margin, currentY, colWidth, 45, 2, 2, "F");
+    pdf.setDrawColor(229, 231, 235);
+    pdf.roundedRect(margin, currentY, colWidth, 45, 2, 2, "S");
+    
+    pdf.setTextColor(37, 99, 235);
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("SUPPLIER", margin + 5, currentY + 8);
+    
+    pdf.setTextColor(31, 41, 55);
+    pdf.setFontSize(11);
+    pdf.text(existingPO.supplierName || "-", margin + 5, currentY + 16);
+    
+    pdf.setTextColor(107, 114, 128);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    let supplierY = currentY + 23;
+    if (existingPO.supplierContact) {
+      pdf.text(existingPO.supplierContact, margin + 5, supplierY);
+      supplierY += 5;
+    }
+    if (existingPO.supplierPhone) {
+      pdf.text(existingPO.supplierPhone, margin + 5, supplierY);
+      supplierY += 5;
+    }
+    if (existingPO.supplierEmail) {
+      pdf.text(existingPO.supplierEmail, margin + 5, supplierY);
+      supplierY += 5;
+    }
+    
+    // Delivery details box
+    const rightColX = margin + colWidth + 10;
+    pdf.setFillColor(249, 250, 251);
+    pdf.roundedRect(rightColX, currentY, colWidth, 45, 2, 2, "F");
+    pdf.setDrawColor(229, 231, 235);
+    pdf.roundedRect(rightColX, currentY, colWidth, 45, 2, 2, "S");
+    
+    pdf.setTextColor(37, 99, 235);
+    pdf.setFontSize(10);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("DELIVER TO", rightColX + 5, currentY + 8);
+    
+    pdf.setTextColor(31, 41, 55);
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    const deliveryAddress = existingPO.deliveryAddress || "-";
+    const deliveryLines = pdf.splitTextToSize(deliveryAddress, colWidth - 10);
+    pdf.text(deliveryLines, rightColX + 5, currentY + 16);
+    
+    if (existingPO.requiredByDate) {
+      pdf.setTextColor(239, 68, 68);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Required by: ${format(new Date(existingPO.requiredByDate), "dd/MM/yyyy")}`, rightColX + 5, currentY + 38);
+    }
+    
+    currentY += 55;
+    
+    // Line items table
+    pdf.setTextColor(31, 41, 55);
+    pdf.setFontSize(12);
+    pdf.setFont("helvetica", "bold");
+    pdf.text("ORDER ITEMS", margin, currentY);
+    currentY += 8;
+    
+    // Table header
+    const tableColWidths = [15, 25, 70, 18, 18, 22, 22]; // #, Code, Description, Qty, UoM, Unit Price, Total
+    const tableHeaders = ["#", "Code", "Description", "Qty", "UoM", "Unit $", "Total $"];
+    
+    // Helper function to draw table headers
+    const drawTableHeaders = () => {
+      pdf.setFillColor(37, 99, 235);
+      pdf.rect(margin, currentY, contentWidth, 8, "F");
+      
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "bold");
+      
+      let headerX = margin;
+      tableHeaders.forEach((header, i) => {
+        const align = i >= 3 ? "right" : "left";
+        if (align === "right") {
+          pdf.text(header, headerX + tableColWidths[i] - 2, currentY + 5.5, { align: "right" });
+        } else {
+          pdf.text(header, headerX + 2, currentY + 5.5);
+        }
+        headerX += tableColWidths[i];
+      });
+      
+      currentY += 8;
+    };
+    
+    // Draw initial table headers
+    drawTableHeaders();
+    
+    // Table rows
+    const rowHeight = 7;
+    let rowsOnCurrentPage = 0;
+    
+    lineItems.forEach((item, index) => {
+      // Check for page break and re-draw headers if needed
+      if (currentY + rowHeight > pageHeight - margin - 15) {
+        pdf.addPage();
+        currentY = margin + 10;
+        
+        // Draw continuation header
+        pdf.setTextColor(107, 114, 128);
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "italic");
+        pdf.text(`${existingPO.poNumber} - Order Items (continued)`, margin, currentY);
+        currentY += 8;
+        
+        // Re-draw table headers
+        drawTableHeaders();
+        rowsOnCurrentPage = 0;
+      }
+      
+      // Alternate row colors (reset for each page)
+      if (rowsOnCurrentPage % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(margin, currentY, contentWidth, rowHeight, "F");
+      }
+      
+      pdf.setTextColor(31, 41, 55);
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      
+      let rowX = margin;
+      const rowData = [
+        String(index + 1),
+        item.itemCode || "-",
+        item.description.length > 40 ? item.description.substring(0, 38) + "..." : item.description,
+        item.quantity,
+        item.unitOfMeasure || "-",
+        parseFloat(item.unitPrice || "0").toFixed(2),
+        parseFloat(item.lineTotal || "0").toFixed(2),
+      ];
+      
+      rowData.forEach((data, i) => {
+        const align = i >= 3 ? "right" : "left";
+        if (align === "right") {
+          pdf.text(data, rowX + tableColWidths[i] - 2, currentY + 5, { align: "right" });
+        } else {
+          pdf.text(data, rowX + 2, currentY + 5);
+        }
+        rowX += tableColWidths[i];
+      });
+      
+      // Draw bottom border
+      pdf.setDrawColor(229, 231, 235);
+      pdf.line(margin, currentY + rowHeight, margin + contentWidth, currentY + rowHeight);
+      
+      currentY += rowHeight;
+      rowsOnCurrentPage++;
+    });
+    
+    currentY += 5;
+    
+    // Totals section
+    const subtotal = lineItems.reduce((sum, item) => sum + (parseFloat(item.lineTotal) || 0), 0);
+    const gst = subtotal * 0.1;
+    const total = subtotal + gst;
+    
+    // Totals box on right
+    const totalsWidth = 70;
+    const totalsX = pageWidth - margin - totalsWidth;
+    
+    pdf.setFillColor(249, 250, 251);
+    pdf.roundedRect(totalsX, currentY, totalsWidth, 28, 2, 2, "F");
+    
+    pdf.setFontSize(9);
+    pdf.setFont("helvetica", "normal");
+    pdf.setTextColor(107, 114, 128);
+    pdf.text("Subtotal:", totalsX + 5, currentY + 7);
+    pdf.text("GST (10%):", totalsX + 5, currentY + 14);
+    
+    pdf.setTextColor(31, 41, 55);
+    pdf.text(`$${subtotal.toFixed(2)}`, totalsX + totalsWidth - 5, currentY + 7, { align: "right" });
+    pdf.text(`$${gst.toFixed(2)}`, totalsX + totalsWidth - 5, currentY + 14, { align: "right" });
+    
+    // Total line
+    pdf.setDrawColor(37, 99, 235);
+    pdf.setLineWidth(0.5);
+    pdf.line(totalsX + 5, currentY + 17, totalsX + totalsWidth - 5, currentY + 17);
+    
+    pdf.setFontSize(11);
+    pdf.setFont("helvetica", "bold");
+    pdf.setTextColor(37, 99, 235);
+    pdf.text("TOTAL:", totalsX + 5, currentY + 24);
+    pdf.text(`$${total.toFixed(2)}`, totalsX + totalsWidth - 5, currentY + 24, { align: "right" });
+    
+    currentY += 35;
+    
+    // Notes section if present
+    if (existingPO.notes) {
+      checkPageBreak(25);
+      
+      pdf.setFillColor(254, 249, 195); // Light yellow
+      pdf.roundedRect(margin, currentY, contentWidth, 20, 2, 2, "F");
+      pdf.setDrawColor(250, 204, 21);
+      pdf.roundedRect(margin, currentY, contentWidth, 20, 2, 2, "S");
+      
+      pdf.setTextColor(133, 77, 14);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("NOTES:", margin + 5, currentY + 6);
+      
+      pdf.setFont("helvetica", "normal");
+      const notesLines = pdf.splitTextToSize(existingPO.notes, contentWidth - 10);
+      pdf.text(notesLines.slice(0, 2), margin + 5, currentY + 12);
+      
+      currentY += 25;
+    }
+    
+    // Approval information
+    if (existingPO.status === "APPROVED" && existingPO.approvedBy) {
+      checkPageBreak(20);
+      
+      pdf.setFillColor(220, 252, 231);
+      pdf.roundedRect(margin, currentY, contentWidth, 15, 2, 2, "F");
+      
+      pdf.setTextColor(22, 101, 52);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("APPROVED", margin + 5, currentY + 6);
+      
+      pdf.setFont("helvetica", "normal");
+      const approvedByName = existingPO.approvedBy.name || existingPO.approvedBy.email;
+      const approvedDate = existingPO.approvedAt ? format(new Date(existingPO.approvedAt), "dd/MM/yyyy HH:mm") : "";
+      pdf.text(`By: ${approvedByName}  |  Date: ${approvedDate}`, margin + 5, currentY + 11);
+    }
+    
+    if (existingPO.status === "REJECTED") {
+      checkPageBreak(25);
+      
+      pdf.setFillColor(254, 226, 226);
+      pdf.roundedRect(margin, currentY, contentWidth, 20, 2, 2, "F");
+      
+      pdf.setTextColor(153, 27, 27);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("REJECTED", margin + 5, currentY + 6);
+      
+      pdf.setFont("helvetica", "normal");
+      if (existingPO.rejectionReason) {
+        const reasonLines = pdf.splitTextToSize(`Reason: ${existingPO.rejectionReason}`, contentWidth - 10);
+        pdf.text(reasonLines.slice(0, 2), margin + 5, currentY + 12);
+      }
+    }
+    
+    // Add footers to all pages
+    const totalPages = pdf.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setTextColor(156, 163, 175);
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, margin, pageHeight - 8);
+      pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+    }
+    
+    pdf.save(`${existingPO.poNumber || "PurchaseOrder"}.pdf`);
+  }, [existingPO, lineItems, settings]);
 
   const canEdit = isNew || existingPO?.status === "DRAFT" || existingPO?.status === "REJECTED";
   const canApprove = existingPO?.status === "SUBMITTED" && (user?.poApprover || user?.role === "ADMIN");
