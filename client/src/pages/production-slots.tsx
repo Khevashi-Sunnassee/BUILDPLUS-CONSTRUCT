@@ -22,6 +22,7 @@ import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister
 
 interface ProductionSlotWithDetails extends ProductionSlot {
   job: Job;
+  levelCycleTime?: number | null;
 }
 
 interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
@@ -64,6 +65,47 @@ const HOLIDAY_COLORS: Record<string, { bg: string; text: string; border: string 
   PUBLIC_HOLIDAY: { bg: "#FEE2E2", text: "#991B1B", border: "#EF4444" },
   OTHER: { bg: "#E0E7FF", text: "#3730A3", border: "#6366F1" },
 };
+
+// Helper to add working days (skipping weekends and holidays)
+// Start date counts as day 1 (inclusive), returns the date when workingDays are complete
+function addWorkingDays(
+  startDate: Date, 
+  workingDays: number, 
+  factoryWorkDays: boolean[] | null, 
+  holidays: CfmeuHoliday[]
+): Date {
+  // Default work days: Mon-Fri (index 0=Sun, 1=Mon, ..., 6=Sat)
+  const workDays = factoryWorkDays || [false, true, true, true, true, true, false];
+  
+  // Create a set of holiday dates for quick lookup
+  const holidayDates = new Set(
+    holidays.map(h => format(new Date(h.date), "yyyy-MM-dd"))
+  );
+  
+  let currentDate = new Date(startDate);
+  let daysAdded = 0;
+  
+  // Check if start date itself is a working day (counts as day 1)
+  const startDayOfWeek = getDay(currentDate);
+  const startDateStr = format(currentDate, "yyyy-MM-dd");
+  if (workDays[startDayOfWeek] && !holidayDates.has(startDateStr)) {
+    daysAdded = 1;
+  }
+  
+  // Continue adding working days until we reach the target
+  while (daysAdded < workingDays) {
+    currentDate = addDays(currentDate, 1);
+    const dayOfWeek = getDay(currentDate); // 0=Sunday, 1=Monday, etc.
+    const dateStr = format(currentDate, "yyyy-MM-dd");
+    
+    // Check if it's a working day (factory work days) and not a holiday
+    if (workDays[dayOfWeek] && !holidayDates.has(dateStr)) {
+      daysAdded++;
+    }
+  }
+  
+  return currentDate;
+}
 
 interface CalendarViewProps {
   slots: ProductionSlotWithDetails[];
@@ -159,14 +201,22 @@ function CalendarView({
 
   // Calculate slots with their production window (start date to onsite date)
   const slotsWithWindows = useMemo(() => {
+    // Get factory work days for calculation
+    const factoryWorkDays = selectedFactory?.workDays || null;
+    
     return filteredSlots.map(slot => {
       const productionDate = new Date(slot.productionSlotDate);
-      const productionDaysInAdvance = slot.job.productionDaysInAdvance ?? 10;
-      const onsiteDate = addDays(productionDate, productionDaysInAdvance);
+      // Use level cycle time if available, otherwise fall back to job's productionDaysInAdvance
+      const cycleDays = slot.levelCycleTime ?? slot.job.productionDaysInAdvance ?? 10;
+      
+      // Calculate end date using working days (accounting for weekends and holidays)
+      const onsiteDate = addWorkingDays(productionDate, cycleDays, factoryWorkDays, cfmeuHolidays);
+      
       return {
         slot,
         startDate: productionDate,
         endDate: onsiteDate,
+        cycleDays,
         jobColor: colorCache[slot.job.jobNumber] || stringToColor(slot.job.jobNumber),
         levelColor: colorCache[`${slot.job.jobNumber}-${slot.level}`] || stringToColor(`${slot.job.jobNumber}-${slot.level}`),
       };
@@ -180,7 +230,7 @@ function CalendarView({
       }
       return a.slot.level.localeCompare(b.slot.level);
     });
-  }, [filteredSlots, start, end, colorCache]);
+  }, [filteredSlots, start, end, colorCache, selectedFactory, cfmeuHolidays]);
 
   // Navigate to previous/next period
   const navigate = useCallback((direction: "prev" | "next") => {
@@ -390,34 +440,50 @@ function CalendarView({
                       })}
                     </div>
 
-                    {/* The bar */}
+                    {/* The bar - spans entire production window */}
                     <div
                       onClick={() => onSlotClick(item.slot)}
-                      className="absolute top-2 h-10 rounded cursor-pointer hover-elevate flex items-center text-xs font-medium shadow-sm overflow-hidden"
+                      className="absolute top-2 h-10 rounded cursor-pointer hover-elevate flex items-center text-xs font-medium shadow-md overflow-hidden"
                       style={{
                         left: barStyle.left,
                         width: barStyle.width,
-                        backgroundColor: `${item.levelColor}30`,
-                        border: `1px solid ${item.jobColor}40`,
-                        color: item.jobColor,
+                        backgroundColor: `${item.jobColor}60`,
+                        border: `2px solid ${item.jobColor}`,
+                        color: "white",
                       }}
-                      title={`${item.slot.job.jobNumber} - Level ${item.slot.level}\nProduction: ${format(item.startDate, "dd MMM")} → Onsite: ${format(item.endDate, "dd MMM")}\n${item.slot.panelCount} panels`}
+                      title={`${item.slot.job.jobNumber} - Level ${item.slot.level}\nProduction Start: ${format(item.startDate, "dd MMM")} → End: ${format(item.endDate, "dd MMM")}\n${item.cycleDays} working days\n${item.slot.panelCount} panels`}
                       data-testid={`calendar-slot-${item.slot.id}`}
                     >
-                      {/* Green production date indicator */}
+                      {/* Green production START date indicator */}
                       <div 
-                        className="h-full flex items-center justify-center px-2 text-white font-semibold shrink-0"
+                        className="h-full flex items-center justify-center px-2 text-white font-bold shrink-0"
                         style={{
-                          backgroundColor: "#22c55e",
+                          backgroundColor: "#16a34a",
                           minWidth: "fit-content",
+                          borderRight: "2px solid white",
                         }}
-                        title={`Production Date: ${format(item.startDate, "dd MMM yyyy")}`}
+                        title={`Production Start: ${format(item.startDate, "dd MMM yyyy")}`}
                       >
                         {format(item.startDate, "dd")}
                       </div>
-                      <span className="truncate px-2">
-                        {item.slot.panelCount} panels
-                      </span>
+                      {/* Production window - middle section */}
+                      <div className="flex-1 flex items-center justify-center px-1 min-w-0">
+                        <span className="truncate font-semibold">
+                          {item.slot.panelCount}p / {item.cycleDays}d
+                        </span>
+                      </div>
+                      {/* End date indicator */}
+                      <div 
+                        className="h-full flex items-center justify-center px-2 text-white font-bold shrink-0"
+                        style={{
+                          backgroundColor: "#dc2626",
+                          minWidth: "fit-content",
+                          borderLeft: "2px solid white",
+                        }}
+                        title={`Production End: ${format(item.endDate, "dd MMM yyyy")}`}
+                      >
+                        {format(item.endDate, "dd")}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -430,8 +496,12 @@ function CalendarView({
       {/* Legend */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t flex-wrap">
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 rounded" style={{ backgroundColor: "#22c55e" }} />
-          <span>Production Date</span>
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "#16a34a" }} />
+          <span>Start Date</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <div className="w-3 h-3 rounded" style={{ backgroundColor: "#dc2626" }} />
+          <span>End Date</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 bg-primary/10 border border-primary rounded" />
@@ -448,7 +518,7 @@ function CalendarView({
         {cfmeuCalendarType && (
           <span className="text-primary font-medium">Calendar: {cfmeuCalendarType.replace("_", " ")}</span>
         )}
-        <span className="ml-auto">Bars show production window. Click a bar to view panel details.</span>
+        <span className="ml-auto">Bars span full production window (working days). Click a bar to view panel details.</span>
       </div>
     </div>
   );

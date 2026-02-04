@@ -178,6 +178,7 @@ export interface LoadListWithDetails extends LoadList {
 
 export interface ProductionSlotWithDetails extends ProductionSlot {
   job: Job;
+  levelCycleTime?: number | null;
 }
 
 export interface ProductionSlotAdjustmentWithDetails extends ProductionSlotAdjustment {
@@ -2282,7 +2283,26 @@ export class DatabaseStorage implements IStorage {
       ? await query.where(and(...conditions))
       : await query;
     
-    return results.map(r => ({ ...r.productionSlot, job: r.job }));
+    // Fetch level cycle times for all jobs in the results
+    const jobIds = [...new Set(results.map(r => r.job.id))];
+    const levelCycleTimes = jobIds.length > 0 
+      ? await db.select().from(jobLevelCycleTimes).where(inArray(jobLevelCycleTimes.jobId, jobIds))
+      : [];
+    
+    // Create a lookup map for level cycle times
+    const cycleTimeMap = new Map<string, number>();
+    for (const ct of levelCycleTimes) {
+      cycleTimeMap.set(`${ct.jobId}-${ct.level}`, ct.cycleDays);
+    }
+    
+    return results.map(r => {
+      const levelCycleTime = cycleTimeMap.get(`${r.job.id}-${r.productionSlot.level}`);
+      return { 
+        ...r.productionSlot, 
+        job: r.job,
+        levelCycleTime: levelCycleTime ?? null
+      };
+    });
   }
 
   async getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined> {
