@@ -826,10 +826,36 @@ export async function registerRoutes(
         const buildingNumber = parseInt(panel.building || '1', 10) || 1;
         let level = panel.level || 'Ground';
         
-        // Extract lowest level from ranges (e.g., "5-L6" -> "5", "3-L4" -> "3")
-        const rangeMatch = level.match(/^(\d+|L\d+|Ground)-?(L?\d+|Roof)?$/i);
-        if (rangeMatch && rangeMatch[2]) {
-          level = rangeMatch[1].replace(/^L/i, '');
+        // Extract lowest level from ranges and normalize:
+        // "5-L6" -> "5", "3-L4" -> "3", "13-R" -> "13", "B1-L1" -> "1"
+        // First check for range format with dash
+        if (level.includes('-')) {
+          const parts = level.split('-');
+          // Take the first part (lowest level)
+          let firstPart = parts[0].trim();
+          // Strip B prefix if present (e.g., "B1" -> "1")
+          firstPart = firstPart.replace(/^B/i, '');
+          // Strip L prefix if present
+          firstPart = firstPart.replace(/^L/i, '');
+          level = firstPart;
+        } else {
+          // No range - just normalize the level
+          // Handle mezzanine levels (ML1, M1, Mezzanine -> Mezzanine)
+          if (/^M(L?\d*|ezzanine)$/i.test(level)) {
+            level = 'Mezzanine';
+          }
+          // Strip L prefix (e.g., "L1" -> "1")
+          else if (/^L\d+$/i.test(level)) {
+            level = level.replace(/^L/i, '');
+          }
+          // Handle roof (R -> Roof)
+          else if (level.toUpperCase() === 'R') {
+            level = 'Roof';
+          }
+          // Strip B prefix if it looks like "B1" level
+          else if (/^B\d+$/i.test(level)) {
+            level = level.replace(/^B/i, '');
+          }
         }
         
         const key = `${buildingNumber}-${level}`;
@@ -839,10 +865,11 @@ export async function registerRoutes(
         }
       }
       
-      // Helper to parse level for sorting (Ground=0, numbers as-is, Roof=999)
+      // Helper to parse level for sorting (Ground=0, Mezzanine=0.5, numbers as-is, Roof=999)
       const parseLevelOrder = (level: string): number => {
-        const lowerLevel = level.toLowerCase().replace(/^l/i, '');
+        const lowerLevel = level.toLowerCase();
         if (lowerLevel === 'ground' || lowerLevel === 'g') return 0;
+        if (lowerLevel === 'mezzanine' || lowerLevel.startsWith('m')) return 0.5;
         if (lowerLevel === 'roof' || lowerLevel === 'r') return 999;
         const num = parseInt(lowerLevel, 10);
         return isNaN(num) ? 500 : num; // Unknown levels in middle
