@@ -263,6 +263,7 @@ export interface IStorage {
   deleteDailyLog(id: string): Promise<void>;
   deleteProductionDay(id: string): Promise<void>;
   deleteProductionDayByDateAndFactory(date: string, factory: string): Promise<void>;
+  deleteProductionDayByDateAndFactoryId(date: string, factoryId: string): Promise<void>;
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
@@ -300,6 +301,7 @@ export interface IStorage {
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
   getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionEntriesByDateAndFactory(date: string, factory: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesByDateAndFactoryId(date: string, factoryId: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry>;
   updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined>;
@@ -310,6 +312,7 @@ export interface IStorage {
   
   getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]>;
   getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined>;
+  getProductionDayByFactoryId(date: string, factoryId: string): Promise<ProductionDay | undefined>;
   createProductionDay(data: InsertProductionDay): Promise<ProductionDay>;
   getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]>;
   getDailyLogsWithRowsInRange(startDate: string, endDate: string): Promise<Array<{
@@ -398,6 +401,7 @@ export interface IStorage {
   getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]>;
   getWeeklyWageReport(id: string): Promise<WeeklyWageReport | undefined>;
   getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string): Promise<WeeklyWageReport | undefined>;
+  getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string): Promise<WeeklyWageReport | undefined>;
   createWeeklyWageReport(data: InsertWeeklyWageReport): Promise<WeeklyWageReport>;
   updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined>;
   deleteWeeklyWageReport(id: string): Promise<void>;
@@ -787,6 +791,23 @@ export class DatabaseStorage implements IStorage {
       and(
         eq(productionDays.productionDate, date),
         eq(productionDays.factory, factory)
+      )
+    );
+  }
+
+  async deleteProductionDayByDateAndFactoryId(date: string, factoryId: string): Promise<void> {
+    // First delete all production entries for this date and factory
+    await db.delete(productionEntries).where(
+      and(
+        eq(productionEntries.productionDate, date),
+        eq(productionEntries.factoryId, factoryId)
+      )
+    );
+    // Then delete the production day
+    await db.delete(productionDays).where(
+      and(
+        eq(productionDays.productionDate, date),
+        eq(productionDays.factoryId, factoryId)
       )
     );
   }
@@ -1455,6 +1476,19 @@ export class DatabaseStorage implements IStorage {
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   }
 
+  async getProductionEntriesByDateAndFactoryId(date: string, factoryId: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const result = await db.select().from(productionEntries)
+      .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
+      .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
+      .innerJoin(users, eq(productionEntries.userId, users.id))
+      .where(and(
+        eq(productionEntries.productionDate, date),
+        eq(productionEntries.factoryId, factoryId)
+      ))
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
+  }
+
   async getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]> {
     return await db.select().from(productionDays)
       .where(and(
@@ -1469,6 +1503,15 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(productionDays.productionDate, date),
         eq(productionDays.factory, factory)
+      ));
+    return day;
+  }
+
+  async getProductionDayByFactoryId(date: string, factoryId: string): Promise<ProductionDay | undefined> {
+    const [day] = await db.select().from(productionDays)
+      .where(and(
+        eq(productionDays.productionDate, date),
+        eq(productionDays.factoryId, factoryId)
       ));
     return day;
   }
@@ -1946,6 +1989,16 @@ export class DatabaseStorage implements IStorage {
         eq(weeklyWageReports.weekStartDate, weekStartDate),
         eq(weeklyWageReports.weekEndDate, weekEndDate),
         eq(weeklyWageReports.factory, factory)
+      ));
+    return report;
+  }
+
+  async getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string): Promise<WeeklyWageReport | undefined> {
+    const [report] = await db.select().from(weeklyWageReports)
+      .where(and(
+        eq(weeklyWageReports.weekStartDate, weekStartDate),
+        eq(weeklyWageReports.weekEndDate, weekEndDate),
+        eq(weeklyWageReports.factoryId, factoryId)
       ));
     return report;
   }
