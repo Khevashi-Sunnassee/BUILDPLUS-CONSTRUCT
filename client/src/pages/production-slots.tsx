@@ -14,9 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon } from "lucide-react";
+import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon, LayoutGrid, ChevronLeft } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek } from "date-fns";
+import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, getDay } from "date-fns";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory } from "@shared/schema";
 
 interface ProductionSlotWithDetails extends ProductionSlot {
@@ -47,6 +47,254 @@ const getWeekLabel = (weekStartStr: string) => {
   return `${format(weekStart, "dd MMM")} - ${format(weekEnd, "dd MMM yyyy")}`;
 };
 
+// Generate a color based on string (for job/level coloring)
+const stringToColor = (str: string): string => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const h = hash % 360;
+  return `hsl(${h}, 70%, 45%)`;
+};
+
+interface CalendarViewProps {
+  slots: ProductionSlotWithDetails[];
+  factories: Factory[];
+  getFactory: (factoryId: string | null | undefined) => Factory | undefined;
+  currentDate: Date;
+  setCurrentDate: (date: Date) => void;
+  calendarViewMode: "week" | "month";
+  setCalendarViewMode: (mode: "week" | "month") => void;
+  weekStartDay: number;
+  onSlotClick: (slot: ProductionSlotWithDetails) => void;
+}
+
+function CalendarView({
+  slots,
+  factories,
+  getFactory,
+  currentDate,
+  setCurrentDate,
+  calendarViewMode,
+  setCalendarViewMode,
+  weekStartDay,
+  onSlotClick,
+}: CalendarViewProps) {
+  // Get date range for current view
+  const getDateRange = () => {
+    if (calendarViewMode === "week") {
+      const start = startOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      const end = endOfWeek(currentDate, { weekStartsOn: weekStartDay as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      return { start, end };
+    } else {
+      const start = startOfMonth(currentDate);
+      const end = endOfMonth(currentDate);
+      return { start, end };
+    }
+  };
+
+  const { start, end } = getDateRange();
+  const days = eachDayOfInterval({ start, end });
+
+  // Get slots for a specific day
+  const getSlotsForDay = (day: Date) => {
+    return slots.filter(slot => {
+      const slotDate = new Date(slot.productionSlotDate);
+      return isSameDay(slotDate, day);
+    });
+  };
+
+  // Navigate to previous/next period
+  const navigate = (direction: "prev" | "next") => {
+    const amount = calendarViewMode === "week" ? 7 : 30;
+    setCurrentDate(direction === "prev" ? subDays(currentDate, amount) : addDays(currentDate, amount));
+  };
+
+  // Get header label
+  const getHeaderLabel = () => {
+    if (calendarViewMode === "week") {
+      return `${format(start, "dd MMM")} - ${format(end, "dd MMM yyyy")}`;
+    }
+    return format(currentDate, "MMMM yyyy");
+  };
+
+  // Day names for header
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const orderedDayNames = [...dayNames.slice(weekStartDay), ...dayNames.slice(0, weekStartDay)];
+
+  return (
+    <div className="space-y-4">
+      {/* Calendar Header */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" onClick={() => navigate("prev")} data-testid="button-calendar-prev">
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => navigate("next")} data-testid="button-calendar-next">
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <span className="font-semibold text-lg ml-2">{getHeaderLabel()}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant={calendarViewMode === "week" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCalendarViewMode("week")}
+            data-testid="button-calendar-week"
+          >
+            Week
+          </Button>
+          <Button
+            variant={calendarViewMode === "month" ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCalendarViewMode("month")}
+            data-testid="button-calendar-month"
+          >
+            Month
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())} data-testid="button-calendar-today">
+            Today
+          </Button>
+        </div>
+      </div>
+
+      {/* Calendar Grid */}
+      {calendarViewMode === "week" ? (
+        <div className="grid grid-cols-7 gap-2">
+          {/* Day headers */}
+          {orderedDayNames.map((name, i) => (
+            <div key={i} className="text-center text-sm font-medium text-muted-foreground py-2">
+              {name}
+            </div>
+          ))}
+          {/* Day cells */}
+          {days.map((day) => {
+            const daySlots = getSlotsForDay(day);
+            const isToday = isSameDay(day, new Date());
+            return (
+              <div
+                key={day.toISOString()}
+                className={`min-h-32 p-2 border rounded-lg ${isToday ? "border-primary bg-primary/5" : "bg-muted/20"}`}
+              >
+                <div className={`text-sm font-medium mb-1 ${isToday ? "text-primary" : "text-muted-foreground"}`}>
+                  {format(day, "d")}
+                </div>
+                <div className="space-y-1 overflow-y-auto max-h-28">
+                  {daySlots.map((slot) => {
+                    const factory = getFactory(slot.job.factoryId);
+                    const jobColor = stringToColor(slot.job.jobNumber);
+                    const levelColor = stringToColor(`${slot.job.jobNumber}-${slot.level}`);
+                    return (
+                      <div
+                        key={slot.id}
+                        onClick={() => onSlotClick(slot)}
+                        className="p-1.5 rounded text-xs cursor-pointer hover-elevate"
+                        style={{
+                          backgroundColor: `${levelColor}20`,
+                          borderLeft: `3px solid ${jobColor}`,
+                        }}
+                        title={`${slot.job.jobNumber} - ${slot.job.name} | Level ${slot.level} | ${slot.panelCount} panels`}
+                        data-testid={`calendar-slot-${slot.id}`}
+                      >
+                        <div className="font-medium truncate" style={{ color: jobColor }}>
+                          {slot.job.jobNumber}
+                        </div>
+                        <div className="text-muted-foreground truncate">
+                          Lvl {slot.level}
+                        </div>
+                        {factory && (
+                          <Badge
+                            variant="outline"
+                            className="text-[10px] px-1 py-0 mt-0.5"
+                            style={{
+                              backgroundColor: factory.color ? `${factory.color}20` : undefined,
+                              borderColor: factory.color || undefined,
+                              color: factory.color || undefined,
+                            }}
+                          >
+                            {factory.code}
+                          </Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div>
+          {/* Month view header */}
+          <div className="grid grid-cols-7 gap-1 mb-1">
+            {orderedDayNames.map((name, i) => (
+              <div key={i} className="text-center text-sm font-medium text-muted-foreground py-2">
+                {name}
+              </div>
+            ))}
+          </div>
+          {/* Month grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {/* Padding for days before the start of month */}
+            {Array.from({ length: (getDay(start) - weekStartDay + 7) % 7 }).map((_, i) => (
+              <div key={`pad-${i}`} className="min-h-24 p-1 bg-muted/10 rounded" />
+            ))}
+            {/* Day cells */}
+            {days.map((day) => {
+              const daySlots = getSlotsForDay(day);
+              const isToday = isSameDay(day, new Date());
+              const isCurrentMonth = isSameMonth(day, currentDate);
+              return (
+                <div
+                  key={day.toISOString()}
+                  className={`min-h-24 p-1 border rounded ${
+                    isToday ? "border-primary bg-primary/5" : isCurrentMonth ? "bg-background" : "bg-muted/30"
+                  }`}
+                >
+                  <div className={`text-xs font-medium mb-0.5 ${isToday ? "text-primary" : isCurrentMonth ? "" : "text-muted-foreground"}`}>
+                    {format(day, "d")}
+                  </div>
+                  <div className="space-y-0.5 overflow-y-auto max-h-20">
+                    {daySlots.slice(0, 3).map((slot) => {
+                      const jobColor = stringToColor(slot.job.jobNumber);
+                      return (
+                        <div
+                          key={slot.id}
+                          onClick={() => onSlotClick(slot)}
+                          className="p-0.5 rounded text-[10px] cursor-pointer hover-elevate truncate"
+                          style={{
+                            backgroundColor: `${jobColor}20`,
+                            borderLeft: `2px solid ${jobColor}`,
+                          }}
+                          title={`${slot.job.jobNumber} - Level ${slot.level}`}
+                          data-testid={`calendar-slot-${slot.id}`}
+                        >
+                          <span style={{ color: jobColor }}>{slot.job.jobNumber}</span>
+                          <span className="text-muted-foreground ml-1">L{slot.level}</span>
+                        </div>
+                      );
+                    })}
+                    {daySlots.length > 3 && (
+                      <div className="text-[10px] text-muted-foreground text-center">
+                        +{daySlots.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-xs text-muted-foreground pt-2 border-t">
+        <span>Colors represent job numbers and levels. Click on a slot to view panel details.</span>
+      </div>
+    </div>
+  );
+}
+
 export default function ProductionSlotsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -66,6 +314,11 @@ export default function ProductionSlotsPage() {
   const [dateToFilter, setDateToFilter] = useState<string>("");
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  
+  // View mode: grid or calendar
+  const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
+  const [calendarViewMode, setCalendarViewMode] = useState<"week" | "month">("week");
+  const [calendarCurrentDate, setCalendarCurrentDate] = useState<Date>(new Date());
   
   const [showAdjustDialog, setShowAdjustDialog] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
@@ -689,11 +942,50 @@ export default function ProductionSlotsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Production Slots</CardTitle>
-          <CardDescription>View and manage production slots ordered by date</CardDescription>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle>Production Slots</CardTitle>
+              <CardDescription>View and manage production slots ordered by date</CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === "grid" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                data-testid="button-view-grid"
+              >
+                <LayoutGrid className="h-4 w-4 mr-1" />
+                Grid
+              </Button>
+              <Button
+                variant={viewMode === "calendar" ? "default" : "outline"}
+                size="sm"
+                onClick={() => setViewMode("calendar")}
+                data-testid="button-view-calendar"
+              >
+                <Calendar className="h-4 w-4 mr-1" />
+                Calendar
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {loadingSlots ? (
+          {viewMode === "calendar" ? (
+            <CalendarView 
+              slots={slots}
+              factories={factories}
+              getFactory={getFactory}
+              currentDate={calendarCurrentDate}
+              setCurrentDate={setCalendarCurrentDate}
+              calendarViewMode={calendarViewMode}
+              setCalendarViewMode={setCalendarViewMode}
+              weekStartDay={weekStartDay}
+              onSlotClick={(slot) => {
+                setSelectedSlot(slot);
+                setShowPanelBreakdownDialog(true);
+              }}
+            />
+          ) : loadingSlots ? (
             <div className="text-center py-8">Loading...</div>
           ) : slots.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
