@@ -964,6 +964,14 @@ export async function registerRoutes(
       const highestLevel = parseInt(job?.highestLevel || '999', 10);
       const hasValidRange = !isNaN(lowestLevel) && !isNaN(highestLevel) && highestLevel >= lowestLevel;
       
+      // Also add levels from existing saved cycle times (may not have panels yet)
+      for (const ct of existingCycleTimes) {
+        const key = `${ct.buildingNumber}-${ct.level}`;
+        if (!levelMap.has(key)) {
+          levelMap.set(key, { buildingNumber: ct.buildingNumber, level: ct.level });
+        }
+      }
+      
       // Sort by building number then level order (lowest to highest)
       // Filter to only include numeric levels within the lowest/highest range
       const levels = Array.from(levelMap.values())
