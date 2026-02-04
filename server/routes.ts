@@ -6330,6 +6330,8 @@ Return ONLY valid JSON, no explanation text.`
   });
 
   // CFMEU Calendar Routes
+  // Note: QLD CFMEU does not provide ICS calendar files - only PDF downloads available
+  // Manual entry required for QLD holidays via Admin UI
   const CFMEU_CALENDAR_URLS: Record<string, { url: string; years: number[] }[]> = {
     VIC_ONSITE: [
       { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-onsite-2025.ics", years: [2025] },
@@ -6338,9 +6340,6 @@ Return ONLY valid JSON, no explanation text.`
     VIC_OFFSITE: [
       { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-offsite-2025.ics", years: [2025] },
       { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/38hr-offsite-rdo-calendar.ics", years: [2026] },
-    ],
-    QLD: [
-      { url: "https://qnt.cfmeu.org/rdo-calendar/?ical=1", years: [2025, 2026] },
     ],
   };
 
