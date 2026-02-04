@@ -198,6 +198,9 @@ export default function AdminJobsPage() {
     totalSlots: number;
     nonStartedCount: number;
   } | null>(null);
+  
+  // Level change confirmation dialog state
+  const [levelChangeConfirmOpen, setLevelChangeConfirmOpen] = useState(false);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -724,6 +727,34 @@ export default function AdminJobsPage() {
     ));
   };
 
+  // Regenerate levels based on job settings
+  const regenerateLevelsMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      const response = await fetch(`/api/admin/jobs/${jobId}/generate-levels`);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate levels");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setLevelCycleTimes(data);
+      setLevelChangeConfirmOpen(false);
+      toast({ title: "Level cycle times updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setLevelChangeConfirmOpen(false);
+    },
+  });
+
+  // Handler to show confirmation when level fields change
+  const handleLevelFieldChange = () => {
+    if (editingJob && levelCycleTimes.length > 0) {
+      setLevelChangeConfirmOpen(true);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -1242,6 +1273,7 @@ export default function AdminJobsPage() {
                                 const calculatedHighest = lowestLevel + levelsCount - 1;
                                 jobForm.setValue("highestLevel", String(calculatedHighest));
                               }
+                              handleLevelFieldChange();
                             }}
                             data-testid="input-job-levels" 
                           />
@@ -1271,6 +1303,7 @@ export default function AdminJobsPage() {
                                   const calculatedHighest = lowestLevel + levelsCount - 1;
                                   jobForm.setValue("highestLevel", String(calculatedHighest));
                                 }
+                                handleLevelFieldChange();
                               }}
                               data-testid="input-job-lowest-level" 
                             />
@@ -1298,6 +1331,7 @@ export default function AdminJobsPage() {
                                   const calculatedLevels = highestLevel - lowestLevel + 1;
                                   jobForm.setValue("levels", String(calculatedLevels));
                                 }
+                                handleLevelFieldChange();
                               }}
                               data-testid="input-job-highest-level" 
                             />
@@ -2033,6 +2067,33 @@ export default function AdminJobsPage() {
                 {productionSlotStatus.hasSlots ? "Update Slots" : "Create Slots"}
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={levelChangeConfirmOpen} onOpenChange={setLevelChangeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Level Cycle Times?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You've changed the level settings. Would you like to regenerate the level cycle times table to match the new Lowest Level and Highest Level values?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-skip-level-regenerate">
+              Keep Existing
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!editingJob) return;
+                regenerateLevelsMutation.mutate(editingJob.id);
+              }}
+              disabled={regenerateLevelsMutation.isPending}
+              data-testid="button-confirm-level-regenerate"
+            >
+              {regenerateLevelsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Regenerate Levels
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
