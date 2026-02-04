@@ -89,6 +89,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation, useSearch } from "wouter";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
+import { MessageCircle, FileIcon, Send, UserPlus } from "lucide-react";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 
 const panelSchema = z.object({
@@ -126,6 +131,295 @@ interface PanelWithJob extends PanelRegister {
   job: Job;
 }
 
+interface User {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+interface ConversationMember {
+  id: string;
+  conversationId: string;
+  userId: string;
+  role: string;
+  joinedAt: Date;
+  user: User | null;
+}
+
+interface PanelConversation {
+  id: string;
+  name: string | null;
+  type: string;
+  panelId: string | null;
+  jobId: string | null;
+  members: ConversationMember[];
+}
+
+interface ChatMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  sender: User | null;
+  attachments: Array<{ id: string; fileName: string; url: string; mimeType: string }>;
+  mentions: Array<{ id: string; mentionedUserId: string; user: User | null }>;
+}
+
+function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: string }) {
+  const { toast } = useToast();
+  const [messageContent, setMessageContent] = useState("");
+  const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
+  const [selectedMemberIds, setSelectedMemberIds] = useState<string[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { data: conversation, isLoading: conversationLoading } = useQuery<PanelConversation>({
+    queryKey: ["/api/chat/panels", panelId, "conversation"],
+  });
+
+  const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
+    queryKey: ["/api/chat/conversations", conversation?.id, "messages"],
+    enabled: !!conversation?.id,
+  });
+
+  const { data: allUsers = [] } = useQuery<User[]>({
+    queryKey: ["/api/users"],
+  });
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return apiRequest("POST", `/api/chat/conversations/${conversation?.id}/messages`, {
+        content,
+        mentionedUserIds: [],
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", conversation?.id, "messages"] });
+      setMessageContent("");
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to send message", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addMembersMutation = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      return apiRequest("POST", `/api/chat/conversations/${conversation?.id}/members`, { userIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/panels", panelId, "conversation"] });
+      setShowAddMembersDialog(false);
+      setSelectedMemberIds([]);
+      toast({ title: "Members added" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to add members", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSendMessage = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageContent.trim() || !conversation?.id) return;
+    sendMessageMutation.mutate(messageContent);
+  };
+
+  const existingMemberIds = conversation?.members?.map(m => m.userId) || [];
+  const availableUsersToAdd = allUsers.filter(u => !existingMemberIds.includes(u.id));
+
+  if (conversationLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-[400px] border rounded-md">
+      <div className="flex items-center justify-between p-3 border-b bg-muted/30">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="h-4 w-4" />
+          <span className="font-medium text-sm">Panel: {panelMark}</span>
+          <Badge variant="secondary" className="text-xs">
+            {conversation?.members?.length || 0} members
+          </Badge>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setShowAddMembersDialog(true)}
+          data-testid="button-add-chat-members"
+        >
+          <UserPlus className="h-4 w-4 mr-1" />
+          Add Members
+        </Button>
+      </div>
+
+      <ScrollArea className="flex-1 p-4">
+        {messagesLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+            <MessageCircle className="h-8 w-8 mb-2" />
+            <p className="text-sm">No messages yet</p>
+            <p className="text-xs">Start the conversation about this panel</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {messages.map((msg) => (
+              <div key={msg.id} className="flex gap-3">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="text-xs">
+                    {msg.sender?.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{msg.sender?.name || "Unknown"}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {new Date(msg.createdAt).toLocaleString("en-AU", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-sm mt-1">{msg.body}</p>
+                  {msg.attachments?.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {msg.attachments.map((att) => (
+                        <a
+                          key={att.id}
+                          href={att.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                        >
+                          <FileIcon className="h-3 w-3" />
+                          {att.fileName}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </ScrollArea>
+
+      <form onSubmit={handleSendMessage} className="p-3 border-t">
+        <div className="flex gap-2">
+          <Textarea
+            value={messageContent}
+            onChange={(e) => setMessageContent(e.target.value)}
+            placeholder="Type a message..."
+            className="resize-none min-h-[40px] max-h-[80px]"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(e);
+              }
+            }}
+            data-testid="input-chat-message"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={!messageContent.trim() || sendMessageMutation.isPending}
+            data-testid="button-send-message"
+          >
+            {sendMessageMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </form>
+
+      <Dialog open={showAddMembersDialog} onOpenChange={setShowAddMembersDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Members to Chat</DialogTitle>
+            <DialogDescription>
+              Select users to add to this panel's conversation
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {availableUsersToAdd.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                All users are already members
+              </p>
+            ) : (
+              availableUsersToAdd.map((user) => (
+                <label
+                  key={user.id}
+                  className="flex items-center gap-3 p-2 rounded-md hover:bg-muted cursor-pointer"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedMemberIds.includes(user.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedMemberIds([...selectedMemberIds, user.id]);
+                      } else {
+                        setSelectedMemberIds(selectedMemberIds.filter(id => id !== user.id));
+                      }
+                    }}
+                    className="rounded"
+                  />
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="text-xs">
+                      {user.name?.split(" ").map(n => n[0]).join("").toUpperCase() || "?"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">{user.name || "Unnamed"}</p>
+                    <p className="text-xs text-muted-foreground">{user.email}</p>
+                  </div>
+                </label>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddMembersDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => addMembersMutation.mutate(selectedMemberIds)}
+              disabled={selectedMemberIds.length === 0 || addMembersMutation.isPending}
+            >
+              {addMembersMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Add {selectedMemberIds.length} Members
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function PanelDocumentsTab({ panelId }: { panelId: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-64 border rounded-md bg-muted/30">
+      <FileIcon className="h-12 w-12 text-muted-foreground mb-3" />
+      <h3 className="font-medium text-muted-foreground">Documents</h3>
+      <p className="text-sm text-muted-foreground text-center mt-1">
+        Document management for this panel will be available soon
+      </p>
+    </div>
+  );
+}
+
 export default function AdminPanelsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
@@ -135,6 +429,7 @@ export default function AdminPanelsPage() {
   
   const [panelDialogOpen, setPanelDialogOpen] = useState(false);
   const [editingPanel, setEditingPanel] = useState<PanelRegister | null>(null);
+  const [panelDialogTab, setPanelDialogTab] = useState<string>("details");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPanelId, setDeletingPanelId] = useState<string | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -1963,8 +2258,11 @@ export default function AdminPanelsPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={panelDialogOpen} onOpenChange={setPanelDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={panelDialogOpen} onOpenChange={(open) => {
+        setPanelDialogOpen(open);
+        if (!open) setPanelDialogTab("details");
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingPanel ? "Edit Panel" : "Create New Panel"}</DialogTitle>
             <DialogDescription>
@@ -1972,36 +2270,57 @@ export default function AdminPanelsPage() {
             </DialogDescription>
           </DialogHeader>
           
-          {/* Import Info Section - only shown for source=3 (Estimate Import) */}
-          {editingPanel && editingPanel.source === 3 && (
-            <div className="bg-muted/50 rounded-md p-4 space-y-2 border">
-              <h4 className="font-medium text-sm text-muted-foreground">Import Details</h4>
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Tab Name:</span>
-                  <p className="font-medium">{editingPanel.sourceSheet || editingPanel.sheetNumber || "-"}</p>
+          <Tabs value={panelDialogTab} onValueChange={setPanelDialogTab} className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="w-full justify-start">
+              <TabsTrigger value="details" className="flex items-center gap-2" data-testid="tab-panel-details">
+                <ClipboardList className="h-4 w-4" />
+                Details
+              </TabsTrigger>
+              {editingPanel && (
+                <>
+                  <TabsTrigger value="chat" className="flex items-center gap-2" data-testid="tab-panel-chat">
+                    <MessageCircle className="h-4 w-4" />
+                    Chat
+                  </TabsTrigger>
+                  <TabsTrigger value="documents" className="flex items-center gap-2" data-testid="tab-panel-documents">
+                    <FileIcon className="h-4 w-4" />
+                    Documents
+                  </TabsTrigger>
+                </>
+              )}
+            </TabsList>
+            
+            <TabsContent value="details" className="flex-1 overflow-y-auto mt-4">
+              {/* Import Info Section - only shown for source=3 (Estimate Import) */}
+              {editingPanel && editingPanel.source === 3 && (
+                <div className="bg-muted/50 rounded-md p-4 space-y-2 border mb-4">
+                  <h4 className="font-medium text-sm text-muted-foreground">Import Details</h4>
+                  <div className="grid grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Tab Name:</span>
+                      <p className="font-medium">{editingPanel.sourceSheet || editingPanel.sheetNumber || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">File Name:</span>
+                      <p className="font-medium">{editingPanel.sourceFileName || "-"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Imported Date:</span>
+                      <p className="font-medium">
+                        {editingPanel.createdAt 
+                          ? new Date(editingPanel.createdAt).toLocaleDateString('en-AU', {
+                              day: '2-digit',
+                              month: '2-digit', 
+                              year: 'numeric'
+                            })
+                          : "-"}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">File Name:</span>
-                  <p className="font-medium">{editingPanel.sourceFileName || "-"}</p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Imported Date:</span>
-                  <p className="font-medium">
-                    {editingPanel.createdAt 
-                      ? new Date(editingPanel.createdAt).toLocaleDateString('en-AU', {
-                          day: '2-digit',
-                          month: '2-digit', 
-                          year: 'numeric'
-                        })
-                      : "-"}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          <Form {...panelForm}>
+              )}
+              
+              <Form {...panelForm}>
             <form onSubmit={panelForm.handleSubmit(onSubmit)} className="space-y-4">
               {/* Two-column layout for main content */}
               <div className="grid grid-cols-2 gap-6">
@@ -2448,8 +2767,22 @@ export default function AdminPanelsPage() {
                   {editingPanel ? "Update" : "Create"}
                 </Button>
               </DialogFooter>
-            </form>
-          </Form>
+              </form>
+            </Form>
+            </TabsContent>
+            
+            {editingPanel && (
+              <>
+                <TabsContent value="chat" className="flex-1 overflow-hidden mt-4">
+                  <PanelChatTab panelId={editingPanel.id} panelMark={editingPanel.panelMark} />
+                </TabsContent>
+                
+                <TabsContent value="documents" className="flex-1 overflow-y-auto mt-4">
+                  <PanelDocumentsTab panelId={editingPanel.id} />
+                </TabsContent>
+              </>
+            )}
+          </Tabs>
         </DialogContent>
       </Dialog>
 
