@@ -1,5 +1,6 @@
 import { eq, and, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "./db";
+export { db };
 import {
   users, devices, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, jobLevelCycleTimes, panelRegister, productionEntries,

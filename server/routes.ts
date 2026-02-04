@@ -2,12 +2,13 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import session from "express-session";
 import multer from "multer";
-import { storage, sha256Hex } from "./storage";
-import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema, InsertItem } from "@shared/schema";
+import { storage, sha256Hex, db } from "./storage";
+import { loginSchema, agentIngestSchema, insertJobSchema, insertPanelRegisterSchema, insertWorkTypeSchema, insertWeeklyWageReportSchema, InsertItem, jobs, productionSlots } from "@shared/schema";
 import { z } from "zod";
 import * as XLSX from "xlsx";
 import { format, subDays } from "date-fns";
 import { chatRouter } from "./chat/chat.routes";
+import { eq } from "drizzle-orm";
 
 const upload = multer({ 
   storage: multer.memoryStorage(),
@@ -804,6 +805,88 @@ export async function registerRoutes(
       res.json({ ok: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message || "Failed to save level cycle times" });
+    }
+  });
+
+  app.get("/api/admin/jobs/:id/production-slot-status", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const jobId = req.params.id as string;
+      const slots = await storage.getProductionSlots({ jobId });
+      
+      const hasSlots = slots.length > 0;
+      const nonStartedSlots = slots.filter(s => s.status === "SCHEDULED" || s.status === "PENDING_UPDATE");
+      const hasNonStartedSlots = nonStartedSlots.length > 0;
+      const allStarted = hasSlots && !hasNonStartedSlots;
+      
+      res.json({
+        hasSlots,
+        hasNonStartedSlots,
+        allStarted,
+        totalSlots: slots.length,
+        nonStartedCount: nonStartedSlots.length,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to get production slot status" });
+    }
+  });
+
+  app.post("/api/admin/jobs/:id/update-production-slots", requireRole("ADMIN"), async (req, res) => {
+    try {
+      const jobId = req.params.id as string;
+      const { action } = req.body;
+      
+      if (action === "create") {
+        const slots = await storage.generateProductionSlotsForJob(jobId);
+        res.json({ ok: true, action: "created", count: slots.length });
+      } else if (action === "update") {
+        const existingSlots = await storage.getProductionSlots({ jobId });
+        const nonStartedSlots = existingSlots.filter(s => s.status === "SCHEDULED" || s.status === "PENDING_UPDATE");
+        
+        if (nonStartedSlots.length === 0) {
+          return res.json({ ok: true, action: "none", count: 0 });
+        }
+        
+        const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
+        if (!job || !job.productionStartDate || !job.expectedCycleTimePerFloor) {
+          return res.status(400).json({ error: "Job missing required production fields" });
+        }
+        
+        const levelCycleTimes = await storage.getJobLevelCycleTimes(jobId);
+        const cycleTimeMap = new Map<string, number>(
+          levelCycleTimes.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays])
+        );
+        const defaultCycleTime = job.expectedCycleTimePerFloor;
+        
+        const daysInAdvance = job.daysInAdvance || 7;
+        const baseDate = new Date(job.productionStartDate);
+        baseDate.setDate(baseDate.getDate() - daysInAdvance);
+        
+        const allSlots = existingSlots.sort((a, b) => a.levelOrder - b.levelOrder);
+        let cumulativeDays = 0;
+        let updatedCount = 0;
+        
+        for (const slot of allSlots) {
+          const newSlotDate = new Date(baseDate);
+          newSlotDate.setDate(newSlotDate.getDate() + cumulativeDays);
+          
+          const levelCycleTime = cycleTimeMap.get(`${slot.buildingNumber || 1}-${slot.level}`) ?? defaultCycleTime;
+          
+          if (slot.status === "SCHEDULED" || slot.status === "PENDING_UPDATE") {
+            await db.update(productionSlots)
+              .set({ productionSlotDate: newSlotDate, updatedAt: new Date() })
+              .where(eq(productionSlots.id, slot.id));
+            updatedCount++;
+          }
+          
+          cumulativeDays += levelCycleTime;
+        }
+        
+        res.json({ ok: true, action: "updated", count: updatedCount });
+      } else {
+        res.status(400).json({ error: "Invalid action" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || "Failed to update production slots" });
     }
   });
 

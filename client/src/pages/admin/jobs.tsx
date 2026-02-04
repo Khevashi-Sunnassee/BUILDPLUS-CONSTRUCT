@@ -188,6 +188,16 @@ export default function AdminJobsPage() {
   const [levelCycleTimes, setLevelCycleTimes] = useState<{ buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[]>([]);
   const [isLoadingLevelData, setIsLoadingLevelData] = useState(false);
   const [editDialogTab, setEditDialogTab] = useState("details");
+  
+  // Cycle times confirmation dialog state
+  const [cycleTimesConfirmOpen, setCycleTimesConfirmOpen] = useState(false);
+  const [productionSlotStatus, setProductionSlotStatus] = useState<{
+    hasSlots: boolean;
+    hasNonStartedSlots: boolean;
+    allStarted: boolean;
+    totalSlots: number;
+    nonStartedCount: number;
+  } | null>(null);
 
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: ["/api/admin/jobs"],
@@ -668,8 +678,40 @@ export default function AdminJobsPage() {
       const res = await apiRequest("POST", `/api/admin/jobs/${jobId}/level-cycle-times`, { cycleTimes });
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({ title: "Saved", description: "Level cycle times updated successfully" });
+      
+      if (!editingJob) return;
+      
+      try {
+        const res = await fetch(`/api/admin/jobs/${editingJob.id}/production-slot-status`);
+        if (res.ok) {
+          const status = await res.json();
+          setProductionSlotStatus(status);
+          setCycleTimesConfirmOpen(true);
+        }
+      } catch (error) {
+        console.error("Failed to check production slot status:", error);
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateProductionSlotsMutation = useMutation({
+    mutationFn: async ({ jobId, action }: { jobId: string; action: "create" | "update" }) => {
+      const res = await apiRequest("POST", `/api/admin/jobs/${jobId}/update-production-slots`, { action });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setCycleTimesConfirmOpen(false);
+      if (data.action === "created") {
+        toast({ title: "Success", description: `Created ${data.count} production slots` });
+      } else if (data.action === "updated") {
+        toast({ title: "Success", description: `Updated ${data.count} production slots` });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs"] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1895,6 +1937,47 @@ export default function AdminJobsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={cycleTimesConfirmOpen} onOpenChange={setCycleTimesConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Production Slots?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                {productionSlotStatus && !productionSlotStatus.hasSlots ? (
+                  <p>No production slots exist for this job. Would you like to create them now using the new cycle times?</p>
+                ) : productionSlotStatus?.hasNonStartedSlots ? (
+                  <p>
+                    This job has {productionSlotStatus.nonStartedCount} production slot(s) that haven't started yet. 
+                    Would you like to update their dates based on the new cycle times?
+                  </p>
+                ) : (
+                  <p>All production slots for this job have already started or been completed. No updates needed.</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-skip-production-update">
+              {productionSlotStatus?.hasSlots && !productionSlotStatus?.hasNonStartedSlots ? "Close" : "Skip"}
+            </AlertDialogCancel>
+            {productionSlotStatus && (!productionSlotStatus.hasSlots || productionSlotStatus.hasNonStartedSlots) && (
+              <AlertDialogAction
+                onClick={() => {
+                  if (!editingJob) return;
+                  const action = productionSlotStatus.hasSlots ? "update" : "create";
+                  updateProductionSlotsMutation.mutate({ jobId: editingJob.id, action });
+                }}
+                disabled={updateProductionSlotsMutation.isPending}
+                data-testid="button-confirm-production-update"
+              >
+                {updateProductionSlotsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                {productionSlotStatus.hasSlots ? "Update Slots" : "Create Slots"}
+              </AlertDialogAction>
+            )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
