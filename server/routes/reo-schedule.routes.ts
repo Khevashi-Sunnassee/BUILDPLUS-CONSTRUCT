@@ -4,6 +4,8 @@ import { storage } from "../storage";
 import logger from "../lib/logger";
 import { insertReoScheduleSchema, insertReoScheduleItemSchema } from "@shared/schema";
 import { z } from "zod";
+import { extractReoFromPdf } from "../services/reo-extraction.service";
+import { ObjectStorageService } from "../replit_integrations/object_storage";
 
 const router = Router();
 
@@ -296,10 +298,11 @@ router.post("/api/reo-schedules/:scheduleId/items/bulk-status", requireAuth, asy
 router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: Request, res: Response) => {
   try {
     const scheduleId = req.params.scheduleId as string;
+    const { pdfBase64 } = req.body;
     const user = (req as any).user;
     const companyId = user?.companyId;
 
-    const schedule = await storage.getReoSchedule(scheduleId);
+    const schedule = await storage.getReoScheduleWithDetails(scheduleId);
     if (!schedule) {
       return res.status(404).json({ message: "Reo schedule not found" });
     }
@@ -308,16 +311,68 @@ router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: R
       return res.status(403).json({ message: "Access denied" });
     }
 
-    await storage.updateReoSchedule(scheduleId, { status: "PROCESSING" as any });
+    let pdfData = pdfBase64;
     
-    res.json({ 
-      message: "AI processing initiated", 
+    if (!pdfData && schedule.panel?.productionPdfUrl) {
+      const objectStorage = new ObjectStorageService();
+      const objectFile = await objectStorage.getObjectEntityFile(schedule.panel.productionPdfUrl);
+      const chunks: Buffer[] = [];
+      
+      await new Promise<void>((resolve, reject) => {
+        const stream = objectFile.createReadStream();
+        stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+        stream.on("end", () => resolve());
+        stream.on("error", reject);
+      });
+      
+      pdfData = Buffer.concat(chunks).toString("base64");
+    }
+
+    if (!pdfData) {
+      return res.status(400).json({ message: "No PDF data available for processing" });
+    }
+
+    await storage.updateReoSchedule(scheduleId, { status: "PROCESSING" as any });
+
+    const panelMark = schedule.panel?.panelMark || `Panel-${schedule.panelId}`;
+    const extractionResult = await extractReoFromPdf(pdfData, panelMark);
+
+    if (!extractionResult.success) {
+      await storage.updateReoSchedule(scheduleId, { 
+        status: "FAILED" as any,
+        aiResponseRaw: extractionResult.rawResponse,
+        notes: extractionResult.error,
+      });
+      return res.status(400).json({ 
+        message: "AI extraction failed", 
+        error: extractionResult.error 
+      });
+    }
+
+    const itemsToCreate = extractionResult.items.map(item => ({
+      ...item,
       scheduleId,
-      status: "PROCESSING" 
+    }));
+
+    const createdItems = await storage.createReoScheduleItemsBulk(itemsToCreate);
+
+    await storage.updateReoSchedule(scheduleId, { 
+      status: "COMPLETED" as any,
+      processedAt: new Date(),
+      aiModelUsed: extractionResult.modelUsed,
+      aiResponseRaw: extractionResult.rawResponse,
+    });
+
+    res.json({ 
+      message: "AI processing completed", 
+      scheduleId,
+      status: "COMPLETED",
+      itemsCreated: createdItems.length,
+      items: createdItems,
     });
   } catch (error: any) {
-    logger.error({ err: error }, "Error initiating AI processing");
-    res.status(500).json({ message: "Failed to initiate AI processing" });
+    logger.error({ err: error }, "Error during AI processing");
+    res.status(500).json({ message: "Failed to process with AI" });
   }
 });
 
