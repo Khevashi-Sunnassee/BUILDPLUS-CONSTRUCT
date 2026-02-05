@@ -70,6 +70,8 @@ export default function ProductionSchedulePage() {
   const [scheduleStartDate, setScheduleStartDate] = useState<string>(format(today, "yyyy-MM-dd"));
   const [scheduleEndDate, setScheduleEndDate] = useState<string>(format(addDays(today, 30), "yyyy-MM-dd"));
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
+  const [showReadyForProduction, setShowReadyForProduction] = useState(true);
+  const [showProductionDaysRegister, setShowProductionDaysRegister] = useState(true);
 
   const { data: stats, isLoading: loadingStats } = useQuery<PanelStats>({
     queryKey: [PRODUCTION_ROUTES.SCHEDULE_STATS, { jobId: jobFilter !== "all" ? jobFilter : undefined }],
@@ -361,10 +363,22 @@ export default function ProductionSchedulePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
-            Panels Ready for Production
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5" />
+              Panels Ready for Production
+            </CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowReadyForProduction(!showReadyForProduction)}
+              data-testid="button-toggle-ready-production"
+            >
+              {showReadyForProduction ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {showReadyForProduction ? "Hide" : "Show"}
+            </Button>
+          </div>
+          {showReadyForProduction && (
           <div className="flex flex-wrap items-center gap-4 pt-4">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -412,7 +426,9 @@ export default function ProductionSchedulePage() {
               Add to Schedule ({selectedPanelIds.size})
             </Button>
           </div>
+          )}
         </CardHeader>
+        {showReadyForProduction && (
         <CardContent>
           {loadingPanels ? (
             <div className="space-y-2">
@@ -527,14 +543,27 @@ export default function ProductionSchedulePage() {
             </div>
           )}
         </CardContent>
+        )}
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Production Days Register
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Production Days Register
+            </CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={() => setShowProductionDaysRegister(!showProductionDaysRegister)}
+              data-testid="button-toggle-production-register"
+            >
+              {showProductionDaysRegister ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {showProductionDaysRegister ? "Hide" : "Show"}
+            </Button>
+          </div>
+          {showProductionDaysRegister && (
           <div className="flex flex-wrap items-center gap-4 pt-4">
             <div className="flex items-center gap-2">
               <Label>From:</Label>
@@ -557,7 +586,9 @@ export default function ProductionSchedulePage() {
               />
             </div>
           </div>
+          )}
         </CardHeader>
+        {showProductionDaysRegister && (
         <CardContent>
           {loadingDays ? (
             <div className="space-y-2">
@@ -602,6 +633,7 @@ export default function ProductionSchedulePage() {
             </div>
           )}
         </CardContent>
+        )}
       </Card>
 
       <Dialog open={showAddToScheduleDialog} onOpenChange={setShowAddToScheduleDialog}>
