@@ -760,11 +760,27 @@ export default function ManualEntryPage() {
     }
   }, [productionFormData.loadWidth, productionFormData.loadHeight, productionFormData.panelThickness]);
 
-  const onSubmit = (data: ManualEntryForm) => {
+  const onSubmit = async (data: ManualEntryForm) => {
+    // Stop the timer for this panel if one is active
+    const panelId = addNewPanel ? undefined : (data.panelRegisterId === "none" ? undefined : data.panelRegisterId);
+    if (activeTimer && activeTimer.panelRegisterId === panelId) {
+      try {
+        await stopTimerMutation.mutateAsync({
+          timerId: activeTimer.id,
+          notes: data.notes,
+          workTypeId: data.workTypeId && data.workTypeId !== "none" ? parseInt(data.workTypeId) : undefined,
+        });
+        toast({ title: "Timer stopped", description: "Timer was automatically stopped and time entry saved" });
+      } catch (error) {
+        // Timer stop failed, but we should still save the manual entry
+        console.error("Failed to stop timer", error);
+      }
+    }
+
     const submitData = {
       ...data,
       jobId: data.jobId === "none" ? undefined : data.jobId,
-      panelRegisterId: addNewPanel ? undefined : (data.panelRegisterId === "none" ? undefined : data.panelRegisterId),
+      panelRegisterId: panelId,
       workTypeId: data.workTypeId && data.workTypeId !== "none" ? parseInt(data.workTypeId) : undefined,
       createNewPanel: addNewPanel && newPanelMark ? true : undefined,
       newPanelMark: addNewPanel && newPanelMark ? newPanelMark : undefined,

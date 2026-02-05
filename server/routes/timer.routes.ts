@@ -1,10 +1,31 @@
 import { Router } from "express";
 import { db } from "../db";
-import { timerSessions, logRows, dailyLogs, jobs, panelRegister, workTypes } from "@shared/schema";
+import { timerSessions, timerEvents, logRows, dailyLogs, jobs, panelRegister, workTypes } from "@shared/schema";
 import { requireAuth } from "./middleware/auth.middleware";
 import { eq, and, desc, or } from "drizzle-orm";
 import { format } from "date-fns";
 import logger from "../lib/logger";
+
+// Helper function to record timer events
+async function recordTimerEvent(
+  timerSessionId: string,
+  userId: string,
+  eventType: "START" | "PAUSE" | "RESUME" | "STOP" | "CANCEL",
+  elapsedMsAtEvent: number,
+  notes?: string
+) {
+  try {
+    await db.insert(timerEvents).values({
+      timerSessionId,
+      userId,
+      eventType,
+      elapsedMsAtEvent,
+      notes: notes || null,
+    });
+  } catch (error) {
+    logger.error({ err: error }, `Failed to record timer event: ${eventType}`);
+  }
+}
 
 const router = Router();
 
@@ -176,6 +197,9 @@ router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
       })
       .returning();
 
+    // Record START event
+    await recordTimerEvent(newSession.id, userId, "START", 0);
+
     logger.info(`Timer session started: ${newSession.id} for user: ${userId}`);
     res.json(newSession);
   } catch (error) {
@@ -223,6 +247,9 @@ router.post("/api/timer-sessions/:id/pause", requireAuth, async (req, res) => {
       .where(eq(timerSessions.id, sessionId))
       .returning();
 
+    // Record PAUSE event
+    await recordTimerEvent(sessionId, userId, "PAUSE", newTotalElapsed);
+
     logger.info(`Timer session paused: ${sessionId}, totalElapsedMs: ${newTotalElapsed}`);
     res.json(updatedSession);
   } catch (error) {
@@ -266,6 +293,9 @@ router.post("/api/timer-sessions/:id/resume", requireAuth, async (req, res) => {
       })
       .where(eq(timerSessions.id, sessionId))
       .returning();
+
+    // Record RESUME event
+    await recordTimerEvent(sessionId, userId, "RESUME", session.totalElapsedMs);
 
     logger.info(`Timer session resumed: ${sessionId}`);
     res.json(updatedSession);
@@ -402,6 +432,9 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
       .where(eq(timerSessions.id, sessionId))
       .returning();
 
+    // Record STOP event
+    await recordTimerEvent(sessionId, userId, "STOP", totalElapsed, notes || undefined);
+
     logger.info(`Timer session stopped: ${sessionId}, logRowId: ${logRow.id}, durationMinutes: ${durationMinutes}`);
 
     res.json({ session: updatedSession, logRow });
@@ -445,6 +478,13 @@ router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
       })
       .where(eq(timerSessions.id, sessionId))
       .returning();
+
+    // Record CANCEL event - calculate elapsed time
+    let elapsedAtCancel = session.totalElapsedMs;
+    if (session.status === "RUNNING") {
+      elapsedAtCancel += now.getTime() - session.startedAt.getTime();
+    }
+    await recordTimerEvent(sessionId, userId, "CANCEL", elapsedAtCancel);
 
     logger.info(`Timer session cancelled: ${sessionId}`);
     res.json(updatedSession);
