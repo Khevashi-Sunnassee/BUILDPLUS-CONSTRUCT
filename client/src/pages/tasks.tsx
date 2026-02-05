@@ -352,14 +352,22 @@ function TaskRow({
 
   const createSubtaskMutation = useMutation({
     mutationFn: async (data: { title: string; assigneeIds: string[]; jobId: string | null; status: TaskStatus; dueDate: Date | null; reminderDate: Date | null; projectStage: string | null }) => {
+      const formatDate = (date: Date | null): string | null => {
+        if (!date) return null;
+        if (date instanceof Date && !isNaN(date.getTime())) {
+          return date.toISOString();
+        }
+        return null;
+      };
+      
       const response = await apiRequest("POST", TASKS_ROUTES.LIST, {
         groupId: task.groupId,
         parentId: task.id,
         title: data.title,
         status: data.status,
         jobId: data.jobId,
-        dueDate: data.dueDate?.toISOString() || null,
-        reminderDate: data.reminderDate?.toISOString() || null,
+        dueDate: formatDate(data.dueDate),
+        reminderDate: formatDate(data.reminderDate),
         projectStage: data.projectStage,
       });
       
@@ -426,11 +434,13 @@ function TaskRow({
   };
 
   const handleDateChange = (date: Date | undefined) => {
-    updateTaskMutation.mutate({ dueDate: date?.toISOString() || null } as any);
+    const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
+    updateTaskMutation.mutate({ dueDate: isoDate } as any);
   };
 
   const handleReminderChange = (date: Date | undefined) => {
-    updateTaskMutation.mutate({ reminderDate: date?.toISOString() || null } as any);
+    const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
+    updateTaskMutation.mutate({ reminderDate: isoDate } as any);
   };
 
   const handleStageChange = (stage: string) => {
