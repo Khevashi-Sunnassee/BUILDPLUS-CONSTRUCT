@@ -763,7 +763,14 @@ export default function ManualEntryPage() {
   const onSubmit = async (data: ManualEntryForm) => {
     // Stop the timer for this panel if one is active
     const panelId = addNewPanel ? undefined : (data.panelRegisterId === "none" ? undefined : data.panelRegisterId);
-    if (activeTimer && activeTimer.panelRegisterId === panelId) {
+    
+    // Auto-stop timer if it matches the panel being saved, OR if saving for same job when no panel selected
+    const shouldStopTimer = activeTimer && (
+      (panelId && activeTimer.panelRegisterId === panelId) ||
+      (!panelId && !addNewPanel && activeTimer.jobId === data.jobId && !activeTimer.panelRegisterId)
+    );
+    
+    if (shouldStopTimer) {
       try {
         await stopTimerMutation.mutateAsync({
           timerId: activeTimer.id,
