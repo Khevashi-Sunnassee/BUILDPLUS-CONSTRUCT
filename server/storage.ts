@@ -4305,16 +4305,14 @@ export class DatabaseStorage implements IStorage {
     const panels = await db.select({
       panel: panelRegister,
       job: jobs,
-      productionSlot: productionSlots,
     })
       .from(panelRegister)
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .leftJoin(productionSlots, eq(productionSlots.panelId, panelRegister.id))
       .where(and(
-        eq(panelRegister.companyId, companyId),
-        eq(panelRegister.approvedForProduction, true)
+        eq(jobs.companyId, companyId),
+        eq(panelRegister.documentStatus, "IFC")
       ))
-      .orderBy(asc(productionSlots.slotDate), asc(panelRegister.panelMark));
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     
     return panels;
   }
