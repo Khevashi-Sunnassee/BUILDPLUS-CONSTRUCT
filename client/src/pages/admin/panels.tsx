@@ -534,14 +534,48 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
   );
 }
 
-function PanelDocumentsTab({ panelId }: { panelId: string }) {
+function PanelDocumentsTab({ panelId, productionPdfUrl }: { panelId: string; productionPdfUrl?: string | null }) {
+  if (!productionPdfUrl) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 border rounded-md bg-muted/30">
+        <FileIcon className="h-12 w-12 text-muted-foreground mb-3" />
+        <h3 className="font-medium text-muted-foreground">No Documents</h3>
+        <p className="text-sm text-muted-foreground text-center mt-1">
+          No IFC documents have been uploaded for this panel yet.
+        </p>
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          Upload documents during the Production Approval process.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center h-64 border rounded-md bg-muted/30">
-      <FileIcon className="h-12 w-12 text-muted-foreground mb-3" />
-      <h3 className="font-medium text-muted-foreground">Documents</h3>
-      <p className="text-sm text-muted-foreground text-center mt-1">
-        Document management for this panel will be available soon
-      </p>
+    <div className="space-y-4">
+      <div className="border rounded-lg p-4 bg-card">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-lg">
+              <FileText className="h-6 w-6 text-primary" />
+            </div>
+            <div>
+              <h4 className="font-medium">IFC Shop Drawing</h4>
+              <p className="text-sm text-muted-foreground">Production approval document</p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            asChild
+            data-testid="button-download-ifc-pdf"
+          >
+            <a href={ADMIN_ROUTES.PANEL_DOWNLOAD_PDF(panelId)} target="_blank" rel="noopener noreferrer">
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </a>
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3072,7 +3106,7 @@ export default function AdminPanelsPage() {
                 </TabsContent>
                 
                 <TabsContent value="documents" className="flex-1 overflow-y-auto mt-4">
-                  <PanelDocumentsTab panelId={editingPanel.id} />
+                  <PanelDocumentsTab panelId={editingPanel.id} productionPdfUrl={editingPanel.productionPdfUrl} />
                 </TabsContent>
               </>
             )}
