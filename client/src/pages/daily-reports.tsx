@@ -167,6 +167,7 @@ export default function DailyReportsPage() {
   });
 
   const [showAllocatedPanels, setShowAllocatedPanels] = useState(true);
+  const [allocatedPanelTab, setAllocatedPanelTab] = useState<"pending" | "ifc">("pending");
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
@@ -568,7 +569,19 @@ export default function DailyReportsPage() {
             </CardContent>
           </Card>
 
-          {allocatedData.stats.total > 0 && (
+          {allocatedData.stats.total > 0 && (() => {
+            const pendingPanels = allocatedData.programs.filter(p => 
+              p.status !== "COMPLETED" && 
+              p.panel?.documentStatus !== "IFC" && 
+              p.panel?.documentStatus !== "APPROVED"
+            );
+            const ifcPanels = allocatedData.programs.filter(p => 
+              p.status !== "COMPLETED" && 
+              (p.panel?.documentStatus === "IFC" || p.panel?.documentStatus === "APPROVED")
+            );
+            const currentPanels = allocatedPanelTab === "pending" ? pendingPanels : ifcPanels;
+            
+            return (
           <Card>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
@@ -583,9 +596,29 @@ export default function DailyReportsPage() {
                   data-testid="button-toggle-allocated"
                 >
                   {showAllocatedPanels ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  {showAllocatedPanels ? "Hide" : "Show"} ({allocatedData.programs.filter(p => p.status !== "COMPLETED").length} pending)
+                  {showAllocatedPanels ? "Hide" : "Show"}
                 </Button>
               </div>
+              {showAllocatedPanels && (
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant={allocatedPanelTab === "pending" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setAllocatedPanelTab("pending")}
+                    data-testid="button-tab-pending"
+                  >
+                    Pending ({pendingPanels.length})
+                  </Button>
+                  <Button
+                    variant={allocatedPanelTab === "ifc" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setAllocatedPanelTab("ifc")}
+                    data-testid="button-tab-ifc"
+                  >
+                    IFC ({ifcPanels.length})
+                  </Button>
+                </div>
+              )}
             </CardHeader>
             {showAllocatedPanels && (
               <CardContent className="pt-0">
@@ -601,8 +634,7 @@ export default function DailyReportsPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {allocatedData.programs
-                      .filter(p => p.status !== "COMPLETED")
+                    {currentPanels
                       .sort((a, b) => {
                         const dateA = a.drawingDueDate ? new Date(a.drawingDueDate).getTime() : Infinity;
                         const dateB = b.drawingDueDate ? new Date(b.drawingDueDate).getTime() : Infinity;
@@ -662,10 +694,12 @@ export default function DailyReportsPage() {
                           </TableRow>
                         );
                       })}
-                    {allocatedData.programs.filter(p => p.status !== "COMPLETED").length === 0 && (
+                    {currentPanels.length === 0 && (
                       <TableRow>
                         <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
-                          All your allocated panels are completed!
+                          {allocatedPanelTab === "pending" 
+                            ? "No pending panels in this category" 
+                            : "No IFC panels in this category"}
                         </TableCell>
                       </TableRow>
                     )}
@@ -674,7 +708,8 @@ export default function DailyReportsPage() {
               </CardContent>
             )}
           </Card>
-          )}
+            );
+          })()}
         </>
       )}
 
