@@ -250,6 +250,13 @@ function TaskRow({
   const [localConsultant, setLocalConsultant] = useState(task.consultant || "");
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [newSubtaskAssignees, setNewSubtaskAssignees] = useState<string[]>([]);
+  const [newSubtaskJobId, setNewSubtaskJobId] = useState<string | null>(null);
+  const [newSubtaskStatus, setNewSubtaskStatus] = useState<TaskStatus>("NOT_STARTED");
+  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<Date | null>(null);
+  const [newSubtaskReminderDate, setNewSubtaskReminderDate] = useState<Date | null>(null);
+  const [newSubtaskProjectStage, setNewSubtaskProjectStage] = useState<string | null>(null);
+  const [showNewSubtaskAssigneePopover, setShowNewSubtaskAssigneePopover] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -329,23 +336,61 @@ function TaskRow({
   });
 
   const createSubtaskMutation = useMutation({
-    mutationFn: async (title: string) => {
-      return apiRequest("POST", TASKS_ROUTES.LIST, {
+    mutationFn: async (data: { title: string; assigneeIds: string[]; jobId: string | null; status: TaskStatus; dueDate: Date | null; reminderDate: Date | null; projectStage: string | null }) => {
+      const response = await apiRequest("POST", TASKS_ROUTES.LIST, {
         groupId: task.groupId,
         parentId: task.id,
-        title,
-        dueDate: new Date().toISOString(),
+        title: data.title,
+        status: data.status,
+        jobId: data.jobId,
+        dueDate: data.dueDate?.toISOString() || null,
+        reminderDate: data.reminderDate?.toISOString() || null,
+        projectStage: data.projectStage,
       });
+      
+      if (data.assigneeIds.length > 0 && response?.id) {
+        await apiRequest("PUT", TASKS_ROUTES.ASSIGNEES(response.id), { userIds: data.assigneeIds });
+      }
+      
+      return response;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewSubtaskTitle("");
+      setNewSubtaskAssignees([]);
+      setNewSubtaskJobId(null);
+      setNewSubtaskStatus("NOT_STARTED");
+      setNewSubtaskDueDate(null);
+      setNewSubtaskReminderDate(null);
+      setNewSubtaskProjectStage(null);
       setTimeout(() => subtaskInputRef.current?.focus(), 50);
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
+  
+  const handleCreateSubtask = () => {
+    if (newSubtaskTitle.trim() && !createSubtaskMutation.isPending) {
+      createSubtaskMutation.mutate({
+        title: newSubtaskTitle,
+        assigneeIds: newSubtaskAssignees,
+        jobId: newSubtaskJobId,
+        status: newSubtaskStatus,
+        dueDate: newSubtaskDueDate,
+        reminderDate: newSubtaskReminderDate,
+        projectStage: newSubtaskProjectStage,
+      });
+    }
+  };
+  
+  const handleToggleNewSubtaskAssignee = (userId: string) => {
+    setNewSubtaskAssignees(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
 
   const handleTitleBlur = () => {
     if (localTitle !== task.title && localTitle.trim()) {
@@ -402,7 +447,7 @@ function TaskRow({
         ref={sortableRef}
         style={sortableStyle}
         className={cn(
-          "grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
+          "grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
           isSubtask && "bg-muted/30",
           task.status === "DONE" && "bg-green-50 dark:bg-green-950/30"
         )}
@@ -718,7 +763,7 @@ function TaskRow({
 
       {!isSubtask && showSubtasks && (
         <div 
-          className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20"
+          className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20"
           data-testid={`add-subitem-row-${task.id}`}
         >
           <div />
@@ -730,8 +775,8 @@ function TaskRow({
               value={newSubtaskTitle}
               onChange={(e) => setNewSubtaskTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && newSubtaskTitle.trim() && !createSubtaskMutation.isPending) {
-                  createSubtaskMutation.mutate(newSubtaskTitle);
+                if (e.key === "Enter") {
+                  handleCreateSubtask();
                 }
               }}
               className="h-7 border-0 bg-transparent focus-visible:ring-1 text-sm"
@@ -740,7 +785,205 @@ function TaskRow({
               data-testid={`input-add-subitem-${task.id}`}
             />
           </div>
-          <div className="col-span-8" />
+          
+          <div />
+          
+          <Popover open={showNewSubtaskAssigneePopover} onOpenChange={setShowNewSubtaskAssigneePopover}>
+            <PopoverTrigger asChild>
+              <div
+                className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-muted/50 rounded"
+                data-testid={`new-subitem-assignees-${task.id}`}
+              >
+                {newSubtaskAssignees.length > 0 ? (
+                  <div className="flex -space-x-2">
+                    {newSubtaskAssignees.slice(0, 3).map((userId) => {
+                      const user = users.find(u => u.id === userId);
+                      return (
+                        <Avatar key={userId} className="h-5 w-5 border-2 border-background">
+                          <AvatarFallback className="text-[9px] bg-primary text-primary-foreground">
+                            {getInitials(user?.name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      );
+                    })}
+                    {newSubtaskAssignees.length > 3 && (
+                      <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center text-[9px] border-2 border-background">
+                        +{newSubtaskAssignees.length - 3}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                )}
+              </div>
+            </PopoverTrigger>
+            <PopoverContent className="w-64 p-2" align="start">
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {users.map((user) => {
+                  const isAssigned = newSubtaskAssignees.includes(user.id);
+                  return (
+                    <div
+                      key={user.id}
+                      className={cn(
+                        "flex items-center gap-2 p-2 rounded cursor-pointer hover-elevate",
+                        isAssigned && "bg-primary/10"
+                      )}
+                      onClick={() => handleToggleNewSubtaskAssignee(user.id)}
+                      data-testid={`new-subitem-assignee-option-${user.id}`}
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarFallback className="text-[10px]">
+                          {getInitials(user.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm flex-1">{user.name || user.email}</span>
+                      {isAssigned && <div className="h-2 w-2 rounded-full bg-primary" />}
+                    </div>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Select
+            value={newSubtaskJobId || "none"}
+            onValueChange={(v) => setNewSubtaskJobId(v === "none" ? null : v)}
+          >
+            <SelectTrigger
+              className="h-7 border-0 text-xs"
+              data-testid={`new-subitem-job-${task.id}`}
+            >
+              <SelectValue placeholder="No job" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No job</SelectItem>
+              {jobs.map((job) => (
+                <SelectItem key={job.id} value={job.id}>
+                  {job.jobNumber}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select 
+            value={newSubtaskStatus} 
+            onValueChange={(v) => setNewSubtaskStatus(v as TaskStatus)}
+          >
+            <SelectTrigger
+              className="h-7 border-0 text-xs justify-center"
+              data-testid={`new-subitem-status-${task.id}`}
+            >
+              <Badge
+                className={cn("text-white text-[10px]", STATUS_CONFIG[newSubtaskStatus].bgClass)}
+              >
+                {STATUS_CONFIG[newSubtaskStatus].label}
+              </Badge>
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(STATUS_CONFIG).map(([key, config]) => (
+                <SelectItem key={key} value={key}>
+                  <Badge className={cn("text-white text-[10px]", config.bgClass)}>
+                    {config.label}
+                  </Badge>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={newSubtaskProjectStage || "none"}
+            onValueChange={(v) => setNewSubtaskProjectStage(v === "none" ? null : v)}
+          >
+            <SelectTrigger
+              className="h-7 border-0 text-xs"
+              data-testid={`new-subitem-stage-${task.id}`}
+            >
+              <SelectValue placeholder="Stage" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">No stage</SelectItem>
+              {PROJECT_STAGES.map((stage) => (
+                <SelectItem key={stage} value={stage}>
+                  {stage}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs justify-start"
+                data-testid={`new-subitem-date-${task.id}`}
+              >
+                <CalendarIcon className="h-3 w-3 mr-1" />
+                {newSubtaskDueDate ? format(newSubtaskDueDate, "dd/MM/yy") : "Date"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={newSubtaskDueDate || undefined}
+                onSelect={(date) => setNewSubtaskDueDate(date || null)}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-7 px-2 text-xs justify-start",
+                  newSubtaskReminderDate && "text-amber-600 dark:text-amber-400"
+                )}
+                data-testid={`new-subitem-reminder-${task.id}`}
+              >
+                <Bell className={cn("h-4 w-4", newSubtaskReminderDate && "fill-current")} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <div className="p-2 border-b">
+                <p className="text-sm font-medium">Set Reminder</p>
+              </div>
+              <Calendar
+                mode="single"
+                selected={newSubtaskReminderDate || undefined}
+                onSelect={(date) => setNewSubtaskReminderDate(date || null)}
+                initialFocus
+              />
+              {newSubtaskReminderDate && (
+                <div className="p-2 border-t">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-destructive hover:text-destructive"
+                    onClick={() => setNewSubtaskReminderDate(null)}
+                  >
+                    Clear Reminder
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+
+          <div />
+
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleCreateSubtask}
+              disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
+              data-testid={`btn-add-subitem-${task.id}`}
+            >
+              <Check className="h-4 w-4 text-green-600" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -973,7 +1216,7 @@ function TaskGroupComponent({
 
       {!isCollapsed && (
         <>
-          <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
+          <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
             <div />
             <div />
             <div className="px-2">Item</div>
@@ -983,6 +1226,7 @@ function TaskGroupComponent({
             <div className="px-2 text-center">Status</div>
             <div className="px-2 text-center">Stage</div>
             <div className="px-2 text-center">Date</div>
+            <div className="px-2 text-center">Reminder</div>
             <div className="px-2 text-center">Files</div>
             <div />
           </div>
@@ -999,7 +1243,7 @@ function TaskGroupComponent({
             ))}
           </SortableContext>
 
-          <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
+          <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
             <div />
             <div />
             <div className="flex items-center gap-2 py-2 pr-2">
