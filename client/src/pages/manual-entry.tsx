@@ -415,12 +415,16 @@ export default function ManualEntryPage() {
   const isTimerForSelectedPanel = activeTimer && activeTimer.panelRegisterId === selectedPanelId;
 
   // Update start and end times when latest end time changes or date changes
+  // Skip if there's an active timer for the selected panel (timer controls time fields)
   useEffect(() => {
+    if (isTimerForSelectedPanel) {
+      return; // Don't overwrite times when timer is active
+    }
     const newStartTime = latestEndTime;
     const newEndTime = calculateEndTime(newStartTime);
     form.setValue("startTime", newStartTime);
     form.setValue("endTime", newEndTime);
-  }, [latestEndTime, form]);
+  }, [latestEndTime, form, isTimerForSelectedPanel]);
 
   // Handle date change - update selectedDate state
   const handleDateChange = (newDate: string) => {
