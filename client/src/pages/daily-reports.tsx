@@ -170,6 +170,8 @@ export default function DailyReportsPage() {
   const [showAllocatedPanels, setShowAllocatedPanels] = useState(true);
   const [showDraftingRegister, setShowDraftingRegister] = useState(true);
   const [allocatedPanelTab, setAllocatedPanelTab] = useState<"pending" | "ifc">("pending");
+  const [allocatedSearch, setAllocatedSearch] = useState("");
+  const [allocatedStatusFilter, setAllocatedStatusFilter] = useState<string>("all");
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
@@ -623,7 +625,20 @@ export default function DailyReportsPage() {
               p.status !== "COMPLETED" && 
               (p.panel?.documentStatus === "IFC" || p.panel?.documentStatus === "APPROVED")
             );
-            const currentPanels = allocatedPanelTab === "pending" ? pendingPanels : ifcPanels;
+            const basePanels = allocatedPanelTab === "pending" ? pendingPanels : ifcPanels;
+            const currentPanels = basePanels.filter(p => {
+              // Apply search filter
+              const searchLower = allocatedSearch.toLowerCase();
+              const matchesSearch = !allocatedSearch || 
+                p.panel?.panelMark?.toLowerCase().includes(searchLower) ||
+                p.job?.jobNumber?.toLowerCase().includes(searchLower) ||
+                p.level?.toLowerCase().includes(searchLower);
+              
+              // Apply status filter
+              const matchesStatus = allocatedStatusFilter === "all" || p.status === allocatedStatusFilter;
+              
+              return matchesSearch && matchesStatus;
+            });
             
             return (
           <Card>
@@ -644,23 +659,48 @@ export default function DailyReportsPage() {
                 </Button>
               </div>
               {showAllocatedPanels && (
-                <div className="flex gap-2 mt-3">
-                  <Button
-                    variant={allocatedPanelTab === "pending" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setAllocatedPanelTab("pending")}
-                    data-testid="button-tab-pending"
-                  >
-                    Pending ({pendingPanels.length})
-                  </Button>
-                  <Button
-                    variant={allocatedPanelTab === "ifc" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setAllocatedPanelTab("ifc")}
-                    data-testid="button-tab-ifc"
-                  >
-                    IFC ({ifcPanels.length})
-                  </Button>
+                <div className="space-y-3 mt-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant={allocatedPanelTab === "pending" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAllocatedPanelTab("pending")}
+                      data-testid="button-tab-pending"
+                    >
+                      Pending ({pendingPanels.length})
+                    </Button>
+                    <Button
+                      variant={allocatedPanelTab === "ifc" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAllocatedPanelTab("ifc")}
+                      data-testid="button-tab-ifc"
+                    >
+                      IFC ({ifcPanels.length})
+                    </Button>
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search panel or job..."
+                        value={allocatedSearch}
+                        onChange={(e) => setAllocatedSearch(e.target.value)}
+                        className="pl-8 h-8"
+                        data-testid="input-allocated-search"
+                      />
+                    </div>
+                    <Select value={allocatedStatusFilter} onValueChange={setAllocatedStatusFilter}>
+                      <SelectTrigger className="w-[140px] h-8" data-testid="select-allocated-status">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="SCHEDULED">Scheduled</SelectItem>
+                        <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                        <SelectItem value="ON_HOLD">On Hold</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               )}
             </CardHeader>
