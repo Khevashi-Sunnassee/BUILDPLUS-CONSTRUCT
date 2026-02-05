@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { Link } from "wouter";
 import {
   Plus,
   Edit2,
@@ -16,6 +17,7 @@ import {
   Layers,
   CheckSquare,
   X,
+  Pencil,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -711,10 +713,21 @@ export default function AdminChecklistTemplatesPage() {
 
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button
+                    variant="default"
+                    size="sm"
+                    asChild
+                    data-testid={`button-build-template-${template.id}`}
+                  >
+                    <Link href={`/admin/checklist-templates/${template.id}/edit`}>
+                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                      Edit
+                    </Link>
+                  </Button>
+                  <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleOpenTemplateDialog(template)}
-                    data-testid={`button-edit-template-${template.id}`}
+                    data-testid={`button-settings-template-${template.id}`}
                   >
                     <Settings className="h-3.5 w-3.5 mr-1.5" />
                     Settings

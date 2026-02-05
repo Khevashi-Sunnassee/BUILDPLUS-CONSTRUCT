@@ -49,6 +49,7 @@ import PublicBundlePage from "@/pages/public-bundle";
 import AdminDocumentConfigPage from "@/pages/admin/document-config";
 import AdminCompaniesPage from "@/pages/admin/companies";
 import AdminChecklistTemplatesPage from "@/pages/admin/checklist-templates";
+import TemplateEditorPage from "@/pages/admin/template-editor";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -421,6 +422,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminChecklistTemplatesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/checklist-templates/:id/edit">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <TemplateEditorPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
