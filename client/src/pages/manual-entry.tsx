@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -18,7 +18,21 @@ import {
   Briefcase,
   AlertCircle,
   Ruler,
+  Hammer,
+  Upload,
+  XCircle,
+  Sparkles,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,6 +133,27 @@ export default function ManualEntryPage() {
   const [addNewPanel, setAddNewPanel] = useState(false);
   const [newPanelMark, setNewPanelMark] = useState("");
   const [selectedDate, setSelectedDate] = useState(initialDate);
+
+  // Production approval dialog state
+  const [productionDialogOpen, setProductionDialogOpen] = useState(false);
+  const [productionPanel, setProductionPanel] = useState<PanelWithJob | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [productionFormData, setProductionFormData] = useState({
+    loadWidth: "",
+    loadHeight: "",
+    panelThickness: "",
+    panelVolume: "",
+    panelMass: "",
+    panelArea: "",
+    liftFcm: "",
+    concreteStrengthMpa: "",
+    rotationalLifters: "",
+    primaryLifters: "",
+  });
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
@@ -369,6 +404,167 @@ export default function ManualEntryPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  // PDF Analysis mutation
+  const analyzePdfMutation = useMutation({
+    mutationFn: async ({ panelId, pdfBase64 }: { panelId: string; pdfBase64: string }) => {
+      const res = await apiRequest("POST", ADMIN_ROUTES.PANEL_ANALYZE_PDF(panelId), { pdfBase64 });
+      return res.json();
+    },
+    onSuccess: (result) => {
+      if (result.extracted) {
+        setProductionFormData((prev) => ({
+          ...prev,
+          loadWidth: result.extracted.loadWidth || prev.loadWidth,
+          loadHeight: result.extracted.loadHeight || prev.loadHeight,
+          panelThickness: result.extracted.panelThickness || prev.panelThickness,
+          panelVolume: result.extracted.panelVolume || prev.panelVolume,
+          panelMass: result.extracted.panelMass || prev.panelMass,
+          panelArea: result.extracted.panelArea || prev.panelArea,
+          liftFcm: result.extracted.liftFcm || prev.liftFcm,
+          concreteStrengthMpa: result.extracted.concreteStrengthMpa || result.extracted.day28Fc || prev.concreteStrengthMpa,
+          rotationalLifters: result.extracted.rotationalLifters || prev.rotationalLifters,
+          primaryLifters: result.extracted.primaryLifters || prev.primaryLifters,
+        }));
+        toast({ title: "PDF analyzed successfully" });
+      }
+      setIsAnalyzing(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error analyzing PDF", description: error.message, variant: "destructive" });
+      setIsAnalyzing(false);
+    },
+  });
+
+  // Production approval mutation
+  const approveProductionMutation = useMutation({
+    mutationFn: async ({ panelId, data }: { panelId: string; data: typeof productionFormData }) => {
+      const res = await apiRequest("POST", ADMIN_ROUTES.PANEL_APPROVE_PRODUCTION(panelId), data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Panel approved for production" });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+      closeProductionDialog();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Production dialog handlers
+  const openProductionDialog = (panel: PanelWithJob) => {
+    setProductionPanel(panel);
+    setProductionFormData({
+      loadWidth: panel.loadWidth || "",
+      loadHeight: panel.loadHeight || "",
+      panelThickness: panel.panelThickness || "",
+      panelVolume: panel.panelVolume || "",
+      panelMass: panel.panelMass || "",
+      panelArea: panel.panelArea || "",
+      liftFcm: panel.liftFcm || "",
+      concreteStrengthMpa: panel.concreteStrengthMpa || panel.day28Fc || "",
+      rotationalLifters: panel.rotationalLifters || "",
+      primaryLifters: panel.primaryLifters || "",
+    });
+    setPdfFile(null);
+    setValidationErrors([]);
+    setProductionDialogOpen(true);
+  };
+
+  const closeProductionDialog = () => {
+    setProductionDialogOpen(false);
+    setProductionPanel(null);
+    setPdfFile(null);
+    setValidationErrors([]);
+    setProductionFormData({
+      loadWidth: "",
+      loadHeight: "",
+      panelThickness: "",
+      panelVolume: "",
+      panelMass: "",
+      panelArea: "",
+      liftFcm: "",
+      concreteStrengthMpa: "",
+      rotationalLifters: "",
+      primaryLifters: "",
+    });
+  };
+
+  const handlePdfDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === "application/pdf") {
+      setPdfFile(file);
+    }
+  }, []);
+
+  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPdfFile(file);
+    }
+  };
+
+  const analyzePdf = async () => {
+    if (!pdfFile || !productionPanel) return;
+    setIsAnalyzing(true);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      analyzePdfMutation.mutate({ panelId: productionPanel.id, pdfBase64: base64 });
+    };
+    reader.readAsDataURL(pdfFile);
+  };
+
+  const handleApproveProduction = () => {
+    if (!productionPanel) return;
+
+    const errors: string[] = [];
+    if (!productionFormData.loadWidth) errors.push("Load Width is required");
+    if (!productionFormData.loadHeight) errors.push("Load Height is required");
+    if (!productionFormData.panelThickness) errors.push("Panel Thickness is required");
+    if (!productionFormData.concreteStrengthMpa) errors.push("Concrete Strength f'c (MPa) is required");
+    if (!productionFormData.liftFcm) errors.push("Lift f'cm is required");
+
+    if (errors.length > 0) {
+      setValidationErrors(errors);
+      toast({ title: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+
+    // First update document status to IFC, then approve for production
+    updateDocumentStatusMutation.mutate({ 
+      panelId: productionPanel.id, 
+      documentStatus: "IFC" 
+    }, {
+      onSuccess: () => {
+        approveProductionMutation.mutate({ panelId: productionPanel.id, data: productionFormData });
+      }
+    });
+  };
+
+  // Calculate panel metrics when dimensions change
+  useEffect(() => {
+    const width = parseFloat(productionFormData.loadWidth);
+    const height = parseFloat(productionFormData.loadHeight);
+    const thickness = parseFloat(productionFormData.panelThickness);
+    
+    if (!isNaN(width) && !isNaN(height) && !isNaN(thickness)) {
+      const areaM2 = (width * height) / 1000000;
+      const volumeM3 = areaM2 * (thickness / 1000);
+      const massKg = volumeM3 * 2500;
+      
+      setProductionFormData((prev) => ({
+        ...prev,
+        panelArea: areaM2.toFixed(3),
+        panelVolume: volumeM3.toFixed(3),
+        panelMass: Math.round(massKg).toString(),
+      }));
+    }
+  }, [productionFormData.loadWidth, productionFormData.loadHeight, productionFormData.panelThickness]);
 
   const onSubmit = (data: ManualEntryForm) => {
     const submitData = {
@@ -718,10 +914,15 @@ export default function ManualEntryPage() {
                       <Select
                         value={selectedPanel.documentStatus || "DRAFT"}
                         onValueChange={(value) => {
-                          updateDocumentStatusMutation.mutate({ 
-                            panelId: selectedPanel.id, 
-                            documentStatus: value 
-                          });
+                          if (value === "IFC" && selectedPanel.documentStatus !== "IFC") {
+                            // Open production dialog when changing to IFC
+                            openProductionDialog(selectedPanel);
+                          } else {
+                            updateDocumentStatusMutation.mutate({ 
+                              panelId: selectedPanel.id, 
+                              documentStatus: value 
+                            });
+                          }
                         }}
                         disabled={updateDocumentStatusMutation.isPending}
                       >
@@ -929,6 +1130,250 @@ export default function ManualEntryPage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Production Approval Dialog */}
+      <Dialog open={productionDialogOpen} onOpenChange={(open) => !open && closeProductionDialog()}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Hammer className="h-5 w-5" />
+              Set Up for Production - IFC Approval
+            </DialogTitle>
+            <DialogDescription>
+              {productionPanel && (
+                <span>
+                  Panel: <strong className="font-mono">{productionPanel.panelMark}</strong>
+                  {productionPanel.approvedForProduction && (
+                    <Badge variant="secondary" className="ml-2 gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      Currently Approved
+                    </Badge>
+                  )}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* PDF Upload Section */}
+            <div className="space-y-2">
+              <Label>Production Drawing PDF</Label>
+              <div
+                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                  isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handlePdfDrop}
+              >
+                {pdfFile ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <FileText className="h-8 w-8 text-primary" />
+                    <div className="text-left">
+                      <p className="font-medium">{pdfFile.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setPdfFile(null)}
+                      data-testid="button-remove-pdf"
+                    >
+                      <XCircle className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <FileText className="h-10 w-10 mx-auto text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">
+                      Drag and drop a PDF here, or click to browse
+                    </p>
+                    <input
+                      type="file"
+                      ref={pdfInputRef}
+                      accept=".pdf"
+                      onChange={handlePdfSelect}
+                      className="hidden"
+                      data-testid="input-pdf-upload"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => pdfInputRef.current?.click()}
+                      data-testid="button-browse-pdf"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Browse
+                    </Button>
+                  </div>
+                )}
+              </div>
+              {pdfFile && (
+                <Button
+                  onClick={analyzePdf}
+                  disabled={isAnalyzing}
+                  className="w-full"
+                  data-testid="button-analyze-pdf"
+                >
+                  {isAnalyzing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  Analyze PDF with AI
+                </Button>
+              )}
+            </div>
+
+            {/* Panel Dimensions */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="prod-loadWidth">Load Width (mm) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="prod-loadWidth"
+                  value={productionFormData.loadWidth}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, loadWidth: e.target.value })}
+                  placeholder="e.g., 3000"
+                  data-testid="input-prod-load-width"
+                  className={validationErrors.includes("Load Width is required") ? "border-red-500" : ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-loadHeight">Load Height (mm) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="prod-loadHeight"
+                  value={productionFormData.loadHeight}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, loadHeight: e.target.value })}
+                  placeholder="e.g., 2800"
+                  data-testid="input-prod-load-height"
+                  className={validationErrors.includes("Load Height is required") ? "border-red-500" : ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-panelThickness">Panel Thickness (mm) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="prod-panelThickness"
+                  value={productionFormData.panelThickness}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, panelThickness: e.target.value })}
+                  placeholder="e.g., 200"
+                  data-testid="input-prod-thickness"
+                  className={validationErrors.includes("Panel Thickness is required") ? "border-red-500" : ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-panelArea">Panel Area (m²)</Label>
+                <Input
+                  id="prod-panelArea"
+                  value={productionFormData.panelArea}
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-calculated"
+                  data-testid="input-prod-area"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-panelVolume">Panel Volume (m³)</Label>
+                <Input
+                  id="prod-panelVolume"
+                  value={productionFormData.panelVolume}
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-calculated"
+                  data-testid="input-prod-volume"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-panelMass">Panel Mass (kg)</Label>
+                <Input
+                  id="prod-panelMass"
+                  value={productionFormData.panelMass}
+                  readOnly
+                  className="bg-muted"
+                  placeholder="Auto-calculated"
+                  data-testid="input-prod-mass"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-concreteStrengthMpa">Concrete Strength f'c (MPa) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="prod-concreteStrengthMpa"
+                  value={productionFormData.concreteStrengthMpa}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, concreteStrengthMpa: e.target.value })}
+                  placeholder="e.g., 40, 50, 65"
+                  data-testid="input-prod-concrete-strength"
+                  className={validationErrors.includes("Concrete Strength f'c (MPa) is required") ? "border-red-500" : ""}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-liftFcm">Lift f'cm (MPa) <span className="text-red-500">*</span></Label>
+                <Input
+                  id="prod-liftFcm"
+                  value={productionFormData.liftFcm}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, liftFcm: e.target.value })}
+                  placeholder="e.g., 25"
+                  data-testid="input-prod-lift-fcm"
+                  className={validationErrors.includes("Lift f'cm is required") ? "border-red-500" : ""}
+                />
+              </div>
+            </div>
+
+            {/* Validation Errors Display */}
+            {validationErrors.length > 0 && (
+              <div className="border border-red-200 bg-red-50 dark:bg-red-950/20 rounded-lg p-3">
+                <p className="font-medium text-sm text-red-600 dark:text-red-400 mb-2">Please complete all required fields:</p>
+                <ul className="list-disc list-inside text-sm text-red-600 dark:text-red-400 space-y-1">
+                  {validationErrors.map((error, i) => (
+                    <li key={i}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Lifters */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="prod-rotationalLifters">Rotational Lifters</Label>
+                <Input
+                  id="prod-rotationalLifters"
+                  value={productionFormData.rotationalLifters}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, rotationalLifters: e.target.value })}
+                  placeholder="e.g., 2x ERH-2.5T"
+                  data-testid="input-prod-rotational-lifters"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prod-primaryLifters">Primary Lifters</Label>
+                <Input
+                  id="prod-primaryLifters"
+                  value={productionFormData.primaryLifters}
+                  onChange={(e) => setProductionFormData({ ...productionFormData, primaryLifters: e.target.value })}
+                  placeholder="e.g., 4x Anchor Point"
+                  data-testid="input-prod-primary-lifters"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 mt-4">
+            <Button variant="outline" onClick={closeProductionDialog} data-testid="button-cancel-production">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleApproveProduction}
+              disabled={approveProductionMutation.isPending || updateDocumentStatusMutation.isPending}
+              data-testid="button-approve-production"
+            >
+              {(approveProductionMutation.isPending || updateDocumentStatusMutation.isPending) && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Approve for Production
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
