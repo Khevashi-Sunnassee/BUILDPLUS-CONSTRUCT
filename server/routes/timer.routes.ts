@@ -340,13 +340,34 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
     // Calculate start time from completed time minus duration
     const sessionStartTime = new Date(now.getTime() - totalElapsed);
 
+    // Get panel mark and drawing code from panel register if panelRegisterId is provided
+    const finalPanelRegisterId = panelRegisterId || session.panelRegisterId || null;
+    let finalPanelMark = panelMark || null;
+    let finalDrawingCode = drawingCode || null;
+
+    if (finalPanelRegisterId && (!finalPanelMark || !finalDrawingCode)) {
+      const [panel] = await db
+        .select({
+          panelMark: panelRegister.panelMark,
+          drawingCode: panelRegister.drawingCode,
+        })
+        .from(panelRegister)
+        .where(eq(panelRegister.id, finalPanelRegisterId))
+        .limit(1);
+
+      if (panel) {
+        if (!finalPanelMark) finalPanelMark = panel.panelMark;
+        if (!finalDrawingCode) finalDrawingCode = panel.drawingCode || null;
+      }
+    }
+
     // Create log row entry
     const [logRow] = await db
       .insert(logRows)
       .values({
         dailyLogId: dailyLog.id,
         jobId: jobId || session.jobId || null,
-        panelRegisterId: panelRegisterId || session.panelRegisterId || null,
+        panelRegisterId: finalPanelRegisterId,
         workTypeId: workTypeId || session.workTypeId || null,
         startAt: sessionStartTime,
         endAt: now,
@@ -355,8 +376,8 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
         source: "timer",
         sourceEventId: `timer-${sessionId}`,
         app: app || session.app || "manual",
-        panelMark: panelMark || null,
-        drawingCode: drawingCode || null,
+        panelMark: finalPanelMark,
+        drawingCode: finalDrawingCode,
         notes: notes || session.notes || null,
         isUserEdited: true,
       })
