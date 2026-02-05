@@ -248,7 +248,6 @@ function TaskRow({
   const [localTitle, setLocalTitle] = useState(task.title);
   const [localConsultant, setLocalConsultant] = useState(task.consultant || "");
   const [showSubtasks, setShowSubtasks] = useState(false);
-  const [showAddSubtask, setShowAddSubtask] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -326,7 +325,6 @@ function TaskRow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewSubtaskTitle("");
-      setShowAddSubtask(false);
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -612,8 +610,7 @@ function TaskRow({
               )}
               data-testid={`btn-reminder-${task.id}`}
             >
-              <Bell className={cn("h-3 w-3 mr-1", task.reminderDate && "fill-current")} />
-              {task.reminderDate ? format(new Date(task.reminderDate), "dd/MM/yy") : "Remind"}
+              <Bell className={cn("h-4 w-4", task.reminderDate && "fill-current")} />
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -668,7 +665,7 @@ function TaskRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {!isSubtask && (
-              <DropdownMenuItem onClick={() => setShowAddSubtask(true)} data-testid={`menu-add-subtask-${task.id}`}>
+              <DropdownMenuItem onClick={() => setShowSubtasks(true)} data-testid={`menu-add-subtask-${task.id}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add subtask
               </DropdownMenuItem>
@@ -701,28 +698,15 @@ function TaskRow({
           />
         ))}
 
-      {!isSubtask && showSubtasks && !showAddSubtask && (
+      {!isSubtask && showSubtasks && (
         <div 
-          className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors"
-          onClick={() => setShowAddSubtask(true)}
-          data-testid={`btn-add-subitem-${task.id}`}
+          className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20"
+          data-testid={`add-subitem-row-${task.id}`}
         >
           <div />
           <div />
           <div className="flex items-center gap-2 py-1.5 pl-8 pr-2">
             <Plus className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">Add subitem</span>
-          </div>
-          <div className="col-span-8" />
-        </div>
-      )}
-
-      {showSubtasks && showAddSubtask && (
-        <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
-          <div />
-          <div />
-          <div className="flex items-center gap-2 py-2 pl-6 pr-2">
-            <div className="w-5" />
             <Input
               value={newSubtaskTitle}
               onChange={(e) => setNewSubtaskTitle(e.target.value)}
@@ -730,38 +714,18 @@ function TaskRow({
                 if (e.key === "Enter" && newSubtaskTitle.trim()) {
                   createSubtaskMutation.mutate(newSubtaskTitle);
                 }
-                if (e.key === "Escape") {
-                  setShowAddSubtask(false);
-                  setNewSubtaskTitle("");
+              }}
+              onBlur={() => {
+                if (newSubtaskTitle.trim()) {
+                  createSubtaskMutation.mutate(newSubtaskTitle);
                 }
               }}
               className="h-7 border-0 bg-transparent focus-visible:ring-1 text-sm"
-              placeholder="New subtask..."
-              autoFocus
-              data-testid="input-new-subtask"
+              placeholder="Add subitem..."
+              data-testid={`input-add-subitem-${task.id}`}
             />
           </div>
-          <div className="col-span-7 flex items-center gap-2 px-2">
-            <Button
-              size="sm"
-              onClick={() => newSubtaskTitle.trim() && createSubtaskMutation.mutate(newSubtaskTitle)}
-              disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
-              data-testid="btn-save-subtask"
-            >
-              Add
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setShowAddSubtask(false);
-                setNewSubtaskTitle("");
-              }}
-              data-testid="btn-cancel-subtask"
-            >
-              Cancel
-            </Button>
-          </div>
+          <div className="col-span-8" />
         </div>
       )}
 
