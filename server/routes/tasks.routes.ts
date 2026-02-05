@@ -92,8 +92,18 @@ router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req
 router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const userId = (req.session as any).userId;
+    const taskData = { ...req.body };
+    
+    // Convert date strings to Date objects for Drizzle timestamp columns
+    if (taskData.dueDate !== undefined) {
+      taskData.dueDate = taskData.dueDate ? new Date(taskData.dueDate) : null;
+    }
+    if (taskData.reminderDate !== undefined) {
+      taskData.reminderDate = taskData.reminderDate ? new Date(taskData.reminderDate) : null;
+    }
+    
     const task = await storage.createTask({
-      ...req.body,
+      ...taskData,
       createdById: userId,
     });
     res.status(201).json(task);
@@ -108,6 +118,9 @@ router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND
     const updateData = { ...req.body };
     if (updateData.dueDate !== undefined) {
       updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
+    }
+    if (updateData.reminderDate !== undefined) {
+      updateData.reminderDate = updateData.reminderDate ? new Date(updateData.reminderDate) : null;
     }
     const task = await storage.updateTask(String(req.params.id), updateData);
     if (!task) return res.status(404).json({ error: "Task not found" });
