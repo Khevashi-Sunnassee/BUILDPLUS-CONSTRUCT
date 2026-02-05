@@ -247,7 +247,7 @@ function TaskRow({
   const { toast } = useToast();
   const [localTitle, setLocalTitle] = useState(task.title);
   const [localConsultant, setLocalConsultant] = useState(task.consultant || "");
-  const [showSubtasks, setShowSubtasks] = useState(true);
+  const [showSubtasks, setShowSubtasks] = useState(false);
   const [showAddSubtask, setShowAddSubtask] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -411,11 +411,11 @@ function TaskRow({
         </div>
 
         <div className={cn("flex items-center gap-2 py-2 pr-2", isSubtask && "pl-6")}>
-          {!isSubtask && hasSubtasks && (
+          {!isSubtask && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 p-0"
+              className="h-5 w-5 p-0 shrink-0"
               onClick={() => setShowSubtasks(!showSubtasks)}
               data-testid={`btn-toggle-subtasks-${task.id}`}
             >
@@ -426,7 +426,6 @@ function TaskRow({
               )}
             </Button>
           )}
-          {!isSubtask && !hasSubtasks && <div className="w-5" />}
           <Input
             ref={titleInputRef}
             value={localTitle}
@@ -437,6 +436,11 @@ function TaskRow({
             placeholder="Task name..."
             data-testid={`input-task-title-${task.id}`}
           />
+          {!isSubtask && hasSubtasks && (
+            <span className="text-xs text-muted-foreground shrink-0">
+              {(task.subtasks || []).length}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center justify-center">
@@ -713,7 +717,7 @@ function TaskRow({
         </div>
       )}
 
-      {showAddSubtask && (
+      {showSubtasks && showAddSubtask && (
         <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
           <div />
           <div />
@@ -740,7 +744,6 @@ function TaskRow({
           <div className="col-span-7 flex items-center gap-2 px-2">
             <Button
               size="sm"
-              className="h-6"
               onClick={() => newSubtaskTitle.trim() && createSubtaskMutation.mutate(newSubtaskTitle)}
               disabled={!newSubtaskTitle.trim() || createSubtaskMutation.isPending}
               data-testid="btn-save-subtask"
@@ -750,7 +753,6 @@ function TaskRow({
             <Button
               variant="ghost"
               size="sm"
-              className="h-6"
               onClick={() => {
                 setShowAddSubtask(false);
                 setNewSubtaskTitle("");
