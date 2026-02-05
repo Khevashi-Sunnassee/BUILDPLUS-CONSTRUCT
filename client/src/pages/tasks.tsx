@@ -348,11 +348,13 @@ function TaskRow({
         projectStage: data.projectStage,
       });
       
-      if (data.assigneeIds.length > 0 && response?.id) {
-        await apiRequest("PUT", TASKS_ROUTES.ASSIGNEES(response.id), { userIds: data.assigneeIds });
+      const createdTask = await response.json();
+      
+      if (data.assigneeIds.length > 0 && createdTask?.id) {
+        await apiRequest("PUT", TASKS_ROUTES.ASSIGNEES(createdTask.id), { userIds: data.assigneeIds });
       }
       
-      return response;
+      return createdTask;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
@@ -720,7 +722,7 @@ function TaskRow({
             <Button
               variant="ghost"
               size="icon"
-              className="invisible group-hover:visible"
+              className="opacity-0 group-hover:opacity-100"
               data-testid={`btn-task-menu-${task.id}`}
             >
               <MoreHorizontal className="h-4 w-4" />
