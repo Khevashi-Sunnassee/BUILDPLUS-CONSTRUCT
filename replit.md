@@ -22,7 +22,7 @@ The frontend uses React + Vite, TanStack Query for data fetching, Wouter for rou
 - **Time & Approval Management**: Daily log entries, submission for approval, manual entry, manager review, and a timer feature for real-time drafting time tracking with pause/resume/stop capabilities.
 - **Reporting & Analytics**: Comprehensive reports covering time, production, logistics, wages, and cost analysis.
 - **Admin Provisioning**: Centralized management for users, jobs, devices, global settings, panel types, and work types.
-- **Jobs & Panel Management**: Creation and tracking of jobs, panel registration, production approval workflow, and an estimate import system supporting drag & drop Excel uploads with dynamic parsing.
+- **Jobs & Panel Management**: Creation and tracking of jobs, panel registration, production approval workflow, and an estimate import system supporting drag & drop Excel uploads with dynamic parsing. The panel register now supports 100+ detailed fields covering reinforcement (vertical/horizontal reo, mesh, fitments, U-bars, ligs, blockout bars, additional reo sets), concrete details (grout, strength), lifters, dowel bars, plates, inserts, and reo summary calculations.
 - **AI Integration**: OpenAI-powered PDF analysis for extracting panel specifications from shop drawings during production approval.
 - **Configurable Rates & Cost Analysis**: Panel types and jobs support configurable rates (supply, install, sell) and track expected costs by component (labor, concrete, steel) with job-level overrides.
 - **Production Tracking**: Production reports grouped by date, including financial and production metrics.
