@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import * as XLSX from "xlsx";
+import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { InsertItem } from "@shared/schema";
@@ -8,9 +9,53 @@ import logger from "../lib/logger";
 
 const router = Router();
 
+const supplierSchema = z.object({
+  name: z.string().min(1, "Name is required").max(255),
+  code: z.string().max(50).optional(),
+  contactName: z.string().max(255).optional().nullable(),
+  email: z.string().email().optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  address: z.string().max(500).optional().nullable(),
+  website: z.string().max(255).optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+const itemCategorySchema = z.object({
+  name: z.string().min(1, "Name is required").max(255),
+  code: z.string().max(50).optional(),
+  description: z.string().max(1000).optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+const itemSchema = z.object({
+  code: z.string().min(1, "Code is required").max(100),
+  description: z.string().min(1, "Description is required").max(1000),
+  categoryId: z.string().optional().nullable(),
+  supplierId: z.string().optional().nullable(),
+  unitOfMeasure: z.string().max(50).optional(),
+  unitPrice: z.string().optional(),
+  preferredSupplierId: z.string().optional().nullable(),
+  notes: z.string().max(5000).optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+const ALLOWED_IMPORT_TYPES = [
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_IMPORT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed. Only Excel and CSV files are accepted.`));
+    }
+  },
 });
 
 router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
@@ -53,7 +98,11 @@ router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const supplier = await storage.createSupplier({ ...req.body, companyId });
+    const parsed = supplierSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const supplier = await storage.createSupplier({ ...parsed.data, companyId });
     res.json(supplier);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating supplier");
@@ -66,7 +115,11 @@ router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), 
     const companyId = req.companyId;
     const existing = await storage.getSupplier(String(req.params.id));
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
-    const supplier = await storage.updateSupplier(String(req.params.id), req.body);
+    const parsed = supplierSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const supplier = await storage.updateSupplier(String(req.params.id), parsed.data);
     res.json(supplier);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating supplier");
@@ -127,7 +180,11 @@ router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"),
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const category = await storage.createItemCategory({ ...req.body, companyId });
+    const parsed = itemCategorySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const category = await storage.createItemCategory({ ...parsed.data, companyId });
     res.json(category);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating category");
@@ -140,7 +197,11 @@ router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAG
     const companyId = req.companyId;
     const existing = await storage.getItemCategory(String(req.params.id));
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Category not found" });
-    const category = await storage.updateItemCategory(String(req.params.id), req.body);
+    const parsed = itemCategorySchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const category = await storage.updateItemCategory(String(req.params.id), parsed.data);
     res.json(category);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating category");
@@ -187,8 +248,9 @@ router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
 
 router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const item = await storage.getItem(String(req.params.id));
-    if (!item) return res.status(404).json({ error: "Item not found" });
+    if (!item || item.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
     res.json(item);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching item");
@@ -198,7 +260,13 @@ router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
 
 router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const item = await storage.createItem(req.body);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const parsed = itemSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const item = await storage.createItem({ ...parsed.data, companyId });
     res.json(item);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating item");
@@ -208,7 +276,14 @@ router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (re
 
 router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const item = await storage.updateItem(String(req.params.id), req.body);
+    const companyId = req.companyId;
+    const existing = await storage.getItem(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
+    const parsed = itemSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const item = await storage.updateItem(String(req.params.id), parsed.data);
     if (!item) return res.status(404).json({ error: "Item not found" });
     res.json(item);
   } catch (error: any) {
@@ -219,6 +294,9 @@ router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), asyn
 
 router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getItem(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
     await storage.deleteItem(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {

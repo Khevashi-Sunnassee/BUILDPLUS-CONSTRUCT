@@ -22,9 +22,30 @@ const openai = new OpenAI({
 const router = Router();
 const objectStorageService = new ObjectStorageService();
 
+const ALLOWED_DOCUMENT_TYPES = [
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff",
+  "application/pdf",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/plain", "text/csv", "text/html", "text/xml", "application/json",
+  "application/zip", "application/x-rar-compressed", "application/x-7z-compressed",
+  "application/acad", "application/x-autocad", "image/vnd.dwg", "image/x-dwg",
+  "application/dxf", "image/vnd.dxf",
+  "application/x-step", "application/ifc",
+  "application/rtf", "application/xml",
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max per file
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_DOCUMENT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed`));
+    }
+  },
 });
 
 // ==================== DOCUMENT TYPES ====================
@@ -346,7 +367,13 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       documentNumber = await storage.getNextDocumentNumber(typeId);
     }
 
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company context required" });
+    }
+
     const document = await storage.createDocument({
+      companyId,
       title,
       description: description || null,
       fileName: `${Date.now()}-${req.file.originalname}`,
@@ -421,7 +448,13 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
     const newVersion = version || String((currentVersion + 1).toFixed(1));
     const newRevision = revision || "A";
 
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company context required" });
+    }
+
     const newDocument = await storage.createNewVersion(parentId, {
+      companyId,
       title: parentDoc.title,
       description: parentDoc.description,
       fileName: `${Date.now()}-${req.file.originalname}`,
@@ -582,9 +615,15 @@ router.post("/api/document-bundles", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Bundle name is required" });
     }
 
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company context required" });
+    }
+
     const qrCodeId = `bundle-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
 
     const bundle = await storage.createDocumentBundle({
+      companyId,
       bundleName,
       description: description || null,
       qrCodeId,

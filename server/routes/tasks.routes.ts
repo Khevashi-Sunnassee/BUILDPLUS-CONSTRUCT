@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
@@ -7,9 +8,58 @@ import logger from "../lib/logger";
 
 const router = Router();
 
+const ALLOWED_TASK_FILE_TYPES = [
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+  "application/pdf",
+  "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain", "text/csv", "application/json",
+  "application/zip",
+];
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_TASK_FILE_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed`));
+    }
+  },
+});
+
+const taskGroupSchema = z.object({
+  name: z.string().min(1, "Name is required").max(255),
+  color: z.string().optional(),
+});
+
+const taskCreateSchema = z.object({
+  title: z.string().min(1, "Title is required").max(500),
+  groupId: z.string().min(1, "Group ID is required"),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "BLOCKED"]).optional(),
+  dueDate: z.string().nullable().optional(),
+  reminderDate: z.string().nullable().optional(),
+  consultant: z.string().max(255).optional(),
+  projectStage: z.string().max(255).optional(),
+  jobId: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
+});
+
+const taskUpdateSchema_partial = z.object({
+  title: z.string().min(1).max(500).optional(),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "BLOCKED"]).optional(),
+  dueDate: z.string().nullable().optional(),
+  reminderDate: z.string().nullable().optional(),
+  consultant: z.string().max(255).optional(),
+  projectStage: z.string().max(255).optional(),
+  jobId: z.string().nullable().optional(),
+  parentId: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
+});
+
+const taskUpdateSchema = z.object({
+  content: z.string().min(1, "Content is required").max(10000),
 });
 
 router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (req, res) => {
@@ -40,7 +90,11 @@ router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AN
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const group = await storage.createTaskGroup({ ...req.body, companyId });
+    const parsed = taskGroupSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const group = await storage.createTaskGroup({ ...parsed.data, companyId });
     res.status(201).json(group);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating task group");
@@ -53,7 +107,11 @@ router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VI
     const companyId = req.companyId;
     const existing = await storage.getTaskGroup(String(req.params.id));
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
-    const group = await storage.updateTaskGroup(String(req.params.id), req.body);
+    const parsed = taskGroupSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const group = await storage.updateTaskGroup(String(req.params.id), parsed.data);
     if (!group) return res.status(404).json({ error: "Task group not found" });
     res.json(group);
   } catch (error: any) {
@@ -117,15 +175,19 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    
+    const parsed = taskCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    
     const userId = req.session.userId;
-    const taskData = { ...req.body };
+    const taskData = { ...parsed.data } as any;
     
     // Verify task group belongs to company
-    if (taskData.groupId) {
-      const group = await storage.getTaskGroup(taskData.groupId);
-      if (!group || group.companyId !== companyId) {
-        return res.status(400).json({ error: "Invalid task group" });
-      }
+    const group = await storage.getTaskGroup(taskData.groupId);
+    if (!group || group.companyId !== companyId) {
+      return res.status(400).json({ error: "Invalid task group" });
     }
     
     // Convert date strings to Date objects for Drizzle timestamp columns
@@ -150,13 +212,19 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
 router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    
+    const parsed = taskUpdateSchema_partial.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    
     const existingTask = await storage.getTask(String(req.params.id));
     if (!existingTask) return res.status(404).json({ error: "Task not found" });
     if (existingTask.groupId) {
       const group = await storage.getTaskGroup(existingTask.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
-    const updateData = { ...req.body };
+    const updateData = { ...parsed.data } as any;
     if (updateData.dueDate !== undefined) {
       updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
     }
@@ -295,6 +363,10 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const parsed = taskUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
     const userId = req.session.userId;
     const taskId = String(req.params.id);
     
@@ -308,7 +380,7 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
     const update = await storage.createTaskUpdate({
       taskId,
       userId,
-      content: req.body.content,
+      content: parsed.data.content,
     });
     
     const taskTitle = task.title || "Task";

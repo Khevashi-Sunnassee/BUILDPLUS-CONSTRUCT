@@ -6,9 +6,23 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 
 const router = Router();
+
+const ALLOWED_IMPORT_TYPES = [
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+
 const upload = multer({ 
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_IMPORT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed. Only Excel and CSV files are accepted.`));
+    }
+  },
 });
 
 router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Request, res: Response) => {

@@ -3732,16 +3732,23 @@ export class DatabaseStorage implements IStorage {
   async getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]> {
     const files = await db.select().from(taskFiles).where(eq(taskFiles.taskId, taskId)).orderBy(desc(taskFiles.createdAt));
     
-    const result: (TaskFile & { uploadedBy?: User | null })[] = [];
-    for (const file of files) {
-      let uploadedBy: User | null = null;
-      if (file.uploadedById) {
-        const [user] = await db.select().from(users).where(eq(users.id, file.uploadedById));
-        uploadedBy = user || null;
+    if (files.length === 0) return [];
+    
+    // Batch fetch all uploaders in one query
+    const uploaderIds = [...new Set(files.map(f => f.uploadedById).filter((id): id is string => !!id))];
+    const uploaderMap = new Map<string, User>();
+    
+    if (uploaderIds.length > 0) {
+      const uploaders = await db.select().from(users).where(inArray(users.id, uploaderIds));
+      for (const user of uploaders) {
+        uploaderMap.set(user.id, user);
       }
-      result.push({ ...file, uploadedBy });
     }
-    return result;
+    
+    return files.map(file => ({
+      ...file,
+      uploadedBy: file.uploadedById ? uploaderMap.get(file.uploadedById) || null : null,
+    }));
   }
 
   async createTaskFile(data: InsertTaskFile): Promise<TaskFile> {
@@ -3765,21 +3772,28 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(taskNotifications.createdAt))
       .limit(50);
     
-    const result = [];
-    for (const notif of notifications) {
-      let fromUser: User | null = null;
-      let task: Task | null = null;
-      
-      if (notif.fromUserId) {
-        const [u] = await db.select().from(users).where(eq(users.id, notif.fromUserId));
-        fromUser = u || null;
-      }
-      const [t] = await db.select().from(tasks).where(eq(tasks.id, notif.taskId));
-      task = t || null;
-      
-      result.push({ ...notif, fromUser, task });
-    }
-    return result;
+    if (notifications.length === 0) return [];
+    
+    // Batch fetch all fromUsers and tasks in parallel
+    const fromUserIds = [...new Set(notifications.map(n => n.fromUserId).filter((id): id is string => !!id))];
+    const taskIds = [...new Set(notifications.map(n => n.taskId))];
+    
+    const [fromUsers, tasksList] = await Promise.all([
+      fromUserIds.length > 0 ? db.select().from(users).where(inArray(users.id, fromUserIds)) : Promise.resolve([]),
+      taskIds.length > 0 ? db.select().from(tasks).where(inArray(tasks.id, taskIds)) : Promise.resolve([]),
+    ]);
+    
+    const userMap = new Map<string, User>();
+    for (const u of fromUsers) userMap.set(u.id, u);
+    
+    const taskMap = new Map<string, Task>();
+    for (const t of tasksList) taskMap.set(t.id, t);
+    
+    return notifications.map(notif => ({
+      ...notif,
+      fromUser: notif.fromUserId ? userMap.get(notif.fromUserId) || null : null,
+      task: taskMap.get(notif.taskId) || null,
+    }));
   }
 
   async getTaskNotificationById(id: string): Promise<any | null> {
@@ -3825,19 +3839,21 @@ export class DatabaseStorage implements IStorage {
     const assignees = await db.select().from(taskAssignees)
       .where(eq(taskAssignees.taskId, taskId));
     
-    // Create notifications for each assignee except the sender
-    for (const assignee of assignees) {
-      if (assignee.userId !== excludeUserId) {
-        await db.insert(taskNotifications).values({
-          userId: assignee.userId,
-          taskId,
-          updateId,
-          type: type as any,
-          title,
-          body,
-          fromUserId: excludeUserId,
-        });
-      }
+    // Batch insert notifications for all assignees except the sender
+    const notificationsToInsert = assignees
+      .filter(a => a.userId !== excludeUserId)
+      .map(assignee => ({
+        userId: assignee.userId,
+        taskId,
+        updateId,
+        type: type as any,
+        title,
+        body,
+        fromUserId: excludeUserId,
+      }));
+    
+    if (notificationsToInsert.length > 0) {
+      await db.insert(taskNotifications).values(notificationsToInsert);
     }
   }
 
