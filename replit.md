@@ -75,33 +75,134 @@ apiRequest("POST", CHAT_ROUTES.MESSAGES(conversationId), data)
 - `CHAT_ROUTES.PANEL_CONVERSATION(panelId)` = `/api/chat/panels/:panelId/conversation`
 
 ### Frontend Conventions
-- Use TanStack Query with proper `queryKey` arrays for cache management
-- Use `apiRequest` from `@/lib/queryClient` for mutations
-- Always invalidate related queries after mutations
-- Use route constants, never hardcode API paths
+
+**TanStack Query Usage:**
+```typescript
+// Always use route constants in queryKey
+const { data, isLoading } = useQuery<PanelType[]>({
+  queryKey: [ADMIN_ROUTES.PANELS],
+});
+
+// For parameterized queries, use array format
+const { data } = useQuery({
+  queryKey: [CHAT_ROUTES.MESSAGES(conversationId)],
+});
+
+// Mutations with cache invalidation
+const mutation = useMutation({
+  mutationFn: async (data: FormData) => {
+    return apiRequest("POST", ADMIN_ROUTES.PANELS, data);
+  },
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.PANELS] });
+  },
+});
+```
+
+**Form Handling:**
+- Use `react-hook-form` with `zodResolver` for validation
+- Import schemas from `@shared/schema.ts` and extend with `.extend()` for additional rules
+- Always provide `defaultValues` to `useForm()`
+
+**UI Components:**
+- Use `shadcn/ui` components from `@/components/ui/`
+- Use `lucide-react` for icons
+- Use `Wouter` for routing (`Link`, `useLocation`, `useParams`)
 
 ### Backend Conventions
-- Use `requireAuth` middleware for authenticated routes
-- Use `requireRole("ADMIN", "MANAGER")` for role-based access
-- Use `requirePermission("feature_key", "VIEW_AND_UPDATE")` for permission-based access
-- Use the `logger` from `server/lib/logger` instead of `console.log`
+
+**Middleware Chain:**
+```typescript
+// Authenticated route
+router.get("/api/resource", requireAuth, handler);
+
+// Role-based access (any of listed roles)
+router.post("/api/admin/resource", requireRole("ADMIN", "MANAGER"), handler);
+
+// Permission-based access
+router.put("/api/resource/:id", requireAuth, requirePermission("feature_key", "VIEW_AND_UPDATE"), handler);
+```
+
+**Storage Interface Pattern:**
+- All database operations go through `server/storage.ts`
+- Define async methods matching this pattern:
+```typescript
+async getResource(id: string): Promise<Resource | undefined>
+async createResource(data: InsertResource): Promise<Resource>
+async updateResource(id: string, data: Partial<InsertResource>): Promise<Resource | undefined>
+async deleteResource(id: string): Promise<void>
+async getAllResources(): Promise<Resource[]>
+```
+
+**Error Handling:**
+- Use `logger` from `server/lib/logger` (never `console.log`)
+- Return appropriate HTTP status codes (400 for validation, 401 for auth, 403 for forbidden, 404 for not found)
+- Always include descriptive error messages in responses
+
+### Schema Conventions
+
+**Drizzle Schema Patterns:**
+```typescript
+// Table definition with UUID primary key
+export const resources = pgTable("resources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Insert schema with omitted auto-fields
+export const insertResourceSchema = createInsertSchema(resources).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type InsertResource = z.infer<typeof insertResourceSchema>;
+export type Resource = typeof resources.$inferSelect;
+```
+
+**Enum Definitions:**
+```typescript
+export const statusEnum = pgEnum("status_name", ["VALUE1", "VALUE2", "VALUE3"]);
+```
+
+### Database Safety Rules (CRITICAL)
+- **NEVER** change primary key ID column types (serial ↔ varchar breaks migrations)
+- Use `npm run db:push` or `npm run db:push --force` to sync schema
+- Never manually write SQL migrations
+- Always check existing schema before making changes
+
+### Testing & Validation
+- Test all CRUD operations via API endpoints
+- Verify frontend/backend route alignment
+- Check cache invalidation after mutations
+- Validate role-based access restrictions
 
 ### Project Structure
 ```
 client/src/
 ├── components/      # Reusable UI components
+│   └── ui/          # shadcn/ui components
 ├── pages/           # Route components
 │   └── admin/       # Admin-only pages
-├── lib/             # Utilities and hooks
+├── lib/             # Utilities (queryClient, apiRequest)
 └── hooks/           # Custom React hooks
 
 server/
-├── routes/          # API route handlers
+├── routes/          # API route handlers (*.routes.ts)
 ├── chat/            # Chat-specific routes and utilities
+├── middleware/      # Auth, role, permission middleware
 ├── storage.ts       # Database operations interface
-└── lib/             # Utilities including logger
+└── lib/             # Utilities (logger)
 
 shared/
 ├── api-routes.ts    # Centralized route constants (CRITICAL)
-└── schema.ts        # Drizzle schema and types
+└── schema.ts        # Drizzle schema, types, and enums
 ```
+
+### Import Aliases
+| Alias | Path |
+|-------|------|
+| `@/` | `client/src/` |
+| `@shared/` | `shared/` |
+| `@assets/` | `attached_assets/` |
