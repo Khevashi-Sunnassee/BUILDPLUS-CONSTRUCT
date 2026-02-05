@@ -237,6 +237,11 @@ export default function ManualEntryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      // Set start time to now, end time to blank
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      form.setValue("startTime", currentTime);
+      form.setValue("endTime", "");
       toast({ title: "Timer started", description: "Recording time for this panel" });
     },
     onError: (error: any) => {
