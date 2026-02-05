@@ -21,7 +21,6 @@ import {
   FileDown,
   Trash2,
 } from "lucide-react";
-import { TimerWidget } from "@/components/timer-widget";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -364,7 +363,6 @@ export default function DailyReportDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <TimerWidget />
           <Button 
             variant="outline"
             onClick={exportToPDF} 
