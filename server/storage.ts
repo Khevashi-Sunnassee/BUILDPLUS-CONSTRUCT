@@ -11,7 +11,7 @@ import {
   suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   factories, cfmeuHolidays,
-  documentTypesConfig, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems,
+  documentTypesConfig, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems, documentBundleAccessLogs,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -608,6 +608,10 @@ export interface IStorage {
   deleteDocumentBundle(id: string): Promise<void>;
   addDocumentsToBundle(bundleId: string, documentIds: string[], addedBy: string): Promise<DocumentBundleItem[]>;
   removeDocumentFromBundle(bundleId: string, documentId: string): Promise<void>;
+  
+  // Bundle Access Logging
+  logBundleAccess(bundleId: string, accessType: string, documentId?: string, ipAddress?: string, userAgent?: string): Promise<void>;
+  getBundleAccessLogs(bundleId: string): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4185,6 +4189,23 @@ export class DatabaseStorage implements IStorage {
         eq(documentBundleItems.bundleId, bundleId),
         eq(documentBundleItems.documentId, documentId)
       ));
+  }
+
+  async logBundleAccess(bundleId: string, accessType: string, documentId?: string, ipAddress?: string, userAgent?: string): Promise<void> {
+    await db.insert(documentBundleAccessLogs).values({
+      bundleId,
+      documentId: documentId || null,
+      accessType,
+      ipAddress: ipAddress || null,
+      userAgent: userAgent || null,
+    });
+  }
+
+  async getBundleAccessLogs(bundleId: string): Promise<any[]> {
+    return db.select()
+      .from(documentBundleAccessLogs)
+      .where(eq(documentBundleAccessLogs.bundleId, bundleId))
+      .orderBy(desc(documentBundleAccessLogs.accessedAt));
   }
 }
 

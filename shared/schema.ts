@@ -1677,6 +1677,31 @@ export const insertDocumentBundleItemSchema = createInsertSchema(documentBundleI
 export type InsertDocumentBundleItem = z.infer<typeof insertDocumentBundleItemSchema>;
 export type DocumentBundleItem = typeof documentBundleItems.$inferSelect;
 
+// Document Bundle Access Logs - Track guest access to bundles
+export const documentBundleAccessLogs = pgTable("document_bundle_access_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  bundleId: varchar("bundle_id", { length: 36 }).notNull().references(() => documentBundles.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id", { length: 36 }).references(() => documents.id, { onDelete: "set null" }),
+  
+  // Access type
+  accessType: varchar("access_type", { length: 20 }).notNull(), // VIEW_BUNDLE, VIEW_DOCUMENT, DOWNLOAD_DOCUMENT
+  
+  // Guest information (since they're not registered users)
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  
+  // Timestamps
+  accessedAt: timestamp("accessed_at").defaultNow().notNull(),
+}, (table) => ({
+  bundleIdx: index("bundle_access_logs_bundle_idx").on(table.bundleId),
+  documentIdx: index("bundle_access_logs_document_idx").on(table.documentId),
+  accessedAtIdx: index("bundle_access_logs_accessed_at_idx").on(table.accessedAt),
+}));
+
+export const insertDocumentBundleAccessLogSchema = createInsertSchema(documentBundleAccessLogs).omit({ id: true, accessedAt: true });
+export type InsertDocumentBundleAccessLog = z.infer<typeof insertDocumentBundleAccessLogSchema>;
+export type DocumentBundleAccessLog = typeof documentBundleAccessLogs.$inferSelect;
+
 // Safe user type (excludes sensitive data like passwordHash)
 export type SafeUser = Pick<User, 'id' | 'email' | 'name' | 'role'>;
 

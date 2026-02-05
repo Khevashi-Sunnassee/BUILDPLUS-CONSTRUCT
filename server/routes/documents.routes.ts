@@ -659,26 +659,67 @@ router.delete("/api/document-bundles/:id", requireRole("ADMIN", "MANAGER"), asyn
 
 // ==================== PUBLIC BUNDLE ACCESS (No Auth) ====================
 
+// Helper to get client IP address
+function getClientIp(req: Request): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string") {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket.remoteAddress || "unknown";
+}
+
+// Helper to validate bundle access and log failed attempts
+async function validateBundleAccess(
+  bundle: any, 
+  req: Request, 
+  res: Response, 
+  accessType: string
+): Promise<boolean> {
+  const ipAddress = getClientIp(req);
+  const userAgent = req.headers["user-agent"] || undefined;
+  
+  if (!bundle) {
+    res.status(404).json({ error: "Bundle not found" });
+    return false;
+  }
+
+  if (!bundle.allowGuestAccess) {
+    // Log denied access attempt
+    await storage.logBundleAccess(bundle.id, `DENIED_${accessType}`, undefined, ipAddress, userAgent);
+    res.status(403).json({ error: "Guest access is not allowed for this bundle" });
+    return false;
+  }
+
+  if (bundle.expiresAt && new Date(bundle.expiresAt) < new Date()) {
+    // Log denied access attempt
+    await storage.logBundleAccess(bundle.id, `DENIED_EXPIRED_${accessType}`, undefined, ipAddress, userAgent);
+    res.status(410).json({ error: "This bundle has expired" });
+    return false;
+  }
+
+  return true;
+}
+
 router.get("/api/public/bundles/:qrCodeId", async (req, res) => {
   try {
-    const bundle = await storage.getDocumentBundleByQr(String(req.params.qrCodeId));
+    const qrCodeId = String(req.params.qrCodeId);
+    const bundle = await storage.getDocumentBundleByQr(qrCodeId);
     
-    if (!bundle) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
+    if (!await validateBundleAccess(bundle, req, res, "VIEW_BUNDLE")) return;
 
-    if (!bundle.allowGuestAccess) {
-      return res.status(403).json({ error: "Guest access is not allowed for this bundle" });
-    }
-
-    if (bundle.expiresAt && new Date(bundle.expiresAt) < new Date()) {
-      return res.status(410).json({ error: "This bundle has expired" });
-    }
+    // Log the access
+    await storage.logBundleAccess(
+      bundle!.id,
+      "VIEW_BUNDLE",
+      undefined,
+      getClientIp(req),
+      req.headers["user-agent"] || undefined
+    );
 
     res.json({
-      bundleName: bundle.bundleName,
-      description: bundle.description,
-      items: bundle.items.map(item => ({
+      bundleName: bundle!.bundleName,
+      description: bundle!.description,
+      items: bundle!.items.map(item => ({
         id: item.document.id,
         title: item.document.title,
         fileName: item.document.originalName,
@@ -692,26 +733,19 @@ router.get("/api/public/bundles/:qrCodeId", async (req, res) => {
   }
 });
 
-router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async (req, res) => {
+// View document inline (for PDFs, images in browser)
+router.get("/api/public/bundles/:qrCodeId/documents/:documentId/view", async (req, res) => {
   try {
     const bundle = await storage.getDocumentBundleByQr(String(req.params.qrCodeId));
-    
-    if (!bundle) {
-      return res.status(404).json({ error: "Bundle not found" });
-    }
-
-    if (!bundle.allowGuestAccess) {
-      return res.status(403).json({ error: "Guest access is not allowed for this bundle" });
-    }
-
-    if (bundle.expiresAt && new Date(bundle.expiresAt) < new Date()) {
-      return res.status(410).json({ error: "This bundle has expired" });
-    }
-
     const documentId = String(req.params.documentId);
-    const bundleItem = bundle.items.find(item => item.documentId === documentId);
+    
+    if (!await validateBundleAccess(bundle, req, res, "VIEW_DOCUMENT")) return;
+
+    const bundleItem = bundle!.items.find(item => item.documentId === documentId);
     
     if (!bundleItem) {
+      // Log attempt to access document not in bundle
+      await storage.logBundleAccess(bundle!.id, "DENIED_VIEW_DOCUMENT_NOT_IN_BUNDLE", documentId, getClientIp(req), req.headers["user-agent"] || undefined);
       return res.status(404).json({ error: "Document not found in this bundle" });
     }
 
@@ -719,6 +753,64 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async
     if (!document) {
       return res.status(404).json({ error: "Document not found" });
     }
+
+    // Log the successful view access
+    await storage.logBundleAccess(
+      bundle!.id,
+      "VIEW_DOCUMENT",
+      documentId,
+      getClientIp(req),
+      req.headers["user-agent"] || undefined
+    );
+
+    const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
+    const [metadata] = await objectFile.getMetadata();
+    
+    res.set({
+      "Content-Type": metadata.contentType || "application/octet-stream",
+      "Content-Disposition": `inline; filename="${document.originalName}"`,
+    });
+
+    const stream = objectFile.createReadStream();
+    stream.pipe(res);
+  } catch (error: any) {
+    if (error instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "File not found in storage" });
+    }
+    logger.error({ err: error }, "Error viewing public bundle document");
+    res.status(500).json({ error: error.message || "Failed to view document" });
+  }
+});
+
+// Download document as attachment
+router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async (req, res) => {
+  try {
+    const bundle = await storage.getDocumentBundleByQr(String(req.params.qrCodeId));
+    const documentId = String(req.params.documentId);
+    
+    if (!await validateBundleAccess(bundle, req, res, "DOWNLOAD_DOCUMENT")) return;
+
+    const bundleItem = bundle!.items.find(item => item.documentId === documentId);
+    
+    if (!bundleItem) {
+      // Log attempt to download document not in bundle
+      await storage.logBundleAccess(bundle!.id, "DENIED_DOWNLOAD_DOCUMENT_NOT_IN_BUNDLE", documentId, getClientIp(req), req.headers["user-agent"] || undefined);
+      return res.status(404).json({ error: "Document not found in this bundle" });
+    }
+
+    const document = await storage.getDocument(documentId);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    // Log the successful download access
+    await storage.logBundleAccess(
+      bundle!.id,
+      "DOWNLOAD_DOCUMENT",
+      documentId,
+      getClientIp(req),
+      req.headers["user-agent"] || undefined
+    );
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
     const [metadata] = await objectFile.getMetadata();
@@ -736,6 +828,17 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async
     }
     logger.error({ err: error }, "Error downloading public bundle document");
     res.status(500).json({ error: error.message || "Failed to download document" });
+  }
+});
+
+// Get bundle access logs (admin only)
+router.get("/api/document-bundles/:id/access-logs", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  try {
+    const logs = await storage.getBundleAccessLogs(String(req.params.id));
+    res.json(logs);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching bundle access logs");
+    res.status(500).json({ error: error.message || "Failed to fetch access logs" });
   }
 });
 
