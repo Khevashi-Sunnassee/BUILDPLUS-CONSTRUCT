@@ -206,6 +206,8 @@ export default function DocumentRegister() {
   const [isBundleViewOpen, setIsBundleViewOpen] = useState(false);
   const [isBundlesListOpen, setIsBundlesListOpen] = useState(false);
   const [selectedBundleForQR, setSelectedBundleForQR] = useState<DocumentBundle | null>(null);
+  const [isAnalyzingVersion, setIsAnalyzingVersion] = useState(false);
+  const [aiVersionSummary, setAiVersionSummary] = useState("");
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -406,12 +408,43 @@ export default function DocumentRegister() {
     uploadMutation.mutate(formData);
   };
 
+  const handleAIAnalysis = async (file: File) => {
+    if (!selectedDocumentForVersion) return;
+    
+    setIsAnalyzingVersion(true);
+    setAiVersionSummary("");
+    
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("originalDocumentId", selectedDocumentForVersion.id);
+      
+      const response = await fetch(`${DOCUMENT_ROUTES.LIST}/analyze-version`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAiVersionSummary(data.summary || "");
+        if (data.summary && !changeSummary) {
+          setChangeSummary(data.summary);
+        }
+      }
+    } catch (error) {
+      console.error("AI analysis failed:", error);
+    } finally {
+      setIsAnalyzingVersion(false);
+    }
+  };
+
   const handleNewVersion = () => {
     if (!selectedDocumentForVersion || !versionFile) return;
 
     const formData = new FormData();
     formData.append("file", versionFile);
-    formData.append("changeSummary", changeSummary);
+    formData.append("changeSummary", changeSummary || aiVersionSummary);
 
     newVersionMutation.mutate({ documentId: selectedDocumentForVersion.id, formData });
   };
@@ -1078,7 +1111,7 @@ export default function DocumentRegister() {
       </Dialog>
 
       <Dialog open={isVersionDialogOpen} onOpenChange={setIsVersionDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Upload New Version</DialogTitle>
             <DialogDescription>
@@ -1093,10 +1126,34 @@ export default function DocumentRegister() {
                 input.type = "file";
                 input.onchange = (e) => {
                   const file = (e.target as HTMLInputElement).files?.[0];
-                  if (file) setVersionFile(file);
+                  if (file) {
+                    setVersionFile(file);
+                    handleAIAnalysis(file);
+                  }
                 };
                 input.click();
               }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.add("border-primary", "bg-primary/5");
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.classList.remove("border-primary", "bg-primary/5");
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  setVersionFile(file);
+                  handleAIAnalysis(file);
+                }
+              }}
+              data-testid="version-dropzone"
             >
               {versionFile ? (
                 <div className="flex items-center justify-center gap-2">
@@ -1106,7 +1163,7 @@ export default function DocumentRegister() {
                     type="button"
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => { e.stopPropagation(); setVersionFile(null); }}
+                    onClick={(e) => { e.stopPropagation(); setVersionFile(null); setAiVersionSummary(""); }}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -1114,16 +1171,36 @@ export default function DocumentRegister() {
               ) : (
                 <>
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-muted-foreground">Click to select file</p>
+                  <p className="text-muted-foreground">Click to select file or drag and drop</p>
                 </>
               )}
             </div>
+
+            {isAnalyzingVersion && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>AI is analyzing document changes...</span>
+              </div>
+            )}
+
+            {aiVersionSummary && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <span className="bg-primary/10 text-primary px-2 py-0.5 rounded text-xs font-medium">AI Generated</span>
+                  Version Summary
+                </Label>
+                <div className="bg-muted/50 rounded-lg p-3 text-sm border">
+                  {aiVersionSummary}
+                </div>
+              </div>
+            )}
+
             <div>
               <Label>Change Summary</Label>
               <Textarea
                 value={changeSummary}
                 onChange={(e) => setChangeSummary(e.target.value)}
-                placeholder="Describe what changed in this version"
+                placeholder="Describe what changed in this version (or use AI-generated summary above)"
                 rows={3}
                 data-testid="input-change-summary"
               />

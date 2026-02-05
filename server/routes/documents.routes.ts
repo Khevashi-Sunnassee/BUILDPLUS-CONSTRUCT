@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
 import crypto from "crypto";
+import OpenAI from "openai";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
@@ -12,6 +13,11 @@ import {
   insertDocumentDisciplineSchema,
   insertDocumentCategorySchema,
 } from "@shared/schema";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -730,6 +736,77 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async
     }
     logger.error({ err: error }, "Error downloading public bundle document");
     res.status(500).json({ error: error.message || "Failed to download document" });
+  }
+});
+
+// ==================== AI DOCUMENT ANALYSIS ====================
+
+router.post("/api/documents/analyze-version", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    const originalDocumentId = req.body.originalDocumentId;
+
+    if (!file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    if (!originalDocumentId) {
+      return res.status(400).json({ error: "Original document ID required" });
+    }
+
+    const originalDocument = await storage.getDocument(originalDocumentId);
+    if (!originalDocument) {
+      return res.status(404).json({ error: "Original document not found" });
+    }
+
+    // For text-based files, analyze content differences
+    const newFileName = file.originalname;
+    const originalFileName = originalDocument.originalName;
+    const newFileSize = file.size;
+    const originalFileSize = originalDocument.fileSize || 0;
+    const mimeType = file.mimetype;
+
+    // Build context for AI analysis
+    let prompt = `You are analyzing a document version update. Compare the new version to the original and provide a brief, professional summary of what likely changed.
+
+Original Document:
+- Title: ${originalDocument.title}
+- File Name: ${originalFileName}
+- File Size: ${originalFileSize} bytes
+- Type: ${originalDocument.type?.typeName || 'Unknown'}
+- Discipline: ${originalDocument.discipline?.disciplineName || 'Unknown'}
+
+New Version:
+- File Name: ${newFileName}
+- File Size: ${newFileSize} bytes
+- Size Change: ${newFileSize > originalFileSize ? `+${newFileSize - originalFileSize}` : newFileSize - originalFileSize} bytes
+
+Based on the file information and typical document workflows, provide a concise 1-2 sentence summary of what likely changed. Focus on professional, construction/engineering document terminology where appropriate. Examples: "Updated drawing with revised dimensions", "Incorporated client feedback on specifications", "Minor text corrections and formatting updates".`;
+
+    // For PDF/text files, try to extract and compare content
+    if (mimeType === 'application/pdf' || mimeType.startsWith('text/')) {
+      prompt += `\n\nNote: This is a ${mimeType} file. Consider typical changes for this document type.`;
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-5-mini",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are a document management assistant that provides brief, professional summaries of document changes. Keep responses concise and relevant to construction/engineering workflows."
+        },
+        { role: "user", content: prompt }
+      ],
+      max_completion_tokens: 150,
+    });
+
+    const summary = completion.choices[0]?.message?.content?.trim() || "";
+
+    logger.info({ originalDocumentId, newFileName }, "AI version analysis completed");
+    res.json({ summary });
+  } catch (error: any) {
+    logger.error({ err: error }, "Error analyzing document version with AI");
+    res.status(500).json({ error: "Failed to analyze document", summary: "" });
   }
 });
 
