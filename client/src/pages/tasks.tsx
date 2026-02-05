@@ -188,11 +188,13 @@ function SortableTaskRow({
   users,
   jobs,
   onOpenSidebar,
+  showCompleted,
 }: {
   task: Task;
   users: User[];
   jobs: Job[];
   onOpenSidebar: (task: Task) => void;
+  showCompleted: boolean;
 }) {
   const {
     attributes,
@@ -216,6 +218,7 @@ function SortableTaskRow({
       jobs={jobs}
       isSubtask={false}
       onOpenSidebar={onOpenSidebar}
+      showCompleted={showCompleted}
       sortableRef={setNodeRef}
       sortableStyle={style}
       sortableAttributes={attributes}
@@ -230,6 +233,7 @@ function TaskRow({
   jobs,
   isSubtask = false,
   onOpenSidebar,
+  showCompleted = true,
   sortableRef,
   sortableStyle,
   sortableAttributes,
@@ -240,6 +244,7 @@ function TaskRow({
   jobs: Job[];
   isSubtask?: boolean;
   onOpenSidebar: (task: Task) => void;
+  showCompleted?: boolean;
   sortableRef?: (node: HTMLElement | null) => void;
   sortableStyle?: React.CSSProperties;
   sortableAttributes?: Record<string, any>;
@@ -752,7 +757,9 @@ function TaskRow({
       </div>
 
       {showSubtasks &&
-        (task.subtasks || []).map((subtask) => (
+        (task.subtasks || [])
+          .filter((subtask) => showCompleted || subtask.status !== "DONE")
+          .map((subtask) => (
           <TaskRow
             key={subtask.id}
             task={subtask}
@@ -760,6 +767,7 @@ function TaskRow({
             jobs={jobs}
             isSubtask
             onOpenSidebar={onOpenSidebar}
+            showCompleted={showCompleted}
           />
         ))}
 
@@ -1021,12 +1029,14 @@ function TaskGroupComponent({
   jobs,
   onOpenSidebar,
   allGroups,
+  showCompleted,
 }: {
   group: TaskGroup;
   users: User[];
   jobs: Job[];
   onOpenSidebar: (task: Task) => void;
   allGroups: TaskGroup[];
+  showCompleted: boolean;
 }) {
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(group.isCollapsed);
@@ -1241,6 +1251,7 @@ function TaskGroupComponent({
                 users={users}
                 jobs={jobs}
                 onOpenSidebar={onOpenSidebar}
+                showCompleted={showCompleted}
               />
             ))}
           </SortableContext>
@@ -2296,6 +2307,7 @@ export default function TasksPage() {
                 jobs={jobs}
                 onOpenSidebar={setSelectedTask}
                 allGroups={filteredGroups}
+                showCompleted={showCompleted}
               />
             ))}
           </div>
