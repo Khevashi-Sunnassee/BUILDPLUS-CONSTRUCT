@@ -796,18 +796,142 @@ export default function ManualEntryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
-            Manual Time Entry
-          </h1>
-          <p className="text-muted-foreground">
-            Log time manually when the add-in is not available
-          </p>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
+              Manual Time Entry
+            </h1>
+            <p className="text-muted-foreground">
+              Log time manually when the add-in is not available
+            </p>
+          </div>
         </div>
+
+        {/* Timer Widget - Top Right Corner */}
+        {(hasActiveTimer || selectedPanelId) && (
+          <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+            <Timer className="h-5 w-5 text-muted-foreground" />
+            <div className="text-right">
+              <p className="font-medium text-sm">
+                {hasActiveTimer 
+                  ? (isTimerForSelectedPanel 
+                      ? `Timer: ${selectedPanel?.panelMark || "Panel"}` 
+                      : `Timer: ${activeTimer?.panelMark || "Unknown Panel"}`)
+                  : `Panel: ${selectedPanel?.panelMark || "None"}`}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {hasActiveTimer ? activeTimer?.status : "No timer"}
+              </p>
+            </div>
+            
+            {hasActiveTimer && (
+              <div className="text-2xl font-mono font-bold tabular-nums min-w-[100px] text-right">
+                {formatTimer(timerElapsed)}
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              {!hasActiveTimer && selectedPanelId && selectedPanelId !== "none" && (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    const jobId = form.getValues("jobId");
+                    if (jobId && selectedPanelId) {
+                      startTimerMutation.mutate({ jobId, panelRegisterId: selectedPanelId });
+                    }
+                  }}
+                  disabled={startTimerMutation.isPending || !selectedJobId}
+                  data-testid="button-start-timer-header"
+                >
+                  {startTimerMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4 mr-1" />
+                  )}
+                  Start
+                </Button>
+              )}
+
+              {isTimerForSelectedPanel && activeTimer?.status === "RUNNING" && activeTimer?.id && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => pauseTimerMutation.mutate(activeTimer.id)}
+                  disabled={pauseTimerMutation.isPending}
+                  data-testid="button-pause-timer-header"
+                >
+                  <Pause className="h-4 w-4" />
+                </Button>
+              )}
+
+              {isTimerForSelectedPanel && activeTimer?.status === "PAUSED" && activeTimer?.id && (
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  onClick={() => resumeTimerMutation.mutate(activeTimer.id)}
+                  disabled={resumeTimerMutation.isPending}
+                  data-testid="button-resume-timer-header"
+                >
+                  <Play className="h-4 w-4" />
+                </Button>
+              )}
+
+              {isTimerForSelectedPanel && activeTimer?.id && (
+                <>
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      const workTypeId = form.getValues("workTypeId");
+                      stopTimerMutation.mutate({ 
+                        timerId: activeTimer.id,
+                        workTypeId: workTypeId && workTypeId !== "none" ? parseInt(workTypeId) : undefined 
+                      });
+                    }}
+                    disabled={stopTimerMutation.isPending}
+                    data-testid="button-stop-timer-header"
+                  >
+                    <Square className="h-4 w-4 mr-1" />
+                    Save
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
+                    disabled={cancelTimerMutation.isPending}
+                    data-testid="button-cancel-timer-header"
+                  >
+                    <XCircle className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+
+              {hasActiveTimer && !isTimerForSelectedPanel && activeTimer?.id && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
+                  disabled={cancelTimerMutation.isPending}
+                  data-testid="button-cancel-other-timer-header"
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Stop
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <Card>
@@ -1071,137 +1195,6 @@ export default function ManualEntryPage() {
                       )}
                     />
                   </div>
-
-                  {/* Timer Controls - Only show when a panel is selected */}
-                  {selectedPanelId && selectedPanelId !== "none" && (
-                    <div className="mt-4 p-4 rounded-lg border bg-card">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <Timer className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="font-medium text-sm">Timer for {selectedPanel?.panelMark || "Panel"}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {hasActiveTimer && isTimerForSelectedPanel 
-                                ? `Status: ${activeTimer?.status}` 
-                                : hasActiveTimer 
-                                  ? `Timer active for different panel: ${activeTimer?.panelMark || "Unknown"}`
-                                  : "No active timer"}
-                            </p>
-                          </div>
-                        </div>
-
-                        {isTimerForSelectedPanel && (
-                          <div className="text-2xl font-mono font-bold tabular-nums">
-                            {formatTimer(timerElapsed)}
-                          </div>
-                        )}
-
-                        <div className="flex items-center gap-2">
-                          {!hasActiveTimer && (
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={() => {
-                                const jobId = form.getValues("jobId");
-                                if (jobId && selectedPanelId) {
-                                  startTimerMutation.mutate({ jobId, panelRegisterId: selectedPanelId });
-                                }
-                              }}
-                              disabled={startTimerMutation.isPending || !selectedJobId}
-                              data-testid="button-start-panel-timer"
-                            >
-                              {startTimerMutation.isPending ? (
-                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                              ) : (
-                                <Play className="h-4 w-4 mr-1" />
-                              )}
-                              Start Timer
-                            </Button>
-                          )}
-
-                          {isTimerForSelectedPanel && activeTimer?.status === "RUNNING" && activeTimer?.id && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => pauseTimerMutation.mutate(activeTimer.id)}
-                              disabled={pauseTimerMutation.isPending}
-                              data-testid="button-pause-panel-timer"
-                            >
-                              <Pause className="h-4 w-4 mr-1" />
-                              Pause
-                            </Button>
-                          )}
-
-                          {isTimerForSelectedPanel && activeTimer?.status === "PAUSED" && activeTimer?.id && (
-                            <Button
-                              type="button"
-                              variant="default"
-                              size="sm"
-                              onClick={() => resumeTimerMutation.mutate(activeTimer.id)}
-                              disabled={resumeTimerMutation.isPending}
-                              data-testid="button-resume-panel-timer"
-                            >
-                              <Play className="h-4 w-4 mr-1" />
-                              Resume
-                            </Button>
-                          )}
-
-                          {isTimerForSelectedPanel && activeTimer?.id && (
-                            <>
-                              <Button
-                                type="button"
-                                variant="default"
-                                size="sm"
-                                onClick={() => {
-                                  const workTypeId = form.getValues("workTypeId");
-                                  stopTimerMutation.mutate({ 
-                                    timerId: activeTimer.id,
-                                    workTypeId: workTypeId && workTypeId !== "none" ? parseInt(workTypeId) : undefined 
-                                  });
-                                }}
-                                disabled={stopTimerMutation.isPending}
-                                data-testid="button-stop-panel-timer"
-                              >
-                                <Square className="h-4 w-4 mr-1" />
-                                Stop & Save
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
-                                disabled={cancelTimerMutation.isPending}
-                                data-testid="button-cancel-panel-timer"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-
-                          {hasActiveTimer && !isTimerForSelectedPanel && activeTimer?.id && (
-                            <div className="flex items-center gap-2">
-                              <div className="text-xl font-mono font-bold tabular-nums">
-                                {formatTimer(timerElapsed)}
-                              </div>
-                              <Button
-                                type="button"
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
-                                disabled={cancelTimerMutation.isPending}
-                                data-testid="button-cancel-other-timer"
-                              >
-                                <XCircle className="h-4 w-4 mr-1" />
-                                Stop Other Timer
-                              </Button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
 
