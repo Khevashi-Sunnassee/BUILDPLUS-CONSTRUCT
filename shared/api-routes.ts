@@ -188,6 +188,12 @@ export const PRODUCTION_ROUTES = {
   DAYS: '/api/production-days',
   DAY_BY_ID: (id: string | number) => `/api/production-days/${id}`,
   REPORTS: '/api/production-reports',
+  
+  // Schedule (new production schedule page)
+  SCHEDULE_STATS: '/api/production-schedule/stats',
+  SCHEDULE_READY_PANELS: '/api/production-schedule/ready-panels',
+  SCHEDULE_DAYS: '/api/production-schedule/days',
+  SCHEDULE_ADD_PANELS: '/api/production-schedule/add-panels',
 } as const;
 
 // ============================================================================

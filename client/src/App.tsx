@@ -44,6 +44,7 @@ import PurchaseOrderFormPage from "@/pages/purchase-order-form";
 import TasksPage from "@/pages/tasks";
 import PanelDetailsPage from "@/pages/panel-details";
 import ChatPage from "@/pages/chat";
+import ProductionSchedulePage from "@/pages/production-schedule";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -219,6 +220,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ProductionSlotsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/production-schedule">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ProductionSchedulePage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

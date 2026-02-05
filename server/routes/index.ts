@@ -27,6 +27,7 @@ import { factoriesRouter, initializeCfmeuSync } from "./factories.routes";
 import { adminRouter } from "./admin.routes";
 import { agentRouter } from "./agent.routes";
 import { chatRouter } from "../chat/chat.routes";
+import productionScheduleRouter from "./production-schedule.routes";
 
 declare module "express-session" {
   interface SessionData {
@@ -68,6 +69,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(productionRouter);
   app.use(productionEntriesRouter);
   app.use(productionSlotsRouter);
+  app.use(productionScheduleRouter);
   app.use(draftingRouter);
   app.use(logisticsRouter);
   app.use(procurementRouter);
