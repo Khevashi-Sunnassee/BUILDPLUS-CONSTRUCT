@@ -7,6 +7,7 @@ import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { format } from "date-fns";
 import { JOBS_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES, DAILY_LOGS_ROUTES, MANUAL_ENTRY_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
+import { TimerWidget } from "@/components/timer-widget";
 import {
   Plus,
   Clock,
@@ -658,6 +659,8 @@ export default function ManualEntryPage() {
           </p>
         </div>
       </div>
+
+      <TimerWidget />
 
       <Card>
         <CardHeader>
