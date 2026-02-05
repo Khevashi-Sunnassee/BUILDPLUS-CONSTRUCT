@@ -1859,21 +1859,42 @@ export default function TasksPage() {
       const footerHeight = 12;
       let yPos = headerHeight + 5;
 
-      const logoHeight = 12;
-      const logoWidth = 24;
+      const maxLogoHeight = 12;
+      const maxLogoWidth = 30;
+      let logoWidth = maxLogoWidth;
+      let logoHeight = maxLogoHeight;
+      
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 8, logoWidth, logoHeight);
+        const img = document.createElement("img");
+        img.src = reportLogo;
+        await new Promise<void>((resolve) => {
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+        });
+        
+        if (img.naturalWidth && img.naturalHeight) {
+          const aspectRatio = img.naturalWidth / img.naturalHeight;
+          if (aspectRatio > maxLogoWidth / maxLogoHeight) {
+            logoWidth = maxLogoWidth;
+            logoHeight = maxLogoWidth / aspectRatio;
+          } else {
+            logoHeight = maxLogoHeight;
+            logoWidth = maxLogoHeight * aspectRatio;
+          }
+        }
+        
+        pdf.addImage(reportLogo, "PNG", margin, 8, logoWidth, logoHeight, undefined, "FAST");
       } catch (e) {}
 
       pdf.setTextColor(0, 0, 0);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Task List", margin + logoWidth + 8, 14);
+      pdf.text("Task List", margin + maxLogoWidth + 8, 14);
 
       pdf.setFontSize(10);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 100, 100);
-      pdf.text(companyName, margin + logoWidth + 8, 20);
+      pdf.text(companyName, margin + maxLogoWidth + 8, 20);
 
       pdf.setFontSize(8);
       pdf.setTextColor(120, 120, 120);
