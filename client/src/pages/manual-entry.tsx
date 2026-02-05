@@ -126,13 +126,18 @@ export default function ManualEntryPage() {
   
   const canApproveForProduction = user?.role === "MANAGER" || user?.role === "ADMIN";
   
-  // Parse date, logId, jobId and panelMark from URL query parameters if present
+  // Parse date, logId, jobId, panelId, panelMark and startTimer from URL query parameters if present
   const urlParams = new URLSearchParams(searchString);
   const dateFromUrl = urlParams.get("date");
   const logIdFromUrl = urlParams.get("logId");
   const jobIdFromUrl = urlParams.get("jobId");
+  const panelIdFromUrl = urlParams.get("panelId");
   const panelMarkFromUrl = urlParams.get("panelMark");
+  const startTimerFromUrl = urlParams.get("startTimer") === "true";
   const initialDate = dateFromUrl && /^\d{4}-\d{2}-\d{2}$/.test(dateFromUrl) ? dateFromUrl : today;
+  
+  // Track if we've processed the URL params for auto-start timer
+  const [hasProcessedUrlParams, setHasProcessedUrlParams] = useState(false);
   
   const [selectedJobId, setSelectedJobId] = useState<string | null>(jobIdFromUrl);
   const [addNewPanel, setAddNewPanel] = useState(false);
@@ -473,7 +478,7 @@ export default function ManualEntryPage() {
     }
   }, [watchedPanelRegisterId, panels, form]);
 
-  // Auto-select panel from URL parameters
+  // Auto-select panel from URL parameters (by panelMark)
   useEffect(() => {
     if (panelMarkFromUrl && panels && panels.length > 0 && selectedJobId) {
       const matchingPanel = panels.find(
@@ -484,6 +489,35 @@ export default function ManualEntryPage() {
       }
     }
   }, [panelMarkFromUrl, panels, selectedJobId, form]);
+
+  // Auto-select panel from URL parameters (by panelId) and auto-start timer if requested
+  useEffect(() => {
+    if (panelIdFromUrl && panels && panels.length > 0 && !hasProcessedUrlParams) {
+      const matchingPanel = panels.find(p => p.id === panelIdFromUrl);
+      if (matchingPanel) {
+        // Set the job first
+        if (matchingPanel.jobId && matchingPanel.jobId !== selectedJobId) {
+          setSelectedJobId(matchingPanel.jobId);
+          form.setValue("jobId", matchingPanel.jobId);
+        }
+        // Then set the panel
+        if (form.getValues("panelRegisterId") !== matchingPanel.id) {
+          form.setValue("panelRegisterId", matchingPanel.id);
+        }
+        
+        // Auto-start timer if requested and no timer is currently active
+        if (startTimerFromUrl && !hasActiveTimer && matchingPanel.jobId) {
+          setHasProcessedUrlParams(true);
+          startTimerMutation.mutate({
+            jobId: matchingPanel.jobId,
+            panelRegisterId: matchingPanel.id,
+          });
+        } else {
+          setHasProcessedUrlParams(true);
+        }
+      }
+    }
+  }, [panelIdFromUrl, panels, hasProcessedUrlParams, startTimerFromUrl, hasActiveTimer, selectedJobId, form, startTimerMutation]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: ManualEntryForm) => {

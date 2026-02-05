@@ -710,20 +710,21 @@ export default function DailyReportsPage() {
                                   size="sm"
                                   onClick={() => {
                                     if (program.panel?.id && program.jobId) {
-                                      startTimerMutation.mutate({
-                                        jobId: program.jobId,
-                                        panelRegisterId: program.panel.id,
-                                      });
+                                      // Navigate to manual entry with job and panel info, and start timer
+                                      const params = new URLSearchParams();
+                                      params.set("date", format(new Date(), "yyyy-MM-dd"));
+                                      params.set("jobId", program.jobId);
+                                      params.set("panelId", program.panel.id);
+                                      if (program.panel?.panelMark) {
+                                        params.set("panelMark", program.panel.panelMark);
+                                      }
+                                      params.set("startTimer", "true");
+                                      setLocation(`/manual-entry?${params.toString()}`);
                                     }
                                   }}
-                                  disabled={startTimerMutation.isPending}
                                   data-testid={`button-draft-now-${program.id}`}
                                 >
-                                  {startTimerMutation.isPending ? (
-                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                                  ) : (
-                                    <Play className="h-3 w-3 mr-1" />
-                                  )}
+                                  <Play className="h-3 w-3 mr-1" />
                                   Draft Now
                                 </Button>
                                 <Button
