@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DOCUMENT_ROUTES } from "@shared/api-routes";
 
 interface PublicBundleDocument {
   id: string;
@@ -31,9 +32,9 @@ export default function PublicBundlePage() {
   const { qrCodeId } = useParams<{ qrCodeId: string }>();
 
   const { data: bundle, isLoading, error } = useQuery<PublicBundle>({
-    queryKey: ["/api/public/bundles", qrCodeId],
+    queryKey: [DOCUMENT_ROUTES.PUBLIC_BUNDLE(qrCodeId || "")],
     queryFn: async () => {
-      const response = await fetch(`/api/public/bundles/${qrCodeId}`);
+      const response = await fetch(DOCUMENT_ROUTES.PUBLIC_BUNDLE(qrCodeId || ""));
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.error || "Failed to load bundle");
@@ -45,7 +46,7 @@ export default function PublicBundlePage() {
 
   const handleDownload = (documentId: string, fileName: string) => {
     const link = document.createElement("a");
-    link.href = `/api/public/bundles/${qrCodeId}/documents/${documentId}/download`;
+    link.href = `${DOCUMENT_ROUTES.PUBLIC_BUNDLE(qrCodeId || "")}/documents/${documentId}/download`;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();

@@ -23,7 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { TIMER_ROUTES, JOBS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { TIMER_ROUTES, JOBS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES, DAILY_LOGS_ROUTES } from "@shared/api-routes";
 
 interface TimerSession {
   id: string;
@@ -199,7 +199,7 @@ export function TimerWidget() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-logs"] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       setIsStopDialogOpen(false);
       setSelectedJobId("");
       setSelectedPanelId("");
