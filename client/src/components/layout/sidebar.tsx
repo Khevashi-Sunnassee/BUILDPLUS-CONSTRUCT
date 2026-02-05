@@ -84,6 +84,7 @@ const managerNavItems = [
 
 const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
+  { title: "Companies", url: "/admin/companies", icon: Building2 },
   { title: "Factories", url: "/admin/factories", icon: Factory },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
@@ -119,6 +120,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/users": "admin_users",
   "/admin/settings": "admin_settings",
   "/admin/factories": "admin_factories",
+  "/admin/companies": "admin_companies",
   "/manager/review": "daily_reports",
 };
 

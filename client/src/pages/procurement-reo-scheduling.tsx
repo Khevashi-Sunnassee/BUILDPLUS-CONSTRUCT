@@ -660,7 +660,7 @@ export default function ProcurementReoSchedulingPage() {
           <DialogHeader>
             <DialogTitle>Create Purchase Order</DialogTitle>
             <DialogDescription>
-              Create a purchase order for approved reo items from {selectedSchedule?.panel?.panelNumber || "selected panel"}
+              Create a purchase order for approved reo items from {selectedSchedule?.panel?.panelMark || "selected panel"}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

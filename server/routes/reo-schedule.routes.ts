@@ -11,8 +11,7 @@ const router = Router();
 
 router.get("/api/reo-schedules/ifc-panels", requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
     if (!companyId) {
       return res.status(400).json({ message: "Company ID is required" });
     }
@@ -46,8 +45,7 @@ router.get("/api/reo-schedules/ifc-panels", requireAuth, async (req: Request, re
 
 router.get("/api/reo-schedules", requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
     if (!companyId) {
       return res.status(400).json({ message: "Company ID is required" });
     }
@@ -63,8 +61,7 @@ router.get("/api/reo-schedules", requireAuth, async (req: Request, res: Response
 router.get("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoScheduleWithDetails(id);
     if (!schedule) {
@@ -85,8 +82,7 @@ router.get("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Resp
 router.get("/api/reo-schedules/panel/:panelId", requireAuth, async (req: Request, res: Response) => {
   try {
     const panelId = req.params.panelId as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoScheduleByPanel(panelId);
     if (!schedule) {
@@ -107,9 +103,8 @@ router.get("/api/reo-schedules/panel/:panelId", requireAuth, async (req: Request
 
 router.post("/api/reo-schedules", requireAuth, async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user;
-    const companyId = user?.companyId;
-    const userId = user?.id;
+    const companyId = req.companyId;
+    const userId = req.session.userId;
 
     if (!companyId) {
       return res.status(400).json({ message: "Company ID is required" });
@@ -135,8 +130,7 @@ router.post("/api/reo-schedules", requireAuth, async (req: Request, res: Respons
 router.patch("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const existing = await storage.getReoSchedule(id);
     if (!existing) {
@@ -158,8 +152,7 @@ router.patch("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Re
 router.get("/api/reo-schedules/:scheduleId/items", requireAuth, async (req: Request, res: Response) => {
   try {
     const scheduleId = req.params.scheduleId as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoSchedule(scheduleId);
     if (!schedule) {
@@ -181,8 +174,7 @@ router.get("/api/reo-schedules/:scheduleId/items", requireAuth, async (req: Requ
 router.post("/api/reo-schedules/:scheduleId/items", requireAuth, async (req: Request, res: Response) => {
   try {
     const scheduleId = req.params.scheduleId as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoSchedule(scheduleId);
     if (!schedule) {
@@ -213,8 +205,7 @@ router.patch("/api/reo-schedules/:scheduleId/items/:itemId", requireAuth, async 
   try {
     const scheduleId = req.params.scheduleId as string;
     const itemId = req.params.itemId as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoSchedule(scheduleId);
     if (!schedule) {
@@ -241,8 +232,7 @@ router.delete("/api/reo-schedules/:scheduleId/items/:itemId", requireAuth, async
   try {
     const scheduleId = req.params.scheduleId as string;
     const itemId = req.params.itemId as string;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoSchedule(scheduleId);
     if (!schedule) {
@@ -265,8 +255,7 @@ router.post("/api/reo-schedules/:scheduleId/items/bulk-status", requireAuth, asy
   try {
     const scheduleId = req.params.scheduleId as string;
     const { itemIds, status } = req.body;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
       return res.status(400).json({ message: "itemIds array is required" });
@@ -297,8 +286,7 @@ router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: R
   try {
     const scheduleId = req.params.scheduleId as string;
     const { pdfBase64 } = req.body;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
+    const companyId = req.companyId;
 
     const schedule = await storage.getReoScheduleWithDetails(scheduleId);
     if (!schedule) {
@@ -378,9 +366,8 @@ router.post("/api/reo-schedules/:scheduleId/create-po", requireAuth, async (req:
   try {
     const scheduleId = req.params.scheduleId as string;
     const { supplierId, itemIds, notes } = req.body;
-    const user = (req as any).user;
-    const companyId = user?.companyId;
-    const userId = user?.id;
+    const companyId = req.companyId;
+    const userId = req.session.userId;
 
     if (!supplierId) {
       return res.status(400).json({ message: "Supplier ID is required" });

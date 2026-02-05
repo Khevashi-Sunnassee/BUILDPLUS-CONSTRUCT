@@ -47,6 +47,7 @@ import ProductionSchedulePage from "@/pages/production-schedule";
 import DocumentRegisterPage from "@/pages/document-register";
 import PublicBundlePage from "@/pages/public-bundle";
 import AdminDocumentConfigPage from "@/pages/admin/document-config";
+import AdminCompaniesPage from "@/pages/admin/companies";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -371,6 +372,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminUserPermissionsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/companies">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminCompaniesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

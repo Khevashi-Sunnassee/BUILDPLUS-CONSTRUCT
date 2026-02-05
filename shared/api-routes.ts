@@ -324,6 +324,10 @@ export const ADMIN_ROUTES = {
   DEVICES: '/api/admin/devices',
   DEVICE_BY_ID: (id: string | number) => `/api/admin/devices/${id}`,
   
+  // Companies
+  COMPANIES: '/api/admin/companies',
+  COMPANY_BY_ID: (id: string | number) => `/api/admin/companies/${id}`,
+  
   // Settings
   SETTINGS: '/api/admin/settings',
   SETTINGS_COMPANY_NAME: '/api/admin/settings/company-name',

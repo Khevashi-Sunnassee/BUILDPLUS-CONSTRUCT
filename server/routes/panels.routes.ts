@@ -50,7 +50,8 @@ router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, 
     }
     
     if (documentStatus === "APPROVED") {
-      const user = (req as any).user;
+      const userId = req.session.userId;
+      const user = userId ? await storage.getUser(userId) : null;
       if (!user || !["MANAGER", "ADMIN"].includes(user.role)) {
         return res.status(403).json({ error: "Only managers or admins can approve documents for production" });
       }
