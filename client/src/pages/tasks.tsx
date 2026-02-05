@@ -1993,10 +1993,11 @@ export default function TasksPage() {
         pdf.setFontSize(11);
         pdf.setFont("helvetica", "bold");
         pdf.text(group.name, margin + 3, yPos + 5.5);
+        const groupNameWidth = pdf.getTextWidth(group.name);
         pdf.setFontSize(9);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(100, 116, 139);
-        pdf.text(`(${group.tasks.length} tasks)`, margin + pdf.getTextWidth(group.name) + 6, yPos + 5.5);
+        pdf.text(`(${group.tasks.length} tasks)`, margin + 3 + groupNameWidth + 4, yPos + 5.5);
         yPos += 12;
 
         const colWidths = {
