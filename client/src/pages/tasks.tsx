@@ -57,6 +57,11 @@ import {
   ArrowUp,
   ArrowDown,
   Printer,
+  Bell,
+  Filter,
+  Eye,
+  EyeOff,
+  Check,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -105,6 +110,7 @@ interface Task {
   title: string;
   status: TaskStatus;
   dueDate: string | null;
+  reminderDate: string | null;
   consultant: string | null;
   projectStage: string | null;
   sortOrder: number;
@@ -314,6 +320,7 @@ function TaskRow({
         groupId: task.groupId,
         parentId: task.id,
         title,
+        dueDate: new Date().toISOString(),
       });
     },
     onSuccess: () => {
@@ -344,6 +351,10 @@ function TaskRow({
 
   const handleDateChange = (date: Date | undefined) => {
     updateTaskMutation.mutate({ dueDate: date?.toISOString() || null } as any);
+  };
+
+  const handleReminderChange = (date: Date | undefined) => {
+    updateTaskMutation.mutate({ reminderDate: date?.toISOString() || null } as any);
   };
 
   const handleStageChange = (stage: string) => {
@@ -378,7 +389,8 @@ function TaskRow({
         style={sortableStyle}
         className={cn(
           "grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
-          isSubtask && "bg-muted/30"
+          isSubtask && "bg-muted/30",
+          task.status === "DONE" && "bg-green-50 dark:bg-green-950/30"
         )}
         data-testid={`task-row-${task.id}`}
       >
@@ -586,6 +598,45 @@ function TaskRow({
           </PopoverContent>
         </Popover>
 
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              className={cn(
+                "h-7 px-2 text-xs justify-start",
+                task.reminderDate && "text-amber-600 dark:text-amber-400"
+              )}
+              data-testid={`btn-reminder-${task.id}`}
+            >
+              <Bell className={cn("h-3 w-3 mr-1", task.reminderDate && "fill-current")} />
+              {task.reminderDate ? format(new Date(task.reminderDate), "dd/MM/yy") : "Remind"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <div className="p-2 border-b">
+              <p className="text-sm font-medium">Set Reminder</p>
+            </div>
+            <Calendar
+              mode="single"
+              selected={task.reminderDate ? new Date(task.reminderDate) : undefined}
+              onSelect={handleReminderChange}
+              initialFocus
+            />
+            {task.reminderDate && (
+              <div className="p-2 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-destructive hover:text-destructive"
+                  onClick={() => handleReminderChange(undefined)}
+                >
+                  Clear Reminder
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+
         <div className="flex items-center justify-center gap-1 text-muted-foreground">
           {task.filesCount > 0 && (
             <Tooltip>
@@ -635,7 +686,7 @@ function TaskRow({
       </div>
 
       {showSubtasks &&
-        task.subtasks.map((subtask) => (
+        (task.subtasks || []).map((subtask) => (
           <TaskRow
             key={subtask.id}
             task={subtask as any}
@@ -812,6 +863,7 @@ function TaskGroupComponent({
       return apiRequest("POST", TASKS_ROUTES.LIST, {
         groupId: group.id,
         title,
+        dueDate: new Date().toISOString(),
       });
     },
     onSuccess: () => {
@@ -1394,6 +1446,9 @@ export default function TasksPage() {
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [jobFilter, setJobFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [dueDateFilter, setDueDateFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -1420,6 +1475,33 @@ export default function TasksPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
+  const notifiedRemindersRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const checkReminders = () => {
+      const now = new Date();
+      groups.forEach((group) => {
+        group.tasks.forEach((task) => {
+          if (task.reminderDate && !notifiedRemindersRef.current.has(task.id)) {
+            const reminderTime = new Date(task.reminderDate);
+            if (reminderTime <= now && task.status !== "DONE") {
+              notifiedRemindersRef.current.add(task.id);
+              toast({
+                title: "Task Reminder",
+                description: `Reminder: ${task.title}`,
+                variant: "default",
+              });
+            }
+          }
+        });
+      });
+    };
+
+    checkReminders();
+    const interval = setInterval(checkReminders, 60000);
+    return () => clearInterval(interval);
+  }, [groups, toast]);
+
   const [isExporting, setIsExporting] = useState(false);
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
@@ -1427,9 +1509,31 @@ export default function TasksPage() {
   const filteredGroups = groups.map((group) => ({
     ...group,
     tasks: group.tasks.filter((task) => {
-      if (jobFilter === "all") return true;
-      if (jobFilter === "none") return !task.jobId;
-      return task.jobId === jobFilter;
+      if (!showCompleted && task.status === "DONE") return false;
+      if (jobFilter !== "all") {
+        if (jobFilter === "none" && task.jobId) return false;
+        if (jobFilter !== "none" && task.jobId !== jobFilter) return false;
+      }
+      if (statusFilter !== "all" && task.status !== statusFilter) return false;
+      if (dueDateFilter !== "all") {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const taskDueDate = task.dueDate ? new Date(task.dueDate) : null;
+        if (taskDueDate) taskDueDate.setHours(0, 0, 0, 0);
+        
+        if (dueDateFilter === "overdue") {
+          if (!taskDueDate || taskDueDate >= today) return false;
+        } else if (dueDateFilter === "today") {
+          if (!taskDueDate || taskDueDate.getTime() !== today.getTime()) return false;
+        } else if (dueDateFilter === "week") {
+          const weekFromNow = new Date(today);
+          weekFromNow.setDate(weekFromNow.getDate() + 7);
+          if (!taskDueDate || taskDueDate > weekFromNow) return false;
+        } else if (dueDateFilter === "no-date") {
+          if (taskDueDate) return false;
+        }
+      }
+      return true;
     }),
   }));
 
@@ -1764,11 +1868,11 @@ export default function TasksPage() {
           <h1 className="text-2xl font-bold">Tasks</h1>
           <p className="text-muted-foreground">Manage your team's work and track progress</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <Briefcase className="h-4 w-4 text-muted-foreground" />
             <Select value={jobFilter} onValueChange={setJobFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-job-filter">
+              <SelectTrigger className="w-[150px]" data-testid="select-job-filter">
                 <SelectValue placeholder="Filter by job" />
               </SelectTrigger>
               <SelectContent>
@@ -1782,6 +1886,41 @@ export default function TasksPage() {
               </SelectContent>
             </Select>
           </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[130px]" data-testid="select-status-filter">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="NOT_STARTED">Not Started</SelectItem>
+              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+              <SelectItem value="STUCK">Stuck</SelectItem>
+              <SelectItem value="ON_HOLD">On Hold</SelectItem>
+              <SelectItem value="DONE">Done</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={dueDateFilter} onValueChange={setDueDateFilter}>
+            <SelectTrigger className="w-[130px]" data-testid="select-date-filter">
+              <SelectValue placeholder="Due Date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Dates</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+              <SelectItem value="today">Due Today</SelectItem>
+              <SelectItem value="week">Due This Week</SelectItem>
+              <SelectItem value="no-date">No Due Date</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowCompleted(!showCompleted)}
+            className={cn("gap-1", showCompleted && "bg-accent")}
+            data-testid="btn-toggle-completed"
+          >
+            {showCompleted ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {showCompleted ? "Showing Done" : "Done Hidden"}
+          </Button>
           <Button
             variant="outline"
             onClick={exportToPDF}

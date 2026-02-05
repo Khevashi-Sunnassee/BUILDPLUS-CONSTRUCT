@@ -1192,6 +1192,7 @@ export const tasks = pgTable("tasks", {
   title: text("title").notNull(),
   status: taskStatusEnum("status").default("NOT_STARTED").notNull(),
   dueDate: timestamp("due_date"),
+  reminderDate: timestamp("reminder_date"),
   consultant: text("consultant"),
   projectStage: text("project_stage"),
   sortOrder: integer("sort_order").default(0).notNull(),
@@ -1204,6 +1205,7 @@ export const tasks = pgTable("tasks", {
   jobIdx: index("tasks_job_idx").on(table.jobId),
   statusIdx: index("tasks_status_idx").on(table.status),
   sortOrderIdx: index("tasks_sort_order_idx").on(table.sortOrder),
+  reminderIdx: index("tasks_reminder_idx").on(table.reminderDate),
 }));
 
 export const taskAssignees = pgTable("task_assignees", {
