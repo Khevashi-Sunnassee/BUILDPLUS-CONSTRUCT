@@ -68,6 +68,7 @@ const userNavItems = [
   { title: "Drafting Program", url: "/drafting-program", icon: Clock },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Document Register", url: "/documents", icon: FolderOpen },
+  { title: "Checklists", url: "/checklists", icon: CheckSquare },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Production Report", url: "/production-report", icon: Factory },
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
@@ -123,6 +124,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/factories": "admin_factories",
   "/admin/companies": "admin_companies",
   "/admin/checklist-templates": "admin_checklist_templates",
+  "/checklists": "checklists",
   "/manager/review": "daily_reports",
 };
 
