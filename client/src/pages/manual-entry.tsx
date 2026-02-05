@@ -206,6 +206,12 @@ export default function ManualEntryPage() {
 
   // Timer state
   const [timerElapsed, setTimerElapsed] = useState(0);
+  
+  // Track previous panel ID to detect panel changes
+  const previousPanelIdRef = useRef<string | null>(null);
+  
+  // History section expanded state
+  const [historyExpanded, setHistoryExpanded] = useState(false);
 
   // Update timer display
   useEffect(() => {
@@ -414,17 +420,100 @@ export default function ManualEntryPage() {
   const selectedPanelId = form.watch("panelRegisterId");
   const isTimerForSelectedPanel = activeTimer && activeTimer.panelRegisterId === selectedPanelId;
 
+  // Fetch timer history for the selected panel
+  interface TimerHistorySession {
+    id: string;
+    status: string;
+    startedAt: string;
+    completedAt: string | null;
+    totalElapsedMs: number;
+    pauseCount: number;
+    notes: string | null;
+    jobNumber: string | null;
+    jobName: string | null;
+    panelMark: string | null;
+    workTypeName: string | null;
+  }
+  
+  interface PanelTimerHistory {
+    panelId: string;
+    totalElapsedMs: number;
+    sessionCount: number;
+    sessions: TimerHistorySession[];
+  }
+
+  const { data: panelTimerHistory } = useQuery<PanelTimerHistory>({
+    queryKey: [TIMER_ROUTES.PANEL_HISTORY(selectedPanelId || "")],
+    enabled: !!selectedPanelId && selectedPanelId !== "none",
+  });
+
+  // Cancel existing timer when switching to a different panel
+  useEffect(() => {
+    const currentPanelId = selectedPanelId || null;
+    const previousPanelId = previousPanelIdRef.current;
+    
+    // Only cancel if:
+    // 1. We had a previous panel selected
+    // 2. We're switching TO a different panel (not just clearing selection)
+    // 3. The active timer belongs to the previous panel
+    // 4. The cancel mutation is not already in progress
+    const isExplicitPanelSwitch = previousPanelId && currentPanelId && currentPanelId !== previousPanelId;
+    const timerBelongsToPreviousPanel = activeTimer && activeTimer.panelRegisterId === previousPanelId;
+    
+    if (isExplicitPanelSwitch && timerBelongsToPreviousPanel && !cancelTimerMutation.isPending) {
+      cancelTimerMutation.mutate(activeTimer.id);
+    }
+    
+    previousPanelIdRef.current = currentPanelId;
+  }, [selectedPanelId, activeTimer, cancelTimerMutation.isPending]);
+
+  // Track if we've set initial time
+  const [hasSetInitialTime, setHasSetInitialTime] = useState(false);
+  
+  // Set current time as start time when page opens (not last end time)
+  // Wait for activeTimer query to resolve before setting
+  useEffect(() => {
+    // Only set once, when queries have loaded and there's no active timer
+    if (!hasSetInitialTime && !activeTimer && panels !== undefined) {
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      form.setValue("startTime", currentTime);
+      form.setValue("endTime", calculateEndTime(currentTime));
+      setHasSetInitialTime(true);
+    }
+  }, [activeTimer, panels, hasSetInitialTime, form]);
+
+  // Cleanup: warn user about active timer when page is closed or navigated away
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (activeTimer && (activeTimer.status === "RUNNING" || activeTimer.status === "PAUSED")) {
+        // Warn user about unsaved timer - browser will show confirmation dialog
+        e.preventDefault();
+        e.returnValue = "You have an active timer. Are you sure you want to leave?";
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [activeTimer]);
+
   // Update start and end times when latest end time changes or date changes
   // Skip if there's an active timer for the selected panel (timer controls time fields)
   useEffect(() => {
     if (isTimerForSelectedPanel) {
       return; // Don't overwrite times when timer is active
     }
-    const newStartTime = latestEndTime;
-    const newEndTime = calculateEndTime(newStartTime);
-    form.setValue("startTime", newStartTime);
-    form.setValue("endTime", newEndTime);
-  }, [latestEndTime, form, isTimerForSelectedPanel]);
+    // Don't override the initial current time setting
+    if (hasProcessedUrlParams || activeTimer) {
+      const newStartTime = latestEndTime;
+      const newEndTime = calculateEndTime(newStartTime);
+      form.setValue("startTime", newStartTime);
+      form.setValue("endTime", newEndTime);
+    }
+  }, [latestEndTime, form, isTimerForSelectedPanel, hasProcessedUrlParams, activeTimer]);
 
   // Handle date change - update selectedDate state
   const handleDateChange = (newDate: string) => {
@@ -967,6 +1056,76 @@ export default function ManualEntryPage() {
                 </Button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Total Elapsed Time for Selected Panel */}
+        {selectedPanelId && selectedPanelId !== "none" && panelTimerHistory && panelTimerHistory.totalElapsedMs > 0 && (
+          <div className="mt-4">
+            <Card className="border-dashed">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Total time logged for this panel:</span>
+                    <Badge variant="secondary" className="font-mono text-base" data-testid="badge-total-elapsed-time">
+                      {formatTimer(panelTimerHistory.totalElapsedMs)}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground">
+                      ({panelTimerHistory.sessionCount} session{panelTimerHistory.sessionCount !== 1 ? 's' : ''})
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setHistoryExpanded(!historyExpanded)}
+                    data-testid="button-toggle-timer-history"
+                  >
+                    {historyExpanded ? (
+                      <><ChevronDown className="h-4 w-4 mr-1" /> Hide History</>
+                    ) : (
+                      <><ChevronRight className="h-4 w-4 mr-1" /> View History</>
+                    )}
+                  </Button>
+                </div>
+                
+                {historyExpanded && panelTimerHistory.sessions.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">Timer Sessions</div>
+                    <div className="divide-y divide-border rounded-lg border">
+                      {panelTimerHistory.sessions.map((session) => (
+                        <div key={session.id} className="p-3 flex items-center justify-between" data-testid={`timer-session-${session.id}`}>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                {session.completedAt ? format(new Date(session.completedAt), "MMM d, yyyy h:mm a") : "In Progress"}
+                              </span>
+                              {session.workTypeName && (
+                                <Badge variant="outline" className="text-xs">{session.workTypeName}</Badge>
+                              )}
+                            </div>
+                            {session.notes && (
+                              <span className="text-xs text-muted-foreground">{session.notes}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="font-mono">
+                              {formatTimer(session.totalElapsedMs)}
+                            </Badge>
+                            {session.pauseCount > 0 && (
+                              <span className="text-xs text-muted-foreground">
+                                ({session.pauseCount} pause{session.pauseCount !== 1 ? 's' : ''})
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>
