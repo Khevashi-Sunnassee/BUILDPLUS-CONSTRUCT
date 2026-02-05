@@ -1055,14 +1055,17 @@ export default function AdminChecklistTemplatesPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Module</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select 
+                        onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)} 
+                        value={field.value || "__none__"}
+                      >
                         <FormControl>
                           <SelectTrigger data-testid="select-template-module">
                             <SelectValue placeholder="Select module" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {entityTypes?.map((type) => (
                             <SelectItem key={type.id} value={type.id}>
                               {type.name}
@@ -1081,8 +1084,8 @@ export default function AdminChecklistTemplatesPage() {
                     <FormItem>
                       <FormLabel>Subtype</FormLabel>
                       <Select 
-                        onValueChange={field.onChange} 
-                        value={field.value || ""}
+                        onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)} 
+                        value={field.value || "__none__"}
                         disabled={!templateForm.watch("entityTypeId")}
                       >
                         <FormControl>
@@ -1091,7 +1094,7 @@ export default function AdminChecklistTemplatesPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {entitySubtypes
                             ?.filter((s) => s.entityTypeId === templateForm.watch("entityTypeId"))
                             .map((subtype) => (

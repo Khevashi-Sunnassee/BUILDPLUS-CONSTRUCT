@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { renderField } from "./field-renderers";
+import { normalizeSections } from "./normalize-sections";
 import type { ChecklistTemplate, ChecklistSection, ChecklistField } from "@shared/schema";
 
 interface ChecklistFormProps {
@@ -23,7 +24,7 @@ export function ChecklistForm({
   disabled = false,
   showProgress = true,
 }: ChecklistFormProps) {
-  const sections = (template.sections as ChecklistSection[]) || [];
+  const sections = normalizeSections(template.sections);
 
   const handleFieldChange = (fieldId: string, value: unknown) => {
     onChange({
@@ -159,7 +160,7 @@ export function calculateCompletionRate(
   template: ChecklistTemplate,
   responses: Record<string, unknown>
 ): number {
-  const sections = (template.sections as ChecklistSection[]) || [];
+  const sections = normalizeSections(template.sections);
   let completed = 0;
   let total = 0;
 
@@ -187,7 +188,7 @@ export function getMissingRequiredFields(
   template: ChecklistTemplate,
   responses: Record<string, unknown>
 ): string[] {
-  const sections = (template.sections as ChecklistSection[]) || [];
+  const sections = normalizeSections(template.sections);
   const missing: string[] = [];
 
   sections.forEach((section) => {

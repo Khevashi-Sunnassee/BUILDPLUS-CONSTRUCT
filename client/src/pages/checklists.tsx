@@ -328,12 +328,12 @@ export default function ChecklistsPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Job (Optional)</label>
-              <Select value={selectedJobId} onValueChange={setSelectedJobId}>
+              <Select value={selectedJobId || "__none__"} onValueChange={(v) => setSelectedJobId(v === "__none__" ? "" : v)}>
                 <SelectTrigger data-testid="select-job">
                   <SelectValue placeholder="Select a job" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" data-testid="option-job-none">None</SelectItem>
+                  <SelectItem value="__none__" data-testid="option-job-none">None</SelectItem>
                   {jobs?.map((job) => (
                     <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                       {job.name}

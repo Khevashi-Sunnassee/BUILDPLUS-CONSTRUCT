@@ -97,6 +97,7 @@ import type {
 } from "@shared/schema";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
 import { Link } from "wouter";
+import { normalizeSections } from "@/components/checklist/normalize-sections";
 
 const FIELD_TYPE_CONFIG: Record<
   string,
@@ -188,7 +189,7 @@ export default function TemplateEditorPage() {
 
   useEffect(() => {
     if (template?.sections && !hasChanges) {
-      setSections(template.sections as ChecklistSection[]);
+      setSections(normalizeSections(template.sections));
     }
   }, [template, hasChanges]);
 
@@ -339,12 +340,12 @@ export default function TemplateEditorPage() {
         if (editingField) {
           return {
             ...section,
-            items: section.items.map((f) => (f.id === editingField.id ? newField : f)),
+            items: (section.items || []).map((f) => (f.id === editingField.id ? newField : f)),
           };
         }
         return {
           ...section,
-          items: [...section.items, newField],
+          items: [...(section.items || []), newField],
         };
       })
     );
@@ -370,7 +371,7 @@ export default function TemplateEditorPage() {
         if (section.id !== deletingFieldSectionId) return section;
         return {
           ...section,
-          items: section.items.filter((f) => f.id !== deletingFieldId),
+          items: (section.items || []).filter((f) => f.id !== deletingFieldId),
         };
       })
     );
@@ -397,9 +398,10 @@ export default function TemplateEditorPage() {
       prev.map((section) => {
         if (section.id !== sectionId) return section;
         const newIndex = direction === "up" ? fieldIndex - 1 : fieldIndex + 1;
-        if (newIndex < 0 || newIndex >= section.items.length) return section;
+        const items = section.items || [];
+        if (newIndex < 0 || newIndex >= items.length) return section;
 
-        const newItems = [...section.items];
+        const newItems = [...items];
         [newItems[fieldIndex], newItems[newIndex]] = [newItems[newIndex], newItems[fieldIndex]];
         return { ...section, items: newItems };
       })
@@ -416,7 +418,7 @@ export default function TemplateEditorPage() {
           id: generateId(),
           name: `${field.name} (Copy)`,
         };
-        return { ...section, items: [...section.items, newField] };
+        return { ...section, items: [...(section.items || []), newField] };
       })
     );
     setHasChanges(true);
@@ -443,7 +445,7 @@ export default function TemplateEditorPage() {
     setSections((prev) =>
       prev.map((section) => {
         if (section.id !== sectionId) return section;
-        return { ...section, items: [...section.items, newField] };
+        return { ...section, items: [...(section.items || []), newField] };
       })
     );
     setHasChanges(true);
@@ -580,7 +582,7 @@ export default function TemplateEditorPage() {
                       <div className="flex items-center gap-3">
                         <span className="font-medium">{section.name}</span>
                         <Badge variant="secondary" className="text-xs">
-                          {section.items.length} fields
+                          {(section.items || []).length} fields
                         </Badge>
                         {section.allowRepeats && (
                           <Badge variant="outline" className="text-xs">
@@ -644,7 +646,7 @@ export default function TemplateEditorPage() {
                       <p className="text-sm text-muted-foreground mb-4">{section.description}</p>
                     )}
                     <div className="space-y-2">
-                      {section.items.map((field, fieldIndex) => {
+                      {(section.items || []).map((field, fieldIndex) => {
                         const config = FIELD_TYPE_CONFIG[field.type];
                         const Icon = config?.icon || Type;
                         return (
@@ -681,7 +683,7 @@ export default function TemplateEditorPage() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => moveField(section.id, fieldIndex, "down")}
-                                disabled={fieldIndex === section.items.length - 1}
+                                disabled={fieldIndex === (section.items || []).length - 1}
                               >
                                 <ChevronDown className="h-4 w-4" />
                               </Button>

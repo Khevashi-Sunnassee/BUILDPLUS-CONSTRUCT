@@ -259,30 +259,30 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
   }
 });
 
-router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/checklist/templates/module/:entityTypeId/:entitySubtypeId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const templateId = String(req.params.id);
+    const entityTypeId = String(req.params.entityTypeId);
+    const entitySubtypeId = String(req.params.entitySubtypeId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
     }
 
-    const [template] = await db.select()
+    const templates = await db.select()
       .from(checklistTemplates)
       .where(and(
-        eq(checklistTemplates.id, templateId),
-        eq(checklistTemplates.companyId, companyId!)
-      ));
+        eq(checklistTemplates.companyId, companyId!),
+        eq(checklistTemplates.entityTypeId, entityTypeId),
+        eq(checklistTemplates.entitySubtypeId, entitySubtypeId),
+        eq(checklistTemplates.isActive, true)
+      ))
+      .orderBy(checklistTemplates.name);
 
-    if (!template) {
-      return res.status(404).json({ error: "Template not found" });
-    }
-
-    res.json(template);
+    res.json(templates);
   } catch (error) {
-    logger.error({ err: error }, "Failed to fetch template");
-    res.status(500).json({ error: "Failed to fetch template" });
+    logger.error({ err: error }, "Failed to fetch templates by module and subtype");
+    res.status(500).json({ error: "Failed to fetch templates" });
   }
 });
 
@@ -311,30 +311,30 @@ router.get("/api/checklist/templates/module/:entityTypeId", requireAuth, async (
   }
 });
 
-router.get("/api/checklist/templates/module/:entityTypeId/:entitySubtypeId", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const entityTypeId = String(req.params.entityTypeId);
-    const entitySubtypeId = String(req.params.entitySubtypeId);
+    const templateId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
     }
 
-    const templates = await db.select()
+    const [template] = await db.select()
       .from(checklistTemplates)
       .where(and(
-        eq(checklistTemplates.companyId, companyId!),
-        eq(checklistTemplates.entityTypeId, entityTypeId),
-        eq(checklistTemplates.entitySubtypeId, entitySubtypeId),
-        eq(checklistTemplates.isActive, true)
-      ))
-      .orderBy(checklistTemplates.name);
+        eq(checklistTemplates.id, templateId),
+        eq(checklistTemplates.companyId, companyId!)
+      ));
 
-    res.json(templates);
+    if (!template) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    res.json(template);
   } catch (error) {
-    logger.error({ err: error }, "Failed to fetch templates by module and subtype");
-    res.status(500).json({ error: "Failed to fetch templates" });
+    logger.error({ err: error }, "Failed to fetch template");
+    res.status(500).json({ error: "Failed to fetch template" });
   }
 });
 
@@ -347,8 +347,12 @@ router.post("/api/checklist/templates", requireAuth, requireRole("ADMIN", "MANAG
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const body = { ...req.body };
+    if (!body.entityTypeId) body.entityTypeId = null;
+    if (!body.entitySubtypeId) body.entitySubtypeId = null;
+
     const validation = insertChecklistTemplateSchema.safeParse({
-      ...req.body,
+      ...body,
       companyId,
       createdBy: userId,
     });
@@ -374,8 +378,12 @@ router.put("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN", "MA
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const body = { ...req.body };
+    if (body.entityTypeId === "") body.entityTypeId = null;
+    if (body.entitySubtypeId === "") body.entitySubtypeId = null;
+
     const [updated] = await db.update(checklistTemplates)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set({ ...body, updatedAt: new Date() })
       .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
 
