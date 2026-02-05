@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import crypto from "crypto";
 import { storage } from "../storage";
-import { requireAuth, requireRole, requirePermission } from "./middleware/auth.middleware";
+import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
 import logger from "../lib/logger";
 import { 
