@@ -483,6 +483,23 @@ export const timerSessions = pgTable("timer_sessions", {
   startedAtIdx: index("timer_sessions_started_at_idx").on(table.startedAt),
 }));
 
+// Timer events for tracking history of all timer actions
+export const timerEventTypeEnum = pgEnum("timer_event_type", ["START", "PAUSE", "RESUME", "STOP", "CANCEL"]);
+
+export const timerEvents = pgTable("timer_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  timerSessionId: varchar("timer_session_id", { length: 36 }).notNull().references(() => timerSessions.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  eventType: timerEventTypeEnum("event_type").notNull(),
+  elapsedMsAtEvent: integer("elapsed_ms_at_event").default(0).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  timerSessionIdIdx: index("timer_events_timer_session_id_idx").on(table.timerSessionId),
+  userIdIdx: index("timer_events_user_id_idx").on(table.userId),
+  eventTypeIdx: index("timer_events_event_type_idx").on(table.eventType),
+}));
+
 export const auditEvents = pgTable("audit_events", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 }).references(() => users.id),
@@ -768,6 +785,11 @@ export const insertTimerSessionSchema = createInsertSchema(timerSessions).omit({
   updatedAt: true,
 });
 
+export const insertTimerEventSchema = createInsertSchema(timerEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertGlobalSettingsSchema = createInsertSchema(globalSettings).omit({
   id: true,
   createdAt: true,
@@ -964,6 +986,8 @@ export type InsertLogRow = z.infer<typeof insertLogRowSchema>;
 export type LogRow = typeof logRows.$inferSelect;
 export type InsertTimerSession = z.infer<typeof insertTimerSessionSchema>;
 export type TimerSession = typeof timerSessions.$inferSelect;
+export type InsertTimerEvent = z.infer<typeof insertTimerEventSchema>;
+export type TimerEvent = typeof timerEvents.$inferSelect;
 export type InsertApprovalEvent = z.infer<typeof insertApprovalEventSchema>;
 export type ApprovalEvent = typeof approvalEvents.$inferSelect;
 export type InsertGlobalSettings = z.infer<typeof insertGlobalSettingsSchema>;
