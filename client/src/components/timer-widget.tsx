@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { Play, Pause, Square, X, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,7 @@ interface Panel {
 export function TimerWidget() {
   const { toast } = useToast();
   const [displayTime, setDisplayTime] = useState("00:00:00");
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [isStopDialogOpen, setIsStopDialogOpen] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [selectedPanelId, setSelectedPanelId] = useState<string>("");
@@ -126,6 +128,14 @@ export function TimerWidget() {
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
   }, [activeSession]);
+
+  // Update current time for end time display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const startMutation = useMutation({
     mutationFn: async () => {
@@ -389,6 +399,23 @@ export function TimerWidget() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Start Time</Label>
+                <div className="p-2 bg-muted rounded-md font-mono text-sm" data-testid="text-timer-start-time">
+                  {activeSession?.startedAt 
+                    ? format(new Date(activeSession.startedAt), "hh:mm a")
+                    : "--:-- --"}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>End Time</Label>
+                <div className="p-2 bg-muted rounded-md font-mono text-sm" data-testid="text-timer-end-time">
+                  {format(currentTime, "hh:mm a")}
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="job">Job</Label>
               <Select value={selectedJobId} onValueChange={(value) => {
