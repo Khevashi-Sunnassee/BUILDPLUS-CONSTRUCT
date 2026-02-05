@@ -29,6 +29,8 @@ import {
   Pause,
   Square,
   Timer,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import {
   Dialog,
@@ -165,6 +167,9 @@ export default function ManualEntryPage() {
   });
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const pdfInputRef = useRef<HTMLInputElement>(null);
+  
+  // Panel details collapse state - default to collapsed
+  const [panelDetailsExpanded, setPanelDetailsExpanded] = useState(false);
 
   const { data: jobs } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
@@ -1020,6 +1025,62 @@ export default function ManualEntryPage() {
                   )}
                 />
 
+                {/* Document Status next to Application - only show when panel selected */}
+                {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" && (
+                  <FormItem>
+                    <FormLabel>Document Status</FormLabel>
+                    <Select
+                      value={selectedPanel.documentStatus || "DRAFT"}
+                      onValueChange={(value) => {
+                        // When changing from DRAFT to IFA, expand panel details and validate
+                        if (value === "IFA" && selectedPanel.documentStatus === "DRAFT") {
+                          // Expand panel details
+                          setPanelDetailsExpanded(true);
+                          // Check if required fields are filled
+                          const loadWidth = form.getValues("panelLoadWidth");
+                          const loadHeight = form.getValues("panelLoadHeight");
+                          const thickness = form.getValues("panelThickness");
+                          
+                          if (!loadWidth || !loadHeight || !thickness) {
+                            toast({
+                              title: "Panel Details Required",
+                              description: "Please fill in Load Width, Load Height, and Thickness before changing to IFA status.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                        }
+                        if (value === "IFC" && selectedPanel.documentStatus !== "IFC") {
+                          openProductionDialog(selectedPanel);
+                        } else {
+                          updateDocumentStatusMutation.mutate({ 
+                            panelId: selectedPanel.id, 
+                            documentStatus: value 
+                          });
+                        }
+                      }}
+                      disabled={updateDocumentStatusMutation.isPending}
+                    >
+                      <SelectTrigger data-testid="select-document-status-header">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="DRAFT">DRAFT</SelectItem>
+                        <SelectItem value="IFA">IFA (Issued for Approval)</SelectItem>
+                        <SelectItem value="IFC">IFC (Issued for Construction)</SelectItem>
+                        <SelectItem 
+                          value="APPROVED" 
+                          disabled={!canApproveForProduction || selectedPanel.documentStatus !== "IFC"}
+                        >
+                          Approved for Production {!canApproveForProduction && "(Manager/Admin only)"}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      DRAFT → IFA → IFC → Approved
+                    </p>
+                  </FormItem>
+                )}
               </div>
 
               <Card className="bg-muted/30">
@@ -1198,58 +1259,32 @@ export default function ManualEntryPage() {
                 </CardContent>
               </Card>
 
-              {/* Panel Details Section - shows when panel is selected */}
+              {/* Panel Details Section - collapsible, shows when panel is selected */}
               {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" && (
                 <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-                  <CardHeader className="pb-3">
+                  <CardHeader 
+                    className="pb-3 cursor-pointer select-none"
+                    onClick={() => setPanelDetailsExpanded(!panelDetailsExpanded)}
+                    data-testid="panel-details-header"
+                  >
                     <CardTitle className="text-base flex items-center gap-2">
+                      {panelDetailsExpanded ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
                       <Ruler className="h-4 w-4" />
                       Panel Details - {selectedPanel.panelMark}
                     </CardTitle>
                     <CardDescription className="text-sm">
-                      Review and update panel specifications. Changes will be saved to the panel record.
+                      {panelDetailsExpanded 
+                        ? "Review and update panel specifications. Changes will be saved to the panel record."
+                        : "Click to expand panel specifications"
+                      }
                     </CardDescription>
                   </CardHeader>
+                  {panelDetailsExpanded && (
                   <CardContent className="space-y-4">
-                    {/* Document Status Section */}
-                    <div className="flex items-center gap-4 p-3 bg-background rounded-md border">
-                      <div className="flex-1">
-                        <Label className="text-sm font-medium">Document Status</Label>
-                        <p className="text-xs text-muted-foreground">
-                          Track the document approval workflow: DRAFT → IFA → IFC → Approved for Production
-                        </p>
-                      </div>
-                      <Select
-                        value={selectedPanel.documentStatus || "DRAFT"}
-                        onValueChange={(value) => {
-                          if (value === "IFC" && selectedPanel.documentStatus !== "IFC") {
-                            // Open production dialog when changing to IFC
-                            openProductionDialog(selectedPanel);
-                          } else {
-                            updateDocumentStatusMutation.mutate({ 
-                              panelId: selectedPanel.id, 
-                              documentStatus: value 
-                            });
-                          }
-                        }}
-                        disabled={updateDocumentStatusMutation.isPending}
-                      >
-                        <SelectTrigger className="w-[180px]" data-testid="select-document-status">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="DRAFT">DRAFT</SelectItem>
-                          <SelectItem value="IFA">IFA (Issued for Approval)</SelectItem>
-                          <SelectItem value="IFC">IFC (Issued for Construction)</SelectItem>
-                          <SelectItem 
-                            value="APPROVED" 
-                            disabled={!canApproveForProduction || selectedPanel.documentStatus !== "IFC"}
-                          >
-                            Approved for Production {!canApproveForProduction && "(Manager/Admin only)"}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                     <div className="grid gap-4 md:grid-cols-3">
                       <FormField
                         control={form.control}
@@ -1379,6 +1414,7 @@ export default function ManualEntryPage() {
                       />
                     </div>
                   </CardContent>
+                  )}
                 </Card>
               )}
 
