@@ -598,6 +598,7 @@ export default function AdminPanelsPage() {
     concreteStrengthMpa: "",
     rotationalLifters: "",
     primaryLifters: "",
+    productionPdfUrl: "",
   });
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -1020,6 +1021,14 @@ export default function AdminPanelsPage() {
     },
   });
 
+  // PDF upload mutation
+  const uploadPdfMutation = useMutation({
+    mutationFn: async ({ panelId, pdfBase64, fileName }: { panelId: string; pdfBase64: string; fileName: string }) => {
+      const res = await apiRequest("POST", ADMIN_ROUTES.PANEL_UPLOAD_PDF(panelId), { pdfBase64, fileName });
+      return res.json();
+    },
+  });
+
   // PDF analysis mutation
   const analyzePdfMutation = useMutation({
     mutationFn: async ({ panelId, pdfBase64 }: { panelId: string; pdfBase64: string }) => {
@@ -1028,7 +1037,8 @@ export default function AdminPanelsPage() {
     onSuccess: async (response) => {
       const result = await response.json();
       if (result.extracted) {
-        setBuildFormData({
+        setBuildFormData((prev) => ({
+          ...prev,
           loadWidth: result.extracted.loadWidth || "",
           loadHeight: result.extracted.loadHeight || "",
           panelThickness: result.extracted.panelThickness || "",
@@ -1039,7 +1049,7 @@ export default function AdminPanelsPage() {
           concreteStrengthMpa: result.extracted.concreteStrengthMpa || result.extracted.day28Fc || "",
           rotationalLifters: result.extracted.rotationalLifters || "",
           primaryLifters: result.extracted.primaryLifters || "",
-        });
+        }));
         toast({ title: "PDF analyzed successfully" });
       }
       setIsAnalyzing(false);
@@ -1108,6 +1118,7 @@ export default function AdminPanelsPage() {
       concreteStrengthMpa: panel.concreteStrengthMpa || panel.day28Fc || "",
       rotationalLifters: panel.rotationalLifters || "",
       primaryLifters: panel.primaryLifters || "",
+      productionPdfUrl: panel.productionPdfUrl || "",
     });
     setPdfFile(null);
     setBuildDialogOpen(true);
@@ -1129,6 +1140,7 @@ export default function AdminPanelsPage() {
       concreteStrengthMpa: "",
       rotationalLifters: "",
       primaryLifters: "",
+      productionPdfUrl: "",
     });
   };
 
@@ -1158,7 +1170,23 @@ export default function AdminPanelsPage() {
     reader.onload = async (e) => {
       const base64 = (e.target?.result as string)?.split(",")[1];
       if (base64) {
-        analyzePdfMutation.mutate({ panelId: buildingPanel.id, pdfBase64: base64 });
+        try {
+          const uploadResult = await uploadPdfMutation.mutateAsync({ 
+            panelId: buildingPanel.id, 
+            pdfBase64: base64,
+            fileName: pdfFile.name 
+          });
+          if (uploadResult.objectPath) {
+            setBuildFormData((prev) => ({
+              ...prev,
+              productionPdfUrl: uploadResult.objectPath,
+            }));
+          }
+          analyzePdfMutation.mutate({ panelId: buildingPanel.id, pdfBase64: base64 });
+        } catch (error: any) {
+          toast({ title: "Error uploading PDF", description: error.message, variant: "destructive" });
+          setIsAnalyzing(false);
+        }
       }
     };
     reader.readAsDataURL(pdfFile);
@@ -3294,6 +3322,25 @@ export default function AdminPanelsPage() {
                   )}
                   {isAnalyzing ? "Analyzing PDF..." : "Analyze PDF with AI"}
                 </Button>
+              )}
+              {buildFormData.productionPdfUrl && !pdfFile && selectedPanel && (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">IFC Document Attached</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    data-testid="button-view-pdf"
+                  >
+                    <a href={ADMIN_ROUTES.PANEL_DOWNLOAD_PDF(selectedPanel.id)} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      View PDF
+                    </a>
+                  </Button>
+                </div>
               )}
             </div>
 

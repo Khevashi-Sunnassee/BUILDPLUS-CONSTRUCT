@@ -24,6 +24,7 @@ import {
   Sparkles,
   Loader2,
   CheckCircle2,
+  Download,
 } from "lucide-react";
 import {
   Dialog,
@@ -151,6 +152,7 @@ export default function ManualEntryPage() {
     concreteStrengthMpa: "",
     rotationalLifters: "",
     primaryLifters: "",
+    productionPdfUrl: "",
   });
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -405,6 +407,14 @@ export default function ManualEntryPage() {
     },
   });
 
+  // PDF Upload mutation
+  const uploadPdfMutation = useMutation({
+    mutationFn: async ({ panelId, pdfBase64, fileName }: { panelId: string; pdfBase64: string; fileName: string }) => {
+      const res = await apiRequest("POST", ADMIN_ROUTES.PANEL_UPLOAD_PDF(panelId), { pdfBase64, fileName });
+      return res.json();
+    },
+  });
+
   // PDF Analysis mutation
   const analyzePdfMutation = useMutation({
     mutationFn: async ({ panelId, pdfBase64 }: { panelId: string; pdfBase64: string }) => {
@@ -467,6 +477,7 @@ export default function ManualEntryPage() {
       concreteStrengthMpa: panel.concreteStrengthMpa || panel.day28Fc || "",
       rotationalLifters: panel.rotationalLifters || "",
       primaryLifters: panel.primaryLifters || "",
+      productionPdfUrl: panel.productionPdfUrl || "",
     });
     setPdfFile(null);
     setValidationErrors([]);
@@ -489,6 +500,7 @@ export default function ManualEntryPage() {
       concreteStrengthMpa: "",
       rotationalLifters: "",
       primaryLifters: "",
+      productionPdfUrl: "",
     });
   };
 
@@ -512,9 +524,25 @@ export default function ManualEntryPage() {
     if (!pdfFile || !productionPanel) return;
     setIsAnalyzing(true);
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const base64 = (reader.result as string).split(",")[1];
-      analyzePdfMutation.mutate({ panelId: productionPanel.id, pdfBase64: base64 });
+      try {
+        const uploadResult = await uploadPdfMutation.mutateAsync({ 
+          panelId: productionPanel.id, 
+          pdfBase64: base64,
+          fileName: pdfFile.name 
+        });
+        if (uploadResult.objectPath) {
+          setProductionFormData((prev) => ({
+            ...prev,
+            productionPdfUrl: uploadResult.objectPath,
+          }));
+        }
+        analyzePdfMutation.mutate({ panelId: productionPanel.id, pdfBase64: base64 });
+      } catch (error: any) {
+        toast({ title: "Error uploading PDF", description: error.message, variant: "destructive" });
+        setIsAnalyzing(false);
+      }
     };
     reader.readAsDataURL(pdfFile);
   };
@@ -1224,6 +1252,25 @@ export default function ManualEntryPage() {
                   )}
                   Analyze PDF with AI
                 </Button>
+              )}
+              {productionFormData.productionPdfUrl && !pdfFile && productionApprovalPanel && (
+                <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">IFC Document Attached</span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    data-testid="button-view-pdf"
+                  >
+                    <a href={ADMIN_ROUTES.PANEL_DOWNLOAD_PDF(productionApprovalPanel.id)} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      View PDF
+                    </a>
+                  </Button>
+                </div>
               )}
             </div>
 

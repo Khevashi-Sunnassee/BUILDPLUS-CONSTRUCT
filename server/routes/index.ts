@@ -29,6 +29,7 @@ import { agentRouter } from "./agent.routes";
 import { chatRouter } from "../chat/chat.routes";
 import productionScheduleRouter from "./production-schedule.routes";
 import { timerRouter } from "./timer.routes";
+import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
   interface SessionData {
@@ -95,6 +96,9 @@ export async function setupRoutes(app: Express): Promise<void> {
   
   // Chat router already exists
   app.use("/api/chat", chatRouter);
+
+  // Register object storage routes for file uploads
+  registerObjectStorageRoutes(app);
 
   // Initialize CFMEU calendar sync
   initializeCfmeuSync();

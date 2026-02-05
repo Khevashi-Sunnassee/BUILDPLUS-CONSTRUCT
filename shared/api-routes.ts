@@ -303,6 +303,8 @@ export const ADMIN_ROUTES = {
   PANELS_SOURCE_COUNTS: '/api/panels/admin/source-counts',
   PANELS_BY_SOURCE: (sourceId: string | number) => `/api/panels/admin/by-source/${sourceId}`,
   PANEL_VALIDATE: (id: string | number) => `/api/panels/admin/${id}/validate`,
+  PANEL_UPLOAD_PDF: (id: string | number) => `/api/panels/admin/${id}/upload-pdf`,
+  PANEL_DOWNLOAD_PDF: (id: string | number) => `/api/panels/admin/${id}/download-pdf`,
   PANEL_ANALYZE_PDF: (id: string | number) => `/api/panels/admin/${id}/analyze-pdf`,
   PANEL_APPROVE_PRODUCTION: (id: string | number) => `/api/panels/admin/${id}/approve-production`,
   PANEL_REVOKE_PRODUCTION: (id: string | number) => `/api/panels/admin/${id}/revoke-production`,
