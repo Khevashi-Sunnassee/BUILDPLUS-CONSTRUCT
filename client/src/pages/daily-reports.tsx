@@ -167,6 +167,7 @@ export default function DailyReportsPage() {
   });
 
   const [showAllocatedPanels, setShowAllocatedPanels] = useState(true);
+  const [showDraftingRegister, setShowDraftingRegister] = useState(true);
   const [allocatedPanelTab, setAllocatedPanelTab] = useState<"pending" | "ifc">("pending");
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
@@ -726,8 +727,18 @@ export default function DailyReportsPage() {
           <div className="flex flex-col sm:flex-row gap-4 justify-between">
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Filters</span>
+              <span className="text-sm font-medium">Drafting Register</span>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowDraftingRegister(!showDraftingRegister)}
+                data-testid="button-toggle-register"
+              >
+                {showDraftingRegister ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                {showDraftingRegister ? "Hide" : "Show"}
+              </Button>
             </div>
+            {showDraftingRegister && (
             <div className="flex flex-wrap gap-3">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -783,8 +794,10 @@ export default function DailyReportsPage() {
                 </SelectContent>
               </Select>
             </div>
+            )}
           </div>
         </CardHeader>
+        {showDraftingRegister && (
         <CardContent>
           {isLoading ? (
             <div className="space-y-3">
@@ -1074,6 +1087,7 @@ export default function DailyReportsPage() {
             </div>
           )}
         </CardContent>
+        )}
       </Card>
       </div>
 
