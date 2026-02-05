@@ -25,7 +25,7 @@ const ALLOWED_MIME_TYPES = [
 export const chatUpload = multer({
   storage: multer.memoryStorage(),
   limits: { 
-    fileSize: 10 * 1024 * 1024, // 10MB max per file
+    fileSize: 25 * 1024 * 1024, // 25MB max per file
     files: 10, // Max 10 files per request
   },
   fileFilter: (_req, file, cb) => {

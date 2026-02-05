@@ -24,7 +24,7 @@ const objectStorageService = new ObjectStorageService();
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB max per file
 });
 
 // ==================== DOCUMENT TYPES ====================
