@@ -189,12 +189,16 @@ function SortableTaskRow({
   jobs,
   onOpenSidebar,
   showCompleted,
+  isExpanded,
+  onToggleExpanded,
 }: {
   task: Task;
   users: User[];
   jobs: Job[];
   onOpenSidebar: (task: Task) => void;
   showCompleted: boolean;
+  isExpanded: boolean;
+  onToggleExpanded: () => void;
 }) {
   const {
     attributes,
@@ -223,6 +227,8 @@ function SortableTaskRow({
       sortableStyle={style}
       sortableAttributes={attributes}
       sortableListeners={listeners}
+      isExpanded={isExpanded}
+      onToggleExpanded={onToggleExpanded}
     />
   );
 }
@@ -238,6 +244,8 @@ function TaskRow({
   sortableStyle,
   sortableAttributes,
   sortableListeners,
+  isExpanded = false,
+  onToggleExpanded,
 }: {
   task: Task;
   users: User[];
@@ -249,11 +257,13 @@ function TaskRow({
   sortableStyle?: React.CSSProperties;
   sortableAttributes?: Record<string, any>;
   sortableListeners?: Record<string, any>;
+  isExpanded?: boolean;
+  onToggleExpanded?: () => void;
 }) {
   const { toast } = useToast();
   const [localTitle, setLocalTitle] = useState(task.title);
   const [localConsultant, setLocalConsultant] = useState(task.consultant || "");
-  const [showSubtasks, setShowSubtasks] = useState(false);
+  const showSubtasks = isExpanded;
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [newSubtaskAssignees, setNewSubtaskAssignees] = useState<string[]>([]);
   const [newSubtaskJobId, setNewSubtaskJobId] = useState<string | null>(null);
@@ -482,7 +492,7 @@ function TaskRow({
               variant="ghost"
               size="icon"
               className="h-5 w-5 p-0 shrink-0"
-              onClick={() => setShowSubtasks(!showSubtasks)}
+              onClick={() => onToggleExpanded?.()}
               data-testid={`btn-toggle-subtasks-${task.id}`}
             >
               {showSubtasks ? (
@@ -735,7 +745,7 @@ function TaskRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {!isSubtask && (
-              <DropdownMenuItem onClick={() => setShowSubtasks(true)} data-testid={`menu-add-subtask-${task.id}`}>
+              <DropdownMenuItem onClick={() => { if (!showSubtasks) onToggleExpanded?.(); }} data-testid={`menu-add-subtask-${task.id}`}>
                 <Plus className="h-4 w-4 mr-2" />
                 Add subtask
               </DropdownMenuItem>
@@ -1045,7 +1055,20 @@ function TaskGroupComponent({
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("default");
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const nameInputRef = useRef<HTMLInputElement>(null);
+  
+  const toggleTaskExpanded = (taskId: string) => {
+    setExpandedTaskIds(prev => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+      }
+      return next;
+    });
+  };
   
   const sortedTasks = [...group.tasks].sort((a, b) => {
     switch (sortOption) {
@@ -1252,6 +1275,8 @@ function TaskGroupComponent({
                 jobs={jobs}
                 onOpenSidebar={onOpenSidebar}
                 showCompleted={showCompleted}
+                isExpanded={expandedTaskIds.has(task.id)}
+                onToggleExpanded={() => toggleTaskExpanded(task.id)}
               />
             ))}
           </SortableContext>
