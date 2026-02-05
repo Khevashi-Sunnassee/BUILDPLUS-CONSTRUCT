@@ -195,7 +195,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
   });
 
   const { data: messages = [], isLoading: messagesLoading } = useQuery<ChatMessage[]>({
-    queryKey: [CHAT_ROUTES.CONVERSATION_MESSAGES(conversation?.id || ""), conversation?.id, "messages"],
+    queryKey: [CHAT_ROUTES.MESSAGES(conversation?.id || ""), conversation?.id, "messages"],
     enabled: !!conversation?.id,
   });
 
@@ -214,7 +214,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
       formData.append("mentionedUserIds", JSON.stringify([]));
       files.forEach((file) => formData.append("files", file));
       
-      const res = await fetch(CHAT_ROUTES.CONVERSATION_MESSAGES(conversation?.id || ""), {
+      const res = await fetch(CHAT_ROUTES.MESSAGES(conversation?.id || ""), {
         method: "POST",
         body: formData,
         credentials: "include",
@@ -226,8 +226,8 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATION_MESSAGES(conversation?.id || ""), conversation?.id, "messages"] });
-      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.PANEL_COUNTS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.MESSAGES(conversation?.id || ""), conversation?.id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.PANELS_COUNTS] });
       setMessageContent("");
       setPendingFiles([]);
     },
@@ -265,7 +265,7 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
 
   const addMembersMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
-      return apiRequest("POST", CHAT_ROUTES.CONVERSATION_MEMBERS(conversation?.id || ""), { userIds });
+      return apiRequest("POST", CHAT_ROUTES.MEMBERS(conversation?.id || ""), { userIds });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.PANEL_CONVERSATION(panelId), panelId, "conversation"] });
@@ -668,10 +668,10 @@ export default function AdminPanelsPage() {
 
   const panelIds = panels?.map(p => p.id) || [];
   const { data: panelCounts } = useQuery<Record<string, { messageCount: number; documentCount: number }>>({
-    queryKey: [CHAT_ROUTES.PANEL_COUNTS, panelIds],
+    queryKey: [CHAT_ROUTES.PANELS_COUNTS, panelIds],
     queryFn: async () => {
       if (panelIds.length === 0) return {};
-      const res = await fetch(CHAT_ROUTES.PANEL_COUNTS, {
+      const res = await fetch(CHAT_ROUTES.PANELS_COUNTS, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ panelIds }),

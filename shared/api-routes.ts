@@ -263,6 +263,7 @@ export const CHAT_ROUTES = {
   MARK_READ_CONVERSATION: (conversationId: string | number) => `/api/chat/conversations/${conversationId}/read`,
   PANELS: '/api/chat/panels',
   PANELS_COUNTS: '/api/chat/panels/counts',
+  PANEL_CONVERSATION: (panelId: string | number) => `/api/chat/panels/${panelId}/conversation`,
 } as const;
 
 // ============================================================================

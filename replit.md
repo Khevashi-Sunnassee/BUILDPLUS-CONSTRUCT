@@ -45,3 +45,63 @@ The frontend uses React + Vite, TanStack Query for data fetching, Wouter for rou
 - **Drizzle ORM**: PostgreSQL ORM.
 - **bcrypt**: Password hashing.
 - **express-session**: Session management.
+
+## Coding Standards
+
+### API Route Constants (CRITICAL)
+All API endpoints MUST use centralized route constants from `shared/api-routes.ts`. This prevents frontend/backend endpoint mismatches.
+
+**Frontend Usage:**
+```typescript
+import { ADMIN_ROUTES, PANELS_ROUTES, CHAT_ROUTES } from "@shared/api-routes";
+
+// Using route constants
+queryKey: [ADMIN_ROUTES.PANELS]
+apiRequest("POST", CHAT_ROUTES.MESSAGES(conversationId), data)
+```
+
+**Route Naming Patterns:**
+| Pattern | Use Case | Example |
+|---------|----------|---------|
+| `/api/{resource}` | Public/authenticated access | `/api/panels` |
+| `/api/{resource}/admin` | Admin CRUD on resources | `/api/panels/admin` |
+| `/api/admin/{resource}` | Admin-only resources | `/api/admin/users` |
+| `/api/{resource}/{id}/{action}` | Resource actions | `/api/panels/:id/approve-production` |
+
+**Key Route Groups:**
+- `ADMIN_ROUTES.PANELS` = `/api/panels/admin` (admin panel management)
+- `PANELS_ROUTES.LIST` = `/api/panels` (general panel access)
+- `CHAT_ROUTES.MESSAGES(id)` = `/api/chat/conversations/:id/messages`
+- `CHAT_ROUTES.PANEL_CONVERSATION(panelId)` = `/api/chat/panels/:panelId/conversation`
+
+### Frontend Conventions
+- Use TanStack Query with proper `queryKey` arrays for cache management
+- Use `apiRequest` from `@/lib/queryClient` for mutations
+- Always invalidate related queries after mutations
+- Use route constants, never hardcode API paths
+
+### Backend Conventions
+- Use `requireAuth` middleware for authenticated routes
+- Use `requireRole("ADMIN", "MANAGER")` for role-based access
+- Use `requirePermission("feature_key", "VIEW_AND_UPDATE")` for permission-based access
+- Use the `logger` from `server/lib/logger` instead of `console.log`
+
+### Project Structure
+```
+client/src/
+├── components/      # Reusable UI components
+├── pages/           # Route components
+│   └── admin/       # Admin-only pages
+├── lib/             # Utilities and hooks
+└── hooks/           # Custom React hooks
+
+server/
+├── routes/          # API route handlers
+├── chat/            # Chat-specific routes and utilities
+├── storage.ts       # Database operations interface
+└── lib/             # Utilities including logger
+
+shared/
+├── api-routes.ts    # Centralized route constants (CRITICAL)
+└── schema.ts        # Drizzle schema and types
+```
