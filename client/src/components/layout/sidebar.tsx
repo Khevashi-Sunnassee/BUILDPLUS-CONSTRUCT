@@ -88,6 +88,7 @@ const adminNavItems = [
   { title: "Factories", url: "/admin/factories", icon: Factory },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
+  { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
   { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
   { title: "Items", url: "/admin/items", icon: Package },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
@@ -121,6 +122,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/settings": "admin_settings",
   "/admin/factories": "admin_factories",
   "/admin/companies": "admin_companies",
+  "/admin/checklist-templates": "admin_checklist_templates",
   "/manager/review": "daily_reports",
 };
 
