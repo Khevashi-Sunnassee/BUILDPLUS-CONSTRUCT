@@ -587,6 +587,8 @@ export interface IStorage {
     supplierId?: string;
     purchaseOrderId?: string;
     taskId?: string;
+    conversationId?: string;
+    messageId?: string;
     showLatestOnly?: boolean;
   }): Promise<{ documents: DocumentWithDetails[]; total: number; page: number; limit: number; totalPages: number }>;
   getDocument(id: string): Promise<DocumentWithDetails | undefined>;
@@ -3868,6 +3870,8 @@ export class DatabaseStorage implements IStorage {
     supplierId?: string;
     purchaseOrderId?: string;
     taskId?: string;
+    conversationId?: string;
+    messageId?: string;
     showLatestOnly?: boolean;
   }): Promise<{ documents: DocumentWithDetails[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = filters.page || 1;
@@ -3889,6 +3893,8 @@ export class DatabaseStorage implements IStorage {
     if (filters.supplierId) conditions.push(eq(documents.supplierId, filters.supplierId));
     if (filters.purchaseOrderId) conditions.push(eq(documents.purchaseOrderId, filters.purchaseOrderId));
     if (filters.taskId) conditions.push(eq(documents.taskId, filters.taskId));
+    if (filters.conversationId) conditions.push(eq(documents.conversationId, filters.conversationId));
+    if (filters.messageId) conditions.push(eq(documents.messageId, filters.messageId));
     if (filters.showLatestOnly) conditions.push(eq(documents.isLatestVersion, true));
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

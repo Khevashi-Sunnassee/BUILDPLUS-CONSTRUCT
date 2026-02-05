@@ -18,8 +18,21 @@ import {
 import { and, eq, desc, gt, isNull, sql, inArray } from "drizzle-orm";
 import { chatUpload } from "./chat.files";
 import { extractMentionUserIds } from "./chat.utils";
+import { documentRegisterService } from "../services/document-register.service";
+import logger from "../lib/logger";
 
 export const chatRouter = Router();
+
+let chatAttachmentTypeId: string | null = null;
+async function getChatAttachmentTypeId(): Promise<string> {
+  if (chatAttachmentTypeId) return chatAttachmentTypeId;
+  chatAttachmentTypeId = await documentRegisterService.getDocumentTypeIdByPrefix("CHAT");
+  if (!chatAttachmentTypeId) {
+    logger.error("Chat attachment document type not found in database (prefix: CHAT)");
+    throw new Error("Document type 'CHAT' not configured in database");
+  }
+  return chatAttachmentTypeId;
+}
 
 function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!req.session?.userId) {
@@ -289,15 +302,41 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
 
     const files = req.files as Express.Multer.File[] | undefined;
     if (files && files.length > 0) {
+      const conv = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+      const jobId = conv[0]?.jobId || null;
+      const panelId = conv[0]?.panelId || null;
+      const typeId = await getChatAttachmentTypeId();
+      
       for (const file of files) {
-        await db.insert(chatMessageAttachments).values({
-          messageId,
-          fileName: file.originalname,
-          mimeType: file.mimetype,
-          sizeBytes: file.size,
-          storageKey: file.filename,
-          url: `/uploads/chat/${file.filename}`,
-        });
+        try {
+          const registeredDoc = await documentRegisterService.registerDocument({
+            file: {
+              buffer: file.buffer,
+              originalname: file.originalname,
+              mimetype: file.mimetype,
+              size: file.size,
+            },
+            uploadedBy: userId,
+            source: "CHAT_ATTACHMENT",
+            typeId,
+            jobId,
+            panelId,
+            conversationId,
+            messageId,
+          });
+          
+          await db.insert(chatMessageAttachments).values({
+            messageId,
+            fileName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: file.size,
+            storageKey: registeredDoc.storageKey,
+            url: `/api/documents/${registeredDoc.id}/view`,
+          });
+        } catch (err) {
+          logger.error({ err, fileName: file.originalname }, "Failed to register chat attachment");
+          throw new Error(`Failed to upload file: ${file.originalname}`);
+        }
       }
     }
 
@@ -345,17 +384,36 @@ chatRouter.post("/upload", requireAuth, requireChatPermission, chatUpload.single
 
     if (!req.file) return res.status(400).json({ error: "No file" });
 
-    const storageKey = req.file.filename;
-    const url = `/uploads/chat/${storageKey}`;
+    const conv = await db.select().from(conversations).where(eq(conversations.id, conversationId)).limit(1);
+    const jobId = conv[0]?.jobId || null;
+    const panelId = conv[0]?.panelId || null;
+    const typeId = await getChatAttachmentTypeId();
+
+    const registeredDoc = await documentRegisterService.registerDocument({
+      file: {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      },
+      uploadedBy: userId,
+      source: "CHAT_ATTACHMENT",
+      typeId,
+      jobId,
+      panelId,
+      conversationId,
+    });
 
     res.json({
-      storageKey,
-      url,
+      storageKey: registeredDoc.storageKey,
+      url: `/api/documents/${registeredDoc.id}/view`,
       fileName: req.file.originalname,
       mimeType: req.file.mimetype,
       sizeBytes: req.file.size,
+      documentId: registeredDoc.id,
     });
   } catch (e: any) {
+    logger.error({ err: e }, "Failed to upload chat file");
     res.status(400).json({ error: e.message || String(e) });
   }
 });

@@ -175,6 +175,68 @@ export const statusEnum = pgEnum("status_name", ["VALUE1", "VALUE2", "VALUE3"]);
 - Never manually write SQL migrations
 - Always check existing schema before making changes
 
+### Document Handling Standards (CRITICAL)
+All file uploads across the application MUST be registered through the centralized Document Register system.
+
+**DocumentRegisterService Usage:**
+```typescript
+import { documentRegisterService } from "../services/document-register.service";
+
+// Use prefix-based lookup for document types (cached internally)
+const typeId = await documentRegisterService.getDocumentTypeIdByPrefix("CHAT");
+
+const registeredDoc = await documentRegisterService.registerDocument({
+  file: {
+    buffer: fileBuffer,
+    originalname: fileName,
+    mimetype: mimeType,
+    size: fileSize,
+  },
+  uploadedBy: userId,
+  source: "CHAT_ATTACHMENT" | "PANEL_IFC" | "TASK_FILE" | "PO_ATTACHMENT" | "MANUAL_UPLOAD",
+  typeId,  // Use lookup, never hard-code UUIDs
+  jobId: jobId,            // Optional entity linking
+  panelId: panelId,        // Optional entity linking
+  conversationId: convId,  // Optional for chat attachments
+  messageId: msgId,        // Optional for chat attachments
+});
+```
+
+**Document Type Prefixes:**
+| Prefix | Document Type |
+|--------|---------------|
+| `CHAT` | Chat Attachment |
+| `IFC` | IFC Document |
+
+**Document Sources:**
+| Source | Use Case | Document Type |
+|--------|----------|---------------|
+| `CHAT_ATTACHMENT` | Files shared via chat | Chat Attachment (CHAT) |
+| `PANEL_IFC` | Panel IFC PDFs | IFC Document (IFC) |
+| `TASK_FILE` | Task file attachments | Varies by task |
+| `PO_ATTACHMENT` | Purchase order files | Varies |
+| `MANUAL_UPLOAD` | Document register uploads | User-selected |
+
+**Error Handling:**
+Document type lookup throws an error if the type is not found in the database. This ensures uploads fail early with a clear error rather than proceeding with null typeId. The lookup is cached per-module after the first successful call.
+
+**Entity Linking Fields:**
+Documents can be linked to multiple entities via optional foreign keys:
+- `jobId` - Link to jobs table
+- `panelId` - Link to panel register
+- `taskId` - Link to tasks table
+- `conversationId` - Link to chat conversations
+- `messageId` - Link to specific chat messages
+- `supplierId` - Link to suppliers
+- `purchaseOrderId` - Link to purchase orders
+
+**Benefits:**
+- Centralized audit trail for all documents
+- Version control support
+- Entity-linked document searching
+- Consistent object storage handling
+- Document bundles with QR code sharing
+
 ### Testing & Validation
 - Test all CRUD operations via API endpoints
 - Verify frontend/backend route alignment
@@ -194,6 +256,7 @@ client/src/
 server/
 ├── routes/          # API route handlers (*.routes.ts)
 ├── chat/            # Chat-specific routes and utilities
+├── services/        # Business logic services (DocumentRegisterService, etc.)
 ├── middleware/      # Auth, role, permission middleware
 ├── storage.ts       # Database operations interface
 └── lib/             # Utilities (logger)

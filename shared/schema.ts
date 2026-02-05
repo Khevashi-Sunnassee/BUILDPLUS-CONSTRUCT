@@ -1571,6 +1571,8 @@ export const documents = pgTable("documents", {
   supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
   purchaseOrderId: varchar("purchase_order_id", { length: 36 }).references(() => purchaseOrders.id),
   taskId: varchar("task_id", { length: 36 }).references(() => tasks.id),
+  conversationId: varchar("conversation_id", { length: 36 }).references(() => conversations.id),
+  messageId: varchar("message_id", { length: 36 }).references(() => chatMessages.id),
   
   // User tracking
   uploadedBy: varchar("uploaded_by", { length: 36 }).notNull().references(() => users.id),
@@ -1594,6 +1596,8 @@ export const documents = pgTable("documents", {
   supplierIdx: index("documents_supplier_idx").on(table.supplierId),
   poIdx: index("documents_po_idx").on(table.purchaseOrderId),
   taskIdx: index("documents_task_idx").on(table.taskId),
+  conversationIdx: index("documents_conversation_idx").on(table.conversationId),
+  messageIdx: index("documents_message_idx").on(table.messageId),
   uploadedByIdx: index("documents_uploaded_by_idx").on(table.uploadedBy),
   latestVersionIdx: index("documents_latest_version_idx").on(table.isLatestVersion),
   parentDocIdx: index("documents_parent_doc_idx").on(table.parentDocumentId),

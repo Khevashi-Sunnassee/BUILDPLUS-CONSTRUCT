@@ -3,9 +3,21 @@ import { storage } from "../storage";
 import { requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
+import { documentRegisterService } from "../services/document-register.service";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
+
+let ifcDocumentTypeId: string | null = null;
+async function getIfcDocumentTypeId(): Promise<string> {
+  if (ifcDocumentTypeId) return ifcDocumentTypeId;
+  ifcDocumentTypeId = await documentRegisterService.getDocumentTypeIdByPrefix("IFC");
+  if (!ifcDocumentTypeId) {
+    logger.error("IFC document type not found in database (prefix: IFC)");
+    throw new Error("Document type 'IFC' not configured in database");
+  }
+  return ifcDocumentTypeId;
+}
 
 router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
@@ -21,36 +33,35 @@ router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"),
       return res.status(404).json({ error: "Panel not found" });
     }
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-
     const pdfBuffer = Buffer.from(pdfBase64, "base64");
+    const pdfFileName = fileName || `${panel.panelMark}_IFC.pdf`;
+    const typeId = await getIfcDocumentTypeId();
 
-    const uploadResponse = await fetch(uploadURL, {
-      method: "PUT",
-      body: pdfBuffer,
-      headers: {
-        "Content-Type": "application/pdf",
+    const registeredDoc = await documentRegisterService.registerDocument({
+      file: {
+        buffer: pdfBuffer,
+        originalname: pdfFileName,
+        mimetype: "application/pdf",
+        size: pdfBuffer.length,
       },
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error("Failed to upload PDF to storage");
-    }
-
-    await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
-      owner: req.session.userId!,
-      visibility: "private",
+      uploadedBy: req.session.userId!,
+      source: "PANEL_IFC",
+      title: `IFC: ${panel.panelMark}`,
+      typeId,
+      jobId: panel.jobId,
+      panelId: id as string,
+      status: "APPROVED",
     });
 
     await storage.updatePanelRegisterItem(id as string, {
-      productionPdfUrl: objectPath,
+      productionPdfUrl: registeredDoc.storageKey,
     });
 
     res.json({
       success: true,
-      objectPath,
-      fileName: fileName || `${panel.panelMark}_IFC.pdf`,
+      objectPath: registeredDoc.storageKey,
+      fileName: pdfFileName,
+      documentId: registeredDoc.id,
     });
   } catch (error: any) {
     logger.error({ err: error }, "PDF upload error");
@@ -74,19 +85,12 @@ router.get("/api/panels/admin/:id/download-pdf", requireRole("ADMIN", "MANAGER")
       return res.status(404).json({ error: "No PDF attached to this panel" });
     }
 
-    const objectPath = panel.productionPdfUrl;
-    const downloadUrl = await objectStorageService.getObjectEntityDownloadURL(objectPath);
-    
-    const response = await fetch(downloadUrl);
-    if (!response.ok) {
-      throw new Error("Failed to retrieve PDF from storage");
-    }
-
-    const pdfBuffer = await response.arrayBuffer();
+    const objectFile = await objectStorageService.getObjectEntityFile(panel.productionPdfUrl);
     
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${panel.panelMark}_IFC.pdf"`);
-    res.send(Buffer.from(pdfBuffer));
+    
+    objectFile.createReadStream().pipe(res);
   } catch (error: any) {
     logger.error({ err: error }, "PDF download error");
     res.status(500).json({
