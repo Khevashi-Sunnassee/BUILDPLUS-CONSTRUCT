@@ -545,27 +545,34 @@ export default function DailyReportsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <div className="text-sm text-muted-foreground">Panels Allocated</div>
-                  <div className="text-2xl font-bold" data-testid="text-total-allocated">{allocatedData.stats.total}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">Completed</div>
-                  <div className="text-2xl font-bold text-green-600" data-testid="text-completed-count">{allocatedData.stats.completed}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">In Progress</div>
-                  <div className="text-2xl font-bold text-amber-500" data-testid="text-in-progress-count">{allocatedData.stats.inProgress}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-muted-foreground">Hours Spent</div>
-                  <div className="text-2xl font-bold" data-testid="text-hours-spent">{allocatedData.stats.totalActualHours.toFixed(1)}h</div>
-                  {allocatedData.stats.totalEstimatedHours > 0 && (
-                    <div className="text-xs text-muted-foreground">of {allocatedData.stats.totalEstimatedHours.toFixed(1)}h estimated</div>
-                  )}
-                </div>
-              </div>
+              {(() => {
+                const ifcCount = allocatedData.programs.filter(p => 
+                  p.panel?.documentStatus === "IFC" || p.panel?.documentStatus === "APPROVED"
+                ).length;
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <div className="text-sm text-muted-foreground">Panels Allocated</div>
+                      <div className="text-2xl font-bold" data-testid="text-total-allocated">{allocatedData.stats.total}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">IFC</div>
+                      <div className="text-2xl font-bold text-green-600" data-testid="text-ifc-count">{ifcCount}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">In Progress</div>
+                      <div className="text-2xl font-bold text-amber-500" data-testid="text-in-progress-count">{allocatedData.stats.inProgress}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm text-muted-foreground">Hours Spent</div>
+                      <div className="text-2xl font-bold" data-testid="text-hours-spent">{allocatedData.stats.totalActualHours.toFixed(1)}h</div>
+                      {allocatedData.stats.totalEstimatedHours > 0 && (
+                        <div className="text-xs text-muted-foreground">of {allocatedData.stats.totalEstimatedHours.toFixed(1)}h estimated</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
 
