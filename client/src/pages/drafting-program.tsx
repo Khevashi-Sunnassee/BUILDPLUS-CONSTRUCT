@@ -435,6 +435,7 @@ export default function DraftingProgramPage() {
                   <TableHead>Panel</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Level</TableHead>
+                  <TableHead>Drawing Status</TableHead>
                   <TableHead>Drafting Window</TableHead>
                   <TableHead>Drawing Due</TableHead>
                   <TableHead>Production Date</TableHead>
@@ -445,17 +446,27 @@ export default function DraftingProgramPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPrograms.map((entry) => (
-                  <TableRow 
-                    key={entry.id}
-                    style={entry.job.productionSlotColor ? { 
-                      backgroundColor: `${entry.job.productionSlotColor}15`,
-                      borderLeft: `4px solid ${entry.job.productionSlotColor}` 
-                    } : undefined}
-                  >
+                {filteredPrograms.map((entry) => {
+                  const isIfc = entry.panel.documentStatus === "IFC" || entry.panel.documentStatus === "APPROVED";
+                  return (
+                    <TableRow 
+                      key={entry.id}
+                      style={isIfc ? { 
+                        backgroundColor: "rgba(34, 197, 94, 0.15)",
+                        borderLeft: "4px solid #22c55e"
+                      } : entry.job.productionSlotColor ? { 
+                        backgroundColor: `${entry.job.productionSlotColor}15`,
+                        borderLeft: `4px solid ${entry.job.productionSlotColor}` 
+                      } : undefined}
+                    >
                     <TableCell className="font-medium">{entry.panel.panelMark}</TableCell>
                     <TableCell>{entry.job.jobNumber}</TableCell>
                     <TableCell>{entry.level}</TableCell>
+                    <TableCell>
+                      <Badge variant={isIfc ? "default" : "secondary"} className={isIfc ? "bg-green-600" : ""}>
+                        {entry.panel.documentStatus || "DRAFT"}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
                     </TableCell>
@@ -518,7 +529,8 @@ export default function DraftingProgramPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -565,6 +577,7 @@ export default function DraftingProgramPage() {
                           <TableHead>Panel</TableHead>
                           <TableHead>Job</TableHead>
                           <TableHead>Level</TableHead>
+                          <TableHead>Drawing Status</TableHead>
                           <TableHead>Drafting Window</TableHead>
                           <TableHead>Drawing Due</TableHead>
                           <TableHead>Production Date</TableHead>
@@ -575,80 +588,91 @@ export default function DraftingProgramPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {group.entries.map((entry) => (
-                          <TableRow 
-                            key={entry.id}
-                            style={entry.job.productionSlotColor ? { 
-                              backgroundColor: `${entry.job.productionSlotColor}15`,
-                              borderLeft: `4px solid ${entry.job.productionSlotColor}` 
-                            } : undefined}
-                          >
-                            <TableCell className="font-medium">{entry.panel.panelMark}</TableCell>
-                            <TableCell>{entry.job.jobNumber}</TableCell>
-                            <TableCell>{entry.level}</TableCell>
-                            <TableCell>
-                              {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
-                            </TableCell>
-                            <TableCell className={getDateColorClass(entry.drawingDueDate ? new Date(entry.drawingDueDate) : null)}>
-                              {entry.drawingDueDate ? format(new Date(entry.drawingDueDate), "dd/MM/yyyy") : "-"}
-                            </TableCell>
-                            <TableCell>
-                              {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
-                            </TableCell>
-                            <TableCell>
-                              {entry.proposedStartDate ? format(new Date(entry.proposedStartDate), "dd/MM/yyyy") : "-"}
-                            </TableCell>
-                            <TableCell>
-                              {entry.assignedTo ? (
-                                <span className="flex items-center gap-1">
-                                  <User className="h-3 w-3" />
-                                  {entry.assignedTo.name || entry.assignedTo.email}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">Unassigned</span>
-                              )}
-                            </TableCell>
-                            <TableCell>{getStatusBadge(entry.status)}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                {isManagerOrAdmin && (
-                                  <>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => openAssignDialog(entry)}
-                                          data-testid={`button-assign-${entry.id}`}
-                                        >
-                                          <User className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Assign a drafter to this panel</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => openUpdateStatusDialog(entry)}
-                                          data-testid={`button-status-${entry.id}`}
-                                        >
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Update drafting status</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </>
+                        {group.entries.map((entry) => {
+                          const isIfc = entry.panel.documentStatus === "IFC" || entry.panel.documentStatus === "APPROVED";
+                          return (
+                            <TableRow 
+                              key={entry.id}
+                              style={isIfc ? { 
+                                backgroundColor: "rgba(34, 197, 94, 0.15)",
+                                borderLeft: "4px solid #22c55e"
+                              } : entry.job.productionSlotColor ? { 
+                                backgroundColor: `${entry.job.productionSlotColor}15`,
+                                borderLeft: `4px solid ${entry.job.productionSlotColor}` 
+                              } : undefined}
+                            >
+                              <TableCell className="font-medium">{entry.panel.panelMark}</TableCell>
+                              <TableCell>{entry.job.jobNumber}</TableCell>
+                              <TableCell>{entry.level}</TableCell>
+                              <TableCell>
+                                <Badge variant={isIfc ? "default" : "secondary"} className={isIfc ? "bg-green-600" : ""}>
+                                  {entry.panel.documentStatus || "DRAFT"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                {entry.draftingWindowStart ? format(new Date(entry.draftingWindowStart), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell className={getDateColorClass(entry.drawingDueDate ? new Date(entry.drawingDueDate) : null)}>
+                                {entry.drawingDueDate ? format(new Date(entry.drawingDueDate), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                {entry.productionDate ? format(new Date(entry.productionDate), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                {entry.proposedStartDate ? format(new Date(entry.proposedStartDate), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell>
+                                {entry.assignedTo ? (
+                                  <span className="flex items-center gap-1">
+                                    <User className="h-3 w-3" />
+                                    {entry.assignedTo.name || entry.assignedTo.email}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">Unassigned</span>
                                 )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                              </TableCell>
+                              <TableCell>{getStatusBadge(entry.status)}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {isManagerOrAdmin && (
+                                    <>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => openAssignDialog(entry)}
+                                            data-testid={`button-assign-${entry.id}`}
+                                          >
+                                            <User className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Assign a drafter to this panel</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={() => openUpdateStatusDialog(entry)}
+                                            data-testid={`button-status-${entry.id}`}
+                                          >
+                                            <Pencil className="h-4 w-4" />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Update drafting status</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </>
+                                  )}
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </CardContent>
