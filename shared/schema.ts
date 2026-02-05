@@ -1672,7 +1672,7 @@ export type MemberRole = "OWNER" | "ADMIN" | "MEMBER";
 
 // ==================== DOCUMENT MANAGEMENT SYSTEM ====================
 
-export const docMgmtStatusEnum = pgEnum("doc_mgmt_status", ["DRAFT", "REVIEW", "APPROVED", "SUPERSEDED", "ARCHIVED"]);
+export const docMgmtStatusEnum = pgEnum("doc_mgmt_status", ["PRELIM", "IFA", "IFC", "DRAFT", "REVIEW", "APPROVED", "SUPERSEDED", "ARCHIVED"]);
 
 // Document Types - Configurable types with prefix for auto-numbering
 export const documentTypesConfig = pgTable("document_types_config", {

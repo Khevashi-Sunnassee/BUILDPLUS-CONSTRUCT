@@ -438,6 +438,10 @@ export const DOCUMENT_ROUTES = {
   NEXT_NUMBER: '/api/documents/next-number',
   ANALYZE_VERSION: '/api/documents/analyze-version',
   
+  // Panel Documents (mini register)
+  PANEL_DOCUMENTS: (panelId: string) => `/api/panels/${panelId}/documents`,
+  PANEL_DOCUMENT_UPLOAD: (panelId: string) => `/api/panels/${panelId}/documents/upload`,
+  
   // Document Types
   TYPES: '/api/document-types',
   TYPES_ACTIVE: '/api/document-types/active',
