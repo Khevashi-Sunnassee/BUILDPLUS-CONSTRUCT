@@ -6,6 +6,7 @@ import {
   Star,
   Camera,
   Upload,
+  X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -218,15 +219,30 @@ export function YesNoNaField({ field, value, onChange, disabled }: FieldRenderer
 
 export function ConditionField({ field, value, onChange, disabled }: FieldRendererProps) {
   const currentValue = value as string | null;
-  const conditions = [
+  const defaultConditions = [
     { value: "good", label: "Good", variant: "default" as const },
     { value: "fair", label: "Fair", variant: "secondary" as const },
     { value: "poor", label: "Poor", variant: "destructive" as const },
     { value: "na", label: "N/A", variant: "outline" as const },
   ];
 
+  const variantMap: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    good: "default",
+    fair: "secondary",
+    poor: "destructive",
+    na: "outline",
+  };
+
+  const conditions = (field.options && field.options.length > 0)
+    ? field.options.map((opt, idx) => ({
+        value: opt.value,
+        label: opt.text || opt.value,
+        variant: (variantMap[opt.value] || (idx === 0 ? "default" : idx < field.options!.length - 1 ? "secondary" : "outline")) as "default" | "secondary" | "destructive" | "outline",
+      }))
+    : defaultConditions;
+
   return (
-    <div className="flex items-center gap-2" data-testid={`field-condition-${field.id}`}>
+    <div className="flex items-center gap-2 flex-wrap" data-testid={`field-condition-${field.id}`}>
       {conditions.map((condition) => (
         <Button
           key={condition.value}
@@ -442,6 +458,142 @@ export function PhotoField({ field, value, onChange, disabled }: FieldRendererPr
   );
 }
 
+export function MultiPhotoField({ field, value, onChange, disabled }: FieldRendererProps) {
+  const photos = (value as Array<{ filename: string; base64: string; type: string }>) || [];
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        const newPhoto = { filename: file.name, base64, type: file.type };
+        onChange([...photos, newPhoto]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    onChange(photos.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-2" data-testid={`field-multiphoto-${field.id}`}>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((photo, index) => (
+          <div key={index} className="relative w-24 h-24">
+            <img src={photo.base64} alt={photo.filename} className="w-full h-full object-cover rounded-md" />
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              className="absolute -top-2 -right-2"
+              onClick={() => removePhoto(index)}
+              disabled={disabled}
+              data-testid={`button-remove-photo-${field.id}-${index}`}
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          </div>
+        ))}
+        <label className={cn(
+          "flex flex-col items-center justify-center w-24 h-24 border-2 border-dashed rounded-md cursor-pointer hover:bg-muted/50",
+          disabled && "opacity-50 cursor-not-allowed"
+        )}>
+          <Camera className="h-6 w-6 text-muted-foreground mb-1" />
+          <span className="text-xs text-muted-foreground">Add</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={disabled}
+            data-testid={`input-multiphoto-${field.id}`}
+          />
+        </label>
+      </div>
+      {photos.length > 0 && (
+        <p className="text-xs text-muted-foreground">{photos.length} photo{photos.length !== 1 ? "s" : ""} added</p>
+      )}
+    </div>
+  );
+}
+
+export function ProgressBarField({ field, value, onChange, disabled }: FieldRendererProps) {
+  const currentValue = (value as number) ?? 0;
+  const min = field.min ?? 0;
+  const max = field.max ?? 100;
+
+  return (
+    <div className="space-y-2" data-testid={`field-progress-${field.id}`}>
+      <div className="flex items-center gap-3">
+        <Input
+          type="range"
+          min={min}
+          max={max}
+          value={currentValue}
+          onChange={(e) => onChange(Number(e.target.value))}
+          disabled={disabled}
+          className="flex-1"
+        />
+        <span className="text-sm font-medium w-12 text-right">{currentValue}%</span>
+      </div>
+      <div className="w-full bg-muted rounded-full h-2">
+        <div
+          className="bg-primary rounded-full h-2 transition-all"
+          style={{ width: `${max === min ? 0 : Math.min(100, Math.max(0, ((currentValue - min) / (max - min)) * 100))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function MeasurementField({ field, value, onChange, disabled }: FieldRendererProps) {
+  const measurementValue = (value as { amount: number | null; unit: string }) || { amount: null, unit: "" };
+
+  return (
+    <div className="flex items-center gap-2" data-testid={`field-measurement-${field.id}`}>
+      <Input
+        type="number"
+        placeholder="Value"
+        value={measurementValue.amount ?? ""}
+        onChange={(e) => onChange({
+          ...measurementValue,
+          amount: e.target.value ? Number(e.target.value) : null,
+        })}
+        disabled={disabled}
+        min={field.min ?? undefined}
+        max={field.max ?? undefined}
+        step={field.step ?? undefined}
+        className="flex-1"
+      />
+      <Select
+        value={measurementValue.unit || ""}
+        onValueChange={(unit) => onChange({ ...measurementValue, unit })}
+        disabled={disabled}
+      >
+        <SelectTrigger className="w-24">
+          <SelectValue placeholder="Unit" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="mm">mm</SelectItem>
+          <SelectItem value="cm">cm</SelectItem>
+          <SelectItem value="m">m</SelectItem>
+          <SelectItem value="in">in</SelectItem>
+          <SelectItem value="ft">ft</SelectItem>
+          <SelectItem value="kg">kg</SelectItem>
+          <SelectItem value="t">t</SelectItem>
+          <SelectItem value="L">L</SelectItem>
+          <SelectItem value="m3">m³</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export function FileUploadField({ field, value, onChange, disabled }: FieldRendererProps) {
   const fileInfo = value as { filename: string } | null;
 
@@ -591,12 +743,17 @@ export function renderField(field: ChecklistField, value: unknown, onChange: (va
     case "rating_scale":
       return <RatingField {...props} />;
     case "photo_required":
-    case "multi_photo":
       return <PhotoField {...props} />;
+    case "multi_photo":
+      return <MultiPhotoField {...props} />;
     case "file_upload":
       return <FileUploadField {...props} />;
     case "signature_field":
       return <SignatureField {...props} />;
+    case "progress_bar":
+      return <ProgressBarField {...props} />;
+    case "measurement_field":
+      return <MeasurementField {...props} />;
     case "job_selector":
     case "customer_selector":
     case "supplier_selector":

@@ -36,6 +36,8 @@ import {
   ListChecks,
   AlertCircle,
   X,
+  Ruler,
+  BarChart3,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -66,7 +68,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -128,6 +132,8 @@ const FIELD_TYPE_CONFIG: Record<
   multi_photo: { label: "Multi Photo", icon: Images, category: "Media", description: "Multiple photos" },
   file_upload: { label: "File Upload", icon: FileUp, category: "Media", description: "File attachment" },
   signature_field: { label: "Signature", icon: PenTool, category: "Media", description: "Digital signature" },
+  progress_bar: { label: "Progress Bar", icon: BarChart3, category: "Selection", description: "Progress tracking" },
+  measurement_field: { label: "Measurement", icon: Ruler, category: "Financial", description: "Measurement with units" },
 };
 
 const FIELD_CATEGORIES = ["Basic", "Quality", "DateTime", "Financial", "Selector", "Selection", "Media"];
@@ -435,11 +441,20 @@ export default function TemplateEditorPage() {
       required: false,
     };
 
-    if (["radio_button", "dropdown", "checkbox"].includes(fieldType)) {
-      newField.options = [
-        { text: "Option 1", value: "option_1" },
-        { text: "Option 2", value: "option_2" },
-      ];
+    if (["radio_button", "dropdown", "checkbox", "condition_option"].includes(fieldType)) {
+      if (fieldType === "condition_option") {
+        newField.options = [
+          { text: "Good", value: "good" },
+          { text: "Fair", value: "fair" },
+          { text: "Poor", value: "poor" },
+          { text: "N/A", value: "na" },
+        ];
+      } else {
+        newField.options = [
+          { text: "Option 1", value: "option_1" },
+          { text: "Option 2", value: "option_2" },
+        ];
+      }
     }
 
     setSections((prev) =>
@@ -473,7 +488,7 @@ export default function TemplateEditorPage() {
   };
 
   const fieldTypeRequiresOptions = (type: string) => {
-    return ["radio_button", "dropdown", "checkbox"].includes(type);
+    return ["radio_button", "dropdown", "checkbox", "condition_option"].includes(type);
   };
 
   if (isLoading) {
@@ -887,10 +902,8 @@ export default function TemplateEditorPage() {
                       </FormControl>
                       <SelectContent>
                         {FIELD_CATEGORIES.map((category) => (
-                          <div key={category}>
-                            <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                              {category}
-                            </div>
+                          <SelectGroup key={category}>
+                            <SelectLabel>{category}</SelectLabel>
                             {Object.entries(FIELD_TYPE_CONFIG)
                               .filter(([, config]) => config.category === category)
                               .map(([type, config]) => (
@@ -898,7 +911,7 @@ export default function TemplateEditorPage() {
                                   {config.label}
                                 </SelectItem>
                               ))}
-                          </div>
+                          </SelectGroup>
                         ))}
                       </SelectContent>
                     </Select>
@@ -984,7 +997,7 @@ export default function TemplateEditorPage() {
                 </div>
               )}
 
-              {["number_field", "rating_scale"].includes(fieldForm.watch("type")) && (
+              {["number_field", "rating_scale", "percentage_field", "amount_field", "measurement_field", "progress_bar"].includes(fieldForm.watch("type")) && (
                 <div className="grid grid-cols-3 gap-4">
                   <FormField
                     control={fieldForm.control}

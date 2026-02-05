@@ -37,14 +37,19 @@ const LEGACY_TYPE_MAP: Record<string, ChecklistFieldType> = {
   radio: "radio_button",
   date: "date_field",
   time: "time_field",
+  datetime: "datetime_field",
   amount: "amount_field",
   percentage: "percentage_field",
   priority: "priority_level",
   rating: "rating_scale",
   photo: "photo_required",
+  multi_photo: "multi_photo",
   signature: "signature_field",
   condition: "condition_option",
   inspection: "inspection_check",
+  file_upload: "file_upload",
+  progress: "progress_bar",
+  measurement: "measurement_field",
 };
 
 function normalizeFieldType(rawType: string | undefined): ChecklistFieldType {
