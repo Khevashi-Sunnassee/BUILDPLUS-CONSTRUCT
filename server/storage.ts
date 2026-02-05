@@ -3291,13 +3291,19 @@ export class DatabaseStorage implements IStorage {
         .from(taskFiles)
         .where(eq(taskFiles.taskId, subtask.id));
 
+      let subtaskCreatedBy: User | null = null;
+      if (subtask.createdById) {
+        const [creator] = await db.select().from(users).where(eq(users.id, subtask.createdById));
+        subtaskCreatedBy = creator || null;
+      }
+
       subtasksWithDetails.push({
         ...subtask,
         assignees: subtaskAssignees,
         subtasks: [], // Subtasks don't have their own subtasks (only one level)
         updatesCount: Number(subtaskUpdatesCount?.count || 0),
         filesCount: Number(subtaskFilesCount?.count || 0),
-        createdBy: null,
+        createdBy: subtaskCreatedBy,
         job: subtaskJob,
       });
     }

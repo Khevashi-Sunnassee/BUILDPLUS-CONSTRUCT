@@ -690,7 +690,7 @@ function TaskRow({
         (task.subtasks || []).map((subtask) => (
           <TaskRow
             key={subtask.id}
-            task={subtask as any}
+            task={subtask}
             users={users}
             jobs={jobs}
             isSubtask

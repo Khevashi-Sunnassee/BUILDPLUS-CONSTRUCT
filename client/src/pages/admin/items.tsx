@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,11 @@ import {
   Save,
   Loader2,
   Upload,
+  ChevronDown,
+  ChevronRight,
+  Search,
+  X,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +67,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { Item, ItemCategory, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 
@@ -92,25 +102,241 @@ const UNIT_OF_MEASURE_OPTIONS = [
   { value: "DAY", label: "Day" },
 ];
 
+interface CategoryGroup {
+  category: ItemCategory | null;
+  items: Item[];
+}
+
+function CategoryPanel({
+  group,
+  isOpen,
+  onToggle,
+  categories,
+  suppliers,
+  onEdit,
+  onDelete,
+}: {
+  group: CategoryGroup;
+  isOpen: boolean;
+  onToggle: () => void;
+  categories: ItemCategory[] | undefined;
+  suppliers: Supplier[] | undefined;
+  onEdit: (item: Item) => void;
+  onDelete: (itemId: string) => void;
+}) {
+  const getSupplierName = (supplierId: string | null) => {
+    if (!supplierId) return "-";
+    const supplier = suppliers?.find(s => s.id === supplierId);
+    return supplier?.name || "-";
+  };
+
+  const categoryName = group.category?.name || "Uncategorized";
+  const categoryId = group.category?.id || "uncategorized";
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={onToggle}>
+      <div className="border rounded-lg overflow-hidden">
+        <CollapsibleTrigger asChild>
+          <button
+            className="w-full flex items-center justify-between p-3 bg-muted/50 hover-elevate text-left"
+            data-testid={`category-header-${categoryId}`}
+          >
+            <div className="flex items-center gap-3">
+              {isOpen ? (
+                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              ) : (
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              )}
+              <span className="font-medium">{categoryName}</span>
+              <Badge variant="secondary" className="text-xs">
+                {group.items.length} item{group.items.length !== 1 ? "s" : ""}
+              </Badge>
+            </div>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-24">Code</TableHead>
+                <TableHead>Name</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead className="text-right w-28">Unit Price</TableHead>
+                <TableHead className="text-right w-20">Min Qty</TableHead>
+                <TableHead className="w-24">Status</TableHead>
+                <TableHead className="text-right w-20">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {group.items.map((item) => (
+                <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
+                  <TableCell className="font-mono text-sm" data-testid={`text-item-code-${item.id}`}>
+                    {item.code || "-"}
+                  </TableCell>
+                  <TableCell className="font-medium" data-testid={`text-item-name-${item.id}`}>
+                    {item.name}
+                  </TableCell>
+                  <TableCell data-testid={`text-item-supplier-${item.id}`}>
+                    {getSupplierName(item.supplierId)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>
+                    {item.unitPrice ? `$${Number(item.unitPrice).toFixed(2)}` : "-"}
+                  </TableCell>
+                  <TableCell className="text-right" data-testid={`text-item-minqty-${item.id}`}>
+                    {item.minOrderQty || 1}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={item.isActive ? "default" : "secondary"} data-testid={`badge-item-status-${item.id}`}>
+                      {item.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onEdit(item)}
+                        data-testid={`button-edit-item-${item.id}`}
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => onDelete(item.id)}
+                        data-testid={`button-delete-item-${item.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+}
+
 export default function AdminItemsPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: [PROCUREMENT_ROUTES.ITEMS],
   });
 
-  const { data: categories } = useQuery<ItemCategory[]>({
+  const { data: allCategories } = useQuery<ItemCategory[]>({
+    queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES],
+  });
+
+  const { data: activeCategories } = useQuery<ItemCategory[]>({
     queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES_ACTIVE],
   });
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
   });
+
+  const filteredItems = useMemo(() => {
+    if (!items) return [];
+    
+    return items.filter(item => {
+      const matchesSearch = searchQuery === "" || 
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.code && item.code.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesCategory = filterCategory === "all" || 
+        (filterCategory === "uncategorized" ? !item.categoryId : item.categoryId === filterCategory);
+      
+      const matchesStatus = filterStatus === "all" ||
+        (filterStatus === "active" ? item.isActive : !item.isActive);
+      
+      return matchesSearch && matchesCategory && matchesStatus;
+    });
+  }, [items, searchQuery, filterCategory, filterStatus]);
+
+  const groupedItems = useMemo(() => {
+    const groups: CategoryGroup[] = [];
+    const categoryMap = new Map<string | null, Item[]>();
+    const usedCategoryIds = new Set<string>();
+    
+    filteredItems.forEach(item => {
+      const key = item.categoryId || null;
+      if (!categoryMap.has(key)) {
+        categoryMap.set(key, []);
+      }
+      categoryMap.get(key)!.push(item);
+    });
+
+    const sortedCategories = allCategories?.slice().sort((a, b) => a.name.localeCompare(b.name)) || [];
+    
+    sortedCategories.forEach(category => {
+      const categoryItems = categoryMap.get(category.id);
+      if (categoryItems && categoryItems.length > 0) {
+        groups.push({
+          category,
+          items: categoryItems.sort((a, b) => a.name.localeCompare(b.name)),
+        });
+        usedCategoryIds.add(category.id);
+      }
+    });
+
+    categoryMap.forEach((categoryItems, categoryId) => {
+      if (categoryId !== null && !usedCategoryIds.has(categoryId) && categoryItems.length > 0) {
+        groups.push({
+          category: { id: categoryId, name: `Unknown Category (${categoryId.substring(0, 8)}...)`, isActive: false, createdAt: new Date() } as ItemCategory,
+          items: categoryItems.sort((a, b) => a.name.localeCompare(b.name)),
+        });
+      }
+    });
+
+    const uncategorizedItems = categoryMap.get(null);
+    if (uncategorizedItems && uncategorizedItems.length > 0) {
+      groups.push({
+        category: null,
+        items: uncategorizedItems.sort((a, b) => a.name.localeCompare(b.name)),
+      });
+    }
+
+    return groups;
+  }, [filteredItems, allCategories]);
+
+  const toggleCategory = (categoryId: string | null) => {
+    const key = categoryId || "uncategorized";
+    setOpenCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    const allKeys = new Set<string>();
+    groupedItems.forEach(group => {
+      allKeys.add(group.category?.id || "uncategorized");
+    });
+    setOpenCategories(allKeys);
+  };
+
+  const collapseAll = () => {
+    setOpenCategories(new Set());
+  };
 
   const form = useForm<ItemFormData>({
     resolver: zodResolver(itemSchema),
@@ -232,18 +458,6 @@ export default function AdminItemsPage() {
     }
   };
 
-  const getCategoryName = (categoryId: string | null) => {
-    if (!categoryId) return "-";
-    const category = categories?.find(c => c.id === categoryId);
-    return category?.name || "-";
-  };
-
-  const getSupplierName = (supplierId: string | null) => {
-    if (!supplierId) return "-";
-    const supplier = suppliers?.find(s => s.id === supplierId);
-    return supplier?.name || "-";
-  };
-
   const openCreateDialog = () => {
     setEditingItem(null);
     form.reset({
@@ -285,6 +499,14 @@ export default function AdminItemsPage() {
       createMutation.mutate(data);
     }
   };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setFilterCategory("all");
+    setFilterStatus("all");
+  };
+
+  const hasActiveFilters = searchQuery !== "" || filterCategory !== "all" || filterStatus !== "all";
 
   if (isLoading) {
     return (
@@ -332,88 +554,111 @@ export default function AdminItemsPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5" />
-            Items
-          </CardTitle>
-          <CardDescription>
-            {items?.length || 0} item{items?.length !== 1 ? "s" : ""} in catalog
-          </CardDescription>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Items
+              </CardTitle>
+              <CardDescription>
+                {filteredItems.length} of {items?.length || 0} item{items?.length !== 1 ? "s" : ""} shown
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={expandAll} data-testid="button-expand-all">
+                Expand All
+              </Button>
+              <Button variant="outline" size="sm" onClick={collapseAll} data-testid="button-collapse-all">
+                Collapse All
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 mt-4 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search items..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-items"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="w-[180px]" data-testid="select-filter-category">
+                  <SelectValue placeholder="Category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="uncategorized">Uncategorized</SelectItem>
+                  {allCategories?.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}{!category.isActive ? " (Inactive)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="w-[120px]" data-testid="select-filter-status">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="button-clear-filters">
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {items && items.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Supplier</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Min Qty</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
-                    <TableCell className="font-mono text-sm" data-testid={`text-item-code-${item.id}`}>
-                      {item.code || "-"}
-                    </TableCell>
-                    <TableCell className="font-medium" data-testid={`text-item-name-${item.id}`}>
-                      {item.name}
-                    </TableCell>
-                    <TableCell data-testid={`text-item-category-${item.id}`}>
-                      {getCategoryName(item.categoryId)}
-                    </TableCell>
-                    <TableCell data-testid={`text-item-supplier-${item.id}`}>
-                      {getSupplierName(item.supplierId)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>
-                      {item.unitPrice ? `$${Number(item.unitPrice).toFixed(2)}` : "-"}
-                    </TableCell>
-                    <TableCell className="text-right" data-testid={`text-item-minqty-${item.id}`}>
-                      {item.minOrderQty || 1}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={item.isActive ? "default" : "secondary"} data-testid={`badge-item-status-${item.id}`}>
-                        {item.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(item)}
-                          data-testid={`button-edit-item-${item.id}`}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setDeletingItemId(item.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          data-testid={`button-delete-item-${item.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          {groupedItems.length > 0 ? (
+            <div className="space-y-3">
+              {groupedItems.map((group) => (
+                <CategoryPanel
+                  key={group.category?.id || "uncategorized"}
+                  group={group}
+                  isOpen={openCategories.has(group.category?.id || "uncategorized")}
+                  onToggle={() => toggleCategory(group.category?.id || null)}
+                  categories={allCategories}
+                  suppliers={suppliers}
+                  onEdit={openEditDialog}
+                  onDelete={(itemId) => {
+                    setDeletingItemId(itemId);
+                    setDeleteDialogOpen(true);
+                  }}
+                />
+              ))}
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No items in catalog yet</p>
-              <p className="text-sm">Click "Add Item" to create your first item</p>
+              {hasActiveFilters ? (
+                <>
+                  <p>No items match your filters</p>
+                  <Button variant="ghost" onClick={clearFilters} className="mt-2">
+                    Clear filters
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p>No items in catalog yet</p>
+                  <p className="text-sm">Click "Add Item" to create your first item</p>
+                </>
+              )}
             </div>
           )}
         </CardContent>
@@ -490,7 +735,7 @@ export default function AdminItemsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {categories?.map((category) => (
+                          {activeCategories?.map((category) => (
                             <SelectItem key={category.id} value={category.id}>
                               {category.name}
                             </SelectItem>
