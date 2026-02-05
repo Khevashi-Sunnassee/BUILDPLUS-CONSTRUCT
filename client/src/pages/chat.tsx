@@ -410,8 +410,8 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-full" data-testid="chat-page">
-      <div className="w-80 border-r flex flex-col">
+    <div className="flex h-full min-h-0 overflow-hidden" data-testid="chat-page">
+      <div className="w-80 shrink-0 border-r flex flex-col overflow-hidden">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="text-lg font-semibold">Messages</h2>
@@ -585,7 +585,7 @@ export default function ChatPage() {
         </ScrollArea>
       </div>
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {selectedConversation ? (
           <>
             <div className="p-4 border-b flex items-center justify-between">
