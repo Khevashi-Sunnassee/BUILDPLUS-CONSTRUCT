@@ -52,6 +52,7 @@ import AdminChecklistTemplatesPage from "@/pages/admin/checklist-templates";
 import TemplateEditorPage from "@/pages/admin/template-editor";
 import ChecklistsPage from "@/pages/checklists";
 import ChecklistFillPage from "@/pages/checklist-fill";
+import ChecklistReportsPage from "@/pages/checklist-reports";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -448,6 +449,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ChecklistFillPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/checklist-reports">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ChecklistReportsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
