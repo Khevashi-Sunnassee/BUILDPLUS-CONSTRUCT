@@ -2,6 +2,7 @@ import { eq, and, desc, sql, asc, gte, lte, inArray, isNull } from "drizzle-orm"
 import { db } from "./db";
 export { db };
 import {
+  companies,
   users, devices, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, jobLevelCycleTimes, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
@@ -12,6 +13,7 @@ import {
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   factories, cfmeuHolidays,
   documentTypesConfig, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems, documentBundleAccessLogs,
+  type Company, type InsertCompany,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
   type InsertDailyLog, type DailyLog, type InsertLogRow, type LogRow,
@@ -615,6 +617,49 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  // ============== Companies ==============
+  async getAllCompanies(): Promise<(Company & { userCount: number })[]> {
+    const allCompanies = await db.select().from(companies).orderBy(desc(companies.createdAt));
+    const result = await Promise.all(
+      allCompanies.map(async (company) => {
+        const companyUsers = await db.select().from(users).where(eq(users.companyId, company.id));
+        return {
+          ...company,
+          userCount: companyUsers.length,
+        };
+      })
+    );
+    return result;
+  }
+
+  async getCompany(id: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(companies).where(eq(companies.id, id));
+    return company;
+  }
+
+  async getCompanyByCode(code: string): Promise<Company | undefined> {
+    const [company] = await db.select().from(companies).where(eq(companies.code, code));
+    return company;
+  }
+
+  async createCompany(data: InsertCompany): Promise<Company> {
+    const [company] = await db.insert(companies).values(data).returning();
+    return company;
+  }
+
+  async updateCompany(id: string, data: Partial<InsertCompany>): Promise<Company | undefined> {
+    const [company] = await db.update(companies)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(companies.id, id))
+      .returning();
+    return company;
+  }
+
+  async deleteCompany(id: string): Promise<void> {
+    await db.delete(companies).where(eq(companies.id, id));
+  }
+
+  // ============== Users ==============
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
     return user;
@@ -628,6 +673,7 @@ export class DatabaseStorage implements IStorage {
   async createUser(data: InsertUser & { password?: string }): Promise<User> {
     const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : null;
     const [user] = await db.insert(users).values({
+      companyId: data.companyId,
       email: data.email.toLowerCase(),
       name: data.name,
       passwordHash,
@@ -655,7 +701,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(users).where(eq(users.id, id));
   }
 
-  async getAllUsers(): Promise<User[]> {
+  async getAllUsers(companyId?: string): Promise<User[]> {
+    if (companyId) {
+      return db.select().from(users).where(eq(users.companyId, companyId)).orderBy(desc(users.createdAt));
+    }
     return db.select().from(users).orderBy(desc(users.createdAt));
   }
 
@@ -686,10 +735,11 @@ export class DatabaseStorage implements IStorage {
     return { ...result[0].devices, user: result[0].users };
   }
 
-  async createDevice(data: { userId: string; deviceName: string; os: string }): Promise<{ device: Device; deviceKey: string }> {
+  async createDevice(data: { userId: string; deviceName: string; os: string; companyId: string }): Promise<{ device: Device; deviceKey: string }> {
     const deviceKey = randomKey();
     const apiKeyHash = sha256Hex(deviceKey);
     const [device] = await db.insert(devices).values({
+      companyId: data.companyId,
       userId: data.userId,
       deviceName: data.deviceName,
       os: data.os || "Windows",
@@ -708,8 +758,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(devices).where(eq(devices.id, id));
   }
 
-  async getAllDevices(): Promise<(Device & { user: User })[]> {
-    const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).orderBy(desc(devices.createdAt));
+  async getAllDevices(companyId?: string): Promise<(Device & { user: User })[]> {
+    const query = db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).orderBy(desc(devices.createdAt));
+    if (companyId) {
+      const result = await db.select().from(devices).innerJoin(users, eq(devices.userId, users.id)).where(eq(devices.companyId, companyId)).orderBy(desc(devices.createdAt));
+      return result.map(r => ({ ...r.devices, user: r.users }));
+    }
+    const result = await query;
     return result.map(r => ({ ...r.devices, user: r.users }));
   }
 
@@ -1115,9 +1170,13 @@ export class DatabaseStorage implements IStorage {
     await db.delete(jobs).where(eq(jobs.id, id));
   }
 
-  async getAllJobs(): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[]; panelCount: number; completedPanelCount: number })[]> {
-    const allJobs = await db.select().from(jobs).orderBy(desc(jobs.createdAt));
-    const allRules = await db.select().from(mappingRules);
+  async getAllJobs(companyId?: string): Promise<(Job & { panels: PanelRegister[]; mappingRules: MappingRule[]; panelCount: number; completedPanelCount: number })[]> {
+    const allJobs = companyId 
+      ? await db.select().from(jobs).where(eq(jobs.companyId, companyId)).orderBy(desc(jobs.createdAt))
+      : await db.select().from(jobs).orderBy(desc(jobs.createdAt));
+    const allRules = companyId
+      ? await db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId))
+      : await db.select().from(mappingRules);
     
     const panelCounts = await db.select({
       jobId: panelRegister.jobId,
@@ -1633,7 +1692,10 @@ export class DatabaseStorage implements IStorage {
     await db.delete(panelTypes).where(eq(panelTypes.id, id));
   }
 
-  async getAllPanelTypes(): Promise<PanelTypeConfig[]> {
+  async getAllPanelTypes(companyId?: string): Promise<PanelTypeConfig[]> {
+    if (companyId) {
+      return await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)).orderBy(asc(panelTypes.name));
+    }
     return await db.select().from(panelTypes).orderBy(asc(panelTypes.name));
   }
 
@@ -1713,11 +1775,17 @@ export class DatabaseStorage implements IStorage {
     await db.delete(workTypes).where(eq(workTypes.id, id));
   }
 
-  async getAllWorkTypes(): Promise<WorkType[]> {
+  async getAllWorkTypes(companyId?: string): Promise<WorkType[]> {
+    if (companyId) {
+      return db.select().from(workTypes).where(eq(workTypes.companyId, companyId)).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+    }
     return db.select().from(workTypes).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
   }
 
-  async getActiveWorkTypes(): Promise<WorkType[]> {
+  async getActiveWorkTypes(companyId?: string): Promise<WorkType[]> {
+    if (companyId) {
+      return db.select().from(workTypes).where(and(eq(workTypes.companyId, companyId), eq(workTypes.isActive, true))).orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
+    }
     return db.select().from(workTypes)
       .where(eq(workTypes.isActive, true))
       .orderBy(asc(workTypes.sortOrder), asc(workTypes.name));
@@ -2938,11 +3006,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============== Suppliers ==============
-  async getAllSuppliers(): Promise<Supplier[]> {
+  async getAllSuppliers(companyId?: string): Promise<Supplier[]> {
+    if (companyId) {
+      return db.select().from(suppliers).where(eq(suppliers.companyId, companyId)).orderBy(asc(suppliers.name));
+    }
     return db.select().from(suppliers).orderBy(asc(suppliers.name));
   }
 
-  async getActiveSuppliers(): Promise<Supplier[]> {
+  async getActiveSuppliers(companyId?: string): Promise<Supplier[]> {
+    if (companyId) {
+      return db.select().from(suppliers).where(and(eq(suppliers.companyId, companyId), eq(suppliers.isActive, true))).orderBy(asc(suppliers.name));
+    }
     return db.select().from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.name));
   }
 

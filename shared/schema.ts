@@ -16,9 +16,32 @@ export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHED
 export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const draftingProgramStatusEnum = pgEnum("drafting_program_status", ["NOT_SCHEDULED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
 
+export const companies = pgTable("companies", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  code: text("code").notNull().unique(),
+  logoBase64: text("logo_base64"),
+  address: text("address"),
+  phone: text("phone"),
+  email: text("email"),
+  website: text("website"),
+  abn: text("abn"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: uniqueIndex("companies_code_idx").on(table.code),
+  activeIdx: index("companies_active_idx").on(table.isActive),
+}));
+
+export const insertCompanySchema = createInsertSchema(companies).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCompany = z.infer<typeof insertCompanySchema>;
+export type Company = typeof companies.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  email: text("email").notNull().unique(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  email: text("email").notNull(),
   name: text("name"),
   passwordHash: text("password_hash"),
   role: roleEnum("role").default("USER").notNull(),
@@ -42,7 +65,10 @@ export const users = pgTable("users", {
   selectedFactoryIds: text("selected_factory_ids").array(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  emailCompanyIdx: uniqueIndex("users_email_company_idx").on(table.email, table.companyId),
+  companyIdx: index("users_company_idx").on(table.companyId),
+}));
 
 export const userPermissions = pgTable("user_permissions", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -86,6 +112,7 @@ export type FunctionKey = typeof FUNCTION_KEYS[number];
 
 export const devices = pgTable("devices", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
   deviceName: text("device_name").notNull(),
   os: text("os").notNull(),
@@ -95,12 +122,15 @@ export const devices = pgTable("devices", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  companyIdx: index("devices_company_idx").on(table.companyId),
+}));
 
 export const cfmeuCalendarEnum = pgEnum("cfmeu_calendar", ["NONE", "CFMEU_QLD", "CFMEU_VIC"]);
 
 export const globalSettings = pgTable("global_settings", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   tz: text("tz").default("Australia/Melbourne").notNull(),
   captureIntervalS: integer("capture_interval_s").default(300).notNull(),
   idleThresholdS: integer("idle_threshold_s").default(300).notNull(),
@@ -120,7 +150,9 @@ export const globalSettings = pgTable("global_settings", {
   cfmeuCalendar: cfmeuCalendarEnum("cfmeu_calendar").default("NONE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  companyIdx: uniqueIndex("global_settings_company_idx").on(table.companyId),
+}));
 
 export const australianStateEnum = pgEnum("australian_state", ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"]);
 
@@ -129,6 +161,7 @@ export const cfmeuHolidayTypeEnum = pgEnum("cfmeu_holiday_type", ["RDO", "PUBLIC
 
 export const cfmeuHolidays = pgTable("cfmeu_holidays", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   calendarType: cfmeuCalendarTypeEnum("calendar_type").notNull(),
   date: timestamp("date").notNull(),
   name: text("name").notNull(),
@@ -136,14 +169,16 @@ export const cfmeuHolidays = pgTable("cfmeu_holidays", {
   year: integer("year").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  calendarDateIdx: uniqueIndex("cfmeu_holidays_calendar_date_idx").on(table.calendarType, table.date),
+  calendarDateCompanyIdx: uniqueIndex("cfmeu_holidays_calendar_date_company_idx").on(table.calendarType, table.date, table.companyId),
   yearIdx: index("cfmeu_holidays_year_idx").on(table.year),
+  companyIdx: index("cfmeu_holidays_company_idx").on(table.companyId),
 }));
 
 export const factories = pgTable("factories", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull(),
   address: text("address"),
   state: australianStateEnum("state").default("VIC").notNull(),
   latitude: decimal("latitude", { precision: 10, scale: 7 }),
@@ -156,8 +191,9 @@ export const factories = pgTable("factories", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  codeIdx: uniqueIndex("factories_code_idx").on(table.code),
+  codeCompanyIdx: uniqueIndex("factories_code_company_idx").on(table.code, table.companyId),
   activeIdx: index("factories_active_idx").on(table.isActive),
+  companyIdx: index("factories_company_idx").on(table.companyId),
 }));
 
 export const productionBeds = pgTable("production_beds", {
@@ -176,15 +212,17 @@ export const productionBeds = pgTable("production_beds", {
 
 export const zones = pgTable("zones", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
-  code: text("code").notNull().unique(),
+  code: text("code").notNull(),
   description: text("description"),
   color: text("color").default("#3B82F6"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  codeIdx: uniqueIndex("zones_code_idx").on(table.code),
+  codeCompanyIdx: uniqueIndex("zones_code_company_idx").on(table.code, table.companyId),
+  companyIdx: index("zones_company_idx").on(table.companyId),
 }));
 
 export const insertZoneSchema = createInsertSchema(zones).omit({ id: true, createdAt: true, updatedAt: true });
@@ -193,7 +231,8 @@ export type Zone = typeof zones.$inferSelect;
 
 export const jobs = pgTable("jobs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  jobNumber: text("job_number").notNull().unique(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobNumber: text("job_number").notNull(),
   name: text("name").notNull(),
   code: text("code"),
   client: text("client"),
@@ -205,29 +244,30 @@ export const jobs = pgTable("jobs", {
   description: text("description"),
   craneCapacity: text("crane_capacity"),
   numberOfBuildings: integer("number_of_buildings"),
-  levels: text("levels"), // comma-separated list of level names (e.g., "Ground,L1,L2,L3,Roof")
-  lowestLevel: text("lowest_level"), // e.g., "Ground", "Basement", "L1"
-  highestLevel: text("highest_level"), // e.g., "L5", "Roof"
+  levels: text("levels"),
+  lowestLevel: text("lowest_level"),
+  highestLevel: text("highest_level"),
   productionStartDate: timestamp("production_start_date"),
-  expectedCycleTimePerFloor: integer("expected_cycle_time_per_floor"), // days per floor for production scheduling
-  daysInAdvance: integer("days_in_advance").default(7), // IFC days before production (days before production when drawings need to reach IFC stage)
-  daysToAchieveIfc: integer("days_to_achieve_ifc"), // days to complete drafting work
-  productionWindowDays: integer("production_window_days"), // days before due date when production can start
-  productionDaysInAdvance: integer("production_days_in_advance"), // days before site needs panels to cast
-  procurementDaysInAdvance: integer("procurement_days_in_advance"), // days before production window start for procurement
-  procurementTimeDays: integer("procurement_time_days"), // time required for procurement
+  expectedCycleTimePerFloor: integer("expected_cycle_time_per_floor"),
+  daysInAdvance: integer("days_in_advance").default(7),
+  daysToAchieveIfc: integer("days_to_achieve_ifc"),
+  productionWindowDays: integer("production_window_days"),
+  productionDaysInAdvance: integer("production_days_in_advance"),
+  procurementDaysInAdvance: integer("procurement_days_in_advance"),
+  procurementTimeDays: integer("procurement_time_days"),
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
-  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id), // factory servicing this job for production
-  productionSlotColor: text("production_slot_color"), // hex color for production slots display
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
+  productionSlotColor: text("production_slot_color"),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  jobNumberIdx: index("jobs_job_number_idx").on(table.jobNumber),
+  jobNumberCompanyIdx: uniqueIndex("jobs_job_number_company_idx").on(table.jobNumber, table.companyId),
   statusIdx: index("jobs_status_idx").on(table.status),
   codeIdx: index("jobs_code_idx").on(table.code),
   projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
   factoryIdx: index("jobs_factory_idx").on(table.factoryId),
+  companyIdx: index("jobs_company_idx").on(table.companyId),
 }));
 
 export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
@@ -307,7 +347,8 @@ export const draftingProgram = pgTable("drafting_program", {
 
 export const workTypes = pgTable("work_types", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  code: text("code").notNull().unique(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  code: text("code").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true).notNull(),
@@ -315,8 +356,9 @@ export const workTypes = pgTable("work_types", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  codeIdx: uniqueIndex("work_types_code_idx").on(table.code),
+  codeCompanyIdx: uniqueIndex("work_types_code_company_idx").on(table.code, table.companyId),
   sortOrderIdx: index("work_types_sort_order_idx").on(table.sortOrder),
+  companyIdx: index("work_types_company_idx").on(table.companyId),
 }));
 
 export const panelRegister = pgTable("panel_register", {
@@ -375,6 +417,7 @@ export const panelRegister = pgTable("panel_register", {
 
 export const mappingRules = pgTable("mapping_rules", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
   pathContains: text("path_contains").notNull(),
   priority: integer("priority").default(100).notNull(),
@@ -383,6 +426,7 @@ export const mappingRules = pgTable("mapping_rules", {
 }, (table) => ({
   priorityIdx: index("mapping_rules_priority_idx").on(table.priority),
   jobIdIdx: index("mapping_rules_job_id_idx").on(table.jobId),
+  companyIdx: index("mapping_rules_company_idx").on(table.companyId),
 }));
 
 export const dailyLogs = pgTable("daily_logs", {
@@ -512,7 +556,8 @@ export const auditEvents = pgTable("audit_events", {
 
 export const panelTypes = pgTable("panel_types", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  code: text("code").notNull().unique(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  code: text("code").notNull(),
   name: text("name").notNull(),
   description: text("description"),
   labourCostPerM2: text("labour_cost_per_m2"),
@@ -526,12 +571,13 @@ export const panelTypes = pgTable("panel_types", {
   sellRatePerM2: text("sell_rate_per_m2"),
   sellRatePerM3: text("sell_rate_per_m3"),
   expectedWeightPerM3: text("expected_weight_per_m3").default("2500"),
-  color: text("color"), // hex color for panel type display
+  color: text("color"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  codeIdx: uniqueIndex("panel_types_code_idx").on(table.code),
+  codeCompanyIdx: uniqueIndex("panel_types_code_company_idx").on(table.code, table.companyId),
+  companyIdx: index("panel_types_company_idx").on(table.companyId),
 }));
 
 export const jobPanelRates = pgTable("job_panel_rates", {
@@ -623,13 +669,17 @@ export const jobCostOverrides = pgTable("job_cost_overrides", {
 // Logistics tables
 export const trailerTypes = pgTable("trailer_types", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  name: text("name").notNull().unique(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  nameCompanyIdx: uniqueIndex("trailer_types_name_company_idx").on(table.name, table.companyId),
+  companyIdx: index("trailer_types_company_idx").on(table.companyId),
+}));
 
 export const loadLists = pgTable("load_lists", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -700,9 +750,10 @@ export const deliveryRecords = pgTable("delivery_records", {
 
 export const weeklyWageReports = pgTable("weekly_wage_reports", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   weekStartDate: text("week_start_date").notNull(),
   weekEndDate: text("week_end_date").notNull(),
-  factory: text("factory").default("QLD").notNull(), // Deprecated - use factoryId
+  factory: text("factory").default("QLD").notNull(),
   factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   productionWages: text("production_wages"),
   officeWages: text("office_wages"),
@@ -715,9 +766,10 @@ export const weeklyWageReports = pgTable("weekly_wage_reports", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  weekFactoryIdx: uniqueIndex("weekly_wage_reports_week_factory_idx").on(table.weekStartDate, table.weekEndDate, table.factory),
+  weekFactoryCompanyIdx: uniqueIndex("weekly_wage_reports_week_factory_company_idx").on(table.weekStartDate, table.weekEndDate, table.factory, table.companyId),
   factoryIdx: index("weekly_wage_reports_factory_idx").on(table.factory),
   weekStartIdx: index("weekly_wage_reports_week_start_idx").on(table.weekStartDate),
+  companyIdx: index("weekly_wage_reports_company_idx").on(table.companyId),
 }));
 
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -1073,6 +1125,7 @@ export type DraftingProgram = typeof draftingProgram.$inferSelect;
 
 export const suppliers = pgTable("suppliers", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
   keyContact: text("key_contact"),
   email: text("email"),
@@ -1093,21 +1146,25 @@ export const suppliers = pgTable("suppliers", {
 }, (table) => ({
   nameIdx: index("suppliers_name_idx").on(table.name),
   abnIdx: index("suppliers_abn_idx").on(table.abn),
+  companyIdx: index("suppliers_company_idx").on(table.companyId),
 }));
 
 export const itemCategories = pgTable("item_categories", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  nameIdx: uniqueIndex("item_categories_name_idx").on(table.name),
+  nameCompanyIdx: uniqueIndex("item_categories_name_company_idx").on(table.name, table.companyId),
+  companyIdx: index("item_categories_company_idx").on(table.companyId),
 }));
 
 export const items = pgTable("items", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   code: text("code"),
   name: text("name").notNull(),
   description: text("description"),
@@ -1117,7 +1174,6 @@ export const items = pgTable("items", {
   unitPrice: decimal("unit_price", { precision: 12, scale: 2 }),
   minOrderQty: integer("min_order_qty").default(1),
   leadTimeDays: integer("lead_time_days"),
-  // Sourcing and compliance fields
   hsCode: text("hs_code"),
   adRisk: text("ad_risk"),
   adReferenceUrl: text("ad_reference_url"),
@@ -1132,11 +1188,13 @@ export const items = pgTable("items", {
   nameIdx: index("items_name_idx").on(table.name),
   categoryIdx: index("items_category_idx").on(table.categoryId),
   supplierIdx: index("items_supplier_idx").on(table.supplierId),
+  companyIdx: index("items_company_idx").on(table.companyId),
 }));
 
 export const purchaseOrders = pgTable("purchase_orders", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  poNumber: text("po_number").notNull().unique(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  poNumber: text("po_number").notNull(),
   supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
   supplierName: text("supplier_name"),
   supplierContact: text("supplier_contact"),
@@ -1162,10 +1220,11 @@ export const purchaseOrders = pgTable("purchase_orders", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  poNumberIdx: uniqueIndex("purchase_orders_po_number_idx").on(table.poNumber),
+  poNumberCompanyIdx: uniqueIndex("purchase_orders_po_number_company_idx").on(table.poNumber, table.companyId),
   statusIdx: index("purchase_orders_status_idx").on(table.status),
   requestedByIdx: index("purchase_orders_requested_by_idx").on(table.requestedById),
   supplierIdx: index("purchase_orders_supplier_idx").on(table.supplierId),
+  companyIdx: index("purchase_orders_company_idx").on(table.companyId),
 }));
 
 export const purchaseOrderItems = pgTable("purchase_order_items", {
@@ -1235,6 +1294,7 @@ export const taskStatusEnum = pgEnum("task_status", ["NOT_STARTED", "IN_PROGRESS
 
 export const taskGroups = pgTable("task_groups", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
   color: text("color").default("#6366f1"),
   sortOrder: integer("sort_order").default(0).notNull(),
@@ -1243,6 +1303,7 @@ export const taskGroups = pgTable("task_groups", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   sortOrderIdx: index("task_groups_sort_order_idx").on(table.sortOrder),
+  companyIdx: index("task_groups_company_idx").on(table.companyId),
 }));
 
 export const tasks = pgTable("tasks", {
@@ -1371,6 +1432,7 @@ export const userChatSettings = pgTable("user_chat_settings", {
 
 export const conversations = pgTable("conversations", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   type: conversationTypeEnum("type").notNull(),
   name: text("name"),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
@@ -1381,6 +1443,7 @@ export const conversations = pgTable("conversations", {
   typeIdx: index("conversations_type_idx").on(table.type),
   jobIdx: index("conversations_job_idx").on(table.jobId),
   panelIdx: index("conversations_panel_idx").on(table.panelId),
+  companyIdx: index("conversations_company_idx").on(table.companyId),
 }));
 
 export const conversationMembers = pgTable("conversation_members", {
@@ -1486,6 +1549,7 @@ export const docMgmtStatusEnum = pgEnum("doc_mgmt_status", ["DRAFT", "REVIEW", "
 // Document Types - Configurable types with prefix for auto-numbering
 export const documentTypesConfig = pgTable("document_types_config", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   typeName: text("type_name").notNull(),
   prefix: varchar("prefix", { length: 10 }).notNull(),
   shortForm: varchar("short_form", { length: 20 }),
@@ -1499,13 +1563,15 @@ export const documentTypesConfig = pgTable("document_types_config", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  prefixIdx: uniqueIndex("doc_types_prefix_idx").on(table.prefix),
+  prefixCompanyIdx: uniqueIndex("doc_types_prefix_company_idx").on(table.prefix, table.companyId),
   activeIdx: index("doc_types_active_idx").on(table.isActive),
+  companyIdx: index("doc_types_company_idx").on(table.companyId),
 }));
 
 // Document Disciplines - Engineering/trade disciplines
 export const documentDisciplines = pgTable("document_disciplines", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   disciplineName: text("discipline_name").notNull(),
   shortForm: varchar("short_form", { length: 10 }),
   color: varchar("color", { length: 20 }),
@@ -1515,11 +1581,13 @@ export const documentDisciplines = pgTable("document_disciplines", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   activeIdx: index("doc_disciplines_active_idx").on(table.isActive),
+  companyIdx: index("doc_disciplines_company_idx").on(table.companyId),
 }));
 
 // Document Categories - Optional categorization
 export const documentCategories = pgTable("document_categories", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   categoryName: text("category_name").notNull(),
   shortForm: varchar("short_form", { length: 20 }),
   description: text("description"),
@@ -1530,11 +1598,13 @@ export const documentCategories = pgTable("document_categories", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   activeIdx: index("doc_categories_active_idx").on(table.isActive),
+  companyIdx: index("doc_categories_company_idx").on(table.companyId),
 }));
 
 // Main Documents Table - Core document metadata
 export const documents = pgTable("documents", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   
   // Document identification
   documentNumber: varchar("document_number", { length: 50 }),
@@ -1586,7 +1656,7 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  // Performance indexes for common queries
+  companyIdx: index("documents_company_idx").on(table.companyId),
   docNumberIdx: index("documents_doc_number_idx").on(table.documentNumber),
   statusIdx: index("documents_status_idx").on(table.status),
   typeIdx: index("documents_type_idx").on(table.typeId),
@@ -1602,7 +1672,6 @@ export const documents = pgTable("documents", {
   latestVersionIdx: index("documents_latest_version_idx").on(table.isLatestVersion),
   parentDocIdx: index("documents_parent_doc_idx").on(table.parentDocumentId),
   createdAtIdx: index("documents_created_at_idx").on(table.createdAt),
-  // Compound indexes for common filter combinations
   jobLatestIdx: index("documents_job_latest_idx").on(table.jobId, table.isLatestVersion),
   statusLatestIdx: index("documents_status_latest_idx").on(table.status, table.isLatestVersion),
 }));
@@ -1610,6 +1679,7 @@ export const documents = pgTable("documents", {
 // Document Bundles - Groups of documents with QR code access
 export const documentBundles = pgTable("document_bundles", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   bundleName: text("bundle_name").notNull(),
   description: text("description"),
   qrCodeId: varchar("qr_code_id", { length: 100 }).notNull().unique(),
@@ -1632,6 +1702,7 @@ export const documentBundles = pgTable("document_bundles", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   qrCodeIdx: uniqueIndex("bundles_qr_code_idx").on(table.qrCodeId),
+  companyIdx: index("bundles_company_idx").on(table.companyId),
   jobIdx: index("bundles_job_idx").on(table.jobId),
   supplierIdx: index("bundles_supplier_idx").on(table.supplierId),
   createdByIdx: index("bundles_created_by_idx").on(table.createdBy),

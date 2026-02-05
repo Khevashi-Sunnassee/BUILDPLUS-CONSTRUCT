@@ -18,6 +18,7 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     req.session.userId = user.id;
+    req.session.companyId = user.companyId;
     res.json({ user: { ...user, passwordHash: undefined } });
   } catch (error) {
     if (error instanceof z.ZodError) {

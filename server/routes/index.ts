@@ -27,6 +27,7 @@ import { factoriesRouter, initializeCfmeuSync } from "./factories.routes";
 import { adminRouter } from "./admin.routes";
 import { agentRouter } from "./agent.routes";
 import { chatRouter } from "../chat/chat.routes";
+import { companiesRouter } from "./companies.routes";
 import productionScheduleRouter from "./production-schedule.routes";
 import { timerRouter } from "./timer.routes";
 import documentsRouter from "./documents.routes";
@@ -80,6 +81,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(tasksRouter);
   app.use(factoriesRouter);
   app.use(adminRouter);
+  app.use(companiesRouter);
   
   // Reports routers (split by domain) - all have full paths starting with /api/
   app.use(reportsRouter);

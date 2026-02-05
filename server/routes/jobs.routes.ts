@@ -9,13 +9,13 @@ const router = Router();
 
 // GET /api/projects - Legacy endpoint for backward compatibility
 router.get("/api/projects", requireAuth, async (req: Request, res: Response) => {
-  const jobs = await storage.getAllJobs();
-  res.json(jobs.map(j => ({ id: j.id, name: j.name, code: j.code || j.jobNumber })));
+  const jobsList = await storage.getAllJobs(req.companyId);
+  res.json(jobsList.map(j => ({ id: j.id, name: j.name, code: j.code || j.jobNumber })));
 });
 
 // GET /api/jobs - Get all jobs (active only, for general use)
 router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
-  const allJobs = await storage.getAllJobs();
+  const allJobs = await storage.getAllJobs(req.companyId);
   res.json(allJobs.filter(j => j.status === "ACTIVE"));
 });
 
@@ -281,7 +281,11 @@ router.get("/api/admin/jobs/:id/production-slot-status", requireRole("ADMIN"), a
 
 // POST /api/admin/jobs/:id/rules - Create mapping rule
 router.post("/api/admin/jobs/:id/rules", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  if (!req.companyId) {
+    return res.status(403).json({ error: "Company context required" });
+  }
   const rule = await storage.createMappingRule({
+    companyId: req.companyId,
     jobId: req.params.id as string,
     pathContains: req.body.pathContains,
     priority: req.body.priority || 100,

@@ -8,7 +8,7 @@ const router = Router();
 
 // Get all users for chat member selection (accessible to all authenticated users)
 router.get("/api/users", requireAuth, async (req, res) => {
-  const users = await storage.getAllUsers();
+  const users = await storage.getAllUsers(req.companyId);
   res.json(users.map(u => ({ ...u, passwordHash: undefined })));
 });
 
@@ -49,7 +49,7 @@ router.get("/api/my-permissions", requireAuth, async (req, res) => {
 
 // Admin: Get all users
 router.get("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
-  const users = await storage.getAllUsers();
+  const users = await storage.getAllUsers(req.companyId);
   res.json(users.map(u => ({ ...u, passwordHash: undefined })));
 });
 
