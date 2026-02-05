@@ -799,14 +799,15 @@ export default function AdminDocumentConfigPage() {
                   <FormItem>
                     <FormLabel>Color</FormLabel>
                     <FormControl>
-                      <div className="flex gap-2">
-                        <Input {...field} placeholder="#3B82F6" data-testid="input-discipline-color" />
-                        {field.value && typeof field.value === 'string' && (
-                          <div
-                            className="w-10 h-10 rounded border"
-                            style={{ backgroundColor: field.value }}
-                          />
-                        )}
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={field.value || "#3B82F6"}
+                          onChange={(e) => field.onChange(e.target.value)}
+                          className="w-12 h-10 rounded border cursor-pointer"
+                          data-testid="input-discipline-color"
+                        />
+                        <span className="text-sm text-muted-foreground">{field.value || "#3B82F6"}</span>
                       </div>
                     </FormControl>
                     <FormMessage />
