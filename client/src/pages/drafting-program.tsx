@@ -172,6 +172,28 @@ export default function DraftingProgramPage() {
       toast({ title: "Error", description: "Please select a resource and proposed start date", variant: "destructive" });
       return;
     }
+    
+    // Validate proposed start date is within drafting window
+    if (selectedEntry.draftingWindowStart && selectedEntry.drawingDueDate) {
+      const proposedDate = new Date(proposedStartDate);
+      const windowStart = new Date(selectedEntry.draftingWindowStart);
+      const windowEnd = new Date(selectedEntry.drawingDueDate);
+      
+      // Normalize to start of day for comparison
+      proposedDate.setHours(0, 0, 0, 0);
+      windowStart.setHours(0, 0, 0, 0);
+      windowEnd.setHours(0, 0, 0, 0);
+      
+      if (proposedDate < windowStart || proposedDate > windowEnd) {
+        toast({ 
+          title: "Invalid Date", 
+          description: `Proposed start date must be between ${format(windowStart, "dd/MM/yyyy")} and ${format(windowEnd, "dd/MM/yyyy")}`, 
+          variant: "destructive" 
+        });
+        return;
+      }
+    }
+    
     assignMutation.mutate({
       id: selectedEntry.id,
       assignedToId: assignUserId,
@@ -737,11 +759,13 @@ export default function DraftingProgramPage() {
                 type="date"
                 value={proposedStartDate}
                 onChange={(e) => setProposedStartDate(e.target.value)}
+                min={selectedEntry?.draftingWindowStart ? format(new Date(selectedEntry.draftingWindowStart), "yyyy-MM-dd") : undefined}
+                max={selectedEntry?.drawingDueDate ? format(new Date(selectedEntry.drawingDueDate), "yyyy-MM-dd") : undefined}
                 data-testid="input-proposed-start"
               />
               {selectedEntry?.draftingWindowStart && selectedEntry?.drawingDueDate && (
                 <p className="text-xs text-muted-foreground">
-                  Should be between {format(new Date(selectedEntry.draftingWindowStart), "dd/MM/yyyy")} and{" "}
+                  Must be between {format(new Date(selectedEntry.draftingWindowStart), "dd/MM/yyyy")} and{" "}
                   {format(new Date(selectedEntry.drawingDueDate), "dd/MM/yyyy")}
                 </p>
               )}
