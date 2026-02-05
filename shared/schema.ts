@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json, jsonb, numeric } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1992,4 +1992,267 @@ export type DocumentBundleWithItems = DocumentBundle & {
   job?: Job | null;
   supplier?: Supplier | null;
   createdByUser?: SafeUser | null;
+};
+
+// ==================== ADVANCED TEMPLATES SYSTEM ====================
+
+// Entity Types - Module categories (Maintenance, Quality, Safety, etc.)
+export const entityTypes = pgTable("entity_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  description: text("description"),
+  icon: varchar("icon", { length: 50 }),
+  color: varchar("color", { length: 20 }),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Entity Subtypes - Sub-categories within modules
+export const entitySubtypes = pgTable("entity_subtypes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id),
+  entityTypeId: varchar("entity_type_id", { length: 36 }).references(() => entityTypes.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  code: varchar("code", { length: 50 }).notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Checklist Instance Status Enum
+export const checklistInstanceStatusEnum = pgEnum("checklist_instance_status", [
+  "draft",
+  "in_progress",
+  "completed",
+  "signed_off",
+  "cancelled"
+]);
+
+// Checklist Templates - Dynamic form builder templates
+export const checklistTemplates = pgTable("checklist_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  entityTypeId: varchar("entity_type_id", { length: 36 }).references(() => entityTypes.id),
+  entitySubtypeId: varchar("entity_subtype_id", { length: 36 }).references(() => entitySubtypes.id),
+  sections: jsonb("sections").default([]).notNull(),
+  phase: integer("phase"),
+  hasScoringSystem: boolean("has_scoring_system").default(false),
+  maxScore: integer("max_score").default(0),
+  autoCreateWorkOrders: boolean("auto_create_work_orders").default(false),
+  workOrderPriority: varchar("work_order_priority", { length: 20 }).default("medium"),
+  isMandatoryForSystemActivity: boolean("is_mandatory_for_system_activity").default(false),
+  systemActivityType: varchar("system_activity_type", { length: 100 }),
+  requiredOutcomes: jsonb("required_outcomes").default([]),
+  enableNotifications: boolean("enable_notifications").default(false),
+  notificationSettings: jsonb("notification_settings").default({}),
+  qrCodeEnabled: boolean("qr_code_enabled").default(false),
+  qrCodeToken: varchar("qr_code_token", { length: 100 }),
+  qrCodeExpiresAt: timestamp("qr_code_expires_at"),
+  qrCodeGeneratedAt: timestamp("qr_code_generated_at"),
+  qrCodeUsageCount: integer("qr_code_usage_count").default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("checklist_templates_company_idx").on(table.companyId),
+  entityTypeIdx: index("checklist_templates_entity_type_idx").on(table.entityTypeId),
+  entitySubtypeIdx: index("checklist_templates_entity_subtype_idx").on(table.entitySubtypeId),
+  activeIdx: index("checklist_templates_active_idx").on(table.isActive),
+}));
+
+// Checklist Instances - Filled-out template responses
+export const checklistInstances = pgTable("checklist_instances", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id).notNull(),
+  templateId: varchar("template_id", { length: 36 }).references(() => checklistTemplates.id).notNull(),
+  instanceNumber: varchar("instance_number", { length: 50 }),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  panelId: varchar("panel_id", { length: 36 }).references(() => panelRegister.id),
+  customerId: varchar("customer_id", { length: 36 }),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  staffId: varchar("staff_id", { length: 36 }).references(() => users.id),
+  location: varchar("location", { length: 255 }),
+  assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id),
+  status: checklistInstanceStatusEnum("status").default("draft").notNull(),
+  responses: jsonb("responses").default({}).notNull(),
+  score: numeric("score", { precision: 10, scale: 2 }),
+  maxPossibleScore: integer("max_possible_score").default(0),
+  completionRate: numeric("completion_rate", { precision: 5, scale: 2 }).default("0"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by", { length: 36 }).references(() => users.id),
+  signedOffBy: varchar("signed_off_by", { length: 36 }).references(() => users.id),
+  signedOffAt: timestamp("signed_off_at"),
+  signOffComments: text("sign_off_comments"),
+  generatedWorkOrders: jsonb("generated_work_orders").default([]),
+  entityTypeId: varchar("entity_type_id", { length: 36 }).references(() => entityTypes.id),
+  entitySubtypeId: varchar("entity_subtype_id", { length: 36 }).references(() => entitySubtypes.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("checklist_instances_company_idx").on(table.companyId),
+  templateIdx: index("checklist_instances_template_idx").on(table.templateId),
+  statusIdx: index("checklist_instances_status_idx").on(table.status),
+  jobIdx: index("checklist_instances_job_idx").on(table.jobId),
+  panelIdx: index("checklist_instances_panel_idx").on(table.panelId),
+  assignedToIdx: index("checklist_instances_assigned_to_idx").on(table.assignedTo),
+}));
+
+// Insert Schemas and Types for Entity Types
+export const insertEntityTypeSchema = createInsertSchema(entityTypes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEntityType = z.infer<typeof insertEntityTypeSchema>;
+export type EntityType = typeof entityTypes.$inferSelect;
+
+// Insert Schemas and Types for Entity Subtypes
+export const insertEntitySubtypeSchema = createInsertSchema(entitySubtypes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEntitySubtype = z.infer<typeof insertEntitySubtypeSchema>;
+export type EntitySubtype = typeof entitySubtypes.$inferSelect;
+
+// Insert Schemas and Types for Checklist Templates
+export const insertChecklistTemplateSchema = createInsertSchema(checklistTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertChecklistTemplate = z.infer<typeof insertChecklistTemplateSchema>;
+export type ChecklistTemplate = typeof checklistTemplates.$inferSelect;
+
+// Insert Schemas and Types for Checklist Instances
+export const insertChecklistInstanceSchema = createInsertSchema(checklistInstances).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertChecklistInstance = z.infer<typeof insertChecklistInstanceSchema>;
+export type ChecklistInstance = typeof checklistInstances.$inferSelect;
+
+// Extended Types with Relations
+export type ChecklistTemplateWithDetails = ChecklistTemplate & {
+  entityType?: EntityType | null;
+  entitySubtype?: EntitySubtype | null;
+  createdByUser?: SafeUser | null;
+};
+
+export type ChecklistInstanceWithDetails = ChecklistInstance & {
+  template?: ChecklistTemplate | null;
+  job?: Job | null;
+  panel?: PanelRegister | null;
+  assignedToUser?: SafeUser | null;
+  completedByUser?: SafeUser | null;
+  signedOffByUser?: SafeUser | null;
+};
+
+// Field Type Constants for Template Builder
+export const CHECKLIST_FIELD_TYPES = {
+  // Basic Fields
+  TEXT_FIELD: "text_field",
+  TEXTAREA: "textarea",
+  NUMBER_FIELD: "number_field",
+  RADIO_BUTTON: "radio_button",
+  DROPDOWN: "dropdown",
+  CHECKBOX: "checkbox",
+  // Quality Control Fields
+  PASS_FAIL_FLAG: "pass_fail_flag",
+  YES_NO_NA: "yes_no_na",
+  CONDITION_OPTION: "condition_option",
+  INSPECTION_CHECK: "inspection_check",
+  // Date & Time Fields
+  DATE_FIELD: "date_field",
+  TIME_FIELD: "time_field",
+  DATETIME_FIELD: "datetime_field",
+  // Financial Fields
+  AMOUNT_FIELD: "amount_field",
+  PERCENTAGE_FIELD: "percentage_field",
+  // Database Selector Fields
+  JOB_SELECTOR: "job_selector",
+  CUSTOMER_SELECTOR: "customer_selector",
+  SUPPLIER_SELECTOR: "supplier_selector",
+  STAFF_ASSIGNMENT: "staff_assignment",
+  // Selection Fields
+  PRIORITY_LEVEL: "priority_level",
+  RATING_SCALE: "rating_scale",
+  // Media & File Fields
+  PHOTO_REQUIRED: "photo_required",
+  MULTI_PHOTO: "multi_photo",
+  FILE_UPLOAD: "file_upload",
+  SIGNATURE_FIELD: "signature_field",
+  // Progress & Tracking Fields
+  PROGRESS_BAR: "progress_bar",
+  // Other Fields
+  MEASUREMENT_FIELD: "measurement_field",
+} as const;
+
+export type ChecklistFieldType = typeof CHECKLIST_FIELD_TYPES[keyof typeof CHECKLIST_FIELD_TYPES];
+
+// Section Structure Type for Template Builder
+export type ChecklistSection = {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
+  allowRepeats?: boolean;
+  items: ChecklistField[];
+};
+
+// Field Structure Type for Template Builder
+export type ChecklistField = {
+  id: string;
+  name: string;
+  type: ChecklistFieldType;
+  description?: string;
+  placeholder?: string;
+  required?: boolean;
+  photoRequired?: boolean;
+  defaultValue?: unknown;
+  options?: ChecklistFieldOption[];
+  validation?: Record<string, unknown>;
+  conditions?: ChecklistFieldCondition[];
+  images?: ChecklistFieldImage[];
+  links?: ChecklistFieldLink[];
+  instructions?: string;
+  defaultWorkOrderTypeId?: string | null;
+  workOrderTriggers?: ChecklistWorkOrderTrigger[];
+  min?: number | null;
+  max?: number | null;
+  step?: number | null;
+};
+
+export type ChecklistFieldOption = {
+  text: string;
+  value: string;
+  color?: string;
+};
+
+export type ChecklistFieldCondition = {
+  id: string;
+  field: string;
+  operator: "equals" | "not_equals" | "contains" | "not_contains" | "greater_than" | "less_than" | "is_empty" | "is_not_empty";
+  value: string | number | boolean;
+  action: "show" | "hide";
+};
+
+export type ChecklistFieldImage = {
+  id: string;
+  url: string;
+  alt?: string;
+  description?: string;
+};
+
+export type ChecklistFieldLink = {
+  id: string;
+  url: string;
+  text: string;
+  description?: string;
+};
+
+export type ChecklistWorkOrderTrigger = {
+  id: string;
+  operator: string;
+  value: string | number | boolean;
+  workOrderTitle: string;
+  workOrderDescription?: string;
+  workOrderPriority?: string;
+  workOrderCategoryId?: string;
+  assignToUserId?: string;
 };

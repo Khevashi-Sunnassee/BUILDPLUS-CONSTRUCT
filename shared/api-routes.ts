@@ -493,6 +493,42 @@ export const REO_SCHEDULE_ROUTES = {
 } as const;
 
 // ============================================================================
+// ADVANCED TEMPLATES / CHECKLISTS
+// ============================================================================
+export const CHECKLIST_ROUTES = {
+  // Entity Types (Modules)
+  ENTITY_TYPES: '/api/checklist/entity-types',
+  ENTITY_TYPE_BY_ID: (id: string) => `/api/checklist/entity-types/${id}`,
+  
+  // Entity Subtypes
+  ENTITY_SUBTYPES: '/api/checklist/entity-subtypes',
+  ENTITY_SUBTYPES_BY_TYPE: (entityTypeId: string) => `/api/checklist/entity-types/${entityTypeId}/subtypes`,
+  ENTITY_SUBTYPE_BY_ID: (id: string) => `/api/checklist/entity-subtypes/${id}`,
+  
+  // Templates
+  TEMPLATES: '/api/checklist/templates',
+  TEMPLATE_BY_ID: (id: string) => `/api/checklist/templates/${id}`,
+  TEMPLATE_DUPLICATE: (id: string) => `/api/checklist/templates/${id}/duplicate`,
+  TEMPLATES_BY_MODULE: (entityTypeId: string, entitySubtypeId?: string) => 
+    entitySubtypeId 
+      ? `/api/checklist/templates/module/${entityTypeId}/${entitySubtypeId}`
+      : `/api/checklist/templates/module/${entityTypeId}`,
+  
+  // Instances
+  INSTANCES: '/api/checklist/instances',
+  INSTANCE_BY_ID: (id: string) => `/api/checklist/instances/${id}`,
+  INSTANCE_COMPLETE: (id: string) => `/api/checklist/instances/${id}/complete`,
+  INSTANCE_SIGN_OFF: (id: string) => `/api/checklist/instances/${id}/sign-off`,
+  INSTANCES_BY_TEMPLATE: (templateId: string) => `/api/checklist/templates/${templateId}/instances`,
+  INSTANCES_BY_JOB: (jobId: string) => `/api/checklist/jobs/${jobId}/instances`,
+  INSTANCES_BY_PANEL: (panelId: string) => `/api/checklist/panels/${panelId}/instances`,
+  
+  // Reporting
+  REPORTS: '/api/checklist/reports',
+  REPORT_SUMMARY: '/api/checklist/reports/summary',
+} as const;
+
+// ============================================================================
 // TYPE EXPORTS for frontend usage
 // ============================================================================
 export type AuthRoutes = typeof AUTH_ROUTES;
@@ -520,3 +556,4 @@ export type TimerRoutes = typeof TIMER_ROUTES;
 export type AgentRoutes = typeof AGENT_ROUTES;
 export type DocumentRoutes = typeof DOCUMENT_ROUTES;
 export type ReoScheduleRoutes = typeof REO_SCHEDULE_ROUTES;
+export type ChecklistRoutes = typeof CHECKLIST_ROUTES;
