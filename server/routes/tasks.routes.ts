@@ -142,6 +142,23 @@ router.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_
   }
 });
 
+router.post("/api/tasks/:id/move", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+  try {
+    const { targetGroupId, targetIndex } = req.body;
+    if (!targetGroupId) {
+      return res.status(400).json({ error: "targetGroupId is required" });
+    }
+    const task = await storage.moveTaskToGroup(String(req.params.id), targetGroupId, targetIndex ?? 0);
+    if (!task) {
+      return res.status(404).json({ error: "Task not found" });
+    }
+    res.json(task);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error moving task");
+    res.status(500).json({ error: error.message || "Failed to move task" });
+  }
+});
+
 router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
     const assignees = await storage.getTaskAssignees(String(req.params.id));

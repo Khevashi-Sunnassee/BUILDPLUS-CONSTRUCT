@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, asc, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, asc, gte, lte, inArray, isNull } from "drizzle-orm";
 import { db } from "./db";
 export { db };
 import {
@@ -520,6 +520,7 @@ export interface IStorage {
   updateTask(id: string, data: Partial<InsertTask>): Promise<Task | undefined>;
   deleteTask(id: string): Promise<void>;
   reorderTasks(groupId: string, taskIds: string[]): Promise<void>;
+  moveTaskToGroup(taskId: string, targetGroupId: string, targetIndex: number): Promise<Task | undefined>;
 
   getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]>;
   setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]>;
@@ -3400,6 +3401,37 @@ export class DatabaseStorage implements IStorage {
     for (let i = 0; i < taskIds.length; i++) {
       await db.update(tasks).set({ sortOrder: i, updatedAt: new Date() }).where(eq(tasks.id, taskIds[i]));
     }
+  }
+
+  async moveTaskToGroup(taskId: string, targetGroupId: string, targetIndex: number): Promise<Task | undefined> {
+    const task = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+    if (!task.length) return undefined;
+
+    const targetGroupTasks = await db.select()
+      .from(tasks)
+      .where(and(eq(tasks.groupId, targetGroupId), isNull(tasks.parentId)))
+      .orderBy(tasks.sortOrder);
+
+    await db.update(tasks).set({
+      groupId: targetGroupId,
+      sortOrder: targetIndex,
+      updatedAt: new Date(),
+    }).where(eq(tasks.id, taskId));
+
+    const tasksToReorder = targetGroupTasks.filter(t => t.id !== taskId);
+    let order = 0;
+    for (let i = 0; i <= tasksToReorder.length; i++) {
+      if (i === targetIndex) {
+        order++;
+      }
+      if (i < tasksToReorder.length) {
+        await db.update(tasks).set({ sortOrder: order, updatedAt: new Date() }).where(eq(tasks.id, tasksToReorder[i].id));
+        order++;
+      }
+    }
+
+    const updated = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+    return updated[0];
   }
 
   async getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]> {
