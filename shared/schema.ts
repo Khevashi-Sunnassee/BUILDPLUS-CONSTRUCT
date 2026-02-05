@@ -1233,6 +1233,7 @@ export const taskUpdates = pgTable("task_updates", {
 export const taskFiles = pgTable("task_files", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   taskId: varchar("task_id", { length: 36 }).notNull().references(() => tasks.id, { onDelete: "cascade" }),
+  updateId: varchar("update_id", { length: 36 }).references(() => taskUpdates.id, { onDelete: "set null" }),
   fileName: text("file_name").notNull(),
   fileUrl: text("file_url").notNull(),
   fileSize: integer("file_size"),
@@ -1241,6 +1242,7 @@ export const taskFiles = pgTable("task_files", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   taskIdx: index("task_files_task_idx").on(table.taskId),
+  updateIdx: index("task_files_update_idx").on(table.updateId),
 }));
 
 // Task Management Insert Schemas and Types

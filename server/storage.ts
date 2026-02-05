@@ -525,7 +525,7 @@ export interface IStorage {
   getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]>;
   setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]>;
 
-  getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User })[]>;
+  getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User; files?: TaskFile[] })[]>;
   createTaskUpdate(data: InsertTaskUpdate): Promise<TaskUpdate>;
   deleteTaskUpdate(id: string): Promise<void>;
 
@@ -3500,17 +3500,41 @@ export class DatabaseStorage implements IStorage {
     return this.getTaskAssignees(taskId);
   }
 
-  async getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User })[]> {
+  async getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User; files?: TaskFile[] })[]> {
     const result = await db.select()
       .from(taskUpdates)
       .innerJoin(users, eq(taskUpdates.userId, users.id))
       .where(eq(taskUpdates.taskId, taskId))
       .orderBy(desc(taskUpdates.createdAt));
     
-    return result.map(r => ({
+    const updates = result.map(r => ({
       ...r.task_updates,
       user: r.users,
     }));
+    
+    const updateIds = updates.map(u => u.id);
+    if (updateIds.length > 0) {
+      const linkedFiles = await db.select()
+        .from(taskFiles)
+        .where(inArray(taskFiles.updateId, updateIds));
+      
+      const filesByUpdateId = new Map<string, TaskFile[]>();
+      for (const file of linkedFiles) {
+        if (file.updateId) {
+          if (!filesByUpdateId.has(file.updateId)) {
+            filesByUpdateId.set(file.updateId, []);
+          }
+          filesByUpdateId.get(file.updateId)!.push(file);
+        }
+      }
+      
+      return updates.map(u => ({
+        ...u,
+        files: filesByUpdateId.get(u.id) || [],
+      }));
+    }
+    
+    return updates.map(u => ({ ...u, files: [] }));
   }
 
   async createTaskUpdate(data: InsertTaskUpdate): Promise<TaskUpdate> {

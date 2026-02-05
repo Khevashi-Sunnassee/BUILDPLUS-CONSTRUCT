@@ -262,9 +262,12 @@ router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIE
 
     const base64 = file.buffer.toString("base64");
     const dataUrl = `data:${file.mimetype};base64,${base64}`;
+    
+    const updateId = req.body.updateId || null;
 
     const taskFile = await storage.createTaskFile({
       taskId: String(req.params.id),
+      updateId,
       fileName: file.originalname,
       fileUrl: dataUrl,
       fileSize: file.size,

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Eye, Edit, Paperclip } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Eye, Edit, Paperclip, Search, X } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import type { PurchaseOrder, User, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
@@ -22,16 +24,15 @@ type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
 export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [supplierFilter, setSupplierFilter] = useState<string>("all");
 
   const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrderWithDetails[]>({
-    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, { status: statusFilter !== "ALL" ? statusFilter : undefined }],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (statusFilter !== "ALL") params.append("status", statusFilter);
-      const response = await fetch(`${PROCUREMENT_ROUTES.PURCHASE_ORDERS}?${params.toString()}`);
-      if (!response.ok) throw new Error("Failed to fetch purchase orders");
-      return response.json();
-    },
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
+  });
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS],
   });
 
   const getStatusBadge = (status: string) => {
@@ -77,9 +78,36 @@ export default function PurchaseOrdersPage() {
     return "-";
   };
 
-  const filteredOrders = statusFilter === "ALL" 
-    ? purchaseOrders 
-    : purchaseOrders.filter(po => po.status === statusFilter);
+  const filteredOrders = useMemo(() => {
+    return purchaseOrders.filter(po => {
+      // Status filter
+      if (statusFilter !== "ALL" && po.status !== statusFilter) return false;
+      
+      // Supplier filter
+      if (supplierFilter !== "all") {
+        if (!po.supplierId && !po.supplierName) return false;
+        if (po.supplierId !== supplierFilter) return false;
+      }
+      
+      // Search filter (PO number or supplier name)
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const poNumber = po.poNumber?.toLowerCase() || "";
+        const supplierName = (po.supplier?.name || po.supplierName || "").toLowerCase();
+        if (!poNumber.includes(query) && !supplierName.includes(query)) return false;
+      }
+      
+      return true;
+    });
+  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery]);
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSupplierFilter("all");
+    setStatusFilter("ALL");
+  };
+
+  const hasActiveFilters = searchQuery.trim() || supplierFilter !== "all" || statusFilter !== "ALL";
 
   return (
     <div className="space-y-6">
@@ -97,9 +125,41 @@ export default function PurchaseOrdersPage() {
           </Link>
         </CardHeader>
         <CardContent>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search PO number or supplier..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-po"
+              />
+            </div>
+            <Select value={supplierFilter} onValueChange={setSupplierFilter}>
+              <SelectTrigger className="w-[180px]" data-testid="select-supplier-filter">
+                <SelectValue placeholder="All Suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Suppliers</SelectItem>
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} data-testid="btn-clear-filters">
+                <X className="h-4 w-4 mr-1" />
+                Clear filters
+              </Button>
+            )}
+          </div>
+
           <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)} className="mb-6">
             <TabsList data-testid="tabs-status-filter">
-              <TabsTrigger value="ALL" data-testid="tab-all">All</TabsTrigger>
+              <TabsTrigger value="ALL" data-testid="tab-all">All ({purchaseOrders.length})</TabsTrigger>
               <TabsTrigger value="DRAFT" data-testid="tab-draft">Draft</TabsTrigger>
               <TabsTrigger value="SUBMITTED" data-testid="tab-submitted">Submitted</TabsTrigger>
               <TabsTrigger value="APPROVED" data-testid="tab-approved">Approved</TabsTrigger>
@@ -115,9 +175,22 @@ export default function PurchaseOrdersPage() {
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground" data-testid="text-empty-state">
-              No purchase orders found
+              {hasActiveFilters ? (
+                <>
+                  <p>No purchase orders match your filters</p>
+                  <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-2">
+                    Clear all filters
+                  </Button>
+                </>
+              ) : (
+                "No purchase orders found"
+              )}
             </div>
           ) : (
+            <>
+            <p className="text-sm text-muted-foreground mb-3">
+              Showing {filteredOrders.length} of {purchaseOrders.length} purchase orders
+            </p>
             <Table data-testid="table-purchase-orders">
               <TableHeader>
                 <TableRow>
@@ -179,6 +252,7 @@ export default function PurchaseOrdersPage() {
                 ))}
               </TableBody>
             </Table>
+            </>
           )}
         </CardContent>
       </Card>

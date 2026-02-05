@@ -141,6 +141,7 @@ interface TaskUpdate {
   content: string;
   createdAt: string;
   user: User;
+  files?: TaskFile[];
 }
 
 interface TaskFile {
@@ -1076,7 +1077,8 @@ function TaskSidebar({
 
   const createUpdateMutation = useMutation({
     mutationFn: async (content: string) => {
-      return apiRequest("POST", TASKS_ROUTES.UPDATES(task?.id || ""), { content });
+      const res = await apiRequest("POST", TASKS_ROUTES.UPDATES(task?.id || ""), { content });
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.UPDATES(task?.id || "")] });
@@ -1102,9 +1104,10 @@ function TaskSidebar({
   });
 
   const uploadFileMutation = useMutation({
-    mutationFn: async (file: File) => {
+    mutationFn: async ({ file, updateId }: { file: File; updateId?: string }) => {
       const formData = new FormData();
       formData.append("file", file);
+      if (updateId) formData.append("updateId", updateId);
       const res = await fetch(TASKS_ROUTES.FILES(task?.id || ""), {
         method: "POST",
         body: formData,
@@ -1140,7 +1143,7 @@ function TaskSidebar({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      uploadFileMutation.mutate(file);
+      uploadFileMutation.mutate({ file });
     }
   };
 
@@ -1180,22 +1183,25 @@ function TaskSidebar({
   const handlePostUpdate = async () => {
     if (!newUpdate.trim() && pastedImages.length === 0) return;
     
-    // Upload pasted images first
-    for (const file of pastedImages) {
-      await uploadFileMutation.mutateAsync(file);
+    try {
+      // Create the update first to get the updateId
+      const content = newUpdate.trim();
+      const update = await createUpdateMutation.mutateAsync(content);
+      const updateId = update?.id;
+      
+      // Upload pasted images with the updateId
+      if (pastedImages.length > 0) {
+        for (const file of pastedImages) {
+          await uploadFileMutation.mutateAsync({ file, updateId });
+        }
+        // Refresh updates to show the linked files
+        queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.UPDATES(task?.id || "")] });
+      }
+      
+      setPastedImages([]);
+    } catch (error) {
+      // Error is already handled by mutation onError
     }
-    
-    // Post the update if there's text
-    if (newUpdate.trim()) {
-      const imageNote = pastedImages.length > 0 
-        ? `\n\n[${pastedImages.length} screenshot(s) attached]` 
-        : "";
-      await createUpdateMutation.mutateAsync(newUpdate + imageNote);
-    } else if (pastedImages.length > 0) {
-      await createUpdateMutation.mutateAsync(`[${pastedImages.length} screenshot(s) attached]`);
-    }
-    
-    setPastedImages([]);
   };
 
   const getFileIcon = (mimeType: string | null) => {
@@ -1327,7 +1333,42 @@ function TaskSidebar({
                               {format(new Date(update.createdAt), "dd/MM/yyyy HH:mm")}
                             </span>
                           </div>
-                          <p className="text-sm mt-1 whitespace-pre-wrap">{update.content}</p>
+                          {update.content && (
+                            <p className="text-sm mt-1 whitespace-pre-wrap">{update.content}</p>
+                          )}
+                          {update.files && update.files.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {update.files.map((file) => (
+                                file.mimeType?.startsWith("image/") ? (
+                                  <a
+                                    key={file.id}
+                                    href={file.fileUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="block"
+                                  >
+                                    <img
+                                      src={file.fileUrl}
+                                      alt={file.fileName}
+                                      className="max-w-full max-h-48 rounded border object-contain cursor-pointer hover:opacity-90"
+                                      data-testid={`update-image-${file.id}`}
+                                    />
+                                  </a>
+                                ) : (
+                                  <a
+                                    key={file.id}
+                                    href={file.fileUrl}
+                                    download={file.fileName}
+                                    className="flex items-center gap-2 p-2 border rounded text-sm hover-elevate"
+                                    data-testid={`update-file-${file.id}`}
+                                  >
+                                    <Paperclip className="h-4 w-4" />
+                                    {file.fileName}
+                                  </a>
+                                )
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <Button
                           variant="ghost"
