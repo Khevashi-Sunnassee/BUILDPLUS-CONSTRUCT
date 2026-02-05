@@ -23,6 +23,7 @@ import {
   User,
   MapPin,
   Layers,
+  Play,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES, TIMER_ROUTES } from "@shared/api-routes";
 import { TimerWidget } from "@/components/timer-widget";
 
 type GroupBy = "none" | "user" | "date";
@@ -226,6 +227,26 @@ export default function DailyReportsPage() {
     },
     onError: () => {
       toast({ title: "Failed to delete daily log", variant: "destructive" });
+    },
+  });
+
+  const startTimerMutation = useMutation({
+    mutationFn: async (data: { jobId: string; panelRegisterId: string }) => {
+      return await apiRequest("POST", TIMER_ROUTES.START, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      toast({ 
+        title: "Timer started",
+        description: "Panel drafting timer is now running"
+      });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to start timer", 
+        description: error.message || "You may already have an active timer",
+        variant: "destructive" 
+      });
     },
   });
 
@@ -683,23 +704,46 @@ export default function DailyReportsPage() {
                               </Badge>
                             </TableCell>
                             <TableCell>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const params = new URLSearchParams();
-                                  params.set("date", format(new Date(), "yyyy-MM-dd"));
-                                  params.set("jobId", program.jobId);
-                                  if (program.panel?.panelMark) {
-                                    params.set("panelMark", program.panel.panelMark);
-                                  }
-                                  setLocation(`/manual-entry?${params.toString()}`);
-                                }}
-                                data-testid={`button-add-to-day-${program.id}`}
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Add to Day
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (program.panel?.id && program.jobId) {
+                                      startTimerMutation.mutate({
+                                        jobId: program.jobId,
+                                        panelRegisterId: program.panel.id,
+                                      });
+                                    }
+                                  }}
+                                  disabled={startTimerMutation.isPending}
+                                  data-testid={`button-draft-now-${program.id}`}
+                                >
+                                  {startTimerMutation.isPending ? (
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <Play className="h-3 w-3 mr-1" />
+                                  )}
+                                  Draft Now
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    const params = new URLSearchParams();
+                                    params.set("date", format(new Date(), "yyyy-MM-dd"));
+                                    params.set("jobId", program.jobId);
+                                    if (program.panel?.panelMark) {
+                                      params.set("panelMark", program.panel.panelMark);
+                                    }
+                                    setLocation(`/manual-entry?${params.toString()}`);
+                                  }}
+                                  data-testid={`button-add-to-day-${program.id}`}
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add to Day
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
