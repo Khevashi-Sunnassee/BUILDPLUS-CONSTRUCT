@@ -103,6 +103,10 @@ const workHoursSchema = z.object({
 // Admin: Update user work hours
 router.put("/api/admin/users/:id/work-hours", requireRole("ADMIN"), async (req, res) => {
   try {
+    const existingUser = await storage.getUser(req.params.id as string);
+    if (!existingUser || existingUser.companyId !== req.companyId) {
+      return res.status(404).json({ error: "User not found" });
+    }
     const validatedData = workHoursSchema.parse(req.body);
     const user = await storage.updateUser(req.params.id as string, validatedData);
     res.json({ ...user, passwordHash: undefined });
@@ -116,30 +120,46 @@ router.put("/api/admin/users/:id/work-hours", requireRole("ADMIN"), async (req, 
 
 // Admin: Delete user
 router.delete("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
+  const existingUser = await storage.getUser(req.params.id as string);
+  if (!existingUser || existingUser.companyId !== req.companyId) {
+    return res.status(404).json({ error: "User not found" });
+  }
   await storage.deleteUser(req.params.id as string);
   res.json({ ok: true });
 });
 
 // Admin: Get all user permissions
 router.get("/api/admin/user-permissions", requireRole("ADMIN"), async (req, res) => {
-  const data = await storage.getAllUserPermissionsForAdmin();
+  const data = await storage.getAllUserPermissionsForAdmin(req.companyId);
   res.json(data);
 });
 
 // Admin: Get user permissions by userId
 router.get("/api/admin/user-permissions/:userId", requireRole("ADMIN"), async (req, res) => {
+  const user = await storage.getUser(String(req.params.userId));
+  if (!user || user.companyId !== req.companyId) {
+    return res.status(404).json({ error: "User not found" });
+  }
   const permissions = await storage.getUserPermissions(String(req.params.userId));
   res.json(permissions);
 });
 
 // Admin: Initialize user permissions
 router.post("/api/admin/user-permissions/:userId/initialize", requireRole("ADMIN"), async (req, res) => {
+  const user = await storage.getUser(String(req.params.userId));
+  if (!user || user.companyId !== req.companyId) {
+    return res.status(404).json({ error: "User not found" });
+  }
   const permissions = await storage.initializeUserPermissions(String(req.params.userId));
   res.json(permissions);
 });
 
 // Admin: Update user permission
 router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMIN"), async (req, res) => {
+  const user = await storage.getUser(String(req.params.userId));
+  if (!user || user.companyId !== req.companyId) {
+    return res.status(404).json({ error: "User not found" });
+  }
   const { permissionLevel } = req.body;
   if (!permissionLevel || !["HIDDEN", "VIEW", "VIEW_AND_UPDATE"].includes(permissionLevel)) {
     return res.status(400).json({ error: "Invalid permission level" });

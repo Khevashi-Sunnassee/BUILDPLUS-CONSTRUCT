@@ -257,6 +257,7 @@ export interface IStorage {
 
   createMappingRule(data: InsertMappingRule): Promise<MappingRule>;
   deleteMappingRule(id: string): Promise<void>;
+  getMappingRule(id: string): Promise<MappingRule | undefined>;
   getMappingRules(): Promise<MappingRule[]>;
 
   getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined>;
@@ -436,7 +437,7 @@ export interface IStorage {
   setUserPermission(userId: string, functionKey: FunctionKey, permissionLevel: PermissionLevel): Promise<UserPermission>;
   deleteUserPermission(userId: string, functionKey: FunctionKey): Promise<void>;
   initializeUserPermissions(userId: string): Promise<UserPermission[]>;
-  getAllUserPermissionsForAdmin(): Promise<{ user: User; permissions: UserPermission[] }[]>;
+  getAllUserPermissionsForAdmin(companyId?: string): Promise<{ user: User; permissions: UserPermission[] }[]>;
 
   // Zones
   getAllZones(): Promise<Zone[]>;
@@ -775,6 +776,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMappingRule(id: string): Promise<void> {
     await db.delete(mappingRules).where(eq(mappingRules.id, id));
+  }
+
+  async getMappingRule(id: string): Promise<MappingRule | undefined> {
+    const [rule] = await db.select().from(mappingRules).where(eq(mappingRules.id, id));
+    return rule;
   }
 
   async getMappingRules(): Promise<MappingRule[]> {
@@ -2354,9 +2360,17 @@ export class DatabaseStorage implements IStorage {
     return [...existingPerms, ...newPerms];
   }
 
-  async getAllUserPermissionsForAdmin(): Promise<{ user: User; permissions: UserPermission[] }[]> {
-    const allUsers = await db.select().from(users).where(eq(users.isActive, true));
-    const allPerms = await db.select().from(userPermissions);
+  async getAllUserPermissionsForAdmin(companyId?: string): Promise<{ user: User; permissions: UserPermission[] }[]> {
+    const conditions = [eq(users.isActive, true)];
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+    }
+    const allUsers = await db.select().from(users).where(and(...conditions));
+    const userIds = allUsers.map(u => u.id);
+    
+    const allPerms = userIds.length > 0 
+      ? await db.select().from(userPermissions).where(inArray(userPermissions.userId, userIds))
+      : [];
     
     const permsByUser = new Map<string, UserPermission[]>();
     for (const perm of allPerms) {

@@ -23,6 +23,10 @@ router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
 router.get("/api/jobs/:jobId/totals", requireAuth, async (req: Request, res: Response) => {
   try {
     const jobId = String(req.params.jobId);
+    const job = await storage.getJob(jobId);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
     const panels = await storage.getPanelsByJob(jobId);
     
     let totalAreaM2 = 0;
@@ -64,6 +68,10 @@ router.get("/api/jobs/:jobId/totals", requireAuth, async (req: Request, res: Res
 
 // GET /api/jobs/:jobId/panel-rates - Get panel rates for a job
 router.get("/api/jobs/:jobId/panel-rates", requireAuth, async (req: Request, res: Response) => {
+  const job = await storage.getJob(req.params.jobId as string);
+  if (!job || job.companyId !== req.companyId) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   const rates = await storage.getEffectiveRates(req.params.jobId as string);
   res.json(rates);
 });
@@ -71,6 +79,10 @@ router.get("/api/jobs/:jobId/panel-rates", requireAuth, async (req: Request, res
 // PUT /api/jobs/:jobId/panel-rates/:panelTypeId - Update panel rate for a job
 router.put("/api/jobs/:jobId/panel-rates/:panelTypeId", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const job = await storage.getJob(req.params.jobId as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
     const rate = await storage.upsertJobPanelRate(req.params.jobId as string, req.params.panelTypeId as string, req.body);
     res.json(rate);
   } catch (error: any) {
@@ -80,6 +92,10 @@ router.put("/api/jobs/:jobId/panel-rates/:panelTypeId", requireRole("ADMIN"), as
 
 // DELETE /api/jobs/:jobId/panel-rates/:rateId - Delete panel rate
 router.delete("/api/jobs/:jobId/panel-rates/:rateId", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  const job = await storage.getJob(req.params.jobId as string);
+  if (!job || job.companyId !== req.companyId) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   await storage.deleteJobPanelRate(req.params.rateId as string);
   res.json({ ok: true });
 });
@@ -237,6 +253,10 @@ router.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, 
 // GET /api/admin/jobs/:id/level-cycle-times - Get level cycle times
 router.get("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const job = await storage.getJob(req.params.id as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
     const cycleTimes = await storage.getJobLevelCycleTimes(req.params.id as string);
     res.json(cycleTimes);
   } catch (error: any) {
@@ -247,6 +267,10 @@ router.get("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async 
 // POST /api/admin/jobs/:id/level-cycle-times - Update level cycle times
 router.post("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const job = await storage.getJob(req.params.id as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
     const cycleTimeSchema = z.object({
       buildingNumber: z.number().int().min(1),
       level: z.string().min(1),
@@ -274,6 +298,10 @@ router.post("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async
 router.get("/api/admin/jobs/:id/production-slot-status", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const jobId = req.params.id as string;
+    const job = await storage.getJob(jobId);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
     const slots = await storage.getProductionSlots({ jobId });
     
     const hasSlots = slots.length > 0;
@@ -298,6 +326,10 @@ router.post("/api/admin/jobs/:id/rules", requireRole("ADMIN"), async (req: Reque
   if (!req.companyId) {
     return res.status(403).json({ error: "Company context required" });
   }
+  const job = await storage.getJob(req.params.id as string);
+  if (!job || job.companyId !== req.companyId) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   const rule = await storage.createMappingRule({
     companyId: req.companyId,
     jobId: req.params.id as string,
@@ -309,6 +341,10 @@ router.post("/api/admin/jobs/:id/rules", requireRole("ADMIN"), async (req: Reque
 
 // DELETE /api/admin/mapping-rules/:id - Delete mapping rule
 router.delete("/api/admin/mapping-rules/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  const rule = await storage.getMappingRule(req.params.id as string);
+  if (!rule || rule.companyId !== req.companyId) {
+    return res.status(404).json({ error: "Mapping rule not found" });
+  }
   await storage.deleteMappingRule(req.params.id as string);
   res.json({ ok: true });
 });
