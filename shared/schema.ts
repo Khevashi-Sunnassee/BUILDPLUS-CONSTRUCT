@@ -389,6 +389,134 @@ export const panelRegister = pgTable("panel_register", {
   estimatedHours: integer("estimated_hours"),
   actualHours: integer("actual_hours").default(0),
   notes: text("notes"),
+  // Basic panel info fields
+  fireRate: text("fire_rate"),
+  caulkingFire: text("caulking_fire"),
+  numRebates: integer("num_rebates"),
+  openings: text("openings"),
+  netWeight: text("net_weight"),
+  grossArea: text("gross_area"),
+  craneCapacityWeight: text("crane_capacity_weight"),
+  craneCheck: text("crane_check"),
+  // Concrete fields
+  groutTableManual: text("grout_table_manual"),
+  groutToUse: text("grout_to_use"),
+  groutStrength: text("grout_strength"),
+  // Vertical Reo
+  verticalReoQty: text("vertical_reo_qty"),
+  verticalReoType: text("vertical_reo_type"),
+  // Horizontal Reo
+  horizontalReoQty: text("horizontal_reo_qty"),
+  horizontalReoType: text("horizontal_reo_type"),
+  // Mesh
+  meshQty: text("mesh_qty"),
+  meshType: text("mesh_type"),
+  // Fitments Reo
+  fitmentsReoQty: text("fitments_reo_qty"),
+  fitmentsReoType: text("fitments_reo_type"),
+  // U bars
+  uBarsQty: text("u_bars_qty"),
+  uBarsType: text("u_bars_type"),
+  // Ligs
+  ligsQty: text("ligs_qty"),
+  ligsType: text("ligs_type"),
+  // Blockout bars
+  blockoutBarsQty: text("blockout_bars_qty"),
+  blockoutBarsType: text("blockout_bars_type"),
+  // Additional reo (4 sets)
+  additionalReoQty1: text("additional_reo_qty_1"),
+  additionalReoType1: text("additional_reo_type_1"),
+  additionalReoQty2: text("additional_reo_qty_2"),
+  additionalReoType2: text("additional_reo_type_2"),
+  additionalReoQty3: text("additional_reo_qty_3"),
+  additionalReoType3: text("additional_reo_type_3"),
+  additionalReoQty4: text("additional_reo_qty_4"),
+  additionalReoType4: text("additional_reo_type_4"),
+  // Top Fixing
+  topFixingQty: text("top_fixing_qty"),
+  topFixingType: text("top_fixing_type"),
+  // Trimmer bars
+  trimmerBarsQty: text("trimmer_bars_qty"),
+  trimmerBarsType: text("trimmer_bars_type"),
+  // Ligs Reo
+  ligsReoQty: text("ligs_reo_qty"),
+  ligsReoType: text("ligs_reo_type"),
+  additionalReoType: text("additional_reo_type"),
+  // Tie reinforcement
+  tieReinforcement: text("tie_reinforcement"),
+  additionalReoQty: text("additional_reo_qty"),
+  additionalReoFrlType: text("additional_reo_frl_type"),
+  // Grout Tubes
+  groutTubesBottomQty: text("grout_tubes_bottom_qty"),
+  groutTubesBottomType: text("grout_tubes_bottom_type"),
+  groutTubesTopQty: text("grout_tubes_top_qty"),
+  groutTubesTopType: text("grout_tubes_top_type"),
+  // Fitments (4 sets)
+  ferrulesQty: text("ferrules_qty"),
+  ferrulesType: text("ferrules_type"),
+  fitmentsQty2: text("fitments_qty_2"),
+  fitmentsType2: text("fitments_type_2"),
+  fitmentsQty3: text("fitments_qty_3"),
+  fitmentsType3: text("fitments_type_3"),
+  fitmentsQty4: text("fitments_qty_4"),
+  fitmentsType4: text("fitments_type_4"),
+  // Plates (4 sets)
+  platesQty: text("plates_qty"),
+  platesType: text("plates_type"),
+  platesQty2: text("plates_qty_2"),
+  platesType2: text("plates_type_2"),
+  platesQty3: text("plates_qty_3"),
+  platesType3: text("plates_type_3"),
+  platesQty4: text("plates_qty_4"),
+  platesType4: text("plates_type_4"),
+  // TYPICAL Dowel Bars
+  dowelBarsLength: text("dowel_bars_length"),
+  dowelBarsQty: text("dowel_bars_qty"),
+  dowelBarsType: text("dowel_bars_type"),
+  // END Dowel Bars
+  dowelBarsLength2: text("dowel_bars_length_2"),
+  dowelBarsQty2: text("dowel_bars_qty_2"),
+  dowelBarsType2: text("dowel_bars_type_2"),
+  // Lifters
+  lifterQtyA: text("lifter_qty_a"),
+  liftersType: text("lifters_type"),
+  lifterQtyB: text("lifter_qty_b"),
+  safetyLiftersType: text("safety_lifters_type"),
+  lifterQtyC: text("lifter_qty_c"),
+  faceLiftersType: text("face_lifters_type"),
+  // Other Inserts
+  insertsQtyD: text("inserts_qty_d"),
+  insertTypeD: text("insert_type_d"),
+  unitCheck: text("unit_check"),
+  order: text("order"),
+  horizontalReoText: text("horizontal_reo_text"),
+  horizontalReoAt: text("horizontal_reo_at"),
+  // Reo bar counts
+  reoR6: text("reo_r6"),
+  reoN10: text("reo_n10"),
+  reoN12: text("reo_n12"),
+  reoN16: text("reo_n16"),
+  reoN20: text("reo_n20"),
+  reoN24: text("reo_n24"),
+  reoN28: text("reo_n28"),
+  reoN32: text("reo_n32"),
+  // Mesh counts
+  meshSl82: text("mesh_sl82"),
+  meshSl92: text("mesh_sl92"),
+  meshSl102: text("mesh_sl102"),
+  // Dowel bar counts
+  dowelN20: text("dowel_n20"),
+  dowelN24: text("dowel_n24"),
+  dowelN28: text("dowel_n28"),
+  dowelN32: text("dowel_n32"),
+  dowelN36: text("dowel_n36"),
+  // Totals
+  reoTons: text("reo_tons"),
+  dowelsTons: text("dowels_tons"),
+  totalReo: text("total_reo"),
+  totalKgM3: text("total_kg_m3"),
+  contract: text("contract"),
+  reoContract: text("reo_contract"),
   // Production approval fields
   loadWidth: text("load_width"),
   loadHeight: text("load_height"),
