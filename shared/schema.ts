@@ -1478,3 +1478,215 @@ export type ChatMessageAttachment = typeof chatMessageAttachments.$inferSelect;
 
 export type ConversationType = "DM" | "GROUP" | "CHANNEL";
 export type MemberRole = "OWNER" | "ADMIN" | "MEMBER";
+
+// ==================== DOCUMENT MANAGEMENT SYSTEM ====================
+
+export const docMgmtStatusEnum = pgEnum("doc_mgmt_status", ["DRAFT", "REVIEW", "APPROVED", "SUPERSEDED", "ARCHIVED"]);
+
+// Document Types - Configurable types with prefix for auto-numbering
+export const documentTypesConfig = pgTable("document_types_config", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  typeName: text("type_name").notNull(),
+  prefix: varchar("prefix", { length: 10 }).notNull(),
+  shortForm: varchar("short_form", { length: 20 }),
+  description: text("description"),
+  color: varchar("color", { length: 20 }),
+  icon: varchar("icon", { length: 50 }),
+  requiresApproval: boolean("requires_approval").default(false),
+  retentionDays: integer("retention_days"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  prefixIdx: uniqueIndex("doc_types_prefix_idx").on(table.prefix),
+  activeIdx: index("doc_types_active_idx").on(table.isActive),
+}));
+
+// Document Disciplines - Engineering/trade disciplines
+export const documentDisciplines = pgTable("document_disciplines", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  disciplineName: text("discipline_name").notNull(),
+  shortForm: varchar("short_form", { length: 10 }),
+  color: varchar("color", { length: 20 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  activeIdx: index("doc_disciplines_active_idx").on(table.isActive),
+}));
+
+// Document Categories - Optional categorization
+export const documentCategories = pgTable("document_categories", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  categoryName: text("category_name").notNull(),
+  shortForm: varchar("short_form", { length: 20 }),
+  description: text("description"),
+  color: varchar("color", { length: 20 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  activeIdx: index("doc_categories_active_idx").on(table.isActive),
+}));
+
+// Main Documents Table - Core document metadata
+export const documents = pgTable("documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Document identification
+  documentNumber: varchar("document_number", { length: 50 }),
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // File information
+  fileName: text("file_name").notNull(),
+  originalName: text("original_name").notNull(),
+  mimeType: varchar("mime_type", { length: 100 }).notNull(),
+  fileSize: integer("file_size").notNull(),
+  storageKey: text("storage_key").notNull(),
+  fileSha256: varchar("file_sha256", { length: 64 }),
+  
+  // Classification
+  typeId: varchar("type_id", { length: 36 }).references(() => documentTypesConfig.id),
+  disciplineId: varchar("discipline_id", { length: 36 }).references(() => documentDisciplines.id),
+  categoryId: varchar("category_id", { length: 36 }).references(() => documentCategories.id),
+  tags: text("tags"),
+  
+  // Status and workflow
+  status: docMgmtStatusEnum("status").default("DRAFT").notNull(),
+  
+  // Version control
+  version: varchar("version", { length: 10 }).default("1.0").notNull(),
+  revision: varchar("revision", { length: 5 }).default("A").notNull(),
+  isLatestVersion: boolean("is_latest_version").default(true).notNull(),
+  parentDocumentId: varchar("parent_document_id", { length: 36 }),
+  changeSummary: text("change_summary"),
+  
+  // Entity linking
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  panelId: varchar("panel_id", { length: 36 }).references(() => panelRegister.id),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  purchaseOrderId: varchar("purchase_order_id", { length: 36 }).references(() => purchaseOrders.id),
+  taskId: varchar("task_id", { length: 36 }).references(() => tasks.id),
+  
+  // User tracking
+  uploadedBy: varchar("uploaded_by", { length: 36 }).notNull().references(() => users.id),
+  approvedBy: varchar("approved_by", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  
+  // Confidential flag
+  isConfidential: boolean("is_confidential").default(false),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  // Performance indexes for common queries
+  docNumberIdx: index("documents_doc_number_idx").on(table.documentNumber),
+  statusIdx: index("documents_status_idx").on(table.status),
+  typeIdx: index("documents_type_idx").on(table.typeId),
+  disciplineIdx: index("documents_discipline_idx").on(table.disciplineId),
+  jobIdx: index("documents_job_idx").on(table.jobId),
+  panelIdx: index("documents_panel_idx").on(table.panelId),
+  supplierIdx: index("documents_supplier_idx").on(table.supplierId),
+  poIdx: index("documents_po_idx").on(table.purchaseOrderId),
+  taskIdx: index("documents_task_idx").on(table.taskId),
+  uploadedByIdx: index("documents_uploaded_by_idx").on(table.uploadedBy),
+  latestVersionIdx: index("documents_latest_version_idx").on(table.isLatestVersion),
+  parentDocIdx: index("documents_parent_doc_idx").on(table.parentDocumentId),
+  createdAtIdx: index("documents_created_at_idx").on(table.createdAt),
+  // Compound indexes for common filter combinations
+  jobLatestIdx: index("documents_job_latest_idx").on(table.jobId, table.isLatestVersion),
+  statusLatestIdx: index("documents_status_latest_idx").on(table.status, table.isLatestVersion),
+}));
+
+// Document Bundles - Groups of documents with QR code access
+export const documentBundles = pgTable("document_bundles", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  bundleName: text("bundle_name").notNull(),
+  description: text("description"),
+  qrCodeId: varchar("qr_code_id", { length: 100 }).notNull().unique(),
+  
+  // Entity linking
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  
+  // Access control
+  isPublic: boolean("is_public").default(false),
+  allowGuestAccess: boolean("allow_guest_access").default(false),
+  expiresAt: timestamp("expires_at"),
+  
+  // User tracking
+  createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  updatedBy: varchar("updated_by", { length: 36 }).references(() => users.id),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  qrCodeIdx: uniqueIndex("bundles_qr_code_idx").on(table.qrCodeId),
+  jobIdx: index("bundles_job_idx").on(table.jobId),
+  supplierIdx: index("bundles_supplier_idx").on(table.supplierId),
+  createdByIdx: index("bundles_created_by_idx").on(table.createdBy),
+  expiresIdx: index("bundles_expires_idx").on(table.expiresAt),
+}));
+
+// Document Bundle Items - Join table for bundle-document relationship
+export const documentBundleItems = pgTable("document_bundle_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  bundleId: varchar("bundle_id", { length: 36 }).notNull().references(() => documentBundles.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id", { length: 36 }).notNull().references(() => documents.id, { onDelete: "cascade" }),
+  sortOrder: integer("sort_order").default(0),
+  addedBy: varchar("added_by", { length: 36 }).notNull().references(() => users.id),
+  addedAt: timestamp("added_at").defaultNow().notNull(),
+}, (table) => ({
+  bundleDocUnique: uniqueIndex("bundle_doc_unique_idx").on(table.bundleId, table.documentId),
+  bundleIdx: index("bundle_items_bundle_idx").on(table.bundleId),
+  documentIdx: index("bundle_items_document_idx").on(table.documentId),
+}));
+
+// Document Insert Schemas and Types
+export const insertDocumentTypeSchema = createInsertSchema(documentTypesConfig).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocumentType = z.infer<typeof insertDocumentTypeSchema>;
+export type DocumentTypeConfig = typeof documentTypesConfig.$inferSelect;
+
+export const insertDocumentDisciplineSchema = createInsertSchema(documentDisciplines).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocumentDiscipline = z.infer<typeof insertDocumentDisciplineSchema>;
+export type DocumentDiscipline = typeof documentDisciplines.$inferSelect;
+
+export const insertDocumentCategorySchema = createInsertSchema(documentCategories).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocumentCategory = z.infer<typeof insertDocumentCategorySchema>;
+export type DocumentCategory = typeof documentCategories.$inferSelect;
+
+export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type Document = typeof documents.$inferSelect;
+
+export const insertDocumentBundleSchema = createInsertSchema(documentBundles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocumentBundle = z.infer<typeof insertDocumentBundleSchema>;
+export type DocumentBundle = typeof documentBundles.$inferSelect;
+
+export const insertDocumentBundleItemSchema = createInsertSchema(documentBundleItems).omit({ id: true, addedAt: true });
+export type InsertDocumentBundleItem = z.infer<typeof insertDocumentBundleItemSchema>;
+export type DocumentBundleItem = typeof documentBundleItems.$inferSelect;
+
+// Extended types with relations
+export type DocumentWithDetails = Document & {
+  type?: DocumentTypeConfig | null;
+  discipline?: DocumentDiscipline | null;
+  category?: DocumentCategory | null;
+  job?: Job | null;
+  panel?: PanelRegister | null;
+  supplier?: Supplier | null;
+  uploadedByUser?: User | null;
+};
+
+export type DocumentBundleWithItems = DocumentBundle & {
+  items: (DocumentBundleItem & { document: Document })[];
+  job?: Job | null;
+  supplier?: Supplier | null;
+  createdByUser?: User | null;
+};

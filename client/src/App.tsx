@@ -45,6 +45,7 @@ import TasksPage from "@/pages/tasks";
 import PanelDetailsPage from "@/pages/panel-details";
 import ChatPage from "@/pages/chat";
 import ProductionSchedulePage from "@/pages/production-schedule";
+import DocumentRegisterPage from "@/pages/document-register";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -268,6 +269,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ChatPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/documents">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <DocumentRegisterPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

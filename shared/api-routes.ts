@@ -418,6 +418,47 @@ export const AGENT_ROUTES = {
 } as const;
 
 // ============================================================================
+// DOCUMENT MANAGEMENT
+// ============================================================================
+export const DOCUMENT_ROUTES = {
+  // Documents
+  LIST: '/api/documents',
+  BY_ID: (id: string | number) => `/api/documents/${id}`,
+  UPLOAD: '/api/documents/upload',
+  VIEW: (id: string | number) => `/api/documents/${id}/view`,
+  DOWNLOAD: (id: string | number) => `/api/documents/${id}/download`,
+  NEW_VERSION: (id: string | number) => `/api/documents/${id}/new-version`,
+  VERSIONS: (id: string | number) => `/api/documents/${id}/versions`,
+  STATUS: (id: string | number) => `/api/documents/${id}/status`,
+  NEXT_NUMBER: '/api/documents/next-number',
+  
+  // Document Types
+  TYPES: '/api/document-types',
+  TYPES_ACTIVE: '/api/document-types/active',
+  TYPE_BY_ID: (id: string | number) => `/api/document-types/${id}`,
+  
+  // Document Disciplines
+  DISCIPLINES: '/api/document-disciplines',
+  DISCIPLINES_ACTIVE: '/api/document-disciplines/active',
+  DISCIPLINE_BY_ID: (id: string | number) => `/api/document-disciplines/${id}`,
+  
+  // Document Categories
+  CATEGORIES: '/api/document-categories',
+  CATEGORIES_ACTIVE: '/api/document-categories/active',
+  CATEGORY_BY_ID: (id: string | number) => `/api/document-categories/${id}`,
+  
+  // Document Bundles
+  BUNDLES: '/api/document-bundles',
+  BUNDLE_BY_ID: (id: string | number) => `/api/document-bundles/${id}`,
+  BUNDLE_BY_QR: (qrCodeId: string) => `/api/document-bundles/qr/${qrCodeId}`,
+  BUNDLE_ADD_DOCUMENTS: (id: string | number) => `/api/document-bundles/${id}/documents`,
+  BUNDLE_REMOVE_DOCUMENT: (bundleId: string | number, documentId: string | number) => `/api/document-bundles/${bundleId}/documents/${documentId}`,
+  
+  // Public bundle access (no auth required)
+  PUBLIC_BUNDLE: (qrCodeId: string) => `/api/public/bundles/${qrCodeId}`,
+} as const;
+
+// ============================================================================
 // TYPE EXPORTS for frontend usage
 // ============================================================================
 export type AuthRoutes = typeof AUTH_ROUTES;
@@ -443,3 +484,4 @@ export type DashboardRoutes = typeof DASHBOARD_ROUTES;
 export type DailyLogsRoutes = typeof DAILY_LOGS_ROUTES;
 export type TimerRoutes = typeof TIMER_ROUTES;
 export type AgentRoutes = typeof AGENT_ROUTES;
+export type DocumentRoutes = typeof DOCUMENT_ROUTES;

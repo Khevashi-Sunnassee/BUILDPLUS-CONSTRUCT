@@ -29,6 +29,7 @@ import { agentRouter } from "./agent.routes";
 import { chatRouter } from "../chat/chat.routes";
 import productionScheduleRouter from "./production-schedule.routes";
 import { timerRouter } from "./timer.routes";
+import documentsRouter from "./documents.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -90,6 +91,9 @@ export async function setupRoutes(app: Express): Promise<void> {
   
   // Timer router - for drafting time tracking
   app.use(timerRouter);
+  
+  // Documents router - for document management system
+  app.use(documentsRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

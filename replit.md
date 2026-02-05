@@ -31,6 +31,7 @@ The frontend uses React + Vite, TanStack Query for data fetching, Wouter for rou
 - **Factory Management**: Multi-factory support with location tracking, CFMEU calendar assignment, configurable work days, production beds, and user-specific factory preferences.
 - **Working Days Calculation**: All date-related calculations use working days based on factory schedules and CFMEU calendars, excluding public holidays.
 - **Chat System**: Teams-style messaging with DM, GROUP, CHANNEL types, @mentions, notifications, file attachments, job/panel linking, and read receipts.
+- **Document Management System**: Comprehensive document register with file upload/download via Replit Object Storage, version control (parent_document_id chain, isLatestVersion flag), document bundles with QR code access for guest sharing, entity linking (jobs, panels, suppliers, purchase orders, tasks), configurable document types/disciplines/categories, and pagination support for 1000+ documents.
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.
@@ -73,6 +74,8 @@ apiRequest("POST", CHAT_ROUTES.MESSAGES(conversationId), data)
 - `PANELS_ROUTES.LIST` = `/api/panels` (general panel access)
 - `CHAT_ROUTES.MESSAGES(id)` = `/api/chat/conversations/:id/messages`
 - `CHAT_ROUTES.PANEL_CONVERSATION(panelId)` = `/api/chat/panels/:panelId/conversation`
+- `DOCUMENT_ROUTES.LIST` = `/api/documents` (document register)
+- `DOCUMENT_ROUTES.BUNDLES` = `/api/document-bundles` (document bundles with QR access)
 
 ### Frontend Conventions
 
