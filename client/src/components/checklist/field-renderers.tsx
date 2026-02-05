@@ -83,7 +83,7 @@ export function RadioButtonField({ field, value, onChange, disabled }: FieldRend
     >
       {options.map((option: ChecklistFieldOption) => (
         <div key={option.value} className="flex items-center space-x-2">
-          <RadioGroupItem value={option.value} id={`${field.id}-${option.value}`} />
+          <RadioGroupItem value={option.value} id={`${field.id}-${option.value}`} data-testid={`radio-${field.id}-${option.value}`} />
           <Label htmlFor={`${field.id}-${option.value}`}>{option.text}</Label>
         </div>
       ))}
@@ -104,7 +104,7 @@ export function DropdownField({ field, value, onChange, disabled }: FieldRendere
       </SelectTrigger>
       <SelectContent>
         {options.map((option: ChecklistFieldOption) => (
-          <SelectItem key={option.value} value={option.value}>
+          <SelectItem key={option.value} value={option.value} data-testid={`option-${field.id}-${option.value}`}>
             {option.text}
           </SelectItem>
         ))}
@@ -134,6 +134,7 @@ export function CheckboxField({ field, value, onChange, disabled }: FieldRendere
             checked={selectedValues.includes(option.value)}
             onCheckedChange={() => toggleOption(option.value)}
             disabled={disabled}
+            data-testid={`checkbox-${field.id}-${option.value}`}
           />
           <Label htmlFor={`${field.id}-${option.value}`}>{option.text}</Label>
         </div>
@@ -253,6 +254,7 @@ export function InspectionCheckField({ field, value, onChange, disabled }: Field
         checked={isChecked}
         onCheckedChange={(checked) => onChange(checked)}
         disabled={disabled}
+        data-testid={`checkbox-inspection-${field.id}`}
       />
       <Label htmlFor={`${field.id}-check`}>Checked / Verified</Label>
     </div>
@@ -349,6 +351,7 @@ export function PriorityField({ field, value, onChange, disabled }: FieldRendere
           variant={currentValue === priority.value ? priority.variant : "outline"}
           className={cn("cursor-pointer", disabled && "pointer-events-none opacity-50")}
           onClick={() => !disabled && onChange(priority.value)}
+          data-testid={`badge-priority-${priority.value}-${field.id}`}
         >
           {priority.label}
         </Badge>
@@ -370,6 +373,7 @@ export function RatingField({ field, value, onChange, disabled }: FieldRendererP
           onClick={() => !disabled && onChange(rating)}
           disabled={disabled}
           className="focus:outline-none"
+          data-testid={`button-rating-${rating}-${field.id}`}
         >
           <Star
             className={cn(
@@ -413,6 +417,7 @@ export function PhotoField({ field, value, onChange, disabled }: FieldRendererPr
               setPreview(null);
               onChange(null);
             }}
+            data-testid={`button-remove-photo-${field.id}`}
           >
             ×
           </Button>
@@ -462,6 +467,7 @@ export function FileUploadField({ field, value, onChange, disabled }: FieldRende
             variant="ghost"
             size="sm"
             onClick={() => onChange(null)}
+            data-testid={`button-remove-file-${field.id}`}
           >
             Remove
           </Button>
@@ -500,6 +506,7 @@ export function SignatureField({ field, value, onChange, disabled }: FieldRender
             size="sm"
             className="mt-2"
             onClick={() => onChange(null)}
+            data-testid={`button-clear-signature-${field.id}`}
           >
             Clear Signature
           </Button>
@@ -537,9 +544,9 @@ export function SelectorField({ field, value, onChange, disabled }: FieldRendere
         <SelectValue placeholder={`Select ${field.name.toLowerCase()}`} />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="placeholder_1">Item 1</SelectItem>
-        <SelectItem value="placeholder_2">Item 2</SelectItem>
-        <SelectItem value="placeholder_3">Item 3</SelectItem>
+        <SelectItem value="placeholder_1" data-testid={`option-selector-${field.id}-1`}>Item 1</SelectItem>
+        <SelectItem value="placeholder_2" data-testid={`option-selector-${field.id}-2`}>Item 2</SelectItem>
+        <SelectItem value="placeholder_3" data-testid={`option-selector-${field.id}-3`}>Item 3</SelectItem>
       </SelectContent>
     </Select>
   );

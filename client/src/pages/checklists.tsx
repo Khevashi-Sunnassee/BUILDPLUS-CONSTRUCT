@@ -201,11 +201,11 @@ export default function ChecklistsPage() {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="signed_off">Signed Off</SelectItem>
+                <SelectItem value="all" data-testid="option-status-all">All Statuses</SelectItem>
+                <SelectItem value="draft" data-testid="option-status-draft">Draft</SelectItem>
+                <SelectItem value="in_progress" data-testid="option-status-in-progress">In Progress</SelectItem>
+                <SelectItem value="completed" data-testid="option-status-completed">Completed</SelectItem>
+                <SelectItem value="signed_off" data-testid="option-status-signed-off">Signed Off</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -224,7 +224,7 @@ export default function ChecklistsPage() {
               : "Try adjusting your search or filter"}
           </p>
           {instances?.length === 0 && activeTemplates.length > 0 && (
-            <Button onClick={() => setNewChecklistDialogOpen(true)}>
+            <Button onClick={() => setNewChecklistDialogOpen(true)} data-testid="button-create-first-checklist">
               <Plus className="h-4 w-4 mr-2" />
               Create Checklist
             </Button>
@@ -273,7 +273,7 @@ export default function ChecklistsPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild>
+                      <Button variant="outline" size="sm" asChild data-testid={`button-open-checklist-${instance.id}`}>
                         <Link href={`/checklists/${instance.id}`}>
                           {instance.status === "completed" || instance.status === "signed_off"
                             ? "View"
@@ -319,7 +319,7 @@ export default function ChecklistsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {activeTemplates.map((template) => (
-                    <SelectItem key={template.id} value={template.id}>
+                    <SelectItem key={template.id} value={template.id} data-testid={`option-template-${template.id}`}>
                       {template.name}
                     </SelectItem>
                   ))}
@@ -333,9 +333,9 @@ export default function ChecklistsPage() {
                   <SelectValue placeholder="Select a job" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="" data-testid="option-job-none">None</SelectItem>
                   {jobs?.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
+                    <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                       {job.name}
                     </SelectItem>
                   ))}
@@ -344,7 +344,7 @@ export default function ChecklistsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setNewChecklistDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setNewChecklistDialogOpen(false)} data-testid="button-cancel-new-checklist">
               Cancel
             </Button>
             <Button
@@ -370,10 +370,10 @@ export default function ChecklistsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingInstanceId && deleteInstanceMutation.mutate(deletingInstanceId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
             >
               {deleteInstanceMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

@@ -147,7 +147,7 @@ export default function ChecklistFillPage() {
           <p className="text-muted-foreground mb-4">
             The checklist you're looking for doesn't exist or you don't have access.
           </p>
-          <Button asChild>
+          <Button asChild data-testid="button-back-to-checklists">
             <Link href="/checklists">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Checklists
@@ -249,9 +249,10 @@ export default function ChecklistFillPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-complete">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => completeInstanceMutation.mutate()}
+              data-testid="button-confirm-complete"
             >
               {completeInstanceMutation.isPending && (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
