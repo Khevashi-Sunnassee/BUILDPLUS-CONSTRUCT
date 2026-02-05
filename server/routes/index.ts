@@ -31,6 +31,7 @@ import { companiesRouter } from "./companies.routes";
 import productionScheduleRouter from "./production-schedule.routes";
 import { timerRouter } from "./timer.routes";
 import documentsRouter from "./documents.routes";
+import { reoScheduleRouter } from "./reo-schedule.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -97,6 +98,9 @@ export async function setupRoutes(app: Express): Promise<void> {
   
   // Documents router - for document management system
   app.use(documentsRouter);
+  
+  // Reo Schedule router - for procurement manager
+  app.use(reoScheduleRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);
