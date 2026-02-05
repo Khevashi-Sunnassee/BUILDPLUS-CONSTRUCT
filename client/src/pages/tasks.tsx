@@ -711,17 +711,13 @@ function TaskRow({
               value={newSubtaskTitle}
               onChange={(e) => setNewSubtaskTitle(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && newSubtaskTitle.trim()) {
-                  createSubtaskMutation.mutate(newSubtaskTitle);
-                }
-              }}
-              onBlur={() => {
-                if (newSubtaskTitle.trim()) {
+                if (e.key === "Enter" && newSubtaskTitle.trim() && !createSubtaskMutation.isPending) {
                   createSubtaskMutation.mutate(newSubtaskTitle);
                 }
               }}
               className="h-7 border-0 bg-transparent focus-visible:ring-1 text-sm"
-              placeholder="Add subitem..."
+              placeholder="Add subitem (press Enter)..."
+              disabled={createSubtaskMutation.isPending}
               data-testid={`input-add-subitem-${task.id}`}
             />
           </div>

@@ -208,7 +208,7 @@ export interface ItemWithDetails extends Item {
 
 export interface TaskWithDetails extends Task {
   assignees: (TaskAssignee & { user: User })[];
-  subtasks: Task[];
+  subtasks: TaskWithDetails[];
   updatesCount: number;
   filesCount: number;
   createdBy?: User | null;
@@ -3264,6 +3264,44 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tasks.parentId, taskId))
       .orderBy(asc(tasks.sortOrder));
 
+    // Fetch full details for each subtask
+    const subtasksWithDetails: TaskWithDetails[] = [];
+    for (const subtask of subtasksResult) {
+      const subtaskAssigneesResult = await db.select()
+        .from(taskAssignees)
+        .innerJoin(users, eq(taskAssignees.userId, users.id))
+        .where(eq(taskAssignees.taskId, subtask.id));
+      
+      const subtaskAssignees = subtaskAssigneesResult.map(r => ({
+        ...r.task_assignees,
+        user: r.users,
+      }));
+
+      let subtaskJob: Job | null = null;
+      if (subtask.jobId) {
+        const [jobResult] = await db.select().from(jobs).where(eq(jobs.id, subtask.jobId));
+        subtaskJob = jobResult || null;
+      }
+
+      const [subtaskUpdatesCount] = await db.select({ count: sql<number>`count(*)` })
+        .from(taskUpdates)
+        .where(eq(taskUpdates.taskId, subtask.id));
+
+      const [subtaskFilesCount] = await db.select({ count: sql<number>`count(*)` })
+        .from(taskFiles)
+        .where(eq(taskFiles.taskId, subtask.id));
+
+      subtasksWithDetails.push({
+        ...subtask,
+        assignees: subtaskAssignees,
+        subtasks: [], // Subtasks don't have their own subtasks (only one level)
+        updatesCount: Number(subtaskUpdatesCount?.count || 0),
+        filesCount: Number(subtaskFilesCount?.count || 0),
+        createdBy: null,
+        job: subtaskJob,
+      });
+    }
+
     const [updatesCount] = await db.select({ count: sql<number>`count(*)` })
       .from(taskUpdates)
       .where(eq(taskUpdates.taskId, taskId));
@@ -3287,7 +3325,7 @@ export class DatabaseStorage implements IStorage {
     return {
       ...task,
       assignees,
-      subtasks: subtasksResult,
+      subtasks: subtasksWithDetails,
       updatesCount: Number(updatesCount?.count || 0),
       filesCount: Number(filesCount?.count || 0),
       createdBy,
