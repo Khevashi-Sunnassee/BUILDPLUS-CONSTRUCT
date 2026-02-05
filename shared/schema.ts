@@ -1673,6 +1673,9 @@ export const insertDocumentBundleItemSchema = createInsertSchema(documentBundleI
 export type InsertDocumentBundleItem = z.infer<typeof insertDocumentBundleItemSchema>;
 export type DocumentBundleItem = typeof documentBundleItems.$inferSelect;
 
+// Safe user type (excludes sensitive data like passwordHash)
+export type SafeUser = Pick<User, 'id' | 'email' | 'name' | 'role'>;
+
 // Extended types with relations
 export type DocumentWithDetails = Document & {
   type?: DocumentTypeConfig | null;
@@ -1681,12 +1684,12 @@ export type DocumentWithDetails = Document & {
   job?: Job | null;
   panel?: PanelRegister | null;
   supplier?: Supplier | null;
-  uploadedByUser?: User | null;
+  uploadedByUser?: SafeUser | null;
 };
 
 export type DocumentBundleWithItems = DocumentBundle & {
   items: (DocumentBundleItem & { document: Document })[];
   job?: Job | null;
   supplier?: Supplier | null;
-  createdByUser?: User | null;
+  createdByUser?: SafeUser | null;
 };

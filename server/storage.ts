@@ -3916,7 +3916,14 @@ export class DatabaseStorage implements IStorage {
         const [job] = doc.jobId ? await db.select().from(jobs).where(eq(jobs.id, doc.jobId)) : [null];
         const [panel] = doc.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, doc.panelId)) : [null];
         const [supplier] = doc.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, doc.supplierId)) : [null];
-        const [uploadedByUser] = await db.select().from(users).where(eq(users.id, doc.uploadedBy));
+        const [uploadedByUserFull] = await db.select().from(users).where(eq(users.id, doc.uploadedBy));
+        // Remove sensitive data from user object
+        const uploadedByUser = uploadedByUserFull ? {
+          id: uploadedByUserFull.id,
+          email: uploadedByUserFull.email,
+          name: uploadedByUserFull.name,
+          role: uploadedByUserFull.role,
+        } : null;
         
         return {
           ...doc,
@@ -3950,7 +3957,14 @@ export class DatabaseStorage implements IStorage {
     const [job] = doc.jobId ? await db.select().from(jobs).where(eq(jobs.id, doc.jobId)) : [null];
     const [panel] = doc.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, doc.panelId)) : [null];
     const [supplier] = doc.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, doc.supplierId)) : [null];
-    const [uploadedByUser] = await db.select().from(users).where(eq(users.id, doc.uploadedBy));
+    const [uploadedByUserFull] = await db.select().from(users).where(eq(users.id, doc.uploadedBy));
+    // Remove sensitive data from user object
+    const uploadedByUser = uploadedByUserFull ? {
+      id: uploadedByUserFull.id,
+      email: uploadedByUserFull.email,
+      name: uploadedByUserFull.name,
+      role: uploadedByUserFull.role,
+    } : null;
 
     return {
       ...doc,
@@ -4063,7 +4077,14 @@ export class DatabaseStorage implements IStorage {
 
       const [job] = bundle.jobId ? await db.select().from(jobs).where(eq(jobs.id, bundle.jobId)) : [null];
       const [supplier] = bundle.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, bundle.supplierId)) : [null];
-      const [createdByUser] = await db.select().from(users).where(eq(users.id, bundle.createdBy));
+      const [createdByUserFull] = await db.select().from(users).where(eq(users.id, bundle.createdBy));
+      // Remove sensitive data from user object
+      const createdByUser = createdByUserFull ? {
+        id: createdByUserFull.id,
+        email: createdByUserFull.email,
+        name: createdByUserFull.name,
+        role: createdByUserFull.role,
+      } : null;
 
       return { ...bundle, items: itemsWithDocs, job, supplier, createdByUser };
     }));
@@ -4085,7 +4106,14 @@ export class DatabaseStorage implements IStorage {
 
     const [job] = bundle.jobId ? await db.select().from(jobs).where(eq(jobs.id, bundle.jobId)) : [null];
     const [supplier] = bundle.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, bundle.supplierId)) : [null];
-    const [createdByUser] = await db.select().from(users).where(eq(users.id, bundle.createdBy));
+    const [createdByUserFull] = await db.select().from(users).where(eq(users.id, bundle.createdBy));
+    // Remove sensitive data from user object
+    const createdByUser = createdByUserFull ? {
+      id: createdByUserFull.id,
+      email: createdByUserFull.email,
+      name: createdByUserFull.name,
+      role: createdByUserFull.role,
+    } : null;
 
     return { ...bundle, items: itemsWithDocs, job, supplier, createdByUser };
   }
