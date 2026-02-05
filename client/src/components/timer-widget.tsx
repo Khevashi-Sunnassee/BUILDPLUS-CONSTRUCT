@@ -92,10 +92,10 @@ export function TimerWidget() {
     queryKey: [DRAFTING_ROUTES.MY_ALLOCATED],
   });
 
-  const allPanels = allocatedData?.programs.flatMap(p => p.panels) || [];
+  const allPanels = allocatedData?.programs.flatMap(p => p.panels || []).filter(Boolean) || [];
   const filteredPanels = selectedJobId 
-    ? allPanels.filter(p => p.jobId === selectedJobId)
-    : allPanels;
+    ? allPanels.filter(p => p && p.jobId === selectedJobId)
+    : allPanels.filter(Boolean);
 
   useEffect(() => {
     if (!activeSession) {
