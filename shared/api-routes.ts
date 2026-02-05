@@ -31,7 +31,7 @@ export const USER_ROUTES = {
   LIST: '/api/users',
   BY_ID: (id: string | number) => `/api/users/${id}`,
   SETTINGS: '/api/user/settings',
-  PERMISSIONS: '/api/permissions/my-permissions',
+  MY_PERMISSIONS: '/api/my-permissions',
 } as const;
 
 // ============================================================================
@@ -108,12 +108,17 @@ export const PROCUREMENT_ROUTES = {
   
   // Purchase Orders
   PURCHASE_ORDERS: '/api/purchase-orders',
+  PURCHASE_ORDERS_MY: '/api/purchase-orders/my',
+  PURCHASE_ORDERS_NEXT_NUMBER: '/api/purchase-orders/next-number',
   PURCHASE_ORDER_BY_ID: (id: string | number) => `/api/purchase-orders/${id}`,
   PURCHASE_ORDER_ITEMS: (id: string | number) => `/api/purchase-orders/${id}/items`,
   PURCHASE_ORDER_ATTACHMENTS: (id: string | number) => `/api/purchase-orders/${id}/attachments`,
   PURCHASE_ORDER_SUBMIT: (id: string | number) => `/api/purchase-orders/${id}/submit`,
   PURCHASE_ORDER_APPROVE: (id: string | number) => `/api/purchase-orders/${id}/approve`,
   PURCHASE_ORDER_REJECT: (id: string | number) => `/api/purchase-orders/${id}/reject`,
+  
+  // PO Attachments (direct access)
+  PO_ATTACHMENT_DOWNLOAD: (id: string | number) => `/api/po-attachments/${id}/download`,
 } as const;
 
 // ============================================================================
@@ -121,6 +126,7 @@ export const PROCUREMENT_ROUTES = {
 // ============================================================================
 export const JOBS_ROUTES = {
   LIST: '/api/jobs',
+  PROJECTS: '/api/projects',
   BY_ID: (id: string | number) => `/api/jobs/${id}`,
   SETTINGS: (id: string | number) => `/api/jobs/${id}/settings`,
   COST_BREAKDOWN: (id: string | number) => `/api/jobs/${id}/cost-breakdown`,
@@ -129,6 +135,9 @@ export const JOBS_ROUTES = {
   COST_OVERRIDES_INITIALIZE: (id: string | number) => `/api/jobs/${id}/cost-overrides/initialize`,
   PANELS: (id: string | number) => `/api/jobs/${id}/panels`,
   PANELS_IMPORT_ESTIMATE: (id: string | number) => `/api/jobs/${id}/panels/import-estimate`,
+  IMPORT_ESTIMATE: (id: string | number) => `/api/jobs/${id}/import-estimate`,
+  PANEL_RATES: (id: string | number) => `/api/jobs/${id}/panel-rates`,
+  PANEL_RATE_BY_TYPE: (jobId: string | number, panelTypeId: string | number) => `/api/jobs/${jobId}/panel-rates/${panelTypeId}`,
   TOTALS: (id: string | number) => `/api/jobs/${id}/totals`,
 } as const;
 
@@ -174,7 +183,7 @@ export const PRODUCTION_ROUTES = {
   ENTRIES_BATCH_STATUS: '/api/production-entries/batch-status',
   
   // Summary & Reports
-  SUMMARY: '/api/production/summary',
+  SUMMARY: '/api/production-summary',
   SUMMARY_WITH_COSTS: '/api/production-summary-with-costs',
   DAYS: '/api/production-days',
   DAY_BY_ID: (id: string | number) => `/api/production-days/${id}`,
@@ -201,7 +210,9 @@ export const LOGISTICS_ROUTES = {
   LOAD_LISTS: '/api/load-lists',
   LOAD_LIST_BY_ID: (id: string | number) => `/api/load-lists/${id}`,
   LOAD_LIST_PANELS: (id: string | number) => `/api/load-lists/${id}/panels`,
+  LOAD_LIST_PANEL_REMOVE: (loadListId: string | number, panelId: string | number) => `/api/load-lists/${loadListId}/panels/${panelId}`,
   LOAD_LIST_DELIVERY: (id: string | number) => `/api/load-lists/${id}/delivery`,
+  DELIVERY_RECORD_BY_ID: (id: string | number) => `/api/delivery-records/${id}`,
   TRAILER_TYPES: '/api/trailer-types',
   TRAILER_TYPE_BY_ID: (id: string | number) => `/api/trailer-types/${id}`,
 } as const;
@@ -230,8 +241,11 @@ export const TASKS_ROUTES = {
   FILES: (id: string | number) => `/api/tasks/${id}/files`,
   FILE_BY_ID: (id: string | number) => `/api/task-files/${id}`,
   NOTIFICATIONS: '/api/task-notifications',
+  NOTIFICATIONS_UNREAD_COUNT: '/api/task-notifications/unread-count',
   NOTIFICATION_READ: (id: string | number) => `/api/task-notifications/${id}/read`,
   NOTIFICATIONS_READ_ALL: '/api/task-notifications/read-all',
+  GROUPS_REORDER: '/api/task-groups/reorder',
+  TASKS_REORDER: '/api/tasks/reorder',
 } as const;
 
 // ============================================================================
@@ -274,16 +288,16 @@ export const ADMIN_ROUTES = {
   JOB_PRODUCTION_SLOT_STATUS: (id: string | number) => `/api/admin/jobs/${id}/production-slot-status`,
   JOB_UPDATE_PRODUCTION_SLOTS: (id: string | number) => `/api/admin/jobs/${id}/update-production-slots`,
   
-  // Panels
-  PANELS: '/api/admin/panels',
-  PANEL_BY_ID: (id: string | number) => `/api/admin/panels/${id}`,
-  PANELS_IMPORT: '/api/admin/panels/import',
-  PANELS_SOURCE_COUNTS: '/api/admin/panels/source-counts',
-  PANELS_BY_SOURCE: (sourceId: string | number) => `/api/admin/panels/by-source/${sourceId}`,
-  PANEL_VALIDATE: (id: string | number) => `/api/admin/panels/${id}/validate`,
-  PANEL_ANALYZE_PDF: (id: string | number) => `/api/admin/panels/${id}/analyze-pdf`,
-  PANEL_APPROVE_PRODUCTION: (id: string | number) => `/api/admin/panels/${id}/approve-production`,
-  PANEL_REVOKE_PRODUCTION: (id: string | number) => `/api/admin/panels/${id}/revoke-production`,
+  // Panels (admin management routes - uses /api/panels/admin pattern)
+  PANELS: '/api/panels/admin',
+  PANEL_BY_ID: (id: string | number) => `/api/panels/admin/${id}`,
+  PANELS_IMPORT: '/api/panels/admin/import',
+  PANELS_SOURCE_COUNTS: '/api/panels/admin/source-counts',
+  PANELS_BY_SOURCE: (sourceId: string | number) => `/api/panels/admin/by-source/${sourceId}`,
+  PANEL_VALIDATE: (id: string | number) => `/api/panels/admin/${id}/validate`,
+  PANEL_ANALYZE_PDF: (id: string | number) => `/api/panels/admin/${id}/analyze-pdf`,
+  PANEL_APPROVE_PRODUCTION: (id: string | number) => `/api/panels/admin/${id}/approve-production`,
+  PANEL_REVOKE_PRODUCTION: (id: string | number) => `/api/panels/admin/${id}/revoke-production`,
   
   // Panel Types (admin management routes)
   PANEL_TYPES: '/api/panel-types/admin',

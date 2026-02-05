@@ -125,7 +125,7 @@ export function AppSidebar() {
   const [adminExpanded, setAdminExpanded] = useState(false);
 
   const { data: myPermissions = [] } = useQuery<UserPermission[]>({
-    queryKey: [USER_ROUTES.PERMISSIONS],
+    queryKey: [USER_ROUTES.MY_PERMISSIONS],
     enabled: !!user,
   });
 

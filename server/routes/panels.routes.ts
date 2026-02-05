@@ -68,6 +68,47 @@ router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, 
   }
 });
 
+router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = parseInt(req.query.pageSize as string) || 50;
+    const jobId = req.query.jobId as string | undefined;
+    const search = req.query.search as string | undefined;
+    const status = req.query.status as string | undefined;
+    
+    const panels = await storage.getAllPanelRegisterItems();
+    
+    let filtered = panels;
+    if (jobId) {
+      filtered = filtered.filter(p => p.jobId === jobId);
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(p => 
+        p.panelMark?.toLowerCase().includes(searchLower) ||
+        p.panelType?.toLowerCase().includes(searchLower)
+      );
+    }
+    if (status && status !== 'all') {
+      filtered = filtered.filter(p => p.approvedForProduction === (status === 'approved'));
+    }
+    
+    const start = (page - 1) * pageSize;
+    const paginated = filtered.slice(start, start + pageSize);
+    
+    res.json({
+      panels: paginated,
+      total: filtered.length,
+      page,
+      pageSize,
+      totalPages: Math.ceil(filtered.length / pageSize)
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message }, "Failed to get admin panels");
+    res.status(500).json({ error: "Failed to get panels" });
+  }
+});
+
 router.get("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const panel = await storage.getPanelRegisterItem(req.params.id as string);
   if (!panel) return res.status(404).json({ error: "Panel not found" });
