@@ -312,6 +312,11 @@ export default function ManualEntryPage() {
     if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
       const panel = panels?.find(p => p.id === watchedPanelRegisterId);
       if (panel) {
+        // Auto-select the job from the panel if not already selected
+        if (panel.jobId && (!selectedJobId || selectedJobId === "none")) {
+          setSelectedJobId(panel.jobId);
+          form.setValue("jobId", panel.jobId);
+        }
         // Populate panel mark from selected panel
         form.setValue("panelMark", panel.panelMark || "");
         // Populate drawing code
