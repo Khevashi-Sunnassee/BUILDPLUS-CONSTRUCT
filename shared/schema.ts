@@ -1901,6 +1901,78 @@ export const insertDocumentBundleAccessLogSchema = createInsertSchema(documentBu
 export type InsertDocumentBundleAccessLog = z.infer<typeof insertDocumentBundleAccessLogSchema>;
 export type DocumentBundleAccessLog = typeof documentBundleAccessLogs.$inferSelect;
 
+// ==================== Reo Scheduling (Procurement Manager) ====================
+
+export const reoScheduleStatusEnum = pgEnum("reo_schedule_status", ["PENDING", "PROCESSING", "COMPLETED", "FAILED"]);
+export const reoScheduleItemStatusEnum = pgEnum("reo_schedule_item_status", ["PENDING", "APPROVED", "REJECTED", "ORDERED"]);
+
+export const reoSchedules = pgTable("reo_schedules", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id, { onDelete: "cascade" }),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  sourceDocumentId: varchar("source_document_id", { length: 36 }).references(() => documents.id),
+  status: reoScheduleStatusEnum("status").default("PENDING").notNull(),
+  processedAt: timestamp("processed_at"),
+  aiModelUsed: text("ai_model_used"),
+  aiResponseRaw: text("ai_response_raw"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("reo_schedules_company_idx").on(table.companyId),
+  panelIdx: index("reo_schedules_panel_idx").on(table.panelId),
+  jobIdx: index("reo_schedules_job_idx").on(table.jobId),
+  statusIdx: index("reo_schedules_status_idx").on(table.status),
+}));
+
+export const reoScheduleItems = pgTable("reo_schedule_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  scheduleId: varchar("schedule_id", { length: 36 }).notNull().references(() => reoSchedules.id, { onDelete: "cascade" }),
+  reoType: text("reo_type").notNull(), // Bar, Mesh, Fitment, U-Bar, Lig, etc.
+  barSize: text("bar_size"), // N12, N16, N20, etc.
+  barShape: text("bar_shape"), // Straight, L-Shape, U-Shape, etc.
+  length: decimal("length", { precision: 10, scale: 2 }), // in mm
+  quantity: integer("quantity").notNull(),
+  weight: decimal("weight", { precision: 10, scale: 2 }), // in kg
+  spacing: text("spacing"), // e.g., "200mm c/c"
+  zone: text("zone"), // location within panel
+  description: text("description"),
+  notes: text("notes"),
+  status: reoScheduleItemStatusEnum("status").default("PENDING").notNull(),
+  purchaseOrderId: varchar("purchase_order_id", { length: 36 }).references(() => purchaseOrders.id),
+  purchaseOrderItemId: varchar("purchase_order_item_id", { length: 36 }),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  scheduleIdx: index("reo_schedule_items_schedule_idx").on(table.scheduleId),
+  typeIdx: index("reo_schedule_items_type_idx").on(table.reoType),
+  statusIdx: index("reo_schedule_items_status_idx").on(table.status),
+  poIdx: index("reo_schedule_items_po_idx").on(table.purchaseOrderId),
+}));
+
+// Reo Schedule Insert Schemas and Types
+export const insertReoScheduleSchema = createInsertSchema(reoSchedules).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertReoSchedule = z.infer<typeof insertReoScheduleSchema>;
+export type ReoSchedule = typeof reoSchedules.$inferSelect;
+
+export const insertReoScheduleItemSchema = createInsertSchema(reoScheduleItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertReoScheduleItem = z.infer<typeof insertReoScheduleItemSchema>;
+export type ReoScheduleItem = typeof reoScheduleItems.$inferSelect;
+
+export type ReoScheduleStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type ReoScheduleItemStatus = "PENDING" | "APPROVED" | "REJECTED" | "ORDERED";
+
+export type ReoScheduleWithDetails = ReoSchedule & {
+  panel?: PanelRegister | null;
+  job?: Job | null;
+  sourceDocument?: Document | null;
+  createdBy?: SafeUser | null;
+  items?: ReoScheduleItem[];
+};
+
 // Safe user type (excludes sensitive data like passwordHash)
 export type SafeUser = Pick<User, 'id' | 'email' | 'name' | 'role'>;
 

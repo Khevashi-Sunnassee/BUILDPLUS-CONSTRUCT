@@ -13,6 +13,7 @@ import {
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   factories, cfmeuHolidays,
   documentTypesConfig, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems, documentBundleAccessLogs,
+  reoSchedules, reoScheduleItems,
   type Company, type InsertCompany,
   type InsertUser, type User, type InsertDevice, type Device,
   type InsertMappingRule, type MappingRule,
@@ -56,6 +57,8 @@ import {
   type InsertDocument, type Document, type DocumentWithDetails,
   type InsertDocumentBundle, type DocumentBundle, type DocumentBundleWithItems,
   type InsertDocumentBundleItem, type DocumentBundleItem,
+  type InsertReoSchedule, type ReoSchedule, type ReoScheduleWithDetails,
+  type InsertReoScheduleItem, type ReoScheduleItem, type ReoScheduleStatus, type ReoScheduleItemStatus,
 } from "@shared/schema";
 
 // Working days calculation utilities
@@ -4294,6 +4297,131 @@ export class DatabaseStorage implements IStorage {
       .from(documentBundleAccessLogs)
       .where(eq(documentBundleAccessLogs.bundleId, bundleId))
       .orderBy(desc(documentBundleAccessLogs.accessedAt));
+  }
+
+  // ==================== Reo Scheduling ====================
+
+  async getIfcPanelsForProcurement(companyId: string): Promise<any[]> {
+    const panels = await db.select({
+      panel: panelRegister,
+      job: jobs,
+      productionSlot: productionSlots,
+    })
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .leftJoin(productionSlots, eq(productionSlots.panelId, panelRegister.id))
+      .where(and(
+        eq(panelRegister.companyId, companyId),
+        eq(panelRegister.approvedForProduction, true)
+      ))
+      .orderBy(asc(productionSlots.slotDate), asc(panelRegister.panelMark));
+    
+    return panels;
+  }
+
+  async createReoSchedule(data: InsertReoSchedule): Promise<ReoSchedule> {
+    const [result] = await db.insert(reoSchedules).values(data).returning();
+    return result;
+  }
+
+  async getReoSchedule(id: string): Promise<ReoSchedule | undefined> {
+    const [result] = await db.select().from(reoSchedules).where(eq(reoSchedules.id, id));
+    return result;
+  }
+
+  async getReoScheduleByPanel(panelId: string): Promise<ReoSchedule | undefined> {
+    const [result] = await db.select().from(reoSchedules)
+      .where(eq(reoSchedules.panelId, panelId))
+      .orderBy(desc(reoSchedules.createdAt))
+      .limit(1);
+    return result;
+  }
+
+  async getReoScheduleWithDetails(id: string): Promise<ReoScheduleWithDetails | undefined> {
+    const [schedule] = await db.select().from(reoSchedules).where(eq(reoSchedules.id, id));
+    if (!schedule) return undefined;
+
+    const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, schedule.panelId));
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, schedule.jobId));
+    const [sourceDocument] = schedule.sourceDocumentId 
+      ? await db.select().from(documents).where(eq(documents.id, schedule.sourceDocumentId))
+      : [null];
+    const [createdByUser] = await db.select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+    }).from(users).where(eq(users.id, schedule.createdById));
+    const items = await db.select().from(reoScheduleItems)
+      .where(eq(reoScheduleItems.scheduleId, id))
+      .orderBy(asc(reoScheduleItems.sortOrder), asc(reoScheduleItems.reoType));
+
+    return {
+      ...schedule,
+      panel: panel || null,
+      job: job || null,
+      sourceDocument: sourceDocument || null,
+      createdBy: createdByUser || null,
+      items,
+    };
+  }
+
+  async updateReoSchedule(id: string, data: Partial<InsertReoSchedule>): Promise<ReoSchedule | undefined> {
+    const [result] = await db.update(reoSchedules)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(reoSchedules.id, id))
+      .returning();
+    return result;
+  }
+
+  async getReoSchedulesByCompany(companyId: string): Promise<ReoSchedule[]> {
+    return db.select().from(reoSchedules)
+      .where(eq(reoSchedules.companyId, companyId))
+      .orderBy(desc(reoSchedules.createdAt));
+  }
+
+  async createReoScheduleItem(data: InsertReoScheduleItem): Promise<ReoScheduleItem> {
+    const [result] = await db.insert(reoScheduleItems).values(data).returning();
+    return result;
+  }
+
+  async createReoScheduleItemsBulk(items: InsertReoScheduleItem[]): Promise<ReoScheduleItem[]> {
+    if (items.length === 0) return [];
+    return db.insert(reoScheduleItems).values(items).returning();
+  }
+
+  async getReoScheduleItems(scheduleId: string): Promise<ReoScheduleItem[]> {
+    return db.select().from(reoScheduleItems)
+      .where(eq(reoScheduleItems.scheduleId, scheduleId))
+      .orderBy(asc(reoScheduleItems.sortOrder), asc(reoScheduleItems.reoType));
+  }
+
+  async updateReoScheduleItem(id: string, data: Partial<InsertReoScheduleItem>): Promise<ReoScheduleItem | undefined> {
+    const [result] = await db.update(reoScheduleItems)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(reoScheduleItems.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteReoScheduleItem(id: string): Promise<void> {
+    await db.delete(reoScheduleItems).where(eq(reoScheduleItems.id, id));
+  }
+
+  async updateReoScheduleItemsStatus(scheduleId: string, itemIds: string[], status: ReoScheduleItemStatus): Promise<ReoScheduleItem[]> {
+    return db.update(reoScheduleItems)
+      .set({ status, updatedAt: new Date() })
+      .where(and(
+        eq(reoScheduleItems.scheduleId, scheduleId),
+        inArray(reoScheduleItems.id, itemIds)
+      ))
+      .returning();
+  }
+
+  async linkReoScheduleItemsToPO(itemIds: string[], purchaseOrderId: string): Promise<void> {
+    await db.update(reoScheduleItems)
+      .set({ purchaseOrderId, status: "ORDERED" as ReoScheduleItemStatus, updatedAt: new Date() })
+      .where(inArray(reoScheduleItems.id, itemIds));
   }
 }
 

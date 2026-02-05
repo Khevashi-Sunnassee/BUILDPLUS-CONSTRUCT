@@ -461,6 +461,30 @@ export const DOCUMENT_ROUTES = {
 } as const;
 
 // ============================================================================
+// REO SCHEDULING (Procurement Manager)
+// ============================================================================
+export const REO_SCHEDULE_ROUTES = {
+  // IFC Panels list for procurement manager
+  IFC_PANELS: '/api/reo-schedules/ifc-panels',
+  
+  // Reo Schedules
+  LIST: '/api/reo-schedules',
+  BY_ID: (id: string | number) => `/api/reo-schedules/${id}`,
+  BY_PANEL: (panelId: string | number) => `/api/reo-schedules/panel/${panelId}`,
+  
+  // Schedule Items
+  ITEMS: (scheduleId: string | number) => `/api/reo-schedules/${scheduleId}/items`,
+  ITEM_BY_ID: (scheduleId: string | number, itemId: string | number) => `/api/reo-schedules/${scheduleId}/items/${itemId}`,
+  ITEMS_BULK_STATUS: (scheduleId: string | number) => `/api/reo-schedules/${scheduleId}/items/bulk-status`,
+  
+  // AI Processing
+  PROCESS: (scheduleId: string | number) => `/api/reo-schedules/${scheduleId}/process`,
+  
+  // PO Creation
+  CREATE_PO: (scheduleId: string | number) => `/api/reo-schedules/${scheduleId}/create-po`,
+} as const;
+
+// ============================================================================
 // TYPE EXPORTS for frontend usage
 // ============================================================================
 export type AuthRoutes = typeof AUTH_ROUTES;
@@ -487,3 +511,4 @@ export type DailyLogsRoutes = typeof DAILY_LOGS_ROUTES;
 export type TimerRoutes = typeof TIMER_ROUTES;
 export type AgentRoutes = typeof AGENT_ROUTES;
 export type DocumentRoutes = typeof DOCUMENT_ROUTES;
+export type ReoScheduleRoutes = typeof REO_SCHEDULE_ROUTES;
