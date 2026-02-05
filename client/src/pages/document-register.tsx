@@ -81,14 +81,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { DOCUMENT_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PROCUREMENT_ROUTES, TASKS_ROUTES } from "@shared/api-routes";
 import type { 
   Document, 
   DocumentTypeConfig, 
   DocumentDiscipline, 
   DocumentCategory,
   DocumentWithDetails,
-  Job 
+  Job,
+  PanelRegister,
+  Supplier,
+  PurchaseOrder,
+  Task
 } from "@shared/schema";
 
 const uploadFormSchema = z.object({
@@ -98,6 +102,10 @@ const uploadFormSchema = z.object({
   disciplineId: z.string().optional(),
   categoryId: z.string().optional(),
   jobId: z.string().optional(),
+  panelId: z.string().optional(),
+  supplierId: z.string().optional(),
+  purchaseOrderId: z.string().optional(),
+  taskId: z.string().optional(),
   tags: z.string().optional(),
   isConfidential: z.boolean().default(false),
 });
@@ -235,6 +243,22 @@ export default function DocumentRegister() {
     queryKey: [JOBS_ROUTES.LIST],
   });
 
+  const { data: panels = [] } = useQuery<PanelRegister[]>({
+    queryKey: [PANELS_ROUTES.LIST],
+  });
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
+  });
+
+  const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
+  });
+
+  const { data: tasks = [] } = useQuery<Task[]>({
+    queryKey: [TASKS_ROUTES.LIST],
+  });
+
   const { data: versionHistory = [] } = useQuery<Document[]>({
     queryKey: [DOCUMENT_ROUTES.VERSIONS(versionHistoryDoc?.id || "")],
     enabled: !!versionHistoryDoc?.id && isVersionHistoryOpen,
@@ -249,6 +273,10 @@ export default function DocumentRegister() {
       disciplineId: "",
       categoryId: "",
       jobId: "",
+      panelId: "",
+      supplierId: "",
+      purchaseOrderId: "",
+      taskId: "",
       tags: "",
       isConfidential: false,
     },
@@ -361,6 +389,10 @@ export default function DocumentRegister() {
     if (values.disciplineId) formData.append("disciplineId", values.disciplineId);
     if (values.categoryId) formData.append("categoryId", values.categoryId);
     if (values.jobId) formData.append("jobId", values.jobId);
+    if (values.panelId) formData.append("panelId", values.panelId);
+    if (values.supplierId) formData.append("supplierId", values.supplierId);
+    if (values.purchaseOrderId) formData.append("purchaseOrderId", values.purchaseOrderId);
+    if (values.taskId) formData.append("taskId", values.taskId);
     if (values.tags) formData.append("tags", values.tags);
     formData.append("isConfidential", String(values.isConfidential));
 
@@ -879,6 +911,106 @@ export default function DocumentRegister() {
                           {jobs.map((job) => (
                             <SelectItem key={job.id} value={job.id}>
                               {job.code} - {job.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={uploadForm.control}
+                  name="panelId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Panel</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-panel">
+                            <SelectValue placeholder="Select panel" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {panels.map((panel) => (
+                            <SelectItem key={panel.id} value={panel.id}>
+                              {panel.panelId}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={uploadForm.control}
+                  name="supplierId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supplier</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-supplier">
+                            <SelectValue placeholder="Select supplier" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {suppliers.map((supplier) => (
+                            <SelectItem key={supplier.id} value={supplier.id}>
+                              {supplier.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={uploadForm.control}
+                  name="purchaseOrderId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Purchase Order</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-purchase-order">
+                            <SelectValue placeholder="Select purchase order" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {purchaseOrders.map((po) => (
+                            <SelectItem key={po.id} value={po.id}>
+                              {po.orderNumber}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={uploadForm.control}
+                  name="taskId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Task</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-task">
+                            <SelectValue placeholder="Select task" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {tasks.map((task) => (
+                            <SelectItem key={task.id} value={task.id}>
+                              {task.title}
                             </SelectItem>
                           ))}
                         </SelectContent>

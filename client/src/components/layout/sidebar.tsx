@@ -85,6 +85,7 @@ const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Factories", url: "/admin/factories", icon: Factory },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
+  { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
   { title: "Item Categories", url: "/admin/item-categories", icon: FolderOpen },
   { title: "Items", url: "/admin/items", icon: Package },

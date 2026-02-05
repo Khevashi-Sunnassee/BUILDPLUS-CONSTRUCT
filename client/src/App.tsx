@@ -47,6 +47,7 @@ import ChatPage from "@/pages/chat";
 import ProductionSchedulePage from "@/pages/production-schedule";
 import DocumentRegisterPage from "@/pages/document-register";
 import PublicBundlePage from "@/pages/public-bundle";
+import AdminDocumentConfigPage from "@/pages/admin/document-config";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -346,6 +347,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminPanelTypesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/document-config">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminDocumentConfigPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
