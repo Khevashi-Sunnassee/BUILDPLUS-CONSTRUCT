@@ -17,29 +17,27 @@ router.get("/api/reo-schedules/ifc-panels", requireAuth, async (req: Request, re
       return res.status(400).json({ message: "Company ID is required" });
     }
 
+    const { jobId } = req.query;
     const panels = await storage.getIfcPanelsForProcurement(companyId);
     
-    const groupedByJob: Record<string, any> = {};
+    // Return flat array with job embedded in each panel to match frontend IfcPanelWithSchedule interface
+    const results = [];
     for (const item of panels) {
-      const jobId = item.job.id;
-      if (!groupedByJob[jobId]) {
-        groupedByJob[jobId] = {
-          job: item.job,
-          panels: [],
-        };
+      // Apply job filter if provided
+      if (jobId && item.job.id !== jobId) {
+        continue;
       }
       
       const existingSchedule = await storage.getReoScheduleByPanel(item.panel.id);
       
-      groupedByJob[jobId].panels.push({
+      results.push({
         ...item.panel,
-        productionSlot: item.productionSlot,
-        reoScheduleStatus: existingSchedule?.status || null,
-        reoScheduleId: existingSchedule?.id || null,
+        job: item.job,
+        reoSchedule: existingSchedule || null,
       });
     }
     
-    res.json(Object.values(groupedByJob));
+    res.json(results);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching IFC panels for procurement");
     res.status(500).json({ message: "Failed to fetch IFC panels" });
