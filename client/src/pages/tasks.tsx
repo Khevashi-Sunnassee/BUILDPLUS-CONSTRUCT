@@ -720,7 +720,7 @@ function TaskRow({
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 opacity-0 group-hover:opacity-100"
+              className="invisible group-hover:visible"
               data-testid={`btn-task-menu-${task.id}`}
             >
               <MoreHorizontal className="h-4 w-4" />
