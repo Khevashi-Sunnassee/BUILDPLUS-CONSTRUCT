@@ -95,7 +95,7 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 
 export default function AdminDocumentConfigPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("types");
+  const [activeTab, setActiveTab] = useState("disciplines");
 
   const [typeDialogOpen, setTypeDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<DocumentTypeConfig | null>(null);
@@ -404,10 +404,6 @@ export default function AdminDocumentConfigPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="types" className="flex items-center gap-2" data-testid="tab-types">
-            <FileText className="h-4 w-4" />
-            Types
-          </TabsTrigger>
           <TabsTrigger value="disciplines" className="flex items-center gap-2" data-testid="tab-disciplines">
             <FolderTree className="h-4 w-4" />
             Disciplines
@@ -415,6 +411,10 @@ export default function AdminDocumentConfigPage() {
           <TabsTrigger value="categories" className="flex items-center gap-2" data-testid="tab-categories">
             <Tag className="h-4 w-4" />
             Categories
+          </TabsTrigger>
+          <TabsTrigger value="types" className="flex items-center gap-2" data-testid="tab-types">
+            <FileText className="h-4 w-4" />
+            Types
           </TabsTrigger>
         </TabsList>
 
