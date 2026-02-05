@@ -204,6 +204,8 @@ export default function DocumentRegister() {
   const [selectedDocsForBundle, setSelectedDocsForBundle] = useState<string[]>([]);
   const [createdBundle, setCreatedBundle] = useState<DocumentBundle | null>(null);
   const [isBundleViewOpen, setIsBundleViewOpen] = useState(false);
+  const [isBundlesListOpen, setIsBundlesListOpen] = useState(false);
+  const [selectedBundleForQR, setSelectedBundleForQR] = useState<DocumentBundle | null>(null);
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -262,6 +264,11 @@ export default function DocumentRegister() {
   const { data: versionHistory = [] } = useQuery<Document[]>({
     queryKey: [DOCUMENT_ROUTES.VERSIONS(versionHistoryDoc?.id || "")],
     enabled: !!versionHistoryDoc?.id && isVersionHistoryOpen,
+  });
+
+  const { data: bundles = [], isLoading: bundlesLoading } = useQuery<DocumentBundle[]>({
+    queryKey: [DOCUMENT_ROUTES.BUNDLES],
+    enabled: isBundlesListOpen,
   });
 
   const uploadForm = useForm<UploadFormValues>({
@@ -445,6 +452,14 @@ export default function DocumentRegister() {
           >
             <Filter className="h-4 w-4 mr-2" />
             Filters
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setIsBundlesListOpen(true)} 
+            data-testid="button-view-bundles"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            View Bundles
           </Button>
           <Button 
             variant="outline"
@@ -935,7 +950,7 @@ export default function DocumentRegister() {
                         <SelectContent>
                           {panels.map((panel) => (
                             <SelectItem key={panel.id} value={panel.id}>
-                              {panel.panelId}
+                              {panel.panelMark}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -985,7 +1000,7 @@ export default function DocumentRegister() {
                         <SelectContent>
                           {purchaseOrders.map((po) => (
                             <SelectItem key={po.id} value={po.id}>
-                              {po.orderNumber}
+                              {po.poNumber}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1380,6 +1395,156 @@ export default function DocumentRegister() {
 
           <DialogFooter>
             <Button onClick={() => setIsBundleViewOpen(false)} data-testid="button-close-bundle-view">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Sheet open={isBundlesListOpen} onOpenChange={setIsBundlesListOpen}>
+        <SheetContent className="w-[500px] sm:w-[600px] sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Document Bundles
+            </SheetTitle>
+            <SheetDescription>
+              View all document bundles and their QR codes for sharing
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            {bundlesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : bundles.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                <p>No bundles created yet</p>
+                <p className="text-sm mt-1">Create a bundle to share documents via QR code</p>
+              </div>
+            ) : (
+              bundles.map((bundle) => (
+                <Card key={bundle.id} className="hover-elevate" data-testid={`bundle-card-${bundle.id}`}>
+                  <CardContent className="pt-4">
+                    <div className="flex gap-4">
+                      <div 
+                        className="bg-white p-2 rounded cursor-pointer hover:ring-2 hover:ring-primary transition-all"
+                        onClick={() => setSelectedBundleForQR(bundle)}
+                        title="Click to enlarge QR code"
+                      >
+                        <QRCodeSVG 
+                          value={`${window.location.origin}/bundle/${bundle.qrCodeId}`}
+                          size={80}
+                        />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium truncate">{bundle.bundleName}</h4>
+                        {bundle.description && (
+                          <p className="text-sm text-muted-foreground truncate">{bundle.description}</p>
+                        )}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <Badge variant="secondary">
+                            {bundle.items?.length || 0} documents
+                          </Badge>
+                          {bundle.allowGuestAccess ? (
+                            <Badge variant="outline" className="text-green-600">Guest Access</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-yellow-600">Restricted</Badge>
+                          )}
+                          {bundle.expiresAt && new Date(bundle.expiresAt) < new Date() && (
+                            <Badge variant="destructive">Expired</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Created: {formatDate(bundle.createdAt)}
+                          {bundle.expiresAt && ` • Expires: ${formatDate(bundle.expiresAt)}`}
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/bundle/${bundle.qrCodeId}`);
+                              toast({ title: "Copied", description: "Bundle link copied to clipboard" });
+                            }}
+                            data-testid={`button-copy-link-${bundle.id}`}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            Copy Link
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`/bundle/${bundle.qrCodeId}`, "_blank")}
+                            data-testid={`button-open-bundle-${bundle.id}`}
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Open
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={!!selectedBundleForQR} onOpenChange={() => setSelectedBundleForQR(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">{selectedBundleForQR?.bundleName}</DialogTitle>
+            <DialogDescription className="text-center">
+              Scan this QR code to access the bundle
+            </DialogDescription>
+          </DialogHeader>
+          {selectedBundleForQR && (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="bg-white p-4 rounded-lg">
+                <QRCodeSVG 
+                  value={`${window.location.origin}/bundle/${selectedBundleForQR.qrCodeId}`}
+                  size={250}
+                  level="H"
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full">
+                <Input 
+                  value={`${window.location.origin}/bundle/${selectedBundleForQR.qrCodeId}`}
+                  readOnly
+                  className="text-xs"
+                />
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${window.location.origin}/bundle/${selectedBundleForQR.qrCodeId}`);
+                    toast({ title: "Copied", description: "Link copied to clipboard" });
+                  }}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="text-center text-sm text-muted-foreground">
+                <p><strong>{selectedBundleForQR.items?.length || 0}</strong> documents in this bundle</p>
+                {selectedBundleForQR.expiresAt && (
+                  <p>Expires: {formatDate(selectedBundleForQR.expiresAt)}</p>
+                )}
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => window.open(`/bundle/${selectedBundleForQR?.qrCodeId}`, "_blank")}
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Open Bundle
+            </Button>
+            <Button onClick={() => setSelectedBundleForQR(null)}>
               Close
             </Button>
           </DialogFooter>
