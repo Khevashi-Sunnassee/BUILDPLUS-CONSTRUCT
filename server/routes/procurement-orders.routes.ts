@@ -13,12 +13,14 @@ const upload = multer({
 
 router.get("/api/purchase-orders", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const status = req.query.status as string | undefined;
     let orders;
     if (status) {
-      orders = await storage.getPurchaseOrdersByStatus(status);
+      orders = await storage.getPurchaseOrdersByStatus(status, companyId);
     } else {
-      orders = await storage.getAllPurchaseOrders();
+      orders = await storage.getAllPurchaseOrders(companyId);
     }
     res.json(orders);
   } catch (error: any) {
@@ -29,7 +31,8 @@ router.get("/api/purchase-orders", requireAuth, async (req, res) => {
 
 router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const orders = await storage.getPurchaseOrdersByUser(userId);
     res.json(orders);
   } catch (error: any) {
@@ -40,7 +43,9 @@ router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
 
 router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
   try {
-    const poNumber = await storage.getNextPONumber();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const poNumber = await storage.getNextPONumber(companyId);
     res.json({ poNumber });
   } catch (error: any) {
     logger.error({ err: error }, "Error getting next PO number");
@@ -50,8 +55,9 @@ router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => 
 
 router.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
-    if (!order) return res.status(404).json({ error: "Purchase order not found" });
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     res.json(order);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching purchase order");
@@ -61,14 +67,16 @@ router.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
 
 router.post("/api/purchase-orders", requireAuth, async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const companyId = req.companyId;
+    const userId = req.session.userId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { items: lineItems, ...poData } = req.body;
-    const poNumber = await storage.getNextPONumber();
+    const poNumber = await storage.getNextPONumber(companyId);
     if (poData.supplierId === "") {
       poData.supplierId = null;
     }
     const order = await storage.createPurchaseOrder(
-      { ...poData, poNumber, requestedById: userId },
+      { ...poData, poNumber, companyId, requestedById: userId },
       lineItems || []
     );
     res.json(order);
@@ -80,10 +88,11 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
 
 router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
-    if (!order) return res.status(404).json({ error: "Purchase order not found" });
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
-    const userId = (req.session as any).userId;
+    const userId = req.session.userId;
     if (order.requestedById !== userId && order.status !== "DRAFT") {
       return res.status(403).json({ error: "Cannot edit this purchase order" });
     }
@@ -102,10 +111,11 @@ router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
 
 router.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
-    if (!order) return res.status(404).json({ error: "Purchase order not found" });
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
-    const userId = (req.session as any).userId;
+    const userId = req.session.userId;
     if (order.requestedById !== userId) {
       return res.status(403).json({ error: "Only the requester can submit this PO" });
     }
@@ -124,15 +134,16 @@ router.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => 
 
 router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
-    if (!order) return res.status(404).json({ error: "Purchase order not found" });
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
     if (order.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted POs can be approved" });
     }
 
-    const userId = (req.session as any).userId;
-    const user = await storage.getUser(userId);
+    const userId = req.session.userId;
+    const user = userId ? await storage.getUser(userId) : null;
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.poApprover && user.role !== "ADMIN") {
@@ -159,15 +170,16 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
 
 router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
-    if (!order) return res.status(404).json({ error: "Purchase order not found" });
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
     if (order.status !== "SUBMITTED") {
       return res.status(400).json({ error: "Only submitted POs can be rejected" });
     }
 
-    const userId = (req.session as any).userId;
-    const user = await storage.getUser(userId);
+    const userId = req.session.userId;
+    const user = userId ? await storage.getUser(userId) : null;
     if (!user) return res.status(404).json({ error: "User not found" });
 
     if (!user.poApprover && user.role !== "ADMIN") {
@@ -189,11 +201,12 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
 
 router.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
-    if (!order) return res.status(404).json({ error: "Purchase order not found" });
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
-    const userId = (req.session as any).userId;
-    const user = await storage.getUser(userId);
+    const userId = req.session.userId;
+    const user = userId ? await storage.getUser(userId) : null;
     
     if (order.requestedById !== userId && user?.role !== "ADMIN") {
       return res.status(403).json({ error: "Cannot delete this purchase order" });

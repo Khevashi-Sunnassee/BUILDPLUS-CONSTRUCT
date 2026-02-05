@@ -14,7 +14,9 @@ const upload = multer({
 
 router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
-    const groups = await storage.getAllTaskGroups();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const groups = await storage.getAllTaskGroups(companyId);
     res.json(groups);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching task groups");
@@ -24,8 +26,9 @@ router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (r
 
 router.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
+    const companyId = req.companyId;
     const group = await storage.getTaskGroup(String(req.params.id));
-    if (!group) return res.status(404).json({ error: "Task group not found" });
+    if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
     res.json(group);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching task group");
@@ -35,7 +38,9 @@ router.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), asyn
 
 router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
-    const group = await storage.createTaskGroup(req.body);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const group = await storage.createTaskGroup({ ...req.body, companyId });
     res.status(201).json(group);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating task group");
@@ -45,6 +50,9 @@ router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AN
 
 router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getTaskGroup(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
     const group = await storage.updateTaskGroup(String(req.params.id), req.body);
     if (!group) return res.status(404).json({ error: "Task group not found" });
     res.json(group);
@@ -56,6 +64,9 @@ router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VI
 
 router.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getTaskGroup(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
     await storage.deleteTaskGroup(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
@@ -66,9 +77,17 @@ router.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "V
 
 router.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { groupIds } = req.body;
     if (!Array.isArray(groupIds)) {
       return res.status(400).json({ error: "groupIds must be an array" });
+    }
+    for (const gid of groupIds) {
+      const group = await storage.getTaskGroup(gid);
+      if (!group || group.companyId !== companyId) {
+        return res.status(403).json({ error: "Invalid group IDs" });
+      }
     }
     await storage.reorderTaskGroups(groupIds);
     res.json({ success: true });
@@ -80,8 +99,13 @@ router.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", 
 
 router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
+    const companyId = req.companyId;
     const task = await storage.getTask(String(req.params.id));
     if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     res.json(task);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching task");
@@ -91,8 +115,18 @@ router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req
 
 router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId;
     const taskData = { ...req.body };
+    
+    // Verify task group belongs to company
+    if (taskData.groupId) {
+      const group = await storage.getTaskGroup(taskData.groupId);
+      if (!group || group.companyId !== companyId) {
+        return res.status(400).json({ error: "Invalid task group" });
+      }
+    }
     
     // Convert date strings to Date objects for Drizzle timestamp columns
     if (taskData.dueDate !== undefined) {
@@ -115,6 +149,13 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
 
 router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existingTask = await storage.getTask(String(req.params.id));
+    if (!existingTask) return res.status(404).json({ error: "Task not found" });
+    if (existingTask.groupId) {
+      const group = await storage.getTaskGroup(existingTask.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     const updateData = { ...req.body };
     if (updateData.dueDate !== undefined) {
       updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
@@ -133,6 +174,13 @@ router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND
 
 router.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existingTask = await storage.getTask(String(req.params.id));
+    if (!existingTask) return res.status(404).json({ error: "Task not found" });
+    if (existingTask.groupId) {
+      const group = await storage.getTaskGroup(existingTask.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     await storage.deleteTask(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
@@ -143,9 +191,14 @@ router.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AN
 
 router.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
     const { groupId, taskIds } = req.body;
     if (!groupId || !Array.isArray(taskIds)) {
       return res.status(400).json({ error: "groupId and taskIds array are required" });
+    }
+    const group = await storage.getTaskGroup(groupId);
+    if (!group || group.companyId !== companyId) {
+      return res.status(404).json({ error: "Task group not found" });
     }
     await storage.reorderTasks(groupId, taskIds);
     res.json({ success: true });
@@ -157,9 +210,20 @@ router.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_
 
 router.post("/api/tasks/:id/move", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
     const { targetGroupId, targetIndex } = req.body;
     if (!targetGroupId) {
       return res.status(400).json({ error: "targetGroupId is required" });
+    }
+    const targetGroup = await storage.getTaskGroup(targetGroupId);
+    if (!targetGroup || targetGroup.companyId !== companyId) {
+      return res.status(404).json({ error: "Target group not found" });
+    }
+    const existingTask = await storage.getTask(String(req.params.id));
+    if (!existingTask) return res.status(404).json({ error: "Task not found" });
+    if (existingTask.groupId) {
+      const group = await storage.getTaskGroup(existingTask.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
     const task = await storage.moveTaskToGroup(String(req.params.id), targetGroupId, targetIndex ?? 0);
     if (!task) {
@@ -174,6 +238,13 @@ router.post("/api/tasks/:id/move", requireAuth, requirePermission("tasks", "VIEW
 
 router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const task = await storage.getTask(String(req.params.id));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     const assignees = await storage.getTaskAssignees(String(req.params.id));
     res.json(assignees);
   } catch (error: any) {
@@ -184,6 +255,13 @@ router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), 
 
 router.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const task = await storage.getTask(String(req.params.id));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     const { userIds } = req.body;
     if (!Array.isArray(userIds)) {
       return res.status(400).json({ error: "userIds must be an array" });
@@ -198,6 +276,13 @@ router.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "
 
 router.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const task = await storage.getTask(String(req.params.id));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     const updates = await storage.getTaskUpdates(String(req.params.id));
     res.json(updates);
   } catch (error: any) {
@@ -208,30 +293,32 @@ router.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), as
 
 router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session.userId;
     const taskId = String(req.params.id);
+    
+    const task = await storage.getTask(taskId);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    
     const update = await storage.createTaskUpdate({
       taskId,
       userId,
       content: req.body.content,
     });
     
-    const taskGroups = await storage.getAllTaskGroups();
-    let taskTitle = "Task";
-    for (const group of taskGroups) {
-      const task = group.tasks.find(t => t.id === taskId);
-      if (task) {
-        taskTitle = task.title;
-        break;
-      }
-    }
+    const taskTitle = task.title || "Task";
     
-    const fromUser = await storage.getUser(userId);
+    const fromUser = userId ? await storage.getUser(userId) : null;
     const fromName = fromUser?.name || fromUser?.email || "Someone";
     
     await storage.createTaskNotificationsForAssignees(
       taskId,
-      userId,
+      userId!,
       "COMMENT",
       `New comment on "${taskTitle}"`,
       `${fromName}: ${req.body.content.substring(0, 100)}${req.body.content.length > 100 ? '...' : ''}`,
@@ -247,6 +334,15 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
 
 router.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const update = await storage.getTaskUpdate(String(req.params.id));
+    if (!update) return res.status(404).json({ error: "Update not found" });
+    const task = await storage.getTask(update.taskId);
+    if (!task) return res.status(404).json({ error: "Update not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Update not found" });
+    }
     await storage.deleteTaskUpdate(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
@@ -257,6 +353,13 @@ router.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "
 
 router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const task = await storage.getTask(String(req.params.id));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
     const files = await storage.getTaskFiles(String(req.params.id));
     res.json(files);
   } catch (error: any) {
@@ -267,7 +370,14 @@ router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), asyn
 
 router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), upload.single("file"), async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const companyId = req.companyId;
+    const task = await storage.getTask(String(req.params.id));
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const userId = req.session.userId;
     const file = req.file;
     if (!file) {
       return res.status(400).json({ error: "No file uploaded" });
@@ -296,6 +406,15 @@ router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIE
 
 router.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const file = await storage.getTaskFile(String(req.params.id));
+    if (!file) return res.status(404).json({ error: "File not found" });
+    const task = await storage.getTask(file.taskId);
+    if (!task) return res.status(404).json({ error: "File not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "File not found" });
+    }
     await storage.deleteTaskFile(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {

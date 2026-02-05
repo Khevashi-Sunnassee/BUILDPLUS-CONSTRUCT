@@ -15,7 +15,9 @@ const upload = multer({
 
 router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
   try {
-    const suppliersData = await storage.getAllSuppliers();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const suppliersData = await storage.getAllSuppliers(companyId);
     res.json(suppliersData);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching suppliers");
@@ -25,7 +27,9 @@ router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
 
 router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) => {
   try {
-    const suppliersData = await storage.getActiveSuppliers();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const suppliersData = await storage.getActiveSuppliers(companyId);
     res.json(suppliersData);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching active suppliers");
@@ -35,8 +39,9 @@ router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) =>
 
 router.get("/api/procurement/suppliers/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const supplier = await storage.getSupplier(String(req.params.id));
-    if (!supplier) return res.status(404).json({ error: "Supplier not found" });
+    if (!supplier || supplier.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
     res.json(supplier);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching supplier");
@@ -46,7 +51,9 @@ router.get("/api/procurement/suppliers/:id", requireAuth, async (req, res) => {
 
 router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const supplier = await storage.createSupplier(req.body);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const supplier = await storage.createSupplier({ ...req.body, companyId });
     res.json(supplier);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating supplier");
@@ -56,8 +63,10 @@ router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async
 
 router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getSupplier(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
     const supplier = await storage.updateSupplier(String(req.params.id), req.body);
-    if (!supplier) return res.status(404).json({ error: "Supplier not found" });
     res.json(supplier);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating supplier");
@@ -67,6 +76,9 @@ router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), 
 
 router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getSupplier(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
     await storage.deleteSupplier(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
@@ -77,7 +89,9 @@ router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req
 
 router.get("/api/procurement/item-categories", requireAuth, async (req, res) => {
   try {
-    const categories = await storage.getAllItemCategories();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const categories = await storage.getAllItemCategories(companyId);
     res.json(categories);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching item categories");
@@ -87,7 +101,9 @@ router.get("/api/procurement/item-categories", requireAuth, async (req, res) => 
 
 router.get("/api/procurement/item-categories/active", requireAuth, async (req, res) => {
   try {
-    const categories = await storage.getActiveItemCategories();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const categories = await storage.getActiveItemCategories(companyId);
     res.json(categories);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching active item categories");
@@ -97,8 +113,9 @@ router.get("/api/procurement/item-categories/active", requireAuth, async (req, r
 
 router.get("/api/procurement/item-categories/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId;
     const category = await storage.getItemCategory(String(req.params.id));
-    if (!category) return res.status(404).json({ error: "Category not found" });
+    if (!category || category.companyId !== companyId) return res.status(404).json({ error: "Category not found" });
     res.json(category);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching category");
@@ -108,7 +125,9 @@ router.get("/api/procurement/item-categories/:id", requireAuth, async (req, res)
 
 router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const category = await storage.createItemCategory(req.body);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const category = await storage.createItemCategory({ ...req.body, companyId });
     res.json(category);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating category");
@@ -118,8 +137,10 @@ router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"),
 
 router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getItemCategory(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Category not found" });
     const category = await storage.updateItemCategory(String(req.params.id), req.body);
-    if (!category) return res.status(404).json({ error: "Category not found" });
     res.json(category);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating category");
@@ -129,6 +150,9 @@ router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAG
 
 router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const existing = await storage.getItemCategory(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Category not found" });
     await storage.deleteItemCategory(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
@@ -139,7 +163,9 @@ router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), asyn
 
 router.get("/api/procurement/items", requireAuth, async (req, res) => {
   try {
-    const itemsData = await storage.getAllItems();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const itemsData = await storage.getAllItems(companyId);
     res.json(itemsData);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching items");
@@ -149,7 +175,9 @@ router.get("/api/procurement/items", requireAuth, async (req, res) => {
 
 router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
   try {
-    const itemsData = await storage.getActiveItems();
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const itemsData = await storage.getActiveItems(companyId);
     res.json(itemsData);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching active items");
@@ -201,6 +229,9 @@ router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, re
 
 router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    
     if (!req.file) {
       return res.status(400).json({ error: "No file uploaded" });
     }
@@ -214,7 +245,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
       return res.status(400).json({ error: "No data found in Excel file" });
     }
 
-    const categories = await storage.getAllItemCategories();
+    const categories = await storage.getAllItemCategories(companyId);
     const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
 
     const itemsToImport: InsertItem[] = [];
@@ -232,7 +263,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
 
     for (const catName of categoriesToCreate) {
       try {
-        const newCat = await storage.createItemCategory({ name: catName, isActive: true });
+        const newCat = await storage.createItemCategory({ name: catName, companyId, isActive: true });
         categoryMap.set(catName.toLowerCase(), newCat.id);
       } catch (error) {
         logger.error({ err: error }, `Error creating category ${catName}`);
@@ -268,6 +299,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
         supplierShortlist,
         sources,
         isActive: true,
+        companyId,
       });
     }
 

@@ -354,8 +354,8 @@ export interface IStorage {
   createWorkType(data: InsertWorkType): Promise<WorkType>;
   updateWorkType(id: number, data: Partial<InsertWorkType>): Promise<WorkType | undefined>;
   deleteWorkType(id: number): Promise<void>;
-  getAllWorkTypes(): Promise<WorkType[]>;
-  getActiveWorkTypes(): Promise<WorkType[]>;
+  getAllWorkTypes(companyId?: string): Promise<WorkType[]>;
+  getActiveWorkTypes(companyId?: string): Promise<WorkType[]>;
 
   getCostComponentsByPanelType(panelTypeId: string): Promise<PanelTypeCostComponent[]>;
   createCostComponent(data: InsertPanelTypeCostComponent): Promise<PanelTypeCostComponent>;
@@ -483,16 +483,16 @@ export interface IStorage {
   deleteSupplier(id: string): Promise<void>;
 
   // Item Categories
-  getAllItemCategories(): Promise<ItemCategory[]>;
-  getActiveItemCategories(): Promise<ItemCategory[]>;
+  getAllItemCategories(companyId?: string): Promise<ItemCategory[]>;
+  getActiveItemCategories(companyId?: string): Promise<ItemCategory[]>;
   getItemCategory(id: string): Promise<ItemCategory | undefined>;
   createItemCategory(data: InsertItemCategory): Promise<ItemCategory>;
   updateItemCategory(id: string, data: Partial<InsertItemCategory>): Promise<ItemCategory | undefined>;
   deleteItemCategory(id: string): Promise<void>;
 
   // Items
-  getAllItems(): Promise<ItemWithDetails[]>;
-  getActiveItems(): Promise<ItemWithDetails[]>;
+  getAllItems(companyId?: string): Promise<ItemWithDetails[]>;
+  getActiveItems(companyId?: string): Promise<ItemWithDetails[]>;
   getItem(id: string): Promise<ItemWithDetails | undefined>;
   getItemsByCategory(categoryId: string): Promise<ItemWithDetails[]>;
   getItemsBySupplier(supplierId: string): Promise<ItemWithDetails[]>;
@@ -502,8 +502,8 @@ export interface IStorage {
   bulkImportItems(itemsData: InsertItem[]): Promise<{ created: number; updated: number; errors: string[] }>;
 
   // Purchase Orders
-  getAllPurchaseOrders(): Promise<PurchaseOrderWithDetails[]>;
-  getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrderWithDetails[]>;
+  getAllPurchaseOrders(companyId?: string): Promise<PurchaseOrderWithDetails[]>;
+  getPurchaseOrdersByStatus(status: string, companyId?: string): Promise<PurchaseOrderWithDetails[]>;
   getPurchaseOrdersByUser(userId: string): Promise<PurchaseOrderWithDetails[]>;
   getPurchaseOrder(id: string): Promise<PurchaseOrderWithDetails | undefined>;
   createPurchaseOrder(data: InsertPurchaseOrder, lineItems: Omit<InsertPurchaseOrderItem, "purchaseOrderId">[]): Promise<PurchaseOrderWithDetails>;
@@ -512,7 +512,7 @@ export interface IStorage {
   approvePurchaseOrder(id: string, approvedById: string): Promise<PurchaseOrder | undefined>;
   rejectPurchaseOrder(id: string, rejectedById: string, reason: string): Promise<PurchaseOrder | undefined>;
   deletePurchaseOrder(id: string): Promise<void>;
-  getNextPONumber(): Promise<string>;
+  getNextPONumber(companyId?: string): Promise<string>;
 
   // PO Attachments
   getPurchaseOrderAttachments(poId: string): Promise<(PurchaseOrderAttachment & { uploadedBy?: Pick<User, 'id' | 'name' | 'email'> | null })[]>;
@@ -521,7 +521,7 @@ export interface IStorage {
   deletePurchaseOrderAttachment(id: string): Promise<void>;
 
   // Task Management (Monday.com-style)
-  getAllTaskGroups(): Promise<TaskGroupWithTasks[]>;
+  getAllTaskGroups(companyId?: string): Promise<TaskGroupWithTasks[]>;
   getTaskGroup(id: string): Promise<TaskGroupWithTasks | undefined>;
   createTaskGroup(data: InsertTaskGroup): Promise<TaskGroup>;
   updateTaskGroup(id: string, data: Partial<InsertTaskGroup>): Promise<TaskGroup | undefined>;
@@ -539,10 +539,12 @@ export interface IStorage {
   setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]>;
 
   getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User; files?: TaskFile[] })[]>;
+  getTaskUpdate(id: string): Promise<TaskUpdate | undefined>;
   createTaskUpdate(data: InsertTaskUpdate): Promise<TaskUpdate>;
   deleteTaskUpdate(id: string): Promise<void>;
 
   getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]>;
+  getTaskFile(id: string): Promise<TaskFile | undefined>;
   createTaskFile(data: InsertTaskFile): Promise<TaskFile>;
   deleteTaskFile(id: string): Promise<void>;
 
@@ -3057,11 +3059,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============== Item Categories ==============
-  async getAllItemCategories(): Promise<ItemCategory[]> {
+  async getAllItemCategories(companyId?: string): Promise<ItemCategory[]> {
+    if (companyId) {
+      return db.select().from(itemCategories).where(eq(itemCategories.companyId, companyId)).orderBy(asc(itemCategories.name));
+    }
     return db.select().from(itemCategories).orderBy(asc(itemCategories.name));
   }
 
-  async getActiveItemCategories(): Promise<ItemCategory[]> {
+  async getActiveItemCategories(companyId?: string): Promise<ItemCategory[]> {
+    if (companyId) {
+      return db.select().from(itemCategories).where(and(eq(itemCategories.companyId, companyId), eq(itemCategories.isActive, true))).orderBy(asc(itemCategories.name));
+    }
     return db.select().from(itemCategories).where(eq(itemCategories.isActive, true)).orderBy(asc(itemCategories.name));
   }
 
@@ -3085,19 +3093,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============== Items ==============
-  async getAllItems(): Promise<ItemWithDetails[]> {
+  async getAllItems(companyId?: string): Promise<ItemWithDetails[]> {
     const rows = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .where(companyId ? eq(items.companyId, companyId) : undefined)
       .orderBy(asc(items.name));
     return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
   }
 
-  async getActiveItems(): Promise<ItemWithDetails[]> {
+  async getActiveItems(companyId?: string): Promise<ItemWithDetails[]> {
     const rows = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
-      .where(eq(items.isActive, true))
+      .where(companyId ? and(eq(items.companyId, companyId), eq(items.isActive, true)) : eq(items.isActive, true))
       .orderBy(asc(items.name));
     return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
   }
@@ -3211,8 +3220,10 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getAllPurchaseOrders(): Promise<PurchaseOrderWithDetails[]> {
-    const poRows = await db.select().from(purchaseOrders).orderBy(desc(purchaseOrders.createdAt));
+  async getAllPurchaseOrders(companyId?: string): Promise<PurchaseOrderWithDetails[]> {
+    const poRows = await db.select().from(purchaseOrders)
+      .where(companyId ? eq(purchaseOrders.companyId, companyId) : undefined)
+      .orderBy(desc(purchaseOrders.createdAt));
     const results: PurchaseOrderWithDetails[] = [];
     for (const po of poRows) {
       const details = await this.getPurchaseOrderWithDetails(po.id);
@@ -3221,9 +3232,9 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrderWithDetails[]> {
+  async getPurchaseOrdersByStatus(status: string, companyId?: string): Promise<PurchaseOrderWithDetails[]> {
     const poRows = await db.select().from(purchaseOrders)
-      .where(eq(purchaseOrders.status, status as any))
+      .where(companyId ? and(eq(purchaseOrders.companyId, companyId), eq(purchaseOrders.status, status as any)) : eq(purchaseOrders.status, status as any))
       .orderBy(desc(purchaseOrders.createdAt));
     const results: PurchaseOrderWithDetails[] = [];
     for (const po of poRows) {
@@ -3366,8 +3377,9 @@ export class DatabaseStorage implements IStorage {
     await db.delete(purchaseOrders).where(eq(purchaseOrders.id, id));
   }
 
-  async getNextPONumber(): Promise<string> {
-    const [result] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders);
+  async getNextPONumber(companyId?: string): Promise<string> {
+    const [result] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders)
+      .where(companyId ? eq(purchaseOrders.companyId, companyId) : undefined);
     const count = Number(result?.count || 0) + 1;
     const year = new Date().getFullYear();
     return `PO-${year}-${String(count).padStart(4, "0")}`;
@@ -3503,8 +3515,10 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getAllTaskGroups(): Promise<TaskGroupWithTasks[]> {
-    const groups = await db.select().from(taskGroups).orderBy(asc(taskGroups.sortOrder));
+  async getAllTaskGroups(companyId?: string): Promise<TaskGroupWithTasks[]> {
+    const groups = await db.select().from(taskGroups)
+      .where(companyId ? eq(taskGroups.companyId, companyId) : undefined)
+      .orderBy(asc(taskGroups.sortOrder));
     
     const result: TaskGroupWithTasks[] = [];
     for (const group of groups) {
@@ -3706,6 +3720,11 @@ export class DatabaseStorage implements IStorage {
     return update;
   }
 
+  async getTaskUpdate(id: string): Promise<TaskUpdate | undefined> {
+    const [update] = await db.select().from(taskUpdates).where(eq(taskUpdates.id, id)).limit(1);
+    return update;
+  }
+
   async deleteTaskUpdate(id: string): Promise<void> {
     await db.delete(taskUpdates).where(eq(taskUpdates.id, id));
   }
@@ -3727,6 +3746,11 @@ export class DatabaseStorage implements IStorage {
 
   async createTaskFile(data: InsertTaskFile): Promise<TaskFile> {
     const [file] = await db.insert(taskFiles).values(data).returning();
+    return file;
+  }
+
+  async getTaskFile(id: string): Promise<TaskFile | undefined> {
+    const [file] = await db.select().from(taskFiles).where(eq(taskFiles.id, id)).limit(1);
     return file;
   }
 

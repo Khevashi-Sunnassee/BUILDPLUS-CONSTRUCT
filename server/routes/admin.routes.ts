@@ -20,40 +20,61 @@ const router = Router();
 
 // Device Management Routes
 router.get("/api/admin/devices", requireRole("ADMIN"), async (req, res) => {
-  const devices = await storage.getAllDevices();
-  res.json(devices);
+  const companyId = req.companyId;
+  if (!companyId) return res.status(400).json({ error: "Company context required" });
+  const allDevices = await storage.getAllDevices();
+  const filtered = allDevices.filter(d => d.companyId === companyId);
+  res.json(filtered);
 });
 
 router.post("/api/admin/devices", requireRole("ADMIN"), async (req, res) => {
   const { userId, deviceName } = req.body;
-  const { device, deviceKey } = await storage.createDevice({ userId, deviceName, os: "Windows" });
+  const companyId = req.companyId;
+  if (!companyId) return res.status(400).json({ error: "Company context required" });
+  const { device, deviceKey } = await storage.createDevice({ userId, deviceName, os: "Windows", companyId });
   res.json({ deviceId: device.id, deviceKey });
 });
 
 router.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) => {
+  const companyId = req.companyId;
+  const existing = await storage.getDevice(req.params.id as string);
+  if (!existing || existing.companyId !== companyId) {
+    return res.status(404).json({ error: "Device not found" });
+  }
   const device = await storage.updateDevice(req.params.id as string, req.body);
   res.json(device);
 });
 
 router.delete("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) => {
+  const companyId = req.companyId;
+  const existing = await storage.getDevice(req.params.id as string);
+  if (!existing || existing.companyId !== companyId) {
+    return res.status(404).json({ error: "Device not found" });
+  }
   await storage.deleteDevice(req.params.id as string);
   res.json({ ok: true });
 });
 
 // Work Types Routes
 router.get("/api/work-types", requireAuth, async (req, res) => {
-  const types = await storage.getActiveWorkTypes();
+  const companyId = req.companyId;
+  if (!companyId) return res.status(400).json({ error: "Company context required" });
+  const types = await storage.getActiveWorkTypes(companyId);
   res.json(types);
 });
 
 router.get("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
-  const types = await storage.getAllWorkTypes();
+  const companyId = req.companyId;
+  if (!companyId) return res.status(400).json({ error: "Company context required" });
+  const types = await storage.getAllWorkTypes(companyId);
   res.json(types);
 });
 
 router.post("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
   try {
-    const parsed = insertWorkTypeSchema.safeParse(req.body);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const parsed = insertWorkTypeSchema.safeParse({ ...req.body, companyId });
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
     }
@@ -66,6 +87,12 @@ router.post("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
 
 router.put("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const existing = await storage.getWorkType(parseInt(req.params.id as string));
+    if (!existing || existing.companyId !== companyId) {
+      return res.status(404).json({ error: "Work type not found" });
+    }
     const parsed = insertWorkTypeSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Invalid work type data", issues: parsed.error.issues });
@@ -81,6 +108,12 @@ router.put("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) =
 });
 
 router.delete("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) => {
+  const companyId = req.companyId;
+  if (!companyId) return res.status(400).json({ error: "Company context required" });
+  const existing = await storage.getWorkType(parseInt(req.params.id as string));
+  if (!existing || existing.companyId !== companyId) {
+    return res.status(404).json({ error: "Work type not found" });
+  }
   await storage.deleteWorkType(parseInt(req.params.id as string));
   res.json({ ok: true });
 });

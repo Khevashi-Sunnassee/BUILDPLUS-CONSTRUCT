@@ -68,6 +68,7 @@ async function parseIcsAndSaveHolidays(
           name: summary,
           holidayType,
           year: eventYear,
+          companyId: "system",
         }).onConflictDoUpdate({
           target: [cfmeuHolidays.calendarType, cfmeuHolidays.date],
           set: {
@@ -153,7 +154,9 @@ export function initializeCfmeuSync() {
 
 router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
   try {
-    const allFactories = await db.select().from(factories).orderBy(factories.name);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const allFactories = await db.select().from(factories).where(eq(factories.companyId, companyId)).orderBy(factories.name);
     res.json(allFactories);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching factories");
@@ -163,7 +166,9 @@ router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
 
 router.get("/api/factories", requireAuth, async (req, res) => {
   try {
-    const activeFactories = await db.select().from(factories).where(eq(factories.isActive, true)).orderBy(factories.name);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const activeFactories = await db.select().from(factories).where(and(eq(factories.companyId, companyId), eq(factories.isActive, true))).orderBy(factories.name);
     res.json(activeFactories);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching factories");
@@ -173,8 +178,9 @@ router.get("/api/factories", requireAuth, async (req, res) => {
 
 router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
     const factoryId = String(req.params.id);
-    const factory = await db.select().from(factories).where(eq(factories.id, factoryId)).limit(1);
+    const factory = await db.select().from(factories).where(and(eq(factories.id, factoryId), eq(factories.companyId, companyId!))).limit(1);
     if (factory.length === 0) {
       return res.status(404).json({ error: "Factory not found" });
     }
@@ -188,7 +194,9 @@ router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) =>
 
 router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
   try {
-    const parsed = insertFactorySchema.parse(req.body);
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const parsed = insertFactorySchema.parse({ ...req.body, companyId });
     const [created] = await db.insert(factories).values(parsed).returning();
     res.json(created);
   } catch (error: any) {
@@ -199,11 +207,12 @@ router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
 
 router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
     const { beds, ...factoryData } = req.body;
     const factoryId = String(req.params.id);
     const [updated] = await db.update(factories)
       .set({ ...factoryData, updatedAt: new Date() })
-      .where(eq(factories.id, factoryId))
+      .where(and(eq(factories.id, factoryId), eq(factories.companyId, companyId!)))
       .returning();
     if (!updated) {
       return res.status(404).json({ error: "Factory not found" });
@@ -217,7 +226,8 @@ router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) 
 
 router.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) => {
   try {
-    const [deleted] = await db.delete(factories).where(eq(factories.id, String(req.params.id))).returning();
+    const companyId = req.companyId;
+    const [deleted] = await db.delete(factories).where(and(eq(factories.id, String(req.params.id)), eq(factories.companyId, companyId!))).returning();
     if (!deleted) {
       return res.status(404).json({ error: "Factory not found" });
     }
@@ -230,6 +240,9 @@ router.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res)
 
 router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const factory = await db.select().from(factories).where(and(eq(factories.id, String(req.params.factoryId)), eq(factories.companyId, companyId!))).limit(1);
+    if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
     const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name);
     res.json(beds);
   } catch (error: any) {
@@ -240,6 +253,9 @@ router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (
 
 router.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const factory = await db.select().from(factories).where(and(eq(factories.id, String(req.params.factoryId)), eq(factories.companyId, companyId!))).limit(1);
+    if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
     const parsed = insertProductionBedSchema.parse({ ...req.body, factoryId: String(req.params.factoryId) });
     const [created] = await db.insert(productionBeds).values(parsed).returning();
     res.json(created);
@@ -251,6 +267,9 @@ router.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async 
 
 router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const factory = await db.select().from(factories).where(and(eq(factories.id, String(req.params.factoryId)), eq(factories.companyId, companyId!))).limit(1);
+    if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
     const [updated] = await db.update(productionBeds)
       .set({ ...req.body, updatedAt: new Date() })
       .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
@@ -267,6 +286,9 @@ router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN")
 
 router.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    const factory = await db.select().from(factories).where(and(eq(factories.id, String(req.params.factoryId)), eq(factories.companyId, companyId!))).limit(1);
+    if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
     const [deleted] = await db.delete(productionBeds)
       .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
       .returning();
