@@ -557,15 +557,15 @@ export default function ChatPage() {
                   key={conv.id}
                   onClick={() => handleSelectConversation(conv.id)}
                   className={cn(
-                    "w-full flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors",
+                    "w-full flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
                     selectedConversationId === conv.id && "bg-accent"
                   )}
                   data-testid={`conversation-${conv.id}`}
                 >
-                  <div className="mt-0.5 text-muted-foreground">
+                  <div className="mt-0.5 text-muted-foreground shrink-0">
                     {getConversationIcon(conv)}
                   </div>
-                  <div className="flex-1 min-w-0">
+                  <div className="flex-1 min-w-0 overflow-hidden">
                     <div className="font-medium truncate text-sm">
                       {getConversationDisplayName(conv)}
                     </div>
