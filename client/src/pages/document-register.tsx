@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { QRCodeSVG } from "qrcode.react";
 import {
   FileText,
   Upload,
@@ -23,6 +24,8 @@ import {
   Package,
   FolderOpen,
   QrCode,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +104,35 @@ const uploadFormSchema = z.object({
 
 type UploadFormValues = z.infer<typeof uploadFormSchema>;
 
+const bundleFormSchema = z.object({
+  bundleName: z.string().min(1, "Bundle name is required"),
+  description: z.string().optional(),
+  allowGuestAccess: z.boolean().default(true),
+  expiresAt: z.string().optional(),
+});
+
+type BundleFormValues = z.infer<typeof bundleFormSchema>;
+
+interface DocumentBundle {
+  id: string;
+  bundleName: string;
+  description: string | null;
+  qrCodeId: string;
+  jobId: string | null;
+  supplierId: string | null;
+  allowGuestAccess: boolean;
+  expiresAt: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    id: string;
+    documentId: string;
+    document?: DocumentWithDetails;
+    addedAt: string;
+  }>;
+}
+
 interface DocumentsResponse {
   documents: DocumentWithDetails[];
   pagination: {
@@ -159,6 +191,11 @@ export default function DocumentRegister() {
   
   const [versionHistoryDoc, setVersionHistoryDoc] = useState<DocumentWithDetails | null>(null);
   const [isVersionHistoryOpen, setIsVersionHistoryOpen] = useState(false);
+
+  const [isBundleDialogOpen, setIsBundleDialogOpen] = useState(false);
+  const [selectedDocsForBundle, setSelectedDocsForBundle] = useState<string[]>([]);
+  const [createdBundle, setCreatedBundle] = useState<DocumentBundle | null>(null);
+  const [isBundleViewOpen, setIsBundleViewOpen] = useState(false);
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -236,6 +273,35 @@ export default function DocumentRegister() {
       setIsUploadOpen(false);
       setSelectedFile(null);
       uploadForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const bundleForm = useForm<BundleFormValues>({
+    resolver: zodResolver(bundleFormSchema),
+    defaultValues: {
+      bundleName: "",
+      description: "",
+      allowGuestAccess: true,
+      expiresAt: "",
+    },
+  });
+
+  const createBundleMutation = useMutation({
+    mutationFn: async (data: BundleFormValues & { documentIds: string[] }) => {
+      const response = await apiRequest("POST", DOCUMENT_ROUTES.BUNDLES, data);
+      return response.json() as Promise<DocumentBundle>;
+    },
+    onSuccess: (bundle) => {
+      toast({ title: "Success", description: "Document bundle created successfully" });
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.BUNDLES] });
+      setIsBundleDialogOpen(false);
+      setCreatedBundle(bundle);
+      setIsBundleViewOpen(true);
+      setSelectedDocsForBundle([]);
+      bundleForm.reset();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -347,6 +413,14 @@ export default function DocumentRegister() {
           >
             <Filter className="h-4 w-4 mr-2" />
             Filters
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => setIsBundleDialogOpen(true)} 
+            data-testid="button-create-bundle"
+          >
+            <QrCode className="h-4 w-4 mr-2" />
+            Create Bundle
           </Button>
           <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
             <Upload className="h-4 w-4 mr-2" />
@@ -987,6 +1061,198 @@ export default function DocumentRegister() {
           </div>
         </SheetContent>
       </Sheet>
+
+      <Dialog open={isBundleDialogOpen} onOpenChange={setIsBundleDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Document Bundle</DialogTitle>
+            <DialogDescription>
+              Create a bundle of documents that can be shared via QR code
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...bundleForm}>
+            <form onSubmit={bundleForm.handleSubmit((data) => {
+              createBundleMutation.mutate({
+                ...data,
+                documentIds: selectedDocsForBundle,
+              });
+            })} className="space-y-4">
+              <FormField
+                control={bundleForm.control}
+                name="bundleName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bundle Name</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Enter bundle name" data-testid="input-bundle-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={bundleForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Describe this bundle" data-testid="input-bundle-description" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={bundleForm.control}
+                name="allowGuestAccess"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-2">
+                    <FormControl>
+                      <Switch 
+                        checked={field.value} 
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-guest-access"
+                      />
+                    </FormControl>
+                    <FormLabel className="!mt-0">Allow guest access via QR code</FormLabel>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={bundleForm.control}
+                name="expiresAt"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Expiration Date (Optional)</FormLabel>
+                    <FormControl>
+                      <Input {...field} type="date" data-testid="input-bundle-expires" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="space-y-2">
+                <Label>Select Documents ({selectedDocsForBundle.length} selected)</Label>
+                <div className="border rounded-lg max-h-48 overflow-y-auto p-2 space-y-1">
+                  {documents.map((doc) => (
+                    <div 
+                      key={doc.id}
+                      className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
+                        selectedDocsForBundle.includes(doc.id) 
+                          ? "bg-primary/10 border border-primary" 
+                          : "hover:bg-muted"
+                      }`}
+                      onClick={() => {
+                        setSelectedDocsForBundle(prev => 
+                          prev.includes(doc.id) 
+                            ? prev.filter(id => id !== doc.id)
+                            : [...prev, doc.id]
+                        );
+                      }}
+                      data-testid={`bundle-doc-${doc.id}`}
+                    >
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="flex-1 text-sm truncate">{doc.title}</span>
+                      <Badge variant="outline" className="text-xs">{doc.revision}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" type="button" onClick={() => setIsBundleDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={createBundleMutation.isPending || selectedDocsForBundle.length === 0}
+                  data-testid="button-create-bundle-submit"
+                >
+                  {createBundleMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Create Bundle
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBundleViewOpen} onOpenChange={setIsBundleViewOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Bundle Created Successfully</DialogTitle>
+            <DialogDescription>
+              {createdBundle?.bundleName}
+            </DialogDescription>
+          </DialogHeader>
+          
+          {createdBundle && (
+            <div className="space-y-6">
+              <div className="flex flex-col items-center gap-4 p-6 bg-muted rounded-lg">
+                <QRCodeSVG 
+                  value={`${window.location.origin}/bundle/${createdBundle.qrCodeId}`}
+                  size={200}
+                  level="H"
+                  includeMargin
+                  data-testid="qr-code-display"
+                />
+                <p className="text-sm text-muted-foreground text-center">
+                  Scan this QR code to access the bundle
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Share Link</Label>
+                <div className="flex gap-2">
+                  <Input 
+                    readOnly 
+                    value={`${window.location.origin}/bundle/${createdBundle.qrCodeId}`}
+                    data-testid="input-bundle-link"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/bundle/${createdBundle.qrCodeId}`);
+                      toast({ title: "Copied!", description: "Link copied to clipboard" });
+                    }}
+                    data-testid="button-copy-link"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => window.open(`/bundle/${createdBundle.qrCodeId}`, "_blank")}
+                    data-testid="button-open-bundle"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Bundle Details</Label>
+                <div className="text-sm space-y-1">
+                  <p><strong>Documents:</strong> {createdBundle.items?.length || 0} files</p>
+                  <p><strong>Guest Access:</strong> {createdBundle.allowGuestAccess ? "Enabled" : "Disabled"}</p>
+                  {createdBundle.expiresAt && (
+                    <p><strong>Expires:</strong> {formatDate(createdBundle.expiresAt)}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button onClick={() => setIsBundleViewOpen(false)} data-testid="button-close-bundle-view">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

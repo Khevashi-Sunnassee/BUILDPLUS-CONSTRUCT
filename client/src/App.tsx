@@ -46,6 +46,7 @@ import PanelDetailsPage from "@/pages/panel-details";
 import ChatPage from "@/pages/chat";
 import ProductionSchedulePage from "@/pages/production-schedule";
 import DocumentRegisterPage from "@/pages/document-register";
+import PublicBundlePage from "@/pages/public-bundle";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -111,6 +112,10 @@ function Router() {
     <Switch>
       <Route path="/login">
         {user ? <Redirect to="/dashboard" /> : <LoginPage />}
+      </Route>
+
+      <Route path="/bundle/:qrCodeId">
+        <PublicBundlePage />
       </Route>
 
       <Route path="/">
