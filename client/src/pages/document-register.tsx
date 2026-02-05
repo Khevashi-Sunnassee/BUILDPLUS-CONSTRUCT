@@ -419,7 +419,7 @@ export default function DocumentRegister() {
       formData.append("file", file);
       formData.append("originalDocumentId", selectedDocumentForVersion.id);
       
-      const response = await fetch(`${DOCUMENT_ROUTES.LIST}/analyze-version`, {
+      const response = await fetch(DOCUMENT_ROUTES.ANALYZE_VERSION, {
         method: "POST",
         body: formData,
         credentials: "include",

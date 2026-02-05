@@ -431,6 +431,7 @@ export const DOCUMENT_ROUTES = {
   VERSIONS: (id: string | number) => `/api/documents/${id}/versions`,
   STATUS: (id: string | number) => `/api/documents/${id}/status`,
   NEXT_NUMBER: '/api/documents/next-number',
+  ANALYZE_VERSION: '/api/documents/analyze-version',
   
   // Document Types
   TYPES: '/api/document-types',
