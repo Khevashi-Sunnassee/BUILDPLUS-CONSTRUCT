@@ -250,6 +250,7 @@ function TaskRow({
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const subtaskInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
   
@@ -259,6 +260,12 @@ function TaskRow({
     setLocalConsultant(task.consultant || "");
   }, [task.title, task.consultant]);
 
+  useEffect(() => {
+    if (showSubtasks && subtaskInputRef.current) {
+      setTimeout(() => subtaskInputRef.current?.focus(), 50);
+    }
+  }, [showSubtasks]);
+
   const updateTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
       return apiRequest("PATCH", TASKS_ROUTES.BY_ID(task.id), data);
@@ -266,13 +273,20 @@ function TaskRow({
     onMutate: async (newData) => {
       await queryClient.cancelQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       const previousGroups = queryClient.getQueryData([TASKS_ROUTES.GROUPS]);
+      const updateTaskRecursive = (t: any): any => {
+        if (t.id === task.id) {
+          return { ...t, ...newData };
+        }
+        if (t.subtasks && t.subtasks.length > 0) {
+          return { ...t, subtasks: t.subtasks.map(updateTaskRecursive) };
+        }
+        return t;
+      };
       queryClient.setQueryData([TASKS_ROUTES.GROUPS], (old: any) => {
         if (!old) return old;
         return old.map((group: any) => ({
           ...group,
-          tasks: group.tasks.map((t: any) =>
-            t.id === task.id ? { ...t, ...newData } : t
-          ),
+          tasks: group.tasks.map(updateTaskRecursive),
         }));
       });
       return { previousGroups };
@@ -325,6 +339,7 @@ function TaskRow({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewSubtaskTitle("");
+      setTimeout(() => subtaskInputRef.current?.focus(), 50);
     },
     onError: (error: any) => {
       toast({ variant: "destructive", title: "Error", description: error.message });
@@ -408,7 +423,7 @@ function TaskRow({
           )} />
         </div>
 
-        <div className={cn("flex items-center gap-2 py-2 pr-2", isSubtask && "pl-6")}>
+        <div className={cn("flex items-center gap-2 py-1 pr-2", isSubtask && "pl-6")}>
           {!isSubtask && (
             <Button
               variant="ghost"
@@ -446,8 +461,8 @@ function TaskRow({
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
-                size="icon"
-                className="h-7 w-7"
+                size="sm"
+                className="h-7 w-7 p-0"
                 onClick={() => onOpenSidebar(task)}
                 data-testid={`btn-updates-${task.id}`}
               >
@@ -583,6 +598,7 @@ function TaskRow({
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
+              size="sm"
               className="h-7 px-2 text-xs justify-start"
               data-testid={`btn-date-${task.id}`}
             >
@@ -604,6 +620,7 @@ function TaskRow({
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
+              size="sm"
               className={cn(
                 "h-7 px-2 text-xs justify-start",
                 task.reminderDate && "text-amber-600 dark:text-amber-400"
@@ -705,9 +722,10 @@ function TaskRow({
         >
           <div />
           <div />
-          <div className="flex items-center gap-2 py-1.5 pl-8 pr-2">
+          <div className="flex items-center gap-2 py-1 pl-8 pr-2">
             <Plus className="h-3 w-3 text-muted-foreground" />
             <Input
+              ref={subtaskInputRef}
               value={newSubtaskTitle}
               onChange={(e) => setNewSubtaskTitle(e.target.value)}
               onKeyDown={(e) => {
