@@ -35,9 +35,7 @@ import {
   MoreVertical,
   Trash2,
   UserPlus,
-  Smile,
 } from "lucide-react";
-import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,7 +106,6 @@ export default function ChatPage() {
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
   const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
@@ -344,12 +341,6 @@ export default function ChatPage() {
       e.preventDefault();
       setPendingFiles(prev => [...prev, ...imageFiles]);
     }
-  };
-
-  const handleEmojiClick = (emojiData: EmojiClickData) => {
-    setMessageContent(prev => prev + emojiData.emoji);
-    setShowEmojiPicker(false);
-    messageInputRef.current?.focus();
   };
 
   const filteredMentionUsers = users.filter(u => {
@@ -825,26 +816,6 @@ export default function ChatPage() {
                   >
                     <Paperclip className="h-4 w-4" />
                   </Button>
-                  <div className="relative">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      data-testid="button-emoji-picker"
-                    >
-                      <Smile className="h-4 w-4" />
-                    </Button>
-                    {showEmojiPicker && (
-                      <div className="absolute bottom-12 left-0 z-50">
-                        <EmojiPicker
-                          onEmojiClick={handleEmojiClick}
-                          theme={Theme.AUTO}
-                          width={300}
-                          height={400}
-                        />
-                      </div>
-                    )}
-                  </div>
                   <Textarea
                     ref={messageInputRef}
                     value={messageContent}
