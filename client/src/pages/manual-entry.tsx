@@ -6,8 +6,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { format } from "date-fns";
-import { JOBS_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES, DAILY_LOGS_ROUTES, MANUAL_ENTRY_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
-import { TimerWidget } from "@/components/timer-widget";
+import { JOBS_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES, DAILY_LOGS_ROUTES, MANUAL_ENTRY_ROUTES, ADMIN_ROUTES, TIMER_ROUTES } from "@shared/api-routes";
 import {
   Plus,
   Clock,
@@ -26,6 +25,10 @@ import {
   Loader2,
   CheckCircle2,
   Download,
+  Play,
+  Pause,
+  Square,
+  Timer,
 } from "lucide-react";
 import {
   Dialog,
@@ -175,6 +178,115 @@ export default function ManualEntryPage() {
     queryKey: [DAILY_LOGS_ROUTES.LIST],
   });
 
+  // Fetch active timer for this panel
+  const { data: activeTimer, refetch: refetchTimer } = useQuery<{
+    id: string;
+    status: "RUNNING" | "PAUSED" | "COMPLETED";
+    startedAt: string;
+    pausedAt: string | null;
+    totalElapsedMs: number;
+    jobId: string | null;
+    panelRegisterId: string | null;
+    panelMark: string | null;
+    jobNumber: string | null;
+  } | null>({
+    queryKey: [TIMER_ROUTES.ACTIVE],
+    refetchInterval: 1000, // Poll every second when timer is active
+  });
+
+  // Timer state
+  const [timerElapsed, setTimerElapsed] = useState(0);
+
+  // Update timer display
+  useEffect(() => {
+    if (!activeTimer) {
+      setTimerElapsed(0);
+      return;
+    }
+    
+    if (activeTimer.status === "RUNNING") {
+      const interval = setInterval(() => {
+        const now = Date.now();
+        const startedAt = new Date(activeTimer.startedAt).getTime();
+        const elapsed = activeTimer.totalElapsedMs + (now - startedAt);
+        setTimerElapsed(elapsed);
+      }, 100);
+      return () => clearInterval(interval);
+    } else if (activeTimer.status === "PAUSED") {
+      setTimerElapsed(activeTimer.totalElapsedMs);
+    }
+  }, [activeTimer]);
+
+  // hasActiveTimer is defined here, selectedPanelId/isTimerForSelectedPanel will be defined after form
+  const hasActiveTimer = !!activeTimer;
+
+  // Timer mutations
+  const startTimerMutation = useMutation({
+    mutationFn: async (data: { jobId: string; panelRegisterId: string }) => {
+      return await apiRequest("POST", TIMER_ROUTES.START, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      toast({ title: "Timer started", description: "Recording time for this panel" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to start timer", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const pauseTimerMutation = useMutation({
+    mutationFn: async (timerId: string) => {
+      return await apiRequest("POST", TIMER_ROUTES.PAUSE(timerId), {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      toast({ title: "Timer paused" });
+    },
+  });
+
+  const resumeTimerMutation = useMutation({
+    mutationFn: async (timerId: string) => {
+      return await apiRequest("POST", TIMER_ROUTES.RESUME(timerId), {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      toast({ title: "Timer resumed" });
+    },
+  });
+
+  const stopTimerMutation = useMutation({
+    mutationFn: async (data: { timerId: string; notes?: string; workTypeId?: number }) => {
+      return await apiRequest("POST", TIMER_ROUTES.STOP(data.timerId), { notes: data.notes, workTypeId: data.workTypeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
+      toast({ title: "Timer stopped", description: "Time entry saved" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to stop timer", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const cancelTimerMutation = useMutation({
+    mutationFn: async (timerId: string) => {
+      return await apiRequest("POST", TIMER_ROUTES.CANCEL(timerId), {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      toast({ title: "Timer cancelled" });
+    },
+  });
+
+  // Format timer display
+  const formatTimer = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
   // Calculate the latest end time from existing entries for the selected date
   const latestEndTime = useMemo(() => {
     if (!dailyLogs) return "09:00";
@@ -282,6 +394,10 @@ export default function ManualEntryPage() {
       panelPrimaryLifters: "",
     },
   });
+
+  // Check if timer is for the currently selected panel (must be after form definition)
+  const selectedPanelId = form.watch("panelRegisterId");
+  const isTimerForSelectedPanel = activeTimer && activeTimer.panelRegisterId === selectedPanelId;
 
   // Update start and end times when latest end time changes or date changes
   useEffect(() => {
@@ -660,8 +776,6 @@ export default function ManualEntryPage() {
         </div>
       </div>
 
-      <TimerWidget />
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -923,6 +1037,124 @@ export default function ManualEntryPage() {
                       )}
                     />
                   </div>
+
+                  {/* Timer Controls - Only show when a panel is selected */}
+                  {selectedPanelId && selectedPanelId !== "none" && (
+                    <div className="mt-4 p-4 rounded-lg border bg-card">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <Timer className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="font-medium text-sm">Timer for {selectedPanel?.panelMark || "Panel"}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {hasActiveTimer && isTimerForSelectedPanel 
+                                ? `Status: ${activeTimer?.status}` 
+                                : hasActiveTimer 
+                                  ? `Timer active for different panel: ${activeTimer?.panelMark || "Unknown"}`
+                                  : "No active timer"}
+                            </p>
+                          </div>
+                        </div>
+
+                        {isTimerForSelectedPanel && (
+                          <div className="text-2xl font-mono font-bold tabular-nums">
+                            {formatTimer(timerElapsed)}
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          {!hasActiveTimer && (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                const jobId = form.getValues("jobId");
+                                if (jobId && selectedPanelId) {
+                                  startTimerMutation.mutate({ jobId, panelRegisterId: selectedPanelId });
+                                }
+                              }}
+                              disabled={startTimerMutation.isPending || !selectedJobId}
+                              data-testid="button-start-panel-timer"
+                            >
+                              {startTimerMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Play className="h-4 w-4 mr-1" />
+                              )}
+                              Start Timer
+                            </Button>
+                          )}
+
+                          {isTimerForSelectedPanel && activeTimer?.status === "RUNNING" && activeTimer?.id && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => pauseTimerMutation.mutate(activeTimer.id)}
+                              disabled={pauseTimerMutation.isPending}
+                              data-testid="button-pause-panel-timer"
+                            >
+                              <Pause className="h-4 w-4 mr-1" />
+                              Pause
+                            </Button>
+                          )}
+
+                          {isTimerForSelectedPanel && activeTimer?.status === "PAUSED" && activeTimer?.id && (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              onClick={() => resumeTimerMutation.mutate(activeTimer.id)}
+                              disabled={resumeTimerMutation.isPending}
+                              data-testid="button-resume-panel-timer"
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              Resume
+                            </Button>
+                          )}
+
+                          {isTimerForSelectedPanel && activeTimer?.id && (
+                            <>
+                              <Button
+                                type="button"
+                                variant="default"
+                                size="sm"
+                                onClick={() => {
+                                  const workTypeId = form.getValues("workTypeId");
+                                  stopTimerMutation.mutate({ 
+                                    timerId: activeTimer.id,
+                                    workTypeId: workTypeId && workTypeId !== "none" ? parseInt(workTypeId) : undefined 
+                                  });
+                                }}
+                                disabled={stopTimerMutation.isPending}
+                                data-testid="button-stop-panel-timer"
+                              >
+                                <Square className="h-4 w-4 mr-1" />
+                                Stop & Save
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
+                                disabled={cancelTimerMutation.isPending}
+                                data-testid="button-cancel-panel-timer"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+
+                          {hasActiveTimer && !isTimerForSelectedPanel && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              Stop the current timer before starting a new one
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -1261,7 +1493,7 @@ export default function ManualEntryPage() {
                   Analyze PDF with AI
                 </Button>
               )}
-              {productionFormData.productionPdfUrl && !pdfFile && productionApprovalPanel && (
+              {productionFormData.productionPdfUrl && !pdfFile && selectedPanel && (
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5 text-primary" />
@@ -1273,7 +1505,7 @@ export default function ManualEntryPage() {
                     asChild
                     data-testid="button-view-pdf"
                   >
-                    <a href={ADMIN_ROUTES.PANEL_DOWNLOAD_PDF(productionApprovalPanel.id)} target="_blank" rel="noopener noreferrer">
+                    <a href={ADMIN_ROUTES.PANEL_DOWNLOAD_PDF(selectedPanel.id)} target="_blank" rel="noopener noreferrer">
                       <Download className="h-4 w-4 mr-2" />
                       View PDF
                     </a>
