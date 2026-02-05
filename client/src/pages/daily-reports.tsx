@@ -458,8 +458,23 @@ export default function DailyReportsPage() {
     }
   };
 
+  // Check if there's a timesheet for today
+  const today = format(new Date(), "yyyy-MM-dd");
+  const hasTodayTimesheet = logs?.some(log => log.logDay === today);
+
   return (
     <div className="space-y-6">
+      {/* Warning banner if no timesheet for today */}
+      {!isLoading && !hasTodayTimesheet && (
+        <div className="bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-800 rounded-lg p-4 flex items-center gap-3" data-testid="alert-no-timesheet">
+          <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+          <div>
+            <p className="font-medium text-red-800 dark:text-red-200">No drafting timesheet started for today</p>
+            <p className="text-sm text-red-600 dark:text-red-400">Remember to log your drafting time for {format(new Date(), "dd/MM/yyyy")}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-daily-reports-title">
@@ -724,23 +739,6 @@ export default function DailyReportsPage() {
                                 >
                                   <Play className="h-3 w-3 mr-1" />
                                   Draft Now
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    const params = new URLSearchParams();
-                                    params.set("date", format(new Date(), "yyyy-MM-dd"));
-                                    params.set("jobId", program.jobId);
-                                    if (program.panel?.panelMark) {
-                                      params.set("panelMark", program.panel.panelMark);
-                                    }
-                                    setLocation(`/manual-entry?${params.toString()}`);
-                                  }}
-                                  data-testid={`button-add-to-day-${program.id}`}
-                                >
-                                  <Plus className="h-3 w-3 mr-1" />
-                                  Add to Day
                                 </Button>
                               </div>
                             </TableCell>
