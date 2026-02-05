@@ -1821,6 +1821,7 @@ export default function AdminPanelsPage() {
                 <TableHead className="text-right w-20">Vol (m³)</TableHead>
                 <TableHead className="text-right w-16">MPa</TableHead>
                 <TableHead>Source</TableHead>
+                <TableHead>Drawing Status</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -1838,7 +1839,7 @@ export default function AdminPanelsPage() {
                           onClick={() => togglePanelTypeCollapse(panelType)}
                           data-testid={`row-type-group-${panelType}`}
                         >
-                          <TableCell colSpan={14}>
+                          <TableCell colSpan={15}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -1895,6 +1896,14 @@ export default function AdminPanelsPage() {
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "default" : "secondary"} 
+                                className={`text-xs ${panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "bg-green-600" : ""}`}
+                              >
+                                {panel.documentStatus || "DRAFT"}
                               </Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
@@ -1975,7 +1984,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={14}>
+                          <TableCell colSpan={15}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2046,6 +2055,14 @@ export default function AdminPanelsPage() {
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "default" : "secondary"} 
+                                className={`text-xs ${panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "bg-green-600" : ""}`}
+                              >
+                                {panel.documentStatus || "DRAFT"}
                               </Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
@@ -2126,7 +2143,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleLevelCollapse(level)}
                           data-testid={`row-level-group-${level}`}
                         >
-                          <TableCell colSpan={14}>
+                          <TableCell colSpan={15}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2202,6 +2219,14 @@ export default function AdminPanelsPage() {
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "default" : "secondary"} 
+                                className={`text-xs ${panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "bg-green-600" : ""}`}
+                              >
+                                {panel.documentStatus || "DRAFT"}
                               </Badge>
                             </TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
@@ -2331,6 +2356,14 @@ export default function AdminPanelsPage() {
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {getSourceLabel(panel.source)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "default" : "secondary"} 
+                          className={`text-xs ${panel.documentStatus === "IFC" || panel.documentStatus === "APPROVED" ? "bg-green-600" : ""}`}
+                        >
+                          {panel.documentStatus || "DRAFT"}
                         </Badge>
                       </TableCell>
                       <TableCell>{getStatusBadge(panel.status)}</TableCell>
