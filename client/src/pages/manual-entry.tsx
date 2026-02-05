@@ -374,8 +374,8 @@ export default function ManualEntryPage() {
       app: "acad",
       startTime: "09:00",
       endTime: "09:30",
-      jobId: "",
-      panelRegisterId: "",
+      jobId: jobIdFromUrl || "",
+      panelRegisterId: panelIdFromUrl || "",
       workTypeId: "",
       fileName: "",
       filePath: "",
@@ -434,8 +434,8 @@ export default function ManualEntryPage() {
     if (watchedPanelRegisterId && watchedPanelRegisterId !== "none") {
       const panel = panels?.find(p => p.id === watchedPanelRegisterId);
       if (panel) {
-        // Auto-select the job from the panel if not already selected
-        if (panel.jobId && (!selectedJobId || selectedJobId === "none")) {
+        // Always sync the job from the panel's associated job
+        if (panel.jobId) {
           setSelectedJobId(panel.jobId);
           form.setValue("jobId", panel.jobId);
         }
@@ -1180,10 +1180,23 @@ export default function ManualEntryPage() {
                             </>
                           )}
 
-                          {hasActiveTimer && !isTimerForSelectedPanel && (
-                            <p className="text-xs text-amber-600 dark:text-amber-400">
-                              Stop the current timer before starting a new one
-                            </p>
+                          {hasActiveTimer && !isTimerForSelectedPanel && activeTimer?.id && (
+                            <div className="flex items-center gap-2">
+                              <div className="text-xl font-mono font-bold tabular-nums">
+                                {formatTimer(timerElapsed)}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
+                                disabled={cancelTimerMutation.isPending}
+                                data-testid="button-cancel-other-timer"
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Stop Other Timer
+                              </Button>
+                            </div>
                           )}
                         </div>
                       </div>
