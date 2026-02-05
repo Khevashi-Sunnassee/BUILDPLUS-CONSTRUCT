@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { TASKS_ROUTES, USER_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { TASKS_ROUTES, USER_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import jsPDF from "jspdf";
+import defaultLogo from "@/assets/lte-logo.png";
 import {
   DndContext,
   DragEndEvent,
@@ -54,6 +56,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Printer,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -357,7 +360,7 @@ function TaskRow({
   };
 
   const handleToggleAssignee = (userId: string) => {
-    const currentIds = task.assignees.map((a) => a.userId);
+    const currentIds = (task.assignees || []).map((a) => a.userId);
     const newIds = currentIds.includes(userId)
       ? currentIds.filter((id) => id !== userId)
       : [...currentIds, userId];
@@ -452,18 +455,18 @@ function TaskRow({
               className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-muted/50 rounded"
               data-testid={`assignees-${task.id}`}
             >
-              {task.assignees.length > 0 ? (
+              {(task.assignees?.length || 0) > 0 ? (
                 <div className="flex -space-x-2">
-                  {task.assignees.slice(0, 3).map((assignee) => (
+                  {(task.assignees || []).slice(0, 3).map((assignee) => (
                     <Avatar key={assignee.id} className="h-6 w-6 border-2 border-background">
                       <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
-                        {getInitials(assignee.user.name)}
+                        {getInitials(assignee.user?.name)}
                       </AvatarFallback>
                     </Avatar>
                   ))}
-                  {task.assignees.length > 3 && (
+                  {(task.assignees?.length || 0) > 3 && (
                     <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] border-2 border-background">
-                      +{task.assignees.length - 3}
+                      +{(task.assignees?.length || 0) - 3}
                     </div>
                   )}
                 </div>
@@ -475,7 +478,7 @@ function TaskRow({
           <PopoverContent className="w-64 p-2" align="start">
             <div className="space-y-1 max-h-60 overflow-y-auto">
               {users.map((user) => {
-                const isAssigned = task.assignees.some((a) => a.userId === user.id);
+                const isAssigned = (task.assignees || []).some((a) => a.userId === user.id);
                 return (
                   <div
                     key={user.id}
@@ -1413,6 +1416,14 @@ export default function TasksPage() {
     queryKey: [JOBS_ROUTES.LIST],
   });
 
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: [SETTINGS_ROUTES.LOGO],
+  });
+
+  const [isExporting, setIsExporting] = useState(false);
+  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
+  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+
   const filteredGroups = groups.map((group) => ({
     ...group,
     tasks: group.tasks.filter((task) => {
@@ -1460,6 +1471,202 @@ export default function TasksPage() {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
+
+  const exportToPDF = async () => {
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const headerHeight = 30;
+      const footerHeight = 12;
+      let yPos = headerHeight + 5;
+
+      const logoHeight = 12;
+      const logoWidth = 24;
+      try {
+        pdf.addImage(reportLogo, "PNG", margin, 8, logoWidth, logoHeight);
+      } catch (e) {}
+
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Task List", margin + logoWidth + 8, 14);
+
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(companyName, margin + logoWidth + 8, 20);
+
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+
+      if (jobFilter !== "all") {
+        const filterLabel = jobFilter === "none" 
+          ? "No Job Assigned" 
+          : jobs.find(j => j.id === jobFilter)?.name || "";
+        pdf.text(`Filter: ${filterLabel}`, pdfWidth - margin, 20, { align: "right" });
+      }
+
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, headerHeight - 2, pdfWidth - margin, headerHeight - 2);
+
+      const getStatusColor = (status: string): [number, number, number] => {
+        switch (status) {
+          case "NOT_STARTED": return [107, 114, 128];
+          case "IN_PROGRESS": return [59, 130, 246];
+          case "STUCK": return [239, 68, 68];
+          case "DONE": return [34, 197, 94];
+          case "ON_HOLD": return [245, 158, 11];
+          default: return [107, 114, 128];
+        }
+      };
+
+      const formatStatus = (status: string) => {
+        return status.replace(/_/g, " ");
+      };
+
+      const checkNewPage = (requiredHeight: number) => {
+        if (yPos + requiredHeight > pdfHeight - footerHeight - 10) {
+          addFooter();
+          pdf.addPage();
+          yPos = margin;
+          return true;
+        }
+        return false;
+      };
+
+      const addFooter = () => {
+        pdf.setFillColor(248, 250, 252);
+        pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
+        pdf.text(`Page ${pdf.getNumberOfPages()}`, pdfWidth - margin, pdfHeight - 5, { align: "right" });
+      };
+
+      for (const group of filteredGroups) {
+        if (group.tasks.length === 0) continue;
+
+        checkNewPage(25);
+
+        pdf.setFillColor(241, 245, 249);
+        pdf.roundedRect(margin, yPos, pdfWidth - margin * 2, 8, 1, 1, "F");
+        pdf.setTextColor(51, 65, 85);
+        pdf.setFontSize(11);
+        pdf.setFont("helvetica", "bold");
+        pdf.text(group.name, margin + 3, yPos + 5.5);
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`(${group.tasks.length} tasks)`, margin + pdf.getTextWidth(group.name) + 6, yPos + 5.5);
+        yPos += 12;
+
+        const colWidths = {
+          task: 70,
+          status: 25,
+          assignee: 35,
+          dueDate: 25,
+          job: 25,
+        };
+        const tableWidth = pdfWidth - margin * 2;
+        const startX = margin;
+
+        pdf.setFillColor(248, 250, 252);
+        pdf.rect(startX, yPos, tableWidth, 7, "F");
+        pdf.setDrawColor(226, 232, 240);
+        pdf.line(startX, yPos, startX + tableWidth, yPos);
+        pdf.line(startX, yPos + 7, startX + tableWidth, yPos + 7);
+
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(71, 85, 105);
+        let xPos = startX + 2;
+        pdf.text("Task", xPos, yPos + 5);
+        xPos += colWidths.task;
+        pdf.text("Status", xPos, yPos + 5);
+        xPos += colWidths.status;
+        pdf.text("Assignee", xPos, yPos + 5);
+        xPos += colWidths.assignee;
+        pdf.text("Due Date", xPos, yPos + 5);
+        xPos += colWidths.dueDate;
+        pdf.text("Job", xPos, yPos + 5);
+        yPos += 8;
+
+        const drawTask = (task: Task, indent: number = 0) => {
+          checkNewPage(8);
+
+          pdf.setDrawColor(241, 245, 249);
+          pdf.line(startX, yPos + 6, startX + tableWidth, yPos + 6);
+
+          let xPos = startX + 2 + indent;
+          pdf.setFont("helvetica", "normal");
+          pdf.setTextColor(30, 41, 59);
+          pdf.setFontSize(8);
+
+          const taskTitle = task.title.length > 40 - indent / 2 
+            ? task.title.substring(0, 37 - indent / 2) + "..." 
+            : task.title;
+          pdf.text(indent > 0 ? `└ ${taskTitle}` : taskTitle, xPos, yPos + 4);
+
+          xPos = startX + 2 + colWidths.task;
+          const statusColor = getStatusColor(task.status);
+          pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
+          pdf.roundedRect(xPos, yPos + 0.5, 20, 5, 1, 1, "F");
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFontSize(6);
+          pdf.text(formatStatus(task.status), xPos + 1, yPos + 4);
+
+          xPos += colWidths.status;
+          pdf.setTextColor(71, 85, 105);
+          pdf.setFontSize(8);
+          const assignees = task.assignees?.map(a => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";
+          const assigneeText = assignees.length > 18 ? assignees.substring(0, 15) + "..." : assignees;
+          pdf.text(assigneeText, xPos, yPos + 4);
+
+          xPos += colWidths.assignee;
+          pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yy") : "-", xPos, yPos + 4);
+
+          xPos += colWidths.dueDate;
+          const jobText = task.job ? `${(task.job as any).jobNumber}` : "-";
+          pdf.text(jobText.length > 12 ? jobText.substring(0, 9) + "..." : jobText, xPos, yPos + 4);
+
+          yPos += 7;
+
+          if (task.subtasks && task.subtasks.length > 0) {
+            for (const subtask of task.subtasks) {
+              drawTask(subtask, 6);
+            }
+          }
+        };
+
+        for (const task of group.tasks) {
+          drawTask(task);
+        }
+
+        yPos += 6;
+      }
+
+      addFooter();
+
+      pdf.save(`LTE-Tasks-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      toast({ title: "PDF exported successfully" });
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to generate PDF" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const findTaskById = (id: string): { task: Task; groupId: string } | null => {
     for (const group of filteredGroups) {
@@ -1575,6 +1782,15 @@ export default function TasksPage() {
               </SelectContent>
             </Select>
           </div>
+          <Button
+            variant="outline"
+            onClick={exportToPDF}
+            disabled={isExporting || filteredGroups.every(g => g.tasks.length === 0)}
+            data-testid="btn-export-pdf"
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            {isExporting ? "Exporting..." : "Print"}
+          </Button>
           <Button
             onClick={() => setShowNewGroupInput(true)}
             data-testid="btn-new-group"
