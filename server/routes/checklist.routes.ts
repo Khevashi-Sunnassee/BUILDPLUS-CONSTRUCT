@@ -65,7 +65,7 @@ router.post("/api/checklist/entity-types", requireAuth, requireRole("ADMIN"), as
 router.put("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const typeId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -73,7 +73,7 @@ router.put("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN"),
 
     const [updated] = await db.update(entityTypes)
       .set({ ...req.body, updatedAt: new Date() })
-      .where(and(eq(entityTypes.id, id), eq(entityTypes.companyId, companyId)))
+      .where(and(eq(entityTypes.id, typeId), eq(entityTypes.companyId, companyId!)))
       .returning();
 
     if (!updated) {
@@ -90,7 +90,7 @@ router.put("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN"),
 router.delete("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const typeId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -98,7 +98,7 @@ router.delete("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN
 
     const [deleted] = await db.update(entityTypes)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(entityTypes.id, id), eq(entityTypes.companyId, companyId)))
+      .where(and(eq(entityTypes.id, typeId), eq(entityTypes.companyId, companyId!)))
       .returning();
 
     if (!deleted) {
@@ -141,7 +141,7 @@ router.get("/api/checklist/entity-subtypes", requireAuth, async (req: Request, r
 router.get("/api/checklist/entity-types/:entityTypeId/subtypes", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { entityTypeId } = req.params;
+    const entityTypeId = String(req.params.entityTypeId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -150,7 +150,7 @@ router.get("/api/checklist/entity-types/:entityTypeId/subtypes", requireAuth, as
     const subtypes = await db.select()
       .from(entitySubtypes)
       .where(and(
-        eq(entitySubtypes.companyId, companyId),
+        eq(entitySubtypes.companyId, companyId!),
         eq(entitySubtypes.entityTypeId, entityTypeId),
         eq(entitySubtypes.isActive, true)
       ))
@@ -186,7 +186,7 @@ router.post("/api/checklist/entity-subtypes", requireAuth, requireRole("ADMIN"),
 router.put("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const subtypeId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -194,7 +194,7 @@ router.put("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("ADMIN
 
     const [updated] = await db.update(entitySubtypes)
       .set({ ...req.body, updatedAt: new Date() })
-      .where(and(eq(entitySubtypes.id, id), eq(entitySubtypes.companyId, companyId)))
+      .where(and(eq(entitySubtypes.id, subtypeId), eq(entitySubtypes.companyId, companyId!)))
       .returning();
 
     if (!updated) {
@@ -211,7 +211,7 @@ router.put("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("ADMIN
 router.delete("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const subtypeId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -219,7 +219,7 @@ router.delete("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("AD
 
     const [deleted] = await db.update(entitySubtypes)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(entitySubtypes.id, id), eq(entitySubtypes.companyId, companyId)))
+      .where(and(eq(entitySubtypes.id, subtypeId), eq(entitySubtypes.companyId, companyId!)))
       .returning();
 
     if (!deleted) {
@@ -262,7 +262,7 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
 router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const templateId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -271,8 +271,8 @@ router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res
     const [template] = await db.select()
       .from(checklistTemplates)
       .where(and(
-        eq(checklistTemplates.id, id),
-        eq(checklistTemplates.companyId, companyId)
+        eq(checklistTemplates.id, templateId),
+        eq(checklistTemplates.companyId, companyId!)
       ));
 
     if (!template) {
@@ -289,7 +289,7 @@ router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res
 router.get("/api/checklist/templates/module/:entityTypeId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { entityTypeId } = req.params;
+    const entityTypeId = String(req.params.entityTypeId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -298,7 +298,7 @@ router.get("/api/checklist/templates/module/:entityTypeId", requireAuth, async (
     const templates = await db.select()
       .from(checklistTemplates)
       .where(and(
-        eq(checklistTemplates.companyId, companyId),
+        eq(checklistTemplates.companyId, companyId!),
         eq(checklistTemplates.entityTypeId, entityTypeId),
         eq(checklistTemplates.isActive, true)
       ))
@@ -314,7 +314,8 @@ router.get("/api/checklist/templates/module/:entityTypeId", requireAuth, async (
 router.get("/api/checklist/templates/module/:entityTypeId/:entitySubtypeId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { entityTypeId, entitySubtypeId } = req.params;
+    const entityTypeId = String(req.params.entityTypeId);
+    const entitySubtypeId = String(req.params.entitySubtypeId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -323,7 +324,7 @@ router.get("/api/checklist/templates/module/:entityTypeId/:entitySubtypeId", req
     const templates = await db.select()
       .from(checklistTemplates)
       .where(and(
-        eq(checklistTemplates.companyId, companyId),
+        eq(checklistTemplates.companyId, companyId!),
         eq(checklistTemplates.entityTypeId, entityTypeId),
         eq(checklistTemplates.entitySubtypeId, entitySubtypeId),
         eq(checklistTemplates.isActive, true)
@@ -367,7 +368,7 @@ router.post("/api/checklist/templates", requireAuth, requireRole("ADMIN", "MANAG
 router.put("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const templateId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -375,7 +376,7 @@ router.put("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN", "MA
 
     const [updated] = await db.update(checklistTemplates)
       .set({ ...req.body, updatedAt: new Date() })
-      .where(and(eq(checklistTemplates.id, id), eq(checklistTemplates.companyId, companyId)))
+      .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
 
     if (!updated) {
@@ -393,7 +394,7 @@ router.post("/api/checklist/templates/:id/duplicate", requireAuth, requireRole("
   try {
     const companyId = req.companyId;
     const userId = req.session.userId;
-    const { id } = req.params;
+    const templateId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -401,7 +402,7 @@ router.post("/api/checklist/templates/:id/duplicate", requireAuth, requireRole("
 
     const [original] = await db.select()
       .from(checklistTemplates)
-      .where(and(eq(checklistTemplates.id, id), eq(checklistTemplates.companyId, companyId)));
+      .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)));
 
     if (!original) {
       return res.status(404).json({ error: "Template not found" });
@@ -426,7 +427,7 @@ router.post("/api/checklist/templates/:id/duplicate", requireAuth, requireRole("
 router.delete("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const templateId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -434,7 +435,7 @@ router.delete("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN"),
 
     const [deleted] = await db.update(checklistTemplates)
       .set({ isActive: false, updatedAt: new Date() })
-      .where(and(eq(checklistTemplates.id, id), eq(checklistTemplates.companyId, companyId)))
+      .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
 
     if (!deleted) {
@@ -491,7 +492,7 @@ router.get("/api/checklist/instances", requireAuth, async (req: Request, res: Re
 router.get("/api/checklist/instances/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const instanceId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -500,8 +501,8 @@ router.get("/api/checklist/instances/:id", requireAuth, async (req: Request, res
     const [instance] = await db.select()
       .from(checklistInstances)
       .where(and(
-        eq(checklistInstances.id, id),
-        eq(checklistInstances.companyId, companyId)
+        eq(checklistInstances.id, instanceId),
+        eq(checklistInstances.companyId, companyId!)
       ));
 
     if (!instance) {
@@ -518,7 +519,7 @@ router.get("/api/checklist/instances/:id", requireAuth, async (req: Request, res
 router.get("/api/checklist/templates/:templateId/instances", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { templateId } = req.params;
+    const templateId = String(req.params.templateId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -527,7 +528,7 @@ router.get("/api/checklist/templates/:templateId/instances", requireAuth, async 
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(
-        eq(checklistInstances.companyId, companyId),
+        eq(checklistInstances.companyId, companyId!),
         eq(checklistInstances.templateId, templateId)
       ))
       .orderBy(desc(checklistInstances.createdAt));
@@ -542,7 +543,7 @@ router.get("/api/checklist/templates/:templateId/instances", requireAuth, async 
 router.get("/api/checklist/jobs/:jobId/instances", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { jobId } = req.params;
+    const jobId = String(req.params.jobId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -551,7 +552,7 @@ router.get("/api/checklist/jobs/:jobId/instances", requireAuth, async (req: Requ
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(
-        eq(checklistInstances.companyId, companyId),
+        eq(checklistInstances.companyId, companyId!),
         eq(checklistInstances.jobId, jobId)
       ))
       .orderBy(desc(checklistInstances.createdAt));
@@ -566,7 +567,7 @@ router.get("/api/checklist/jobs/:jobId/instances", requireAuth, async (req: Requ
 router.get("/api/checklist/panels/:panelId/instances", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { panelId } = req.params;
+    const panelId = String(req.params.panelId);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -575,7 +576,7 @@ router.get("/api/checklist/panels/:panelId/instances", requireAuth, async (req: 
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(
-        eq(checklistInstances.companyId, companyId),
+        eq(checklistInstances.companyId, companyId!),
         eq(checklistInstances.panelId, panelId)
       ))
       .orderBy(desc(checklistInstances.createdAt));
@@ -620,7 +621,7 @@ router.post("/api/checklist/instances", requireAuth, async (req: Request, res: R
 router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const instanceId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -628,7 +629,7 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
 
     const [updated] = await db.update(checklistInstances)
       .set({ ...req.body, updatedAt: new Date() })
-      .where(and(eq(checklistInstances.id, id), eq(checklistInstances.companyId, companyId)))
+      .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
       .returning();
 
     if (!updated) {
@@ -646,7 +647,7 @@ router.patch("/api/checklist/instances/:id/complete", requireAuth, async (req: R
   try {
     const companyId = req.companyId;
     const userId = req.session.userId;
-    const { id } = req.params;
+    const instanceId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -659,7 +660,7 @@ router.patch("/api/checklist/instances/:id/complete", requireAuth, async (req: R
         completedBy: userId,
         updatedAt: new Date(),
       })
-      .where(and(eq(checklistInstances.id, id), eq(checklistInstances.companyId, companyId)))
+      .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
       .returning();
 
     if (!updated) {
@@ -677,7 +678,7 @@ router.patch("/api/checklist/instances/:id/sign-off", requireAuth, requireRole("
   try {
     const companyId = req.companyId;
     const userId = req.session.userId;
-    const { id } = req.params;
+    const instanceId = String(req.params.id);
     const { comments } = req.body;
 
     if (!companyId) {
@@ -692,7 +693,7 @@ router.patch("/api/checklist/instances/:id/sign-off", requireAuth, requireRole("
         signOffComments: comments,
         updatedAt: new Date(),
       })
-      .where(and(eq(checklistInstances.id, id), eq(checklistInstances.companyId, companyId)))
+      .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
       .returning();
 
     if (!updated) {
@@ -709,7 +710,7 @@ router.patch("/api/checklist/instances/:id/sign-off", requireAuth, requireRole("
 router.delete("/api/checklist/instances/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
-    const { id } = req.params;
+    const instanceId = String(req.params.id);
 
     if (!companyId) {
       return res.status(400).json({ error: "Company ID required" });
@@ -717,7 +718,7 @@ router.delete("/api/checklist/instances/:id", requireAuth, requireRole("ADMIN"),
 
     const [deleted] = await db.update(checklistInstances)
       .set({ status: "cancelled", updatedAt: new Date() })
-      .where(and(eq(checklistInstances.id, id), eq(checklistInstances.companyId, companyId)))
+      .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
       .returning();
 
     if (!deleted) {
