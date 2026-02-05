@@ -17,6 +17,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import {
+  DndContext,
+  DragEndEvent,
+  DragOverEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   ChevronDown,
   ChevronRight,
   Plus,
@@ -34,6 +51,9 @@ import {
   Image,
   File,
   Briefcase,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -153,18 +173,67 @@ function getInitials(name: string | null | undefined): string {
     .slice(0, 2);
 }
 
+function SortableTaskRow({
+  task,
+  users,
+  jobs,
+  onOpenSidebar,
+}: {
+  task: Task;
+  users: User[];
+  jobs: Job[];
+  onOpenSidebar: (task: Task) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TaskRow
+      task={task}
+      users={users}
+      jobs={jobs}
+      isSubtask={false}
+      onOpenSidebar={onOpenSidebar}
+      sortableRef={setNodeRef}
+      sortableStyle={style}
+      sortableAttributes={attributes}
+      sortableListeners={listeners}
+    />
+  );
+}
+
 function TaskRow({
   task,
   users,
   jobs,
   isSubtask = false,
   onOpenSidebar,
+  sortableRef,
+  sortableStyle,
+  sortableAttributes,
+  sortableListeners,
 }: {
   task: Task;
   users: User[];
   jobs: Job[];
   isSubtask?: boolean;
   onOpenSidebar: (task: Task) => void;
+  sortableRef?: (node: HTMLElement | null) => void;
+  sortableStyle?: React.CSSProperties;
+  sortableAttributes?: Record<string, any>;
+  sortableListeners?: Record<string, any>;
 }) {
   const { toast } = useToast();
   const [localTitle, setLocalTitle] = useState(task.title);
@@ -175,6 +244,7 @@ function TaskRow({
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
+  
 
   useEffect(() => {
     setLocalTitle(task.title);
@@ -301,6 +371,8 @@ function TaskRow({
   return (
     <>
       <div
+        ref={sortableRef}
+        style={sortableStyle}
         className={cn(
           "grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
           isSubtask && "bg-muted/30"
@@ -312,8 +384,15 @@ function TaskRow({
           style={{ backgroundColor: jobColor || 'transparent' }}
           title={task.job ? `${task.job.jobNumber} - ${task.job.name}` : undefined}
         />
-        <div className="flex items-center justify-center px-1">
-          <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 cursor-grab" />
+        <div 
+          className="flex items-center justify-center px-1"
+          {...(sortableAttributes || {})}
+          {...(sortableListeners || {})}
+        >
+          <GripVertical className={cn(
+            "h-4 w-4 text-muted-foreground cursor-grab",
+            isSubtask ? "opacity-0" : "opacity-0 group-hover:opacity-100"
+          )} />
         </div>
 
         <div className={cn("flex items-center gap-2 py-2 pr-2", isSubtask && "pl-6")}>
@@ -564,6 +643,22 @@ function TaskRow({
           />
         ))}
 
+      {!isSubtask && showSubtasks && !showAddSubtask && (
+        <div 
+          className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20 hover:bg-muted/40 cursor-pointer transition-colors"
+          onClick={() => setShowAddSubtask(true)}
+          data-testid={`btn-add-subitem-${task.id}`}
+        >
+          <div />
+          <div />
+          <div className="flex items-center gap-2 py-1.5 pl-8 pr-2">
+            <Plus className="h-3 w-3 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground">Add subitem</span>
+          </div>
+          <div className="col-span-8" />
+        </div>
+      )}
+
       {showAddSubtask && (
         <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-border/50 bg-muted/30">
           <div />
@@ -638,16 +733,20 @@ function TaskRow({
   );
 }
 
+type SortOption = "default" | "status" | "date-asc" | "date-desc" | "title";
+
 function TaskGroupComponent({
   group,
   users,
   jobs,
   onOpenSidebar,
+  allGroups,
 }: {
   group: TaskGroup;
   users: User[];
   jobs: Job[];
   onOpenSidebar: (task: Task) => void;
+  allGroups: TaskGroup[];
 }) {
   const { toast } = useToast();
   const [isCollapsed, setIsCollapsed] = useState(group.isCollapsed);
@@ -655,7 +754,30 @@ function TaskGroupComponent({
   const [groupName, setGroupName] = useState(group.name);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [sortOption, setSortOption] = useState<SortOption>("default");
   const nameInputRef = useRef<HTMLInputElement>(null);
+  
+  const sortedTasks = [...group.tasks].sort((a, b) => {
+    switch (sortOption) {
+      case "status":
+        const statusOrder = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "STUCK", "DONE"];
+        return statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status);
+      case "date-asc":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      case "date-desc":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      case "title":
+        return a.title.localeCompare(b.title);
+      default:
+        return a.sortOrder - b.sortOrder;
+    }
+  });
 
   const updateGroupMutation = useMutation({
     mutationFn: async (data: Partial<TaskGroup>) => {
@@ -760,6 +882,39 @@ function TaskGroupComponent({
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-7 gap-1" data-testid={`btn-sort-${group.id}`}>
+              <ArrowUpDown className="h-3.5 w-3.5" />
+              <span className="text-xs">Sort</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setSortOption("default")} data-testid={`sort-default-${group.id}`}>
+              {sortOption === "default" && <span className="mr-2">✓</span>}
+              Default order
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortOption("title")} data-testid={`sort-title-${group.id}`}>
+              {sortOption === "title" && <span className="mr-2">✓</span>}
+              By name
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortOption("status")} data-testid={`sort-status-${group.id}`}>
+              {sortOption === "status" && <span className="mr-2">✓</span>}
+              By status
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortOption("date-asc")} data-testid={`sort-date-asc-${group.id}`}>
+              {sortOption === "date-asc" && <span className="mr-2">✓</span>}
+              <ArrowUp className="h-3 w-3 mr-1" />
+              Date (earliest first)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setSortOption("date-desc")} data-testid={`sort-date-desc-${group.id}`}>
+              {sortOption === "date-desc" && <span className="mr-2">✓</span>}
+              <ArrowDown className="h-3 w-3 mr-1" />
+              Date (latest first)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" data-testid={`btn-group-menu-${group.id}`}>
               <MoreHorizontal className="h-4 w-4" />
             </Button>
@@ -796,15 +951,17 @@ function TaskGroupComponent({
             <div />
           </div>
 
-          {group.tasks.map((task) => (
-            <TaskRow
-              key={task.id}
-              task={task}
-              users={users}
-              jobs={jobs}
-              onOpenSidebar={onOpenSidebar}
-            />
-          ))}
+          <SortableContext items={sortedTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+            {sortedTasks.map((task) => (
+              <SortableTaskRow
+                key={task.id}
+                task={task}
+                users={users}
+                jobs={jobs}
+                onOpenSidebar={onOpenSidebar}
+              />
+            ))}
+          </SortableContext>
 
           <div className="grid grid-cols-[4px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
             <div />
@@ -1234,6 +1391,15 @@ export default function TasksPage() {
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [jobFilter, setJobFilter] = useState<string>("all");
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  );
 
   const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
     queryKey: [TASKS_ROUTES.GROUPS],
@@ -1256,6 +1422,30 @@ export default function TasksPage() {
     }),
   }));
 
+  const moveTaskMutation = useMutation({
+    mutationFn: async ({ taskId, targetGroupId, targetIndex }: { taskId: string; targetGroupId: string; targetIndex: number }) => {
+      return apiRequest("POST", TASKS_ROUTES.MOVE_TASK(taskId), { targetGroupId, targetIndex });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error moving task", description: error.message });
+    },
+  });
+
+  const reorderTasksMutation = useMutation({
+    mutationFn: async ({ groupId, taskIds }: { groupId: string; taskIds: string[] }) => {
+      return apiRequest("POST", TASKS_ROUTES.TASKS_REORDER, { groupId, taskIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error reordering", description: error.message });
+    },
+  });
+
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
       return apiRequest("POST", TASKS_ROUTES.GROUPS, { name });
@@ -1270,6 +1460,79 @@ export default function TasksPage() {
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
+
+  const findTaskById = (id: string): { task: Task; groupId: string } | null => {
+    for (const group of filteredGroups) {
+      const task = group.tasks.find(t => t.id === id);
+      if (task) return { task, groupId: group.id };
+    }
+    return null;
+  };
+
+  const findGroupContainingTask = (taskId: string): string | null => {
+    for (const group of filteredGroups) {
+      if (group.tasks.some(t => t.id === taskId)) {
+        return group.id;
+      }
+    }
+    return null;
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over) return;
+
+    const activeTaskInfo = findTaskById(active.id as string);
+    if (!activeTaskInfo) return;
+
+    const overId = over.id as string;
+    
+    const overGroup = filteredGroups.find(g => g.id === overId);
+    if (overGroup) {
+      if (activeTaskInfo.groupId !== overId) {
+        moveTaskMutation.mutate({
+          taskId: active.id as string,
+          targetGroupId: overId,
+          targetIndex: overGroup.tasks.length,
+        });
+      }
+      return;
+    }
+
+    const overTaskInfo = findTaskById(overId);
+    if (overTaskInfo) {
+      if (activeTaskInfo.groupId === overTaskInfo.groupId) {
+        const group = filteredGroups.find(g => g.id === activeTaskInfo.groupId);
+        if (group) {
+          const taskIds = group.tasks.map(t => t.id);
+          const oldIndex = taskIds.indexOf(active.id as string);
+          const newIndex = taskIds.indexOf(overId);
+          if (oldIndex !== newIndex) {
+            const newTaskIds = [...taskIds];
+            newTaskIds.splice(oldIndex, 1);
+            newTaskIds.splice(newIndex, 0, active.id as string);
+            reorderTasksMutation.mutate({ groupId: group.id, taskIds: newTaskIds });
+          }
+        }
+      } else {
+        const overGroupTasks = filteredGroups.find(g => g.id === overTaskInfo.groupId)?.tasks || [];
+        const targetIndex = overGroupTasks.findIndex(t => t.id === overId);
+        moveTaskMutation.mutate({
+          taskId: active.id as string,
+          targetGroupId: overTaskInfo.groupId,
+          targetIndex: Math.max(0, targetIndex),
+        });
+      }
+    }
+  };
+
+  const activeTask = activeId ? findTaskById(activeId)?.task : null;
 
   if (isLoading) {
     return (
@@ -1361,32 +1624,48 @@ export default function TasksPage() {
         </div>
       )}
 
-      {groups.length === 0 ? (
-        <div className="text-center py-16 border rounded-lg bg-muted/30">
-          <div className="max-w-md mx-auto">
-            <h3 className="text-lg font-semibold mb-2">No task groups yet</h3>
-            <p className="text-muted-foreground mb-4">
-              Create your first group to start organizing tasks. Groups help you categorize and manage related work items.
-            </p>
-            <Button onClick={() => setShowNewGroupInput(true)} data-testid="btn-create-first-group">
-              <Plus className="h-4 w-4 mr-2" />
-              Create First Group
-            </Button>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {groups.length === 0 ? (
+          <div className="text-center py-16 border rounded-lg bg-muted/30">
+            <div className="max-w-md mx-auto">
+              <h3 className="text-lg font-semibold mb-2">No task groups yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Create your first group to start organizing tasks. Groups help you categorize and manage related work items.
+              </p>
+              <Button onClick={() => setShowNewGroupInput(true)} data-testid="btn-create-first-group">
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Group
+              </Button>
+            </div>
           </div>
-        </div>
-      ) : (
-        <div className="border rounded-lg overflow-hidden bg-card">
-          {filteredGroups.map((group) => (
-            <TaskGroupComponent
-              key={group.id}
-              group={group}
-              users={users}
-              jobs={jobs}
-              onOpenSidebar={setSelectedTask}
-            />
-          ))}
-        </div>
-      )}
+        ) : (
+          <div className="border rounded-lg overflow-hidden bg-card">
+            {filteredGroups.map((group) => (
+              <TaskGroupComponent
+                key={group.id}
+                group={group}
+                users={users}
+                jobs={jobs}
+                onOpenSidebar={setSelectedTask}
+                allGroups={filteredGroups}
+              />
+            ))}
+          </div>
+        )}
+
+        <DragOverlay>
+          {activeTask && (
+            <div className="bg-card border shadow-lg rounded-md p-2 opacity-90">
+              <span className="text-sm font-medium">{activeTask.title}</span>
+            </div>
+          )}
+        </DragOverlay>
+      </DndContext>
 
       <TaskSidebar task={selectedTask} onClose={() => setSelectedTask(null)} />
     </div>
