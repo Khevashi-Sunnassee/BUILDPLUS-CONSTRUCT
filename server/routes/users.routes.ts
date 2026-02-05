@@ -56,11 +56,15 @@ router.get("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
 // Admin: Create user
 router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
   try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
     const existing = await storage.getUserByEmail(req.body.email);
     if (existing) {
       return res.status(400).json({ error: "User with this email already exists" });
     }
-    const user = await storage.createUser(req.body);
+    const userData = { ...req.body, companyId: req.companyId };
+    const user = await storage.createUser(userData);
     res.json({ ...user, passwordHash: undefined });
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to create user" });
@@ -69,7 +73,13 @@ router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
 
 // Admin: Update user
 router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
-  const user = await storage.updateUser(req.params.id as string, req.body);
+  const existingUser = await storage.getUser(req.params.id as string);
+  if (!existingUser || existingUser.companyId !== req.companyId) {
+    return res.status(404).json({ error: "User not found" });
+  }
+  const updateData = { ...req.body };
+  delete updateData.companyId;
+  const user = await storage.updateUser(req.params.id as string, updateData);
   res.json({ ...user, passwordHash: undefined });
 });
 

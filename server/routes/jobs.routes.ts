@@ -88,25 +88,30 @@ router.delete("/api/jobs/:jobId/panel-rates/:rateId", requireRole("ADMIN"), asyn
 
 // GET /api/admin/jobs - Get all jobs (for admin)
 router.get("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: Response) => {
-  const allJobs = await storage.getAllJobs();
+  const allJobs = await storage.getAllJobs(req.companyId);
   res.json(allJobs);
 });
 
 // GET /api/admin/jobs/:id - Get single job
 router.get("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const job = await storage.getJob(req.params.id as string);
-  if (!job) return res.status(404).json({ error: "Job not found" });
+  if (!job || job.companyId !== req.companyId) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   res.json(job);
 });
 
 // POST /api/admin/jobs - Create job
 router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
     const existing = await storage.getJobByNumber(req.body.jobNumber);
-    if (existing) {
+    if (existing && existing.companyId === req.companyId) {
       return res.status(400).json({ error: "Job with this number already exists" });
     }
-    const data = { ...req.body };
+    const data = { ...req.body, companyId: req.companyId };
     if (data.productionStartDate && typeof data.productionStartDate === 'string') {
       data.productionStartDate = new Date(data.productionStartDate);
     }
@@ -139,7 +144,12 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
 // PUT /api/admin/jobs/:id - Update job
 router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const existingJob = await storage.getJob(req.params.id as string);
+    if (!existingJob || existingJob.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
     const data = { ...req.body };
+    delete data.companyId;
     if (data.productionStartDate !== undefined) {
       if (data.productionStartDate && typeof data.productionStartDate === 'string') {
         data.productionStartDate = new Date(data.productionStartDate);
@@ -169,7 +179,6 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       data.productionDaysInAdvance = val;
     }
     const globalSettings = await storage.getGlobalSettings();
-    const existingJob = await storage.getJob(req.params.id as string);
     
     if (data.daysInAdvance !== undefined && data.daysInAdvance !== null) {
       const newIfcDays = parseInt(data.daysInAdvance, 10);
@@ -207,6 +216,11 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
 // DELETE /api/admin/jobs/:id - Delete job
 router.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const jobId = req.params.id as string;
+  
+  const existingJob = await storage.getJob(jobId);
+  if (!existingJob || existingJob.companyId !== req.companyId) {
+    return res.status(404).json({ error: "Job not found" });
+  }
   
   const panels = await storage.getPanelsByJob(jobId);
   if (panels.length > 0) {

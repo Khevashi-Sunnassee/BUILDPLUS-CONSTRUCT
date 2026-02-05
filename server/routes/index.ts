@@ -36,6 +36,7 @@ import { registerObjectStorageRoutes } from "../replit_integrations/object_stora
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    companyId?: string;
   }
 }
 
