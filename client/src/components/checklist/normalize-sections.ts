@@ -12,7 +12,7 @@ interface LegacyField {
   placeholder?: string;
   photoRequired?: boolean;
   instructions?: string;
-  options?: Array<{ text: string; value: string; color?: string }>;
+  options?: Array<{ text?: string; label?: string; value: string; color?: string }>;
   min?: number | null;
   max?: number | null;
   step?: number | null;
@@ -31,17 +31,47 @@ interface LegacySection {
   [key: string]: unknown;
 }
 
+const LEGACY_TYPE_MAP: Record<string, ChecklistFieldType> = {
+  text: "text_field",
+  number: "number_field",
+  radio: "radio_button",
+  date: "date_field",
+  time: "time_field",
+  amount: "amount_field",
+  percentage: "percentage_field",
+  priority: "priority_level",
+  rating: "rating_scale",
+  photo: "photo_required",
+  signature: "signature_field",
+  condition: "condition_option",
+  inspection: "inspection_check",
+};
+
+function normalizeFieldType(rawType: string | undefined): ChecklistFieldType {
+  if (!rawType) return "text_field";
+  return LEGACY_TYPE_MAP[rawType] || rawType as ChecklistFieldType;
+}
+
+function normalizeOptions(raw: LegacyField["options"]): ChecklistField["options"] {
+  if (!raw || !Array.isArray(raw)) return undefined;
+  return raw.map((opt) => ({
+    text: opt.text || opt.label || "",
+    value: opt.value,
+    color: opt.color,
+  }));
+}
+
 function normalizeField(raw: LegacyField): ChecklistField {
   return {
     id: raw.id,
     name: raw.name || raw.label || "Unnamed Field",
-    type: (raw.type || raw.fieldType || "text_field") as ChecklistFieldType,
+    type: normalizeFieldType(raw.type || raw.fieldType),
     required: raw.required || false,
     description: raw.description,
     placeholder: raw.placeholder,
     photoRequired: raw.photoRequired,
     instructions: raw.instructions,
-    options: raw.options,
+    options: normalizeOptions(raw.options),
     min: raw.min,
     max: raw.max,
     step: raw.step,
