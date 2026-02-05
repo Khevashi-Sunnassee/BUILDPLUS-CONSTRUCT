@@ -1,0 +1,476 @@
+import { Router } from "express";
+import { db } from "../db";
+import { timerSessions, logRows, dailyLogs, jobs, panelRegister, workTypes } from "@shared/schema";
+import { requireAuth } from "./middleware/auth.middleware";
+import { eq, and, desc, or } from "drizzle-orm";
+import { format } from "date-fns";
+import logger from "../lib/logger";
+
+const router = Router();
+
+// Get all timer sessions for current user
+router.get("/api/timer-sessions", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const sessions = await db
+      .select({
+        id: timerSessions.id,
+        userId: timerSessions.userId,
+        dailyLogId: timerSessions.dailyLogId,
+        jobId: timerSessions.jobId,
+        panelRegisterId: timerSessions.panelRegisterId,
+        workTypeId: timerSessions.workTypeId,
+        app: timerSessions.app,
+        status: timerSessions.status,
+        startedAt: timerSessions.startedAt,
+        pausedAt: timerSessions.pausedAt,
+        completedAt: timerSessions.completedAt,
+        totalElapsedMs: timerSessions.totalElapsedMs,
+        pauseCount: timerSessions.pauseCount,
+        notes: timerSessions.notes,
+        logRowId: timerSessions.logRowId,
+        createdAt: timerSessions.createdAt,
+        jobNumber: jobs.jobNumber,
+        jobName: jobs.name,
+        panelMark: panelRegister.panelMark,
+        workTypeName: workTypes.name,
+      })
+      .from(timerSessions)
+      .leftJoin(jobs, eq(timerSessions.jobId, jobs.id))
+      .leftJoin(panelRegister, eq(timerSessions.panelRegisterId, panelRegister.id))
+      .leftJoin(workTypes, eq(timerSessions.workTypeId, workTypes.id))
+      .where(eq(timerSessions.userId, userId))
+      .orderBy(desc(timerSessions.startedAt))
+      .limit(50);
+
+    res.json(sessions);
+  } catch (error) {
+    logger.error({ err: error }, "Error fetching timer sessions");
+    res.status(500).json({ error: "Failed to fetch timer sessions" });
+  }
+});
+
+// Get active timer session for current user
+router.get("/api/timer-sessions/active", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const [activeSession] = await db
+      .select({
+        id: timerSessions.id,
+        userId: timerSessions.userId,
+        dailyLogId: timerSessions.dailyLogId,
+        jobId: timerSessions.jobId,
+        panelRegisterId: timerSessions.panelRegisterId,
+        workTypeId: timerSessions.workTypeId,
+        app: timerSessions.app,
+        status: timerSessions.status,
+        startedAt: timerSessions.startedAt,
+        pausedAt: timerSessions.pausedAt,
+        completedAt: timerSessions.completedAt,
+        totalElapsedMs: timerSessions.totalElapsedMs,
+        pauseCount: timerSessions.pauseCount,
+        notes: timerSessions.notes,
+        logRowId: timerSessions.logRowId,
+        createdAt: timerSessions.createdAt,
+        jobNumber: jobs.jobNumber,
+        jobName: jobs.name,
+        panelMark: panelRegister.panelMark,
+        workTypeName: workTypes.name,
+      })
+      .from(timerSessions)
+      .leftJoin(jobs, eq(timerSessions.jobId, jobs.id))
+      .leftJoin(panelRegister, eq(timerSessions.panelRegisterId, panelRegister.id))
+      .leftJoin(workTypes, eq(timerSessions.workTypeId, workTypes.id))
+      .where(and(
+        eq(timerSessions.userId, userId),
+        eq(timerSessions.status, "RUNNING")
+      ))
+      .limit(1);
+
+    // Also check for paused sessions
+    if (!activeSession) {
+      const [pausedSession] = await db
+        .select({
+          id: timerSessions.id,
+          userId: timerSessions.userId,
+          dailyLogId: timerSessions.dailyLogId,
+          jobId: timerSessions.jobId,
+          panelRegisterId: timerSessions.panelRegisterId,
+          workTypeId: timerSessions.workTypeId,
+          app: timerSessions.app,
+          status: timerSessions.status,
+          startedAt: timerSessions.startedAt,
+          pausedAt: timerSessions.pausedAt,
+          completedAt: timerSessions.completedAt,
+          totalElapsedMs: timerSessions.totalElapsedMs,
+          pauseCount: timerSessions.pauseCount,
+          notes: timerSessions.notes,
+          logRowId: timerSessions.logRowId,
+          createdAt: timerSessions.createdAt,
+          jobNumber: jobs.jobNumber,
+          jobName: jobs.name,
+          panelMark: panelRegister.panelMark,
+          workTypeName: workTypes.name,
+        })
+        .from(timerSessions)
+        .leftJoin(jobs, eq(timerSessions.jobId, jobs.id))
+        .leftJoin(panelRegister, eq(timerSessions.panelRegisterId, panelRegister.id))
+        .leftJoin(workTypes, eq(timerSessions.workTypeId, workTypes.id))
+        .where(and(
+          eq(timerSessions.userId, userId),
+          eq(timerSessions.status, "PAUSED")
+        ))
+        .limit(1);
+
+      res.json(pausedSession || null);
+      return;
+    }
+
+    res.json(activeSession);
+  } catch (error) {
+    logger.error({ err: error }, "Error fetching active timer session");
+    res.status(500).json({ error: "Failed to fetch active timer session" });
+  }
+});
+
+// Start a new timer session
+router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const { jobId, panelRegisterId, workTypeId, app, dailyLogId } = req.body;
+
+    // Check if there's already an active or paused session
+    const [existingSession] = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.userId, userId),
+        or(
+          eq(timerSessions.status, "RUNNING"),
+          eq(timerSessions.status, "PAUSED")
+        )
+      ))
+      .limit(1);
+
+    if (existingSession) {
+      const message = existingSession.status === "PAUSED" 
+        ? "You have a paused timer. Please resume or cancel it first."
+        : "You already have an active timer running";
+      return res.status(400).json({ error: message });
+    }
+
+    const now = new Date();
+    const [newSession] = await db
+      .insert(timerSessions)
+      .values({
+        userId,
+        dailyLogId: dailyLogId || null,
+        jobId: jobId || null,
+        panelRegisterId: panelRegisterId || null,
+        workTypeId: workTypeId || null,
+        app: app || null,
+        status: "RUNNING",
+        startedAt: now,
+        totalElapsedMs: 0,
+        pauseCount: 0,
+      })
+      .returning();
+
+    logger.info(`Timer session started: ${newSession.id} for user: ${userId}`);
+    res.json(newSession);
+  } catch (error) {
+    logger.error({ err: error }, "Error starting timer session");
+    res.status(500).json({ error: "Failed to start timer session" });
+  }
+});
+
+// Pause a timer session
+router.post("/api/timer-sessions/:id/pause", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const sessionId = req.params.id;
+
+    const [session] = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.id, sessionId),
+        eq(timerSessions.userId, userId)
+      ))
+      .limit(1);
+
+    if (!session) {
+      return res.status(404).json({ error: "Timer session not found" });
+    }
+
+    if (session.status !== "RUNNING") {
+      return res.status(400).json({ error: "Timer is not running" });
+    }
+
+    const now = new Date();
+    const elapsedSinceStart = now.getTime() - session.startedAt.getTime();
+    const newTotalElapsed = session.totalElapsedMs + elapsedSinceStart;
+
+    const [updatedSession] = await db
+      .update(timerSessions)
+      .set({
+        status: "PAUSED",
+        pausedAt: now,
+        totalElapsedMs: newTotalElapsed,
+        pauseCount: session.pauseCount + 1,
+        updatedAt: now,
+      })
+      .where(eq(timerSessions.id, sessionId))
+      .returning();
+
+    logger.info(`Timer session paused: ${sessionId}, totalElapsedMs: ${newTotalElapsed}`);
+    res.json(updatedSession);
+  } catch (error) {
+    logger.error({ err: error }, "Error pausing timer session");
+    res.status(500).json({ error: "Failed to pause timer session" });
+  }
+});
+
+// Resume a paused timer session
+router.post("/api/timer-sessions/:id/resume", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const sessionId = req.params.id;
+
+    const [session] = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.id, sessionId),
+        eq(timerSessions.userId, userId)
+      ))
+      .limit(1);
+
+    if (!session) {
+      return res.status(404).json({ error: "Timer session not found" });
+    }
+
+    if (session.status !== "PAUSED") {
+      return res.status(400).json({ error: "Timer is not paused" });
+    }
+
+    const now = new Date();
+
+    const [updatedSession] = await db
+      .update(timerSessions)
+      .set({
+        status: "RUNNING",
+        startedAt: now, // Reset start time to now, elapsed time is preserved in totalElapsedMs
+        pausedAt: null,
+        updatedAt: now,
+      })
+      .where(eq(timerSessions.id, sessionId))
+      .returning();
+
+    logger.info(`Timer session resumed: ${sessionId}`);
+    res.json(updatedSession);
+  } catch (error) {
+    logger.error({ err: error }, "Error resuming timer session");
+    res.status(500).json({ error: "Failed to resume timer session" });
+  }
+});
+
+// Stop a timer session and create a log entry
+router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const sessionId = req.params.id;
+    const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = req.body;
+
+    const [session] = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.id, sessionId),
+        eq(timerSessions.userId, userId)
+      ))
+      .limit(1);
+
+    if (!session) {
+      return res.status(404).json({ error: "Timer session not found" });
+    }
+
+    if (session.status === "COMPLETED" || session.status === "CANCELLED") {
+      return res.status(400).json({ error: "Timer session is already completed or cancelled" });
+    }
+
+    const now = new Date();
+    let totalElapsed = session.totalElapsedMs;
+
+    // If still running, add the time since last start
+    if (session.status === "RUNNING") {
+      totalElapsed += now.getTime() - session.startedAt.getTime();
+    }
+
+    const durationMinutes = Math.round(totalElapsed / 60000);
+
+    // Get or create daily log for today (Melbourne timezone)
+    // Simple approach: use the current date in Melbourne timezone
+    const melbourneOffset = 11 * 60 * 60 * 1000; // AEDT offset
+    const melbourneNow = new Date(now.getTime() + melbourneOffset);
+    const logDay = format(melbourneNow, "yyyy-MM-dd");
+
+    let [dailyLog] = await db
+      .select()
+      .from(dailyLogs)
+      .where(and(
+        eq(dailyLogs.userId, userId),
+        eq(dailyLogs.logDay, logDay)
+      ))
+      .limit(1);
+
+    if (!dailyLog) {
+      // Create daily log
+      [dailyLog] = await db
+        .insert(dailyLogs)
+        .values({
+          userId,
+          logDay,
+          factory: "MELBOURNE",
+          status: "DRAFT",
+        })
+        .returning();
+    }
+
+    // Calculate start time from completed time minus duration
+    const sessionStartTime = new Date(now.getTime() - totalElapsed);
+
+    // Create log row entry
+    const [logRow] = await db
+      .insert(logRows)
+      .values({
+        dailyLogId: dailyLog.id,
+        jobId: jobId || session.jobId || null,
+        panelRegisterId: panelRegisterId || session.panelRegisterId || null,
+        workTypeId: workTypeId || session.workTypeId || null,
+        startAt: sessionStartTime,
+        endAt: now,
+        durationMin: durationMinutes,
+        idleMin: 0,
+        source: "timer",
+        sourceEventId: `timer-${sessionId}`,
+        app: app || session.app || "manual",
+        panelMark: panelMark || null,
+        drawingCode: drawingCode || null,
+        notes: notes || session.notes || null,
+        isUserEdited: true,
+      })
+      .returning();
+
+    // Update timer session
+    const [updatedSession] = await db
+      .update(timerSessions)
+      .set({
+        status: "COMPLETED",
+        completedAt: now,
+        totalElapsedMs: totalElapsed,
+        logRowId: logRow.id,
+        dailyLogId: dailyLog.id,
+        jobId: jobId || session.jobId,
+        panelRegisterId: panelRegisterId || session.panelRegisterId,
+        workTypeId: workTypeId || session.workTypeId,
+        app: app || session.app,
+        notes: notes || session.notes,
+        updatedAt: now,
+      })
+      .where(eq(timerSessions.id, sessionId))
+      .returning();
+
+    logger.info(`Timer session stopped: ${sessionId}, logRowId: ${logRow.id}, durationMinutes: ${durationMinutes}`);
+
+    res.json({ session: updatedSession, logRow });
+  } catch (error) {
+    logger.error({ err: error }, "Error stopping timer session");
+    res.status(500).json({ error: "Failed to stop timer session" });
+  }
+});
+
+// Cancel a timer session without creating a log entry
+router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const sessionId = req.params.id;
+
+    const [session] = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.id, sessionId),
+        eq(timerSessions.userId, userId)
+      ))
+      .limit(1);
+
+    if (!session) {
+      return res.status(404).json({ error: "Timer session not found" });
+    }
+
+    if (session.status === "COMPLETED" || session.status === "CANCELLED") {
+      return res.status(400).json({ error: "Timer session is already completed or cancelled" });
+    }
+
+    const now = new Date();
+
+    const [updatedSession] = await db
+      .update(timerSessions)
+      .set({
+        status: "CANCELLED",
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(timerSessions.id, sessionId))
+      .returning();
+
+    logger.info(`Timer session cancelled: ${sessionId}`);
+    res.json(updatedSession);
+  } catch (error) {
+    logger.error({ err: error }, "Error cancelling timer session");
+    res.status(500).json({ error: "Failed to cancel timer session" });
+  }
+});
+
+// Update timer session metadata (job, panel, etc.)
+router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const sessionId = req.params.id;
+    const { jobId, panelRegisterId, workTypeId, app, notes } = req.body;
+
+    const [session] = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.id, sessionId),
+        eq(timerSessions.userId, userId)
+      ))
+      .limit(1);
+
+    if (!session) {
+      return res.status(404).json({ error: "Timer session not found" });
+    }
+
+    const [updatedSession] = await db
+      .update(timerSessions)
+      .set({
+        jobId: jobId !== undefined ? jobId : session.jobId,
+        panelRegisterId: panelRegisterId !== undefined ? panelRegisterId : session.panelRegisterId,
+        workTypeId: workTypeId !== undefined ? workTypeId : session.workTypeId,
+        app: app !== undefined ? app : session.app,
+        notes: notes !== undefined ? notes : session.notes,
+        updatedAt: new Date(),
+      })
+      .where(eq(timerSessions.id, sessionId))
+      .returning();
+
+    res.json(updatedSession);
+  } catch (error) {
+    logger.error({ err: error }, "Error updating timer session");
+    res.status(500).json({ error: "Failed to update timer session" });
+  }
+});
+
+export const timerRouter = router;

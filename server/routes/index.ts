@@ -28,6 +28,7 @@ import { adminRouter } from "./admin.routes";
 import { agentRouter } from "./agent.routes";
 import { chatRouter } from "../chat/chat.routes";
 import productionScheduleRouter from "./production-schedule.routes";
+import { timerRouter } from "./timer.routes";
 
 declare module "express-session" {
   interface SessionData {
@@ -85,6 +86,9 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(productionAnalyticsRouter);
   app.use(draftingLogisticsRouter);
   app.use(costAnalyticsRouter);
+  
+  // Timer router - for drafting time tracking
+  app.use(timerRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

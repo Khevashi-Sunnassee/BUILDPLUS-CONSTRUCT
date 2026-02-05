@@ -68,6 +68,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { TimerWidget } from "@/components/timer-widget";
 
 type GroupBy = "none" | "user" | "date";
 
@@ -448,7 +449,8 @@ export default function DailyReportsPage() {
             Review and manage your drafting time entries
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <TimerWidget />
           <Button 
             variant="outline"
             onClick={exportToPDF} 

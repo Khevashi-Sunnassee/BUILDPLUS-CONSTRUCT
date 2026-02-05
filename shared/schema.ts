@@ -455,6 +455,34 @@ export const approvalEvents = pgTable("approval_events", {
   dailyLogIdIdx: index("approval_events_daily_log_id_idx").on(table.dailyLogId),
 }));
 
+// Timer sessions for tracking drafting time
+export const timerStatusEnum = pgEnum("timer_status", ["RUNNING", "PAUSED", "COMPLETED", "CANCELLED"]);
+
+export const timerSessions = pgTable("timer_sessions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  dailyLogId: varchar("daily_log_id", { length: 36 }).references(() => dailyLogs.id),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  panelRegisterId: varchar("panel_register_id", { length: 36 }).references(() => panelRegister.id),
+  workTypeId: integer("work_type_id").references(() => workTypes.id),
+  app: text("app"),
+  status: timerStatusEnum("status").default("RUNNING").notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  pausedAt: timestamp("paused_at"),
+  completedAt: timestamp("completed_at"),
+  totalElapsedMs: integer("total_elapsed_ms").default(0).notNull(),
+  pauseCount: integer("pause_count").default(0).notNull(),
+  notes: text("notes"),
+  logRowId: varchar("log_row_id", { length: 36 }).references(() => logRows.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("timer_sessions_user_id_idx").on(table.userId),
+  dailyLogIdIdx: index("timer_sessions_daily_log_id_idx").on(table.dailyLogId),
+  statusIdx: index("timer_sessions_status_idx").on(table.status),
+  startedAtIdx: index("timer_sessions_started_at_idx").on(table.startedAt),
+}));
+
 export const auditEvents = pgTable("audit_events", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 }).references(() => users.id),
@@ -734,6 +762,12 @@ export const insertApprovalEventSchema = createInsertSchema(approvalEvents).omit
   createdAt: true,
 });
 
+export const insertTimerSessionSchema = createInsertSchema(timerSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertGlobalSettingsSchema = createInsertSchema(globalSettings).omit({
   id: true,
   createdAt: true,
@@ -928,6 +962,8 @@ export type InsertDailyLog = z.infer<typeof insertDailyLogSchema>;
 export type DailyLog = typeof dailyLogs.$inferSelect;
 export type InsertLogRow = z.infer<typeof insertLogRowSchema>;
 export type LogRow = typeof logRows.$inferSelect;
+export type InsertTimerSession = z.infer<typeof insertTimerSessionSchema>;
+export type TimerSession = typeof timerSessions.$inferSelect;
 export type InsertApprovalEvent = z.infer<typeof insertApprovalEventSchema>;
 export type ApprovalEvent = typeof approvalEvents.$inferSelect;
 export type InsertGlobalSettings = z.infer<typeof insertGlobalSettingsSchema>;

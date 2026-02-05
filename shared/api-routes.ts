@@ -394,6 +394,20 @@ export const DAILY_LOGS_ROUTES = {
 } as const;
 
 // ============================================================================
+// TIMER SESSIONS
+// ============================================================================
+export const TIMER_ROUTES = {
+  LIST: '/api/timer-sessions',
+  ACTIVE: '/api/timer-sessions/active',
+  BY_ID: (id: string | number) => `/api/timer-sessions/${id}`,
+  START: '/api/timer-sessions/start',
+  PAUSE: (id: string | number) => `/api/timer-sessions/${id}/pause`,
+  RESUME: (id: string | number) => `/api/timer-sessions/${id}/resume`,
+  STOP: (id: string | number) => `/api/timer-sessions/${id}/stop`,
+  CANCEL: (id: string | number) => `/api/timer-sessions/${id}/cancel`,
+} as const;
+
+// ============================================================================
 // AGENT (Windows Agent Data Ingestion)
 // ============================================================================
 export const AGENT_ROUTES = {
@@ -425,4 +439,5 @@ export type AdminRoutes = typeof ADMIN_ROUTES;
 export type ReportsRoutes = typeof REPORTS_ROUTES;
 export type DashboardRoutes = typeof DASHBOARD_ROUTES;
 export type DailyLogsRoutes = typeof DAILY_LOGS_ROUTES;
+export type TimerRoutes = typeof TIMER_ROUTES;
 export type AgentRoutes = typeof AGENT_ROUTES;

@@ -19,7 +19,7 @@ The frontend uses React + Vite, TanStack Query for data fetching, Wouter for rou
 **Technical Implementations & Features:**
 - **Authentication & Authorization**: Standalone email/password auth, RBAC (USER, MANAGER, ADMIN roles), and configurable per-user permissions (HIDDEN, VIEW, VIEW_AND_UPDATE).
 - **Data Ingestion**: Idempotent API for Windows Agent data, secured by device key.
-- **Time & Approval Management**: Daily log entries, submission for approval, manual entry, and manager review.
+- **Time & Approval Management**: Daily log entries, submission for approval, manual entry, manager review, and a timer feature for real-time drafting time tracking with pause/resume/stop capabilities.
 - **Reporting & Analytics**: Comprehensive reports covering time, production, logistics, wages, and cost analysis.
 - **Admin Provisioning**: Centralized management for users, jobs, devices, global settings, panel types, and work types.
 - **Jobs & Panel Management**: Creation and tracking of jobs, panel registration, production approval workflow, and an estimate import system supporting drag & drop Excel uploads with dynamic parsing.
