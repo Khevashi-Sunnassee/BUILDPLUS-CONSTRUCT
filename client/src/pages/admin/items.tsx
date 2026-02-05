@@ -16,7 +16,14 @@ import {
   Search,
   X,
   Filter,
+  FolderOpen,
 } from "lucide-react";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -89,6 +96,14 @@ const itemSchema = z.object({
 });
 
 type ItemFormData = z.infer<typeof itemSchema>;
+
+const categorySchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+  isActive: z.boolean().default(true),
+});
+
+type CategoryFormData = z.infer<typeof categorySchema>;
 
 const UNIT_OF_MEASURE_OPTIONS = [
   { value: "EA", label: "Each" },
@@ -222,6 +237,7 @@ function CategoryPanel({
 
 export default function AdminItemsPage() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState("categories");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -231,6 +247,11 @@ export default function AdminItemsPage() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ItemCategory | null>(null);
+  const [categoryDeleteDialogOpen, setCategoryDeleteDialogOpen] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
 
   const { data: items, isLoading } = useQuery<Item[]>({
     queryKey: [PROCUREMENT_ROUTES.ITEMS],
@@ -353,6 +374,92 @@ export default function AdminItemsPage() {
       isActive: true,
     },
   });
+
+  const categoryForm = useForm<CategoryFormData>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      isActive: true,
+    },
+  });
+
+  const createCategoryMutation = useMutation({
+    mutationFn: async (data: CategoryFormData) => {
+      return apiRequest("POST", PROCUREMENT_ROUTES.ITEM_CATEGORIES, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES_ACTIVE] });
+      toast({ title: "Category created successfully" });
+      setCategoryDialogOpen(false);
+      categoryForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create category", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateCategoryMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: CategoryFormData }) => {
+      return apiRequest("PATCH", PROCUREMENT_ROUTES.ITEM_CATEGORY_BY_ID(id), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES_ACTIVE] });
+      toast({ title: "Category updated successfully" });
+      setCategoryDialogOpen(false);
+      setEditingCategory(null);
+      categoryForm.reset();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update category", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", PROCUREMENT_ROUTES.ITEM_CATEGORY_BY_ID(id), {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES_ACTIVE] });
+      toast({ title: "Category deleted" });
+      setCategoryDeleteDialogOpen(false);
+      setDeletingCategoryId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete category", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const openCreateCategoryDialog = () => {
+    setEditingCategory(null);
+    categoryForm.reset({
+      name: "",
+      description: "",
+      isActive: true,
+    });
+    setCategoryDialogOpen(true);
+  };
+
+  const openEditCategoryDialog = (category: ItemCategory) => {
+    setEditingCategory(category);
+    categoryForm.reset({
+      name: category.name,
+      description: category.description || "",
+      isActive: category.isActive,
+    });
+    setCategoryDialogOpen(true);
+  };
+
+  const onCategorySubmit = (data: CategoryFormData) => {
+    if (editingCategory) {
+      updateCategoryMutation.mutate({ id: editingCategory.id, data });
+    } else {
+      createCategoryMutation.mutate(data);
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: ItemFormData) => {
@@ -522,38 +629,132 @@ export default function AdminItemsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-items-title">Item Catalog</h1>
-          <p className="text-muted-foreground">Manage inventory items for purchase orders</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            accept=".xlsx,.xls"
-            className="hidden"
-            data-testid="input-import-file"
-          />
-          <Button 
-            variant="outline" 
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importMutation.isPending}
-            data-testid="button-import-items"
-          >
-            {importMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4 mr-2" />
-            )}
-            Import Excel
-          </Button>
-          <Button onClick={openCreateDialog} data-testid="button-create-item">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Item
-          </Button>
+          <p className="text-muted-foreground">Manage categories and inventory items</p>
         </div>
       </div>
 
-      <Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="categories" className="flex items-center gap-2" data-testid="tab-categories">
+            <FolderOpen className="h-4 w-4" />
+            Categories
+          </TabsTrigger>
+          <TabsTrigger value="items" className="flex items-center gap-2" data-testid="tab-items">
+            <Package className="h-4 w-4" />
+            Items
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="categories" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5" />
+                  Item Categories
+                </CardTitle>
+                <CardDescription>
+                  {allCategories?.length || 0} categor{allCategories?.length !== 1 ? "ies" : "y"} configured
+                </CardDescription>
+              </div>
+              <Button onClick={openCreateCategoryDialog} data-testid="button-create-category">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Category
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {allCategories && allCategories.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allCategories.map((category) => (
+                      <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
+                          {category.name}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
+                          {category.description || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
+                            {category.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditCategoryDialog(category)}
+                              data-testid={`button-edit-category-${category.id}`}
+                            >
+                              <Edit2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setDeletingCategoryId(category.id);
+                                setCategoryDeleteDialogOpen(true);
+                              }}
+                              data-testid={`button-delete-category-${category.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No categories configured yet</p>
+                  <p className="text-sm">Click "Add Category" to create your first category</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="items" className="space-y-4">
+          <div className="flex items-center justify-end gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              accept=".xlsx,.xls"
+              className="hidden"
+              data-testid="input-import-file"
+            />
+            <Button 
+              variant="outline" 
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importMutation.isPending}
+              data-testid="button-import-items"
+            >
+              {importMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              Import Excel
+            </Button>
+            <Button onClick={openCreateDialog} data-testid="button-create-item">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Item
+            </Button>
+          </div>
+
+          <Card>
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <div>
@@ -662,7 +863,117 @@ export default function AdminItemsPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingCategory ? "Edit Category" : "Add New Category"}</DialogTitle>
+            <DialogDescription>
+              {editingCategory ? "Update the category details" : "Create a new category for organizing items"}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...categoryForm}>
+            <form onSubmit={categoryForm.handleSubmit(onCategorySubmit)} className="space-y-4">
+              <FormField
+                control={categoryForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name *</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Category name" {...field} data-testid="input-category-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={categoryForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Optional description for this category" 
+                        {...field} 
+                        data-testid="input-category-description"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={categoryForm.control}
+                name="isActive"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Active</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Inactive categories won't appear in selection lists
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-category-active"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setCategoryDialogOpen(false)} data-testid="button-cancel-category">
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createCategoryMutation.isPending || updateCategoryMutation.isPending}
+                  data-testid="button-save-category"
+                >
+                  {(createCategoryMutation.isPending || updateCategoryMutation.isPending) && (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  )}
+                  <Save className="h-4 w-4 mr-2" />
+                  {editingCategory ? "Update" : "Create"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={categoryDeleteDialogOpen} onOpenChange={setCategoryDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this category? This action cannot be undone.
+              Items using this category may be affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-category">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingCategoryId && deleteCategoryMutation.mutate(deletingCategoryId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-category"
+            >
+              {deleteCategoryMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
