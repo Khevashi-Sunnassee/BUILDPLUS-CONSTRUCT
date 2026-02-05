@@ -831,7 +831,7 @@ export default function AdminJobsPage() {
       await apiRequest("DELETE", DRAFTING_ROUTES.BY_JOB(jobId), {});
       
       // Then regenerate production slots
-      const slotsRes = await apiRequest("POST", PRODUCTION_ROUTES.SLOTS_GENERATE(jobId), {});
+      const slotsRes = await apiRequest("POST", PRODUCTION_ROUTES.SLOTS_GENERATE_FOR_JOB(jobId), {});
       const slotsData = await slotsRes.json();
       
       // Finally regenerate drafting program

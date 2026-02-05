@@ -741,7 +741,7 @@ export default function DailyReportsPage() {
                   }
                   
                   return sortedTypes.map(panelType => {
-                    const panelsInGroup = groupedByType[panelType].sort((a, b) => {
+                    const panelsInGroup = groupedByType[panelType].sort((a: any, b: any) => {
                       const dateA = a.drawingDueDate ? new Date(a.drawingDueDate).getTime() : Infinity;
                       const dateB = b.drawingDueDate ? new Date(b.drawingDueDate).getTime() : Infinity;
                       return dateA - dateB;
@@ -775,7 +775,7 @@ export default function DailyReportsPage() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {panelsInGroup.map((program) => {
+                              {panelsInGroup.map((program: any) => {
                                 const dueDate = program.drawingDueDate ? new Date(program.drawingDueDate) : null;
                                 const today = new Date();
                                 const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
