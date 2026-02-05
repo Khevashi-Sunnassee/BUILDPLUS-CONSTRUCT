@@ -172,6 +172,19 @@ export default function DailyReportsPage() {
   const [allocatedPanelTab, setAllocatedPanelTab] = useState<"pending" | "ifc">("pending");
   const [allocatedSearch, setAllocatedSearch] = useState("");
   const [allocatedStatusFilter, setAllocatedStatusFilter] = useState<string>("all");
+  const [collapsedPanelTypes, setCollapsedPanelTypes] = useState<Set<string>>(new Set());
+
+  const togglePanelTypeGroup = (panelType: string) => {
+    setCollapsedPanelTypes(prev => {
+      const next = new Set(prev);
+      if (next.has(panelType)) {
+        next.delete(panelType);
+      } else {
+        next.add(panelType);
+      }
+      return next;
+    });
+  };
 
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
@@ -705,97 +718,130 @@ export default function DailyReportsPage() {
               )}
             </CardHeader>
             {showAllocatedPanels && (
-              <CardContent className="pt-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Panel</TableHead>
-                      <TableHead>Job</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead>Drawing Due</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentPanels
-                      .sort((a, b) => {
-                        const dateA = a.drawingDueDate ? new Date(a.drawingDueDate).getTime() : Infinity;
-                        const dateB = b.drawingDueDate ? new Date(b.drawingDueDate).getTime() : Infinity;
-                        return dateA - dateB;
-                      })
-                      .map((program) => {
-                        const dueDate = program.drawingDueDate ? new Date(program.drawingDueDate) : null;
-                        const today = new Date();
-                        const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                        const isOverdue = daysUntil !== null && daysUntil < 0;
-                        const isUrgent = daysUntil !== null && daysUntil >= 0 && daysUntil <= 5;
-                        
-                        return (
-                          <TableRow 
-                            key={program.id}
-                            style={program.job?.productionSlotColor ? { 
-                              backgroundColor: `${program.job.productionSlotColor}15`,
-                              borderLeft: `4px solid ${program.job.productionSlotColor}` 
-                            } : undefined}
-                          >
-                            <TableCell className="font-medium">{program.panel?.panelMark}</TableCell>
-                            <TableCell>{program.job?.jobNumber}</TableCell>
-                            <TableCell>{program.level}</TableCell>
-                            <TableCell className={isOverdue ? "text-red-600 font-semibold" : isUrgent ? "text-orange-500 font-medium" : ""}>
-                              {dueDate ? format(dueDate, "dd/MM/yyyy") : "-"}
-                              {isOverdue && <span className="ml-1 text-xs">({Math.abs(daysUntil!)} days overdue)</span>}
-                              {isUrgent && !isOverdue && <span className="ml-1 text-xs">({daysUntil} days)</span>}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant={
-                                program.status === "IN_PROGRESS" ? "default" :
-                                program.status === "SCHEDULED" ? "outline" :
-                                program.status === "ON_HOLD" ? "destructive" : "secondary"
-                              }>
-                                {program.status.replace("_", " ")}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="default"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (program.panel?.id && program.jobId) {
-                                      // Navigate to manual entry with job and panel info, and start timer
-                                      const params = new URLSearchParams();
-                                      params.set("date", format(new Date(), "yyyy-MM-dd"));
-                                      params.set("jobId", program.jobId);
-                                      params.set("panelId", program.panel.id);
-                                      if (program.panel?.panelMark) {
-                                        params.set("panelMark", program.panel.panelMark);
-                                      }
-                                      params.set("startTimer", "true");
-                                      setLocation(`/manual-entry?${params.toString()}`);
-                                    }
-                                  }}
-                                  data-testid={`button-draft-now-${program.id}`}
-                                >
-                                  <Play className="h-3 w-3 mr-1" />
-                                  Draft Now
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    {currentPanels.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
-                          {allocatedPanelTab === "pending" 
-                            ? "No pending panels in this category" 
-                            : "No IFC panels in this category"}
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+              <CardContent className="pt-0 space-y-3">
+                {(() => {
+                  // Group panels by panel type
+                  const groupedByType = currentPanels.reduce((acc, program) => {
+                    const panelType = program.panel?.panelType || "Unknown";
+                    if (!acc[panelType]) acc[panelType] = [];
+                    acc[panelType].push(program);
+                    return acc;
+                  }, {} as Record<string, typeof currentPanels>);
+                  
+                  const sortedTypes = Object.keys(groupedByType).sort();
+                  
+                  if (currentPanels.length === 0) {
+                    return (
+                      <div className="text-center text-muted-foreground py-4">
+                        {allocatedPanelTab === "pending" 
+                          ? "No pending panels in this category" 
+                          : "No IFC panels in this category"}
+                      </div>
+                    );
+                  }
+                  
+                  return sortedTypes.map(panelType => {
+                    const panelsInGroup = groupedByType[panelType].sort((a, b) => {
+                      const dateA = a.drawingDueDate ? new Date(a.drawingDueDate).getTime() : Infinity;
+                      const dateB = b.drawingDueDate ? new Date(b.drawingDueDate).getTime() : Infinity;
+                      return dateA - dateB;
+                    });
+                    const isCollapsed = collapsedPanelTypes.has(panelType);
+                    
+                    return (
+                      <div key={panelType} className="border rounded-md overflow-hidden">
+                        <button
+                          type="button"
+                          className="w-full flex items-center justify-between px-3 py-2 bg-muted/50 hover-elevate text-left"
+                          onClick={() => togglePanelTypeGroup(panelType)}
+                          data-testid={`button-toggle-group-${panelType}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            <span className="font-medium">{panelType}</span>
+                            <Badge variant="secondary" className="text-xs">{panelsInGroup.length}</Badge>
+                          </div>
+                        </button>
+                        {!isCollapsed && (
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Panel</TableHead>
+                                <TableHead>Job</TableHead>
+                                <TableHead>Level</TableHead>
+                                <TableHead>Drawing Due</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Action</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {panelsInGroup.map((program) => {
+                                const dueDate = program.drawingDueDate ? new Date(program.drawingDueDate) : null;
+                                const today = new Date();
+                                const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)) : null;
+                                const isOverdue = daysUntil !== null && daysUntil < 0;
+                                const isUrgent = daysUntil !== null && daysUntil >= 0 && daysUntil <= 5;
+                                
+                                return (
+                                  <TableRow 
+                                    key={program.id}
+                                    style={program.job?.productionSlotColor ? { 
+                                      backgroundColor: `${program.job.productionSlotColor}15`,
+                                      borderLeft: `4px solid ${program.job.productionSlotColor}` 
+                                    } : undefined}
+                                  >
+                                    <TableCell className="font-medium">{program.panel?.panelMark}</TableCell>
+                                    <TableCell>{program.job?.jobNumber}</TableCell>
+                                    <TableCell>{program.level}</TableCell>
+                                    <TableCell className={isOverdue ? "text-red-600 font-semibold" : isUrgent ? "text-orange-500 font-medium" : ""}>
+                                      {dueDate ? format(dueDate, "dd/MM/yyyy") : "-"}
+                                      {isOverdue && <span className="ml-1 text-xs">({Math.abs(daysUntil!)} days overdue)</span>}
+                                      {isUrgent && !isOverdue && <span className="ml-1 text-xs">({daysUntil} days)</span>}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={
+                                        program.status === "IN_PROGRESS" ? "default" :
+                                        program.status === "SCHEDULED" ? "outline" :
+                                        program.status === "ON_HOLD" ? "destructive" : "secondary"
+                                      }>
+                                        {program.status.replace("_", " ")}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="default"
+                                          size="sm"
+                                          onClick={() => {
+                                            if (program.panel?.id && program.jobId) {
+                                              const params = new URLSearchParams();
+                                              params.set("date", format(new Date(), "yyyy-MM-dd"));
+                                              params.set("jobId", program.jobId);
+                                              params.set("panelId", program.panel.id);
+                                              if (program.panel?.panelMark) {
+                                                params.set("panelMark", program.panel.panelMark);
+                                              }
+                                              params.set("startTimer", "true");
+                                              setLocation(`/manual-entry?${params.toString()}`);
+                                            }
+                                          }}
+                                          data-testid={`button-draft-now-${program.id}`}
+                                        >
+                                          <Play className="h-3 w-3 mr-1" />
+                                          Draft Now
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        )}
+                      </div>
+                    );
+                  });
+                })()}
               </CardContent>
             )}
           </Card>
