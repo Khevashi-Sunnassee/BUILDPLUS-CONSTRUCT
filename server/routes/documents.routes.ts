@@ -958,22 +958,27 @@ Based on the file information and typical document workflows, provide a concise 
 
 router.get("/api/panels/:panelId/documents", requireAuth, async (req, res) => {
   try {
-    const { panelId } = req.params;
+    const panelId = String(req.params.panelId);
     const companyId = req.companyId;
     
     if (!companyId) {
       return res.status(400).json({ error: "Company context required" });
     }
 
-    const panel = await storage.getPanel(panelId);
-    if (!panel || panel.companyId !== companyId) {
+    const panel = await storage.getPanelById(panelId);
+    if (!panel) {
+      return res.status(404).json({ error: "Panel not found" });
+    }
+    
+    const job = await storage.getJob(panel.jobId);
+    if (!job || job.companyId !== companyId) {
       return res.status(404).json({ error: "Panel not found" });
     }
 
     const result = await storage.getDocuments({
       page: 1,
       limit: 100,
-      panelId,
+      panelId: panelId,
       showLatestOnly: true,
     });
 
@@ -986,15 +991,20 @@ router.get("/api/panels/:panelId/documents", requireAuth, async (req, res) => {
 
 router.post("/api/panels/:panelId/documents/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
   try {
-    const { panelId } = req.params;
+    const panelId = String(req.params.panelId);
     const companyId = req.companyId;
     
     if (!companyId) {
       return res.status(400).json({ error: "Company context required" });
     }
 
-    const panel = await storage.getPanel(panelId);
-    if (!panel || panel.companyId !== companyId) {
+    const panel = await storage.getPanelById(panelId);
+    if (!panel) {
+      return res.status(404).json({ error: "Panel not found" });
+    }
+    
+    const job = await storage.getJob(panel.jobId);
+    if (!job || job.companyId !== companyId) {
       return res.status(404).json({ error: "Panel not found" });
     }
 
@@ -1016,7 +1026,7 @@ router.post("/api/panels/:panelId/documents/upload", requireAuth, upload.single(
       const existingDocs = await storage.getDocuments({
         page: 1,
         limit: 100,
-        panelId,
+        panelId: panelId,
         showLatestOnly: true,
       });
       
@@ -1123,7 +1133,8 @@ router.post("/api/panels/:panelId/documents/upload", requireAuth, upload.single(
 
 router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, async (req, res) => {
   try {
-    const { panelId, documentId } = req.params;
+    const panelId = String(req.params.panelId);
+    const documentId = String(req.params.documentId);
     const { status } = req.body;
     const companyId = req.companyId;
 
@@ -1131,8 +1142,13 @@ router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, a
       return res.status(400).json({ error: "Company context required" });
     }
 
-    const panel = await storage.getPanel(panelId);
-    if (!panel || panel.companyId !== companyId) {
+    const panel = await storage.getPanelById(panelId);
+    if (!panel) {
+      return res.status(404).json({ error: "Panel not found" });
+    }
+    
+    const job = await storage.getJob(panel.jobId);
+    if (!job || job.companyId !== companyId) {
       return res.status(404).json({ error: "Panel not found" });
     }
 
@@ -1149,7 +1165,7 @@ router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, a
       const existingDocs = await storage.getDocuments({
         page: 1,
         limit: 100,
-        panelId,
+        panelId: panelId,
         showLatestOnly: true,
       });
       
