@@ -1996,7 +1996,7 @@ export type DocumentBundleWithItems = DocumentBundle & {
 
 // ==================== ADVANCED TEMPLATES SYSTEM ====================
 
-// Entity Types - Module categories (Maintenance, Quality, Safety, etc.)
+// Entity Types - Checklist type categories (Maintenance, Quality, Safety, etc.)
 export const entityTypes = pgTable("entity_types", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).references(() => companies.id),
@@ -2011,7 +2011,7 @@ export const entityTypes = pgTable("entity_types", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Entity Subtypes - Sub-categories within modules
+// Entity Subtypes - Sub-categories within checklist types
 export const entitySubtypes = pgTable("entity_subtypes", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).references(() => companies.id),

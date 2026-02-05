@@ -17,7 +17,7 @@ import logger from "../lib/logger";
 const router = Router();
 
 // ============================================================================
-// ENTITY TYPES (Modules) CRUD
+// ENTITY TYPES (Checklist Types) CRUD
 // ============================================================================
 
 router.get("/api/checklist/entity-types", requireAuth, async (req: Request, res: Response) => {
@@ -259,7 +259,7 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
   }
 });
 
-router.get("/api/checklist/templates/module/:entityTypeId/:entitySubtypeId", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/checklist/templates/by-type/:entityTypeId/:entitySubtypeId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
     const entityTypeId = String(req.params.entityTypeId);
@@ -281,12 +281,12 @@ router.get("/api/checklist/templates/module/:entityTypeId/:entitySubtypeId", req
 
     res.json(templates);
   } catch (error) {
-    logger.error({ err: error }, "Failed to fetch templates by module and subtype");
+    logger.error({ err: error }, "Failed to fetch templates by checklist type and subtype");
     res.status(500).json({ error: "Failed to fetch templates" });
   }
 });
 
-router.get("/api/checklist/templates/module/:entityTypeId", requireAuth, async (req: Request, res: Response) => {
+router.get("/api/checklist/templates/by-type/:entityTypeId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
     const entityTypeId = String(req.params.entityTypeId);
@@ -306,7 +306,7 @@ router.get("/api/checklist/templates/module/:entityTypeId", requireAuth, async (
 
     res.json(templates);
   } catch (error) {
-    logger.error({ err: error }, "Failed to fetch templates by module");
+    logger.error({ err: error }, "Failed to fetch templates by checklist type");
     res.status(500).json({ error: "Failed to fetch templates" });
   }
 });

@@ -92,7 +92,7 @@ import type {
 } from "@shared/schema";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
 
-const MODULE_COLORS: Record<string, { bg: string; border: string; text: string; badge: string; dot: string }> = {
+const TYPE_COLORS: Record<string, { bg: string; border: string; text: string; badge: string; dot: string }> = {
   default: { bg: "bg-slate-500/10", border: "border-slate-500/30", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-300", dot: "bg-slate-400" },
   "0": { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400", badge: "bg-blue-500/20 text-blue-300", dot: "bg-blue-400" },
   "1": { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-300", dot: "bg-emerald-400" },
@@ -137,17 +137,17 @@ type EntityTypeFormData = z.infer<typeof entityTypeSchema>;
 type EntitySubtypeFormData = z.infer<typeof entitySubtypeSchema>;
 type TemplateFormData = z.infer<typeof templateSchema>;
 
-function getModuleColor(index: number) {
+function getTypeColor(index: number) {
   const key = String(index % 8);
-  return MODULE_COLORS[key] || MODULE_COLORS.default;
+  return TYPE_COLORS[key] || TYPE_COLORS.default;
 }
 
 export default function AdminChecklistTemplatesPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("templates");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedModuleFilter, setSelectedModuleFilter] = useState<string | null>(null);
-  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<string | null>(null);
+  const [collapsedTypes, setCollapsedTypes] = useState<Record<string, boolean>>({});
   
   const [entityTypeDialogOpen, setEntityTypeDialogOpen] = useState(false);
   const [editingEntityType, setEditingEntityType] = useState<EntityType | null>(null);
@@ -497,19 +497,19 @@ export default function AdminChecklistTemplatesPage() {
     return sections.reduce((acc, section) => acc + (section.items?.length || 0), 0);
   };
 
-  const moduleColorMap = useMemo(() => {
-    const map: Record<string, typeof MODULE_COLORS["default"]> = {};
+  const typeColorMap = useMemo(() => {
+    const map: Record<string, typeof TYPE_COLORS["default"]> = {};
     if (entityTypes) {
       entityTypes.forEach((et, idx) => {
-        map[et.id] = getModuleColor(idx);
+        map[et.id] = getTypeColor(idx);
       });
     }
     return map;
   }, [entityTypes]);
 
-  const getModuleColorForId = (entityTypeId: string | null | undefined) => {
-    if (!entityTypeId) return MODULE_COLORS.default;
-    return moduleColorMap[entityTypeId] || MODULE_COLORS.default;
+  const getTypeColorForId = (entityTypeId: string | null | undefined) => {
+    if (!entityTypeId) return TYPE_COLORS.default;
+    return typeColorMap[entityTypeId] || TYPE_COLORS.default;
   };
 
   const filteredAndGroupedTemplates = useMemo(() => {
@@ -525,24 +525,24 @@ export default function AdminChecklistTemplatesPage() {
       );
     }
 
-    if (selectedModuleFilter !== null) {
-      if (selectedModuleFilter === "__unassigned__") {
+    if (selectedTypeFilter !== null) {
+      if (selectedTypeFilter === "__unassigned__") {
         filtered = filtered.filter((t) => !t.entityTypeId);
       } else {
-        filtered = filtered.filter((t) => t.entityTypeId === selectedModuleFilter);
+        filtered = filtered.filter((t) => t.entityTypeId === selectedTypeFilter);
       }
     }
 
-    const groups: { moduleId: string | null; moduleName: string; moduleCode: string; color: typeof MODULE_COLORS["default"]; templates: ChecklistTemplate[] }[] = [];
-    const moduleGroups: Record<string, ChecklistTemplate[]> = {};
+    const groups: { typeId: string | null; typeName: string; typeCode: string; color: typeof TYPE_COLORS["default"]; templates: ChecklistTemplate[] }[] = [];
+    const typeGroups: Record<string, ChecklistTemplate[]> = {};
     const unassigned: ChecklistTemplate[] = [];
 
     filtered.forEach((t) => {
       if (t.entityTypeId) {
-        if (!moduleGroups[t.entityTypeId]) {
-          moduleGroups[t.entityTypeId] = [];
+        if (!typeGroups[t.entityTypeId]) {
+          typeGroups[t.entityTypeId] = [];
         }
-        moduleGroups[t.entityTypeId].push(t);
+        typeGroups[t.entityTypeId].push(t);
       } else {
         unassigned.push(t);
       }
@@ -550,13 +550,13 @@ export default function AdminChecklistTemplatesPage() {
 
     if (entityTypes) {
       entityTypes.forEach((et) => {
-        const tpls = moduleGroups[et.id];
+        const tpls = typeGroups[et.id];
         if (tpls && tpls.length > 0) {
           groups.push({
-            moduleId: et.id,
-            moduleName: et.name,
-            moduleCode: et.code,
-            color: getModuleColorForId(et.id),
+            typeId: et.id,
+            typeName: et.name,
+            typeCode: et.code,
+            color: getTypeColorForId(et.id),
             templates: tpls,
           });
         }
@@ -565,21 +565,21 @@ export default function AdminChecklistTemplatesPage() {
 
     if (unassigned.length > 0) {
       groups.push({
-        moduleId: null,
-        moduleName: "Unassigned",
-        moduleCode: "NONE",
-        color: MODULE_COLORS.default,
+        typeId: null,
+        typeName: "Unassigned",
+        typeCode: "NONE",
+        color: TYPE_COLORS.default,
         templates: unassigned,
       });
     }
 
     return groups;
-  }, [templates, entityTypes, searchQuery, selectedModuleFilter, moduleColorMap]);
+  }, [templates, entityTypes, searchQuery, selectedTypeFilter, typeColorMap]);
 
-  const toggleModuleCollapse = (moduleKey: string) => {
-    setCollapsedModules((prev) => ({
+  const toggleTypeCollapse = (typeKey: string) => {
+    setCollapsedTypes((prev) => ({
       ...prev,
-      [moduleKey]: !prev[moduleKey],
+      [typeKey]: !prev[typeKey],
     }));
   };
 
@@ -629,7 +629,7 @@ export default function AdminChecklistTemplatesPage() {
               </TableRow>
             ) : (
               entityTypes?.map((type, idx) => {
-                const colors = getModuleColor(idx);
+                const colors = getTypeColor(idx);
                 return (
                 <TableRow key={type.id} data-testid={`row-entity-type-${type.id}`}>
                   <TableCell className="font-medium">
@@ -770,7 +770,7 @@ export default function AdminChecklistTemplatesPage() {
   );
 
   const renderTemplateCard = (template: ChecklistTemplate) => {
-    const colors = getModuleColorForId(template.entityTypeId);
+    const colors = getTypeColorForId(template.entityTypeId);
     return (
       <Card key={template.id} className="hover-elevate" data-testid={`card-template-${template.id}`}>
         <CardHeader className="pb-3">
@@ -852,7 +852,7 @@ export default function AdminChecklistTemplatesPage() {
   };
 
   const renderTemplatesTab = () => {
-    const hasModules = entityTypes && entityTypes.length > 0;
+    const hasChecklistTypes = entityTypes && entityTypes.length > 0;
     const hasUnassigned = templates?.some((t) => !t.entityTypeId);
 
     return (
@@ -893,28 +893,28 @@ export default function AdminChecklistTemplatesPage() {
             )}
           </div>
 
-          {hasModules && (
+          {hasChecklistTypes && (
             <div className="flex items-center gap-2 flex-wrap">
               <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
               <Button
-                variant={selectedModuleFilter === null ? "default" : "outline"}
+                variant={selectedTypeFilter === null ? "default" : "outline"}
                 size="sm"
-                onClick={() => setSelectedModuleFilter(null)}
+                onClick={() => setSelectedTypeFilter(null)}
                 data-testid="button-filter-all"
               >
                 All
               </Button>
               {entityTypes?.map((et, idx) => {
-                const colors = getModuleColor(idx);
-                const isActive = selectedModuleFilter === et.id;
+                const colors = getTypeColor(idx);
+                const isActive = selectedTypeFilter === et.id;
                 return (
                   <Button
                     key={et.id}
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelectedModuleFilter(isActive ? null : et.id)}
+                    onClick={() => setSelectedTypeFilter(isActive ? null : et.id)}
                     className={isActive ? `${colors.bg} ${colors.border} ${colors.text} border` : ""}
-                    data-testid={`button-filter-module-${et.id}`}
+                    data-testid={`button-filter-type-${et.id}`}
                   >
                     <span className={`h-2 w-2 rounded-full mr-1.5 shrink-0 ${colors.dot}`} />
                     {et.name}
@@ -925,11 +925,11 @@ export default function AdminChecklistTemplatesPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setSelectedModuleFilter(selectedModuleFilter === "__unassigned__" ? null : "__unassigned__")}
-                  className={selectedModuleFilter === "__unassigned__" ? `${MODULE_COLORS.default.bg} ${MODULE_COLORS.default.border} ${MODULE_COLORS.default.text} border` : ""}
+                  onClick={() => setSelectedTypeFilter(selectedTypeFilter === "__unassigned__" ? null : "__unassigned__")}
+                  className={selectedTypeFilter === "__unassigned__" ? `${TYPE_COLORS.default.bg} ${TYPE_COLORS.default.border} ${TYPE_COLORS.default.text} border` : ""}
                   data-testid="button-filter-unassigned"
                 >
-                  <span className={`h-2 w-2 rounded-full mr-1.5 shrink-0 ${MODULE_COLORS.default.dot}`} />
+                  <span className={`h-2 w-2 rounded-full mr-1.5 shrink-0 ${TYPE_COLORS.default.dot}`} />
                   Unassigned
                 </Button>
               )}
@@ -937,12 +937,12 @@ export default function AdminChecklistTemplatesPage() {
           )}
         </div>
 
-        {(searchQuery || selectedModuleFilter) && (
+        {(searchQuery || selectedTypeFilter) && (
           <p className="text-sm text-muted-foreground">
             Showing {totalFilteredCount} template{totalFilteredCount !== 1 ? "s" : ""}
             {searchQuery && ` matching "${searchQuery}"`}
-            {selectedModuleFilter && selectedModuleFilter !== "__unassigned__" && ` in ${getEntityTypeName(selectedModuleFilter)}`}
-            {selectedModuleFilter === "__unassigned__" && " without a checklist type"}
+            {selectedTypeFilter && selectedTypeFilter !== "__unassigned__" && ` in ${getEntityTypeName(selectedTypeFilter)}`}
+            {selectedTypeFilter === "__unassigned__" && " without a checklist type"}
           </p>
         )}
 
@@ -978,32 +978,32 @@ export default function AdminChecklistTemplatesPage() {
             <p className="text-muted-foreground mb-4">
               Try adjusting your search or filter criteria
             </p>
-            <Button variant="outline" onClick={() => { setSearchQuery(""); setSelectedModuleFilter(null); }}>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setSelectedTypeFilter(null); }}>
               Clear Filters
             </Button>
           </Card>
         ) : (
           <div className="space-y-4">
             {filteredAndGroupedTemplates.map((group) => {
-              const moduleKey = group.moduleId || "__unassigned__";
-              const isCollapsed = collapsedModules[moduleKey] === true;
+              const typeKey = group.typeId || "__unassigned__";
+              const isCollapsed = collapsedTypes[typeKey] === true;
               const colors = group.color;
 
               return (
                 <Collapsible
-                  key={moduleKey}
+                  key={typeKey}
                   open={!isCollapsed}
-                  onOpenChange={() => toggleModuleCollapse(moduleKey)}
+                  onOpenChange={() => toggleTypeCollapse(typeKey)}
                 >
                   <CollapsibleTrigger asChild>
                     <button
                       className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-md border ${colors.border} ${colors.bg} transition-colors cursor-pointer`}
-                      data-testid={`button-toggle-module-${moduleKey}`}
+                      data-testid={`button-toggle-type-${typeKey}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <span className={`h-3 w-3 rounded-full shrink-0 ${colors.dot}`} />
                         <span className={`font-semibold text-sm ${colors.text}`}>
-                          {group.moduleName}
+                          {group.typeName}
                         </span>
                         <Badge variant="secondary" className="text-xs">
                           {group.templates.length} template{group.templates.length !== 1 ? "s" : ""}
@@ -1048,7 +1048,7 @@ export default function AdminChecklistTemplatesPage() {
             <FileText className="h-4 w-4 mr-2" />
             Templates
           </TabsTrigger>
-          <TabsTrigger value="modules" data-testid="tab-modules">
+          <TabsTrigger value="checklist-types" data-testid="tab-checklist-types">
             <Layers className="h-4 w-4 mr-2" />
             Checklist Types
           </TabsTrigger>
@@ -1059,7 +1059,7 @@ export default function AdminChecklistTemplatesPage() {
         </TabsList>
 
         <TabsContent value="templates">{renderTemplatesTab()}</TabsContent>
-        <TabsContent value="modules">{renderEntityTypesTab()}</TabsContent>
+        <TabsContent value="checklist-types">{renderEntityTypesTab()}</TabsContent>
         <TabsContent value="subtypes">{renderSubtypesTab()}</TabsContent>
       </Tabs>
 
@@ -1185,7 +1185,7 @@ export default function AdminChecklistTemplatesPage() {
                     <FormLabel>Checklist Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger data-testid="select-subtype-module">
+                        <SelectTrigger data-testid="select-subtype-type">
                           <SelectValue placeholder="Select a checklist type" />
                         </SelectTrigger>
                       </FormControl>
@@ -1329,7 +1329,7 @@ export default function AdminChecklistTemplatesPage() {
                         value={field.value || "__none__"}
                       >
                         <FormControl>
-                          <SelectTrigger data-testid="select-template-module">
+                          <SelectTrigger data-testid="select-template-type">
                             <SelectValue placeholder="Select checklist type" />
                           </SelectTrigger>
                         </FormControl>

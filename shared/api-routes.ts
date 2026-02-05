@@ -496,7 +496,7 @@ export const REO_SCHEDULE_ROUTES = {
 // ADVANCED TEMPLATES / CHECKLISTS
 // ============================================================================
 export const CHECKLIST_ROUTES = {
-  // Entity Types (Modules)
+  // Entity Types (Checklist Types)
   ENTITY_TYPES: '/api/checklist/entity-types',
   ENTITY_TYPE_BY_ID: (id: string) => `/api/checklist/entity-types/${id}`,
   
@@ -509,10 +509,10 @@ export const CHECKLIST_ROUTES = {
   TEMPLATES: '/api/checklist/templates',
   TEMPLATE_BY_ID: (id: string) => `/api/checklist/templates/${id}`,
   TEMPLATE_DUPLICATE: (id: string) => `/api/checklist/templates/${id}/duplicate`,
-  TEMPLATES_BY_MODULE: (entityTypeId: string, entitySubtypeId?: string) => 
+  TEMPLATES_BY_TYPE: (entityTypeId: string, entitySubtypeId?: string) => 
     entitySubtypeId 
-      ? `/api/checklist/templates/module/${entityTypeId}/${entitySubtypeId}`
-      : `/api/checklist/templates/module/${entityTypeId}`,
+      ? `/api/checklist/templates/by-type/${entityTypeId}/${entitySubtypeId}`
+      : `/api/checklist/templates/by-type/${entityTypeId}`,
   
   // Instances
   INSTANCES: '/api/checklist/instances',
