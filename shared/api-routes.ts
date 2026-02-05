@@ -285,10 +285,10 @@ export const ADMIN_ROUTES = {
   PANEL_APPROVE_PRODUCTION: (id: string | number) => `/api/admin/panels/${id}/approve-production`,
   PANEL_REVOKE_PRODUCTION: (id: string | number) => `/api/admin/panels/${id}/revoke-production`,
   
-  // Panel Types
-  PANEL_TYPES: '/api/admin/panel-types',
-  PANEL_TYPE_BY_ID: (id: string | number) => `/api/admin/panel-types/${id}`,
-  PANEL_TYPES_COST_SUMMARIES: '/api/admin/panel-types/cost-summaries',
+  // Panel Types (admin management routes)
+  PANEL_TYPES: '/api/panel-types/admin',
+  PANEL_TYPE_BY_ID: (id: string | number) => `/api/panel-types/admin/${id}`,
+  PANEL_TYPES_COST_SUMMARIES: '/api/panel-types/admin/cost-summaries',
   
   // Factories
   FACTORIES: '/api/admin/factories',
