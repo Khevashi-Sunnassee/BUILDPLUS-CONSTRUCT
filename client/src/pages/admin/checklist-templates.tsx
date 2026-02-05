@@ -222,10 +222,10 @@ export default function AdminChecklistTemplatesPage() {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.ENTITY_TYPES] });
       setEntityTypeDialogOpen(false);
       entityTypeForm.reset();
-      toast({ title: "Success", description: "Module created successfully" });
+      toast({ title: "Success", description: "Checklist type created successfully" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to create module", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to create checklist type", variant: "destructive" });
     },
   });
 
@@ -239,10 +239,10 @@ export default function AdminChecklistTemplatesPage() {
       setEntityTypeDialogOpen(false);
       setEditingEntityType(null);
       entityTypeForm.reset();
-      toast({ title: "Success", description: "Module updated successfully" });
+      toast({ title: "Success", description: "Checklist type updated successfully" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to update module", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to update checklist type", variant: "destructive" });
     },
   });
 
@@ -254,10 +254,10 @@ export default function AdminChecklistTemplatesPage() {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.ENTITY_TYPES] });
       setDeleteEntityTypeDialogOpen(false);
       setDeletingEntityTypeId(null);
-      toast({ title: "Success", description: "Module deleted successfully" });
+      toast({ title: "Success", description: "Checklist type deleted successfully" });
     },
     onError: () => {
-      toast({ title: "Error", description: "Failed to delete module", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to delete checklist type", variant: "destructive" });
     },
   });
 
@@ -591,14 +591,14 @@ export default function AdminChecklistTemplatesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-lg font-medium">Modules</h3>
+          <h3 className="text-lg font-medium">Checklist Types</h3>
           <p className="text-sm text-muted-foreground">
             Define the main categories where templates can be used (e.g., Panels, Jobs, Quality)
           </p>
         </div>
         <Button onClick={() => handleOpenEntityTypeDialog()} data-testid="button-add-entity-type">
           <Plus className="h-4 w-4 mr-2" />
-          Add Module
+          Add Checklist Type
         </Button>
       </div>
 
@@ -624,7 +624,7 @@ export default function AdminChecklistTemplatesPage() {
             {entityTypes?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No modules defined. Add your first module to get started.
+                  No checklist types defined. Add your first checklist type to get started.
                 </TableCell>
               </TableRow>
             ) : (
@@ -687,7 +687,7 @@ export default function AdminChecklistTemplatesPage() {
         <div>
           <h3 className="text-lg font-medium">Subtypes</h3>
           <p className="text-sm text-muted-foreground">
-            Define subcategories within each module (e.g., Panel Types, Inspection Types)
+            Define subcategories within each checklist type (e.g., Panel Types, Inspection Types)
           </p>
         </div>
         <Button onClick={() => handleOpenSubtypeDialog()} data-testid="button-add-subtype">
@@ -706,7 +706,7 @@ export default function AdminChecklistTemplatesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Module</TableHead>
+              <TableHead>Checklist Type</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Code</TableHead>
               <TableHead>Description</TableHead>
@@ -718,7 +718,7 @@ export default function AdminChecklistTemplatesPage() {
             {entitySubtypes?.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                  No subtypes defined. Add a subtype to organize templates within modules.
+                  No subtypes defined. Add a subtype to organize templates within checklist types.
                 </TableCell>
               </TableRow>
             ) : (
@@ -790,7 +790,7 @@ export default function AdminChecklistTemplatesPage() {
           <div className="space-y-2 text-sm text-muted-foreground mb-4">
             <div className="flex items-center gap-2">
               <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${colors.dot}`} />
-              <span>Module: {getEntityTypeName(template.entityTypeId)}</span>
+              <span>Type: {getEntityTypeName(template.entityTypeId)}</span>
             </div>
             {template.entitySubtypeId && (
               <div className="flex items-center gap-2">
@@ -942,7 +942,7 @@ export default function AdminChecklistTemplatesPage() {
             Showing {totalFilteredCount} template{totalFilteredCount !== 1 ? "s" : ""}
             {searchQuery && ` matching "${searchQuery}"`}
             {selectedModuleFilter && selectedModuleFilter !== "__unassigned__" && ` in ${getEntityTypeName(selectedModuleFilter)}`}
-            {selectedModuleFilter === "__unassigned__" && " without a module"}
+            {selectedModuleFilter === "__unassigned__" && " without a checklist type"}
           </p>
         )}
 
@@ -1050,7 +1050,7 @@ export default function AdminChecklistTemplatesPage() {
           </TabsTrigger>
           <TabsTrigger value="modules" data-testid="tab-modules">
             <Layers className="h-4 w-4 mr-2" />
-            Modules
+            Checklist Types
           </TabsTrigger>
           <TabsTrigger value="subtypes" data-testid="tab-subtypes">
             <ChevronRight className="h-4 w-4 mr-2" />
@@ -1066,9 +1066,9 @@ export default function AdminChecklistTemplatesPage() {
       <Dialog open={entityTypeDialogOpen} onOpenChange={setEntityTypeDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingEntityType ? "Edit Module" : "Add Module"}</DialogTitle>
+            <DialogTitle>{editingEntityType ? "Edit Checklist Type" : "Add Checklist Type"}</DialogTitle>
             <DialogDescription>
-              Modules define where templates can be used in the system
+              Checklist types define where templates can be used in the system
             </DialogDescription>
           </DialogHeader>
           <Form {...entityTypeForm}>
@@ -1138,7 +1138,7 @@ export default function AdminChecklistTemplatesPage() {
                   <FormItem className="flex items-center justify-between rounded-lg border p-3">
                     <div>
                       <FormLabel>Active</FormLabel>
-                      <FormDescription>Enable this module for use</FormDescription>
+                      <FormDescription>Enable this checklist type for use</FormDescription>
                     </div>
                     <FormControl>
                       <Switch checked={field.value} onCheckedChange={field.onChange} data-testid="switch-entity-type-active" />
@@ -1172,7 +1172,7 @@ export default function AdminChecklistTemplatesPage() {
           <DialogHeader>
             <DialogTitle>{editingEntitySubtype ? "Edit Subtype" : "Add Subtype"}</DialogTitle>
             <DialogDescription>
-              Subtypes help organize templates within a module
+              Subtypes help organize templates within a checklist type
             </DialogDescription>
           </DialogHeader>
           <Form {...entitySubtypeForm}>
@@ -1182,11 +1182,11 @@ export default function AdminChecklistTemplatesPage() {
                 name="entityTypeId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Module</FormLabel>
+                    <FormLabel>Checklist Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger data-testid="select-subtype-module">
-                          <SelectValue placeholder="Select a module" />
+                          <SelectValue placeholder="Select a checklist type" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -1323,14 +1323,14 @@ export default function AdminChecklistTemplatesPage() {
                   name="entityTypeId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Module</FormLabel>
+                      <FormLabel>Checklist Type</FormLabel>
                       <Select 
                         onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)} 
                         value={field.value || "__none__"}
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-template-module">
-                            <SelectValue placeholder="Select module" />
+                            <SelectValue placeholder="Select checklist type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -1452,9 +1452,9 @@ export default function AdminChecklistTemplatesPage() {
       <AlertDialog open={deleteEntityTypeDialogOpen} onOpenChange={setDeleteEntityTypeDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Module?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Checklist Type?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will deactivate the module. Templates using this module will no longer be categorized.
+              This will deactivate the checklist type. Templates using this checklist type will no longer be categorized.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
