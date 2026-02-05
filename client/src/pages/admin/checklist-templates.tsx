@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,10 +14,13 @@ import {
   Copy,
   Settings,
   ChevronRight,
+  ChevronDown,
   Layers,
   CheckSquare,
   X,
   Pencil,
+  Search,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +79,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import type { 
   EntityType, 
   EntitySubtype, 
@@ -83,6 +91,18 @@ import type {
   ChecklistSection,
 } from "@shared/schema";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
+
+const MODULE_COLORS: Record<string, { bg: string; border: string; text: string; badge: string; dot: string }> = {
+  default: { bg: "bg-slate-500/10", border: "border-slate-500/30", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-300", dot: "bg-slate-400" },
+  "0": { bg: "bg-blue-500/10", border: "border-blue-500/30", text: "text-blue-400", badge: "bg-blue-500/20 text-blue-300", dot: "bg-blue-400" },
+  "1": { bg: "bg-emerald-500/10", border: "border-emerald-500/30", text: "text-emerald-400", badge: "bg-emerald-500/20 text-emerald-300", dot: "bg-emerald-400" },
+  "2": { bg: "bg-purple-500/10", border: "border-purple-500/30", text: "text-purple-400", badge: "bg-purple-500/20 text-purple-300", dot: "bg-purple-400" },
+  "3": { bg: "bg-amber-500/10", border: "border-amber-500/30", text: "text-amber-400", badge: "bg-amber-500/20 text-amber-300", dot: "bg-amber-400" },
+  "4": { bg: "bg-rose-500/10", border: "border-rose-500/30", text: "text-rose-400", badge: "bg-rose-500/20 text-rose-300", dot: "bg-rose-400" },
+  "5": { bg: "bg-cyan-500/10", border: "border-cyan-500/30", text: "text-cyan-400", badge: "bg-cyan-500/20 text-cyan-300", dot: "bg-cyan-400" },
+  "6": { bg: "bg-orange-500/10", border: "border-orange-500/30", text: "text-orange-400", badge: "bg-orange-500/20 text-orange-300", dot: "bg-orange-400" },
+  "7": { bg: "bg-indigo-500/10", border: "border-indigo-500/30", text: "text-indigo-400", badge: "bg-indigo-500/20 text-indigo-300", dot: "bg-indigo-400" },
+};
 
 const entityTypeSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -117,9 +137,17 @@ type EntityTypeFormData = z.infer<typeof entityTypeSchema>;
 type EntitySubtypeFormData = z.infer<typeof entitySubtypeSchema>;
 type TemplateFormData = z.infer<typeof templateSchema>;
 
+function getModuleColor(index: number) {
+  const key = String(index % 8);
+  return MODULE_COLORS[key] || MODULE_COLORS.default;
+}
+
 export default function AdminChecklistTemplatesPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("templates");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedModuleFilter, setSelectedModuleFilter] = useState<string | null>(null);
+  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
   
   const [entityTypeDialogOpen, setEntityTypeDialogOpen] = useState(false);
   const [editingEntityType, setEditingEntityType] = useState<EntityType | null>(null);
@@ -469,6 +497,96 @@ export default function AdminChecklistTemplatesPage() {
     return sections.reduce((acc, section) => acc + (section.items?.length || 0), 0);
   };
 
+  const moduleColorMap = useMemo(() => {
+    const map: Record<string, typeof MODULE_COLORS["default"]> = {};
+    if (entityTypes) {
+      entityTypes.forEach((et, idx) => {
+        map[et.id] = getModuleColor(idx);
+      });
+    }
+    return map;
+  }, [entityTypes]);
+
+  const getModuleColorForId = (entityTypeId: string | null | undefined) => {
+    if (!entityTypeId) return MODULE_COLORS.default;
+    return moduleColorMap[entityTypeId] || MODULE_COLORS.default;
+  };
+
+  const filteredAndGroupedTemplates = useMemo(() => {
+    if (!templates) return [];
+
+    let filtered = templates;
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter((t) =>
+        t.name.toLowerCase().includes(q) ||
+        (t.description && t.description.toLowerCase().includes(q))
+      );
+    }
+
+    if (selectedModuleFilter !== null) {
+      if (selectedModuleFilter === "__unassigned__") {
+        filtered = filtered.filter((t) => !t.entityTypeId);
+      } else {
+        filtered = filtered.filter((t) => t.entityTypeId === selectedModuleFilter);
+      }
+    }
+
+    const groups: { moduleId: string | null; moduleName: string; moduleCode: string; color: typeof MODULE_COLORS["default"]; templates: ChecklistTemplate[] }[] = [];
+    const moduleGroups: Record<string, ChecklistTemplate[]> = {};
+    const unassigned: ChecklistTemplate[] = [];
+
+    filtered.forEach((t) => {
+      if (t.entityTypeId) {
+        if (!moduleGroups[t.entityTypeId]) {
+          moduleGroups[t.entityTypeId] = [];
+        }
+        moduleGroups[t.entityTypeId].push(t);
+      } else {
+        unassigned.push(t);
+      }
+    });
+
+    if (entityTypes) {
+      entityTypes.forEach((et) => {
+        const tpls = moduleGroups[et.id];
+        if (tpls && tpls.length > 0) {
+          groups.push({
+            moduleId: et.id,
+            moduleName: et.name,
+            moduleCode: et.code,
+            color: getModuleColorForId(et.id),
+            templates: tpls,
+          });
+        }
+      });
+    }
+
+    if (unassigned.length > 0) {
+      groups.push({
+        moduleId: null,
+        moduleName: "Unassigned",
+        moduleCode: "NONE",
+        color: MODULE_COLORS.default,
+        templates: unassigned,
+      });
+    }
+
+    return groups;
+  }, [templates, entityTypes, searchQuery, selectedModuleFilter, moduleColorMap]);
+
+  const toggleModuleCollapse = (moduleKey: string) => {
+    setCollapsedModules((prev) => ({
+      ...prev,
+      [moduleKey]: !prev[moduleKey],
+    }));
+  };
+
+  const totalFilteredCount = useMemo(() => {
+    return filteredAndGroupedTemplates.reduce((sum, g) => sum + g.templates.length, 0);
+  }, [filteredAndGroupedTemplates]);
+
   const renderEntityTypesTab = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -510,9 +628,16 @@ export default function AdminChecklistTemplatesPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              entityTypes?.map((type) => (
+              entityTypes?.map((type, idx) => {
+                const colors = getModuleColor(idx);
+                return (
                 <TableRow key={type.id} data-testid={`row-entity-type-${type.id}`}>
-                  <TableCell className="font-medium">{type.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span className={`h-3 w-3 rounded-full shrink-0 ${colors.dot}`} />
+                      {type.name}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">{type.code}</Badge>
                   </TableCell>
@@ -547,7 +672,8 @@ export default function AdminChecklistTemplatesPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -643,123 +769,266 @@ export default function AdminChecklistTemplatesPage() {
     </div>
   );
 
-  const renderTemplatesTab = () => (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-medium">Templates</h3>
-          <p className="text-sm text-muted-foreground">
-            Create and manage checklist templates with sections and fields
-          </p>
-        </div>
-        <Button onClick={() => handleOpenTemplateDialog()} data-testid="button-add-template">
-          <Plus className="h-4 w-4 mr-2" />
-          Create Template
-        </Button>
-      </div>
+  const renderTemplateCard = (template: ChecklistTemplate) => {
+    const colors = getModuleColorForId(template.entityTypeId);
+    return (
+      <Card key={template.id} className="hover-elevate" data-testid={`card-template-${template.id}`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <CardTitle className="text-base truncate">{template.name}</CardTitle>
+              <CardDescription className="text-xs mt-1 line-clamp-2">
+                {template.description || "No description"}
+              </CardDescription>
+            </div>
+            <Badge variant={template.isActive ? "default" : "secondary"} className="shrink-0">
+              {template.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-2 text-sm text-muted-foreground mb-4">
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${colors.dot}`} />
+              <span>Module: {getEntityTypeName(template.entityTypeId)}</span>
+            </div>
+            {template.entitySubtypeId && (
+              <div className="flex items-center gap-2">
+                <ChevronRight className="h-4 w-4" />
+                <span>Subtype: {getEntitySubtypeName(template.entitySubtypeId)}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-4">
+              <span>{getSectionsCount(template)} sections</span>
+              <span>{getFieldsCount(template)} fields</span>
+            </div>
+          </div>
 
-      {templatesLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-48 w-full" />
-          ))}
-        </div>
-      ) : templates?.length === 0 ? (
-        <Card className="p-8 text-center">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No Templates Yet</h3>
-          <p className="text-muted-foreground mb-4">
-            Create your first checklist template to start building forms
-          </p>
-          <Button onClick={() => handleOpenTemplateDialog()}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="default"
+              size="sm"
+              asChild
+              data-testid={`button-build-template-${template.id}`}
+            >
+              <Link href={`/admin/checklist-templates/${template.id}/edit`}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Edit
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenTemplateDialog(template)}
+              data-testid={`button-settings-template-${template.id}`}
+            >
+              <Settings className="h-3.5 w-3.5 mr-1.5" />
+              Settings
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => duplicateTemplateMutation.mutate(template.id)}
+              data-testid={`button-duplicate-template-${template.id}`}
+            >
+              <Copy className="h-3.5 w-3.5 mr-1.5" />
+              Duplicate
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDeletingTemplateId(template.id);
+                setDeleteTemplateDialogOpen(true);
+              }}
+              data-testid={`button-delete-template-${template.id}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const renderTemplatesTab = () => {
+    const hasModules = entityTypes && entityTypes.length > 0;
+    const hasUnassigned = templates?.some((t) => !t.entityTypeId);
+
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-lg font-medium">Templates</h3>
+            <p className="text-sm text-muted-foreground">
+              Create and manage checklist templates with sections and fields
+            </p>
+          </div>
+          <Button onClick={() => handleOpenTemplateDialog()} data-testid="button-add-template">
             <Plus className="h-4 w-4 mr-2" />
             Create Template
           </Button>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {templates?.map((template) => (
-            <Card key={template.id} className="hover-elevate" data-testid={`card-template-${template.id}`}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <CardTitle className="text-base truncate">{template.name}</CardTitle>
-                    <CardDescription className="text-xs mt-1 line-clamp-2">
-                      {template.description || "No description"}
-                    </CardDescription>
-                  </div>
-                  <Badge variant={template.isActive ? "default" : "secondary"} className="shrink-0">
-                    {template.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-2 text-sm text-muted-foreground mb-4">
-                  <div className="flex items-center gap-2">
-                    <Layers className="h-4 w-4" />
-                    <span>Module: {getEntityTypeName(template.entityTypeId)}</span>
-                  </div>
-                  {template.entitySubtypeId && (
-                    <div className="flex items-center gap-2">
-                      <ChevronRight className="h-4 w-4" />
-                      <span>Subtype: {getEntitySubtypeName(template.entitySubtypeId)}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-4">
-                    <span>{getSectionsCount(template)} sections</span>
-                    <span>{getFieldsCount(template)} fields</span>
-                  </div>
-                </div>
+        </div>
 
-                <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search templates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+              data-testid="input-search-templates"
+            />
+            {searchQuery && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                onClick={() => setSearchQuery("")}
+                data-testid="button-clear-search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </div>
+
+          {hasModules && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <Button
+                variant={selectedModuleFilter === null ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedModuleFilter(null)}
+                data-testid="button-filter-all"
+              >
+                All
+              </Button>
+              {entityTypes?.map((et, idx) => {
+                const colors = getModuleColor(idx);
+                const isActive = selectedModuleFilter === et.id;
+                return (
                   <Button
-                    variant="default"
-                    size="sm"
-                    asChild
-                    data-testid={`button-build-template-${template.id}`}
-                  >
-                    <Link href={`/admin/checklist-templates/${template.id}/edit`}>
-                      <Pencil className="h-3.5 w-3.5 mr-1.5" />
-                      Edit
-                    </Link>
-                  </Button>
-                  <Button
+                    key={et.id}
                     variant="outline"
                     size="sm"
-                    onClick={() => handleOpenTemplateDialog(template)}
-                    data-testid={`button-settings-template-${template.id}`}
+                    onClick={() => setSelectedModuleFilter(isActive ? null : et.id)}
+                    className={isActive ? `${colors.bg} ${colors.border} ${colors.text} border` : ""}
+                    data-testid={`button-filter-module-${et.id}`}
                   >
-                    <Settings className="h-3.5 w-3.5 mr-1.5" />
-                    Settings
+                    <span className={`h-2 w-2 rounded-full mr-1.5 shrink-0 ${colors.dot}`} />
+                    {et.name}
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => duplicateTemplateMutation.mutate(template.id)}
-                    data-testid={`button-duplicate-template-${template.id}`}
-                  >
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Duplicate
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setDeletingTemplateId(template.id);
-                      setDeleteTemplateDialogOpen(true);
-                    }}
-                    data-testid={`button-delete-template-${template.id}`}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                );
+              })}
+              {hasUnassigned && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedModuleFilter(selectedModuleFilter === "__unassigned__" ? null : "__unassigned__")}
+                  className={selectedModuleFilter === "__unassigned__" ? `${MODULE_COLORS.default.bg} ${MODULE_COLORS.default.border} ${MODULE_COLORS.default.text} border` : ""}
+                  data-testid="button-filter-unassigned"
+                >
+                  <span className={`h-2 w-2 rounded-full mr-1.5 shrink-0 ${MODULE_COLORS.default.dot}`} />
+                  Unassigned
+                </Button>
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
+
+        {(searchQuery || selectedModuleFilter) && (
+          <p className="text-sm text-muted-foreground">
+            Showing {totalFilteredCount} template{totalFilteredCount !== 1 ? "s" : ""}
+            {searchQuery && ` matching "${searchQuery}"`}
+            {selectedModuleFilter && selectedModuleFilter !== "__unassigned__" && ` in ${getEntityTypeName(selectedModuleFilter)}`}
+            {selectedModuleFilter === "__unassigned__" && " without a module"}
+          </p>
+        )}
+
+        {templatesLoading ? (
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {[1, 2, 3].map((j) => (
+                    <Skeleton key={j} className="h-48 w-full" />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : templates?.length === 0 ? (
+          <Card className="p-8 text-center">
+            <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Templates Yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first checklist template to start building forms
+            </p>
+            <Button onClick={() => handleOpenTemplateDialog()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Template
+            </Button>
+          </Card>
+        ) : filteredAndGroupedTemplates.length === 0 ? (
+          <Card className="p-8 text-center">
+            <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No Matching Templates</h3>
+            <p className="text-muted-foreground mb-4">
+              Try adjusting your search or filter criteria
+            </p>
+            <Button variant="outline" onClick={() => { setSearchQuery(""); setSelectedModuleFilter(null); }}>
+              Clear Filters
+            </Button>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {filteredAndGroupedTemplates.map((group) => {
+              const moduleKey = group.moduleId || "__unassigned__";
+              const isCollapsed = collapsedModules[moduleKey] === true;
+              const colors = group.color;
+
+              return (
+                <Collapsible
+                  key={moduleKey}
+                  open={!isCollapsed}
+                  onOpenChange={() => toggleModuleCollapse(moduleKey)}
+                >
+                  <CollapsibleTrigger asChild>
+                    <button
+                      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-md border ${colors.border} ${colors.bg} transition-colors cursor-pointer`}
+                      data-testid={`button-toggle-module-${moduleKey}`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className={`h-3 w-3 rounded-full shrink-0 ${colors.dot}`} />
+                        <span className={`font-semibold text-sm ${colors.text}`}>
+                          {group.moduleName}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">
+                          {group.templates.length} template{group.templates.length !== 1 ? "s" : ""}
+                        </Badge>
+                      </div>
+                      {isCollapsed ? (
+                        <ChevronRight className={`h-4 w-4 shrink-0 ${colors.text}`} />
+                      ) : (
+                        <ChevronDown className={`h-4 w-4 shrink-0 ${colors.text}`} />
+                      )}
+                    </button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-3">
+                      {group.templates.map((template) => renderTemplateCard(template))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
