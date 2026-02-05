@@ -1,11 +1,25 @@
 import multer from "multer";
 
 const ALLOWED_MIME_TYPES = [
-  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
+  // Images
+  "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff",
+  // PDF
   "application/pdf",
+  // Microsoft Office
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "text/plain", "text/csv",
+  "application/vnd.ms-powerpoint", "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  // Text files
+  "text/plain", "text/csv", "text/html", "text/xml", "application/json",
+  // Archives
+  "application/zip", "application/x-rar-compressed", "application/x-7z-compressed",
+  // CAD/Engineering (common in construction)
+  "application/acad", "application/x-autocad", "image/vnd.dwg", "image/x-dwg",
+  "application/dxf", "image/vnd.dxf",
+  // IFC (Building Information Modeling)
+  "application/x-step", "application/ifc",
+  // Other common formats
+  "application/rtf", "application/xml",
 ];
 
 export const chatUpload = multer({
