@@ -212,7 +212,7 @@ router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
 router.post("/api/timer-sessions/:id/pause", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const sessionId = req.params.id;
+    const sessionId = req.params.id as string;
 
     const [session] = await db
       .select()
@@ -262,7 +262,7 @@ router.post("/api/timer-sessions/:id/pause", requireAuth, async (req, res) => {
 router.post("/api/timer-sessions/:id/resume", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const sessionId = req.params.id;
+    const sessionId = req.params.id as string;
 
     const [session] = await db
       .select()
@@ -309,7 +309,7 @@ router.post("/api/timer-sessions/:id/resume", requireAuth, async (req, res) => {
 router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const sessionId = req.params.id;
+    const sessionId = req.params.id as string;
     const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = req.body;
 
     const [session] = await db
@@ -362,7 +362,7 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
           userId,
           logDay,
           factory: "MELBOURNE",
-          status: "DRAFT",
+          status: "PENDING",
         })
         .returning();
     }
@@ -448,7 +448,7 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
 router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const sessionId = req.params.id;
+    const sessionId = req.params.id as string;
 
     const [session] = await db
       .select()
@@ -498,7 +498,7 @@ router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
 router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const sessionId = req.params.id;
+    const sessionId = req.params.id as string;
     const { jobId, panelRegisterId, workTypeId, app, notes } = req.body;
 
     const [session] = await db
@@ -531,6 +531,53 @@ router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
   } catch (error) {
     logger.error({ err: error }, "Error updating timer session");
     res.status(500).json({ error: "Failed to update timer session" });
+  }
+});
+
+// Get total elapsed time and history for a specific panel
+router.get("/api/timer-sessions/panel/:panelId", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const panelId = req.params.panelId as string;
+
+    // Get all completed timer sessions for this panel
+    const sessions = await db
+      .select({
+        id: timerSessions.id,
+        status: timerSessions.status,
+        startedAt: timerSessions.startedAt,
+        completedAt: timerSessions.completedAt,
+        totalElapsedMs: timerSessions.totalElapsedMs,
+        pauseCount: timerSessions.pauseCount,
+        notes: timerSessions.notes,
+        jobNumber: jobs.jobNumber,
+        jobName: jobs.name,
+        panelMark: panelRegister.panelMark,
+        workTypeName: workTypes.name,
+      })
+      .from(timerSessions)
+      .leftJoin(jobs, eq(timerSessions.jobId, jobs.id))
+      .leftJoin(panelRegister, eq(timerSessions.panelRegisterId, panelRegister.id))
+      .leftJoin(workTypes, eq(timerSessions.workTypeId, workTypes.id))
+      .where(and(
+        eq(timerSessions.userId, userId),
+        eq(timerSessions.panelRegisterId, panelId),
+        eq(timerSessions.status, "COMPLETED")
+      ))
+      .orderBy(desc(timerSessions.completedAt));
+
+    // Calculate total elapsed time across all sessions
+    const totalElapsedMs = sessions.reduce((sum, s) => sum + (s.totalElapsedMs || 0), 0);
+
+    res.json({
+      panelId,
+      totalElapsedMs,
+      sessionCount: sessions.length,
+      sessions,
+    });
+  } catch (error) {
+    logger.error({ err: error }, "Error fetching panel timer history");
+    res.status(500).json({ error: "Failed to fetch panel timer history" });
   }
 });
 
