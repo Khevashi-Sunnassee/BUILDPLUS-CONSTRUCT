@@ -96,7 +96,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon, Smile } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
-import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES } from "@shared/api-routes";
+import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
 const panelSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
@@ -118,6 +118,7 @@ const panelSchema = z.object({
   panelMass: z.string().optional(),
   qty: z.number().optional(),
   concreteStrengthMpa: z.string().optional(),
+  workTypeId: z.number().optional(),
 });
 
 type PanelFormData = z.infer<typeof panelSchema>;
@@ -694,6 +695,16 @@ export default function AdminPanelsPage() {
   const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
     queryKey: [PANEL_TYPES_ROUTES.LIST],
   });
+
+  interface WorkType {
+    id: number;
+    name: string;
+    description: string | null;
+  }
+  
+  const { data: workTypes } = useQuery<WorkType[]>({
+    queryKey: [SETTINGS_ROUTES.WORK_TYPES],
+  });
   
   // Helper function to normalize panel type for dropdown compatibility
   // Handles both old format (normalized name like "WALL_PANEL") and new format (code like "WP")
@@ -889,6 +900,7 @@ export default function AdminPanelsPage() {
       structuralElevation: "",
       estimatedHours: undefined,
       status: "NOT_STARTED",
+      workTypeId: 1,
     },
   });
 
@@ -1301,6 +1313,7 @@ export default function AdminPanelsPage() {
       panelMass: "",
       qty: 1,
       concreteStrengthMpa: "",
+      workTypeId: 1,
     });
     setPanelDialogOpen(true);
   };
@@ -1327,6 +1340,7 @@ export default function AdminPanelsPage() {
       panelMass: panel.panelMass || "",
       qty: panel.qty || 1,
       concreteStrengthMpa: panel.concreteStrengthMpa || "",
+      workTypeId: panel.workTypeId || 1,
     });
     setPanelDialogOpen(true);
   };
@@ -1805,6 +1819,7 @@ export default function AdminPanelsPage() {
                 <TableHead className="text-right w-20">Height (mm)</TableHead>
                 <TableHead className="text-right w-20">Area (m²)</TableHead>
                 <TableHead className="text-right w-20">Vol (m³)</TableHead>
+                <TableHead className="text-right w-16">MPa</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -1876,6 +1891,7 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{panel.panelArea ? `${parseFloat(panel.panelArea).toFixed(2)}` : "-"}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)}` : "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{panel.concreteStrengthMpa || "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
@@ -1942,7 +1958,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2026,6 +2042,7 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{panel.panelArea ? `${parseFloat(panel.panelArea).toFixed(2)}` : "-"}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)}` : "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{panel.concreteStrengthMpa || "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
@@ -2092,7 +2109,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2181,6 +2198,7 @@ export default function AdminPanelsPage() {
                             <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{panel.panelArea ? `${parseFloat(panel.panelArea).toFixed(2)}` : "-"}</TableCell>
                             <TableCell className="text-right font-mono text-xs">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)}` : "-"}</TableCell>
+                            <TableCell className="text-right font-mono text-xs">{panel.concreteStrengthMpa || "-"}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className="text-xs">
                                 {getSourceLabel(panel.source)}
@@ -2244,7 +2262,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={14} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2309,6 +2327,7 @@ export default function AdminPanelsPage() {
                       <TableCell className="text-right font-mono text-xs">{formatNumber(panel.loadHeight)}</TableCell>
                       <TableCell className="text-right font-mono text-xs">{panel.panelArea ? `${parseFloat(panel.panelArea).toFixed(2)}` : "-"}</TableCell>
                       <TableCell className="text-right font-mono text-xs">{panel.panelVolume ? `${parseFloat(panel.panelVolume).toFixed(2)}` : "-"}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{panel.concreteStrengthMpa || "-"}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
                           {getSourceLabel(panel.source)}
@@ -2370,7 +2389,7 @@ export default function AdminPanelsPage() {
                   ))}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? 13 : 14} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? 14 : 15} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>
@@ -2605,6 +2624,35 @@ export default function AdminPanelsPage() {
                                 <SelectItem value="LANDING_WALL">Landing Wall</SelectItem>
                                 <SelectItem value="OTHER">Other</SelectItem>
                               </>
+                            )}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={panelForm.control}
+                    name="workTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work Type</FormLabel>
+                        <Select 
+                          onValueChange={(val) => field.onChange(parseInt(val))} 
+                          value={field.value?.toString() || "1"}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-panel-work-type">
+                              <SelectValue placeholder="Select work type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {workTypes && workTypes.length > 0 ? (
+                              workTypes.map((wt) => (
+                                <SelectItem key={wt.id} value={wt.id.toString()}>{wt.name}</SelectItem>
+                              ))
+                            ) : (
+                              <SelectItem value="1">General Drafting</SelectItem>
                             )}
                           </SelectContent>
                         </Select>

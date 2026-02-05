@@ -333,6 +333,7 @@ export const panelRegister = pgTable("panel_register", {
   structuralElevation: text("structural_elevation"),
   reckliDetail: text("reckli_detail"),
   qty: integer("qty").default(1).notNull(),
+  workTypeId: integer("work_type_id").default(1).references(() => workTypes.id),
   takeoffCategory: text("takeoff_category"),
   concreteStrengthMpa: text("concrete_strength_mpa"),
   // Traceability fields for imports
