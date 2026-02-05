@@ -594,7 +594,6 @@ export default function AdminPanelsPage() {
     panelVolume: "",
     panelMass: "",
     panelArea: "",
-    day28Fc: "",
     liftFcm: "",
     concreteStrengthMpa: "",
     rotationalLifters: "",
@@ -1036,9 +1035,8 @@ export default function AdminPanelsPage() {
           panelVolume: result.extracted.panelVolume || "",
           panelMass: result.extracted.panelMass || "",
           panelArea: result.extracted.panelArea || "",
-          day28Fc: result.extracted.day28Fc || "",
           liftFcm: result.extracted.liftFcm || "",
-          concreteStrengthMpa: result.extracted.concreteStrengthMpa || "",
+          concreteStrengthMpa: result.extracted.concreteStrengthMpa || result.extracted.day28Fc || "",
           rotationalLifters: result.extracted.rotationalLifters || "",
           primaryLifters: result.extracted.primaryLifters || "",
         });
@@ -1106,9 +1104,8 @@ export default function AdminPanelsPage() {
       panelVolume: panel.panelVolume || "",
       panelMass: panel.panelMass || "",
       panelArea: panel.panelArea || "",
-      day28Fc: panel.day28Fc || "",
       liftFcm: panel.liftFcm || "",
-      concreteStrengthMpa: panel.concreteStrengthMpa || "",
+      concreteStrengthMpa: panel.concreteStrengthMpa || panel.day28Fc || "",
       rotationalLifters: panel.rotationalLifters || "",
       primaryLifters: panel.primaryLifters || "",
     });
@@ -1128,7 +1125,6 @@ export default function AdminPanelsPage() {
       panelVolume: "",
       panelMass: "",
       panelArea: "",
-      day28Fc: "",
       liftFcm: "",
       concreteStrengthMpa: "",
       rotationalLifters: "",
@@ -1176,8 +1172,7 @@ export default function AdminPanelsPage() {
     if (!buildFormData.loadWidth) errors.push("Load Width is required");
     if (!buildFormData.loadHeight) errors.push("Load Height is required");
     if (!buildFormData.panelThickness) errors.push("Panel Thickness is required");
-    if (!buildFormData.concreteStrengthMpa) errors.push("Concrete Strength (MPa) is required");
-    if (!buildFormData.day28Fc) errors.push("28-Day f'c is required");
+    if (!buildFormData.concreteStrengthMpa) errors.push("Concrete Strength f'c (MPa) is required");
     if (!buildFormData.liftFcm) errors.push("Lift f'cm is required");
     
     if (errors.length > 0) {
@@ -3371,14 +3366,14 @@ export default function AdminPanelsPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="day28Fc">28-Day f'c (MPa) <span className="text-red-500">*</span></Label>
+                <Label htmlFor="concreteStrengthMpa">Concrete Strength f'c (MPa) <span className="text-red-500">*</span></Label>
                 <Input
-                  id="day28Fc"
-                  value={buildFormData.day28Fc}
-                  onChange={(e) => setBuildFormData({ ...buildFormData, day28Fc: e.target.value })}
-                  placeholder="e.g., 40"
-                  data-testid="input-day28-fc"
-                  className={validationErrors.includes("28-Day f'c is required") ? "border-red-500" : ""}
+                  id="concreteStrengthMpa"
+                  value={buildFormData.concreteStrengthMpa}
+                  onChange={(e) => setBuildFormData({ ...buildFormData, concreteStrengthMpa: e.target.value })}
+                  placeholder="e.g., 40, 50, 65"
+                  data-testid="input-concrete-strength"
+                  className={validationErrors.includes("Concrete Strength f'c (MPa) is required") ? "border-red-500" : ""}
                 />
               </div>
               <div className="space-y-2">
@@ -3391,26 +3386,6 @@ export default function AdminPanelsPage() {
                   data-testid="input-lift-fcm"
                   className={validationErrors.includes("Lift f'cm is required") ? "border-red-500" : ""}
                 />
-              </div>
-            </div>
-
-            {/* Concrete Strength Section */}
-            <div className="border rounded-lg p-4 space-y-4 bg-amber-50/50 dark:bg-amber-950/20">
-              <div className="flex items-center gap-2">
-                <h4 className="font-medium text-sm">Concrete Specification <span className="text-red-500">*</span></h4>
-                <Badge variant="secondary" className="text-xs">Required for Approval</Badge>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="concreteStrengthMpa">Concrete Strength (MPa) <span className="text-red-500">*</span></Label>
-                <Input
-                  id="concreteStrengthMpa"
-                  value={buildFormData.concreteStrengthMpa}
-                  onChange={(e) => setBuildFormData({ ...buildFormData, concreteStrengthMpa: e.target.value })}
-                  placeholder="e.g., 40, 50, 65"
-                  data-testid="input-concrete-strength"
-                  className={validationErrors.includes("Concrete Strength (MPa) is required") ? "border-red-500" : ""}
-                />
-                <p className="text-xs text-muted-foreground">Enter the specified concrete strength grade (e.g., N40, N50)</p>
               </div>
             </div>
 
