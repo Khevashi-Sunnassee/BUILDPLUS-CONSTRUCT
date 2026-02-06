@@ -932,19 +932,21 @@ export default function PurchaseOrdersPage() {
                           </TooltipTrigger>
                           <TooltipContent>View</TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleOpenEmailDialog(po)}
-                              data-testid={`button-email-${po.id}`}
-                            >
-                              <Mail className="h-4 w-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Send Email</TooltipContent>
-                        </Tooltip>
+                        {po.status === "APPROVED" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleOpenEmailDialog(po)}
+                                data-testid={`button-email-${po.id}`}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Send Email</TooltipContent>
+                          </Tooltip>
+                        )}
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button

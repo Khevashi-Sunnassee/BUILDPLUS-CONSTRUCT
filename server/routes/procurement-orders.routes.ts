@@ -3,6 +3,7 @@ import multer from "multer";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { twilioService } from "../services/twilio.service";
 
 const router = Router();
 
@@ -176,6 +177,26 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
     }
 
     const approved = await storage.approvePurchaseOrder(String(req.params.id), userId);
+
+    try {
+      const requestor = await storage.getUser(order.requestedById);
+      if (requestor?.phone) {
+        const supplierName = order.supplierName || "Unknown Supplier";
+        const total = parseFloat(order.total || "0").toFixed(2);
+        const message = `Your Purchase Order ${order.poNumber} for ${supplierName} totalling $${total} has been approved. You can now print and send it to the supplier.`;
+        const smsResult = await twilioService.sendSMS(requestor.phone, message);
+        if (!smsResult.success) {
+          logger.warn({ error: smsResult.error, poId: order.id, userId: order.requestedById }, "Failed to send PO approval SMS");
+        } else {
+          logger.info({ poId: order.id, userId: order.requestedById }, "PO approval SMS sent");
+        }
+      } else {
+        logger.info({ poId: order.id, userId: order.requestedById }, "No phone number for PO requestor, skipping SMS");
+      }
+    } catch (smsError) {
+      logger.warn({ err: smsError, poId: order.id }, "Error sending PO approval SMS notification");
+    }
+
     res.json(approved);
   } catch (error: any) {
     logger.error({ err: error }, "Error approving purchase order");
