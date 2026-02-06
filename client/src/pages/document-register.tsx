@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,6 +26,8 @@ import {
   QrCode,
   Copy,
   ExternalLink,
+  ChevronDown,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -189,6 +191,8 @@ export default function DocumentRegister() {
   const [jobFilter, setJobFilter] = useState<string>("");
   const [showLatestOnly, setShowLatestOnly] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [groupBy, setGroupBy] = useState<string>("job");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -467,6 +471,216 @@ export default function DocumentRegister() {
   const documents = documentsData?.documents || [];
   const pagination = documentsData?.pagination;
 
+  const toggleGroup = useCallback((key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  }, []);
+
+  const groupedDocuments = useMemo(() => {
+    if (groupBy === "none") return null;
+
+    const groups = new Map<string, { label: string; docs: DocumentWithDetails[] }>();
+
+    for (const doc of documents) {
+      let key = "";
+      let label = "";
+
+      switch (groupBy) {
+        case "job":
+          key = doc.job?.id || "_unassigned";
+          label = doc.job ? `${doc.job.jobNumber} - ${doc.job.name}` : "Unassigned";
+          break;
+        case "discipline":
+          key = doc.discipline?.id || "_unassigned";
+          label = doc.discipline?.disciplineName || "Unassigned";
+          break;
+        case "type":
+          key = doc.type?.id || "_unassigned";
+          label = doc.type ? `${doc.type.prefix} - ${doc.type.typeName}` : "Unassigned";
+          break;
+        case "category":
+          key = doc.category?.id || "_unassigned";
+          label = doc.category?.categoryName || "Unassigned";
+          break;
+        case "status":
+          key = doc.status;
+          label = statusConfig[doc.status]?.label || doc.status;
+          break;
+        default:
+          key = "_all";
+          label = "All Documents";
+      }
+
+      if (!groups.has(key)) {
+        groups.set(key, { label, docs: [] });
+      }
+      groups.get(key)!.docs.push(doc);
+    }
+
+    const sorted = Array.from(groups.entries()).sort(([keyA, a], [keyB, b]) => {
+      if (keyA === "_unassigned") return 1;
+      if (keyB === "_unassigned") return -1;
+      return a.label.localeCompare(b.label);
+    });
+
+    return sorted;
+  }, [documents, groupBy]);
+
+  const renderDocumentRow = useCallback((doc: DocumentWithDetails) => {
+    const status = statusConfig[doc.status] || statusConfig.DRAFT;
+    const StatusIcon = status.icon;
+
+    return (
+      <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
+        <TableCell>
+          <div className="flex flex-col">
+            <span className="font-medium">{doc.title}</span>
+            <span className="text-xs text-muted-foreground">{doc.originalName}</span>
+            {doc.documentNumber && (
+              <span className="text-xs text-blue-600">{doc.documentNumber}</span>
+            )}
+          </div>
+        </TableCell>
+        <TableCell>
+          <div className="flex flex-col gap-1">
+            {doc.type && <Badge variant="outline" className="w-fit">{doc.type.prefix}</Badge>}
+            {doc.discipline && <Badge variant="secondary" className="w-fit text-xs">{doc.discipline.shortForm || doc.discipline.disciplineName}</Badge>}
+          </div>
+        </TableCell>
+        <TableCell>
+          {doc.job ? (
+            <span className="text-sm">{doc.job.jobNumber} - {doc.job.name}</span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </TableCell>
+        <TableCell>
+          <span className="font-mono text-sm">v{doc.version}{doc.revision}</span>
+        </TableCell>
+        <TableCell>
+          <Badge className={status.className}>
+            <StatusIcon className="h-3 w-3 mr-1" />
+            {status.label}
+          </Badge>
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          {formatFileSize(doc.fileSize)}
+        </TableCell>
+        <TableCell className="text-sm text-muted-foreground">
+          {formatDate(doc.createdAt)}
+        </TableCell>
+        <TableCell>
+          <div className="flex justify-end gap-1">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => window.open(DOCUMENT_ROUTES.VIEW(doc.id), "_blank")}
+              title="View"
+              data-testid={`button-view-${doc.id}`}
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href = DOCUMENT_ROUTES.DOWNLOAD(doc.id);
+                link.download = doc.originalName;
+                link.click();
+              }}
+              title="Download"
+              data-testid={`button-download-${doc.id}`}
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => {
+                setVersionHistoryDoc(doc);
+                setIsVersionHistoryOpen(true);
+              }}
+              title="Version History"
+              data-testid={`button-history-${doc.id}`}
+            >
+              <History className="h-4 w-4" />
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" variant="ghost" data-testid={`button-actions-${doc.id}`}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setSelectedDocumentForVersion(doc);
+                    setIsVersionDialogOpen(true);
+                  }}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload New Version
+                </DropdownMenuItem>
+                {doc.status === "DRAFT" && (
+                  <DropdownMenuItem
+                    onClick={() => updateStatusMutation.mutate({ id: doc.id, status: "REVIEW" })}
+                  >
+                    <Clock className="h-4 w-4 mr-2" />
+                    Submit for Review
+                  </DropdownMenuItem>
+                )}
+                {doc.status === "REVIEW" && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={() => updateStatusMutation.mutate({ id: doc.id, status: "APPROVED" })}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Approve
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => updateStatusMutation.mutate({ id: doc.id, status: "DRAFT" })}
+                    >
+                      <AlertCircle className="h-4 w-4 mr-2" />
+                      Return to Draft
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </TableCell>
+      </TableRow>
+    );
+  }, [updateStatusMutation]);
+
+  const renderDocumentTable = useCallback((docs: DocumentWithDetails[]) => (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Document</TableHead>
+          <TableHead>Type / Discipline</TableHead>
+          <TableHead>Job</TableHead>
+          <TableHead>Version</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Size</TableHead>
+          <TableHead>Uploaded</TableHead>
+          <TableHead className="text-right">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {docs.map((doc) => renderDocumentRow(doc))}
+      </TableBody>
+    </Table>
+  ), [renderDocumentRow]);
+
   return (
     <div className="container mx-auto py-6 px-4 space-y-6" data-testid="document-register-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -534,6 +748,23 @@ export default function DocumentRegister() {
                 data-testid="switch-latest-only"
               />
               <Label htmlFor="latest-only" className="text-sm">Latest versions only</Label>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <Layers className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-sm text-muted-foreground whitespace-nowrap">Group by</Label>
+              <Select value={groupBy} onValueChange={(v) => { setGroupBy(v); setCollapsedGroups(new Set()); }}>
+                <SelectTrigger className="w-[160px]" data-testid="select-group-by">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="job">Job</SelectItem>
+                  <SelectItem value="discipline">Discipline</SelectItem>
+                  <SelectItem value="type">Type</SelectItem>
+                  <SelectItem value="category">Category</SelectItem>
+                  <SelectItem value="status">Status</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -606,151 +837,72 @@ export default function DocumentRegister() {
               <h3 className="text-lg font-medium">No documents found</h3>
               <p className="text-muted-foreground">Upload your first document to get started</p>
             </div>
+          ) : groupedDocuments ? (
+            <>
+              <div className="space-y-4">
+                {groupedDocuments.map(([key, { label, docs }]) => {
+                  const isCollapsed = collapsedGroups.has(key);
+                  return (
+                    <div key={key} className="border rounded-md overflow-visible" data-testid={`group-${groupBy}-${key}`}>
+                      <button
+                        type="button"
+                        className="flex items-center justify-between gap-3 w-full px-4 py-3 text-left hover-elevate transition-colors"
+                        onClick={() => toggleGroup(key)}
+                        data-testid={`button-toggle-group-${key}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
+                          />
+                          <span className="font-medium">{label}</span>
+                          <Badge variant="secondary">{docs.length}</Badge>
+                        </div>
+                      </button>
+                      {!isCollapsed && (
+                        <div className="border-t">
+                          {renderDocumentTable(docs)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {pagination && pagination.totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                    {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} documents
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      data-testid="button-prev-page"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="flex items-center px-3 text-sm">
+                      Page {pagination.page} of {pagination.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage((p) => p + 1)}
+                      disabled={!pagination.hasMore}
+                      data-testid="button-next-page"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Document</TableHead>
-                    <TableHead>Type / Discipline</TableHead>
-                    <TableHead>Job</TableHead>
-                    <TableHead>Version</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Uploaded</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {documents.map((doc) => {
-                    const status = statusConfig[doc.status] || statusConfig.DRAFT;
-                    const StatusIcon = status.icon;
-                    
-                    return (
-                      <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{doc.title}</span>
-                            <span className="text-xs text-muted-foreground">{doc.originalName}</span>
-                            {doc.documentNumber && (
-                              <span className="text-xs text-blue-600">{doc.documentNumber}</span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            {doc.type && <Badge variant="outline" className="w-fit">{doc.type.prefix}</Badge>}
-                            {doc.discipline && <Badge variant="secondary" className="w-fit text-xs">{doc.discipline.shortForm || doc.discipline.disciplineName}</Badge>}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {doc.job ? (
-                            <span className="text-sm">{doc.job.jobNumber} - {doc.job.name}</span>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-sm">v{doc.version}{doc.revision}</span>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={status.className}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatFileSize(doc.fileSize)}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {formatDate(doc.createdAt)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => window.open(DOCUMENT_ROUTES.VIEW(doc.id), "_blank")}
-                              title="View"
-                              data-testid={`button-view-${doc.id}`}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                const link = document.createElement("a");
-                                link.href = DOCUMENT_ROUTES.DOWNLOAD(doc.id);
-                                link.download = doc.originalName;
-                                link.click();
-                              }}
-                              title="Download"
-                              data-testid={`button-download-${doc.id}`}
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => {
-                                setVersionHistoryDoc(doc);
-                                setIsVersionHistoryOpen(true);
-                              }}
-                              title="Version History"
-                              data-testid={`button-history-${doc.id}`}
-                            >
-                              <History className="h-4 w-4" />
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button size="icon" variant="ghost" data-testid={`button-actions-${doc.id}`}>
-                                  <Plus className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setSelectedDocumentForVersion(doc);
-                                    setIsVersionDialogOpen(true);
-                                  }}
-                                >
-                                  <Upload className="h-4 w-4 mr-2" />
-                                  Upload New Version
-                                </DropdownMenuItem>
-                                {doc.status === "DRAFT" && (
-                                  <DropdownMenuItem
-                                    onClick={() => updateStatusMutation.mutate({ id: doc.id, status: "REVIEW" })}
-                                  >
-                                    <Clock className="h-4 w-4 mr-2" />
-                                    Submit for Review
-                                  </DropdownMenuItem>
-                                )}
-                                {doc.status === "REVIEW" && (
-                                  <>
-                                    <DropdownMenuItem
-                                      onClick={() => updateStatusMutation.mutate({ id: doc.id, status: "APPROVED" })}
-                                    >
-                                      <CheckCircle className="h-4 w-4 mr-2" />
-                                      Approve
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      onClick={() => updateStatusMutation.mutate({ id: doc.id, status: "DRAFT" })}
-                                    >
-                                      <AlertCircle className="h-4 w-4 mr-2" />
-                                      Return to Draft
-                                    </DropdownMenuItem>
-                                  </>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              {renderDocumentTable(documents)}
 
               {pagination && pagination.totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4">
