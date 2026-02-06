@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -11,8 +11,12 @@ import {
   Search,
   Filter,
   Trash2,
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  Briefcase,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -56,6 +60,8 @@ import {
 import type { ChecklistInstance, ChecklistTemplate, Job } from "@shared/schema";
 import { CHECKLIST_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 
+type GroupByOption = "status" | "job" | "none";
+
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
   draft: { label: "Draft", variant: "secondary", icon: FileText },
   in_progress: { label: "In Progress", variant: "default", icon: Clock },
@@ -64,11 +70,15 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   cancelled: { label: "Cancelled", variant: "destructive", icon: AlertCircle },
 };
 
+const STATUS_ORDER = ["draft", "in_progress", "completed", "signed_off", "cancelled"];
+
 export default function ChecklistsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [groupBy, setGroupBy] = useState<GroupByOption>("status");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [newChecklistDialogOpen, setNewChecklistDialogOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
@@ -131,19 +141,115 @@ export default function ChecklistsPage() {
   };
 
   const getJobName = (jobId: string | null) => {
-    if (!jobId) return "-";
+    if (!jobId) return null;
     const job = jobs?.find((j) => j.id === jobId);
-    return job?.name || "Unknown Job";
+    return job ? (job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name) : "Unknown Job";
   };
 
-  const filteredInstances = instances?.filter((instance) => {
-    const matchesSearch =
-      searchTerm === "" ||
-      getTemplateName(instance.templateId).toLowerCase().includes(searchTerm.toLowerCase()) ||
-      instance.instanceNumber?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || instance.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredInstances = useMemo(() => {
+    if (!instances) return [];
+    return instances.filter((instance) => {
+      const templateName = getTemplateName(instance.templateId);
+      const jobName = getJobName(instance.jobId) || "";
+      const matchesSearch =
+        searchTerm === "" ||
+        templateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        instance.instanceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        jobName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || instance.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [instances, searchTerm, statusFilter, templates, jobs]);
+
+  type GroupItem = {
+    key: string;
+    label: string;
+    items: ChecklistInstance[];
+    icon: React.ElementType | null;
+    variant: "default" | "secondary" | "destructive" | "outline";
+  };
+
+  const groupedInstances = useMemo((): GroupItem[] => {
+    if (!filteredInstances.length) return [];
+
+    if (groupBy === "none") {
+      return [{ key: "all", label: "All Checklists", items: filteredInstances, icon: null, variant: "secondary" }];
+    }
+
+    if (groupBy === "status") {
+      const groups: Record<string, ChecklistInstance[]> = {};
+      filteredInstances.forEach((instance) => {
+        const key = instance.status;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(instance);
+      });
+      return STATUS_ORDER
+        .filter((status) => groups[status]?.length > 0)
+        .map((status) => {
+          const config = STATUS_CONFIG[status];
+          return {
+            key: status,
+            label: config?.label || status,
+            items: groups[status],
+            icon: config?.icon || FileText,
+            variant: config?.variant || "secondary",
+          };
+        });
+    }
+
+    if (groupBy === "job") {
+      const groups: Record<string, ChecklistInstance[]> = {};
+      const unassigned: ChecklistInstance[] = [];
+      filteredInstances.forEach((instance) => {
+        if (instance.jobId) {
+          if (!groups[instance.jobId]) groups[instance.jobId] = [];
+          groups[instance.jobId].push(instance);
+        } else {
+          unassigned.push(instance);
+        }
+      });
+
+      const result: GroupItem[] = Object.entries(groups)
+        .map(([jobId, items]) => {
+          const jobName = getJobName(jobId) || "Unknown Job";
+          return {
+            key: jobId,
+            label: jobName,
+            items,
+            icon: Briefcase as React.ElementType,
+            variant: "outline" as const,
+          };
+        })
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+      if (unassigned.length > 0) {
+        result.push({
+          key: "unassigned",
+          label: "No Job Assigned",
+          items: unassigned,
+          icon: FileText,
+          variant: "secondary",
+        });
+      }
+
+      return result;
+    }
+
+    return [];
+  }, [filteredInstances, groupBy, jobs]);
+
+  const toggleGroupCollapse = (key: string) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  };
+
+  const getGroupProgress = (items: ChecklistInstance[]) => {
+    if (!items.length) return 0;
+    const total = items.reduce((sum, item) => sum + Number(item.completionRate || 0), 0);
+    return Math.round(total / items.length);
+  };
 
   const activeTemplates = templates?.filter((t) => t.isActive) || [];
 
@@ -182,13 +288,13 @@ export default function ChecklistsPage() {
         </Button>
       </div>
 
-      <Card className="mb-6">
+      <Card>
         <CardContent className="pt-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search checklists..."
+                placeholder="Search by template, job, or checklist number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -206,6 +312,17 @@ export default function ChecklistsPage() {
                 <SelectItem value="in_progress" data-testid="option-status-in-progress">In Progress</SelectItem>
                 <SelectItem value="completed" data-testid="option-status-completed">Completed</SelectItem>
                 <SelectItem value="signed_off" data-testid="option-status-signed-off">Signed Off</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={groupBy} onValueChange={(v) => { setGroupBy(v as GroupByOption); setCollapsedGroups({}); }}>
+              <SelectTrigger className="w-[180px]" data-testid="select-group-by">
+                <Layers className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Group by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="status" data-testid="option-group-status">Group by Status</SelectItem>
+                <SelectItem value="job" data-testid="option-group-job">Group by Job</SelectItem>
+                <SelectItem value="none" data-testid="option-group-none">No Grouping</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -231,75 +348,133 @@ export default function ChecklistsPage() {
           )}
         </Card>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Template</TableHead>
-              <TableHead>Job</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Progress</TableHead>
-              <TableHead>Started</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredInstances.map((instance) => {
-              const statusConfig = STATUS_CONFIG[instance.status];
-              const StatusIcon = statusConfig?.icon || FileText;
-              const completionRate = Number(instance.completionRate || 0);
+        <div className="space-y-4">
+          {groupedInstances.map((group) => {
+            const isCollapsed = collapsedGroups[group.key] === true;
+            const avgProgress = getGroupProgress(group.items);
+            const GroupIcon = group.icon;
 
-              return (
-                <TableRow key={instance.id} data-testid={`row-checklist-${instance.id}`}>
-                  <TableCell className="font-medium">
-                    {getTemplateName(instance.templateId)}
-                  </TableCell>
-                  <TableCell>{getJobName(instance.jobId)}</TableCell>
-                  <TableCell>
-                    <Badge variant={statusConfig?.variant || "secondary"}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {statusConfig?.label || instance.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2 min-w-[120px]">
-                      <Progress value={completionRate} className="h-2 flex-1" />
-                      <span className="text-xs text-muted-foreground w-10">
-                        {completionRate.toFixed(0)}%
+            return (
+              <div key={group.key} data-testid={`group-${group.key}`}>
+                {groupBy !== "none" && (
+                  <button
+                    onClick={() => toggleGroupCollapse(group.key)}
+                    className="flex items-center gap-3 w-full py-3 px-1 text-left hover-elevate rounded-md"
+                    data-testid={`button-toggle-group-${group.key}`}
+                  >
+                    {isCollapsed ? (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                    )}
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      {GroupIcon && <GroupIcon className="h-4 w-4 shrink-0" />}
+                      <span className="font-semibold truncate" data-testid={`text-group-label-${group.key}`}>{group.label}</span>
+                      <Badge variant="secondary" className="shrink-0" data-testid={`badge-group-count-${group.key}`}>
+                        {group.items.length}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Progress value={avgProgress} className="h-2 w-24" />
+                      <span className="text-xs text-muted-foreground w-10 text-right" data-testid={`text-group-progress-${group.key}`}>
+                        {avgProgress}%
                       </span>
                     </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {new Date(instance.startedAt).toLocaleDateString()}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button variant="outline" size="sm" asChild data-testid={`button-open-checklist-${instance.id}`}>
-                        <Link href={`/checklists/${instance.id}`}>
-                          {instance.status === "completed" || instance.status === "signed_off"
-                            ? "View"
-                            : "Continue"}
-                        </Link>
-                      </Button>
-                      {instance.status === "draft" && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setDeletingInstanceId(instance.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          data-testid={`button-delete-checklist-${instance.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                  </button>
+                )}
+
+                {!isCollapsed && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Template</TableHead>
+                        {groupBy !== "job" && <TableHead>Job</TableHead>}
+                        {groupBy !== "status" && <TableHead>Status</TableHead>}
+                        <TableHead>Progress</TableHead>
+                        <TableHead>Started</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {group.items.map((instance) => {
+                        const statusConfig = STATUS_CONFIG[instance.status];
+                        const StatusIcon = statusConfig?.icon || FileText;
+                        const completionRate = Number(instance.completionRate || 0);
+
+                        return (
+                          <TableRow key={instance.id} data-testid={`row-checklist-${instance.id}`}>
+                            <TableCell className="font-medium">
+                              <div>
+                                {getTemplateName(instance.templateId)}
+                                {instance.instanceNumber && (
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    #{instance.instanceNumber}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            {groupBy !== "job" && (
+                              <TableCell>
+                                {instance.jobId ? (
+                                  <span className="text-sm">{getJobName(instance.jobId)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </TableCell>
+                            )}
+                            {groupBy !== "status" && (
+                              <TableCell>
+                                <Badge variant={statusConfig?.variant || "secondary"}>
+                                  <StatusIcon className="h-3 w-3 mr-1" />
+                                  {statusConfig?.label || instance.status}
+                                </Badge>
+                              </TableCell>
+                            )}
+                            <TableCell>
+                              <div className="flex items-center gap-2 min-w-[120px]">
+                                <Progress value={completionRate} className="h-2 flex-1" />
+                                <span className="text-xs text-muted-foreground w-10">
+                                  {completionRate.toFixed(0)}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {new Date(instance.startedAt).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button variant="outline" size="sm" asChild data-testid={`button-open-checklist-${instance.id}`}>
+                                  <Link href={`/checklists/${instance.id}`}>
+                                    {instance.status === "completed" || instance.status === "signed_off"
+                                      ? "View"
+                                      : "Continue"}
+                                  </Link>
+                                </Button>
+                                {instance.status === "draft" && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => {
+                                      setDeletingInstanceId(instance.id);
+                                      setDeleteDialogOpen(true);
+                                    }}
+                                    data-testid={`button-delete-checklist-${instance.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            );
+          })}
+        </div>
       )}
 
       <Dialog open={newChecklistDialogOpen} onOpenChange={setNewChecklistDialogOpen}>
@@ -336,7 +511,7 @@ export default function ChecklistsPage() {
                   <SelectItem value="__none__" data-testid="option-job-none">None</SelectItem>
                   {jobs?.map((job) => (
                     <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
-                      {job.name}
+                      {job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
