@@ -83,8 +83,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, PanelRegister, User as UserType, GlobalSettings, Factory } from "@shared/schema";
-import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES } from "@shared/api-routes";
+import type { Job, PanelRegister, User as UserType, GlobalSettings, Factory, Customer } from "@shared/schema";
+import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -107,6 +107,7 @@ const jobSchema = z.object({
   jobNumber: z.string().min(1, "Job number is required"),
   name: z.string().min(1, "Name is required"),
   client: z.string().optional(),
+  customerId: z.string().optional().nullable(),
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.enum(AUSTRALIAN_STATES).optional().nullable(),
@@ -224,6 +225,10 @@ export default function AdminJobsPage() {
   // Scheduling settings change confirmation state
   const [schedulingSettingsChanged, setSchedulingSettingsChanged] = useState(false);
 
+  // Quick-add customer dialog state
+  const [quickAddCustomerOpen, setQuickAddCustomerOpen] = useState(false);
+  const [quickAddCustomerName, setQuickAddCustomerName] = useState("");
+
   const { data: jobs, isLoading } = useQuery<JobWithPanels[]>({
     queryKey: [ADMIN_ROUTES.JOBS],
   });
@@ -234,6 +239,10 @@ export default function AdminJobsPage() {
 
   const { data: factories } = useQuery<Factory[]>({
     queryKey: [FACTORIES_ROUTES.LIST],
+  });
+
+  const { data: activeCustomers } = useQuery<Customer[]>({
+    queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_ACTIVE],
   });
 
   const { data: globalSettings } = useQuery<GlobalSettings>({
@@ -320,6 +329,7 @@ export default function AdminJobsPage() {
       jobNumber: "",
       name: "",
       client: "",
+      customerId: null,
       address: "",
       description: "",
       siteContact: "",
@@ -406,6 +416,25 @@ export default function AdminJobsPage() {
         description: error.message,
         variant: "destructive" 
       });
+    },
+  });
+
+  const quickAddCustomerMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", PROCUREMENT_ROUTES.CUSTOMERS, { name, isActive: true });
+      return res.json();
+    },
+    onSuccess: (customer: Customer) => {
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_ACTIVE] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.CUSTOMERS] });
+      jobForm.setValue("customerId", customer.id);
+      jobForm.setValue("client", customer.name);
+      setQuickAddCustomerOpen(false);
+      setQuickAddCustomerName("");
+      toast({ title: "Customer created and selected" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create customer", description: error.message, variant: "destructive" });
     },
   });
 
@@ -646,6 +675,7 @@ export default function AdminJobsPage() {
       jobNumber: "",
       name: "",
       client: "",
+      customerId: null,
       address: "",
       city: "",
       state: null,
@@ -680,6 +710,7 @@ export default function AdminJobsPage() {
       jobNumber: job.jobNumber,
       name: job.name,
       client: job.client || "",
+      customerId: job.customerId || null,
       address: job.address || "",
       city: job.city || "",
       state: job.state || null,
@@ -1245,13 +1276,49 @@ export default function AdminJobsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={jobForm.control}
-                      name="client"
+                      name="customerId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Client</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Client name" {...field} data-testid="input-job-client" />
-                          </FormControl>
+                          <FormLabel>Customer</FormLabel>
+                          <Select
+                            onValueChange={(value) => {
+                              if (value === "__quick_add__") {
+                                setQuickAddCustomerName("");
+                                setQuickAddCustomerOpen(true);
+                                return;
+                              }
+                              if (value === "__none__") {
+                                field.onChange(null);
+                                jobForm.setValue("client", "");
+                                return;
+                              }
+                              field.onChange(value);
+                              const selected = activeCustomers?.find(c => c.id === value);
+                              if (selected) {
+                                jobForm.setValue("client", selected.name);
+                              }
+                            }}
+                            value={field.value || "__none__"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job-customer">
+                                <SelectValue placeholder="Select customer" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="__none__">No customer</SelectItem>
+                              {activeCustomers?.map((customer) => (
+                                <SelectItem key={customer.id} value={customer.id}>
+                                  {customer.name}
+                                </SelectItem>
+                              ))}
+                              <SelectItem value="__quick_add__">
+                                <span className="flex items-center gap-1 text-primary">
+                                  <Plus className="h-3 w-3" /> Add new customer
+                                </span>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -2537,6 +2604,48 @@ export default function AdminJobsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={quickAddCustomerOpen} onOpenChange={setQuickAddCustomerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quick Add Customer</DialogTitle>
+            <DialogDescription>
+              Create a new customer to link to this job. You can add full details later in the Customers admin page.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Company Name *</label>
+              <Input
+                placeholder="Enter customer company name"
+                value={quickAddCustomerName}
+                onChange={(e) => setQuickAddCustomerName(e.target.value)}
+                data-testid="input-quick-add-customer-name"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && quickAddCustomerName.trim()) {
+                    e.preventDefault();
+                    quickAddCustomerMutation.mutate(quickAddCustomerName.trim());
+                  }
+                }}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickAddCustomerOpen(false)} data-testid="button-cancel-quick-add-customer">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => quickAddCustomerName.trim() && quickAddCustomerMutation.mutate(quickAddCustomerName.trim())}
+              disabled={!quickAddCustomerName.trim() || quickAddCustomerMutation.isPending}
+              data-testid="button-save-quick-add-customer"
+            >
+              {quickAddCustomerMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Save className="h-4 w-4 mr-2" />
+              Create & Select
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );

@@ -582,7 +582,7 @@ export default function DocumentRegister() {
                 <SelectContent>
                   <SelectItem value="all">All Jobs</SelectItem>
                   {jobs.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>{job.code} - {job.name}</SelectItem>
+                    <SelectItem key={job.id} value={job.id}>{job.jobNumber} - {job.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -645,7 +645,7 @@ export default function DocumentRegister() {
                         </TableCell>
                         <TableCell>
                           {doc.job ? (
-                            <span className="text-sm">{doc.job.code}</span>
+                            <span className="text-sm">{doc.job.jobNumber} - {doc.job.name}</span>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
@@ -958,7 +958,7 @@ export default function DocumentRegister() {
                         <SelectContent>
                           {jobs.map((job) => (
                             <SelectItem key={job.id} value={job.id}>
-                              {job.code} - {job.name}
+                              {job.jobNumber} - {job.name}
                             </SelectItem>
                           ))}
                         </SelectContent>

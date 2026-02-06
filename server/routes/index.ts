@@ -20,6 +20,7 @@ import { weeklyReportsRouter } from "./weekly-reports.routes";
 import { productionAnalyticsRouter } from "./production-analytics.routes";
 import { draftingLogisticsRouter } from "./drafting-logistics.routes";
 import { costAnalyticsRouter } from "./cost-analytics.routes";
+import { customerRouter } from "./customer.routes";
 import { procurementRouter } from "./procurement.routes";
 import { procurementOrdersRouter } from "./procurement-orders.routes";
 import { tasksRouter } from "./tasks.routes";
@@ -79,6 +80,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(productionScheduleRouter);
   app.use(draftingRouter);
   app.use(logisticsRouter);
+  app.use(customerRouter);
   app.use(procurementRouter);
   app.use(procurementOrdersRouter);
   app.use(tasksRouter);

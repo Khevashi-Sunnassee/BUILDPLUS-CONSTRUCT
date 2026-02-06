@@ -106,6 +106,7 @@ export const FUNCTION_KEYS = [
   "admin_suppliers",
   "admin_item_catalog",
   "admin_factories",
+  "admin_customers",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -236,6 +237,7 @@ export const jobs = pgTable("jobs", {
   name: text("name").notNull(),
   code: text("code"),
   client: text("client"),
+  customerId: varchar("customer_id", { length: 36 }).references(() => customers.id),
   address: text("address"),
   city: text("city"),
   state: australianStateEnum("state"),
@@ -1251,6 +1253,32 @@ export type DraftingProgram = typeof draftingProgram.$inferSelect;
 
 // ============== Purchase Order Tables ==============
 
+export const customers = pgTable("customers", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  keyContact: text("key_contact"),
+  email: text("email"),
+  phone: text("phone"),
+  abn: text("abn"),
+  acn: text("acn"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  city: text("city"),
+  state: text("state"),
+  postcode: text("postcode"),
+  country: text("country").default("Australia"),
+  paymentTerms: text("payment_terms"),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  nameIdx: index("customers_name_idx").on(table.name),
+  abnIdx: index("customers_abn_idx").on(table.abn),
+  companyIdx: index("customers_company_idx").on(table.companyId),
+}));
+
 export const suppliers = pgTable("suppliers", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -1390,6 +1418,10 @@ export const purchaseOrderAttachments = pgTable("purchase_order_attachments", {
 }));
 
 // Insert schemas and types for PO tables
+export const insertCustomerSchema = createInsertSchema(customers).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCustomer = z.infer<typeof insertCustomerSchema>;
+export type Customer = typeof customers.$inferSelect;
+
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;

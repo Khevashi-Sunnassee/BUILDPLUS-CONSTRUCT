@@ -101,6 +101,11 @@ export const PROCUREMENT_ROUTES = {
   ITEM_CATEGORIES_ACTIVE: '/api/procurement/item-categories/active',
   ITEM_CATEGORY_BY_ID: (id: string | number) => `/api/procurement/item-categories/${id}`,
   
+  // Customers
+  CUSTOMERS: '/api/customers',
+  CUSTOMERS_ACTIVE: '/api/customers/active',
+  CUSTOMER_BY_ID: (id: string | number) => `/api/customers/${id}`,
+
   // Suppliers
   SUPPLIERS: '/api/procurement/suppliers',
   SUPPLIERS_ACTIVE: '/api/procurement/suppliers/active',

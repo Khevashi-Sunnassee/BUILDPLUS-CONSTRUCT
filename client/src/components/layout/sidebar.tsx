@@ -32,6 +32,7 @@ import {
   ShoppingCart,
   ListTodo,
   MessageSquare,
+  Handshake,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -91,6 +92,7 @@ const adminNavItems = [
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
+  { title: "Customers", url: "/admin/customers", icon: Handshake },
   { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
   { title: "Items", url: "/admin/items", icon: Package },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
@@ -117,6 +119,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",
   "/admin/panel-types": "admin_panel_types",
+  "/admin/customers": "admin_customers",
   "/admin/suppliers": "admin_suppliers",
   "/admin/items": "admin_item_catalog",
   "/admin/devices": "admin_devices",

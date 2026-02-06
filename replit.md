@@ -19,8 +19,9 @@ The frontend leverages TanStack Query for data fetching, Wouter for routing, `sh
 **Technical Implementations & Features:**
 - **Time & Approval Management**: Daily log entries, approval workflows, and real-time drafting time tracking.
 - **Reporting & Analytics**: Comprehensive reports covering time, production, logistics, wages, and cost analysis.
-- **Admin Provisioning**: Centralized management for users, jobs, devices, global settings, panel types, and work types.
-- **Jobs & Panel Management**: Creation and tracking of jobs, panel registration, production approval workflows, estimate import with Excel parsing, and detailed panel field management (reinforcement, concrete, lifters, dowels, plates, inserts).
+- **Admin Provisioning**: Centralized management for users, jobs, customers, devices, global settings, panel types, and work types.
+- **Customer Management**: Full CRUD for customer companies with contact details, ABN/ACN, address, payment terms. Customers are linked to jobs via customerId foreign key, with a quick-add dialog in the job form for inline customer creation.
+- **Jobs & Panel Management**: Creation and tracking of jobs with customer linking, panel registration, production approval workflows, estimate import with Excel parsing, and detailed panel field management (reinforcement, concrete, lifters, dowels, plates, inserts).
 - **AI Integration**: OpenAI-powered PDF analysis for extracting panel specifications from shop drawings.
 - **Configurable Rates & Cost Analysis**: Job and panel-level configurable rates (supply, install, sell) and cost tracking by component (labor, concrete, steel).
 - **Production Tracking**: Production reports grouped by date, including financial and production metrics.

@@ -9,7 +9,7 @@ import {
   trailerTypes, loadLists, loadListPanels, deliveryRecords, productionDays, weeklyWageReports,
   userPermissions, FUNCTION_KEYS, weeklyJobReports, weeklyJobReportSchedules, zones,
   productionSlots, productionSlotAdjustments, draftingProgram,
-  suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
+  customers, suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   factories, cfmeuHolidays,
   documentTypesConfig, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems, documentBundleAccessLogs,
@@ -37,6 +37,7 @@ import {
   type InsertProductionSlot, type ProductionSlot,
   type InsertProductionSlotAdjustment, type ProductionSlotAdjustment,
   type InsertDraftingProgram, type DraftingProgram,
+  type InsertCustomer, type Customer,
   type InsertSupplier, type Supplier,
   type InsertItemCategory, type ItemCategory,
   type InsertItem, type Item,
@@ -473,6 +474,14 @@ export interface IStorage {
   deleteDraftingProgramByJob(jobId: string): Promise<number>;
   generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }>;
   assignDraftingResource(id: string, assignedToId: string, proposedStartDate: Date): Promise<DraftingProgram | undefined>;
+
+  // Customers
+  getAllCustomers(companyId?: string): Promise<Customer[]>;
+  getActiveCustomers(companyId?: string): Promise<Customer[]>;
+  getCustomer(id: string): Promise<Customer | undefined>;
+  createCustomer(data: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined>;
+  deleteCustomer(id: string): Promise<void>;
 
   // Suppliers
   getAllSuppliers(): Promise<Supplier[]>;
@@ -3025,6 +3034,40 @@ export class DatabaseStorage implements IStorage {
   }
 
   // ============== Suppliers ==============
+  // ============== Customers ==============
+  async getAllCustomers(companyId?: string): Promise<Customer[]> {
+    if (companyId) {
+      return db.select().from(customers).where(eq(customers.companyId, companyId)).orderBy(asc(customers.name));
+    }
+    return db.select().from(customers).orderBy(asc(customers.name));
+  }
+
+  async getActiveCustomers(companyId?: string): Promise<Customer[]> {
+    if (companyId) {
+      return db.select().from(customers).where(and(eq(customers.companyId, companyId), eq(customers.isActive, true))).orderBy(asc(customers.name));
+    }
+    return db.select().from(customers).where(eq(customers.isActive, true)).orderBy(asc(customers.name));
+  }
+
+  async getCustomer(id: string): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer;
+  }
+
+  async createCustomer(data: InsertCustomer): Promise<Customer> {
+    const [customer] = await db.insert(customers).values(data).returning();
+    return customer;
+  }
+
+  async updateCustomer(id: string, data: Partial<InsertCustomer>): Promise<Customer | undefined> {
+    const [customer] = await db.update(customers).set({ ...data, updatedAt: new Date() }).where(eq(customers.id, id)).returning();
+    return customer;
+  }
+
+  async deleteCustomer(id: string): Promise<void> {
+    await db.delete(customers).where(eq(customers.id, id));
+  }
+
   async getAllSuppliers(companyId?: string): Promise<Supplier[]> {
     if (companyId) {
       return db.select().from(suppliers).where(eq(suppliers.companyId, companyId)).orderBy(asc(suppliers.name));
