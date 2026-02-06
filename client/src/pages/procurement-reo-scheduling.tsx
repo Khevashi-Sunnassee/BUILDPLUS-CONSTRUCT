@@ -593,7 +593,7 @@ export default function ProcurementReoSchedulingPage() {
 
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [selectedPanels, setSelectedPanels] = useState<Set<string>>(new Set());
   
   const [showScheduleBuilderDialog, setShowScheduleBuilderDialog] = useState(false);
@@ -745,13 +745,13 @@ export default function ProcurementReoSchedulingPage() {
   }, {});
 
   const toggleGroupExpansion = (key: string) => {
-    const newExpanded = new Set(expandedGroups);
-    if (newExpanded.has(key)) {
-      newExpanded.delete(key);
+    const newCollapsed = new Set(collapsedGroups);
+    if (newCollapsed.has(key)) {
+      newCollapsed.delete(key);
     } else {
-      newExpanded.add(key);
+      newCollapsed.add(key);
     }
-    setExpandedGroups(newExpanded);
+    setCollapsedGroups(newCollapsed);
   };
 
   const togglePanelSelection = (panelId: string) => {
@@ -855,7 +855,7 @@ export default function ProcurementReoSchedulingPage() {
             <div className="space-y-2">
               {Object.entries(groupedPanels).map(([jobId, panels]) => {
                 const job = panels[0]?.job;
-                const isExpanded = expandedGroups.has(jobId);
+                const isExpanded = !collapsedGroups.has(jobId);
                 const panelsWithSchedule = panels.filter(p => p.reoSchedule);
                 const completedSchedules = panels.filter(p => p.reoSchedule?.status === "COMPLETED");
 
