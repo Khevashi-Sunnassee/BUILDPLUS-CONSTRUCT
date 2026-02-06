@@ -64,6 +64,57 @@ class EmailService {
       return { success: false, error: errorMessage };
     }
   }
+
+  async sendEmailWithAttachment(options: {
+    to: string;
+    cc?: string;
+    bcc?: string;
+    subject: string;
+    body: string;
+    attachments?: Array<{
+      filename: string;
+      content: Buffer;
+      contentType: string;
+    }>;
+    replyTo?: string;
+  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    if (!this.transporter || !this.fromAddress) {
+      return { success: false, error: "Email service is not configured" };
+    }
+
+    try {
+      const textBody = options.body.replace(/<[^>]*>/g, "");
+
+      const mailOptions: any = {
+        from: `"LTE System (No Reply)" <${this.fromAddress}>`,
+        to: options.to,
+        subject: options.subject,
+        text: textBody,
+        html: options.body,
+      };
+
+      if (options.cc) mailOptions.cc = options.cc;
+      if (options.bcc) mailOptions.bcc = options.bcc;
+      if (options.replyTo) mailOptions.replyTo = options.replyTo;
+
+      if (options.attachments && options.attachments.length > 0) {
+        mailOptions.attachments = options.attachments.map((att) => ({
+          filename: att.filename,
+          content: att.content,
+          contentType: att.contentType,
+        }));
+      }
+
+      const info = await this.transporter.sendMail(mailOptions);
+      const messageId = info.messageId || info.response;
+      logger.info({ messageId, to: options.to }, "Email with attachment sent successfully");
+      return { success: true, messageId };
+    } catch (err: any) {
+      const errorMessage = err?.message || "Unknown email error";
+      logger.error({ err, to: options.to }, "Failed to send email with attachment");
+      return { success: false, error: errorMessage };
+    }
+  }
 }
 
 export const emailService = new EmailService();

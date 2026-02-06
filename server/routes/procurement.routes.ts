@@ -6,6 +6,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { InsertItem } from "@shared/schema";
 import logger from "../lib/logger";
+import { emailService } from "../services/email.service";
 
 const router = Router();
 
@@ -394,6 +395,78 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
   } catch (error: any) {
     logger.error({ err: error }, "Error importing items");
     res.status(500).json({ error: error.message || "Failed to import items" });
+  }
+});
+
+const sendPoEmailSchema = z.object({
+  to: z.string().email("Valid email address is required"),
+  cc: z.string().optional(),
+  subject: z.string().min(1, "Subject is required"),
+  message: z.string().min(1, "Message is required"),
+  attachPdf: z.boolean().default(true),
+  sendCopy: z.boolean().default(false),
+  pdfBase64: z.string().optional(),
+});
+
+router.post("/purchase-orders/:id/send-email", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const parsed = sendPoEmailSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
+    }
+
+    const { to, cc, subject, message, attachPdf, sendCopy, pdfBase64 } = parsed.data;
+
+    const po = await storage.getPurchaseOrder(id);
+    if (!po) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured. Please configure SMTP settings." });
+    }
+
+    const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+
+    if (attachPdf && pdfBase64) {
+      const pdfBuffer = Buffer.from(pdfBase64, "base64");
+      attachments.push({
+        filename: `${po.poNumber || "PurchaseOrder"}.pdf`,
+        content: pdfBuffer,
+        contentType: "application/pdf",
+      });
+    }
+
+    let bcc: string | undefined;
+    if (sendCopy && req.session.userId) {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.email) {
+        bcc = currentUser.email;
+      }
+    }
+
+    const htmlBody = message.replace(/\n/g, "<br>");
+
+    const result = await emailService.sendEmailWithAttachment({
+      to,
+      cc: cc || undefined,
+      bcc,
+      subject,
+      body: htmlBody,
+      attachments: attachments.length > 0 ? attachments : undefined,
+    });
+
+    if (result.success) {
+      logger.info({ poId: id, poNumber: po.poNumber, to }, "PO email sent successfully");
+      res.json({ success: true, messageId: result.messageId });
+    } else {
+      logger.error({ poId: id, error: result.error }, "Failed to send PO email");
+      res.status(500).json({ error: result.error || "Failed to send email" });
+    }
+  } catch (error: any) {
+    logger.error({ err: error }, "Error sending PO email");
+    res.status(500).json({ error: error.message || "Failed to send email" });
   }
 });
 
