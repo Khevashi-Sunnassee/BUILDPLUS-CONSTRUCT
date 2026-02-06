@@ -80,7 +80,7 @@ const userSchema = z.object({
   name: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
