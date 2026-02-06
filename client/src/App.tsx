@@ -56,6 +56,7 @@ import ChecklistsPage from "@/pages/checklists";
 import ChecklistFillPage from "@/pages/checklist-fill";
 import ChecklistReportsPage from "@/pages/checklist-reports";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
+import BroadcastPage from "@/pages/broadcast";
 
 import MobileLoginPage from "@/pages/mobile/login";
 import MobileDashboard from "@/pages/mobile/dashboard";
@@ -73,6 +74,7 @@ import MobileWeeklyJobReportPage from "@/pages/mobile/weekly-job-report";
 import MobileDocumentsPage from "@/pages/mobile/documents";
 import MobileChecklistsPage from "@/pages/mobile/checklists";
 import MobileChecklistFillPage from "@/pages/mobile/checklist-fill";
+import MobileBroadcastPage from "@/pages/mobile/broadcast";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -513,6 +515,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/broadcast">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <BroadcastPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       {/* Mobile Routes */}
       <Route path="/mobile">
         <ProtectedRoute>
@@ -592,6 +602,11 @@ function Router() {
       <Route path="/mobile/checklists">
         <ProtectedRoute>
           <MobileChecklistsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/broadcast">
+        <ProtectedRoute>
+          <MobileBroadcastPage />
         </ProtectedRoute>
       </Route>
 

@@ -35,6 +35,7 @@ import { timerRouter } from "./timer.routes";
 import documentsRouter from "./documents.routes";
 import { reoScheduleRouter } from "./reo-schedule.routes";
 import checklistRouter from "./checklist.routes";
+import { broadcastRouter } from "./broadcast.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -121,6 +122,9 @@ export async function setupRoutes(app: Express): Promise<void> {
   
   // Checklist router - for advanced templates system
   app.use(checklistRouter);
+  
+  // Broadcast router - for broadcast messaging system
+  app.use(broadcastRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

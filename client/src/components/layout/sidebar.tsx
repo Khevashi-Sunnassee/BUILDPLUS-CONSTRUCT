@@ -33,6 +33,7 @@ import {
   ListTodo,
   MessageSquare,
   Handshake,
+  Radio,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -76,6 +77,7 @@ const userNavItems = [
   { title: "Reo Scheduling", url: "/procurement-reo", icon: Layers },
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
+  { title: "Broadcast", url: "/broadcast", icon: Radio },
 ];
 
 const managerNavItems = [

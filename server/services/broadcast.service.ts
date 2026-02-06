@@ -1,0 +1,195 @@
+import { db } from "../db";
+import { eq, and, inArray } from "drizzle-orm";
+import { users, broadcastMessages, broadcastDeliveries } from "@shared/schema";
+import { twilioService } from "./twilio.service";
+import { emailService } from "./email.service";
+import logger from "../lib/logger";
+
+interface Recipient {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+class BroadcastService {
+  async sendBroadcast(broadcastMessageId: string): Promise<void> {
+    const [message] = await db
+      .select()
+      .from(broadcastMessages)
+      .where(eq(broadcastMessages.id, broadcastMessageId));
+
+    if (!message) {
+      logger.error({ broadcastMessageId }, "Broadcast message not found");
+      return;
+    }
+
+    await db
+      .update(broadcastMessages)
+      .set({ status: "SENDING", updatedAt: new Date() })
+      .where(eq(broadcastMessages.id, broadcastMessageId));
+
+    const recipients = await this.resolveRecipients(message);
+
+    let sentCount = 0;
+    let failedCount = 0;
+
+    for (const recipient of recipients) {
+      for (const channel of message.channels) {
+        const [delivery] = await db
+          .insert(broadcastDeliveries)
+          .values({
+            broadcastMessageId,
+            recipientName: recipient.name,
+            recipientPhone: recipient.phone,
+            recipientEmail: recipient.email,
+            channel: channel as "SMS" | "WHATSAPP" | "EMAIL",
+            status: "PENDING",
+          })
+          .returning();
+
+        let result: { success: boolean; messageId?: string; error?: string };
+
+        switch (channel) {
+          case "SMS":
+            if (!twilioService.isConfigured()) {
+              result = { success: false, error: "Channel not configured" };
+            } else if (!recipient.phone) {
+              result = { success: false, error: "No phone number for recipient" };
+            } else {
+              result = await twilioService.sendSMS(recipient.phone, message.message);
+            }
+            break;
+
+          case "WHATSAPP":
+            if (!twilioService.isConfigured()) {
+              result = { success: false, error: "Channel not configured" };
+            } else if (!recipient.phone) {
+              result = { success: false, error: "No phone number for recipient" };
+            } else {
+              result = await twilioService.sendWhatsApp(recipient.phone, message.message);
+            }
+            break;
+
+          case "EMAIL":
+            if (!emailService.isConfigured()) {
+              result = { success: false, error: "Channel not configured" };
+            } else if (!recipient.email) {
+              result = { success: false, error: "No email address for recipient" };
+            } else {
+              result = await emailService.sendEmail(
+                recipient.email,
+                message.subject || "Broadcast Message",
+                message.message
+              );
+            }
+            break;
+
+          default:
+            result = { success: false, error: `Unknown channel: ${channel}` };
+        }
+
+        if (result.success) {
+          sentCount++;
+          await db
+            .update(broadcastDeliveries)
+            .set({
+              status: "SENT",
+              externalMessageId: result.messageId || null,
+              sentAt: new Date(),
+            })
+            .where(eq(broadcastDeliveries.id, delivery.id));
+        } else {
+          failedCount++;
+          await db
+            .update(broadcastDeliveries)
+            .set({
+              status: "FAILED",
+              errorMessage: result.error || "Unknown error",
+            })
+            .where(eq(broadcastDeliveries.id, delivery.id));
+        }
+      }
+    }
+
+    const finalStatus = sentCount === 0 && failedCount > 0 ? "FAILED" : "COMPLETED";
+
+    await db
+      .update(broadcastMessages)
+      .set({
+        sentCount,
+        failedCount,
+        status: finalStatus,
+        updatedAt: new Date(),
+      })
+      .where(eq(broadcastMessages.id, broadcastMessageId));
+
+    logger.info(
+      { broadcastMessageId, sentCount, failedCount, status: finalStatus },
+      "Broadcast delivery completed"
+    );
+  }
+
+  private async resolveRecipients(
+    message: typeof broadcastMessages.$inferSelect
+  ): Promise<Recipient[]> {
+    switch (message.recipientType) {
+      case "ALL_USERS": {
+        const allUsers = await db
+          .select()
+          .from(users)
+          .where(
+            and(
+              eq(users.isActive, true),
+              eq(users.companyId, message.companyId)
+            )
+          );
+        return allUsers.map((u) => ({
+          name: u.name,
+          phone: u.phone,
+          email: u.email,
+        }));
+      }
+
+      case "SPECIFIC_USERS": {
+        if (!message.recipientIds || message.recipientIds.length === 0) {
+          return [];
+        }
+        const specificUsers = await db
+          .select()
+          .from(users)
+          .where(inArray(users.id, message.recipientIds));
+        return specificUsers.map((u) => ({
+          name: u.name,
+          phone: u.phone,
+          email: u.email,
+        }));
+      }
+
+      case "CUSTOM_CONTACTS": {
+        const custom = message.customRecipients as Recipient[] | null;
+        if (!custom || !Array.isArray(custom)) {
+          return [];
+        }
+        return custom.map((c) => ({
+          name: c.name || null,
+          phone: c.phone || null,
+          email: c.email || null,
+        }));
+      }
+
+      default:
+        logger.warn({ recipientType: message.recipientType }, "Unknown recipient type");
+        return [];
+    }
+  }
+
+  getChannelStatus(): { sms: boolean; whatsapp: boolean; email: boolean } {
+    return {
+      sms: twilioService.isConfigured(),
+      whatsapp: twilioService.isConfigured(),
+      email: emailService.isConfigured(),
+    };
+  }
+}
+
+export const broadcastService = new BroadcastService();

@@ -9,6 +9,7 @@ import {
   LogOut,
   FolderOpen,
   ClipboardCheck,
+  Radio,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -86,6 +87,12 @@ export default function MobileMore() {
           iconBg="bg-teal-500/20"
           label="Checklists"
           href="/mobile/checklists"
+        />
+        <MenuItem
+          icon={<Radio className="h-5 w-5 text-rose-400" />}
+          iconBg="bg-rose-500/20"
+          label="Broadcast"
+          href="/mobile/broadcast"
         />
         
         <div className="pt-4 border-t border-white/10 mt-4">
