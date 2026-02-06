@@ -85,7 +85,7 @@ export default function MobileBottomNav() {
         />
         <TabButton 
           label="More" 
-          active={isActive("/mobile/more") || isActive("/mobile/profile") || isActive("/mobile/panels") || isActive("/mobile/logistics") || isActive("/mobile/purchase-orders") || isActive("/mobile/weekly-report")} 
+          active={isActive("/mobile/more") || isActive("/mobile/profile") || isActive("/mobile/panels") || isActive("/mobile/logistics") || isActive("/mobile/purchase-orders") || isActive("/mobile/weekly-report") || isActive("/mobile/documents") || isActive("/mobile/checklists")} 
           href="/mobile/more" 
           icon={<MoreHorizontal className="h-5 w-5" />} 
         />

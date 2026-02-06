@@ -6,7 +6,9 @@ import {
   FileText, 
   User, 
   ChevronRight,
-  LogOut
+  LogOut,
+  FolderOpen,
+  ClipboardCheck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -72,6 +74,18 @@ export default function MobileMore() {
           iconBg="bg-indigo-500/20"
           label="Weekly Report"
           href="/mobile/weekly-report"
+        />
+        <MenuItem
+          icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
+          iconBg="bg-cyan-500/20"
+          label="Documents"
+          href="/mobile/documents"
+        />
+        <MenuItem
+          icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}
+          iconBg="bg-teal-500/20"
+          label="Checklists"
+          href="/mobile/checklists"
         />
         
         <div className="pt-4 border-t border-white/10 mt-4">

@@ -31,6 +31,46 @@ The frontend leverages TanStack Query for data fetching, Wouter for routing, `sh
 - **Document Management System**: Comprehensive document register with file upload/download via Replit Object Storage, version control, document bundles with QR code access, entity linking (jobs, panels, suppliers, purchase orders, tasks), and configurable document types/disciplines/categories.
 - **Advanced Templates System**: Dynamic, reusable checklist templates with JSONB storage for flexible sections and fields. Features include an admin builder with drag-and-drop field palette (20+ field types), a checklist form renderer with validation, and reports with multi-dimensional filtering and CSV export.
 
+## Mobile UI Standards
+All mobile pages live under `client/src/pages/mobile/` and follow these strict conventions:
+
+**Design Tokens:**
+- Main background: `bg-[#070B12]`
+- Sheet/bottom nav background: `bg-[#0D1117]`
+- Card background: `bg-white/5`
+- Border color: `border-white/10`
+- Primary text: `text-white`
+- Secondary text: `text-white/60`
+- Muted text: `text-white/40`
+- Active accent: `text-blue-400`
+
+**Layout Pattern (every mobile page):**
+```
+<div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+  {/* Sticky header with safe-area-inset */}
+  <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10"
+       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+    <div className="px-4 py-4">...</div>
+  </div>
+  {/* Scrollable content with bottom padding for nav */}
+  <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">...</div>
+  <MobileBottomNav />
+</div>
+```
+
+**Coding Rules:**
+- Target: iPhone 14+ (390px min width)
+- Bottom nav height: 64px (`h-16`), content needs `pb-24` clearance
+- All interactive items use `active:scale-[0.99]` for press feedback
+- Cards: `rounded-2xl border border-white/10 bg-white/5 px-4`
+- Menu items: 66px height (`h-[66px]`) with 44px icon containers
+- Toast policy: NO success/confirmation toasts on mobile. Only error (destructive) toasts are shown.
+- Use `data-testid` attributes on all interactive and display elements
+- Import `MobileBottomNav` from `@/components/mobile/MobileBottomNav`
+- Mobile pages are standalone (no sidebar, no AuthenticatedLayout)
+- Mobile routes must not interfere with desktop routes
+- All data fetching uses existing API routes from `@shared/api-routes`
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **OpenAI**: AI-powered PDF analysis.
