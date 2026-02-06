@@ -1,4 +1,4 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -10,6 +10,7 @@ import { AppSidebar } from "@/components/layout/sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserSettingsPopover } from "@/components/user-settings-popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
@@ -88,7 +89,27 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode;
   return <>{children}</>;
 }
 
+function getMobileEquivalentRoute(desktopPath: string): string {
+  const routeMap: Record<string, string> = {
+    '/': '/mobile/dashboard',
+    '/dashboard': '/mobile/dashboard',
+    '/tasks': '/mobile/tasks',
+    '/chat': '/mobile/chat',
+    '/logistics': '/mobile/logistics',
+    '/purchase-orders': '/mobile/purchase-orders',
+  };
+  return routeMap[desktopPath] || '/mobile/dashboard';
+}
+
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+  const isMobile = useIsMobile();
+  const [location] = useLocation();
+
+  if (isMobile && !location.startsWith('/mobile')) {
+    const mobileRoute = getMobileEquivalentRoute(location);
+    return <Redirect to={mobileRoute} />;
+  }
+
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
@@ -117,6 +138,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
 
 function Router() {
   const { user, isLoading } = useAuth();
+  const isMobile = useIsMobile();
 
   if (isLoading) {
     return (
@@ -129,7 +151,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login">
-        {user ? <Redirect to="/dashboard" /> : <LoginPage />}
+        {user ? <Redirect to={isMobile ? "/mobile/dashboard" : "/dashboard"} /> : <LoginPage />}
       </Route>
 
       <Route path="/bundle/:qrCodeId">
