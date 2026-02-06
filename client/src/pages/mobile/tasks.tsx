@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,6 +20,10 @@ import {
   Plus,
   Calendar,
   User,
+  Pencil,
+  Save,
+  X,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -39,6 +43,8 @@ interface Task {
   status: TaskStatus;
   dueDate: string | null;
   priority: string | null;
+  consultant: string | null;
+  projectStage: string | null;
   assignees: TaskAssignee[];
 }
 
@@ -302,15 +308,22 @@ export default function MobileTasksPage() {
       </div>
 
       <Sheet open={!!selectedTask} onOpenChange={(open) => !open && setSelectedTask(null)}>
-        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl bg-[#0D1117] border-white/10">
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl bg-[#0D1117] border-white/10">
           {selectedTask && (
             <TaskDetailSheet 
               task={selectedTask} 
               onClose={() => setSelectedTask(null)}
-              onStatusChange={(status) => {
-                updateTaskMutation.mutate({ taskId: selectedTask.id, data: { status } });
-                setSelectedTask({ ...selectedTask, status });
+              onSave={(data) => {
+                updateTaskMutation.mutate(
+                  { taskId: selectedTask.id, data },
+                  {
+                    onSuccess: () => {
+                      setSelectedTask({ ...selectedTask, ...data } as Task);
+                    },
+                  }
+                );
               }}
+              isSaving={updateTaskMutation.isPending}
             />
           )}
         </SheetContent>
@@ -321,40 +334,116 @@ export default function MobileTasksPage() {
   );
 }
 
+const priorityOptions = ["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const;
+
 function TaskDetailSheet({ 
   task, 
   onClose,
-  onStatusChange,
+  onSave,
+  isSaving,
 }: { 
   task: Task; 
   onClose: () => void;
-  onStatusChange: (status: TaskStatus) => void;
+  onSave: (data: Partial<Task>) => void;
+  isSaving: boolean;
 }) {
+  const [title, setTitle] = useState(task.title);
+  const [status, setStatus] = useState<TaskStatus>(task.status);
+  const [dueDate, setDueDate] = useState(task.dueDate ? task.dueDate.split("T")[0] : "");
+  const [priority, setPriority] = useState(task.priority || "");
+  const [consultant, setConsultant] = useState(task.consultant || "");
+  const [projectStage, setProjectStage] = useState(task.projectStage || "");
+
+  useEffect(() => {
+    setTitle(task.title);
+    setStatus(task.status);
+    setDueDate(task.dueDate ? task.dueDate.split("T")[0] : "");
+    setPriority(task.priority || "");
+    setConsultant(task.consultant || "");
+    setProjectStage(task.projectStage || "");
+  }, [task.id]);
+
+  const hasChanges = 
+    title !== task.title ||
+    status !== task.status ||
+    (dueDate || null) !== (task.dueDate ? task.dueDate.split("T")[0] : null) ||
+    (priority || null) !== task.priority ||
+    (consultant || null) !== (task.consultant || null) ||
+    (projectStage || null) !== (task.projectStage || null);
+
+  const handleSave = () => {
+    const data: Record<string, any> = {};
+    if (title !== task.title) data.title = title;
+    if (status !== task.status) data.status = status;
+    if ((dueDate || null) !== (task.dueDate ? task.dueDate.split("T")[0] : null)) {
+      data.dueDate = dueDate || null;
+    }
+    if ((priority || null) !== task.priority) {
+      data.priority = priority || null;
+    }
+    if ((consultant || "") !== (task.consultant || "")) data.consultant = consultant || null;
+    if ((projectStage || "") !== (task.projectStage || "")) data.projectStage = projectStage || null;
+    if (Object.keys(data).length > 0) {
+      onSave(data);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full text-white">
       <SheetHeader className="pb-4">
-        <SheetTitle className="text-left text-white">{task.title}</SheetTitle>
+        <div className="flex items-center justify-between gap-2">
+          <SheetTitle className="text-left text-white flex items-center gap-2">
+            <Pencil className="h-4 w-4 text-white/60" />
+            Edit Task
+          </SheetTitle>
+          {hasChanges && (
+            <Button
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving || !title.trim()}
+              className="bg-blue-500"
+              data-testid="button-save-task"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Save
+            </Button>
+          )}
+        </div>
       </SheetHeader>
 
-      <div className="flex-1 overflow-auto space-y-4">
+      <div className="flex-1 overflow-auto space-y-5">
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-2 block">Title</label>
+          <Input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            data-testid="input-task-title"
+          />
+        </div>
+
         <div>
           <label className="text-sm font-medium text-white/60 mb-2 block">Status</label>
           <div className="flex flex-wrap gap-2">
-            {statusOrder.map((status) => {
-              const config = statusConfig[status];
-              const isActive = task.status === status;
+            {statusOrder.map((s) => {
+              const config = statusConfig[s];
+              const isActive = status === s;
               
               return (
                 <Button
-                  key={status}
+                  key={s}
                   variant={isActive ? "default" : "outline"}
                   size="sm"
-                  onClick={() => onStatusChange(status)}
+                  onClick={() => setStatus(s)}
                   className={cn(
                     "flex items-center gap-2",
                     isActive ? config.bgColor : "border-white/20 text-white/70"
                   )}
-                  data-testid={`status-option-${status}`}
+                  data-testid={`status-option-${s}`}
                 >
                   <config.icon className="h-4 w-4" />
                   {config.label}
@@ -364,21 +453,74 @@ function TaskDetailSheet({
           </div>
         </div>
 
-        {task.dueDate && (
-          <div>
-            <label className="text-sm font-medium text-white/60 mb-1 block">Due Date</label>
-            <p className="text-sm text-white">{format(new Date(task.dueDate), "EEEE, MMMM d, yyyy")}</p>
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-2 block">Due Date</label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="bg-white/10 border-white/20 text-white flex-1 [color-scheme:dark]"
+              data-testid="input-task-due-date"
+            />
+            {dueDate && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setDueDate("")}
+                className="text-white/50 flex-shrink-0"
+                data-testid="button-clear-due-date"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </div>
-        )}
+        </div>
 
-        {task.priority && (
-          <div>
-            <label className="text-sm font-medium text-white/60 mb-1 block">Priority</label>
-            <Badge variant="outline" className={cn("border", priorityColors[task.priority])}>
-              {task.priority}
-            </Badge>
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-2 block">Priority</label>
+          <div className="flex flex-wrap gap-2">
+            {priorityOptions.map((p) => {
+              const isActive = priority === p;
+              return (
+                <Button
+                  key={p}
+                  variant={isActive ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setPriority(isActive ? "" : p)}
+                  className={cn(
+                    isActive ? priorityColors[p] : "border-white/20 text-white/70"
+                  )}
+                  data-testid={`priority-option-${p}`}
+                >
+                  {p}
+                </Button>
+              );
+            })}
           </div>
-        )}
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-2 block">Consultant</label>
+          <Input
+            value={consultant}
+            onChange={(e) => setConsultant(e.target.value)}
+            placeholder="Enter consultant name..."
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            data-testid="input-task-consultant"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-2 block">Project Stage</label>
+          <Input
+            value={projectStage}
+            onChange={(e) => setProjectStage(e.target.value)}
+            placeholder="Enter project stage..."
+            className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            data-testid="input-task-project-stage"
+          />
+        </div>
 
         {task.assignees?.length > 0 && (
           <div>
@@ -397,10 +539,36 @@ function TaskDetailSheet({
         )}
       </div>
 
-      <div className="pt-4 border-t border-white/10 mt-4">
-        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose}>
-          Close
-        </Button>
+      <div className="pt-4 border-t border-white/10 mt-4 flex gap-2">
+        {hasChanges ? (
+          <>
+            <Button 
+              variant="outline" 
+              className="flex-1 border-white/20 text-white" 
+              onClick={onClose}
+              data-testid="button-cancel-edit"
+            >
+              Cancel
+            </Button>
+            <Button 
+              className="flex-1 bg-blue-500"
+              onClick={handleSave}
+              disabled={isSaving || !title.trim()}
+              data-testid="button-save-task-bottom"
+            >
+              {isSaving ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4 mr-1" />
+              )}
+              Save Changes
+            </Button>
+          </>
+        ) : (
+          <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose} data-testid="button-close-task">
+            Close
+          </Button>
+        )}
       </div>
     </div>
   );
