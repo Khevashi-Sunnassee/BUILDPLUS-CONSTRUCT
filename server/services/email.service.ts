@@ -1,38 +1,41 @@
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
+import Mailgun from "mailgun.js";
+import FormData from "form-data";
 import logger from "../lib/logger";
 
 class EmailService {
-  private transporter: Transporter | null = null;
+  private mg: ReturnType<InstanceType<typeof Mailgun>["client"]> | null = null;
+  private domain: string | undefined;
   private fromAddress: string | undefined;
 
   constructor() {
-    const host = process.env.SMTP_HOST;
-    const port = process.env.SMTP_PORT;
-    const user = process.env.SMTP_USER;
-    const pass = process.env.SMTP_PASS;
-    this.fromAddress = process.env.SMTP_FROM;
+    const apiKey = process.env.MAILGUN_API_KEY;
+    this.domain = process.env.MAILGUN_DOMAIN;
+    this.fromAddress = process.env.MAILGUN_FROM;
 
-    if (host && port && user && pass) {
+    if (apiKey && this.domain) {
       try {
-        this.transporter = nodemailer.createTransport({
-          host,
-          port: parseInt(port, 10),
-          secure: parseInt(port, 10) === 465,
-          auth: { user, pass },
+        const mailgun = new Mailgun(FormData);
+        this.mg = mailgun.client({
+          username: "api",
+          key: apiKey,
         });
-        logger.info("Email transporter initialized successfully");
+
+        if (!this.fromAddress) {
+          this.fromAddress = `LTE System <noreply@${this.domain}>`;
+        }
+
+        logger.info("Mailgun email client initialized successfully");
       } catch (err) {
-        logger.warn({ err }, "Failed to initialize email transporter");
-        this.transporter = null;
+        logger.warn({ err }, "Failed to initialize Mailgun client");
+        this.mg = null;
       }
     } else {
-      logger.info("SMTP credentials not configured — email disabled");
+      logger.info("Mailgun credentials not configured — email disabled");
     }
   }
 
   isConfigured(): boolean {
-    return this.transporter !== null && !!this.fromAddress;
+    return this.mg !== null && !!this.domain;
   }
 
   async sendEmail(
@@ -40,27 +43,27 @@ class EmailService {
     subject: string,
     body: string
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!this.transporter || !this.fromAddress) {
+    if (!this.mg || !this.domain) {
       return { success: false, error: "Email service is not configured" };
     }
 
     try {
       const textBody = body.replace(/<[^>]*>/g, "");
 
-      const info = await this.transporter.sendMail({
-        from: this.fromAddress,
-        to,
+      const result = await this.mg.messages.create(this.domain, {
+        from: this.fromAddress || `noreply@${this.domain}`,
+        to: [to],
         subject,
         text: textBody,
         html: body,
       });
 
-      const messageId = info.messageId || info.response;
-      logger.info({ messageId, to }, "Email sent successfully");
+      const messageId = result.id || result.message;
+      logger.info({ messageId, to }, "Email sent successfully via Mailgun");
       return { success: true, messageId };
     } catch (err: any) {
       const errorMessage = err?.message || "Unknown email error";
-      logger.error({ err, to }, "Failed to send email");
+      logger.error({ err, to }, "Failed to send email via Mailgun");
       return { success: false, error: errorMessage };
     }
   }
@@ -78,40 +81,39 @@ class EmailService {
     }>;
     replyTo?: string;
   }): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!this.transporter || !this.fromAddress) {
+    if (!this.mg || !this.domain) {
       return { success: false, error: "Email service is not configured" };
     }
 
     try {
       const textBody = options.body.replace(/<[^>]*>/g, "");
 
-      const mailOptions: any = {
-        from: `"LTE System (No Reply)" <${this.fromAddress}>`,
-        to: options.to,
+      const messageData: any = {
+        from: this.fromAddress || `noreply@${this.domain}`,
+        to: [options.to],
         subject: options.subject,
         text: textBody,
         html: options.body,
       };
 
-      if (options.cc) mailOptions.cc = options.cc;
-      if (options.bcc) mailOptions.bcc = options.bcc;
-      if (options.replyTo) mailOptions.replyTo = options.replyTo;
+      if (options.cc) messageData.cc = [options.cc];
+      if (options.bcc) messageData.bcc = [options.bcc];
+      if (options.replyTo) messageData["h:Reply-To"] = options.replyTo;
 
       if (options.attachments && options.attachments.length > 0) {
-        mailOptions.attachments = options.attachments.map((att) => ({
+        messageData.attachment = options.attachments.map((att) => ({
           filename: att.filename,
-          content: att.content,
-          contentType: att.contentType,
+          data: att.content,
         }));
       }
 
-      const info = await this.transporter.sendMail(mailOptions);
-      const messageId = info.messageId || info.response;
-      logger.info({ messageId, to: options.to }, "Email with attachment sent successfully");
+      const result = await this.mg.messages.create(this.domain, messageData);
+      const messageId = result.id || result.message;
+      logger.info({ messageId, to: options.to }, "Email with attachment sent successfully via Mailgun");
       return { success: true, messageId };
     } catch (err: any) {
       const errorMessage = err?.message || "Unknown email error";
-      logger.error({ err, to: options.to }, "Failed to send email with attachment");
+      logger.error({ err, to: options.to }, "Failed to send email with attachment via Mailgun");
       return { success: false, error: errorMessage };
     }
   }
