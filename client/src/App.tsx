@@ -56,6 +56,7 @@ import ChecklistFillPage from "@/pages/checklist-fill";
 import ChecklistReportsPage from "@/pages/checklist-reports";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
 
+import MobileLoginPage from "@/pages/mobile/login";
 import MobileDashboard from "@/pages/mobile/dashboard";
 import MobileTasksPage from "@/pages/mobile/tasks";
 import MobileChatPage from "@/pages/mobile/chat";
@@ -151,7 +152,11 @@ function Router() {
   return (
     <Switch>
       <Route path="/login">
-        {user ? <Redirect to={isMobile ? "/mobile/dashboard" : "/dashboard"} /> : <LoginPage />}
+        {user ? <Redirect to={isMobile ? "/mobile/dashboard" : "/dashboard"} /> : (isMobile ? <MobileLoginPage /> : <LoginPage />)}
+      </Route>
+
+      <Route path="/mobile/login">
+        {user ? <Redirect to="/mobile/dashboard" /> : <MobileLoginPage />}
       </Route>
 
       <Route path="/bundle/:qrCodeId">
