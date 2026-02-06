@@ -38,7 +38,7 @@ const taskGroupSchema = z.object({
 const taskCreateSchema = z.object({
   title: z.string().min(1, "Title is required").max(500),
   groupId: z.string().min(1, "Group ID is required"),
-  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "BLOCKED"]).optional(),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "STUCK", "DONE", "ON_HOLD"]).optional(),
   dueDate: z.string().nullable().optional(),
   reminderDate: z.string().nullable().optional(),
   consultant: z.string().max(255).optional(),
@@ -49,7 +49,7 @@ const taskCreateSchema = z.object({
 
 const taskUpdateSchema_partial = z.object({
   title: z.string().min(1).max(500).optional(),
-  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "BLOCKED"]).optional(),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "STUCK", "DONE", "ON_HOLD"]).optional(),
   dueDate: z.string().nullable().optional(),
   reminderDate: z.string().nullable().optional(),
   consultant: z.string().max(255).optional(),
