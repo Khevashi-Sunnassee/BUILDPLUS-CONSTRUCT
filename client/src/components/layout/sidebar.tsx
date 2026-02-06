@@ -70,7 +70,6 @@ const userNavItems = [
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Document Register", url: "/documents", icon: FolderOpen },
   { title: "Checklists", url: "/checklists", icon: CheckSquare },
-  { title: "Checklist Reports", url: "/checklist-reports", icon: BarChart3 },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Production Report", url: "/production-report", icon: Factory },
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
@@ -82,6 +81,7 @@ const userNavItems = [
 const managerNavItems = [
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
+  { title: "Checklist Reports", url: "/checklist-reports", icon: BarChart3 },
   { title: "Reports", url: "/reports", icon: Clock },
 ];
 
