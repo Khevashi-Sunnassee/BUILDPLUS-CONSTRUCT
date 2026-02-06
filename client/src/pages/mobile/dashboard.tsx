@@ -13,6 +13,8 @@ import {
   Search,
   ChevronRight,
   Home,
+  FolderOpen,
+  ClipboardCheck,
 } from "lucide-react";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -252,6 +254,18 @@ export default function MobileDashboard() {
             label="Purchase Orders"
             count={purchaseOrders.length}
             href="/mobile/purchase-orders"
+          />
+          <NavRow
+            icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
+            iconBg="bg-cyan-500/20"
+            label="Documents"
+            href="/mobile/documents"
+          />
+          <NavRow
+            icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}
+            iconBg="bg-teal-500/20"
+            label="Checklists"
+            href="/mobile/checklists"
           />
         </div>
       </div>
