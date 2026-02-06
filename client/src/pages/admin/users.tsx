@@ -23,6 +23,8 @@ import {
   Clock,
 } from "lucide-react";
 import { ADMIN_ROUTES } from "@shared/api-routes";
+import { Factory as FactoryIcon } from "lucide-react";
+import type { Factory } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,6 +86,7 @@ const createUserSchema = z.object({
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
+  defaultFactoryId: z.string().nullable().optional(),
 });
 
 const editUserSchema = z.object({
@@ -98,6 +101,7 @@ const editUserSchema = z.object({
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
+  defaultFactoryId: z.string().nullable().optional(),
 });
 
 type UserFormData = z.infer<typeof editUserSchema>;
@@ -150,6 +154,12 @@ export default function AdminUsersPage() {
     queryKey: [ADMIN_ROUTES.USERS],
   });
 
+  const { data: factories = [] } = useQuery<Factory[]>({
+    queryKey: [ADMIN_ROUTES.FACTORIES],
+  });
+
+  const activeFactories = factories.filter((f) => f.isActive);
+
   const form = useForm<UserFormData>({
     resolver: zodResolver(editUserSchema),
     defaultValues: {
@@ -161,6 +171,7 @@ export default function AdminUsersPage() {
       role: "USER",
       poApprover: false,
       poApprovalLimit: "",
+      defaultFactoryId: null,
     },
   });
 
@@ -296,13 +307,14 @@ export default function AdminUsersPage() {
       role: user.role as "USER" | "MANAGER" | "ADMIN",
       poApprover: user.poApprover || false,
       poApprovalLimit: user.poApprovalLimit || "",
+      defaultFactoryId: (user as any).defaultFactoryId || null,
     });
     setDialogOpen(true);
   };
 
   const openNewUser = () => {
     setEditingUser(null);
-    form.reset({ email: "", name: "", phone: "", address: "", password: "", role: "USER", poApprover: false, poApprovalLimit: "" });
+    form.reset({ email: "", name: "", phone: "", address: "", password: "", role: "USER", poApprover: false, poApprovalLimit: "", defaultFactoryId: null });
     setDialogOpen(true);
   };
 
@@ -316,6 +328,7 @@ export default function AdminUsersPage() {
         role: data.role,
         poApprover: data.poApprover,
         poApprovalLimit: data.poApprovalLimit || "",
+        defaultFactoryId: data.defaultFactoryId || null,
       };
       if (data.password) {
         updateData.password = data.password;
@@ -610,6 +623,37 @@ export default function AdminUsersPage() {
                     </Select>
                     <FormDescription>
                       Managers can approve time entries. Admins have full access.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="defaultFactoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Factory</FormLabel>
+                    <Select
+                      onValueChange={(val) => field.onChange(val === "none" ? null : val)}
+                      value={field.value || "none"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-default-factory">
+                          <SelectValue placeholder="Select default factory" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No default</SelectItem>
+                        {activeFactories.map((factory) => (
+                          <SelectItem key={factory.id} value={factory.id}>
+                            {factory.name} ({factory.code})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Auto-selects this factory on production and scheduling pages.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

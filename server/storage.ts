@@ -707,7 +707,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async createUser(data: InsertUser & { password?: string }): Promise<User> {
+  async createUser(data: InsertUser & { password?: string; defaultFactoryId?: string | null }): Promise<User> {
     const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : null;
     const [user] = await db.insert(users).values({
       companyId: data.companyId,
@@ -716,6 +716,7 @@ export class DatabaseStorage implements IStorage {
       passwordHash,
       role: data.role || "USER",
       isActive: data.isActive ?? true,
+      defaultFactoryId: data.defaultFactoryId || null,
     }).returning();
     return user;
   }

@@ -71,6 +71,7 @@ const createUserSchema = z.object({
   role: z.enum(["USER", "MANAGER", "ADMIN"]).default("USER"),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
+  defaultFactoryId: z.string().nullable().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -83,6 +84,7 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().nullable().optional(),
+  defaultFactoryId: z.string().nullable().optional(),
 });
 
 // Admin: Create user
