@@ -114,6 +114,12 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     if (updateData.password === "") {
       delete updateData.password;
     }
+    if (updateData.phone === "") {
+      updateData.phone = null;
+    }
+    if (updateData.address === "") {
+      updateData.address = null;
+    }
     if (updateData.poApprovalLimit === "") {
       updateData.poApprovalLimit = null;
     }

@@ -75,11 +75,22 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { User as UserType, Role } from "@shared/schema";
 
-const userSchema = z.object({
+const createUserSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
   name: z.string().optional(),
   phone: z.string().min(1, "Phone number is required"),
   address: z.string().min(1, "Address is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["USER", "MANAGER", "ADMIN"]),
+  poApprover: z.boolean().optional(),
+  poApprovalLimit: z.string().optional(),
+});
+
+const editUserSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Invalid email address"),
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
   password: z.string().refine(
     (val) => val === "" || val.length >= 6,
     { message: "Password must be at least 6 characters" }
@@ -89,7 +100,7 @@ const userSchema = z.object({
   poApprovalLimit: z.string().optional(),
 });
 
-type UserFormData = z.infer<typeof userSchema>;
+type UserFormData = z.infer<typeof editUserSchema>;
 
 const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const hoursValidation = z.string().refine((val) => {
@@ -140,7 +151,7 @@ export default function AdminUsersPage() {
   });
 
   const form = useForm<UserFormData>({
-    resolver: zodResolver(userSchema),
+    resolver: zodResolver(editUserSchema),
     defaultValues: {
       email: "",
       name: "",
@@ -311,6 +322,20 @@ export default function AdminUsersPage() {
       }
       updateUserMutation.mutate({ id: editingUser.id, data: updateData });
     } else {
+      let hasErrors = false;
+      if (!data.phone) {
+        form.setError("phone", { message: "Phone number is required for new users" });
+        hasErrors = true;
+      }
+      if (!data.address) {
+        form.setError("address", { message: "Address is required for new users" });
+        hasErrors = true;
+      }
+      if (!data.password || data.password.length < 6) {
+        form.setError("password", { message: "Password must be at least 6 characters" });
+        hasErrors = true;
+      }
+      if (hasErrors) return;
       createUserMutation.mutate(data);
     }
   };

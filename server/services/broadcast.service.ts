@@ -144,9 +144,9 @@ class BroadcastService {
             )
           );
         return allUsers.map((u) => ({
-          name: u.name,
-          phone: u.phone,
-          email: u.email,
+          name: u.name || null,
+          phone: u.phone || null,
+          email: u.email || null,
         }));
       }
 
@@ -159,9 +159,9 @@ class BroadcastService {
           .from(users)
           .where(inArray(users.id, message.recipientIds));
         return specificUsers.map((u) => ({
-          name: u.name,
-          phone: u.phone,
-          email: u.email,
+          name: u.name || null,
+          phone: u.phone || null,
+          email: u.email || null,
         }));
       }
 
@@ -223,9 +223,9 @@ class BroadcastService {
             eq(users.companyId, companyId)
           ));
         if (freshUser) {
-          currentPhone = freshUser.phone || currentPhone;
-          currentEmail = freshUser.email || currentEmail;
-          currentName = freshUser.name || currentName;
+          currentPhone = freshUser.phone || null;
+          currentEmail = freshUser.email || null;
+          currentName = freshUser.name || null;
         }
       }
     }
