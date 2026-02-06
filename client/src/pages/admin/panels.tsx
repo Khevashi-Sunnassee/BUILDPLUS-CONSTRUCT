@@ -2028,6 +2028,15 @@ export default function AdminPanelsPage() {
             className="hidden"
             data-testid="input-file-upload"
           />
+          <Button
+            variant="outline"
+            onClick={handlePrintPanelList}
+            disabled={!filteredPanels || filteredPanels.length === 0}
+            data-testid="button-print-panel-list"
+          >
+            <Printer className="h-4 w-4 mr-2" />
+            Print
+          </Button>
           <Button variant="outline" onClick={() => setTemplateDialogOpen(true)} data-testid="button-download-template">
             <Download className="h-4 w-4 mr-2" />
             Template
@@ -2163,16 +2172,6 @@ export default function AdminPanelsPage() {
                   Summary
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrintPanelList}
-                disabled={!filteredPanels || filteredPanels.length === 0}
-                data-testid="button-print-panel-list"
-              >
-                <Printer className="h-4 w-4 mr-1" />
-                Print
-              </Button>
               {viewMode === "list" && (
                 <>
                   <div className="relative">
