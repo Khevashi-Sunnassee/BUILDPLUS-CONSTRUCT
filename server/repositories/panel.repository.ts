@@ -1,7 +1,7 @@
-import { eq, and, desc, asc, sql, like, or, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, like, or, inArray, notInArray } from "drizzle-orm";
 import { db } from "../db";
 import {
-  panelRegister, jobs, panelTypes, jobPanelRates, panelTypeCostComponents, jobCostOverrides,
+  panelRegister, jobs, panelTypes, jobPanelRates, panelTypeCostComponents, jobCostOverrides, loadListPanels,
   type InsertPanelRegister, type PanelRegister, type Job,
   type InsertPanelType, type PanelTypeConfig,
   type InsertJobPanelRate, type JobPanelRate,
@@ -205,6 +205,20 @@ export class PanelRepository {
       .from(panelRegister)
       .where(eq(panelRegister.jobId, jobId));
     return new Set(panels.filter(p => p.panelSourceId).map(p => p.panelSourceId!));
+  }
+
+  async getPanelsReadyForLoading(): Promise<(PanelRegister & { job: Job })[]> {
+    const panelsOnLoadLists = db.select({ panelId: loadListPanels.panelId }).from(loadListPanels);
+    
+    const result = await db.select().from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(and(
+        eq(panelRegister.approvedForProduction, true),
+        eq(panelRegister.status, "COMPLETED"),
+        notInArray(panelRegister.id, panelsOnLoadLists)
+      ))
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return result.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 
   async getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]> {

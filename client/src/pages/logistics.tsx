@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
-import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
+import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Truck,
   Plus,
@@ -25,6 +25,7 @@ import {
   ChevronRight,
   FileDown,
   QrCode,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,11 +72,19 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import type { Job, PanelRegister, TrailerType } from "@shared/schema";
+import type { Job, PanelRegister, TrailerType, PanelTypeConfig } from "@shared/schema";
 
 interface LoadListWithDetails {
   id: string;
@@ -173,6 +182,8 @@ export default function LogisticsPage() {
   const [factoryFilter, setFactoryFilter] = useState("all");
   const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedReadyPanels, setSelectedReadyPanels] = useState<Set<string>>(new Set());
+  const [readyPanelsExpanded, setReadyPanelsExpanded] = useState(true);
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
@@ -206,6 +217,97 @@ export default function LogisticsPage() {
   const { data: trailerTypes } = useQuery<TrailerType[]>({
     queryKey: [LOGISTICS_ROUTES.TRAILER_TYPES],
   });
+
+  const { data: panelTypesData } = useQuery<PanelTypeConfig[]>({
+    queryKey: [PANEL_TYPES_ROUTES.LIST],
+  });
+
+  const { data: readyForLoadingPanels, isLoading: readyPanelsLoading, isError: readyPanelsError } = useQuery<(PanelRegister & { job: Job })[]>({
+    queryKey: [PANELS_ROUTES.READY_FOR_LOADING],
+  });
+
+  const getPanelTypeColor = (panelType: string | null | undefined): string | null => {
+    if (!panelType || !panelTypesData) return null;
+    const pt = panelTypesData.find(t => t.code === panelType || t.name === panelType || t.code.toUpperCase() === panelType.toUpperCase());
+    return pt?.color || null;
+  };
+
+  const getFactoryCode = (panel: PanelRegister & { job: Job }): string => {
+    if (!panel.job.factoryId || !factoriesList) return "QLD";
+    const factory = factoriesList.find(f => f.id === panel.job.factoryId);
+    return factory?.state || factory?.code || "QLD";
+  };
+
+  const filteredReadyPanels = readyForLoadingPanels?.filter(p => {
+    if (factoryFilter === "all") return true;
+    const factoryCode = getFactoryCode(p);
+    return factoryCode === factoryFilter;
+  }) || [];
+
+  const toggleReadyPanel = (panelId: string) => {
+    setSelectedReadyPanels(prev => {
+      const next = new Set(prev);
+      if (next.has(panelId)) {
+        next.delete(panelId);
+      } else {
+        next.add(panelId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllReadyPanels = () => {
+    if (selectedReadyPanels.size === filteredReadyPanels.length) {
+      setSelectedReadyPanels(new Set());
+    } else {
+      setSelectedReadyPanels(new Set(filteredReadyPanels.map(p => p.id)));
+    }
+  };
+
+  const createLoadListFromReady = useMutation({
+    mutationFn: async (panelIds: string[]) => {
+      const panels = readyForLoadingPanels?.filter(p => panelIds.includes(p.id)) || [];
+      if (panels.length === 0) throw new Error("No panels selected");
+      
+      const jobId = panels[0].jobId;
+      const factoryCode = getFactoryCode(panels[0]);
+      
+      return apiRequest("POST", LOGISTICS_ROUTES.LOAD_LISTS, {
+        jobId,
+        factory: factoryCode,
+        panelIds,
+        notes: `Auto-created from ${panels.length} ready panel${panels.length !== 1 ? "s" : ""}`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.READY_FOR_LOADING] });
+      toast({ title: "Load list created successfully" });
+      setSelectedReadyPanels(new Set());
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create load list", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleCreateFromReady = () => {
+    const panelIds = Array.from(selectedReadyPanels);
+    const panels = readyForLoadingPanels?.filter(p => panelIds.includes(p.id)) || [];
+    
+    const jobIds = new Set(panels.map(p => p.jobId));
+    if (jobIds.size > 1) {
+      toast({ title: "Please select panels from the same job", variant: "destructive" });
+      return;
+    }
+
+    const job = panels[0]?.job;
+    if (!job?.factoryId || !factoriesList?.find(f => f.id === job.factoryId)) {
+      toast({ title: "Cannot determine factory for selected panels. Ensure the job has a factory assigned.", variant: "destructive" });
+      return;
+    }
+    
+    createLoadListFromReady.mutate(panelIds);
+  };
 
   const { data: approvedPanels } = useQuery<(PanelRegister & { job: Job })[]>({
     queryKey: [PANELS_ROUTES.APPROVED_FOR_PRODUCTION, selectedJobId],
@@ -628,6 +730,138 @@ export default function LogisticsPage() {
           </Button>
         </div>
       </div>
+
+      <Card data-testid="card-ready-to-load">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <CardTitle className="flex items-center gap-2 cursor-pointer" onClick={() => setReadyPanelsExpanded(!readyPanelsExpanded)}>
+              {readyPanelsExpanded ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+              <Layers className="h-5 w-5" />
+              Panels Ready to Load ({filteredReadyPanels.length})
+            </CardTitle>
+            {selectedReadyPanels.size > 0 && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" data-testid="badge-selected-count">{selectedReadyPanels.size} selected</Badge>
+                <Button
+                  onClick={handleCreateFromReady}
+                  disabled={createLoadListFromReady.isPending}
+                  data-testid="button-create-from-ready"
+                >
+                  {createLoadListFromReady.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4 mr-2" />
+                  )}
+                  Create Loading List
+                </Button>
+              </div>
+            )}
+          </div>
+          <CardDescription>Completed panels approved for production that are not yet on a load list</CardDescription>
+        </CardHeader>
+        {readyPanelsExpanded && (
+          <CardContent>
+            {readyPanelsError ? (
+              <p className="text-destructive text-center py-8" data-testid="text-ready-panels-error">Failed to load panels. Please try refreshing the page.</p>
+            ) : readyPanelsLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+              </div>
+            ) : filteredReadyPanels.length === 0 ? (
+              <p className="text-muted-foreground text-center py-8" data-testid="text-no-ready-panels">No panels ready to load</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">
+                        <Checkbox
+                          checked={filteredReadyPanels.length > 0 && selectedReadyPanels.size === filteredReadyPanels.length}
+                          onCheckedChange={toggleAllReadyPanels}
+                          data-testid="checkbox-select-all-ready"
+                        />
+                      </TableHead>
+                      <TableHead>Job</TableHead>
+                      <TableHead>Panel Mark</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Building</TableHead>
+                      <TableHead>Level</TableHead>
+                      <TableHead className="text-center w-12">Qty</TableHead>
+                      <TableHead className="text-right w-24">Width (mm)</TableHead>
+                      <TableHead className="text-right w-24">Height (mm)</TableHead>
+                      <TableHead className="text-right w-20">Area (m²)</TableHead>
+                      <TableHead className="text-right w-20">Vol (m³)</TableHead>
+                      <TableHead className="text-right w-24">Weight (kg)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredReadyPanels.map(panel => {
+                      const typeColor = getPanelTypeColor(panel.panelType);
+                      return (
+                        <TableRow
+                          key={panel.id}
+                          data-testid={`row-ready-panel-${panel.id}`}
+                          className="cursor-pointer"
+                          style={typeColor ? {
+                            backgroundColor: `${typeColor}15`,
+                          } : undefined}
+                          onClick={() => toggleReadyPanel(panel.id)}
+                        >
+                          <TableCell onClick={e => e.stopPropagation()}>
+                            <Checkbox
+                              checked={selectedReadyPanels.has(panel.id)}
+                              onCheckedChange={() => toggleReadyPanel(panel.id)}
+                              data-testid={`checkbox-ready-${panel.id}`}
+                            />
+                          </TableCell>
+                          <TableCell className="text-sm font-mono" data-testid={`cell-job-${panel.id}`}>
+                            {panel.job.jobNumber}
+                          </TableCell>
+                          <TableCell data-testid={`cell-mark-${panel.id}`}>
+                            <div className="flex items-center gap-2">
+                              {typeColor && (
+                                <span className="w-2 h-6 rounded-full flex-shrink-0" style={{ backgroundColor: typeColor }} />
+                              )}
+                              <span className="font-mono font-medium">{panel.panelMark}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell data-testid={`cell-type-${panel.id}`}>
+                            {typeColor ? (
+                              <Badge variant="outline" className="text-xs" style={{ borderColor: typeColor, color: typeColor }}>
+                                {panel.panelType}
+                              </Badge>
+                            ) : (
+                              <span className="text-sm">{panel.panelType}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-sm" data-testid={`cell-building-${panel.id}`}>{panel.building || "-"}</TableCell>
+                          <TableCell className="text-sm" data-testid={`cell-level-${panel.id}`}>{panel.level || "-"}</TableCell>
+                          <TableCell className="text-center" data-testid={`cell-qty-${panel.id}`}>{panel.qty || 1}</TableCell>
+                          <TableCell className="text-right font-mono text-xs" data-testid={`cell-width-${panel.id}`}>
+                            {panel.loadWidth ? parseFloat(panel.loadWidth).toLocaleString() : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs" data-testid={`cell-height-${panel.id}`}>
+                            {panel.loadHeight ? parseFloat(panel.loadHeight).toLocaleString() : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs" data-testid={`cell-area-${panel.id}`}>
+                            {panel.panelArea ? parseFloat(panel.panelArea).toFixed(2) : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs" data-testid={`cell-volume-${panel.id}`}>
+                            {panel.panelVolume ? parseFloat(panel.panelVolume).toFixed(2) : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono text-xs font-semibold" data-testid={`cell-weight-${panel.id}`}>
+                            {panel.panelMass ? `${parseFloat(panel.panelMass).toLocaleString()}` : "-"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        )}
+      </Card>
 
       <div ref={reportRef} className="space-y-6">
         <Card>

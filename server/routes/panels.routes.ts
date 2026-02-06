@@ -41,6 +41,19 @@ router.get("/api/panels/by-job/:jobId", requireAuth, async (req: Request, res: R
   res.json(panels);
 });
 
+router.get("/api/panels/ready-for-loading", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const panels = await storage.getPanelsReadyForLoading();
+    const filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+    res.json(filtered);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching panels ready for loading");
+    res.status(500).json({ error: "Failed to fetch panels ready for loading" });
+  }
+});
+
 router.get("/api/panels/approved-for-production", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, asc, gte, lte, inArray, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, asc, gte, lte, inArray, isNull, notInArray } from "drizzle-orm";
 import { db } from "./db";
 export { db };
 import {
@@ -393,6 +393,7 @@ export interface IStorage {
     productionPdfUrl?: string | null;
   }): Promise<PanelRegister | undefined>;
   revokePanelProductionApproval(id: string): Promise<PanelRegister | undefined>;
+  getPanelsReadyForLoading(): Promise<(PanelRegister & { job: Job })[]>;
   getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]>;
 
   // Logistics - Trailer Types
@@ -1974,6 +1975,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(panelRegister.id, id))
       .returning();
     return updated;
+  }
+
+  async getPanelsReadyForLoading(): Promise<(PanelRegister & { job: Job })[]> {
+    const panelsOnLoadListsSubquery = db.select({ panelId: loadListPanels.panelId }).from(loadListPanels);
+    
+    const results = await db.select()
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(and(
+        eq(panelRegister.approvedForProduction, true),
+        eq(panelRegister.status, "COMPLETED"),
+        notInArray(panelRegister.id, panelsOnLoadListsSubquery)
+      ))
+      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+    return results.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 
   async getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]> {

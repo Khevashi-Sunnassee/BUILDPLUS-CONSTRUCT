@@ -156,6 +156,7 @@ export const PANELS_ROUTES = {
   APPROVAL: (id: string | number) => `/api/panels/${id}/approval`,
   BULK_APPROVAL: '/api/panels/bulk-approval',
   APPROVED_FOR_PRODUCTION: '/api/panels/approved-for-production',
+  READY_FOR_LOADING: '/api/panels/ready-for-loading',
   DOCUMENT_STATUS: (id: string | number) => `/api/panels/${id}/document-status`,
 } as const;
 
