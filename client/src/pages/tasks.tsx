@@ -128,6 +128,7 @@ interface Task {
   reminderDate: string | null;
   consultant: string | null;
   projectStage: string | null;
+  priority: string | null;
   sortOrder: number;
   createdById: string | null;
   createdAt: string;
@@ -177,6 +178,15 @@ const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bgClass:
   STUCK: { label: "Stuck", color: "#ef4444", bgClass: "bg-red-500" },
   DONE: { label: "Done", color: "#22c55e", bgClass: "bg-green-500" },
   ON_HOLD: { label: "On Hold", color: "#eab308", bgClass: "bg-yellow-500" },
+};
+
+type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+const PRIORITY_CONFIG: Record<TaskPriority, { label: string; bgClass: string }> = {
+  LOW: { label: "Low", bgClass: "bg-slate-500" },
+  MEDIUM: { label: "Medium", bgClass: "bg-yellow-500" },
+  HIGH: { label: "High", bgClass: "bg-orange-500" },
+  CRITICAL: { label: "Critical", bgClass: "bg-red-500" },
 };
 
 const PROJECT_STAGES = [
@@ -482,6 +492,10 @@ function TaskRow({
     updateTaskMutation.mutate({ status });
   };
 
+  const handlePriorityChange = (priority: string) => {
+    updateTaskMutation.mutate({ priority: priority === "none" ? null : priority } as any);
+  };
+
   const handleDateChange = (date: Date | undefined) => {
     const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
     updateTaskMutation.mutate({ dueDate: isoDate } as any);
@@ -523,7 +537,7 @@ function TaskRow({
         ref={sortableRef}
         style={sortableStyle}
         className={cn(
-          "grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
+          "grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
           isSubtask && "bg-muted/30",
           task.status === "DONE" && "bg-green-50 dark:bg-green-950/30"
         )}
@@ -706,6 +720,36 @@ function TaskRow({
         </Select>
 
         <Select
+          value={task.priority || "none"}
+          onValueChange={handlePriorityChange}
+        >
+          <SelectTrigger
+            className="h-7 border-0 text-xs justify-center"
+            data-testid={`select-priority-${task.id}`}
+          >
+            {task.priority && PRIORITY_CONFIG[task.priority as TaskPriority] ? (
+              <div
+                className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", PRIORITY_CONFIG[task.priority as TaskPriority].bgClass)}
+              >
+                {PRIORITY_CONFIG[task.priority as TaskPriority].label}
+              </div>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No priority</SelectItem>
+            {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+              <SelectItem key={key} value={key}>
+                <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", config.bgClass)}>
+                  {config.label}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
           value={task.projectStage || "none"}
           onValueChange={handleStageChange}
         >
@@ -851,7 +895,7 @@ function TaskRow({
 
       {!isSubtask && showSubtasks && (
         <div 
-          className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20"
+          className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20"
           data-testid={`add-subitem-row-${task.id}`}
         >
           <div />
@@ -978,6 +1022,8 @@ function TaskRow({
               ))}
             </SelectContent>
           </Select>
+
+          <div />
 
           <Select
             value={newSubtaskProjectStage || "none"}
@@ -1355,7 +1401,7 @@ function TaskGroupComponent({
 
       {!isCollapsed && (
         <>
-          <div className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
+          <div className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
             <div />
             <div />
             <div />
@@ -1364,6 +1410,7 @@ function TaskGroupComponent({
             <div className="px-2 text-center">Users</div>
             <div className="px-2 text-center">Job</div>
             <div className="px-2 text-center">Status</div>
+            <div className="px-2 text-center">Priority</div>
             <div className="px-2 text-center">Stage</div>
             <div className="px-2 text-center">Date</div>
             <div className="px-2 text-center">Reminder</div>
@@ -1388,7 +1435,7 @@ function TaskGroupComponent({
             ))}
           </SortableContext>
 
-          <div className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
+          <div className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
             <div />
             <div />
             <div />
@@ -1412,7 +1459,7 @@ function TaskGroupComponent({
                 data-testid={`input-new-task-${group.id}`}
               />
             </div>
-            <div className="col-span-8" />
+            <div className="col-span-9" />
           </div>
         </>
       )}
@@ -2400,11 +2447,12 @@ export default function TasksPage() {
         yPos += 12;
 
         const colWidths = {
-          task: 70,
+          task: 60,
           status: 25,
-          assignee: 35,
+          priority: 20,
+          assignee: 30,
           dueDate: 25,
-          job: 25,
+          job: 20,
         };
         const tableWidth = pdfWidth - margin * 2;
         const startX = margin;
@@ -2423,6 +2471,8 @@ export default function TasksPage() {
         xPos += colWidths.task;
         pdf.text("Status", xPos, yPos + 5);
         xPos += colWidths.status;
+        pdf.text("Priority", xPos, yPos + 5);
+        xPos += colWidths.priority;
         pdf.text("Assignee", xPos, yPos + 5);
         xPos += colWidths.assignee;
         pdf.text("Due Date", xPos, yPos + 5);
@@ -2455,6 +2505,23 @@ export default function TasksPage() {
           pdf.text(formatStatus(task.status), xPos + 1, yPos + 4);
 
           xPos += colWidths.status;
+          if (task.priority) {
+            const priorityColor: Record<string, [number, number, number]> = {
+              LOW: [100, 116, 139], MEDIUM: [234, 179, 8], HIGH: [249, 115, 22], CRITICAL: [239, 68, 68],
+            };
+            const pColor = priorityColor[task.priority] || [100, 116, 139];
+            pdf.setFillColor(pColor[0], pColor[1], pColor[2]);
+            pdf.roundedRect(xPos, yPos + 0.5, 16, 5, 1, 1, "F");
+            pdf.setTextColor(255, 255, 255);
+            pdf.setFontSize(6);
+            pdf.text(task.priority, xPos + 1, yPos + 4);
+          } else {
+            pdf.setTextColor(71, 85, 105);
+            pdf.setFontSize(8);
+            pdf.text("-", xPos, yPos + 4);
+          }
+
+          xPos += colWidths.priority;
           pdf.setTextColor(71, 85, 105);
           pdf.setFontSize(8);
           const assignees = task.assignees?.map(a => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";

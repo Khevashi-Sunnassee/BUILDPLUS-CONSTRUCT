@@ -44,6 +44,7 @@ const taskCreateSchema = z.object({
   reminderDate: z.string().nullable().optional(),
   consultant: z.string().max(255).optional(),
   projectStage: z.string().max(255).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).nullable().optional(),
   jobId: z.string().nullable().optional(),
   parentId: z.string().nullable().optional(),
 });
@@ -55,6 +56,7 @@ const taskUpdateSchema_partial = z.object({
   reminderDate: z.string().nullable().optional(),
   consultant: z.string().max(255).optional(),
   projectStage: z.string().max(255).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).nullable().optional(),
   jobId: z.string().nullable().optional(),
   parentId: z.string().nullable().optional(),
   sortOrder: z.number().optional(),
