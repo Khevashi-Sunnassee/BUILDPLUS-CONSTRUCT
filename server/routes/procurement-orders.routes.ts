@@ -184,7 +184,11 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
       if (requestor?.phone) {
         const supplierName = order.supplierName || "Unknown Supplier";
         const total = parseFloat(order.total || "0").toFixed(2);
-        const message = `Your Purchase Order ${order.poNumber} for ${supplierName} totalling $${total} has been approved. You can now print and send it to the supplier.`;
+        const appDomain = process.env.APP_URL
+          || (process.env.REPLIT_DEPLOYMENT ? `https://${process.env.REPLIT_DEPLOYMENT}` : "")
+          || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "");
+        const poLink = appDomain ? `${appDomain}/purchase-orders/${order.id}` : "";
+        const message = `Your Purchase Order ${order.poNumber} for ${supplierName} totalling $${total} has been approved. You can now print and send it to the supplier.${poLink ? `\n\nView & Print: ${poLink}` : ""}`;
         const smsResult = await twilioService.sendSMS(requestor.phone, message);
         if (!smsResult.success) {
           logger.warn({ error: smsResult.error, poId: order.id, userId: order.requestedById }, "Failed to send PO approval SMS");
