@@ -84,4 +84,5 @@ All mobile pages live under `client/src/pages/mobile/` and follow these strict c
 - **Express.js**: Backend framework.
 - **Drizzle ORM**: PostgreSQL ORM.
 - **bcrypt**: Password hashing.
-- **express-session**: Session management.
+- **express-session**: Session management with PostgreSQL-backed persistent store (`connect-pg-simple`).
+- **connect-pg-simple**: PostgreSQL session store for `express-session`, replacing MemoryStore for production reliability.
