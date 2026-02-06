@@ -72,6 +72,14 @@ All mobile pages live under `client/src/pages/mobile/` and follow these strict c
 - Mobile routes must not interfere with desktop routes
 - All data fetching uses existing API routes from `@shared/api-routes`
 
+## Performance Optimizations (Feb 2026)
+- **Database Connection Pool**: Configured for 200 concurrent users (max=30, min=5, idle/connection timeouts set) in `server/db.ts`
+- **FK Indexes**: All 206 foreign key columns indexed via migration `0018_add_missing_fk_indexes.sql`
+- **N+1 Query Elimination**: Batch loading patterns in `server/repositories/task.repository.ts` and `server/chat/chat.routes.ts`
+- **Response Compression**: gzip compression middleware (threshold=1024, level=6) in `server/index.ts` - ~91% size reduction on API responses
+- **Logging Optimization**: Response body only logged for errors (4xx/5xx) or slow requests (>1s), truncated at 500 chars
+- **SQL Injection Fix**: Chat conversations query uses parameterized `sql.join()` instead of unsafe `sql.raw()` string concatenation
+
 ## External Dependencies
 - **PostgreSQL**: Primary database.
 - **OpenAI**: AI-powered PDF analysis.

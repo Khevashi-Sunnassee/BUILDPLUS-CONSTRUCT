@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import serveIndex from "serve-index";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
@@ -8,6 +9,15 @@ import { seedDatabase } from "./seed";
 import logger from "./lib/logger";
 
 const app = express();
+
+app.use(compression({
+  threshold: 1024,
+  level: 6,
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  },
+}));
 
 // Serve public downloads folder for source code packages with directory listing
 const downloadsPath = path.join(process.cwd(), 'public/downloads');
@@ -54,8 +64,9 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      if (capturedJsonResponse && (res.statusCode >= 400 || duration > 1000)) {
+        const body = JSON.stringify(capturedJsonResponse);
+        logLine += ` :: ${body.length > 500 ? body.slice(0, 500) + '...' : body}`;
       }
 
       log(logLine);

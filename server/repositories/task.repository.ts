@@ -25,38 +25,76 @@ export interface TaskGroupWithTasks extends TaskGroup {
 
 export class TaskRepository {
   async getAllTaskGroups(): Promise<TaskGroupWithTasks[]> {
-    const groups = await db.select().from(taskGroups).orderBy(asc(taskGroups.displayOrder));
-    const result: TaskGroupWithTasks[] = [];
-    
-    for (const group of groups) {
-      const groupTasks = await this.getTasksByGroupId(group.id);
-      result.push({ ...group, tasks: groupTasks });
+    const groups = await db.select().from(taskGroups).orderBy(asc((taskGroups as any).displayOrder));
+    const groupIds = groups.map(g => g.id);
+    if (!groupIds.length) return groups.map(g => ({ ...g, tasks: [] }));
+
+    const allTasks = await db.select().from(tasks)
+      .where(inArray(tasks.groupId, groupIds))
+      .orderBy(asc((tasks as any).displayOrder));
+
+    const enrichedTasks = await this.enrichTasksBatch(allTasks);
+
+    const tasksByGroup = new Map<string, TaskWithDetails[]>();
+    for (const task of enrichedTasks) {
+      const list = tasksByGroup.get(task.groupId) || [];
+      list.push(task);
+      tasksByGroup.set(task.groupId, list);
     }
-    
-    return result;
+
+    return groups.map(g => ({ ...g, tasks: tasksByGroup.get(g.id) || [] }));
   }
 
   private async getTasksByGroupId(groupId: string): Promise<TaskWithDetails[]> {
-    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, groupId)).orderBy(asc(tasks.displayOrder));
-    return this.enrichTasks(groupTasks);
+    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, groupId)).orderBy(asc((tasks as any).displayOrder));
+    return this.enrichTasksBatch(groupTasks);
   }
 
-  private async enrichTasks(tasksList: Task[]): Promise<TaskWithDetails[]> {
-    const result: TaskWithDetails[] = [];
-    for (const task of tasksList) {
-      const assignees = await this.getTaskAssignees(task.id);
-      const [job] = task.jobId ? await db.select().from(jobs).where(eq(jobs.id, task.jobId)) : [];
-      const [panel] = task.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, task.panelId)) : [];
-      const [createdBy] = task.createdById ? await db.select().from(users).where(eq(users.id, task.createdById)) : [];
-      result.push({
-        ...task,
-        assignees,
-        job: job || undefined,
-        panel: panel || undefined,
-        createdBy: createdBy || undefined
-      });
+  private async enrichTasksBatch(tasksList: Task[]): Promise<TaskWithDetails[]> {
+    if (!tasksList.length) return [];
+
+    const taskIds = tasksList.map(t => t.id);
+    const jobIds = [...new Set(tasksList.filter(t => t.jobId).map(t => t.jobId!))];
+    const creatorIds = [...new Set(tasksList.filter(t => t.createdById).map(t => t.createdById!))];
+    const panelIds = [...new Set(tasksList.filter(t => (t as any).panelId).map(t => (t as any).panelId!))];
+
+    const allAssignees = await db.select().from(taskAssignees).where(inArray(taskAssignees.taskId, taskIds));
+    const assigneeUserIds = [...new Set(allAssignees.map(a => a.userId))];
+    const allUserIds = [...new Set([...assigneeUserIds, ...creatorIds])];
+
+    const [allUsers, allJobs, allPanels] = await Promise.all([
+      allUserIds.length > 0
+        ? db.select().from(users).where(inArray(users.id, allUserIds))
+        : Promise.resolve([]),
+      jobIds.length > 0
+        ? db.select().from(jobs).where(inArray(jobs.id, jobIds))
+        : Promise.resolve([]),
+      panelIds.length > 0
+        ? db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds))
+        : Promise.resolve([]),
+    ]);
+
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    const jobMap = new Map(allJobs.map(j => [j.id, j]));
+    const panelMap = new Map(allPanels.map(p => [p.id, p]));
+
+    const assigneesByTask = new Map<string, (TaskAssignee & { user: User })[]>();
+    for (const a of allAssignees) {
+      const user = userMap.get(a.userId);
+      if (user) {
+        const list = assigneesByTask.get(a.taskId) || [];
+        list.push({ ...a, user });
+        assigneesByTask.set(a.taskId, list);
+      }
     }
-    return result;
+
+    return tasksList.map(task => ({
+      ...task,
+      assignees: assigneesByTask.get(task.id) || [],
+      job: task.jobId ? jobMap.get(task.jobId) : undefined,
+      panel: (task as any).panelId ? panelMap.get((task as any).panelId) : undefined,
+      createdBy: task.createdById ? userMap.get(task.createdById) : undefined,
+    }));
   }
 
   async getTaskGroup(id: string): Promise<TaskGroupWithTasks | undefined> {
@@ -93,7 +131,7 @@ export class TaskRepository {
   async getTask(id: string): Promise<TaskWithDetails | undefined> {
     const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
     if (!task) return undefined;
-    const enriched = await this.enrichTasks([task]);
+    const enriched = await this.enrichTasksBatch([task]);
     return enriched[0];
   }
 
@@ -123,12 +161,13 @@ export class TaskRepository {
 
   async getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]> {
     const assignees = await db.select().from(taskAssignees).where(eq(taskAssignees.taskId, taskId));
-    const result: (TaskAssignee & { user: User })[] = [];
-    for (const assignee of assignees) {
-      const [user] = await db.select().from(users).where(eq(users.id, assignee.userId));
-      if (user) result.push({ ...assignee, user });
-    }
-    return result;
+    if (!assignees.length) return [];
+    const userIds = [...new Set(assignees.map(a => a.userId))];
+    const allUsers = await db.select().from(users).where(inArray(users.id, userIds));
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    return assignees
+      .filter(a => userMap.has(a.userId))
+      .map(a => ({ ...a, user: userMap.get(a.userId)! }));
   }
 
   async setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]> {
@@ -141,12 +180,13 @@ export class TaskRepository {
 
   async getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User })[]> {
     const updates = await db.select().from(taskUpdates).where(eq(taskUpdates.taskId, taskId)).orderBy(desc(taskUpdates.createdAt));
-    const result: (TaskUpdate & { user: User })[] = [];
-    for (const update of updates) {
-      const [user] = await db.select().from(users).where(eq(users.id, update.userId));
-      if (user) result.push({ ...update, user });
-    }
-    return result;
+    if (!updates.length) return [];
+    const userIds = [...new Set(updates.map(u => u.userId))];
+    const allUsers = await db.select().from(users).where(inArray(users.id, userIds));
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    return updates
+      .filter(u => userMap.has(u.userId))
+      .map(u => ({ ...u, user: userMap.get(u.userId)! }));
   }
 
   async createTaskUpdate(data: InsertTaskUpdate): Promise<TaskUpdate> {
@@ -160,12 +200,16 @@ export class TaskRepository {
 
   async getTaskFiles(taskId: string): Promise<(TaskFile & { uploadedBy?: User | null })[]> {
     const files = await db.select().from(taskFiles).where(eq(taskFiles.taskId, taskId));
-    const result: (TaskFile & { uploadedBy?: User | null })[] = [];
-    for (const file of files) {
-      const [user] = file.uploadedById ? await db.select().from(users).where(eq(users.id, file.uploadedById)) : [];
-      result.push({ ...file, uploadedBy: user || null });
-    }
-    return result;
+    if (!files.length) return [];
+    const uploaderIds = [...new Set(files.filter(f => f.uploadedById).map(f => f.uploadedById!))];
+    const allUsers = uploaderIds.length > 0
+      ? await db.select().from(users).where(inArray(users.id, uploaderIds))
+      : [];
+    const userMap = new Map(allUsers.map(u => [u.id, u]));
+    return files.map(f => ({
+      ...f,
+      uploadedBy: f.uploadedById ? userMap.get(f.uploadedById) || null : null,
+    }));
   }
 
   async createTaskFile(data: InsertTaskFile): Promise<TaskFile> {
@@ -182,12 +226,16 @@ export class TaskRepository {
       .where(eq(taskNotifications.userId, userId))
       .orderBy(desc(taskNotifications.createdAt));
     
-    const result: any[] = [];
-    for (const notif of notifications) {
-      const [task] = notif.taskId ? await db.select().from(tasks).where(eq(tasks.id, notif.taskId)) : [];
-      result.push({ ...notif, task: task || null });
-    }
-    return result;
+    if (!notifications.length) return [];
+    const taskIds = [...new Set(notifications.filter(n => n.taskId).map(n => n.taskId!))];
+    const allTasks = taskIds.length > 0
+      ? await db.select().from(tasks).where(inArray(tasks.id, taskIds))
+      : [];
+    const taskMap = new Map(allTasks.map(t => [t.id, t]));
+    return notifications.map(n => ({
+      ...n,
+      task: n.taskId ? taskMap.get(n.taskId) || null : null,
+    }));
   }
 
   async getUnreadTaskNotificationCount(userId: string): Promise<number> {

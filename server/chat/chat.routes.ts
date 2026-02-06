@@ -111,40 +111,41 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
       : [];
     const userMap = new Map(allUsers.map(u => [u.id, u]));
 
-    // Batch fetch last messages for all conversations using window function
-    const convIdsArray = sql`${sql.raw(`ARRAY[${convIds.map(id => `'${id}'`).join(",")}]::varchar[]`)}`;
+    // Batch fetch last messages for all conversations using parameterized query
+    const safeConvIds = sql.join(convIds.map(id => sql`${id}`), sql`,`);
     const lastMessages = await db.execute(sql`
       SELECT DISTINCT ON (conversation_id) *
       FROM chat_messages
-      WHERE conversation_id = ANY(${convIdsArray})
+      WHERE conversation_id = ANY(ARRAY[${safeConvIds}]::varchar[])
         AND deleted_at IS NULL
       ORDER BY conversation_id, created_at DESC
     `);
     const lastMsgMap = new Map((lastMessages.rows as any[]).map(m => [m.conversation_id, m]));
 
-    // Batch fetch unread counts per conversation
+    // Batch fetch unread counts per conversation in a single query
     const membershipMap = new Map(memberships.map(m => [m.conversationId, m.lastReadAt ?? new Date(0)]));
-    const unreadCounts = await db.execute(sql`
-      SELECT conversation_id, COUNT(*) as count
-      FROM chat_messages
-      WHERE conversation_id = ANY(${convIdsArray})
-        AND deleted_at IS NULL
-      GROUP BY conversation_id
-    `);
     
-    // Calculate unread per conversation based on lastReadAt
     const unreadCountMap = new Map<string, number>();
-    for (const convId of convIds) {
-      const lastReadAt = membershipMap.get(convId) ?? new Date(0);
-      const [result] = await db
-        .select({ count: sql<number>`count(*)` })
+    if (convIds.length > 0) {
+      const caseFragments = convIds.map(convId => {
+        const lastReadAt = membershipMap.get(convId) ?? new Date(0);
+        return sql`WHEN ${chatMessages.conversationId} = ${convId} THEN ${chatMessages.createdAt} > ${lastReadAt}`;
+      });
+      const unreadResults = await db
+        .select({
+          conversationId: chatMessages.conversationId,
+          count: sql<number>`count(*)`,
+        })
         .from(chatMessages)
         .where(and(
-          eq(chatMessages.conversationId, convId),
-          gt(chatMessages.createdAt, lastReadAt),
-          isNull(chatMessages.deletedAt)
-        ));
-      unreadCountMap.set(convId, Number(result?.count || 0));
+          inArray(chatMessages.conversationId, convIds),
+          isNull(chatMessages.deletedAt),
+          sql`CASE ${sql.join(caseFragments, sql` `)} ELSE false END`
+        ))
+        .groupBy(chatMessages.conversationId);
+      for (const r of unreadResults) {
+        unreadCountMap.set(r.conversationId, Number(r.count));
+      }
     }
 
     // Batch fetch unread mentions
@@ -215,17 +216,49 @@ chatRouter.get("/messages", requireAuth, requireChatPermission, async (req, res)
       .orderBy(desc(chatMessages.createdAt))
       .limit(50);
 
-    const messagesWithSender = await Promise.all(rows.map(async (msg) => {
-      const senderRows = await db.select({ id: users.id, name: users.name, email: users.email })
-        .from(users).where(eq(users.id, msg.senderId)).limit(1);
-      const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, msg.id));
-      const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, msg.id));
-      const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
-        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(eq(users.id, m.mentionedUserId)).limit(1);
-        return { ...m, user: userRows[0] || null };
-      }));
-      return { ...msg, sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers };
+    const msgIds = rows.map(m => m.id);
+    const senderIds = [...new Set(rows.map(m => m.senderId))];
+
+    const [allSenders, allAttachments, allMentions] = await Promise.all([
+      senderIds.length > 0
+        ? db.select({ id: users.id, name: users.name, email: users.email })
+            .from(users).where(inArray(users.id, senderIds))
+        : Promise.resolve([]),
+      msgIds.length > 0
+        ? db.select().from(chatMessageAttachments).where(inArray(chatMessageAttachments.messageId, msgIds))
+        : Promise.resolve([]),
+      msgIds.length > 0
+        ? db.select().from(chatMessageMentions).where(inArray(chatMessageMentions.messageId, msgIds))
+        : Promise.resolve([]),
+    ]);
+
+    const senderMap = new Map(allSenders.map(u => [u.id, u]));
+    const attachmentsByMsg = new Map<string, typeof allAttachments>();
+    for (const a of allAttachments) {
+      const list = attachmentsByMsg.get(a.messageId) || [];
+      list.push(a);
+      attachmentsByMsg.set(a.messageId, list);
+    }
+
+    const mentionUserIds = [...new Set(allMentions.map(m => m.mentionedUserId))];
+    const mentionUsers = mentionUserIds.length > 0
+      ? await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(inArray(users.id, mentionUserIds))
+      : [];
+    const mentionUserMap = new Map(mentionUsers.map(u => [u.id, u]));
+
+    const mentionsByMsg = new Map<string, any[]>();
+    for (const m of allMentions) {
+      const list = mentionsByMsg.get(m.messageId) || [];
+      list.push({ ...m, user: mentionUserMap.get(m.mentionedUserId) || null });
+      mentionsByMsg.set(m.messageId, list);
+    }
+
+    const messagesWithSender = rows.map(msg => ({
+      ...msg,
+      sender: senderMap.get(msg.senderId) || null,
+      attachments: attachmentsByMsg.get(msg.id) || [],
+      mentions: mentionsByMsg.get(msg.id) || [],
     }));
 
     res.json({ items: messagesWithSender.reverse(), nextCursor: null });
@@ -247,17 +280,49 @@ chatRouter.get("/conversations/:conversationId/messages", requireAuth, requireCh
       .orderBy(desc(chatMessages.createdAt))
       .limit(50);
 
-    const messagesWithSender = await Promise.all(rows.map(async (msg) => {
-      const senderRows = await db.select({ id: users.id, name: users.name, email: users.email })
-        .from(users).where(eq(users.id, msg.senderId)).limit(1);
-      const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, msg.id));
-      const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, msg.id));
-      const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
-        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(eq(users.id, m.mentionedUserId)).limit(1);
-        return { ...m, user: userRows[0] || null };
-      }));
-      return { ...msg, sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers };
+    const msgIds = rows.map(m => m.id);
+    const senderIds = [...new Set(rows.map(m => m.senderId))];
+
+    const [allSenders, allAttachments, allMentions] = await Promise.all([
+      senderIds.length > 0
+        ? db.select({ id: users.id, name: users.name, email: users.email })
+            .from(users).where(inArray(users.id, senderIds))
+        : Promise.resolve([]),
+      msgIds.length > 0
+        ? db.select().from(chatMessageAttachments).where(inArray(chatMessageAttachments.messageId, msgIds))
+        : Promise.resolve([]),
+      msgIds.length > 0
+        ? db.select().from(chatMessageMentions).where(inArray(chatMessageMentions.messageId, msgIds))
+        : Promise.resolve([]),
+    ]);
+
+    const senderMap = new Map(allSenders.map(u => [u.id, u]));
+    const attachmentsByMsg = new Map<string, typeof allAttachments>();
+    for (const a of allAttachments) {
+      const list = attachmentsByMsg.get(a.messageId) || [];
+      list.push(a);
+      attachmentsByMsg.set(a.messageId, list);
+    }
+
+    const mentionUserIds = [...new Set(allMentions.map(m => m.mentionedUserId))];
+    const mentionUsers = mentionUserIds.length > 0
+      ? await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(inArray(users.id, mentionUserIds))
+      : [];
+    const mentionUserMap = new Map(mentionUsers.map(u => [u.id, u]));
+
+    const mentionsByMsg = new Map<string, any[]>();
+    for (const m of allMentions) {
+      const list = mentionsByMsg.get(m.messageId) || [];
+      list.push({ ...m, user: mentionUserMap.get(m.mentionedUserId) || null });
+      mentionsByMsg.set(m.messageId, list);
+    }
+
+    const messagesWithSender = rows.map(msg => ({
+      ...msg,
+      sender: senderMap.get(msg.senderId) || null,
+      attachments: attachmentsByMsg.get(msg.id) || [],
+      mentions: mentionsByMsg.get(msg.id) || [],
     }));
 
     res.json(messagesWithSender.reverse());
@@ -360,11 +425,14 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
       .from(users).where(eq(users.id, userId)).limit(1);
     const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, messageId));
     const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, messageId));
-    const mentionsWithUsers = await Promise.all(mentions.map(async (m) => {
-      const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-        .from(users).where(eq(users.id, m.mentionedUserId)).limit(1);
-      return { ...m, user: userRows[0] || null };
-    }));
+    let mentionsWithUsers: any[] = [];
+    if (mentions.length > 0) {
+      const mentionUserIds = [...new Set(mentions.map(m => m.mentionedUserId))];
+      const mentionUsersList = await db.select({ id: users.id, name: users.name, email: users.email })
+        .from(users).where(inArray(users.id, mentionUserIds));
+      const mentionUserMap = new Map(mentionUsersList.map(u => [u.id, u]));
+      mentionsWithUsers = mentions.map(m => ({ ...m, user: mentionUserMap.get(m.mentionedUserId) || null }));
+    }
 
     res.json({ ...msgRows[0], sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers });
   } catch (e: any) {
@@ -568,11 +636,13 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
         .from(conversationMembers)
         .where(eq(conversationMembers.conversationId, conv.id));
       
-      const membersWithUsers = await Promise.all(members.map(async (m) => {
-        const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-          .from(users).where(eq(users.id, m.userId)).limit(1);
-        return { ...m, user: userRows[0] || null };
-      }));
+      const memberUserIds = [...new Set(members.map(m => m.userId))];
+      const memberUsers = memberUserIds.length > 0
+        ? await db.select({ id: users.id, name: users.name, email: users.email })
+            .from(users).where(inArray(users.id, memberUserIds))
+        : [];
+      const memberUserMap = new Map(memberUsers.map(u => [u.id, u]));
+      const membersWithUsers = members.map(m => ({ ...m, user: memberUserMap.get(m.userId) || null }));
       
       return res.json({ ...conv, members: membersWithUsers });
     }
@@ -611,11 +681,13 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
       .from(conversationMembers)
       .where(eq(conversationMembers.conversationId, convId));
     
-    const membersWithUsers = await Promise.all(members.map(async (m) => {
-      const userRows = await db.select({ id: users.id, name: users.name, email: users.email })
-        .from(users).where(eq(users.id, m.userId)).limit(1);
-      return { ...m, user: userRows[0] || null };
-    }));
+    const memberUserIds2 = [...new Set(members.map(m => m.userId))];
+    const memberUsers2 = memberUserIds2.length > 0
+      ? await db.select({ id: users.id, name: users.name, email: users.email })
+          .from(users).where(inArray(users.id, memberUserIds2))
+      : [];
+    const memberUserMap2 = new Map(memberUsers2.map(u => [u.id, u]));
+    const membersWithUsers = members.map(m => ({ ...m, user: memberUserMap2.get(m.userId) || null }));
     
     res.json({ ...conv[0], members: membersWithUsers });
   } catch (e: any) {
