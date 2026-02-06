@@ -662,18 +662,18 @@ function TaskRow({
             className="h-7 border-0 text-xs justify-center"
             data-testid={`select-status-${task.id}`}
           >
-            <Badge
-              className={cn("text-white text-[10px]", STATUS_CONFIG[task.status].bgClass)}
+            <div
+              className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", STATUS_CONFIG[task.status].bgClass)}
             >
               {STATUS_CONFIG[task.status].label}
-            </Badge>
+            </div>
           </SelectTrigger>
           <SelectContent>
             {Object.entries(STATUS_CONFIG).map(([key, config]) => (
               <SelectItem key={key} value={key}>
-                <Badge className={cn("text-white text-[10px]", config.bgClass)}>
+                <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", config.bgClass)}>
                   {config.label}
-                </Badge>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>
@@ -936,18 +936,18 @@ function TaskRow({
               className="h-7 border-0 text-xs justify-center"
               data-testid={`new-subitem-status-${task.id}`}
             >
-              <Badge
-                className={cn("text-white text-[10px]", STATUS_CONFIG[newSubtaskStatus].bgClass)}
+              <div
+                className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", STATUS_CONFIG[newSubtaskStatus].bgClass)}
               >
                 {STATUS_CONFIG[newSubtaskStatus].label}
-              </Badge>
+              </div>
             </SelectTrigger>
             <SelectContent>
               {Object.entries(STATUS_CONFIG).map(([key, config]) => (
                 <SelectItem key={key} value={key}>
-                  <Badge className={cn("text-white text-[10px]", config.bgClass)}>
+                  <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", config.bgClass)}>
                     {config.label}
-                  </Badge>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -2044,9 +2044,9 @@ function SendTasksEmailDialog({
                       <div key={t.id} className="p-2 rounded-md bg-muted/50 border text-sm space-y-1" data-testid={`email-task-${t.id}`}>
                         <div className="flex items-center gap-2">
                           <span className="font-medium flex-1 truncate">{t.title}</span>
-                          <Badge className={cn("text-white text-[10px]", STATUS_CONFIG[t.status]?.bgClass)}>
+                          <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", STATUS_CONFIG[t.status]?.bgClass)}>
                             {STATUS_CONFIG[t.status]?.label}
-                          </Badge>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span>Due: {t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "No date"}</span>
