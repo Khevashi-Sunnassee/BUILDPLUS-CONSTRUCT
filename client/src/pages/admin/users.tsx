@@ -80,7 +80,10 @@ const userSchema = z.object({
   name: z.string().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
-  password: z.string().min(6, "Password must be at least 6 characters").optional().or(z.literal("")),
+  password: z.string().refine(
+    (val) => val === "" || val.length >= 6,
+    { message: "Password must be at least 6 characters" }
+  ),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
@@ -491,7 +494,7 @@ export default function AdminUsersPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.error("Form validation errors:", JSON.stringify(errors)))} className="space-y-4">
               <FormField
                 control={form.control}
                 name="email"
