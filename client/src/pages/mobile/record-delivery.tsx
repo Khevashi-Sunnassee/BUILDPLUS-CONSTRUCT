@@ -76,8 +76,8 @@ function CollapsibleSection({ title, icon: Icon, defaultOpen = true, children }:
 
 function FormRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="text-xs text-white/60 mb-1.5 block">{label}</label>
+    <div className="min-w-0">
+      <label className="text-xs text-white/60 mb-1.5 block truncate">{label}</label>
       {children}
     </div>
   );
@@ -361,7 +361,7 @@ export default function MobileRecordDeliveryPage() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Depot to LTE" icon={Clock}>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <FormRow label="Leave Depot">
                   <Input
                     type="time"
@@ -393,7 +393,7 @@ export default function MobileRecordDeliveryPage() {
                   data-testid="input-pickup-location"
                 />
               </FormRow>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <FormRow label="Arrive">
                   <Input
                     type="time"
@@ -425,7 +425,7 @@ export default function MobileRecordDeliveryPage() {
                   data-testid="input-delivery-location"
                 />
               </FormRow>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <FormRow label="Arrive Holding">
                   <Input
                     type="time"
@@ -448,7 +448,7 @@ export default function MobileRecordDeliveryPage() {
             </CollapsibleSection>
 
             <CollapsibleSection title="Unloading" icon={Package}>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <FormRow label="Site First Lift">
                   <Input
                     type="time"
