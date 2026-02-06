@@ -83,6 +83,9 @@ router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
       return res.status(403).json({ error: "Company context required" });
     }
     const validated = createUserSchema.parse(req.body);
+    if (validated.poApprovalLimit === "") {
+      validated.poApprovalLimit = undefined;
+    }
     const existing = await storage.getUserByEmail(validated.email);
     if (existing) {
       return res.status(400).json({ error: "User with this email already exists" });
@@ -110,6 +113,9 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     delete updateData.companyId;
     if (updateData.password === "") {
       delete updateData.password;
+    }
+    if (updateData.poApprovalLimit === "") {
+      updateData.poApprovalLimit = null;
     }
     const user = await storage.updateUser(req.params.id as string, updateData);
     res.json({ ...user, passwordHash: undefined });

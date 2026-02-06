@@ -294,14 +294,14 @@ export default function AdminUsersPage() {
 
   const onSubmit = (data: UserFormData) => {
     if (editingUser) {
-      const updateData: Partial<UserFormData> = {
+      const updateData: Record<string, any> = {
         email: data.email,
         name: data.name,
         phone: data.phone,
         address: data.address,
         role: data.role,
         poApprover: data.poApprover,
-        poApprovalLimit: data.poApprovalLimit,
+        poApprovalLimit: data.poApprovalLimit || null,
       };
       if (data.password) {
         updateData.password = data.password;
