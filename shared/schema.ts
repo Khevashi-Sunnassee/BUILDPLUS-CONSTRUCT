@@ -43,6 +43,7 @@ export const users = pgTable("users", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   email: text("email").notNull(),
   name: text("name"),
+  phone: text("phone"),
   passwordHash: text("password_hash"),
   role: roleEnum("role").default("USER").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
@@ -2311,4 +2312,76 @@ export type ChecklistWorkOrderTrigger = {
   workOrderPriority?: string;
   workOrderCategoryId?: string;
   assignToUserId?: string;
+};
+
+// ==================== BROADCAST MESSAGING SYSTEM ====================
+
+export const broadcastTemplates = pgTable("broadcast_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 500 }),
+  message: text("message").notNull(),
+  category: varchar("category", { length: 100 }),
+  defaultChannels: text("default_channels").array(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBroadcastTemplateSchema = createInsertSchema(broadcastTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBroadcastTemplate = z.infer<typeof insertBroadcastTemplateSchema>;
+export type BroadcastTemplate = typeof broadcastTemplates.$inferSelect;
+
+export const broadcastStatusEnum = pgEnum("broadcast_status", ["PENDING", "SENDING", "COMPLETED", "FAILED"]);
+export const broadcastChannelEnum = pgEnum("broadcast_channel", ["SMS", "WHATSAPP", "EMAIL"]);
+export const deliveryStatusEnum = pgEnum("delivery_status", ["PENDING", "SENT", "FAILED"]);
+export const recipientTypeEnum = pgEnum("recipient_type", ["ALL_USERS", "SPECIFIC_USERS", "CUSTOM_CONTACTS"]);
+
+export const broadcastMessages = pgTable("broadcast_messages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  templateId: varchar("template_id", { length: 36 }).references(() => broadcastTemplates.id),
+  subject: varchar("subject", { length: 500 }),
+  message: text("message").notNull(),
+  channels: text("channels").array().notNull(),
+  recipientType: recipientTypeEnum("recipient_type").notNull(),
+  recipientIds: text("recipient_ids").array(),
+  customRecipients: jsonb("custom_recipients"),
+  totalRecipients: integer("total_recipients").default(0).notNull(),
+  sentCount: integer("sent_count").default(0).notNull(),
+  failedCount: integer("failed_count").default(0).notNull(),
+  status: broadcastStatusEnum("status").default("PENDING").notNull(),
+  sentBy: varchar("sent_by", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertBroadcastMessageSchema = createInsertSchema(broadcastMessages).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBroadcastMessage = z.infer<typeof insertBroadcastMessageSchema>;
+export type BroadcastMessage = typeof broadcastMessages.$inferSelect;
+
+export const broadcastDeliveries = pgTable("broadcast_deliveries", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  broadcastMessageId: varchar("broadcast_message_id", { length: 36 }).notNull().references(() => broadcastMessages.id, { onDelete: "cascade" }),
+  recipientName: varchar("recipient_name", { length: 255 }),
+  recipientPhone: varchar("recipient_phone", { length: 50 }),
+  recipientEmail: varchar("recipient_email", { length: 255 }),
+  channel: broadcastChannelEnum("channel").notNull(),
+  status: deliveryStatusEnum("status").default("PENDING").notNull(),
+  externalMessageId: varchar("external_message_id", { length: 255 }),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertBroadcastDeliverySchema = createInsertSchema(broadcastDeliveries).omit({ id: true, createdAt: true });
+export type InsertBroadcastDelivery = z.infer<typeof insertBroadcastDeliverySchema>;
+export type BroadcastDelivery = typeof broadcastDeliveries.$inferSelect;
+
+export type BroadcastMessageWithDetails = BroadcastMessage & {
+  template?: BroadcastTemplate | null;
+  sentByUser?: SafeUser | null;
+  deliveries?: BroadcastDelivery[];
 };

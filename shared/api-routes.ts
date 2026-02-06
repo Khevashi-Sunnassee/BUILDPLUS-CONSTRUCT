@@ -538,6 +538,19 @@ export const CHECKLIST_ROUTES = {
 } as const;
 
 // ============================================================================
+// BROADCAST MESSAGING
+// ============================================================================
+export const BROADCAST_ROUTES = {
+  TEMPLATES: '/api/broadcast-templates',
+  TEMPLATE_BY_ID: (id: string) => `/api/broadcast-templates/${id}`,
+  MESSAGES: '/api/broadcasts',
+  SEND: '/api/broadcasts/send',
+  MESSAGE_BY_ID: (id: string) => `/api/broadcasts/${id}`,
+  DELIVERIES: (id: string) => `/api/broadcasts/${id}/deliveries`,
+  CHANNELS_STATUS: '/api/broadcasts/channels-status',
+} as const;
+
+// ============================================================================
 // TYPE EXPORTS for frontend usage
 // ============================================================================
 export type AuthRoutes = typeof AUTH_ROUTES;
@@ -566,3 +579,4 @@ export type AgentRoutes = typeof AGENT_ROUTES;
 export type DocumentRoutes = typeof DOCUMENT_ROUTES;
 export type ReoScheduleRoutes = typeof REO_SCHEDULE_ROUTES;
 export type ChecklistRoutes = typeof CHECKLIST_ROUTES;
+export type BroadcastRoutes = typeof BROADCAST_ROUTES;
