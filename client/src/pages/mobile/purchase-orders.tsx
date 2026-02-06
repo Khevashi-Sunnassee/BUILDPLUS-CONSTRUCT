@@ -77,7 +77,6 @@ export default function MobilePurchaseOrdersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(selectedPO?.id || "")] });
-      toast({ title: "Purchase order approved" });
       setSelectedPO(null);
     },
     onError: () => {
@@ -91,7 +90,6 @@ export default function MobilePurchaseOrdersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
-      toast({ title: "Purchase order rejected" });
       setSelectedPO(null);
     },
     onError: () => {

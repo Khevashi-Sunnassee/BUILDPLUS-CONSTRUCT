@@ -84,7 +84,6 @@ export default function MobileTasksPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
-      toast({ title: "Task updated" });
     },
     onError: () => {
       toast({ title: "Failed to update task", variant: "destructive" });
@@ -99,7 +98,6 @@ export default function MobileTasksPage() {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
       setNewTaskGroupId(null);
       setNewTaskTitle("");
-      toast({ title: "Task created" });
     },
     onError: () => {
       toast({ title: "Failed to create task", variant: "destructive" });

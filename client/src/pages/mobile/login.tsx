@@ -37,10 +37,6 @@ export default function MobileLoginPage() {
     setIsLoading(true);
     try {
       await login(data.email, data.password);
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
       setLocation("/mobile/dashboard");
     } catch (error: any) {
       toast({

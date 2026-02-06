@@ -64,7 +64,6 @@ export default function MobileWeeklyJobReportPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
       queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
-      toast({ title: "Report submitted" });
       setSelectedReport(null);
     },
     onError: () => {
@@ -79,7 +78,6 @@ export default function MobileWeeklyJobReportPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
       queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
-      toast({ title: "Report approved" });
       setSelectedReport(null);
     },
     onError: () => {
@@ -94,7 +92,6 @@ export default function MobileWeeklyJobReportPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_MY] });
       queryClient.invalidateQueries({ queryKey: [WEEKLY_REPORTS_ROUTES.JOB_REPORTS_PENDING] });
-      toast({ title: "Report rejected" });
       setSelectedReport(null);
     },
     onError: () => {

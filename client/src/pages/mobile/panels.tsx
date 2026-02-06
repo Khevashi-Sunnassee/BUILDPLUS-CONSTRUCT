@@ -55,7 +55,6 @@ export default function MobilePanelsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
-      toast({ title: "Panel status updated" });
     },
     onError: () => {
       toast({ title: "Failed to update panel", variant: "destructive" });
