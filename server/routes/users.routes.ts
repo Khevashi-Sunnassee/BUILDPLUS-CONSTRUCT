@@ -19,18 +19,27 @@ router.get("/api/user/settings", requireAuth, async (req, res) => {
     return res.status(401).json({ error: "User not found" });
   }
   res.json({
-    selectedFactoryIds: user.selectedFactoryIds || []
+    selectedFactoryIds: user.selectedFactoryIds || [],
+    defaultFactoryId: user.defaultFactoryId || null,
   });
 });
 
 // Update user settings
 router.put("/api/user/settings", requireAuth, async (req, res) => {
-  const { selectedFactoryIds } = req.body;
+  const { selectedFactoryIds, defaultFactoryId } = req.body;
   if (selectedFactoryIds !== undefined && !Array.isArray(selectedFactoryIds)) {
     return res.status(400).json({ error: "selectedFactoryIds must be an array" });
   }
+  if (defaultFactoryId !== undefined && defaultFactoryId !== null && typeof defaultFactoryId !== "string") {
+    return res.status(400).json({ error: "defaultFactoryId must be a string or null" });
+  }
+  const finalSelectedFactoryIds = selectedFactoryIds !== undefined ? (selectedFactoryIds || null) : undefined;
+  if (defaultFactoryId && finalSelectedFactoryIds && finalSelectedFactoryIds.length > 0 && !finalSelectedFactoryIds.includes(defaultFactoryId)) {
+    finalSelectedFactoryIds.push(defaultFactoryId);
+  }
   await storage.updateUserSettings(req.session.userId!, {
-    selectedFactoryIds: selectedFactoryIds || null
+    selectedFactoryIds: finalSelectedFactoryIds,
+    defaultFactoryId: defaultFactoryId !== undefined ? (defaultFactoryId || null) : undefined,
   });
   res.json({ success: true });
 });

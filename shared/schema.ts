@@ -65,6 +65,7 @@ export const users = pgTable("users", {
   sundayStartTime: text("sunday_start_time").default("08:00"),
   sundayHours: decimal("sunday_hours", { precision: 4, scale: 2 }).default("0"),
   selectedFactoryIds: text("selected_factory_ids").array(),
+  defaultFactoryId: varchar("default_factory_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

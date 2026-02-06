@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Settings2, Factory as FactoryIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,6 +14,7 @@ import { ADMIN_ROUTES, USER_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES } from "@
 
 interface UserSettings {
   selectedFactoryIds: string[];
+  defaultFactoryId: string | null;
 }
 
 export function UserSettingsPopover() {
@@ -20,6 +22,7 @@ export function UserSettingsPopover() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [defaultFactoryId, setDefaultFactoryId] = useState<string | null>(null);
 
   const { data: factories = [] } = useQuery<Factory[]>({
     queryKey: [ADMIN_ROUTES.FACTORIES],
@@ -33,11 +36,14 @@ export function UserSettingsPopover() {
     if (settings?.selectedFactoryIds) {
       setSelectedIds(settings.selectedFactoryIds);
     }
+    if (settings?.defaultFactoryId !== undefined) {
+      setDefaultFactoryId(settings.defaultFactoryId);
+    }
   }, [settings]);
 
   const updateSettingsMutation = useMutation({
-    mutationFn: async (selectedFactoryIds: string[]) => {
-      return apiRequest("PUT", USER_ROUTES.SETTINGS, { selectedFactoryIds });
+    mutationFn: async (data: { selectedFactoryIds: string[]; defaultFactoryId: string | null }) => {
+      return apiRequest("PUT", USER_ROUTES.SETTINGS, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [USER_ROUTES.SETTINGS] });
@@ -76,7 +82,12 @@ export function UserSettingsPopover() {
   };
 
   const handleSave = () => {
-    updateSettingsMutation.mutate(selectedIds);
+    let finalSelectedIds = selectedIds;
+    if (defaultFactoryId && !finalSelectedIds.includes(defaultFactoryId) && finalSelectedIds.length > 0) {
+      finalSelectedIds = [...finalSelectedIds, defaultFactoryId];
+      setSelectedIds(finalSelectedIds);
+    }
+    updateSettingsMutation.mutate({ selectedFactoryIds: finalSelectedIds, defaultFactoryId });
     setOpen(false);
   };
 
@@ -109,6 +120,32 @@ export function UserSettingsPopover() {
           <div className="flex items-center gap-2">
             <FactoryIcon className="h-5 w-5" />
             <h4 className="font-medium">Factory View Settings</h4>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Default Factory</Label>
+            <Select
+              value={defaultFactoryId || "none"}
+              onValueChange={(val) => setDefaultFactoryId(val === "none" ? null : val)}
+            >
+              <SelectTrigger data-testid="select-default-factory">
+                <SelectValue placeholder="Select default factory" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No default</SelectItem>
+                {activeFactories.map((factory) => (
+                  <SelectItem key={factory.id} value={factory.id}>
+                    {factory.name} ({factory.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Auto-selects this factory on production schedule and other pages.
+            </p>
+          </div>
+
+          <div className="border-t pt-3">
+            <Label className="text-sm font-medium">Factory View Filter</Label>
           </div>
           <p className="text-sm text-muted-foreground">
             Select which factories to show across production slots, drafting program, and other views. 

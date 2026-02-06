@@ -255,7 +255,7 @@ export interface IStorage {
   deleteUser(id: string): Promise<void>;
   getAllUsers(): Promise<User[]>;
   validatePassword(user: User, password: string): Promise<boolean>;
-  updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null }): Promise<void>;
+  updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null; defaultFactoryId?: string | null }): Promise<void>;
 
   getDevice(id: string): Promise<(Device & { user: User }) | undefined>;
   getDeviceByApiKey(apiKeyHash: string): Promise<(Device & { user: User }) | undefined>;
@@ -750,12 +750,16 @@ export class DatabaseStorage implements IStorage {
     return bcrypt.compare(password, user.passwordHash);
   }
 
-  async updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null }): Promise<void> {
+  async updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null; defaultFactoryId?: string | null }): Promise<void> {
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (settings.selectedFactoryIds !== undefined) {
+      updateData.selectedFactoryIds = settings.selectedFactoryIds;
+    }
+    if (settings.defaultFactoryId !== undefined) {
+      updateData.defaultFactoryId = settings.defaultFactoryId;
+    }
     await db.update(users)
-      .set({
-        selectedFactoryIds: settings.selectedFactoryIds,
-        updatedAt: new Date()
-      })
+      .set(updateData)
       .where(eq(users.id, userId));
   }
 

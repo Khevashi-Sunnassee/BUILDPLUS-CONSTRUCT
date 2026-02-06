@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { PRODUCTION_ROUTES, DRAFTING_ROUTES, JOBS_ROUTES, ADMIN_ROUTES, FACTORIES_ROUTES, CFMEU_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
+import { PRODUCTION_ROUTES, DRAFTING_ROUTES, JOBS_ROUTES, ADMIN_ROUTES, FACTORIES_ROUTES, CFMEU_ROUTES, PANELS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -722,11 +722,25 @@ export default function ProductionSlotsPage() {
   const weekStartDay = globalSettings?.weekStartDay ?? 1;
   const productionWindowDays = globalSettings?.productionWindowDays ?? 10;
   
+  const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
+    queryKey: [USER_ROUTES.SETTINGS],
+  });
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [factoryFilter, setFactoryFilter] = useState<string>("all");
+  const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [dateFromFilter, setDateFromFilter] = useState<string>("");
   const [dateToFilter, setDateToFilter] = useState<string>("");
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings) {
+      if (userSettings.defaultFactoryId) {
+        setFactoryFilter(userSettings.defaultFactoryId);
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoryFilterInitialized]);
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
