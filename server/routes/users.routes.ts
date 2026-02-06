@@ -54,10 +54,10 @@ router.get("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
 });
 
 const createUserSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().min(1, "Email is required").email("Invalid email address"),
   name: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  phone: z.string().min(1, "Phone number is required"),
+  address: z.string().min(1, "Address is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["USER", "MANAGER", "ADMIN"]).default("USER"),
   poApprover: z.boolean().optional(),

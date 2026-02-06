@@ -76,10 +76,10 @@ import { Switch } from "@/components/ui/switch";
 import type { User as UserType, Role } from "@shared/schema";
 
 const userSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.string().min(1, "Email is required").email("Invalid email address"),
   name: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  phone: z.string().min(1, "Phone number is required"),
+  address: z.string().min(1, "Address is required"),
   password: z.string().refine(
     (val) => val === "" || val.length >= 6,
     { message: "Password must be at least 6 characters" }
