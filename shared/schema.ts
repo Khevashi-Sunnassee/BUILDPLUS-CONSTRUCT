@@ -1480,6 +1480,7 @@ export const tasks = pgTable("tasks", {
   reminderDate: timestamp("reminder_date"),
   consultant: text("consultant"),
   projectStage: text("project_stage"),
+  priority: varchar("priority", { length: 20 }),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
