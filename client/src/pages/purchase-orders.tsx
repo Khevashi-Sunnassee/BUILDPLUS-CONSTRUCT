@@ -2,7 +2,13 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import jsPDF from "jspdf";
+import * as pdfjsLib from "pdfjs-dist";
 import { format, parseISO } from "date-fns";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  "pdfjs-dist/build/pdf.worker.mjs",
+  import.meta.url,
+).toString();
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -363,8 +369,9 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
   const [message, setMessage] = useState("");
   const [attachPdf, setAttachPdf] = useState(true);
   const [sendCopy, setSendCopy] = useState(false);
-  const [pdfDataUrl, setPdfDataUrl] = useState<string | null>(null);
+  const [pdfPageImages, setPdfPageImages] = useState<string[]>([]);
   const [pdfBase64, setPdfBase64] = useState<string | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
   const [activePreviewTab, setActivePreviewTab] = useState<"email" | "pdf">("pdf");
 
   const { data: poDetail } = useQuery<PurchaseOrderWithDetails>({
@@ -391,13 +398,15 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
       setAttachPdf(true);
       setSendCopy(false);
       setActivePreviewTab("pdf");
-      setPdfDataUrl(null);
+      setPdfPageImages([]);
       setPdfBase64(null);
+      setPdfLoading(true);
     }
   }, [open, po, settings]);
 
   useEffect(() => {
     if (open && poDetail && poDetail.items) {
+      setPdfLoading(true);
       (async () => {
         try {
           let compressedLogo: string | null = null;
@@ -405,21 +414,33 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
             compressedLogo = await compressLogoForPdf(settings.logoBase64);
           }
           const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo);
-          const blob = pdf.output("blob");
-          const blobUrl = URL.createObjectURL(blob);
-          setPdfDataUrl(blobUrl);
           const base64String = pdf.output("datauristring").split(",")[1] || "";
           setPdfBase64(base64String);
+
+          const arrayBuffer = pdf.output("arraybuffer");
+          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          const pages: string[] = [];
+          for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const scale = 2;
+            const viewport = page.getViewport({ scale });
+            const canvas = document.createElement("canvas");
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              await page.render({ canvasContext: ctx, viewport } as any).promise;
+              pages.push(canvas.toDataURL("image/png"));
+            }
+          }
+          setPdfPageImages(pages);
         } catch (e) {
           console.error("PDF generation error:", e);
+        } finally {
+          setPdfLoading(false);
         }
       })();
     }
-    return () => {
-      if (pdfDataUrl && pdfDataUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(pdfDataUrl);
-      }
-    };
   }, [open, poDetail, settings]);
 
   const sendMutation = useMutation({
@@ -605,18 +626,23 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="h-full" data-testid="div-pdf-preview">
-                  {pdfDataUrl ? (
-                    <iframe
-                      src={pdfDataUrl}
-                      className="w-full h-full min-h-[450px] rounded-md border"
-                      title="PO PDF Preview"
-                      data-testid="iframe-pdf-preview"
-                    />
-                  ) : (
+                <div className="h-full overflow-auto" data-testid="div-pdf-preview">
+                  {pdfLoading || pdfPageImages.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-muted-foreground">
                       <Loader2 className="h-6 w-6 animate-spin mr-2" />
                       Generating PDF preview...
+                    </div>
+                  ) : (
+                    <div className="space-y-2" data-testid="div-pdf-pages">
+                      {pdfPageImages.map((src, i) => (
+                        <img
+                          key={i}
+                          src={src}
+                          alt={`Page ${i + 1}`}
+                          className="w-full rounded-md border shadow-sm"
+                          data-testid={`img-pdf-page-${i}`}
+                        />
+                      ))}
                     </div>
                   )}
                 </div>
