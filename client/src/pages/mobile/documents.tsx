@@ -13,9 +13,11 @@ import {
   X,
   Loader2,
   Filter,
+  Briefcase,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
+import { JOBS_ROUTES } from "@shared/api-routes";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 interface Document {
@@ -40,6 +42,12 @@ interface DocumentType {
   typeName: string;
   prefix: string;
   color: string | null;
+}
+
+interface Job {
+  id: number;
+  jobNumber: string;
+  name: string;
 }
 
 function getFileIcon(mimeType: string) {
@@ -69,15 +77,17 @@ export default function MobileDocumentsPage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [viewingDoc, setViewingDoc] = useState(false);
 
   const { data: docsResult, isLoading } = useQuery<{ documents: Document[]; total: number }>({
-    queryKey: [DOCUMENT_ROUTES.LIST, { search: searchQuery, typeId: selectedTypeId, showLatestOnly: "true", limit: "50" }],
+    queryKey: [DOCUMENT_ROUTES.LIST, { search: searchQuery, typeId: selectedTypeId, jobId: selectedJobId, showLatestOnly: "true", limit: "50" }],
     queryFn: async () => {
       const params = new URLSearchParams({ showLatestOnly: "true", limit: "50" });
       if (searchQuery) params.set("search", searchQuery);
       if (selectedTypeId) params.set("typeId", selectedTypeId);
+      if (selectedJobId) params.set("jobId", selectedJobId);
       const res = await fetch(`${DOCUMENT_ROUTES.LIST}?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch documents");
       return res.json();
@@ -86,6 +96,10 @@ export default function MobileDocumentsPage() {
 
   const { data: docTypes = [] } = useQuery<DocumentType[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES_ACTIVE],
+  });
+
+  const { data: jobs = [] } = useQuery<Job[]>({
+    queryKey: [JOBS_ROUTES.LIST],
   });
 
   const documents = docsResult?.documents || [];
@@ -225,35 +239,72 @@ export default function MobileDocumentsPage() {
         </div>
       </div>
 
-      {docTypes.length > 0 && (
-        <div className="flex-shrink-0 px-4 py-2 border-b border-white/10">
-          <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <button
-              onClick={() => setSelectedTypeId(null)}
-              className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
-                selectedTypeId === null
-                  ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
-                  : "bg-white/5 border-white/10 text-white/60"
-              }`}
-              data-testid="filter-all-types"
-            >
-              All
-            </button>
-            {docTypes.map((type) => (
-              <button
-                key={type.id}
-                onClick={() => setSelectedTypeId(selectedTypeId === type.id ? null : type.id)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
-                  selectedTypeId === type.id
-                    ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
-                    : "bg-white/5 border-white/10 text-white/60"
-                }`}
-                data-testid={`filter-type-${type.id}`}
-              >
-                {type.typeName}
-              </button>
-            ))}
-          </div>
+      {(docTypes.length > 0 || jobs.length > 0) && (
+        <div className="flex-shrink-0 px-4 py-2 border-b border-white/10 space-y-2">
+          {jobs.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+                <button
+                  onClick={() => setSelectedJobId(null)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
+                    selectedJobId === null
+                      ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
+                      : "bg-white/5 border-white/10 text-white/60"
+                  }`}
+                  data-testid="filter-all-jobs"
+                >
+                  All Jobs
+                </button>
+                {jobs.map((job) => (
+                  <button
+                    key={job.id}
+                    onClick={() => setSelectedJobId(selectedJobId === String(job.id) ? null : String(job.id))}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
+                      selectedJobId === String(job.id)
+                        ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
+                        : "bg-white/5 border-white/10 text-white/60"
+                    }`}
+                    data-testid={`filter-job-${job.id}`}
+                  >
+                    {job.jobNumber}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {docTypes.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-white/40 flex-shrink-0" />
+              <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
+                <button
+                  onClick={() => setSelectedTypeId(null)}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
+                    selectedTypeId === null
+                      ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
+                      : "bg-white/5 border-white/10 text-white/60"
+                  }`}
+                  data-testid="filter-all-types"
+                >
+                  All Types
+                </button>
+                {docTypes.map((type) => (
+                  <button
+                    key={type.id}
+                    onClick={() => setSelectedTypeId(selectedTypeId === type.id ? null : type.id)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border active:scale-[0.99] ${
+                      selectedTypeId === type.id
+                        ? "bg-blue-500/20 border-blue-400/30 text-blue-400"
+                        : "bg-white/5 border-white/10 text-white/60"
+                    }`}
+                    data-testid={`filter-type-${type.id}`}
+                  >
+                    {type.typeName}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -190,7 +190,7 @@ export default function DocumentRegister() {
   const [disciplineFilter, setDisciplineFilter] = useState<string>("");
   const [jobFilter, setJobFilter] = useState<string>("");
   const [showLatestOnly, setShowLatestOnly] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [groupBy, setGroupBy] = useState<string>("job");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   
