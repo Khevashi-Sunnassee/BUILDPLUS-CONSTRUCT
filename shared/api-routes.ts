@@ -416,6 +416,7 @@ export const TIMER_ROUTES = {
   RESUME: (id: string | number) => `/api/timer-sessions/${id}/resume`,
   STOP: (id: string | number) => `/api/timer-sessions/${id}/stop`,
   CANCEL: (id: string | number) => `/api/timer-sessions/${id}/cancel`,
+  CANCEL_STALE: '/api/timer-sessions/cancel-stale',
   PANEL_HISTORY: (panelId: string) => `/api/timer-sessions/panel/${panelId}`,
 } as const;
 

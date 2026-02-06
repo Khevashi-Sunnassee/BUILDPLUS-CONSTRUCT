@@ -212,6 +212,49 @@ export default function ManualEntryPage() {
   
   // History section expanded state
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  
+  // Track whether stale timers have been cleaned up on mount
+  const [staleTimersCleaned, setStaleTimersCleaned] = useState(false);
+
+  // Track the active timer ID for cleanup on unmount
+  const activeTimerIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    activeTimerIdRef.current = activeTimer?.id || null;
+  }, [activeTimer]);
+
+  // On page mount: cancel stale (previous-day) timers so timer resets to 00:00:00
+  useEffect(() => {
+    const cancelStaleTimers = async () => {
+      try {
+        const res = await apiRequest("POST", TIMER_ROUTES.CANCEL_STALE, {});
+        const data = await res.json();
+        if (data.cancelledCount > 0) {
+          queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+        }
+        setStaleTimersCleaned(true);
+      } catch (error) {
+        setStaleTimersCleaned(true);
+      }
+    };
+    cancelStaleTimers();
+  }, []);
+
+  // On page unmount (navigate away): cancel the specific active timer from this session
+  useEffect(() => {
+    return () => {
+      const timerId = activeTimerIdRef.current;
+      if (timerId) {
+        const cancelOnLeave = async () => {
+          try {
+            await apiRequest("POST", TIMER_ROUTES.CANCEL(timerId), {});
+          } catch (error) {
+            // Best-effort cleanup on unmount
+          }
+        };
+        cancelOnLeave();
+      }
+    };
+  }, []);
 
   // Update timer display
   useEffect(() => {
@@ -594,21 +637,20 @@ export default function ManualEntryPage() {
   }, [panelMarkFromUrl, panels, selectedJobId, form]);
 
   // Auto-select panel from URL parameters (by panelId) and auto-start timer if requested
+  // Wait for stale timers to be cleaned before auto-starting
   useEffect(() => {
+    if (!staleTimersCleaned) return;
     if (panelIdFromUrl && panels && panels.length > 0 && !hasProcessedUrlParams) {
       const matchingPanel = panels.find(p => p.id === panelIdFromUrl);
       if (matchingPanel) {
-        // Set the job first
         if (matchingPanel.jobId && matchingPanel.jobId !== selectedJobId) {
           setSelectedJobId(matchingPanel.jobId);
           form.setValue("jobId", matchingPanel.jobId);
         }
-        // Then set the panel
         if (form.getValues("panelRegisterId") !== matchingPanel.id) {
           form.setValue("panelRegisterId", matchingPanel.id);
         }
         
-        // Auto-start timer if requested and no timer is currently active
         if (startTimerFromUrl && !hasActiveTimer && matchingPanel.jobId) {
           setHasProcessedUrlParams(true);
           startTimerMutation.mutate({
@@ -620,7 +662,7 @@ export default function ManualEntryPage() {
         }
       }
     }
-  }, [panelIdFromUrl, panels, hasProcessedUrlParams, startTimerFromUrl, hasActiveTimer, selectedJobId, form, startTimerMutation]);
+  }, [panelIdFromUrl, panels, hasProcessedUrlParams, startTimerFromUrl, hasActiveTimer, selectedJobId, form, startTimerMutation, staleTimersCleaned]);
 
   const createEntryMutation = useMutation({
     mutationFn: async (data: ManualEntryForm) => {

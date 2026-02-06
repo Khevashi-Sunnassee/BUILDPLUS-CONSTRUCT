@@ -444,6 +444,66 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
   }
 });
 
+// Cancel stale (non-today) RUNNING or PAUSED timer sessions for the current user
+// This is called when the timer screen is opened to ensure a fresh start
+router.post("/api/timer-sessions/cancel-stale", requireAuth, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+
+    const staleSessions = await db
+      .select()
+      .from(timerSessions)
+      .where(and(
+        eq(timerSessions.userId, userId),
+        or(
+          eq(timerSessions.status, "RUNNING"),
+          eq(timerSessions.status, "PAUSED")
+        )
+      ));
+
+    const now = new Date();
+    const melbourneOffset = 11 * 60 * 60 * 1000;
+    const melbourneNow = new Date(now.getTime() + melbourneOffset);
+    const todayStr = format(melbourneNow, "yyyy-MM-dd");
+    let cancelledCount = 0;
+
+    for (const session of staleSessions) {
+      const sessionMelbourneTime = new Date(session.startedAt.getTime() + melbourneOffset);
+      const sessionDateStr = format(sessionMelbourneTime, "yyyy-MM-dd");
+      
+      if (sessionDateStr === todayStr) {
+        continue;
+      }
+
+      let elapsedAtCancel = session.totalElapsedMs;
+      if (session.status === "RUNNING") {
+        elapsedAtCancel += now.getTime() - session.startedAt.getTime();
+      }
+
+      await db
+        .update(timerSessions)
+        .set({
+          status: "CANCELLED",
+          completedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(timerSessions.id, session.id));
+
+      await recordTimerEvent(session.id, userId, "CANCEL", elapsedAtCancel, "Auto-cancelled: stale session from previous day");
+      cancelledCount++;
+    }
+
+    if (cancelledCount > 0) {
+      logger.info(`Auto-cancelled ${cancelledCount} stale timer session(s) for user: ${userId}`);
+    }
+
+    res.json({ cancelledCount });
+  } catch (error) {
+    logger.error({ err: error }, "Error cancelling stale timer sessions");
+    res.status(500).json({ error: "Failed to cancel stale timer sessions" });
+  }
+});
+
 // Cancel a timer session without creating a log entry
 router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
   try {
