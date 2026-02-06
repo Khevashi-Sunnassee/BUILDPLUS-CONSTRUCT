@@ -371,7 +371,7 @@ export default function MobileChecklistFillPage() {
       )}
 
       {showCompleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-end">
+        <div className="fixed inset-0 z-[60] flex items-end">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowCompleteConfirm(false)} />
           <div className="relative w-full rounded-t-3xl bg-[#0D1117] border-t border-white/10 p-6" style={{ paddingBottom: 'env(safe-area-inset-bottom, 24px)' }}>
             <div className="w-10 h-1 bg-white/20 rounded-full mx-auto mb-6" />

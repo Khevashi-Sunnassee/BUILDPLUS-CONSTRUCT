@@ -342,7 +342,7 @@ export default function MobileChecklistsPage() {
       </div>
 
       {showNewInstanceSheet && (
-        <div className="fixed inset-0 z-50 flex items-end">
+        <div className="fixed inset-0 z-[60] flex items-end">
           <div
             className="absolute inset-0 bg-black/60"
             onClick={() => setShowNewInstanceSheet(false)}
