@@ -28,6 +28,28 @@ import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, A
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
 
+function compressLogoForPdf(logoBase64: string, maxWidth = 200, quality = 0.75): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(maxWidth / img.width, 1);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(logoBase64); return; }
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(logoBase64);
+    img.src = logoBase64;
+  });
+}
+
 interface AttachmentWithUser extends PurchaseOrderAttachment {
   uploadedBy?: User | null;
 }
@@ -506,13 +528,14 @@ export default function PurchaseOrderFormPage() {
     }
   };
 
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback(async () => {
     if (!existingPO) return;
     
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
+      compress: true,
     });
     
     const pageWidth = pdf.internal.pageSize.getWidth();
@@ -521,7 +544,6 @@ export default function PurchaseOrderFormPage() {
     const contentWidth = pageWidth - margin * 2;
     let currentY = margin;
     
-    // Helper function to add a new page if needed
     const checkPageBreak = (requiredHeight: number) => {
       if (currentY + requiredHeight > pageHeight - margin) {
         pdf.addPage();
@@ -531,17 +553,17 @@ export default function PurchaseOrderFormPage() {
       return false;
     };
     
-    // Company header section - clean white background with logo
     let headerTextX = margin;
     const logoHeight = 20;
     
-    // Add company logo if available
     if (settings?.logoBase64) {
       try {
-        pdf.addImage(settings.logoBase64, "PNG", margin, 5, 25, logoHeight);
+        const compressedLogo = await compressLogoForPdf(settings.logoBase64);
+        const fmt = compressedLogo.includes("image/jpeg") ? "JPEG" : "PNG";
+        pdf.addImage(compressedLogo, fmt, margin, 5, 25, logoHeight);
         headerTextX = margin + 30;
       } catch (e) {
-        console.error("Failed to add logo to PDF:", e);
+        // skip logo
       }
     }
     

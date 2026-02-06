@@ -32,15 +32,39 @@ interface PurchaseOrderWithDetails extends PurchaseOrder {
 
 type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
+function compressLogoForPdf(logoBase64: string, maxWidth = 200, quality = 0.75): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(maxWidth / img.width, 1);
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { resolve(logoBase64); return; }
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => resolve(logoBase64);
+    img.src = logoBase64;
+  });
+}
+
 function generatePoPdf(
   po: PurchaseOrderWithDetails,
   lineItems: PurchaseOrderItem[],
-  settings?: { logoBase64: string | null; companyName: string } | null
+  settings?: { logoBase64: string | null; companyName: string } | null,
+  compressedLogo?: string | null
 ): jsPDF {
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
     format: "a4",
+    compress: true,
   });
 
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -60,10 +84,12 @@ function generatePoPdf(
 
   let headerTextX = margin;
   const logoHeight = 20;
+  const logoToUse = compressedLogo || settings?.logoBase64;
 
-  if (settings?.logoBase64) {
+  if (logoToUse) {
     try {
-      pdf.addImage(settings.logoBase64, "PNG", margin, 5, 25, logoHeight);
+      const fmt = logoToUse.includes("image/jpeg") ? "JPEG" : "PNG";
+      pdf.addImage(logoToUse, fmt, margin, 5, 25, logoHeight);
       headerTextX = margin + 30;
     } catch (e) {
       // skip logo
@@ -372,15 +398,21 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
 
   useEffect(() => {
     if (open && poDetail && poDetail.items) {
-      try {
-        const pdf = generatePoPdf(poDetail, poDetail.items, settings);
-        const dataUrl = pdf.output("dataurlstring");
-        setPdfDataUrl(dataUrl);
-        const base64String = pdf.output("datauristring").split(",")[1] || "";
-        setPdfBase64(base64String);
-      } catch (e) {
-        console.error("PDF generation error:", e);
-      }
+      (async () => {
+        try {
+          let compressedLogo: string | null = null;
+          if (settings?.logoBase64) {
+            compressedLogo = await compressLogoForPdf(settings.logoBase64);
+          }
+          const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo);
+          const dataUrl = pdf.output("dataurlstring");
+          setPdfDataUrl(dataUrl);
+          const base64String = pdf.output("datauristring").split(",")[1] || "";
+          setPdfBase64(base64String);
+        } catch (e) {
+          console.error("PDF generation error:", e);
+        }
+      })();
     }
   }, [open, poDetail, settings]);
 
