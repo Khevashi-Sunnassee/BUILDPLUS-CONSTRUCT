@@ -75,6 +75,8 @@ import {
   Check,
   Mail,
   Loader2,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1116,6 +1118,17 @@ function TaskGroupComponent({
       return next;
     });
   };
+
+  const expandAllTasks = () => {
+    const allIds = new Set(group.tasks.map(t => t.id));
+    setExpandedTaskIds(allIds);
+  };
+
+  const collapseAllTasks = () => {
+    setExpandedTaskIds(new Set());
+  };
+
+  const allExpanded = group.tasks.length > 0 && expandedTaskIds.size === group.tasks.length;
   
   const sortedTasks = [...group.tasks].sort((a, b) => {
     switch (sortOption) {
@@ -1240,6 +1253,26 @@ function TaskGroupComponent({
         </Badge>
 
         <div className="flex-1" />
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1"
+              onClick={allExpanded ? collapseAllTasks : expandAllTasks}
+              data-testid={`btn-toggle-all-subtasks-${group.id}`}
+            >
+              {allExpanded ? (
+                <ChevronsDownUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronsUpDown className="h-3.5 w-3.5" />
+              )}
+              <span className="text-xs">{allExpanded ? "Collapse All" : "Expand All"}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{allExpanded ? "Collapse all subtasks" : "Expand all subtasks"}</TooltipContent>
+        </Tooltip>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
