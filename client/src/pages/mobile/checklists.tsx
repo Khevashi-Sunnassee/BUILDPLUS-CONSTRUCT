@@ -13,6 +13,10 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
+  Shield,
+  Wrench,
+  LayoutGrid,
+  type LucideIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -37,6 +41,26 @@ function getStatusStyle(status: string): { text: string; bg: string; label: stri
     case "cancelled": return { text: "text-red-400", bg: "bg-red-500/20", label: "Cancelled" };
     default: return { text: "text-white/60", bg: "bg-white/10", label: status };
   }
+}
+
+const moduleColors: Array<{ text: string; bg: string; icon: LucideIcon }> = [
+  { text: "text-blue-400", bg: "bg-blue-500/20", icon: FileText },
+  { text: "text-amber-400", bg: "bg-amber-500/20", icon: Wrench },
+  { text: "text-red-400", bg: "bg-red-500/20", icon: Shield },
+  { text: "text-purple-400", bg: "bg-purple-500/20", icon: LayoutGrid },
+  { text: "text-emerald-400", bg: "bg-emerald-500/20", icon: ClipboardCheck },
+  { text: "text-cyan-400", bg: "bg-cyan-500/20", icon: FolderOpen },
+  { text: "text-pink-400", bg: "bg-pink-500/20", icon: FileCheck },
+  { text: "text-orange-400", bg: "bg-orange-500/20", icon: FolderOpen },
+];
+
+function getModuleStyle(name: string, index: number): { text: string; bg: string; icon: LucideIcon } {
+  const lower = name.toLowerCase();
+  if (lower.includes("document")) return { text: "text-blue-400", bg: "bg-blue-500/20", icon: FileText };
+  if (lower.includes("equipment")) return { text: "text-amber-400", bg: "bg-amber-500/20", icon: Wrench };
+  if (lower.includes("safety")) return { text: "text-red-400", bg: "bg-red-500/20", icon: Shield };
+  if (lower.includes("panel")) return { text: "text-purple-400", bg: "bg-purple-500/20", icon: LayoutGrid };
+  return moduleColors[index % moduleColors.length];
 }
 
 export default function MobileChecklistsPage() {
@@ -177,8 +201,9 @@ export default function MobileChecklistsPage() {
               <p className="text-white/40 text-sm">No checklist modules available</p>
             </div>
           ) : (
-            entityTypes.map((type) => {
-              const typeTemplateCount = templates.filter(t => t.entityTypeId === type.id).length;
+            entityTypes.map((type, idx) => {
+              const style = getModuleStyle(type.name, idx);
+              const Icon = style.icon;
               return (
                 <button
                   key={type.id}
@@ -186,8 +211,8 @@ export default function MobileChecklistsPage() {
                   className="flex h-[66px] w-full items-center gap-4 rounded-2xl border border-white/10 bg-white/5 px-4 text-left active:scale-[0.99]"
                   data-testid={`module-${type.id}`}
                 >
-                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-teal-500/20">
-                    <FolderOpen className="h-5 w-5 text-teal-400" />
+                  <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${style.bg}`}>
+                    <Icon className={`h-5 w-5 ${style.text}`} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-base font-semibold text-white truncate">{type.name}</div>
