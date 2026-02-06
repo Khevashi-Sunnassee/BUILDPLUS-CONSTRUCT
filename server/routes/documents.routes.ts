@@ -703,12 +703,49 @@ router.post("/api/document-bundles", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Company context required" });
     }
 
+    let finalDescription = description || null;
+
+    if (!finalDescription && documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
+      try {
+        const docDetails: string[] = [];
+        for (const docId of documentIds) {
+          const doc = await storage.getDocument(docId);
+          if (doc) {
+            const parts = [doc.title];
+            if (doc.type?.typeName) parts.push(`(${doc.type.typeName})`);
+            if (doc.discipline?.disciplineName) parts.push(`[${doc.discipline.disciplineName}]`);
+            docDetails.push(parts.join(" "));
+          }
+        }
+
+        if (docDetails.length > 0) {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: "You are a document management assistant for a construction/precast company. Generate a brief 1-2 sentence description of what a document bundle contains based on the document names provided. Be concise and professional. Do not use quotes around the description."
+              },
+              {
+                role: "user",
+                content: `Bundle name: "${bundleName}"\nDocuments included:\n${docDetails.map((d, i) => `${i + 1}. ${d}`).join("\n")}`
+              }
+            ],
+            max_completion_tokens: 100,
+          });
+          finalDescription = completion.choices[0]?.message?.content?.trim() || null;
+        }
+      } catch (aiError) {
+        logger.warn({ err: aiError }, "Failed to generate AI bundle description, continuing without it");
+      }
+    }
+
     const qrCodeId = `bundle-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
 
     const bundle = await storage.createDocumentBundle({
       companyId,
       bundleName,
-      description: description || null,
+      description: finalDescription,
       qrCodeId,
       jobId: jobId || null,
       supplierId: supplierId || null,
@@ -771,6 +808,10 @@ router.delete("/api/document-bundles/:bundleId/documents/:documentId", requireAu
 
 router.delete("/api/document-bundles/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
+    const bundle = await storage.getDocumentBundle(String(req.params.id));
+    if (!bundle || bundle.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
     await storage.deleteDocumentBundle(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {

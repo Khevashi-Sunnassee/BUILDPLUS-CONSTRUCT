@@ -16,6 +16,8 @@ import {
   Loader2,
   Mail,
   User,
+  Phone,
+  MapPin,
   Power,
   PowerOff,
   Clock,
@@ -76,6 +78,8 @@ import type { User as UserType, Role } from "@shared/schema";
 const userSchema = z.object({
   email: z.string().email("Invalid email address"),
   name: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
   password: z.string().min(6, "Password must be at least 6 characters").optional(),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
   poApprover: z.boolean().optional(),
@@ -137,6 +141,8 @@ export default function AdminUsersPage() {
     defaultValues: {
       email: "",
       name: "",
+      phone: "",
+      address: "",
       password: "",
       role: "USER",
       poApprover: false,
@@ -270,6 +276,8 @@ export default function AdminUsersPage() {
     form.reset({
       email: user.email,
       name: user.name || "",
+      phone: user.phone || "",
+      address: user.address || "",
       password: "",
       role: user.role as "USER" | "MANAGER" | "ADMIN",
       poApprover: user.poApprover || false,
@@ -280,7 +288,7 @@ export default function AdminUsersPage() {
 
   const openNewUser = () => {
     setEditingUser(null);
-    form.reset({ email: "", name: "", password: "", role: "USER", poApprover: false, poApprovalLimit: "" });
+    form.reset({ email: "", name: "", phone: "", address: "", password: "", role: "USER", poApprover: false, poApprovalLimit: "" });
     setDialogOpen(true);
   };
 
@@ -289,6 +297,8 @@ export default function AdminUsersPage() {
       const updateData: Partial<UserFormData> = {
         email: data.email,
         name: data.name,
+        phone: data.phone,
+        address: data.address,
         role: data.role,
         poApprover: data.poApprover,
         poApprovalLimit: data.poApprovalLimit,
@@ -358,6 +368,8 @@ export default function AdminUsersPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Address</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
@@ -380,6 +392,12 @@ export default function AdminUsersPage() {
                           <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                           {user.email}
                         </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-phone-${user.id}`}>
+                        {user.phone || "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[200px] truncate" data-testid={`text-address-${user.id}`}>
+                        {user.address || "—"}
                       </TableCell>
                       <TableCell>
                         {getRoleBadge(user.role as Role)}
@@ -500,6 +518,34 @@ export default function AdminUsersPage() {
                   </FormItem>
                 )}
               />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="tel" placeholder="0412 345 678" data-testid="input-phone" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="address"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Address</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="123 Main St, Melbourne VIC" data-testid="input-address" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={form.control}
                 name="password"

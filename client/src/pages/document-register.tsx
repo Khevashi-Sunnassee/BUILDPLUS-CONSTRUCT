@@ -83,6 +83,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DOCUMENT_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PROCUREMENT_ROUTES, TASKS_ROUTES } from "@shared/api-routes";
 import type { 
   Document, 
@@ -212,6 +222,9 @@ export default function DocumentRegister() {
   const [isBundleViewOpen, setIsBundleViewOpen] = useState(false);
   const [isBundlesListOpen, setIsBundlesListOpen] = useState(false);
   const [selectedBundleForQR, setSelectedBundleForQR] = useState<DocumentBundle | null>(null);
+  const [selectedBundleForView, setSelectedBundleForView] = useState<DocumentBundle | null>(null);
+  const [deleteBundleDialogOpen, setDeleteBundleDialogOpen] = useState(false);
+  const [bundleToDelete, setBundleToDelete] = useState<DocumentBundle | null>(null);
   const [isAnalyzingVersion, setIsAnalyzingVersion] = useState(false);
   const [aiVersionSummary, setAiVersionSummary] = useState("");
 
@@ -353,6 +366,21 @@ export default function DocumentRegister() {
       setIsBundleViewOpen(true);
       setSelectedDocsForBundle([]);
       bundleForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteBundleMutation = useMutation({
+    mutationFn: async (bundleId: string) => {
+      await apiRequest("DELETE", DOCUMENT_ROUTES.BUNDLE_BY_ID(bundleId), {});
+    },
+    onSuccess: () => {
+      toast({ title: "Bundle deleted" });
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.BUNDLES] });
+      setDeleteBundleDialogOpen(false);
+      setBundleToDelete(null);
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1527,9 +1555,9 @@ export default function DocumentRegister() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Description</FormLabel>
+                    <FormLabel>Description (Optional)</FormLabel>
                     <FormControl>
-                      <Textarea {...field} placeholder="Describe this bundle" data-testid="input-bundle-description" />
+                      <Textarea {...field} placeholder="Leave blank to auto-generate with AI based on selected documents" data-testid="input-bundle-description" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1686,98 +1714,198 @@ export default function DocumentRegister() {
         </DialogContent>
       </Dialog>
 
-      <Sheet open={isBundlesListOpen} onOpenChange={setIsBundlesListOpen}>
-        <SheetContent className="w-[500px] sm:w-[600px] sm:max-w-xl overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
+      <Dialog open={isBundlesListOpen} onOpenChange={setIsBundlesListOpen}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />
               Document Bundles
-            </SheetTitle>
-            <SheetDescription>
-              View all document bundles and their QR codes for sharing
-            </SheetDescription>
-          </SheetHeader>
+            </DialogTitle>
+            <DialogDescription>
+              All document bundles with their contents and sharing options
+            </DialogDescription>
+          </DialogHeader>
 
-          <div className="mt-6 space-y-4">
+          <div className="space-y-3">
             {bundlesLoading ? (
-              <div className="flex items-center justify-center py-8">
+              <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
             ) : bundles.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Package className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                <p>No bundles created yet</p>
+              <div className="text-center py-12 text-muted-foreground">
+                <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                <p className="font-medium">No bundles created yet</p>
                 <p className="text-sm mt-1">Create a bundle to share documents via QR code</p>
               </div>
             ) : (
-              bundles.map((bundle) => (
-                <Card key={bundle.id} className="hover-elevate" data-testid={`bundle-card-${bundle.id}`}>
-                  <CardContent className="pt-4">
-                    <div className="flex gap-4">
-                      <div 
-                        className="bg-white p-2 rounded cursor-pointer hover:ring-2 hover:ring-primary transition-all"
-                        onClick={() => setSelectedBundleForQR(bundle)}
-                        title="Click to enlarge QR code"
-                      >
-                        <QRCodeSVG 
-                          value={`${window.location.origin}/bundle/${bundle.qrCodeId}`}
-                          size={80}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium truncate">{bundle.bundleName}</h4>
-                        {bundle.description && (
-                          <p className="text-sm text-muted-foreground truncate">{bundle.description}</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          <Badge variant="secondary">
-                            {bundle.items?.length || 0} documents
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Bundle Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-center">Files</TableHead>
+                      <TableHead>Access</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {bundles.map((bundle) => (
+                      <TableRow key={bundle.id} data-testid={`bundle-row-${bundle.id}`}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <span className="font-medium">{bundle.bundleName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[250px]">
+                          <p className="text-sm text-muted-foreground truncate">
+                            {bundle.description || "No description"}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary" data-testid={`badge-file-count-${bundle.id}`}>
+                            {bundle.items?.length || 0}
                           </Badge>
-                          {bundle.allowGuestAccess ? (
-                            <Badge variant="outline" className="text-green-600">Guest Access</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-yellow-600">Restricted</Badge>
-                          )}
-                          {bundle.expiresAt && new Date(bundle.expiresAt) < new Date() && (
-                            <Badge variant="destructive">Expired</Badge>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Created: {formatDate(bundle.createdAt)}
-                          {bundle.expiresAt && ` • Expires: ${formatDate(bundle.expiresAt)}`}
-                        </p>
-                        <div className="flex gap-2 mt-3">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${window.location.origin}/bundle/${bundle.qrCodeId}`);
-                              toast({ title: "Copied", description: "Bundle link copied to clipboard" });
-                            }}
-                            data-testid={`button-copy-link-${bundle.id}`}
-                          >
-                            <Copy className="h-3 w-3 mr-1" />
-                            Copy Link
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => window.open(`/bundle/${bundle.qrCodeId}`, "_blank")}
-                            data-testid={`button-open-bundle-${bundle.id}`}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Open
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {bundle.allowGuestAccess ? (
+                              <Badge variant="outline" className="text-green-600">Guest</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-yellow-600">Restricted</Badge>
+                            )}
+                            {bundle.expiresAt && new Date(bundle.expiresAt) < new Date() && (
+                              <Badge variant="destructive">Expired</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                          {formatDate(bundle.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setSelectedBundleForView(bundle)}
+                              title="View documents"
+                              data-testid={`button-view-bundle-${bundle.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setSelectedBundleForQR(bundle)}
+                              title="Show QR code"
+                              data-testid={`button-qr-bundle-${bundle.id}`}
+                            >
+                              <QrCode className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                setBundleToDelete(bundle);
+                                setDeleteBundleDialogOpen(true);
+                              }}
+                              title="Delete bundle"
+                              data-testid={`button-delete-bundle-${bundle.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedBundleForView} onOpenChange={() => setSelectedBundleForView(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5" />
+              {selectedBundleForView?.bundleName}
+            </DialogTitle>
+            {selectedBundleForView?.description && (
+              <DialogDescription>{selectedBundleForView.description}</DialogDescription>
+            )}
+          </DialogHeader>
+          {selectedBundleForView && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge variant="secondary">
+                  {selectedBundleForView.items?.length || 0} documents
+                </Badge>
+                {selectedBundleForView.allowGuestAccess ? (
+                  <Badge variant="outline" className="text-green-600">Guest Access Enabled</Badge>
+                ) : (
+                  <Badge variant="outline" className="text-yellow-600">Restricted Access</Badge>
+                )}
+                {selectedBundleForView.expiresAt && (
+                  <span className="text-xs text-muted-foreground">
+                    Expires: {formatDate(selectedBundleForView.expiresAt)}
+                  </span>
+                )}
+              </div>
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Document</TableHead>
+                      <TableHead>Version</TableHead>
+                      <TableHead>Added</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedBundleForView.items?.length > 0 ? (
+                      selectedBundleForView.items.map((item) => (
+                        <TableRow key={item.id} data-testid={`bundle-doc-row-${item.id}`}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <span className="font-medium">
+                                {item.document?.title || "Unknown Document"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {(item.document as any)?.revision || "—"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {formatDate(item.addedAt)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                          No documents in this bundle
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedBundleForView(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!selectedBundleForQR} onOpenChange={() => setSelectedBundleForQR(null)}>
         <DialogContent className="max-w-sm">
@@ -1809,6 +1937,7 @@ export default function DocumentRegister() {
                     navigator.clipboard.writeText(`${window.location.origin}/bundle/${selectedBundleForQR.qrCodeId}`);
                     toast({ title: "Copied", description: "Link copied to clipboard" });
                   }}
+                  data-testid="button-copy-qr-link"
                 >
                   <Copy className="h-4 w-4" />
                 </Button>
@@ -1825,6 +1954,7 @@ export default function DocumentRegister() {
             <Button 
               variant="outline" 
               onClick={() => window.open(`/bundle/${selectedBundleForQR?.qrCodeId}`, "_blank")}
+              data-testid="button-open-bundle-external"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               Open Bundle
@@ -1835,6 +1965,32 @@ export default function DocumentRegister() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={deleteBundleDialogOpen} onOpenChange={setDeleteBundleDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Bundle?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the bundle "{bundleToDelete?.bundleName}" and remove all document associations. The documents themselves will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => bundleToDelete && deleteBundleMutation.mutate(bundleToDelete.id)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete-bundle"
+            >
+              {deleteBundleMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

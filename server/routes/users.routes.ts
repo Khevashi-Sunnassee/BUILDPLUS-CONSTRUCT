@@ -53,34 +53,72 @@ router.get("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
   res.json(users.map(u => ({ ...u, passwordHash: undefined })));
 });
 
+const createUserSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["USER", "MANAGER", "ADMIN"]).default("USER"),
+  poApprover: z.boolean().optional(),
+  poApprovalLimit: z.string().optional(),
+});
+
+const updateUserSchema = z.object({
+  email: z.string().email("Invalid email address").optional(),
+  name: z.string().optional(),
+  phone: z.string().optional(),
+  address: z.string().optional(),
+  password: z.string().min(6).optional().or(z.literal("")),
+  role: z.enum(["USER", "MANAGER", "ADMIN"]).optional(),
+  isActive: z.boolean().optional(),
+  poApprover: z.boolean().optional(),
+  poApprovalLimit: z.string().optional(),
+});
+
 // Admin: Create user
 router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
   try {
     if (!req.companyId) {
       return res.status(403).json({ error: "Company context required" });
     }
-    const existing = await storage.getUserByEmail(req.body.email);
+    const validated = createUserSchema.parse(req.body);
+    const existing = await storage.getUserByEmail(validated.email);
     if (existing) {
       return res.status(400).json({ error: "User with this email already exists" });
     }
-    const userData = { ...req.body, companyId: req.companyId };
+    const userData = { ...validated, companyId: req.companyId };
     const user = await storage.createUser(userData);
     res.json({ ...user, passwordHash: undefined });
   } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: error.errors });
+    }
     res.status(400).json({ error: error.message || "Failed to create user" });
   }
 });
 
 // Admin: Update user
 router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
-  const existingUser = await storage.getUser(req.params.id as string);
-  if (!existingUser || existingUser.companyId !== req.companyId) {
-    return res.status(404).json({ error: "User not found" });
+  try {
+    const existingUser = await storage.getUser(req.params.id as string);
+    if (!existingUser || existingUser.companyId !== req.companyId) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const validated = updateUserSchema.parse(req.body);
+    const updateData: Record<string, any> = { ...validated };
+    delete updateData.companyId;
+    if (updateData.password === "") {
+      delete updateData.password;
+    }
+    const user = await storage.updateUser(req.params.id as string, updateData);
+    res.json({ ...user, passwordHash: undefined });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: error.errors });
+    }
+    res.status(400).json({ error: error.message || "Failed to update user" });
   }
-  const updateData = { ...req.body };
-  delete updateData.companyId;
-  const user = await storage.updateUser(req.params.id as string, updateData);
-  res.json({ ...user, passwordHash: undefined });
 });
 
 const workHoursSchema = z.object({
