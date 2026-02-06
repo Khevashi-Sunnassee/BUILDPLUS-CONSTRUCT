@@ -22,6 +22,38 @@ import { normalizeSections } from "@/components/checklist/normalize-sections";
 import { calculateCompletionRate, getMissingRequiredFields } from "@/components/checklist/checklist-form";
 import type { ChecklistInstance, ChecklistTemplate, ChecklistSection, ChecklistField, ChecklistFieldOption } from "@shared/schema";
 
+function compressImage(file: File, maxDimension = 1280, quality = 0.7): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Failed to read file"));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Failed to load image"));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) { resolve(e.target?.result as string); return; }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function MobileChecklistFillPage() {
   const { id } = useParams<{ id: string }>();
   const [, navigate] = useLocation();
@@ -63,8 +95,11 @@ export default function MobileChecklistFillPage() {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)] });
       setHasChanges(false);
     },
-    onError: () => {
-      toast({ title: "Failed to save progress", variant: "destructive" });
+    onError: (error: Error) => {
+      const msg = error.message?.includes("413")
+        ? "Data too large. Try removing some photos."
+        : "Failed to save progress";
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
@@ -83,8 +118,11 @@ export default function MobileChecklistFillPage() {
       setShowCompleteConfirm(false);
       navigate("/mobile/checklists");
     },
-    onError: () => {
-      toast({ title: "Failed to complete checklist", variant: "destructive" });
+    onError: (error: Error) => {
+      const msg = error.message?.includes("413")
+        ? "Data too large. Try removing some photos."
+        : "Failed to complete checklist";
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
@@ -786,27 +824,42 @@ function MobileRatingField({ field, value, onChange, disabled }: MobileFieldProp
 
 function MobilePhotoField({ field, value, onChange, disabled }: MobileFieldProps) {
   const [preview, setPreview] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
   const photoData = value as { base64: string; filename: string } | null;
 
   useEffect(() => {
     if (photoData?.base64) setPreview(photoData.base64);
   }, [photoData]);
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
+    setCompressing(true);
+    try {
+      const base64 = await compressImage(file);
       setPreview(base64);
-      onChange({ filename: file.name, base64, type: file.type });
-    };
-    reader.readAsDataURL(file);
+      onChange({ filename: file.name, base64, type: "image/jpeg" });
+    } catch {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        setPreview(base64);
+        onChange({ filename: file.name, base64, type: file.type });
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setCompressing(false);
+    }
   };
 
   return (
     <div data-testid={`mobile-field-photo-${field.id}`}>
-      {preview ? (
+      {compressing ? (
+        <div className="flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-white/20 bg-white/5">
+          <Loader2 className="h-8 w-8 text-blue-400 animate-spin mb-2" />
+          <span className="text-sm text-white/40">Compressing photo...</span>
+        </div>
+      ) : preview ? (
         <div className="relative rounded-xl overflow-hidden">
           <img src={preview} alt="Captured" className="w-full max-h-48 object-cover rounded-xl" />
           {!disabled && (
@@ -840,18 +893,31 @@ function MobilePhotoField({ field, value, onChange, disabled }: MobileFieldProps
 
 function MobileMultiPhotoField({ field, value, onChange, disabled }: MobileFieldProps) {
   const photos = (value as Array<{ filename: string; base64: string; type: string }>) || [];
+  const [compressing, setCompressing] = useState(false);
 
-  const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    Array.from(files).forEach(file => {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const base64 = ev.target?.result as string;
-        onChange([...photos, { filename: file.name, base64, type: file.type }]);
-      };
-      reader.readAsDataURL(file);
-    });
+    setCompressing(true);
+    try {
+      const newPhotos = [...photos];
+      for (const file of Array.from(files)) {
+        try {
+          const base64 = await compressImage(file);
+          newPhotos.push({ filename: file.name, base64, type: "image/jpeg" });
+        } catch {
+          const base64 = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (ev) => resolve(ev.target?.result as string);
+            reader.readAsDataURL(file);
+          });
+          newPhotos.push({ filename: file.name, base64, type: file.type });
+        }
+      }
+      onChange(newPhotos);
+    } finally {
+      setCompressing(false);
+    }
   };
 
   return (
@@ -872,19 +938,25 @@ function MobileMultiPhotoField({ field, value, onChange, disabled }: MobileField
           </div>
         ))}
         {!disabled && (
-          <label className="flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 border-dashed border-white/20 bg-white/5 cursor-pointer active:scale-[0.99]">
-            <Camera className="h-5 w-5 text-white/40 mb-1" />
-            <span className="text-[10px] text-white/40">Add</span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              multiple
-              className="hidden"
-              onChange={handleCapture}
-              data-testid={`mobile-input-multiphoto-${field.id}`}
-            />
-          </label>
+          compressing ? (
+            <div className="flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 border-dashed border-white/20 bg-white/5">
+              <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+            </div>
+          ) : (
+            <label className="flex flex-col items-center justify-center w-20 h-20 rounded-xl border-2 border-dashed border-white/20 bg-white/5 cursor-pointer active:scale-[0.99]">
+              <Camera className="h-5 w-5 text-white/40 mb-1" />
+              <span className="text-[10px] text-white/40">Add</span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                className="hidden"
+                onChange={handleCapture}
+                data-testid={`mobile-input-multiphoto-${field.id}`}
+              />
+            </label>
+          )
         )}
       </div>
       {photos.length > 0 && (
@@ -896,16 +968,27 @@ function MobileMultiPhotoField({ field, value, onChange, disabled }: MobileField
 
 function MobileFileUploadField({ field, value, onChange, disabled }: MobileFieldProps) {
   const fileInfo = value as { filename: string } | null;
+  const [uploading, setUploading] = useState(false);
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
-      onChange({ filename: file.name, base64, type: file.type, size: file.size });
-    };
-    reader.readAsDataURL(file);
+    setUploading(true);
+    try {
+      if (file.type.startsWith("image/")) {
+        const base64 = await compressImage(file);
+        onChange({ filename: file.name, base64, type: "image/jpeg", size: file.size });
+      } else {
+        const base64 = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.readAsDataURL(file);
+        });
+        onChange({ filename: file.name, base64, type: file.type, size: file.size });
+      }
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -918,6 +1001,11 @@ function MobileFileUploadField({ field, value, onChange, disabled }: MobileField
               Remove
             </button>
           )}
+        </div>
+      ) : uploading ? (
+        <div className="flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed border-white/20 bg-white/5">
+          <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+          <span className="text-sm text-white/40">Processing...</span>
         </div>
       ) : (
         <label className={`flex items-center justify-center gap-2 h-12 rounded-xl border-2 border-dashed border-white/20 bg-white/5 cursor-pointer active:scale-[0.99] ${disabled ? "opacity-50 pointer-events-none" : ""}`}>
