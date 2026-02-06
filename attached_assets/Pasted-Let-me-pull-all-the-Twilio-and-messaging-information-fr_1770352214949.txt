@@ -1,0 +1,196 @@
+Let me pull all the Twilio and messaging information from the codebase.
+
+Here's the complete messaging system brief:
+
+SMS, WhatsApp & Email Messaging System - Complete Setup Guide
+GATEWAY: TWILIO (SMS + WhatsApp)
+Required Environment Variables (Secrets)
+Secret	Where to Get It	Purpose
+TWILIO_ACCOUNT_SID	Twilio Console → Dashboard	Account identifier
+TWILIO_AUTH_TOKEN	Twilio Console → Dashboard	Authentication token
+TWILIO_PHONE_NUMBER	Twilio Console → Phone Numbers	SMS sender number (e.g. +61412345678)
+TWILIO_WHATSAPP_NUMBER	Twilio Console → WhatsApp Sandbox	WhatsApp sender (default sandbox: whatsapp:+14155238886)
+NPM Package
+npm install twilio
+HOW SMS WORKS
+Setup Process
+Create Twilio account at twilio.com
+Buy a phone number with SMS capability (Australian numbers start with +61)
+Set environment variables in your Replit secrets
+The service initializes automatically on server start - checks for all 3 env vars
+Sending an SMS
+The process:
+
+Receive phone number and message text
+Format the phone number (ensure country code):
+If starts with 04 → convert to +614... (Australian mobile)
+If starts with 61 → add + prefix
+Otherwise → prepend +61
+Call Twilio API: client.messages.create({ body, from, to })
+Get back message SID (confirmation ID)
+Key method - sendSMS():
+
+Input: { to: "+61404799799", message: "Your work order is ready" }
+Process: client.messages.create({ body: message, from: TWILIO_PHONE_NUMBER, to: formattedPhone })
+Output: { success: true, messageId: "SMxxxxxxxxxxxx" }
+HOW WHATSAPP WORKS
+Setup Process
+Same Twilio account as SMS
+Join WhatsApp Sandbox (trial): Twilio Console → Messaging → Try WhatsApp
+For production: Apply for WhatsApp Business API through Twilio
+Sandbox number: whatsapp:+14155238886 (free for testing)
+Sending a WhatsApp Message
+The process:
+
+Receive phone number and message text
+Format for WhatsApp: prepend whatsapp: to number (e.g. whatsapp:+61404799799)
+Call Twilio API: client.messages.create({ body, from: whatsappNumber, to: whatsappTo })
+Get back message SID
+Key method - sendMessage():
+
+Input: { to: "+61404799799", message: "Inspection completed" }
+Process: 
+  - toPhone = "whatsapp:+61404799799"
+  - fromPhone = TWILIO_WHATSAPP_NUMBER or "whatsapp:+14155238886"
+  - client.messages.create({ body, from: fromPhone, to: toPhone })
+Output: { success: true, messageId: "SMxxxxxxxxxxxx" }
+Trial Account Limitations
+9 messages per day limit
+Must use sandbox number
+Recipients must opt-in by texting "join [sandbox-word]" to sandbox number
+HOW EMAIL WORKS
+Gateway: Gmail OAuth
+Required Environment Variables
+Secret	Where to Get It	Purpose
+GMAIL_CLIENT_ID	Google Cloud Console → APIs → Credentials	OAuth client ID
+GMAIL_CLIENT_SECRET	Google Cloud Console → APIs → Credentials	OAuth client secret
+GMAIL_REDIRECT_URI	Your app URL + callback path	OAuth redirect
+GMAIL_REFRESH_TOKEN	Obtained after first OAuth flow	Persistent auth
+Setup Process
+Create Google Cloud project
+Enable Gmail API
+Create OAuth 2.0 credentials (Web application type)
+Set redirect URI to https://yourapp.replit.app/auth/gmail/callback
+Complete OAuth flow once to get refresh token
+Store refresh token as environment variable
+Sending an Email
+The process:
+
+Initialize Gmail service with OAuth credentials
+Build email with branded HTML template
+Send via Gmail API
+Return message ID
+Key method - sendInspectionCompletionEmail():
+
+Input: toEmail, { inspectionName, inspectorName, completedAt, workOrders }
+Process:
+  1. Build HTML content with inspection details
+  2. Wrap in branded email template (company logo, colors)
+  3. Create plain text fallback
+  4. Send via gmailService.sendEmail({ to, subject, bodyHtml, bodyText })
+Output: { success: true, messageId: "msg-xxxx" }
+BROADCAST SYSTEM (Mass Messaging)
+What It Does
+Send the same message to multiple people via multiple channels (SMS + WhatsApp + Email) simultaneously.
+
+Database Tables
+broadcast_templates - Reusable message templates:
+
+Column	Purpose
+id, company_id	Identity
+name	Template name (e.g. "Crane Jump Starting")
+message	Full message text with formatting
+category	equipment/safety/construction
+is_active	Active flag
+created_by	Creator
+broadcast_messages - Sent broadcast records:
+
+Column	Purpose
+id, company_id	Identity
+template_id	FK to template used
+custom_message	Override message text
+channels	Array: ['sms', 'whatsapp', 'email']
+recipients	JSON array of recipient objects
+recipient_type	'all_users' / 'specific_users' / 'custom_contacts'
+total_recipients	Count
+sent_count	Successfully sent
+failed_count	Failed sends
+status	pending/completed
+sent_by	User who triggered
+broadcast_deliveries - Individual delivery tracking:
+
+Column	Purpose
+id	Identity
+broadcast_message_id	FK to parent broadcast
+recipient_name/phone/email	Contact details
+channel	sms/whatsapp/email
+status	pending/sent/failed
+message_id	Twilio/Gmail message ID
+error_message	Error if failed
+sent_at	Delivery timestamp
+Broadcast Flow
+User selects template or writes custom message
+User selects channels (SMS, WhatsApp, Email)
+User selects recipients (all users, specific, or custom)
+System loops through each recipient × each channel:
+SMS → calls WhatsAppService.sendSMS()
+WhatsApp → calls WhatsAppService.sendMessage()
+Email → calls email service (partially implemented)
+Each delivery tracked in broadcast_deliveries with success/fail status
+Final counts updated on broadcast_messages record
+Pre-Built Templates (10 defaults)
+Template	Category
+Crane Jump Starting	Equipment
+Site Shutdown - Weather	Safety
+Concrete Pour Scheduled	Construction
+Safety Meeting Mandatory	Safety
+Equipment Maintenance	Equipment
+Site Access Changes	Construction
+Quality Inspection Alert	Construction
+Delivery Schedule Update	Construction
+Emergency Drill	Safety
+Shift Change Notice	Construction
+NOTIFICATION SERVICE (AI-Powered)
+What It Does
+Scheduled notifications with AI-generated content based on business data.
+
+Template Types
+type: 'email' | 'sms' | 'whatsapp' | 'all'
+How AI Content Generation Works
+Template defines subject, body, tone, and detail level
+System gathers context data from database (emails, jobs, finances, work orders)
+Sends template + context + recipient info to OpenAI GPT-4o
+AI generates personalized subject and content
+Falls back to variable substitution if AI fails
+Available Variables
+{{recipientName}} → Recipient's name
+{{date}} → Current date
+{{time}} → Current time
+{{companyName}} → Company name
+{{projectName}} → Project name
+{{jobNumber}} → Job number
+MULTI-CHANNEL NOTIFICATION METHOD
+The sendNotificationByPreference() method sends via ALL channels for a staff member:
+
+WhatsApp first → sendMessage()
+SMS second → sendSMS()
+Email third → sendInspectionCompletionEmail() (if email + data available)
+Returns count of successfully sent notifications
+TO COPY TO YOUR OTHER REPLIT APP
+Files to Recreate
+File	Purpose
+server/whatsappService.ts	SMS + WhatsApp via Twilio
+server/emailNotificationService.ts	Email via Gmail OAuth
+server/broadcastService.ts	Mass messaging system
+server/notificationService.ts	AI-powered scheduled notifications
+Secrets to Add
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_PHONE_NUMBER
+TWILIO_WHATSAPP_NUMBER (optional, defaults to sandbox)
+GMAIL_CLIENT_ID
+GMAIL_CLIENT_SECRET
+GMAIL_REFRESH_TOKEN
+Package to Install
+npm install twilio
+Would you like me to go deeper into any specific part?

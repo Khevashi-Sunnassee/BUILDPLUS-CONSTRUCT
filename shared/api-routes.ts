@@ -452,6 +452,10 @@ export const DOCUMENT_ROUTES = {
   TYPES_ACTIVE: '/api/document-types/active',
   TYPE_BY_ID: (id: string | number) => `/api/document-types/${id}`,
   
+  // Document Type Statuses
+  TYPE_STATUSES: (typeId: string | number) => `/api/document-types/${typeId}/statuses`,
+  TYPE_STATUS_BY_ID: (typeId: string | number, statusId: string | number) => `/api/document-types/${typeId}/statuses/${statusId}`,
+  
   // Document Disciplines
   DISCIPLINES: '/api/document-disciplines',
   DISCIPLINES_ACTIVE: '/api/document-disciplines/active',

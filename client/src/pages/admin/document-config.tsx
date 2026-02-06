@@ -13,6 +13,8 @@ import {
   XCircle,
   FolderTree,
   Tag,
+  Palette,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +65,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import type { DocumentTypeConfig, DocumentDiscipline, DocumentCategory } from "@shared/schema";
+import type { DocumentTypeConfig, DocumentDiscipline, DocumentCategory, DocumentTypeStatus } from "@shared/schema";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
 
 const typeSchema = z.object({
@@ -111,6 +113,15 @@ export default function AdminDocumentConfigPage() {
   const [editingCategory, setEditingCategory] = useState<DocumentCategory | null>(null);
   const [categoryDeleteDialogOpen, setCategoryDeleteDialogOpen] = useState(false);
   const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false);
+  const [statusTypeId, setStatusTypeId] = useState<string | null>(null);
+  const [statusTypeName, setStatusTypeName] = useState<string>("");
+  const [editingStatus, setEditingStatus] = useState<DocumentTypeStatus | null>(null);
+  const [newStatusName, setNewStatusName] = useState("");
+  const [newStatusColor, setNewStatusColor] = useState("#6b7280");
+  const [editStatusName, setEditStatusName] = useState("");
+  const [editStatusColor, setEditStatusColor] = useState("#6b7280");
 
   const { data: types = [], isLoading: typesLoading } = useQuery<DocumentTypeConfig[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES],
@@ -306,6 +317,65 @@ export default function AdminDocumentConfigPage() {
     },
   });
 
+  const { data: typeStatuses = [], isLoading: statusesLoading } = useQuery<DocumentTypeStatus[]>({
+    queryKey: [DOCUMENT_ROUTES.TYPE_STATUSES(statusTypeId || ""), statusTypeId],
+    enabled: !!statusTypeId,
+  });
+
+  const statusCreateMutation = useMutation({
+    mutationFn: async (data: { statusName: string; color: string }) => {
+      if (!statusTypeId) throw new Error("No type selected");
+      return apiRequest("POST", DOCUMENT_ROUTES.TYPE_STATUSES(statusTypeId), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.TYPE_STATUSES(statusTypeId || ""), statusTypeId] });
+      toast({ title: "Status Created", description: "Status has been added successfully." });
+      setNewStatusName("");
+      setNewStatusColor("#6b7280");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const statusUpdateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { statusName: string; color: string } }) => {
+      if (!statusTypeId) throw new Error("No type selected");
+      return apiRequest("PATCH", DOCUMENT_ROUTES.TYPE_STATUS_BY_ID(statusTypeId, id), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.TYPE_STATUSES(statusTypeId || ""), statusTypeId] });
+      toast({ title: "Status Updated", description: "Status has been updated successfully." });
+      setEditingStatus(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const statusDeleteMutation = useMutation({
+    mutationFn: async (statusId: string) => {
+      if (!statusTypeId) throw new Error("No type selected");
+      return apiRequest("DELETE", DOCUMENT_ROUTES.TYPE_STATUS_BY_ID(statusTypeId, statusId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.TYPE_STATUSES(statusTypeId || ""), statusTypeId] });
+      toast({ title: "Status Deleted", description: "Status has been removed." });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleManageStatuses = (type: DocumentTypeConfig) => {
+    setStatusTypeId(type.id);
+    setStatusTypeName(type.typeName);
+    setEditingStatus(null);
+    setNewStatusName("");
+    setNewStatusColor("#6b7280");
+    setStatusDialogOpen(true);
+  };
+
   const handleEditType = (type: DocumentTypeConfig) => {
     setEditingType(type);
     typeForm.reset({
@@ -467,6 +537,15 @@ export default function AdminDocumentConfigPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleManageStatuses(type)}
+                              title="Manage Statuses"
+                              data-testid={`button-manage-statuses-${type.id}`}
+                            >
+                              <Palette className="h-4 w-4" />
+                            </Button>
                             <Button
                               size="icon"
                               variant="ghost"
@@ -998,6 +1077,150 @@ export default function AdminDocumentConfigPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={statusDialogOpen} onOpenChange={setStatusDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manage Statuses - {statusTypeName}</DialogTitle>
+            <DialogDescription>
+              Add, edit, or remove statuses for this document type. Each status has a name and color.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex items-end gap-2">
+              <div className="flex-1 space-y-1">
+                <label className="text-sm font-medium">Status Name</label>
+                <Input
+                  value={newStatusName}
+                  onChange={(e) => setNewStatusName(e.target.value)}
+                  placeholder="e.g. IFC, APPROVED"
+                  data-testid="input-new-status-name"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Color</label>
+                <input
+                  type="color"
+                  value={newStatusColor}
+                  onChange={(e) => setNewStatusColor(e.target.value)}
+                  className="w-10 h-9 rounded border cursor-pointer"
+                  data-testid="input-new-status-color"
+                />
+              </div>
+              <Button
+                onClick={() => {
+                  if (newStatusName.trim()) {
+                    statusCreateMutation.mutate({ statusName: newStatusName.trim().toUpperCase(), color: newStatusColor });
+                  }
+                }}
+                disabled={!newStatusName.trim() || statusCreateMutation.isPending}
+                data-testid="button-add-status"
+              >
+                {statusCreateMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              </Button>
+            </div>
+
+            <div className="border rounded-md">
+              {statusesLoading ? (
+                <div className="p-4 space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : typeStatuses.length === 0 ? (
+                <div className="p-4 text-center text-muted-foreground text-sm">
+                  No statuses configured for this type.
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {typeStatuses.map((status) => (
+                    <div key={status.id} className="flex items-center gap-3 px-3 py-2" data-testid={`row-status-${status.id}`}>
+                      {editingStatus?.id === status.id ? (
+                        <>
+                          <input
+                            type="color"
+                            value={editStatusColor}
+                            onChange={(e) => setEditStatusColor(e.target.value)}
+                            className="w-8 h-8 rounded border cursor-pointer flex-shrink-0"
+                            data-testid="input-edit-status-color"
+                          />
+                          <Input
+                            value={editStatusName}
+                            onChange={(e) => setEditStatusName(e.target.value)}
+                            className="flex-1"
+                            data-testid="input-edit-status-name"
+                          />
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              if (editStatusName.trim()) {
+                                statusUpdateMutation.mutate({
+                                  id: status.id,
+                                  data: { statusName: editStatusName.trim().toUpperCase(), color: editStatusColor },
+                                });
+                              }
+                            }}
+                            disabled={statusUpdateMutation.isPending}
+                            data-testid="button-save-status-edit"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setEditingStatus(null)}
+                            data-testid="button-cancel-status-edit"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <div
+                            className="w-5 h-5 rounded-full flex-shrink-0 border"
+                            style={{ backgroundColor: status.color }}
+                          />
+                          <span className="flex-1 font-medium text-sm">{status.statusName}</span>
+                          <span className="text-xs text-muted-foreground">{status.color}</span>
+                          {status.isDefault && (
+                            <Badge variant="secondary" className="text-xs">Default</Badge>
+                          )}
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingStatus(status);
+                              setEditStatusName(status.statusName);
+                              setEditStatusColor(status.color);
+                            }}
+                            data-testid={`button-edit-status-${status.id}`}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => statusDeleteMutation.mutate(status.id)}
+                            disabled={statusDeleteMutation.isPending}
+                            data-testid={`button-delete-status-${status.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

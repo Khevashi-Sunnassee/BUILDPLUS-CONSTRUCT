@@ -12,7 +12,7 @@ import {
   customers, suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   factories, cfmeuHolidays,
-  documentTypesConfig, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems, documentBundleAccessLogs,
+  documentTypesConfig, documentTypeStatuses, documentDisciplines, documentCategories, documents, documentBundles, documentBundleItems, documentBundleAccessLogs,
   reoSchedules, reoScheduleItems,
   type Company, type InsertCompany,
   type InsertUser, type User, type InsertDevice, type Device,
@@ -53,6 +53,7 @@ import {
   type InsertJobLevelCycleTime, type JobLevelCycleTime,
   type Factory, type CfmeuHoliday,
   type InsertDocumentType, type DocumentTypeConfig,
+  type InsertDocumentTypeStatus, type DocumentTypeStatus,
   type InsertDocumentDiscipline, type DocumentDiscipline,
   type InsertDocumentCategory, type DocumentCategory,
   type InsertDocument, type Document, type DocumentWithDetails,
@@ -573,6 +574,12 @@ export interface IStorage {
   createDocumentType(data: InsertDocumentType): Promise<DocumentTypeConfig>;
   updateDocumentType(id: string, data: Partial<InsertDocumentType>): Promise<DocumentTypeConfig | undefined>;
   deleteDocumentType(id: string): Promise<void>;
+  
+  // Document Type Statuses
+  getDocumentTypeStatuses(typeId: string): Promise<DocumentTypeStatus[]>;
+  createDocumentTypeStatus(data: InsertDocumentTypeStatus): Promise<DocumentTypeStatus>;
+  updateDocumentTypeStatus(id: string, data: Partial<InsertDocumentTypeStatus>): Promise<DocumentTypeStatus | undefined>;
+  deleteDocumentTypeStatus(id: string): Promise<void>;
   
   // Document Disciplines
   getAllDocumentDisciplines(): Promise<DocumentDiscipline[]>;
@@ -3968,6 +3975,30 @@ export class DatabaseStorage implements IStorage {
     await db.delete(documentTypesConfig).where(eq(documentTypesConfig.id, id));
   }
 
+  // Document Type Statuses
+  async getDocumentTypeStatuses(typeId: string): Promise<DocumentTypeStatus[]> {
+    return db.select().from(documentTypeStatuses)
+      .where(eq(documentTypeStatuses.typeId, typeId))
+      .orderBy(asc(documentTypeStatuses.sortOrder));
+  }
+
+  async createDocumentTypeStatus(data: InsertDocumentTypeStatus): Promise<DocumentTypeStatus> {
+    const [result] = await db.insert(documentTypeStatuses).values(data).returning();
+    return result;
+  }
+
+  async updateDocumentTypeStatus(id: string, data: Partial<InsertDocumentTypeStatus>): Promise<DocumentTypeStatus | undefined> {
+    const [result] = await db.update(documentTypeStatuses)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(documentTypeStatuses.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteDocumentTypeStatus(id: string): Promise<void> {
+    await db.delete(documentTypeStatuses).where(eq(documentTypeStatuses.id, id));
+  }
+
   // Document Disciplines
   async getAllDocumentDisciplines(): Promise<DocumentDiscipline[]> {
     return db.select().from(documentDisciplines).orderBy(asc(documentDisciplines.sortOrder));
@@ -4097,11 +4128,11 @@ export class DatabaseStorage implements IStorage {
         const [type] = doc.typeId ? await db.select().from(documentTypesConfig).where(eq(documentTypesConfig.id, doc.typeId)) : [null];
         const [discipline] = doc.disciplineId ? await db.select().from(documentDisciplines).where(eq(documentDisciplines.id, doc.disciplineId)) : [null];
         const [category] = doc.categoryId ? await db.select().from(documentCategories).where(eq(documentCategories.id, doc.categoryId)) : [null];
+        const [docTypeStatus] = doc.documentTypeStatusId ? await db.select().from(documentTypeStatuses).where(eq(documentTypeStatuses.id, doc.documentTypeStatusId)) : [null];
         const [job] = doc.jobId ? await db.select().from(jobs).where(eq(jobs.id, doc.jobId)) : [null];
         const [panel] = doc.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, doc.panelId)) : [null];
         const [supplier] = doc.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, doc.supplierId)) : [null];
         const [uploadedByUserFull] = await db.select().from(users).where(eq(users.id, doc.uploadedBy));
-        // Remove sensitive data from user object
         const uploadedByUser = uploadedByUserFull ? {
           id: uploadedByUserFull.id,
           email: uploadedByUserFull.email,
@@ -4114,6 +4145,7 @@ export class DatabaseStorage implements IStorage {
           type,
           discipline,
           category,
+          documentTypeStatus: docTypeStatus,
           job,
           panel,
           supplier,
@@ -4138,11 +4170,11 @@ export class DatabaseStorage implements IStorage {
     const [type] = doc.typeId ? await db.select().from(documentTypesConfig).where(eq(documentTypesConfig.id, doc.typeId)) : [null];
     const [discipline] = doc.disciplineId ? await db.select().from(documentDisciplines).where(eq(documentDisciplines.id, doc.disciplineId)) : [null];
     const [category] = doc.categoryId ? await db.select().from(documentCategories).where(eq(documentCategories.id, doc.categoryId)) : [null];
+    const [docTypeStatus] = doc.documentTypeStatusId ? await db.select().from(documentTypeStatuses).where(eq(documentTypeStatuses.id, doc.documentTypeStatusId)) : [null];
     const [job] = doc.jobId ? await db.select().from(jobs).where(eq(jobs.id, doc.jobId)) : [null];
     const [panel] = doc.panelId ? await db.select().from(panelRegister).where(eq(panelRegister.id, doc.panelId)) : [null];
     const [supplier] = doc.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, doc.supplierId)) : [null];
     const [uploadedByUserFull] = await db.select().from(users).where(eq(users.id, doc.uploadedBy));
-    // Remove sensitive data from user object
     const uploadedByUser = uploadedByUserFull ? {
       id: uploadedByUserFull.id,
       email: uploadedByUserFull.email,
@@ -4155,6 +4187,7 @@ export class DatabaseStorage implements IStorage {
       type,
       discipline,
       category,
+      documentTypeStatus: docTypeStatus,
       job,
       panel,
       supplier,

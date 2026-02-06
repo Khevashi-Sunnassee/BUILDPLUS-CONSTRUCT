@@ -10,6 +10,7 @@ import {
   insertDocumentSchema, 
   insertDocumentBundleSchema,
   insertDocumentTypeSchema,
+  insertDocumentTypeStatusSchema,
   insertDocumentDisciplineSchema,
   insertDocumentCategorySchema,
 } from "@shared/schema";
@@ -94,6 +95,26 @@ router.post("/api/document-types", requireRole("ADMIN"), async (req, res) => {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
     const type = await storage.createDocumentType(parsed.data);
+    
+    await storage.createDocumentTypeStatus({
+      companyId: parsed.data.companyId,
+      typeId: type.id,
+      statusName: "DRAFT",
+      color: "#EF4444",
+      sortOrder: 0,
+      isDefault: true,
+      isActive: true,
+    });
+    await storage.createDocumentTypeStatus({
+      companyId: parsed.data.companyId,
+      typeId: type.id,
+      statusName: "FINAL",
+      color: "#22C55E",
+      sortOrder: 1,
+      isDefault: false,
+      isActive: true,
+    });
+    
     res.json(type);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating document type");
@@ -123,6 +144,61 @@ router.delete("/api/document-types/:id", requireRole("ADMIN"), async (req, res) 
   } catch (error: any) {
     logger.error({ err: error }, "Error deleting document type");
     res.status(500).json({ error: error.message || "Failed to delete document type" });
+  }
+});
+
+// ==================== DOCUMENT TYPE STATUSES ====================
+
+router.get("/api/document-types/:typeId/statuses", requireAuth, async (req, res) => {
+  try {
+    const statuses = await storage.getDocumentTypeStatuses(String(req.params.typeId));
+    res.json(statuses);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching document type statuses");
+    res.status(500).json({ error: error.message || "Failed to fetch statuses" });
+  }
+});
+
+router.post("/api/document-types/:typeId/statuses", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const data = {
+      ...req.body,
+      typeId: String(req.params.typeId),
+    };
+    const parsed = insertDocumentTypeStatusSchema.safeParse(data);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const status = await storage.createDocumentTypeStatus(parsed.data);
+    res.json(status);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error creating document type status");
+    res.status(500).json({ error: error.message || "Failed to create status" });
+  }
+});
+
+router.patch("/api/document-types/:typeId/statuses/:statusId", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const parsed = insertDocumentTypeStatusSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const status = await storage.updateDocumentTypeStatus(String(req.params.statusId), parsed.data);
+    if (!status) return res.status(404).json({ error: "Status not found" });
+    res.json(status);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error updating document type status");
+    res.status(500).json({ error: error.message || "Failed to update status" });
+  }
+});
+
+router.delete("/api/document-types/:typeId/statuses/:statusId", requireRole("ADMIN"), async (req, res) => {
+  try {
+    await storage.deleteDocumentTypeStatus(String(req.params.statusId));
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error({ err: error }, "Error deleting document type status");
+    res.status(500).json({ error: error.message || "Failed to delete status" });
   }
 });
 
@@ -340,7 +416,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const { title, description, typeId, disciplineId, categoryId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential } = req.body;
+    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: "Title is required" });
@@ -392,6 +468,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       typeId: typeId || null,
       disciplineId: disciplineId || null,
       categoryId: categoryId || null,
+      documentTypeStatusId: documentTypeStatusId || null,
       jobId: jobId || null,
       panelId: panelId || null,
       supplierId: supplierId || null,

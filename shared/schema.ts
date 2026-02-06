@@ -1728,6 +1728,24 @@ export const documentTypesConfig = pgTable("document_types_config", {
   companyIdx: index("doc_types_company_idx").on(table.companyId),
 }));
 
+// Document Type Statuses - Configurable statuses per document type
+export const documentTypeStatuses = pgTable("document_type_statuses", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  typeId: varchar("type_id", { length: 36 }).notNull().references(() => documentTypesConfig.id, { onDelete: "cascade" }),
+  statusName: text("status_name").notNull(),
+  color: varchar("color", { length: 20 }).notNull().default("#6b7280"),
+  sortOrder: integer("sort_order").default(0),
+  isDefault: boolean("is_default").default(false),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  typeIdx: index("doc_type_statuses_type_idx").on(table.typeId),
+  companyIdx: index("doc_type_statuses_company_idx").on(table.companyId),
+  activeIdx: index("doc_type_statuses_active_idx").on(table.isActive),
+}));
+
 // Document Disciplines - Engineering/trade disciplines
 export const documentDisciplines = pgTable("document_disciplines", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -1787,6 +1805,7 @@ export const documents = pgTable("documents", {
   
   // Status and workflow
   status: docMgmtStatusEnum("status").default("DRAFT").notNull(),
+  documentTypeStatusId: varchar("document_type_status_id", { length: 36 }).references(() => documentTypeStatuses.id),
   
   // Version control
   version: varchar("version", { length: 10 }).default("1.0").notNull(),
@@ -1887,6 +1906,10 @@ export const documentBundleItems = pgTable("document_bundle_items", {
 export const insertDocumentTypeSchema = createInsertSchema(documentTypesConfig).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertDocumentType = z.infer<typeof insertDocumentTypeSchema>;
 export type DocumentTypeConfig = typeof documentTypesConfig.$inferSelect;
+
+export const insertDocumentTypeStatusSchema = createInsertSchema(documentTypeStatuses).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDocumentTypeStatus = z.infer<typeof insertDocumentTypeStatusSchema>;
+export type DocumentTypeStatus = typeof documentTypeStatuses.$inferSelect;
 
 export const insertDocumentDisciplineSchema = createInsertSchema(documentDisciplines).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertDocumentDiscipline = z.infer<typeof insertDocumentDisciplineSchema>;
@@ -2013,6 +2036,7 @@ export type DocumentWithDetails = Document & {
   type?: DocumentTypeConfig | null;
   discipline?: DocumentDiscipline | null;
   category?: DocumentCategory | null;
+  documentTypeStatus?: DocumentTypeStatus | null;
   job?: Job | null;
   panel?: PanelRegister | null;
   supplier?: Supplier | null;

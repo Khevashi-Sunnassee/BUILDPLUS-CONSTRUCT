@@ -89,6 +89,7 @@ import type {
   DocumentTypeConfig, 
   DocumentDiscipline, 
   DocumentCategory,
+  DocumentTypeStatus,
   DocumentWithDetails,
   Job,
   PanelRegister,
@@ -103,6 +104,7 @@ const uploadFormSchema = z.object({
   typeId: z.string().optional(),
   disciplineId: z.string().optional(),
   categoryId: z.string().optional(),
+  documentTypeStatusId: z.string().optional(),
   jobId: z.string().optional(),
   panelId: z.string().optional(),
   supplierId: z.string().optional(),
@@ -285,6 +287,7 @@ export default function DocumentRegister() {
       typeId: "",
       disciplineId: "",
       categoryId: "",
+      documentTypeStatusId: "",
       jobId: "",
       panelId: "",
       supplierId: "",
@@ -293,6 +296,13 @@ export default function DocumentRegister() {
       tags: "",
       isConfidential: false,
     },
+  });
+
+  const selectedUploadTypeId = uploadForm.watch("typeId");
+
+  const { data: uploadTypeStatuses = [] } = useQuery<DocumentTypeStatus[]>({
+    queryKey: [DOCUMENT_ROUTES.TYPE_STATUSES(selectedUploadTypeId || ""), selectedUploadTypeId],
+    enabled: !!selectedUploadTypeId,
   });
 
   const uploadMutation = useMutation({
@@ -401,6 +411,7 @@ export default function DocumentRegister() {
     if (values.typeId) formData.append("typeId", values.typeId);
     if (values.disciplineId) formData.append("disciplineId", values.disciplineId);
     if (values.categoryId) formData.append("categoryId", values.categoryId);
+    if (values.documentTypeStatusId) formData.append("documentTypeStatusId", values.documentTypeStatusId);
     if (values.jobId) formData.append("jobId", values.jobId);
     if (values.panelId) formData.append("panelId", values.panelId);
     if (values.supplierId) formData.append("supplierId", values.supplierId);
@@ -509,10 +520,12 @@ export default function DocumentRegister() {
           key = doc.category?.id || "_unassigned";
           label = doc.category?.categoryName || "Unassigned";
           break;
-        case "status":
-          key = doc.status;
-          label = statusConfig[doc.status]?.label || doc.status;
+        case "status": {
+          const dts = doc.documentTypeStatus;
+          key = dts?.id || doc.status;
+          label = dts?.statusName || statusConfig[doc.status]?.label || doc.status;
           break;
+        }
         default:
           key = "_all";
           label = "All Documents";
@@ -534,8 +547,9 @@ export default function DocumentRegister() {
   }, [documents, groupBy]);
 
   const renderDocumentRow = useCallback((doc: DocumentWithDetails) => {
-    const status = statusConfig[doc.status] || statusConfig.DRAFT;
-    const StatusIcon = status.icon;
+    const legacyStatus = statusConfig[doc.status] || statusConfig.DRAFT;
+    const StatusIcon = legacyStatus.icon;
+    const docTypeStatus = doc.documentTypeStatus;
 
     return (
       <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
@@ -565,10 +579,22 @@ export default function DocumentRegister() {
           <span className="font-mono text-sm">v{doc.version}{doc.revision}</span>
         </TableCell>
         <TableCell>
-          <Badge className={status.className}>
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {status.label}
-          </Badge>
+          {docTypeStatus ? (
+            <Badge
+              variant="outline"
+              className="w-fit border"
+              style={{ backgroundColor: `${docTypeStatus.color}20`, borderColor: docTypeStatus.color, color: docTypeStatus.color }}
+              data-testid={`badge-status-${doc.id}`}
+            >
+              <div className="w-2 h-2 rounded-full mr-1.5 flex-shrink-0" style={{ backgroundColor: docTypeStatus.color }} />
+              {docTypeStatus.statusName}
+            </Badge>
+          ) : (
+            <Badge className={legacyStatus.className}>
+              <StatusIcon className="h-3 w-3 mr-1" />
+              {legacyStatus.label}
+            </Badge>
+          )}
         </TableCell>
         <TableCell className="text-sm text-muted-foreground">
           {formatFileSize(doc.fileSize)}
@@ -1094,6 +1120,36 @@ export default function DocumentRegister() {
                     </FormItem>
                   )}
                 />
+
+                {selectedUploadTypeId && uploadTypeStatuses.length > 0 && (
+                  <FormField
+                    control={uploadForm.control}
+                    name="documentTypeStatusId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-document-status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {uploadTypeStatuses.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: s.color }} />
+                                  {s.statusName}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={uploadForm.control}
