@@ -123,6 +123,20 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     if (!req.companyId) {
       return res.status(403).json({ error: "Company context required" });
     }
+    const numericFields = [
+      "numberOfBuildings", "expectedCycleTimePerFloor", "daysInAdvance",
+      "daysToAchieveIfc", "productionWindowDays", "productionDaysInAdvance",
+      "procurementDaysInAdvance", "procurementTimeDays"
+    ];
+    const body = { ...req.body };
+    for (const field of numericFields) {
+      if (body[field] !== undefined && body[field] !== null && body[field] !== "") {
+        const num = parseInt(String(body[field]), 10);
+        if (!isNaN(num)) body[field] = num;
+      } else if (body[field] === "") {
+        body[field] = null;
+      }
+    }
     const jobCreateSchema = z.object({
       jobNumber: z.string().min(1, "Job number is required").max(50),
       name: z.string().min(1, "Job name is required").max(255),
@@ -150,8 +164,8 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       procurementTimeDays: z.number().int().min(1).optional().nullable(),
       status: z.enum(["ACTIVE", "COMPLETED", "ON_HOLD"]).optional(),
       factoryId: z.string().max(36).optional().nullable(),
-    });
-    const parsed = jobCreateSchema.safeParse(req.body);
+    }).passthrough();
+    const parsed = jobCreateSchema.safeParse(body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
