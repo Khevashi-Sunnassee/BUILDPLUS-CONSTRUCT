@@ -122,6 +122,8 @@ export const PROCUREMENT_ROUTES = {
   PURCHASE_ORDER_APPROVE: (id: string | number) => `/api/purchase-orders/${id}/approve`,
   PURCHASE_ORDER_REJECT: (id: string | number) => `/api/purchase-orders/${id}/reject`,
   PURCHASE_ORDER_SEND_EMAIL: (id: string | number) => `/api/purchase-orders/${id}/send-email`,
+  PURCHASE_ORDER_PDF: (id: string | number) => `/api/purchase-orders/${id}/pdf`,
+  PURCHASE_ORDER_SEND_WITH_PDF: (id: string | number) => `/api/purchase-orders/${id}/send-with-pdf`,
   
   // PO Attachments (direct access)
   PO_ATTACHMENT_DOWNLOAD: (id: string | number) => `/api/po-attachments/${id}/download`,

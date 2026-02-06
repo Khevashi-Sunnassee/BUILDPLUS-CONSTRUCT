@@ -398,6 +398,96 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
   }
 });
 
+router.get("/purchase-orders/:id/pdf", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const po = await storage.getPurchaseOrder(id);
+    if (!po) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+
+    const settings = await storage.getGlobalSettings();
+    const { generatePurchaseOrderPdf } = await import("../services/po-pdf.service");
+    const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, companyName: settings.companyName } : null);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="${po.poNumber || "PurchaseOrder"}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error generating PO PDF");
+    res.status(500).json({ error: error.message || "Failed to generate PDF" });
+  }
+});
+
+router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const parsed = sendPoEmailWithPdfSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
+    }
+
+    const { to, cc, subject, message, sendCopy } = parsed.data;
+
+    const po = await storage.getPurchaseOrder(id);
+    if (!po) {
+      return res.status(404).json({ error: "Purchase order not found" });
+    }
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured. Please configure Mailgun settings." });
+    }
+
+    const settings = await storage.getGlobalSettings();
+    const { generatePurchaseOrderPdf } = await import("../services/po-pdf.service");
+    const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, companyName: settings.companyName } : null);
+
+    const attachments = [{
+      filename: `${po.poNumber || "PurchaseOrder"}.pdf`,
+      content: pdfBuffer,
+      contentType: "application/pdf",
+    }];
+
+    let bcc: string | undefined;
+    if (sendCopy && req.session.userId) {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.email) {
+        bcc = currentUser.email;
+      }
+    }
+
+    const htmlBody = message.replace(/\n/g, "<br>");
+
+    const result = await emailService.sendEmailWithAttachment({
+      to,
+      cc: cc || undefined,
+      bcc,
+      subject,
+      body: htmlBody,
+      attachments,
+    });
+
+    if (result.success) {
+      logger.info({ poId: id, poNumber: po.poNumber, to }, "PO email with server-generated PDF sent successfully");
+      res.json({ success: true, messageId: result.messageId });
+    } else {
+      logger.error({ poId: id, error: result.error }, "Failed to send PO email");
+      res.status(500).json({ error: result.error || "Failed to send email" });
+    }
+  } catch (error: any) {
+    logger.error({ err: error }, "Error sending PO email with PDF");
+    res.status(500).json({ error: error.message || "Failed to send email" });
+  }
+});
+
+const sendPoEmailWithPdfSchema = z.object({
+  to: z.string().email("Valid email address is required"),
+  cc: z.string().optional(),
+  subject: z.string().min(1, "Subject is required"),
+  message: z.string().min(1, "Message is required"),
+  sendCopy: z.boolean().default(false),
+});
+
 const sendPoEmailSchema = z.object({
   to: z.string().email("Valid email address is required"),
   cc: z.string().optional(),

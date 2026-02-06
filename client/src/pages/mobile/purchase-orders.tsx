@@ -1,15 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { PROCUREMENT_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format } from "date-fns";
-import { ShoppingCart, Calendar, ChevronRight, ChevronLeft, Check, X } from "lucide-react";
+import { ShoppingCart, Calendar, ChevronRight, ChevronLeft, Check, X, Send, Loader2, FileText, Mail, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -34,9 +36,11 @@ interface PurchaseOrder {
   notes: string | null;
   deliveryAddress: string | null;
   requiredByDate: string | null;
+  supplierEmail?: string | null;
   supplier?: {
     id: string;
     name: string;
+    email?: string | null;
   } | null;
   requestedBy?: {
     id: string;
@@ -60,6 +64,7 @@ export default function MobilePurchaseOrdersPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
+  const [sendingPO, setSendingPO] = useState<PurchaseOrder | null>(null);
 
   const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrder[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
@@ -108,6 +113,11 @@ export default function MobilePurchaseOrdersPage() {
   };
 
   const canApprove = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+  const handleSendPO = (po: PurchaseOrder) => {
+    setSelectedPO(null);
+    setTimeout(() => setSendingPO(po), 200);
+  };
 
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
@@ -196,6 +206,19 @@ export default function MobilePurchaseOrdersPage() {
               isApproving={approveMutation.isPending}
               isRejecting={rejectMutation.isPending}
               onClose={() => setSelectedPO(null)}
+              onSend={handleSendPO}
+              formatCurrency={formatCurrency}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!sendingPO} onOpenChange={(open) => !open && setSendingPO(null)}>
+        <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl bg-[#0D1117] border-white/10">
+          {sendingPO && (
+            <SendPOSheet
+              po={sendingPO}
+              onClose={() => setSendingPO(null)}
               formatCurrency={formatCurrency}
             />
           )}
@@ -257,6 +280,7 @@ function PODetailSheet({
   isApproving,
   isRejecting,
   onClose,
+  onSend,
   formatCurrency,
 }: { 
   po: PurchaseOrder;
@@ -267,9 +291,11 @@ function PODetailSheet({
   isApproving: boolean;
   isRejecting: boolean;
   onClose: () => void;
+  onSend: (po: PurchaseOrder) => void;
   formatCurrency: (amount: string | number | null) => string;
 }) {
   const status = statusConfig[po.status] || statusConfig.DRAFT;
+  const canSend = ["APPROVED", "ORDERED"].includes(po.status);
 
   return (
     <div className="flex flex-col h-full text-white">
@@ -370,12 +396,23 @@ function PODetailSheet({
       </div>
 
       <div className="pt-4 border-t border-white/10 mt-4 space-y-2">
+        {canSend && (
+          <Button 
+            className="w-full bg-blue-600"
+            onClick={() => onSend(po)}
+            data-testid="button-send-po"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            Send Purchase Order
+          </Button>
+        )}
         {canApprove && (
           <div className="flex gap-2">
             <Button 
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-green-600"
               onClick={onApprove}
               disabled={isApproving || isRejecting}
+              data-testid="button-approve-po"
             >
               <Check className="h-4 w-4 mr-2" />
               {isApproving ? "Approving..." : "Approve"}
@@ -385,14 +422,184 @@ function PODetailSheet({
               className="flex-1"
               onClick={onReject}
               disabled={isApproving || isRejecting}
+              data-testid="button-reject-po"
             >
               <X className="h-4 w-4 mr-2" />
               {isRejecting ? "Rejecting..." : "Reject"}
             </Button>
           </div>
         )}
-        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose}>
+        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose} data-testid="button-close-po">
           Close
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function SendPOSheet({ 
+  po, 
+  onClose, 
+  formatCurrency 
+}: { 
+  po: PurchaseOrder; 
+  onClose: () => void;
+  formatCurrency: (amount: string | number | null) => string;
+}) {
+  const { toast } = useToast();
+  
+  const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: [SETTINGS_ROUTES.LOGO],
+  });
+
+  const { data: poDetail } = useQuery<PurchaseOrder>({
+    queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(po.id)],
+    enabled: !!po.id,
+  });
+
+  const activePO = poDetail || po;
+  const supplierEmail = activePO.supplierEmail || activePO.supplier?.email || "";
+  const companyName = settings?.companyName || "LTE Precast Concrete Structures";
+
+  const [toEmail, setToEmail] = useState(supplierEmail);
+  const [ccEmail, setCcEmail] = useState("");
+  const [subject, setSubject] = useState(`Purchase Order ${activePO.poNumber} from ${companyName}`);
+  const [message, setMessage] = useState(
+    `Hi,\n\nPlease find attached Purchase Order ${activePO.poNumber} for ${formatCurrency(activePO.total)}.\n\nIf you have any questions regarding this order, please contact us.\n\nKind regards,\n${companyName}`
+  );
+
+  useEffect(() => {
+    const email = poDetail?.supplierEmail || poDetail?.supplier?.email || supplierEmail;
+    if (email && !toEmail) {
+      setToEmail(email);
+    }
+    const name = settings?.companyName || "LTE Precast Concrete Structures";
+    setSubject(`Purchase Order ${activePO.poNumber} from ${name}`);
+    setMessage(
+      `Hi,\n\nPlease find attached Purchase Order ${activePO.poNumber} for ${formatCurrency(activePO.total)}.\n\nIf you have any questions regarding this order, please contact us.\n\nKind regards,\n${name}`
+    );
+  }, [poDetail, settings]);
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_SEND_WITH_PDF(po.id), {
+        to: toEmail,
+        cc: ccEmail || undefined,
+        subject,
+        message,
+        sendCopy: false,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send", description: err.message || "Could not send email", variant: "destructive" });
+    },
+  });
+
+  const handleSend = () => {
+    if (!toEmail.trim()) {
+      toast({ title: "Email required", description: "Enter a recipient email address", variant: "destructive" });
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(toEmail.trim())) {
+      toast({ title: "Invalid email", description: "Please enter a valid email address", variant: "destructive" });
+      return;
+    }
+    sendMutation.mutate();
+  };
+
+  return (
+    <div className="flex flex-col h-full text-white">
+      <SheetHeader className="pb-4">
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="text-white -ml-2" onClick={onClose} data-testid="button-back-from-send">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <SheetTitle className="text-left flex-1 text-white flex items-center gap-2">
+            <Mail className="h-5 w-5 text-blue-400" />
+            Send {po.poNumber}
+          </SheetTitle>
+        </div>
+      </SheetHeader>
+
+      <div className="flex-1 overflow-auto space-y-4">
+        <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-500/20 flex items-center gap-3">
+          <FileText className="h-5 w-5 text-blue-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white">{po.poNumber}.pdf</p>
+            <p className="text-xs text-white/50">PDF will be generated and attached</p>
+          </div>
+          <span className="text-sm font-semibold text-blue-400">{formatCurrency(activePO.total)}</span>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="text-sm font-medium text-white/60 mb-1.5 block">To</label>
+            <Input
+              type="email"
+              placeholder="recipient@example.com"
+              value={toEmail}
+              onChange={(e) => setToEmail(e.target.value)}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              data-testid="input-send-to"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-white/60 mb-1.5 block">Cc (optional)</label>
+            <Input
+              type="email"
+              placeholder="cc@example.com"
+              value={ccEmail}
+              onChange={(e) => setCcEmail(e.target.value)}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              data-testid="input-send-cc"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-white/60 mb-1.5 block">Subject</label>
+            <Input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+              data-testid="input-send-subject"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-white/60 mb-1.5 block">Message</label>
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={6}
+              className="bg-white/5 border-white/10 text-white placeholder:text-white/30 resize-none text-sm"
+              data-testid="input-send-message"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-white/10 mt-4 space-y-2">
+        <Button 
+          className="w-full bg-blue-600"
+          onClick={handleSend} 
+          disabled={sendMutation.isPending}
+          data-testid="button-send-email"
+        >
+          {sendMutation.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4 mr-2" />
+          )}
+          {sendMutation.isPending ? "Sending..." : "Send Email with PDF"}
+        </Button>
+        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose} data-testid="button-cancel-send">
+          Cancel
         </Button>
       </div>
     </div>
