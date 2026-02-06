@@ -24,6 +24,9 @@ import {
   Save,
   X,
   Loader2,
+  Eye,
+  EyeOff,
+  FolderPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -73,12 +76,21 @@ const priorityColors: Record<string, string> = {
   CRITICAL: "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
+const GROUP_COLORS = [
+  "#6b7280", "#3b82f6", "#10b981", "#f59e0b", "#ef4444", 
+  "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#06b6d4",
+];
+
 export default function MobileTasksPage() {
   const { toast } = useToast();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newTaskGroupId, setNewTaskGroupId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [hideDone, setHideDone] = useState(true);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupColor, setNewGroupColor] = useState(GROUP_COLORS[0]);
 
   const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
     queryKey: [TASKS_ROUTES.GROUPS],
@@ -107,6 +119,21 @@ export default function MobileTasksPage() {
     },
     onError: () => {
       toast({ title: "Failed to create task", variant: "destructive" });
+    },
+  });
+
+  const createGroupMutation = useMutation({
+    mutationFn: async ({ name, color }: { name: string; color: string }) => {
+      return apiRequest("POST", TASKS_ROUTES.GROUPS, { name, color });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      setShowCreateGroup(false);
+      setNewGroupName("");
+      setNewGroupColor(GROUP_COLORS[0]);
+    },
+    onError: () => {
+      toast({ title: "Failed to create group", variant: "destructive" });
     },
   });
 
@@ -142,9 +169,33 @@ export default function MobileTasksPage() {
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="px-4 py-4">
-          <div className="text-2xl font-bold" data-testid="text-tasks-title">Tasks</div>
-          <div className="text-sm text-white/60">
-            {activeTasks} active of {totalTasks} total
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="text-2xl font-bold" data-testid="text-tasks-title">Tasks</div>
+              <div className="text-sm text-white/60">
+                {activeTasks} active of {totalTasks} total
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setHideDone(!hideDone)}
+                className={cn("rounded-full", hideDone ? "text-white/40" : "text-green-400")}
+                data-testid="button-toggle-done"
+              >
+                {hideDone ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => setShowCreateGroup(true)}
+                className="rounded-full text-blue-400"
+                data-testid="button-create-group"
+              >
+                <FolderPlus className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -169,8 +220,9 @@ export default function MobileTasksPage() {
           <div className="space-y-4">
             {groups.map((group) => {
               const isCollapsed = collapsedGroups.has(group.id);
-              const groupTasks = group.tasks || [];
-              const activeCount = groupTasks.filter(t => t.status !== "DONE").length;
+              const allGroupTasks = group.tasks || [];
+              const groupTasks = hideDone ? allGroupTasks.filter(t => t.status !== "DONE") : allGroupTasks;
+              const activeCount = allGroupTasks.filter(t => t.status !== "DONE").length;
 
               return (
                 <div key={group.id} className="space-y-2">
@@ -185,7 +237,7 @@ export default function MobileTasksPage() {
                     />
                     <span className="font-semibold flex-1 text-left text-white">{group.name}</span>
                     <span className="text-sm text-white/60">
-                      {activeCount}/{groupTasks.length}
+                      {activeCount}/{allGroupTasks.length}
                     </span>
                     {isCollapsed ? (
                       <ChevronRight className="h-5 w-5 text-white/40" />
@@ -326,6 +378,82 @@ export default function MobileTasksPage() {
               isSaving={updateTaskMutation.isPending}
             />
           )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showCreateGroup} onOpenChange={(open) => {
+        setShowCreateGroup(open);
+        if (!open) { setNewGroupName(""); setNewGroupColor(GROUP_COLORS[0]); }
+      }}>
+        <SheetContent side="bottom" className="rounded-t-2xl bg-[#0D1117] border-white/10">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-left text-white flex items-center gap-2">
+              <FolderPlus className="h-4 w-4 text-blue-400" />
+              New Group
+            </SheetTitle>
+          </SheetHeader>
+          <div className="space-y-5">
+            <div>
+              <label className="text-sm font-medium text-white/60 mb-2 block">Group Name</label>
+              <Input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="Enter group name..."
+                className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && newGroupName.trim()) {
+                    createGroupMutation.mutate({ name: newGroupName.trim(), color: newGroupColor });
+                  }
+                }}
+                data-testid="input-new-group-name"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-white/60 mb-2 block">Color</label>
+              <div className="flex flex-wrap gap-3">
+                {GROUP_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setNewGroupColor(color)}
+                    className={cn(
+                      "w-8 h-8 rounded-full transition-all",
+                      newGroupColor === color ? "ring-2 ring-white ring-offset-2 ring-offset-[#0D1117] scale-110" : "opacity-60"
+                    )}
+                    style={{ backgroundColor: color }}
+                    data-testid={`color-option-${color}`}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button
+                variant="outline"
+                className="flex-1 border-white/20 text-white"
+                onClick={() => {
+                  setShowCreateGroup(false);
+                  setNewGroupName("");
+                  setNewGroupColor(GROUP_COLORS[0]);
+                }}
+                data-testid="button-cancel-create-group"
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-blue-500"
+                onClick={() => createGroupMutation.mutate({ name: newGroupName.trim(), color: newGroupColor })}
+                disabled={!newGroupName.trim() || createGroupMutation.isPending}
+                data-testid="button-submit-create-group"
+              >
+                {createGroupMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4 mr-1" />
+                )}
+                Create Group
+              </Button>
+            </div>
+          </div>
         </SheetContent>
       </Sheet>
 
