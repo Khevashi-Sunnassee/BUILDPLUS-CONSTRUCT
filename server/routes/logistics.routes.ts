@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import { emailService } from "../services/email.service";
 
 const router = Router();
 
@@ -149,6 +150,21 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
 router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
   const record = await storage.updateDeliveryRecord(req.params.id as string, req.body);
   res.json(record);
+});
+
+router.post("/api/test-gmail", requireAuth, async (req, res) => {
+  try {
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ error: "Recipient email required" });
+    const result = await emailService.sendEmail(
+      to,
+      "Test Email from LTE System (via Gmail)",
+      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #1a56db;">LTE Performance Management System</h2><p>This is a test email sent via <strong>Gmail</strong> from the LTE system.</p><p><strong>Sent at:</strong> ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" })}</p><p style="color: #666; font-size: 12px; margin-top: 20px;">This is an automated test message.</p></div>`
+    );
+    res.json(result);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 export const logisticsRouter = router;
