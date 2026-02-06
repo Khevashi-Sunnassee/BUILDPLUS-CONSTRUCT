@@ -4,6 +4,8 @@ import * as XLSX from "xlsx";
 import { storage, sha256Hex } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { logPanelChange } from "../services/panel-audit.service";
+import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 
 const router = Router();
 
@@ -263,6 +265,9 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
     });
     
     const result = await storage.importPanelRegister(panelsToImport);
+    for (const panelId of result.importedIds) {
+      logPanelChange(panelId, "Panel imported from estimate", req.session.userId, { changedFields: { source: "estimate_import" }, newLifecycleStatus: 0 });
+    }
     res.json(result);
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Import failed" });
@@ -914,6 +919,9 @@ router.post("/api/jobs/:jobId/import-estimate",
         const importResult = await storage.importEstimatePanels(panelsToImport);
         imported = importResult.imported;
         importErrors = importResult.errors || [];
+        for (const panelId of importResult.importedIds) {
+          logPanelChange(panelId, "Panel imported from estimate", req.session.userId, { changedFields: { source: "estimate_import" }, newLifecycleStatus: 0 });
+        }
       } catch (err: any) {
         importErrors.push(err.message);
       }

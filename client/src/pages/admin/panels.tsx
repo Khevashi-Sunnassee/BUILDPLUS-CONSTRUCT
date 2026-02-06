@@ -35,6 +35,7 @@ import {
   QrCode,
   ExternalLink,
   Printer,
+  History,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -96,7 +97,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon, Smile } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
-import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES, DOCUMENT_ROUTES } from "@shared/api-routes";
+import { PANEL_LIFECYCLE_LABELS, PANEL_LIFECYCLE_COLORS } from "@shared/schema";
+import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES, DOCUMENT_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
 import defaultLogo from "@/assets/lte-logo.png";
 
 const panelSchema = z.object({
@@ -566,6 +568,76 @@ const DOC_STATUS_COLORS: Record<string, string> = {
   SUPERSEDED: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300",
   ARCHIVED: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
 };
+
+function PanelAuditLogTab({ panelId }: { panelId: string }) {
+  const { data: logs = [], isLoading } = useQuery<any[]>({
+    queryKey: [PANELS_ROUTES.AUDIT_LOGS(panelId)],
+  });
+
+  const { data: users = [] } = useQuery<any[]>({
+    queryKey: ['/api/users'],
+  });
+
+  const getUserName = (userId: string | null) => {
+    if (!userId) return "System";
+    const user = users.find((u: any) => u.id === userId);
+    return user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : "Unknown";
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3 p-4">
+        {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full" />)}
+      </div>
+    );
+  }
+
+  if (logs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <History className="h-8 w-8 mb-2" />
+        <p className="text-sm">No audit log entries yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <ScrollArea className="h-[500px]">
+      <div className="space-y-2 p-2">
+        {logs.map((log: any) => (
+          <div key={log.id} className="p-3 rounded-md border bg-muted/20" data-testid={`audit-log-${log.id}`}>
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <span className="text-sm font-medium">{log.action}</span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {new Date(log.createdAt).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span>{getUserName(log.changedById)}</span>
+              {log.previousLifecycleStatus !== null && log.newLifecycleStatus !== null && log.previousLifecycleStatus !== log.newLifecycleStatus && (
+                <span className="flex items-center gap-1">
+                  {PANEL_LIFECYCLE_LABELS[log.previousLifecycleStatus] || "Unknown"}
+                  <span>→</span>
+                  {PANEL_LIFECYCLE_LABELS[log.newLifecycleStatus] || "Unknown"}
+                </span>
+              )}
+            </div>
+            {log.changedFields && Object.keys(log.changedFields).length > 0 && (
+              <div className="mt-2 text-xs font-mono bg-muted/40 rounded p-2 space-y-0.5">
+                {Object.entries(log.changedFields).map(([key, value]) => (
+                  <div key={key} className="flex gap-1">
+                    <span className="text-muted-foreground">{key}:</span>
+                    <span>{String(value)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
+  );
+}
 
 function PanelDocumentsTab({ panelId, productionPdfUrl }: { panelId: string; productionPdfUrl?: string | null }) {
   const { toast } = useToast();
@@ -1945,6 +2017,16 @@ export default function AdminPanelsPage() {
     );
   };
 
+  const getLifecycleStatusBadge = (lifecycleStatus: number) => {
+    const label = PANEL_LIFECYCLE_LABELS[lifecycleStatus] || "Unknown";
+    const colors = PANEL_LIFECYCLE_COLORS[lifecycleStatus] || PANEL_LIFECYCLE_COLORS[0];
+    return (
+      <Badge variant="outline" className={`text-xs ${colors.bg} ${colors.text} ${colors.border}`} data-testid={`badge-lifecycle-${lifecycleStatus}`}>
+        {label}
+      </Badge>
+    );
+  };
+
   const getProgress = (panel: PanelRegister) => {
     if (!panel.estimatedHours || panel.estimatedHours === 0) return null;
     const percent = Math.min(100, ((panel.actualHours || 0) / panel.estimatedHours) * 100);
@@ -2406,6 +2488,7 @@ export default function AdminPanelsPage() {
                 <TableHead className="text-right w-16">MPa</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Drawing Status</TableHead>
+                <TableHead>Lifecycle</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -2423,7 +2506,7 @@ export default function AdminPanelsPage() {
                           onClick={() => togglePanelTypeCollapse(panelType)}
                           data-testid={`row-type-group-${panelType}`}
                         >
-                          <TableCell colSpan={15}>
+                          <TableCell colSpan={16}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2490,6 +2573,7 @@ export default function AdminPanelsPage() {
                                 {panel.documentStatus || "DRAFT"}
                               </Badge>
                             </TableCell>
+                            <TableCell>{getLifecycleStatusBadge(panel.lifecycleStatus ?? 0)}</TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
@@ -2551,7 +2635,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2568,7 +2652,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={15}>
+                          <TableCell colSpan={16}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2649,6 +2733,7 @@ export default function AdminPanelsPage() {
                                 {panel.documentStatus || "DRAFT"}
                               </Badge>
                             </TableCell>
+                            <TableCell>{getLifecycleStatusBadge(panel.lifecycleStatus ?? 0)}</TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
@@ -2710,7 +2795,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2727,7 +2812,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleLevelCollapse(level)}
                           data-testid={`row-level-group-${level}`}
                         >
-                          <TableCell colSpan={15}>
+                          <TableCell colSpan={16}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2813,6 +2898,7 @@ export default function AdminPanelsPage() {
                                 {panel.documentStatus || "DRAFT"}
                               </Badge>
                             </TableCell>
+                            <TableCell>{getLifecycleStatusBadge(panel.lifecycleStatus ?? 0)}</TableCell>
                             <TableCell>{getStatusBadge(panel.status)}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
@@ -2871,7 +2957,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={15} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2950,6 +3036,7 @@ export default function AdminPanelsPage() {
                           {panel.documentStatus || "DRAFT"}
                         </Badge>
                       </TableCell>
+                      <TableCell>{getLifecycleStatusBadge(panel.lifecycleStatus ?? 0)}</TableCell>
                       <TableCell>{getStatusBadge(panel.status)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -3006,7 +3093,7 @@ export default function AdminPanelsPage() {
                   ))}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? 14 : 15} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? 15 : 16} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>
@@ -3111,6 +3198,10 @@ export default function AdminPanelsPage() {
                   <TabsTrigger value="documents" className="flex items-center gap-2" data-testid="tab-panel-documents">
                     <FileIcon className="h-4 w-4" />
                     Documents
+                  </TabsTrigger>
+                  <TabsTrigger value="audit-log" className="flex items-center gap-2" data-testid="tab-audit-log">
+                    <History className="h-4 w-4" />
+                    Audit Log
                   </TabsTrigger>
                 </>
               )}
@@ -3634,6 +3725,10 @@ export default function AdminPanelsPage() {
                 
                 <TabsContent value="documents" className="flex-1 overflow-y-auto mt-4">
                   <PanelDocumentsTab panelId={editingPanel.id} productionPdfUrl={editingPanel.productionPdfUrl} />
+                </TabsContent>
+
+                <TabsContent value="audit-log" className="flex-1 overflow-y-auto mt-4">
+                  <PanelAuditLogTab panelId={editingPanel.id} />
                 </TabsContent>
               </>
             )}

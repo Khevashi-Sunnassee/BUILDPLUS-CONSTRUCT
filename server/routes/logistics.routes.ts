@@ -3,6 +3,8 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import { emailService } from "../services/email.service";
+import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
+import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 
 const router = Router();
 
@@ -119,11 +121,13 @@ router.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePer
 router.post("/api/load-lists/:id/panels", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
   const { panelId, sequence } = req.body;
   const panel = await storage.addPanelToLoadList(req.params.id as string, panelId, sequence);
+  advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: req.params.id });
   res.json(panel);
 });
 
 router.delete("/api/load-lists/:id/panels/:panelId", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
   await storage.removePanelFromLoadList(req.params.id as string, req.params.panelId as string);
+  logPanelChange(req.params.panelId as string, "Removed from load list", req.session.userId, { changedFields: { loadListId: req.params.id } });
   res.json({ success: true });
 });
 
@@ -141,6 +145,12 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
       loadListId: req.params.id as string,
       enteredById: req.session.userId!,
     });
+    const loadList = await storage.getLoadList(req.params.id as string);
+    if (loadList?.panels) {
+      for (const lp of loadList.panels) {
+        advancePanelLifecycleIfLower(lp.panel.id, PANEL_LIFECYCLE_STATUS.SHIPPED, "Delivered to site", req.session.userId, { loadListId: req.params.id });
+      }
+    }
     res.json(record);
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to create delivery record" });
@@ -196,6 +206,10 @@ router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
       loadListId: req.params.id as string,
       returnedById: req.session.userId || undefined,
     }, selectedPanelIds);
+
+    for (const panelId of selectedPanelIds) {
+      updatePanelLifecycleStatus(panelId, PANEL_LIFECYCLE_STATUS.RETURNED, "Panel returned from site", req.session.userId, { returnType: returnData.returnType, returnReason: returnData.returnReason });
+    }
 
     res.json(loadReturn);
   } catch (error: any) {

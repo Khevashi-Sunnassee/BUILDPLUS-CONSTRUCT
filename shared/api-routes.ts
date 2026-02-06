@@ -160,6 +160,7 @@ export const PANELS_ROUTES = {
   APPROVED_FOR_PRODUCTION: '/api/panels/approved-for-production',
   READY_FOR_LOADING: '/api/panels/ready-for-loading',
   DOCUMENT_STATUS: (id: string | number) => `/api/panels/${id}/document-status`,
+  AUDIT_LOGS: (id: string | number) => `/api/panels/${id}/audit-logs`,
 } as const;
 
 export const PANEL_TYPES_ROUTES = {

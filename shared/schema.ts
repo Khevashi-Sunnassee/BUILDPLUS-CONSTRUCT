@@ -537,6 +537,7 @@ export const panelRegister = pgTable("panel_register", {
   approvedForProduction: boolean("approved_for_production").default(false).notNull(),
   approvedAt: timestamp("approved_at"),
   approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  lifecycleStatus: integer("lifecycle_status").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -546,7 +547,82 @@ export const panelRegister = pgTable("panel_register", {
   statusIdx: index("panel_register_status_idx").on(table.status),
   jobPanelIdx: uniqueIndex("panel_register_job_panel_idx").on(table.jobId, table.panelMark),
   approvedForProductionIdx: index("panel_register_approved_for_production_idx").on(table.approvedForProduction),
+  lifecycleStatusIdx: index("panel_register_lifecycle_status_idx").on(table.lifecycleStatus),
 }));
+
+export const panelAuditLogs = pgTable("panel_audit_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  changedFields: jsonb("changed_fields"),
+  previousLifecycleStatus: integer("previous_lifecycle_status"),
+  newLifecycleStatus: integer("new_lifecycle_status"),
+  changedById: varchar("changed_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  panelIdIdx: index("panel_audit_logs_panel_id_idx").on(table.panelId),
+  createdAtIdx: index("panel_audit_logs_created_at_idx").on(table.createdAt),
+}));
+
+export const insertPanelAuditLogSchema = createInsertSchema(panelAuditLogs).omit({ id: true, createdAt: true });
+export type InsertPanelAuditLog = z.infer<typeof insertPanelAuditLogSchema>;
+export type PanelAuditLog = typeof panelAuditLogs.$inferSelect;
+
+export const PANEL_LIFECYCLE_STATUS = {
+  REGISTERED: 0,
+  DIMENSIONS_CONFIRMED: 1,
+  DRAFTING: 2,
+  IFA: 3,
+  IFC: 4,
+  MATERIALS_ORDERED: 5,
+  PRODUCTION_APPROVED: 6,
+  IN_PRODUCTION: 7,
+  PRODUCED: 8,
+  QA_PASSED: 9,
+  ON_LOAD_LIST: 10,
+  SHIPPED: 11,
+  RETURNED: 12,
+  INSTALLED: 13,
+  DEFECTED: 14,
+} as const;
+
+export type PanelLifecycleStatus = typeof PANEL_LIFECYCLE_STATUS[keyof typeof PANEL_LIFECYCLE_STATUS];
+
+export const PANEL_LIFECYCLE_LABELS: Record<number, string> = {
+  0: "Registered",
+  1: "Dimensions Confirmed",
+  2: "Drafting",
+  3: "IFA",
+  4: "IFC",
+  5: "Materials Ordered",
+  6: "Production Approved",
+  7: "In Production",
+  8: "Produced",
+  9: "QA Passed",
+  10: "On Load List",
+  11: "Shipped",
+  12: "Returned",
+  13: "Installed",
+  14: "Defected",
+};
+
+export const PANEL_LIFECYCLE_COLORS: Record<number, { bg: string; text: string; border: string }> = {
+  0: { bg: "bg-slate-100 dark:bg-slate-800/50", text: "text-slate-700 dark:text-slate-300", border: "border-slate-300 dark:border-slate-600" },
+  1: { bg: "bg-sky-100 dark:bg-sky-900/30", text: "text-sky-700 dark:text-sky-300", border: "border-sky-300 dark:border-sky-700" },
+  2: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-300", border: "border-blue-300 dark:border-blue-700" },
+  3: { bg: "bg-violet-100 dark:bg-violet-900/30", text: "text-violet-700 dark:text-violet-300", border: "border-violet-300 dark:border-violet-700" },
+  4: { bg: "bg-purple-100 dark:bg-purple-900/30", text: "text-purple-700 dark:text-purple-300", border: "border-purple-300 dark:border-purple-700" },
+  5: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-300", border: "border-amber-300 dark:border-amber-700" },
+  6: { bg: "bg-orange-100 dark:bg-orange-900/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-300 dark:border-orange-700" },
+  7: { bg: "bg-yellow-100 dark:bg-yellow-900/30", text: "text-yellow-700 dark:text-yellow-300", border: "border-yellow-300 dark:border-yellow-700" },
+  8: { bg: "bg-lime-100 dark:bg-lime-900/30", text: "text-lime-700 dark:text-lime-300", border: "border-lime-300 dark:border-lime-700" },
+  9: { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-700 dark:text-green-300", border: "border-green-300 dark:border-green-700" },
+  10: { bg: "bg-teal-100 dark:bg-teal-900/30", text: "text-teal-700 dark:text-teal-300", border: "border-teal-300 dark:border-teal-700" },
+  11: { bg: "bg-cyan-100 dark:bg-cyan-900/30", text: "text-cyan-700 dark:text-cyan-300", border: "border-cyan-300 dark:border-cyan-700" },
+  12: { bg: "bg-rose-100 dark:bg-rose-900/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-300 dark:border-rose-700" },
+  13: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-300 dark:border-emerald-700" },
+  14: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-300", border: "border-red-300 dark:border-red-700" },
+};
 
 export const mappingRules = pgTable("mapping_rules", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

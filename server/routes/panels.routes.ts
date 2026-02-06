@@ -2,6 +2,10 @@ import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
+import { db } from "../db";
+import { panelAuditLogs, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -106,6 +110,15 @@ router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, 
     const updatedPanel = await storage.updatePanelRegisterItem(req.params.id as string, { 
       documentStatus 
     });
+    
+    const panelId = req.params.id as string;
+    const userId = req.session.userId;
+    const docToLifecycle: Record<string, number> = { DRAFT: 2, IFA: 3, IFC: 4, APPROVED: 6 };
+    const mappedStatus = docToLifecycle[documentStatus];
+    if (mappedStatus !== undefined) {
+      advancePanelLifecycleIfLower(panelId, mappedStatus, "Document status changed to " + documentStatus, userId, { documentStatus, previousDocumentStatus: panel.documentStatus });
+    }
+    
     res.json(updatedPanel);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to update document status" });
@@ -174,6 +187,7 @@ router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res:
       return res.status(400).json({ error: "Invalid job" });
     }
     const panel = await storage.createPanelRegisterItem(req.body);
+    logPanelChange(panel.id, "Panel created", req.session.userId, { changedFields: { panelMark: panel.panelMark, panelType: panel.panelType, jobId: panel.jobId }, newLifecycleStatus: 0 });
     res.json(panel);
   } catch (error: any) {
     if (error.message?.includes("duplicate")) {
@@ -190,6 +204,16 @@ router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, r
   const job = await storage.getJob(existing.jobId);
   if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
   const panel = await storage.updatePanelRegisterItem(req.params.id as string, req.body);
+  const diff: Record<string, any> = {};
+  for (const key of Object.keys(req.body)) {
+    if (req.body[key] !== (existing as any)[key]) {
+      diff[key] = req.body[key];
+    }
+  }
+  logPanelChange(panel.id, "Panel updated", req.session.userId, { changedFields: diff });
+  if (diff.loadWidth !== undefined || diff.loadHeight !== undefined || diff.panelThickness !== undefined) {
+    advancePanelLifecycleIfLower(panel.id, PANEL_LIFECYCLE_STATUS.DIMENSIONS_CONFIRMED, "Dimensions confirmed", req.session.userId);
+  }
   res.json(panel);
 });
 
@@ -210,6 +234,7 @@ router.post("/api/panels/admin/:id/validate", requireRole("ADMIN", "MANAGER"), a
     const updatedPanel = await storage.updatePanelRegisterItem(req.params.id as string, { 
       status: "NOT_STARTED" 
     });
+    logPanelChange(updatedPanel.id, "Panel validated", req.session.userId);
     res.json(updatedPanel);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to validate panel" });
@@ -222,6 +247,7 @@ router.delete("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request
   if (!panel) return res.status(404).json({ error: "Panel not found" });
   const job = await storage.getJob(panel.jobId);
   if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
+  logPanelChange(panel.id, "Panel deleted", req.session.userId, { changedFields: { panelMark: panel.panelMark } });
   await storage.deletePanelRegisterItem(req.params.id as string);
   res.json({ ok: true });
 });
@@ -249,6 +275,27 @@ router.delete("/api/panels/admin/by-source/:source", requireRole("ADMIN"), async
     res.json({ deleted: deletedCount });
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to delete panels" });
+  }
+});
+
+router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const panelId = req.params.id as string;
+    const panel = await storage.getPanelRegisterItem(panelId);
+    if (!panel) return res.status(404).json({ error: "Panel not found" });
+    
+    const limit = parseInt(req.query.limit as string) || 100;
+    const offset = parseInt(req.query.offset as string) || 0;
+    
+    const logs = await db.select().from(panelAuditLogs)
+      .where(eq(panelAuditLogs.panelId, panelId))
+      .orderBy(desc(panelAuditLogs.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    res.json(logs);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to get audit logs" });
   }
 });
 

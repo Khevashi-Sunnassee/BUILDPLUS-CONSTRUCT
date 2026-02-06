@@ -3,6 +3,8 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { logPanelChange, advancePanelLifecycleIfLower } from "../services/panel-audit.service";
+import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 
 const router = Router();
 
@@ -275,6 +277,7 @@ router.post("/api/manual-entry", requireAuth, async (req, res) => {
       });
       actualPanelRegisterId = newPanel.id;
       actualPanelMark = newPanelMark;
+      logPanelChange(newPanel.id, "Panel created via manual entry", req.session.userId, { changedFields: { panelMark: newPanelMark, jobId }, newLifecycleStatus: 0 });
     }
 
     const dailyLog = await storage.upsertDailyLog({
@@ -335,6 +338,7 @@ router.post("/api/manual-entry", requireAuth, async (req, res) => {
 
         if (Object.keys(updateData).length > 0) {
           await storage.updatePanelRegisterItem(actualPanelRegisterId, updateData);
+          logPanelChange(actualPanelRegisterId, "Panel details updated via manual entry", req.session.userId, { changedFields: updateData });
         }
       }
     }

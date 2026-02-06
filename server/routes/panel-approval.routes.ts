@@ -4,6 +4,8 @@ import { requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import { documentRegisterService } from "../services/document-register.service";
+import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
+import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
@@ -57,6 +59,8 @@ router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"),
       productionPdfUrl: registeredDoc.storageKey,
     });
 
+    logPanelChange(id, "Production PDF uploaded", req.session.userId, { changedFields: { productionPdfUrl: pdfFileName } });
+    
     res.json({
       success: true,
       objectPath: registeredDoc.storageKey,
@@ -222,6 +226,8 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
       productionPdfUrl,
     });
     
+    updatePanelLifecycleStatus(id, PANEL_LIFECYCLE_STATUS.PRODUCTION_APPROVED, "Approved for production", userId, { loadWidth, loadHeight, panelThickness, panelVolume, panelMass });
+    
     res.json({ success: true, panel: updated });
   } catch (error: any) {
     logger.error({ err: error }, "Approval error");
@@ -239,6 +245,8 @@ router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MAN
     }
     
     const updated = await storage.revokePanelProductionApproval(id as string);
+    
+    updatePanelLifecycleStatus(id, PANEL_LIFECYCLE_STATUS.REGISTERED, "Production approval revoked", req.session.userId);
     
     res.json({ success: true, panel: updated });
   } catch (error: any) {

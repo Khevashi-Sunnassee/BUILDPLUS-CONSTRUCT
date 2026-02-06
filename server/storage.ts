@@ -318,14 +318,14 @@ export interface IStorage {
   deletePanelRegisterItem(id: string): Promise<void>;
   getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
   getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string; factoryId?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }>;
-  importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }>;
+  importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number; importedIds: string[] }>;
   updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
   getPanelCountsBySource(): Promise<{ source: number; count: number }[]>;
   panelsWithSourceHaveRecords(source: number): Promise<boolean>;
   deletePanelsBySource(source: number): Promise<number>;
   deletePanelsByJobAndSource(jobId: string, source: number): Promise<number>;
   getExistingPanelSourceIds(jobId: string): Promise<Set<string>>;
-  importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[] }>;
+  importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[]; importedIds: string[] }>;
 
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
   getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
@@ -1378,9 +1378,10 @@ export class DatabaseStorage implements IStorage {
     return { panels, total, page, limit, totalPages };
   }
 
-  async importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number }> {
+  async importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number; importedIds: string[] }> {
     let imported = 0;
     let skipped = 0;
+    const importedIds: string[] = [];
     
     for (const panelData of data) {
       try {
@@ -1393,14 +1394,15 @@ export class DatabaseStorage implements IStorage {
           skipped++;
           continue;
         }
-        await this.createPanelRegisterItem(panelData);
+        const created = await this.createPanelRegisterItem(panelData);
+        importedIds.push(created.id);
         imported++;
       } catch (error) {
         skipped++;
       }
     }
     
-    return { imported, skipped };
+    return { imported, skipped, importedIds };
   }
 
   async updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void> {
@@ -1502,13 +1504,13 @@ export class DatabaseStorage implements IStorage {
     return new Set(panels.map(p => p.panelSourceId).filter(Boolean) as string[]);
   }
 
-  async importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[] }> {
+  async importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[]; importedIds: string[] }> {
     const errors: string[] = [];
     let imported = 0;
+    const importedIds: string[] = [];
     
     for (const panel of data) {
       try {
-        // Check if panelMark already exists for this job (unless it has a unique panelSourceId)
         const existing = await db.select().from(panelRegister)
           .where(and(
             eq(panelRegister.jobId, panel.jobId),
@@ -1517,7 +1519,6 @@ export class DatabaseStorage implements IStorage {
           .limit(1);
         
         if (existing.length > 0) {
-          // Update existing panel with new data if it's from the same source
           if (existing[0].panelSourceId === panel.panelSourceId) {
             await db.update(panelRegister)
               .set({
@@ -1525,18 +1526,20 @@ export class DatabaseStorage implements IStorage {
                 updatedAt: new Date(),
               })
               .where(eq(panelRegister.id, existing[0].id));
+            importedIds.push(existing[0].id);
             imported++;
           } else {
-            // Panel mark already exists from different source - create with modified mark
             const newMark = `${panel.panelMark}_${panel.sourceRow}`;
-            await db.insert(panelRegister).values({
+            const [created] = await db.insert(panelRegister).values({
               ...panel,
               panelMark: newMark,
-            });
+            }).returning();
+            importedIds.push(created.id);
             imported++;
           }
         } else {
-          await db.insert(panelRegister).values(panel);
+          const [created] = await db.insert(panelRegister).values(panel).returning();
+          importedIds.push(created.id);
           imported++;
         }
       } catch (err: any) {
@@ -1544,7 +1547,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    return { imported, errors };
+    return { imported, errors, importedIds };
   }
 
   async getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined> {

@@ -2,6 +2,8 @@ import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import { logPanelChange, advancePanelLifecycleIfLower } from "../services/panel-audit.service";
+import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 
 const router = Router();
 
@@ -75,10 +77,15 @@ router.put("/api/production-entries/:id", requireAuth, requirePermission("produc
       
       if (Object.keys(panelUpdates).length > 0) {
         await storage.updatePanelRegisterItem(panelId, panelUpdates);
+        logPanelChange(panelId, "Production entry dimensions updated", req.session.userId, { changedFields: panelUpdates });
+        if (panelUpdates.loadWidth || panelUpdates.loadHeight || panelUpdates.panelThickness) {
+          advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.DIMENSIONS_CONFIRMED, "Dimensions confirmed via production entry", req.session.userId);
+        }
       }
       
       if (status === "COMPLETED") {
         await storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" });
+        advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.PRODUCED, "Production completed", req.session.userId);
         
         const panel = await storage.getPanelRegisterItem(panelId);
         if (panel && panel.level && panel.building) {
@@ -145,6 +152,9 @@ router.put("/api/production-entries/batch-status", requireAuth, requirePermissio
     await Promise.all(
       uniquePanelIds.map(panelId => storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" }))
     );
+    for (const panelId of uniquePanelIds) {
+      advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.PRODUCED, "Production completed (batch)", req.session.userId);
+    }
     
     const slotsToCheck = new Map<string, { jobId: string; level: string; building: number }>();
     for (const panelId of uniquePanelIds) {
@@ -275,6 +285,7 @@ router.post("/api/production-slots/:slotId/assign-panels", requireAuth, requireP
         });
         
         await storage.updatePanelRegisterItem(assignment.panelId, { status: "IN_PROGRESS" });
+        advancePanelLifecycleIfLower(assignment.panelId, PANEL_LIFECYCLE_STATUS.IN_PRODUCTION, "Assigned to production slot", req.session.userId, { productionDate: assignment.productionDate });
         
         results.created++;
       } catch (err: any) {
