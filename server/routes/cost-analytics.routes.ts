@@ -5,6 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 const router = Router();
 
 router.get("/api/reports/cost-analysis", requireAuth, async (req, res) => {
+  try {
   const startDate = req.query.startDate as string;
   const endDate = req.query.endDate as string;
   const jobId = req.query.jobId as string | undefined;
@@ -120,9 +121,13 @@ router.get("/api/reports/cost-analysis", requireAuth, async (req, res) => {
     componentBreakdown,
     entryCount: filteredEntries.length,
   });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to generate cost analysis" });
+  }
 });
 
 router.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => {
+  try {
   const startDate = req.query.startDate as string;
   const endDate = req.query.endDate as string;
   const componentFilter = req.query.component as string | undefined;
@@ -263,9 +268,13 @@ router.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => 
     totals,
     selectedComponent: componentFilter || null,
   });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to generate daily cost analysis" });
+  }
 });
 
 router.get("/api/reports/labour-cost-analysis", requireAuth, async (req, res) => {
+  try {
   const startDate = req.query.startDate as string;
   const endDate = req.query.endDate as string;
   const factory = req.query.factory as string | undefined;
@@ -456,6 +465,9 @@ router.get("/api/reports/labour-cost-analysis", requireAuth, async (req, res) =>
     totals,
     hasWeeklyWageData: weeklyWages.length > 0,
   });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to generate labour cost analysis" });
+  }
 });
 
 export const costAnalyticsRouter = router;

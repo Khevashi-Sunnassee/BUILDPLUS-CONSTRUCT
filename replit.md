@@ -79,6 +79,15 @@ All mobile pages live under `client/src/pages/mobile/` and follow these strict c
 - **Response Compression**: gzip compression middleware (threshold=1024, level=6) in `server/index.ts` - ~91% size reduction on API responses
 - **Logging Optimization**: Response body only logged for errors (4xx/5xx) or slow requests (>1s), truncated at 500 chars
 - **SQL Injection Fix**: Chat conversations query uses parameterized `sql.join()` instead of unsafe `sql.raw()` string concatenation
+- **Rate Limiting**: API rate limiter (300 req/min per user), auth rate limiter (20 req/15min), and upload limiter (30 req/min) via `express-rate-limit`
+- **Security Headers**: `helmet` middleware with CSP disabled for app compatibility, protects against XSS, clickjacking, MIME sniffing
+- **Graceful Shutdown**: SIGTERM/SIGINT handlers drain DB pool and close HTTP server with 15s timeout
+- **Unhandled Error Handlers**: `process.on('unhandledRejection')` and `process.on('uncaughtException')` prevent silent crashes
+- **Health Check Endpoint**: `GET /api/health` returns DB pool stats, memory usage, uptime for monitoring
+- **Request Timeouts**: 30s default, 60s for report endpoints to prevent connection hogging
+- **Session Store Pruning**: `connect-pg-simple` auto-prunes expired sessions every 15 minutes
+- **Pool Error Handling**: `pool.on('error')` catches unexpected disconnections to prevent process crashes
+- **Try-Catch Coverage**: All async route handlers wrapped in try-catch for consistent error responses
 
 ## External Dependencies
 - **PostgreSQL**: Primary database.

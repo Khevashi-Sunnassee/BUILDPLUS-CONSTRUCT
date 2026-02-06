@@ -5,6 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 const router = Router();
 
 router.get("/api/reports/production-daily", requireAuth, async (req, res) => {
+  try {
   const startDate = req.query.startDate as string;
   const endDate = req.query.endDate as string;
   
@@ -91,9 +92,13 @@ router.get("/api/reports/production-daily", requireAuth, async (req, res) => {
     panelTypes: panelTypesUsed,
     period: { startDate, endDate },
   });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to generate production report" });
+  }
 });
 
 router.get("/api/reports/production-with-costs", requireAuth, async (req, res) => {
+  try {
   const startDate = req.query.startDate as string;
   const endDate = req.query.endDate as string;
   
@@ -244,6 +249,9 @@ router.get("/api/reports/production-with-costs", requireAuth, async (req, res) =
     panelTypes: panelTypesUsed,
     period: { startDate, endDate },
   });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to generate production cost report" });
+  }
 });
 
 export const productionAnalyticsRouter = router;

@@ -2,13 +2,48 @@ import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import serveIndex from "serve-index";
 import compression from "compression";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase } from "./seed";
 import logger from "./lib/logger";
+import { pool } from "./db";
 
 const app = express();
+
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+}));
+
+app.set("trust proxy", 1);
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later" },
+  validate: { xForwardedForHeader: false },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts, please try again in 15 minutes" },
+});
+
+const uploadLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many upload requests, please try again later" },
+});
 
 app.use(compression({
   threshold: 1024,
@@ -19,11 +54,9 @@ app.use(compression({
   },
 }));
 
-// Serve public downloads folder for source code packages with directory listing
 const downloadsPath = path.join(process.cwd(), 'public/downloads');
 app.use('/download-files', express.static(downloadsPath), serveIndex(downloadsPath, { icons: true }));
 
-// Serve chat uploads
 const chatUploadsPath = path.join(process.cwd(), 'uploads', 'chat');
 app.use('/uploads/chat', express.static(chatUploadsPath));
 const httpServer = createServer(app);
@@ -43,7 +76,32 @@ app.use(
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: "10mb" }));
+
+app.use("/api/auth/login", authLimiter);
+app.use("/api/documents/upload", uploadLimiter);
+app.use("/api/documents/:id/new-version", uploadLimiter);
+app.use("/api/panels/:panelId/documents/upload", uploadLimiter);
+app.use("/api/tasks/:id/files", uploadLimiter);
+app.use("/api/purchase-orders/:id/attachments", uploadLimiter);
+app.use("/api/chat/:conversationId/files", uploadLimiter);
+app.use("/api/procurement/items/import", uploadLimiter);
+app.use("/api/", apiLimiter);
+
+app.use("/api/", (req, res, next) => {
+  const timeout = req.path.includes("/reports/") || req.path.includes("/cost-analysis") 
+    ? 60000 
+    : 30000;
+  
+  req.setTimeout(timeout, () => {
+    if (!res.headersSent) {
+      logger.warn({ path: req.path, method: req.method }, `Request timed out after ${timeout}ms`);
+      res.status(408).json({ error: "Request timed out" });
+    }
+  });
+  res.setTimeout(timeout);
+  next();
+});
 
 export function log(message: string, source = "express") {
   logger.info({ source }, message);
@@ -75,6 +133,72 @@ app.use((req, res, next) => {
 
   next();
 });
+
+app.get("/api/health", (_req, res) => {
+  const poolStatus = {
+    totalCount: pool.totalCount,
+    idleCount: pool.idleCount,
+    waitingCount: pool.waitingCount,
+  };
+  
+  pool.query("SELECT 1")
+    .then(() => {
+      res.json({ 
+        status: "healthy",
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        pool: poolStatus,
+        timestamp: new Date().toISOString(),
+      });
+    })
+    .catch((err) => {
+      logger.error({ err }, "Health check failed — database unreachable");
+      res.status(503).json({ 
+        status: "unhealthy",
+        error: "Database connection failed",
+        pool: poolStatus,
+        timestamp: new Date().toISOString(),
+      });
+    });
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  logger.error({ reason, promise: String(promise) }, "Unhandled promise rejection");
+});
+
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "Uncaught exception — process will exit");
+  gracefulShutdown("uncaughtException");
+});
+
+let isShuttingDown = false;
+
+function gracefulShutdown(signal: string) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  
+  logger.info(`Received ${signal} — starting graceful shutdown`);
+  
+  const forceExitTimer = setTimeout(() => {
+    logger.error("Graceful shutdown timed out after 15s — forcing exit");
+    process.exit(1);
+  }, 15000);
+  forceExitTimer.unref();
+  
+  httpServer.close(async () => {
+    logger.info("HTTP server closed");
+    try {
+      await pool.end();
+      logger.info("Database pool drained");
+    } catch (err) {
+      logger.error({ err }, "Error draining database pool");
+    }
+    process.exit(0);
+  });
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
   await seedDatabase();

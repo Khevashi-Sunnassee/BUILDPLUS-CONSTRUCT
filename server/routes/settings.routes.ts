@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 const router = Router();
 
 router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
+  try {
   let settings = await storage.getGlobalSettings();
   if (!settings) {
     settings = await storage.updateGlobalSettings({
@@ -16,9 +17,13 @@ router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
     });
   }
   res.json(settings);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load settings" });
+  }
 });
 
 router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
+  try {
   if (req.body.weekStartDay !== undefined) {
     const weekStartDay = parseInt(req.body.weekStartDay, 10);
     if (isNaN(weekStartDay) || weekStartDay < 0 || weekStartDay > 6) {
@@ -80,6 +85,9 @@ router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   }
   const settings = await storage.updateGlobalSettings(req.body);
   res.json(settings);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to update settings" });
+  }
 });
 
 router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) => {
@@ -112,11 +120,15 @@ router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req
 });
 
 router.get("/api/settings/logo", async (req, res) => {
-  const settings = await storage.getGlobalSettings();
-  res.json({ 
-    logoBase64: settings?.logoBase64 || null,
-    companyName: settings?.companyName || "LTE Precast Concrete Structures"
-  });
+  try {
+    const settings = await storage.getGlobalSettings();
+    res.json({ 
+      logoBase64: settings?.logoBase64 || null,
+      companyName: settings?.companyName || "LTE Precast Concrete Structures"
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load logo" });
+  }
 });
 
 export const settingsRouter = router;

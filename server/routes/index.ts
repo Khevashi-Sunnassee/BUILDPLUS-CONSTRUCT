@@ -64,6 +64,10 @@ export async function setupRoutes(app: Express): Promise<void> {
         conString: databaseUrl,
         createTableIfMissing: true,
         tableName: "session",
+        pruneSessionInterval: 60 * 15,
+        errorLog: (err: Error) => {
+          console.error("Session store error:", err.message);
+        },
       }),
       secret: sessionSecret,
       resave: false,
