@@ -2,9 +2,11 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import crypto from "crypto";
 import OpenAI from "openai";
+import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
+import { emailService } from "../services/email.service";
 import logger from "../lib/logger";
 import { 
   insertDocumentSchema, 
@@ -613,6 +615,95 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
     }
     logger.error({ err: error }, "Error downloading document");
     res.status(500).json({ error: error.message || "Failed to download document" });
+  }
+});
+
+const sendDocumentsEmailSchema = z.object({
+  to: z.string().email("Valid email address is required"),
+  cc: z.string().optional(),
+  subject: z.string().min(1, "Subject is required"),
+  message: z.string().min(1, "Message is required"),
+  documentIds: z.array(z.string()).min(1, "At least one document is required"),
+  sendCopy: z.boolean().default(false),
+});
+
+router.post("/api/documents/send-email", requireAuth, async (req, res) => {
+  try {
+    const parsed = sendDocumentsEmailSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
+    }
+
+    const { to, cc, subject, message, documentIds, sendCopy } = parsed.data;
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured. Please configure Mailgun settings (MAILGUN_API_KEY, MAILGUN_DOMAIN)." });
+    }
+
+    const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+
+    for (const docId of documentIds) {
+      try {
+        const doc = await storage.getDocument(docId);
+        if (!doc) {
+          logger.warn({ docId }, "Document not found for email attachment, skipping");
+          continue;
+        }
+
+        const objectFile = await objectStorageService.getObjectEntityFile(doc.storageKey);
+        const [metadata] = await objectFile.getMetadata();
+
+        const chunks: Buffer[] = [];
+        const stream = objectFile.createReadStream();
+        await new Promise<void>((resolve, reject) => {
+          stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+          stream.on("end", () => resolve());
+          stream.on("error", (err: Error) => reject(err));
+        });
+
+        attachments.push({
+          filename: doc.originalName,
+          content: Buffer.concat(chunks),
+          contentType: (metadata as any).contentType || "application/octet-stream",
+        });
+      } catch (err) {
+        logger.warn({ docId, err }, "Failed to load document for email attachment, skipping");
+      }
+    }
+
+    if (attachments.length === 0) {
+      return res.status(400).json({ error: "No documents could be loaded for attachment" });
+    }
+
+    let bcc: string | undefined;
+    if (sendCopy && req.session.userId) {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (currentUser?.email) {
+        bcc = currentUser.email;
+      }
+    }
+
+    const htmlBody = message.replace(/\n/g, "<br>");
+
+    const result = await emailService.sendEmailWithAttachment({
+      to,
+      cc: cc || undefined,
+      bcc,
+      subject,
+      body: htmlBody,
+      attachments,
+    });
+
+    if (result.success) {
+      logger.info({ documentCount: attachments.length, to }, "Documents email sent successfully");
+      res.json({ success: true, messageId: result.messageId, attachedCount: attachments.length });
+    } else {
+      logger.error({ error: result.error }, "Failed to send documents email");
+      res.status(500).json({ error: result.error || "Failed to send email" });
+    }
+  } catch (error: any) {
+    logger.error({ err: error }, "Error sending documents email");
+    res.status(500).json({ error: error.message || "Failed to send email" });
   }
 });
 

@@ -475,6 +475,9 @@ export const DOCUMENT_ROUTES = {
   BUNDLE_ADD_DOCUMENTS: (id: string | number) => `/api/document-bundles/${id}/documents`,
   BUNDLE_REMOVE_DOCUMENT: (bundleId: string | number, documentId: string | number) => `/api/document-bundles/${bundleId}/documents/${documentId}`,
   
+  // Send documents via email
+  SEND_DOCUMENTS_EMAIL: '/api/documents/send-email',
+
   // Public bundle access (no auth required)
   PUBLIC_BUNDLE: (qrCodeId: string) => `/api/public/bundles/${qrCodeId}`,
 } as const;

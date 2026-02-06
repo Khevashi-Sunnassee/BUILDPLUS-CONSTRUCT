@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,6 +28,9 @@ import {
   ExternalLink,
   ChevronDown,
   Layers,
+  Mail,
+  Send,
+  Paperclip,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +40,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -190,6 +195,211 @@ function formatDate(date: string | Date | null): string {
   });
 }
 
+interface SendDocumentsEmailDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  selectedDocuments: DocumentWithDetails[];
+  onSuccess: () => void;
+}
+
+function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments, onSuccess }: SendDocumentsEmailDialogProps) {
+  const { toast } = useToast();
+  const [toEmail, setToEmail] = useState("");
+  const [ccEmail, setCcEmail] = useState("");
+  const [subject, setSubject] = useState("");
+  const [message, setMessage] = useState("");
+  const [sendCopy, setSendCopy] = useState(false);
+
+  const buildDocumentList = useCallback((docs: DocumentWithDetails[]) => {
+    return docs.map((d) => `- ${d.title} (${d.originalName})`).join("\n");
+  }, []);
+
+  const resetForm = useCallback(() => {
+    setToEmail("");
+    setCcEmail("");
+    setSubject("");
+    setMessage("");
+    setSendCopy(false);
+  }, []);
+
+  useEffect(() => {
+    if (open && selectedDocuments.length > 0) {
+      setToEmail("");
+      setCcEmail("");
+      setSendCopy(false);
+      setSubject(`Documents - ${selectedDocuments.length} file${selectedDocuments.length > 1 ? "s" : ""} attached`);
+      setMessage(
+        `Hi,\n\nPlease find attached the documents you requested.\n\n${buildDocumentList(selectedDocuments)}\n\nKind regards`
+      );
+    }
+  }, [open, selectedDocuments, buildDocumentList]);
+
+  const sendMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", DOCUMENT_ROUTES.SEND_DOCUMENTS_EMAIL, {
+        to: toEmail,
+        cc: ccEmail || undefined,
+        subject,
+        message,
+        documentIds: selectedDocuments.map((d) => d.id),
+        sendCopy,
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} files attached)` });
+      onOpenChange(false);
+      resetForm();
+      onSuccess();
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send email", description: err.message || "An error occurred", variant: "destructive" });
+    },
+  });
+
+  const handleSend = () => {
+    if (!toEmail.trim()) {
+      toast({ title: "Email required", description: "Please enter a recipient email address", variant: "destructive" });
+      return;
+    }
+    sendMutation.mutate();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[900px] max-h-[85vh] p-0 gap-0 overflow-hidden" data-testid="dialog-send-documents-email">
+        <DialogHeader className="px-6 py-4 border-b">
+          <DialogTitle className="flex items-center gap-2" data-testid="text-email-dialog-title">
+            <Mail className="h-5 w-5" />
+            Email Documents
+          </DialogTitle>
+          <DialogDescription>
+            Send {selectedDocuments.length} document{selectedDocuments.length !== 1 ? "s" : ""} via email
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-1 overflow-hidden" style={{ minHeight: "500px" }}>
+          <div className="w-[420px] flex-shrink-0 border-r overflow-y-auto p-6 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="doc-email-to">To</Label>
+              <Input
+                id="doc-email-to"
+                type="email"
+                placeholder="recipient@example.com"
+                value={toEmail}
+                onChange={(e) => setToEmail(e.target.value)}
+                data-testid="input-doc-email-to"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="doc-email-cc">Cc</Label>
+              <Input
+                id="doc-email-cc"
+                type="email"
+                placeholder="cc@example.com"
+                value={ccEmail}
+                onChange={(e) => setCcEmail(e.target.value)}
+                data-testid="input-doc-email-cc"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="doc-email-subject">Subject</Label>
+              <Input
+                id="doc-email-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                data-testid="input-doc-email-subject"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="doc-email-message">Message</Label>
+              <Textarea
+                id="doc-email-message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={10}
+                className="resize-none text-sm"
+                data-testid="input-doc-email-message"
+              />
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="doc-send-copy"
+                  checked={sendCopy}
+                  onCheckedChange={(v) => setSendCopy(!!v)}
+                  data-testid="checkbox-doc-send-copy"
+                />
+                <Label htmlFor="doc-send-copy" className="text-sm cursor-pointer">Send myself a copy</Label>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-doc-email">
+                Cancel
+              </Button>
+              <Button onClick={handleSend} disabled={sendMutation.isPending} data-testid="button-send-doc-email">
+                {sendMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Send email
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex-1 flex flex-col bg-muted/30 overflow-hidden">
+            <div className="flex border-b px-4">
+              <div className="px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground">
+                Email Preview
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-auto p-4">
+              <Card className="max-w-md mx-auto" data-testid="card-doc-email-preview">
+                <CardContent className="p-6 space-y-4">
+                  <div className="text-center space-y-1">
+                    <p className="text-lg font-semibold">Document Delivery</p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedDocuments.length} document{selectedDocuments.length !== 1 ? "s" : ""} attached
+                    </p>
+                  </div>
+                  <Separator />
+                  <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+                    {message}
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
+                    {selectedDocuments.map((doc) => (
+                      <div key={doc.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-attachment-${doc.id}`}>
+                        <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="truncate font-medium">{doc.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">{doc.originalName} ({formatFileSize(doc.fileSize)})</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function DocumentRegister() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -227,6 +437,9 @@ export default function DocumentRegister() {
   const [bundleToDelete, setBundleToDelete] = useState<DocumentBundle | null>(null);
   const [isAnalyzingVersion, setIsAnalyzingVersion] = useState(false);
   const [aiVersionSummary, setAiVersionSummary] = useState("");
+
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -574,6 +787,34 @@ export default function DocumentRegister() {
     return sorted;
   }, [documents, groupBy]);
 
+  const toggleDocSelection = useCallback((docId: string) => {
+    setSelectedDocIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback((docs: DocumentWithDetails[]) => {
+    setSelectedDocIds((prev) => {
+      const allIds = docs.map((d) => d.id);
+      const allSelected = allIds.every((id) => prev.has(id));
+      if (allSelected) {
+        const next = new Set(prev);
+        allIds.forEach((id) => next.delete(id));
+        return next;
+      } else {
+        const next = new Set(prev);
+        allIds.forEach((id) => next.add(id));
+        return next;
+      }
+    });
+  }, []);
+
   const renderDocumentRow = useCallback((doc: DocumentWithDetails) => {
     const legacyStatus = statusConfig[doc.status] || statusConfig.DRAFT;
     const StatusIcon = legacyStatus.icon;
@@ -581,6 +822,13 @@ export default function DocumentRegister() {
 
     return (
       <TableRow key={doc.id} data-testid={`row-document-${doc.id}`}>
+        <TableCell className="w-10">
+          <Checkbox
+            checked={selectedDocIds.has(doc.id)}
+            onCheckedChange={() => toggleDocSelection(doc.id)}
+            data-testid={`checkbox-doc-${doc.id}`}
+          />
+        </TableCell>
         <TableCell>
           <div className="flex flex-col">
             <span className="font-medium">{doc.title}</span>
@@ -713,27 +961,45 @@ export default function DocumentRegister() {
         </TableCell>
       </TableRow>
     );
-  }, [updateStatusMutation]);
+  }, [updateStatusMutation, selectedDocIds, toggleDocSelection]);
 
-  const renderDocumentTable = useCallback((docs: DocumentWithDetails[]) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Document</TableHead>
-          <TableHead>Type / Discipline</TableHead>
-          <TableHead>Job</TableHead>
-          <TableHead>Version</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Size</TableHead>
-          <TableHead>Uploaded</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {docs.map((doc) => renderDocumentRow(doc))}
-      </TableBody>
-    </Table>
-  ), [renderDocumentRow]);
+  const renderDocumentTable = useCallback((docs: DocumentWithDetails[]) => {
+    const allIds = docs.map((d) => d.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selectedDocIds.has(id));
+    const someSelected = allIds.some((id) => selectedDocIds.has(id)) && !allSelected;
+
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10">
+              <Checkbox
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) {
+                    (el as any).indeterminate = someSelected;
+                  }
+                }}
+                onCheckedChange={() => toggleSelectAll(docs)}
+                data-testid="checkbox-select-all"
+              />
+            </TableHead>
+            <TableHead>Document</TableHead>
+            <TableHead>Type / Discipline</TableHead>
+            <TableHead>Job</TableHead>
+            <TableHead>Version</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Size</TableHead>
+            <TableHead>Uploaded</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {docs.map((doc) => renderDocumentRow(doc))}
+        </TableBody>
+      </Table>
+    );
+  }, [renderDocumentRow, selectedDocIds, toggleSelectAll]);
 
   return (
     <div className="space-y-6" data-testid="document-register-page">
@@ -761,6 +1027,15 @@ export default function DocumentRegister() {
           >
             <Package className="h-4 w-4 mr-2" />
             View Bundles
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => setIsEmailDialogOpen(true)}
+            disabled={selectedDocIds.size === 0}
+            data-testid="button-email-documents"
+          >
+            <Mail className="h-4 w-4 mr-2" />
+            Email ({selectedDocIds.size})
           </Button>
           <Button 
             variant="outline"
@@ -1965,6 +2240,13 @@ export default function DocumentRegister() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <SendDocumentsEmailDialog
+        open={isEmailDialogOpen}
+        onOpenChange={setIsEmailDialogOpen}
+        selectedDocuments={documents.filter((d) => selectedDocIds.has(d.id))}
+        onSuccess={() => setSelectedDocIds(new Set())}
+      />
 
       <AlertDialog open={deleteBundleDialogOpen} onOpenChange={setDeleteBundleDialogOpen}>
         <AlertDialogContent>
