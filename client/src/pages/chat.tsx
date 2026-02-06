@@ -45,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { compressImages } from "@/lib/image-compress";
 import type { User, Job, PanelRegister } from "@shared/schema";
 
 interface ConversationMember {
@@ -108,6 +109,7 @@ export default function ChatPage() {
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
   const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [mentionQuery, setMentionQuery] = useState("");
@@ -289,10 +291,17 @@ export default function ChatPage() {
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setPendingFiles(prev => [...prev, ...files]);
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFiles = Array.from(e.target.files || []);
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (rawFiles.length === 0) return;
+    setIsCompressing(true);
+    try {
+      const compressed = await compressImages(rawFiles);
+      setPendingFiles(prev => [...prev, ...compressed]);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleRemoveFile = (index: number) => {
@@ -325,7 +334,7 @@ export default function ChatPage() {
     messageInputRef.current?.focus();
   };
 
-  const handlePaste = (e: React.ClipboardEvent) => {
+  const handlePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -342,7 +351,13 @@ export default function ChatPage() {
 
     if (imageFiles.length > 0) {
       e.preventDefault();
-      setPendingFiles(prev => [...prev, ...imageFiles]);
+      setIsCompressing(true);
+      try {
+        const compressed = await compressImages(imageFiles);
+        setPendingFiles(prev => [...prev, ...compressed]);
+      } finally {
+        setIsCompressing(false);
+      }
     }
   };
 
@@ -857,7 +872,7 @@ export default function ChatPage() {
                   />
                   <Button
                     onClick={handleSendMessage}
-                    disabled={sendMessageMutation.isPending || (!messageContent.trim() && pendingFiles.length === 0)}
+                    disabled={sendMessageMutation.isPending || isCompressing || (!messageContent.trim() && pendingFiles.length === 0)}
                     data-testid="button-send-message"
                   >
                     <Send className="h-4 w-4" />

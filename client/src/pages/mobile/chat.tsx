@@ -12,6 +12,7 @@ import { format } from "date-fns";
 import { MessageSquare, Users, Hash, Send, ChevronLeft, Plus, X, Image, Loader2, Check, Search as SearchIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { compressImages } from "@/lib/image-compress";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 interface Job {
@@ -67,6 +68,7 @@ export default function MobileChatPage() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<string[]>([]);
+  const [isCompressing, setIsCompressing] = useState(false);
   const [showNewConversation, setShowNewConversation] = useState(false);
   const [newConvType, setNewConvType] = useState<"DM" | "GROUP" | "CHANNEL">("DM");
   const [newConvName, setNewConvName] = useState("");
@@ -173,13 +175,20 @@ export default function MobileChatPage() {
     },
   });
 
-  const handleFilePick = (e: { target: HTMLInputElement }) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setSelectedFiles(prev => [...prev, ...files]);
-    const newPreviews = files.map(f => URL.createObjectURL(f));
-    setFilePreviews(prev => [...prev, ...newPreviews]);
+  const handleFilePick = async (e: { target: HTMLInputElement }) => {
+    const rawFiles = Array.from(e.target.files || []);
+    if (rawFiles.length === 0) return;
     if (fileInputRef.current) fileInputRef.current.value = "";
+
+    setIsCompressing(true);
+    try {
+      const compressed = await compressImages(rawFiles);
+      setSelectedFiles(prev => [...prev, ...compressed]);
+      const newPreviews = compressed.map(f => URL.createObjectURL(f));
+      setFilePreviews(prev => [...prev, ...newPreviews]);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const removeFile = (index: number) => {
@@ -426,32 +435,49 @@ export default function MobileChatPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.dwg,.dxf,.ifc"
             multiple
             className="hidden"
             onChange={handleFilePick}
             data-testid="input-file-picker"
           />
-          {selectedFiles.length > 0 && (
+          {(selectedFiles.length > 0 || isCompressing) && (
             <div className="px-4 pt-3 pb-1">
-              <div className="flex gap-2 overflow-x-auto">
-                {filePreviews.map((preview, i) => (
-                  <div key={i} className="relative flex-shrink-0">
-                    <img
-                      src={preview}
-                      alt={selectedFiles[i]?.name}
-                      className="h-16 w-16 rounded-lg object-cover border border-white/20"
-                      data-testid={`preview-image-${i}`}
-                    />
-                    <button
-                      onClick={() => removeFile(i)}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"
-                      data-testid={`button-remove-file-${i}`}
-                    >
-                      <X className="h-3 w-3 text-white" />
-                    </button>
+              <div className="flex gap-2 overflow-x-auto items-center">
+                {filePreviews.map((preview, i) => {
+                  const file = selectedFiles[i];
+                  const isImg = file?.type?.startsWith("image/");
+                  return (
+                    <div key={i} className="relative flex-shrink-0">
+                      {isImg ? (
+                        <img
+                          src={preview}
+                          alt={file?.name}
+                          className="h-16 w-16 rounded-lg object-cover border border-white/20"
+                          data-testid={`preview-image-${i}`}
+                        />
+                      ) : (
+                        <div className="h-16 w-16 rounded-lg border border-white/20 bg-white/10 flex flex-col items-center justify-center px-1" data-testid={`preview-file-${i}`}>
+                          <Image className="h-4 w-4 text-white/50 mb-1" />
+                          <span className="text-[9px] text-white/60 truncate w-full text-center">{file?.name?.split('.').pop()?.toUpperCase() || "FILE"}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => removeFile(i)}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"
+                        data-testid={`button-remove-file-${i}`}
+                      >
+                        <X className="h-3 w-3 text-white" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {isCompressing && (
+                  <div className="flex items-center gap-2 text-white/50 text-xs flex-shrink-0" data-testid="status-compressing">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Compressing...</span>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           )}
@@ -482,7 +508,7 @@ export default function MobileChatPage() {
             <Button
               size="icon"
               onClick={handleSendMessage}
-              disabled={(!messageContent.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending}
+              disabled={(!messageContent.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending || isCompressing}
               className="rounded-full bg-purple-500 flex-shrink-0"
               data-testid="button-send"
             >
