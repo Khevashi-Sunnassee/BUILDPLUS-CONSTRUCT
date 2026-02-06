@@ -259,6 +259,7 @@ export const TASKS_ROUTES = {
   GROUPS_REORDER: '/api/task-groups/reorder',
   TASKS_REORDER: '/api/tasks/reorder',
   MOVE_TASK: (id: string | number) => `/api/tasks/${id}/move`,
+  SEND_EMAIL: '/api/tasks/send-email',
 } as const;
 
 // ============================================================================

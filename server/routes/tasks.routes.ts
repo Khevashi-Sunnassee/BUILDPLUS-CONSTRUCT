@@ -5,6 +5,7 @@ import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { emailService } from "../services/email.service";
 
 const router = Router();
 
@@ -545,6 +546,43 @@ router.post("/api/task-notifications/read-all", requireAuth, async (req, res) =>
   } catch (error: any) {
     logger.error({ err: error }, "Error marking all notifications read");
     res.status(500).json({ error: error.message || "Failed to mark notifications read" });
+  }
+});
+
+router.post("/api/tasks/send-email", requireAuth, async (req, res) => {
+  try {
+    const schema = z.object({
+      to: z.string().min(1),
+      cc: z.string().optional(),
+      subject: z.string().min(1),
+      message: z.string().min(1),
+      sendCopy: z.boolean().optional(),
+    });
+
+    const data = schema.parse(req.body);
+    const userId = (req.session as any).userId;
+
+    if (!emailService.isConfigured()) {
+      return res.status(500).json({ error: "Email service is not configured" });
+    }
+
+    const currentUser = await storage.getUser(userId);
+    const result = await emailService.sendEmailWithAttachment({
+      to: data.to,
+      cc: data.cc,
+      bcc: data.sendCopy && currentUser?.email ? currentUser.email : undefined,
+      subject: data.subject,
+      body: data.message.replace(/\n/g, "<br>"),
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ error: result.error });
+    }
+
+    res.json({ success: true, messageId: result.messageId });
+  } catch (error: any) {
+    logger.error({ err: error }, "Error sending tasks email");
+    res.status(500).json({ error: error.message || "Failed to send email" });
   }
 });
 
