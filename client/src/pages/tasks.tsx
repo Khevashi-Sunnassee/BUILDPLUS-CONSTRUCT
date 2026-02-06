@@ -198,6 +198,15 @@ const PROJECT_STAGES = [
   "Completed",
 ];
 
+function getTaskGridTemplate(itemWidth: number): string {
+  return `4px 30px 40px ${itemWidth}px 40px 100px 100px 120px 90px 120px 100px 60px 60px 40px`;
+}
+
+const DEFAULT_ITEM_COL_WIDTH = 350;
+const MIN_ITEM_COL_WIDTH = 200;
+const MAX_ITEM_COL_WIDTH = 800;
+const ITEM_COL_STORAGE_KEY = "tasks-item-col-width";
+
 function getInitials(name: string | null | undefined): string {
   if (!name) return "?";
   return name
@@ -218,6 +227,7 @@ function SortableTaskRow({
   onToggleExpanded,
   isSelected,
   onToggleSelected,
+  gridTemplate,
 }: {
   task: Task;
   users: User[];
@@ -228,6 +238,7 @@ function SortableTaskRow({
   onToggleExpanded: () => void;
   isSelected?: boolean;
   onToggleSelected?: () => void;
+  gridTemplate: string;
 }) {
   const {
     attributes,
@@ -260,6 +271,7 @@ function SortableTaskRow({
       onToggleExpanded={onToggleExpanded}
       isSelected={isSelected}
       onToggleSelected={onToggleSelected}
+      gridTemplate={gridTemplate}
     />
   );
 }
@@ -279,6 +291,7 @@ function TaskRow({
   onToggleExpanded,
   isSelected,
   onToggleSelected,
+  gridTemplate,
 }: {
   task: Task;
   users: User[];
@@ -294,6 +307,7 @@ function TaskRow({
   onToggleExpanded?: () => void;
   isSelected?: boolean;
   onToggleSelected?: () => void;
+  gridTemplate?: string;
 }) {
   const { toast } = useToast();
   const [localTitle, setLocalTitle] = useState(task.title);
@@ -535,9 +549,10 @@ function TaskRow({
     <>
       <div
         ref={sortableRef}
-        style={sortableStyle}
+        style={{ ...sortableStyle, ...(gridTemplate ? { gridTemplateColumns: gridTemplate } : {}) }}
         className={cn(
-          "grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] items-center border-b border-border/50 hover-elevate group relative",
+          "grid items-center border-b border-border/50 hover-elevate group relative",
+          !gridTemplate && "grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px]",
           isSubtask && "bg-muted/30",
           task.status === "DONE" && "bg-green-50 dark:bg-green-950/30"
         )}
@@ -895,7 +910,11 @@ function TaskRow({
 
       {!isSubtask && showSubtasks && (
         <div 
-          className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/30 bg-muted/20"
+          style={gridTemplate ? { gridTemplateColumns: gridTemplate } : undefined}
+          className={cn(
+            "grid items-center border-b border-dashed border-border/30 bg-muted/20",
+            !gridTemplate && "grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px]"
+          )}
           data-testid={`add-subitem-row-${task.id}`}
         >
           <div />
@@ -1176,6 +1195,48 @@ function TaskGroupComponent({
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const [itemColWidth, setItemColWidth] = useState<number>(() => {
+    const saved = localStorage.getItem(ITEM_COL_STORAGE_KEY);
+    return saved ? Math.max(MIN_ITEM_COL_WIDTH, Math.min(MAX_ITEM_COL_WIDTH, parseInt(saved, 10) || DEFAULT_ITEM_COL_WIDTH)) : DEFAULT_ITEM_COL_WIDTH;
+  });
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = itemColWidth;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const delta = moveEvent.clientX - startXRef.current;
+      const newWidth = Math.max(MIN_ITEM_COL_WIDTH, Math.min(MAX_ITEM_COL_WIDTH, startWidthRef.current + delta));
+      setItemColWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      isResizingRef.current = false;
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setItemColWidth(w => {
+        localStorage.setItem(ITEM_COL_STORAGE_KEY, String(w));
+        return w;
+      });
+    };
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }, [itemColWidth]);
+
+  const gridTemplate = getTaskGridTemplate(itemColWidth);
   
   const toggleTaskExpanded = (taskId: string) => {
     setExpandedTaskIds(prev => {
@@ -1400,12 +1461,20 @@ function TaskGroupComponent({
       </div>
 
       {!isCollapsed && (
-        <>
-          <div className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2">
+        <div className="overflow-x-auto" data-testid={`task-group-table-${group.id}`}>
+          <div className="min-w-max">
+          <div className="grid text-xs text-muted-foreground font-medium border-b bg-muted/50 py-2" style={{ gridTemplateColumns: gridTemplate }}>
             <div />
             <div />
             <div />
-            <div className="px-2">Item</div>
+            <div className="px-2 relative flex items-center select-none">
+              <span>Item</span>
+              <div
+                className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 active:bg-primary/60 z-10"
+                onMouseDown={handleResizeStart}
+                data-testid="resize-item-column"
+              />
+            </div>
             <div />
             <div className="px-2 text-center">Users</div>
             <div className="px-2 text-center">Job</div>
@@ -1431,11 +1500,12 @@ function TaskGroupComponent({
                 onToggleExpanded={() => toggleTaskExpanded(task.id)}
                 isSelected={selectedTaskIds.has(task.id)}
                 onToggleSelected={() => onToggleTaskSelected(task.id)}
+                gridTemplate={gridTemplate}
               />
             ))}
           </SortableContext>
 
-          <div className="grid grid-cols-[4px_30px_40px_minmax(250px,1fr)_40px_100px_100px_120px_90px_120px_100px_60px_60px_40px] items-center border-b border-dashed border-border/50 hover:bg-muted/30">
+          <div className="grid items-center border-b border-dashed border-border/50 hover:bg-muted/30" style={{ gridTemplateColumns: gridTemplate }}>
             <div />
             <div />
             <div />
@@ -1461,7 +1531,8 @@ function TaskGroupComponent({
             </div>
             <div className="col-span-9" />
           </div>
-        </>
+          </div>
+        </div>
       )}
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
