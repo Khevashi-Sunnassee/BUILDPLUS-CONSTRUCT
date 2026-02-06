@@ -405,8 +405,9 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
             compressedLogo = await compressLogoForPdf(settings.logoBase64);
           }
           const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo);
-          const dataUrl = pdf.output("dataurlstring");
-          setPdfDataUrl(dataUrl);
+          const blob = pdf.output("blob");
+          const blobUrl = URL.createObjectURL(blob);
+          setPdfDataUrl(blobUrl);
           const base64String = pdf.output("datauristring").split(",")[1] || "";
           setPdfBase64(base64String);
         } catch (e) {
@@ -414,6 +415,11 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
         }
       })();
     }
+    return () => {
+      if (pdfDataUrl && pdfDataUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(pdfDataUrl);
+      }
+    };
   }, [open, poDetail, settings]);
 
   const sendMutation = useMutation({
