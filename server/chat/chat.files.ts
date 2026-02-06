@@ -3,6 +3,7 @@ import multer from "multer";
 const ALLOWED_MIME_TYPES = [
   // Images
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff",
+  "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
   // PDF
   "application/pdf",
   // Microsoft Office

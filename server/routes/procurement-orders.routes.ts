@@ -9,6 +9,7 @@ const router = Router();
 
 const ALLOWED_PO_ATTACHMENT_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp",
+  "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
   "application/pdf",
   "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
