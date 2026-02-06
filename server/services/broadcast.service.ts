@@ -209,6 +209,38 @@ class BroadcastService {
       return { success: false, error: "Broadcast message not found" };
     }
 
+    let currentPhone = delivery.recipientPhone;
+    let currentEmail = delivery.recipientEmail;
+    let currentName = delivery.recipientName;
+
+    if (message.recipientType === "ALL_USERS" || message.recipientType === "SPECIFIC_USERS") {
+      if (delivery.recipientEmail) {
+        const [freshUser] = await db
+          .select()
+          .from(users)
+          .where(and(
+            eq(users.email, delivery.recipientEmail),
+            eq(users.companyId, companyId)
+          ));
+        if (freshUser) {
+          currentPhone = freshUser.phone || currentPhone;
+          currentEmail = freshUser.email || currentEmail;
+          currentName = freshUser.name || currentName;
+        }
+      }
+    }
+
+    if (currentPhone !== delivery.recipientPhone || currentEmail !== delivery.recipientEmail || currentName !== delivery.recipientName) {
+      await db
+        .update(broadcastDeliveries)
+        .set({
+          recipientPhone: currentPhone,
+          recipientEmail: currentEmail,
+          recipientName: currentName,
+        })
+        .where(eq(broadcastDeliveries.id, deliveryId));
+    }
+
     await db
       .update(broadcastDeliveries)
       .set({ status: "PENDING", errorMessage: null })
@@ -220,31 +252,31 @@ class BroadcastService {
       case "SMS":
         if (!twilioService.isConfigured()) {
           result = { success: false, error: "Channel not configured" };
-        } else if (!delivery.recipientPhone) {
+        } else if (!currentPhone) {
           result = { success: false, error: "No phone number for recipient" };
         } else {
-          result = await twilioService.sendSMS(delivery.recipientPhone, message.message);
+          result = await twilioService.sendSMS(currentPhone, message.message);
         }
         break;
 
       case "WHATSAPP":
         if (!twilioService.isConfigured()) {
           result = { success: false, error: "Channel not configured" };
-        } else if (!delivery.recipientPhone) {
+        } else if (!currentPhone) {
           result = { success: false, error: "No phone number for recipient" };
         } else {
-          result = await twilioService.sendWhatsApp(delivery.recipientPhone, message.message);
+          result = await twilioService.sendWhatsApp(currentPhone, message.message);
         }
         break;
 
       case "EMAIL":
         if (!emailService.isConfigured()) {
           result = { success: false, error: "Channel not configured" };
-        } else if (!delivery.recipientEmail) {
+        } else if (!currentEmail) {
           result = { success: false, error: "No email address for recipient" };
         } else {
           result = await emailService.sendEmail(
-            delivery.recipientEmail,
+            currentEmail,
             message.subject || "Broadcast Message",
             message.message
           );
