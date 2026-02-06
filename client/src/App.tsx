@@ -55,6 +55,17 @@ import ChecklistFillPage from "@/pages/checklist-fill";
 import ChecklistReportsPage from "@/pages/checklist-reports";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
 
+import MobileDashboard from "@/pages/mobile/dashboard";
+import MobileTasksPage from "@/pages/mobile/tasks";
+import MobileChatPage from "@/pages/mobile/chat";
+import MobileJobsPage from "@/pages/mobile/jobs";
+import MobilePanelsPage from "@/pages/mobile/panels";
+import MobileLogisticsPage from "@/pages/mobile/logistics";
+import MobilePurchaseOrdersPage from "@/pages/mobile/purchase-orders";
+import MobileMore from "@/pages/mobile/more";
+import MobileProfilePage from "@/pages/mobile/profile";
+import MobileWeeklyJobReportPage from "@/pages/mobile/weekly-job-report";
+
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
 
@@ -458,6 +469,63 @@ function Router() {
           <AuthenticatedLayout>
             <ChecklistReportsPage />
           </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      {/* Mobile Routes */}
+      <Route path="/mobile">
+        <ProtectedRoute>
+          <Redirect to="/mobile/dashboard" />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/dashboard">
+        <ProtectedRoute>
+          <MobileDashboard />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/tasks">
+        <ProtectedRoute>
+          <MobileTasksPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/chat">
+        <ProtectedRoute>
+          <MobileChatPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/jobs">
+        <ProtectedRoute>
+          <MobileJobsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/panels">
+        <ProtectedRoute>
+          <MobilePanelsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/logistics">
+        <ProtectedRoute>
+          <MobileLogisticsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/purchase-orders">
+        <ProtectedRoute>
+          <MobilePurchaseOrdersPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/more">
+        <ProtectedRoute>
+          <MobileMore />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/profile">
+        <ProtectedRoute>
+          <MobileProfilePage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/weekly-report">
+        <ProtectedRoute>
+          <MobileWeeklyJobReportPage />
         </ProtectedRoute>
       </Route>
 
