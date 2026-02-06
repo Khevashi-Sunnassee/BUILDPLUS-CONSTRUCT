@@ -382,6 +382,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
               size: file.size,
             },
             uploadedBy: userId,
+            companyId: req.companyId,
             source: "CHAT_ATTACHMENT",
             typeId,
             jobId,

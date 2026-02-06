@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format } from "date-fns";
-import { MessageSquare, Users, Hash, Send, ChevronLeft } from "lucide-react";
+import { MessageSquare, Users, Hash, Send, ChevronLeft, Plus, X, Image, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -19,6 +19,15 @@ interface User {
   email: string;
 }
 
+interface ChatAttachment {
+  id: string;
+  messageId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+}
+
 interface Message {
   id: string;
   conversationId: string;
@@ -26,6 +35,7 @@ interface Message {
   body: string | null;
   createdAt: string;
   sender?: User;
+  attachments?: ChatAttachment[];
 }
 
 interface Conversation {
@@ -48,8 +58,11 @@ export default function MobileChatPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messageContent, setMessageContent] = useState("");
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
@@ -61,18 +74,67 @@ export default function MobileChatPage() {
   });
 
   const sendMessageMutation = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
+      if (files.length > 0) {
+        const formData = new FormData();
+        formData.append("content", content);
+        files.forEach(f => formData.append("files", f));
+        const res = await fetch(CHAT_ROUTES.MESSAGES(selectedConversationId!), {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "Upload failed" }));
+          throw new Error(err.error || "Failed to send message");
+        }
+        return res.json();
+      }
       return apiRequest("POST", CHAT_ROUTES.MESSAGES(selectedConversationId!), { content });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.MESSAGES(selectedConversationId!)] });
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
       setMessageContent("");
+      clearSelectedFiles();
     },
     onError: () => {
       toast({ title: "Failed to send message", variant: "destructive" });
     },
   });
+
+  const handleFilePick = (e: { target: HTMLInputElement }) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setSelectedFiles(prev => [...prev, ...files]);
+    const newPreviews = files.map(f => URL.createObjectURL(f));
+    setFilePreviews(prev => [...prev, ...newPreviews]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    URL.revokeObjectURL(filePreviews[index]);
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setFilePreviews(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const clearSelectedFiles = () => {
+    filePreviews.forEach(url => URL.revokeObjectURL(url));
+    setSelectedFiles([]);
+    setFilePreviews([]);
+  };
+
+  useEffect(() => {
+    return () => {
+      filePreviews.forEach(url => URL.revokeObjectURL(url));
+    };
+  }, []);
+
+  useEffect(() => {
+    clearSelectedFiles();
+  }, [selectedConversationId]);
+
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   const markReadMutation = useMutation({
     mutationFn: async (conversationId: string) => {
@@ -148,8 +210,8 @@ export default function MobileChatPage() {
   };
 
   const handleSendMessage = () => {
-    if (messageContent.trim() && selectedConversationId) {
-      sendMessageMutation.mutate(messageContent.trim());
+    if ((messageContent.trim() || selectedFiles.length > 0) && selectedConversationId) {
+      sendMessageMutation.mutate({ content: messageContent.trim(), files: selectedFiles });
     }
   };
 
@@ -219,9 +281,40 @@ export default function MobileChatPage() {
                           {senderName}
                         </p>
                       )}
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {message.body}
-                      </p>
+                      {message.attachments && message.attachments.length > 0 && (
+                        <div className="space-y-2 mb-1">
+                          {message.attachments.map((att) => {
+                            const isImage = att.mimeType.startsWith("image/");
+                            return isImage ? (
+                              <img
+                                key={att.id}
+                                src={att.url}
+                                alt={att.fileName}
+                                className="rounded-lg max-w-full max-h-64 object-contain cursor-pointer"
+                                onClick={() => setPreviewImageUrl(att.url)}
+                                data-testid={`attachment-image-${att.id}`}
+                              />
+                            ) : (
+                              <a
+                                key={att.id}
+                                href={att.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20 text-sm"
+                                data-testid={`attachment-file-${att.id}`}
+                              >
+                                <Image className="h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{att.fileName}</span>
+                              </a>
+                            );
+                          })}
+                        </div>
+                      )}
+                      {message.body && (
+                        <p className="text-sm whitespace-pre-wrap break-words">
+                          {message.body}
+                        </p>
+                      )}
                       <p className={cn(
                         "text-xs mt-1",
                         isOwn ? "text-white/70" : "text-white/50"
@@ -237,8 +330,71 @@ export default function MobileChatPage() {
           )}
         </main>
 
-        <footer className="flex-shrink-0 px-4 py-3 border-t border-white/10 bg-[#0D1117]">
-          <div className="flex items-center gap-2">
+        {previewImageUrl && (
+          <div 
+            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+            onClick={() => setPreviewImageUrl(null)}
+            data-testid="modal-image-preview"
+          >
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center z-10"
+              data-testid="button-close-preview"
+            >
+              <X className="h-6 w-6 text-white" />
+            </button>
+            <img
+              src={previewImageUrl}
+              alt="Preview"
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
+
+        <footer className="flex-shrink-0 border-t border-white/10 bg-[#0D1117]">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFilePick}
+            data-testid="input-file-picker"
+          />
+          {selectedFiles.length > 0 && (
+            <div className="px-4 pt-3 pb-1">
+              <div className="flex gap-2 overflow-x-auto">
+                {filePreviews.map((preview, i) => (
+                  <div key={i} className="relative flex-shrink-0">
+                    <img
+                      src={preview}
+                      alt={selectedFiles[i]?.name}
+                      className="h-16 w-16 rounded-lg object-cover border border-white/20"
+                      data-testid={`preview-image-${i}`}
+                    />
+                    <button
+                      onClick={() => removeFile(i)}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center"
+                      data-testid={`button-remove-file-${i}`}
+                    >
+                      <X className="h-3 w-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex items-center gap-2 px-4 py-3">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+              className="rounded-full text-white/60 flex-shrink-0"
+              data-testid="button-attach-photo"
+            >
+              <Plus className="h-5 w-5" />
+            </Button>
             <Input
               ref={inputRef}
               value={messageContent}
@@ -256,11 +412,15 @@ export default function MobileChatPage() {
             <Button
               size="icon"
               onClick={handleSendMessage}
-              disabled={!messageContent.trim() || sendMessageMutation.isPending}
-              className="rounded-full bg-purple-500 hover:bg-purple-600"
+              disabled={(!messageContent.trim() && selectedFiles.length === 0) || sendMessageMutation.isPending}
+              className="rounded-full bg-purple-500 flex-shrink-0"
               data-testid="button-send"
             >
-              <Send className="h-5 w-5" />
+              {sendMessageMutation.isPending ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
             </Button>
           </div>
         </footer>

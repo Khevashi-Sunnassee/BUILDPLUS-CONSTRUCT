@@ -23,6 +23,7 @@ export interface DocumentRegistrationOptions {
     size: number;
   };
   uploadedBy: string;
+  companyId?: string;
   source: DocumentSource;
   title?: string;
   description?: string;
@@ -73,6 +74,7 @@ export class DocumentRegisterService {
     const {
       file,
       uploadedBy,
+      companyId,
       source,
       title,
       description,
@@ -124,6 +126,12 @@ export class DocumentRegisterService {
       documentNumber = await storage.getNextDocumentNumber(typeId);
     }
 
+    let resolvedCompanyId = companyId;
+    if (!resolvedCompanyId && uploadedBy) {
+      const uploaderUser = await storage.getUser(uploadedBy);
+      resolvedCompanyId = uploaderUser?.companyId || undefined;
+    }
+
     const documentData: InsertDocument = {
       title: documentTitle,
       description: description || null,
@@ -134,6 +142,7 @@ export class DocumentRegisterService {
       storageKey: objectPath,
       fileSha256,
       documentNumber,
+      companyId: resolvedCompanyId!,
       typeId: typeId || null,
       disciplineId: disciplineId || null,
       categoryId: categoryId || null,
