@@ -123,11 +123,43 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     if (!req.companyId) {
       return res.status(403).json({ error: "Company context required" });
     }
-    const existing = await storage.getJobByNumber(req.body.jobNumber);
+    const jobCreateSchema = z.object({
+      jobNumber: z.string().min(1, "Job number is required").max(50),
+      name: z.string().min(1, "Job name is required").max(255),
+      code: z.string().max(50).optional().nullable(),
+      client: z.string().max(255).optional().nullable(),
+      customerId: z.string().max(36).optional().nullable(),
+      address: z.string().max(500).optional().nullable(),
+      city: z.string().max(100).optional().nullable(),
+      state: z.enum(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"]).optional().nullable(),
+      siteContact: z.string().max(255).optional().nullable(),
+      siteContactPhone: z.string().max(50).optional().nullable(),
+      description: z.string().optional().nullable(),
+      craneCapacity: z.string().max(50).optional().nullable(),
+      numberOfBuildings: z.number().int().min(0).optional().nullable(),
+      levels: z.string().max(50).optional().nullable(),
+      lowestLevel: z.string().max(50).optional().nullable(),
+      highestLevel: z.string().max(50).optional().nullable(),
+      productionStartDate: z.string().optional().nullable(),
+      expectedCycleTimePerFloor: z.number().int().min(0).optional().nullable(),
+      daysInAdvance: z.number().int().min(0).optional().nullable(),
+      daysToAchieveIfc: z.number().int().min(1).optional().nullable(),
+      productionWindowDays: z.number().int().min(1).optional().nullable(),
+      productionDaysInAdvance: z.number().int().min(1).optional().nullable(),
+      procurementDaysInAdvance: z.number().int().min(1).optional().nullable(),
+      procurementTimeDays: z.number().int().min(1).optional().nullable(),
+      status: z.enum(["ACTIVE", "COMPLETED", "ON_HOLD"]).optional(),
+      factoryId: z.string().max(36).optional().nullable(),
+    });
+    const parsed = jobCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const existing = await storage.getJobByNumber(parsed.data.jobNumber);
     if (existing && existing.companyId === req.companyId) {
       return res.status(400).json({ error: "Job with this number already exists" });
     }
-    const data = { ...req.body, companyId: req.companyId };
+    const data = { ...parsed.data, companyId: req.companyId } as any;
     if (data.productionStartDate && typeof data.productionStartDate === 'string') {
       data.productionStartDate = new Date(data.productionStartDate);
     }
