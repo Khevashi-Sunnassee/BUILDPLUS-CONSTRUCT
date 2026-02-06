@@ -899,7 +899,7 @@ export default function PurchaseOrderFormPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto print:max-w-none">
+    <div className="space-y-6 print:max-w-none">
       <div className="flex items-center gap-4 print:hidden">
         <Button 
           variant="ghost" 

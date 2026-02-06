@@ -265,7 +265,7 @@ export default function ProductionSchedulePage() {
   const totalPanels = stats ? stats.draft + stats.ifa + stats.ifc + stats.approved + stats.scheduled + stats.completed : 0;
 
   return (
-    <div className="space-y-6 p-6" data-testid="page-production-schedule">
+    <div className="space-y-6" data-testid="page-production-schedule">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Production Schedule</h1>

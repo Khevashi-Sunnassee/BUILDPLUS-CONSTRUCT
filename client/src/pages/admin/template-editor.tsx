@@ -493,7 +493,7 @@ export default function TemplateEditorPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-64 mb-4" />
         <Skeleton className="h-[600px] w-full" />
       </div>
@@ -502,7 +502,7 @@ export default function TemplateEditorPage() {
 
   if (!template) {
     return (
-      <div className="container mx-auto p-6 max-w-7xl">
+      <div className="space-y-6">
         <Card className="p-8 text-center">
           <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">Template Not Found</h3>
@@ -519,7 +519,7 @@ export default function TemplateEditorPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="space-y-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild data-testid="button-back">

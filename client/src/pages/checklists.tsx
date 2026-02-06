@@ -149,7 +149,7 @@ export default function ChecklistsPage() {
 
   if (instancesLoading || templatesLoading) {
     return (
-      <div className="container mx-auto p-6 max-w-6xl">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-64 mb-4" />
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -161,7 +161,7 @@ export default function ChecklistsPage() {
   }
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
+    <div className="space-y-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">

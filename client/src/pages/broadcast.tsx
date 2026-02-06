@@ -1214,8 +1214,8 @@ export default function BroadcastPage() {
   const [activeTab, setActiveTab] = useState("send");
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between gap-2 flex-wrap mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Broadcast Messaging</h1>
           <p className="text-muted-foreground text-sm">Send messages to users via SMS, WhatsApp, and Email</p>

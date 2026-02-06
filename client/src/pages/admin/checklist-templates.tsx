@@ -1031,7 +1031,7 @@ export default function AdminChecklistTemplatesPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
+    <div className="space-y-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold flex items-center gap-2">
           <CheckSquare className="h-6 w-6" />

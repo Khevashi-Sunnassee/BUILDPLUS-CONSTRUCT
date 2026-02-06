@@ -708,7 +708,7 @@ export default function DocumentRegister() {
   ), [renderDocumentRow]);
 
   return (
-    <div className="container mx-auto py-6 px-4 space-y-6" data-testid="document-register-page">
+    <div className="space-y-6" data-testid="document-register-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <FileText className="h-8 w-8 text-primary" />
