@@ -5,7 +5,9 @@ import logger from "../lib/logger";
 let connectionSettings: any;
 
 async function getAccessToken() {
-  connectionSettings = null;
+  if (connectionSettings && connectionSettings.settings.expires_at && new Date(connectionSettings.settings.expires_at).getTime() > Date.now()) {
+    return connectionSettings.settings.access_token;
+  }
 
   const hostname = process.env.REPLIT_CONNECTORS_HOSTNAME;
   const xReplitToken = process.env.REPL_IDENTITY
