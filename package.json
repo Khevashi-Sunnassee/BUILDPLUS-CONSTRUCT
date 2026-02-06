@@ -73,6 +73,7 @@
     "framer-motion": "^11.13.1",
     "google-auth-library": "^10.5.0",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "ical.js": "^2.2.1",
     "input-otp": "^1.4.2",
     "jspdf": "^4.0.0",
