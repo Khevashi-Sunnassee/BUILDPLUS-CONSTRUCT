@@ -368,6 +368,7 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
     const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: "Authentication required" });
     const taskId = String(req.params.id);
     
     const task = await storage.getTask(taskId);
@@ -385,15 +386,16 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
     
     const taskTitle = task.title || "Task";
     
-    const fromUser = userId ? await storage.getUser(userId) : null;
+    const fromUser = await storage.getUser(userId);
     const fromName = fromUser?.name || fromUser?.email || "Someone";
     
+    const contentStr = parsed.data.content;
     await storage.createTaskNotificationsForAssignees(
       taskId,
-      userId!,
+      userId,
       "COMMENT",
       `New comment on "${taskTitle}"`,
-      `${fromName}: ${req.body.content.substring(0, 100)}${req.body.content.length > 100 ? '...' : ''}`,
+      `${fromName}: ${contentStr.substring(0, 100)}${contentStr.length > 100 ? '...' : ''}`,
       update.id
     );
     

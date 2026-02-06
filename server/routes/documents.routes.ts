@@ -22,6 +22,12 @@ const openai = new OpenAI({
 const router = Router();
 const objectStorageService = new ObjectStorageService();
 
+function buildContentDisposition(disposition: "attachment" | "inline", originalName: string): string {
+  const asciiName = originalName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+  const encodedName = encodeURIComponent(originalName).replace(/'/g, '%27');
+  return `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodedName}`;
+}
+
 const ALLOWED_DOCUMENT_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff",
   "application/pdf",
@@ -519,7 +525,7 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
     
     res.set({
       "Content-Type": metadata.contentType || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${document.originalName}"`,
+      "Content-Disposition": buildContentDisposition("attachment", document.originalName),
     });
 
     const stream = objectFile.createReadStream();
@@ -807,7 +813,7 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/view", async (re
     
     res.set({
       "Content-Type": metadata.contentType || "application/octet-stream",
-      "Content-Disposition": `inline; filename="${document.originalName}"`,
+      "Content-Disposition": buildContentDisposition("inline", document.originalName),
     });
 
     const stream = objectFile.createReadStream();
@@ -856,7 +862,7 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async
     
     res.set({
       "Content-Type": metadata.contentType || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${document.originalName}"`,
+      "Content-Disposition": buildContentDisposition("attachment", document.originalName),
     });
 
     const stream = objectFile.createReadStream();

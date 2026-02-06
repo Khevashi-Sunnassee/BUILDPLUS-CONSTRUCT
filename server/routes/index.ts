@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 
 import { authRouter } from "./auth.routes";
 import { usersRouter } from "./users.routes";
@@ -49,8 +50,20 @@ export async function setupRoutes(app: Express): Promise<void> {
     throw new Error("SESSION_SECRET environment variable is required");
   }
   
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) {
+    throw new Error("DATABASE_URL environment variable is required for session store");
+  }
+  
+  const PgStore = connectPgSimple(session);
+  
   app.use(
     session({
+      store: new PgStore({
+        conString: databaseUrl,
+        createTableIfMissing: true,
+        tableName: "session",
+      }),
       secret: sessionSecret,
       resave: false,
       saveUninitialized: false,
@@ -58,6 +71,7 @@ export async function setupRoutes(app: Express): Promise<void> {
         secure: process.env.NODE_ENV === "production",
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
+        sameSite: "lax",
       },
     })
   );
