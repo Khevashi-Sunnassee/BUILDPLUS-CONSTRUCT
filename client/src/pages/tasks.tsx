@@ -301,6 +301,8 @@ function TaskRow({
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
+  const pendingMutationRef = useRef<Promise<any> | null>(null);
+  const settledTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
 
   useEffect(() => {
@@ -316,10 +318,26 @@ function TaskRow({
 
   const updateTaskMutation = useMutation({
     mutationFn: async (data: Partial<Task>) => {
-      return apiRequest("PATCH", TASKS_ROUTES.BY_ID(task.id), data);
+      if (pendingMutationRef.current) {
+        try { await pendingMutationRef.current; } catch {}
+      }
+      const promise = apiRequest("PATCH", TASKS_ROUTES.BY_ID(task.id), data);
+      pendingMutationRef.current = promise;
+      try {
+        const result = await promise;
+        return result;
+      } finally {
+        if (pendingMutationRef.current === promise) {
+          pendingMutationRef.current = null;
+        }
+      }
     },
     onMutate: async (newData) => {
       await queryClient.cancelQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      if (settledTimerRef.current) {
+        clearTimeout(settledTimerRef.current);
+        settledTimerRef.current = null;
+      }
       const previousGroups = queryClient.getQueryData([TASKS_ROUTES.GROUPS]);
       const updateTaskRecursive = (t: any): any => {
         if (t.id === task.id) {
@@ -346,7 +364,13 @@ function TaskRow({
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      if (settledTimerRef.current) {
+        clearTimeout(settledTimerRef.current);
+      }
+      settledTimerRef.current = setTimeout(() => {
+        settledTimerRef.current = null;
+        queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      }, 500);
     },
   });
 
