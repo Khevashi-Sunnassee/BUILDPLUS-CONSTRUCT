@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import jsPDF from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 import { format, parseISO } from "date-fns";
@@ -22,9 +22,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Eye, Edit, Paperclip, Search, X, Mail, Send, Loader2 } from "lucide-react";
+import { Plus, Eye, Edit, Paperclip, Search, X, Mail, Send, Loader2, Printer, Trash2 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { PurchaseOrder, PurchaseOrderItem, User, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
@@ -668,11 +670,15 @@ function formatCurrency(value: string | number | null | undefined): string {
 }
 
 export default function PurchaseOrdersPage() {
+  const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [selectedPOForEmail, setSelectedPOForEmail] = useState<PurchaseOrderWithDetails | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingPO, setDeletingPO] = useState<PurchaseOrderWithDetails | null>(null);
 
   const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrderWithDetails[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
@@ -742,6 +748,47 @@ export default function PurchaseOrdersPage() {
     setSelectedPOForEmail(po);
     setEmailDialogOpen(true);
   }, []);
+
+  const { data: settings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: [SETTINGS_ROUTES.LOGO],
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      toast({ title: "Purchase order deleted" });
+      setDeleteDialogOpen(false);
+      setDeletingPO(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePrint = useCallback(async (po: PurchaseOrderWithDetails) => {
+    try {
+      const detailRes = await fetch(PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(po.id), { credentials: "include" });
+      if (!detailRes.ok) throw new Error("Failed to load purchase order details");
+      const poDetail = await detailRes.json();
+      let compressedLogo: string | null = null;
+      if (settings?.logoBase64) {
+        compressedLogo = await compressLogoForPdf(settings.logoBase64);
+      }
+      const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo);
+      pdf.autoPrint();
+      const pdfDataUri = pdf.output("dataurlnewwindow");
+      if (!pdfDataUri) {
+        const pdfBlob = pdf.output("blob");
+        const url = URL.createObjectURL(pdfBlob);
+        window.open(url);
+      }
+    } catch (error) {
+      toast({ title: "Failed to generate PDF", variant: "destructive" });
+    }
+  }, [settings, toast]);
 
   return (
     <div className="space-y-6">
@@ -834,6 +881,7 @@ export default function PurchaseOrdersPage() {
                   <TableHead data-testid="th-total">Total</TableHead>
                   <TableHead data-testid="th-status">Status</TableHead>
                   <TableHead data-testid="th-created-date">Created Date</TableHead>
+                  <TableHead data-testid="th-due-date">Due Date</TableHead>
                   <TableHead data-testid="th-actions">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -866,27 +914,82 @@ export default function PurchaseOrdersPage() {
                     <TableCell data-testid={`cell-created-date-${po.id}`}>
                       {formatDate(po.createdAt)}
                     </TableCell>
+                    <TableCell data-testid={`cell-due-date-${po.id}`}>
+                      {formatDate(po.requiredByDate)}
+                    </TableCell>
                     <TableCell data-testid={`cell-actions-${po.id}`}>
-                      <div className="flex items-center gap-2">
-                        <Link href={`/purchase-orders/${po.id}`}>
-                          <Button size="icon" variant="ghost" data-testid={`button-view-${po.id}`}>
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleOpenEmailDialog(po)}
-                          data-testid={`button-email-${po.id}`}
-                        >
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                        {po.status === "DRAFT" && (
-                          <Link href={`/purchase-orders/${po.id}`}>
-                            <Button size="icon" variant="ghost" data-testid={`button-edit-${po.id}`}>
-                              <Edit className="h-4 w-4" />
+                      <div className="flex items-center gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => navigate(`/purchase-orders/${po.id}`)}
+                              data-testid={`button-view-${po.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
                             </Button>
-                          </Link>
+                          </TooltipTrigger>
+                          <TooltipContent>View</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleOpenEmailDialog(po)}
+                              data-testid={`button-email-${po.id}`}
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Send Email</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handlePrint(po)}
+                              data-testid={`button-print-${po.id}`}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Print</TooltipContent>
+                        </Tooltip>
+                        {po.status === "DRAFT" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => navigate(`/purchase-orders/${po.id}`)}
+                                data-testid={`button-edit-${po.id}`}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit</TooltipContent>
+                          </Tooltip>
+                        )}
+                        {po.status !== "APPROVED" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => {
+                                  setDeletingPO(po);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                data-testid={`button-delete-${po.id}`}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Delete</TooltipContent>
+                          </Tooltip>
                         )}
                       </div>
                     </TableCell>
@@ -904,6 +1007,30 @@ export default function PurchaseOrdersPage() {
         onOpenChange={setEmailDialogOpen}
         po={selectedPOForEmail}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent data-testid="dialog-delete-po">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Purchase Order</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {deletingPO?.poNumber}? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingPO && deleteMutation.mutate(deletingPO.id)}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

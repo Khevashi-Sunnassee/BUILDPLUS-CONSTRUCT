@@ -223,12 +223,16 @@ router.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     const userId = req.session.userId;
     const user = userId ? await storage.getUser(userId) : null;
     
+    if (order.status === "APPROVED") {
+      return res.status(400).json({ error: "Approved purchase orders cannot be deleted" });
+    }
+
     if (order.requestedById !== userId && user?.role !== "ADMIN") {
       return res.status(403).json({ error: "Cannot delete this purchase order" });
     }
     
-    if (order.status !== "DRAFT" && user?.role !== "ADMIN") {
-      return res.status(400).json({ error: "Only draft POs can be deleted" });
+    if (order.status !== "DRAFT" && order.status !== "REJECTED" && user?.role !== "ADMIN") {
+      return res.status(400).json({ error: "Only draft or rejected POs can be deleted" });
     }
 
     await storage.deletePurchaseOrder(String(req.params.id));

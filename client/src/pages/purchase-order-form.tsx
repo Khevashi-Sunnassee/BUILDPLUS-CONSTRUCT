@@ -155,7 +155,7 @@ export default function PurchaseOrderFormPage() {
       supplierPhone: "",
       supplierAddress: "",
       deliveryAddress: "",
-      requiredByDate: null,
+      requiredByDate: isNew ? addDays(new Date(), 7) : null,
       notes: "",
     },
   });
