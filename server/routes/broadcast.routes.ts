@@ -103,6 +103,21 @@ router.get("/api/broadcasts/:id/deliveries", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/api/broadcasts/deliveries/:deliveryId/resend", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.session.companyId;
+    if (!companyId) return res.status(400).json({ error: "No company context" });
+    const deliveryId = req.params.deliveryId as string;
+    const result = await broadcastService.resendDelivery(deliveryId, companyId);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
   try {
     const companyId = req.session.companyId;

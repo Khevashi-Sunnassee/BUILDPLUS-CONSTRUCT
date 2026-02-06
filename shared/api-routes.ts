@@ -548,6 +548,7 @@ export const BROADCAST_ROUTES = {
   SEND: '/api/broadcasts/send',
   MESSAGE_BY_ID: (id: string) => `/api/broadcasts/${id}`,
   DELIVERIES: (id: string) => `/api/broadcasts/${id}/deliveries`,
+  RESEND_DELIVERY: (deliveryId: string) => `/api/broadcasts/deliveries/${deliveryId}/resend`,
   CHANNELS_STATUS: '/api/broadcasts/channels-status',
 } as const;
 

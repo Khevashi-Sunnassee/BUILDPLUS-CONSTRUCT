@@ -183,6 +183,113 @@ class BroadcastService {
     }
   }
 
+  async resendDelivery(deliveryId: string, companyId: string): Promise<{ success: boolean; error?: string }> {
+    const [delivery] = await db
+      .select()
+      .from(broadcastDeliveries)
+      .where(eq(broadcastDeliveries.id, deliveryId));
+
+    if (!delivery) {
+      return { success: false, error: "Delivery not found" };
+    }
+
+    if (delivery.status !== "FAILED") {
+      return { success: false, error: "Only failed deliveries can be resent" };
+    }
+
+    const [message] = await db
+      .select()
+      .from(broadcastMessages)
+      .where(and(
+        eq(broadcastMessages.id, delivery.broadcastMessageId),
+        eq(broadcastMessages.companyId, companyId)
+      ));
+
+    if (!message) {
+      return { success: false, error: "Broadcast message not found" };
+    }
+
+    await db
+      .update(broadcastDeliveries)
+      .set({ status: "PENDING", errorMessage: null })
+      .where(eq(broadcastDeliveries.id, deliveryId));
+
+    let result: { success: boolean; messageId?: string; error?: string };
+
+    switch (delivery.channel) {
+      case "SMS":
+        if (!twilioService.isConfigured()) {
+          result = { success: false, error: "Channel not configured" };
+        } else if (!delivery.recipientPhone) {
+          result = { success: false, error: "No phone number for recipient" };
+        } else {
+          result = await twilioService.sendSMS(delivery.recipientPhone, message.message);
+        }
+        break;
+
+      case "WHATSAPP":
+        if (!twilioService.isConfigured()) {
+          result = { success: false, error: "Channel not configured" };
+        } else if (!delivery.recipientPhone) {
+          result = { success: false, error: "No phone number for recipient" };
+        } else {
+          result = await twilioService.sendWhatsApp(delivery.recipientPhone, message.message);
+        }
+        break;
+
+      case "EMAIL":
+        if (!emailService.isConfigured()) {
+          result = { success: false, error: "Channel not configured" };
+        } else if (!delivery.recipientEmail) {
+          result = { success: false, error: "No email address for recipient" };
+        } else {
+          result = await emailService.sendEmail(
+            delivery.recipientEmail,
+            message.subject || "Broadcast Message",
+            message.message
+          );
+        }
+        break;
+
+      default:
+        result = { success: false, error: `Unknown channel: ${delivery.channel}` };
+    }
+
+    if (result.success) {
+      await db
+        .update(broadcastDeliveries)
+        .set({
+          status: "SENT",
+          externalMessageId: result.messageId || null,
+          sentAt: new Date(),
+          errorMessage: null,
+        })
+        .where(eq(broadcastDeliveries.id, deliveryId));
+
+      await db
+        .update(broadcastMessages)
+        .set({
+          sentCount: message.sentCount + 1,
+          failedCount: Math.max(0, message.failedCount - 1),
+          status: message.failedCount - 1 <= 0 ? "COMPLETED" : message.status,
+          updatedAt: new Date(),
+        })
+        .where(eq(broadcastMessages.id, message.id));
+
+      return { success: true };
+    } else {
+      await db
+        .update(broadcastDeliveries)
+        .set({
+          status: "FAILED",
+          errorMessage: result.error || "Unknown error",
+        })
+        .where(eq(broadcastDeliveries.id, deliveryId));
+
+      return { success: false, error: result.error };
+    }
+  }
+
   getChannelStatus(): { sms: boolean; whatsapp: boolean; email: boolean } {
     return {
       sms: twilioService.isConfigured(),

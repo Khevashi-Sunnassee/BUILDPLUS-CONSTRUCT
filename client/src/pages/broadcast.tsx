@@ -909,8 +909,10 @@ function TemplatesTab() {
 }
 
 function HistoryTab() {
+  const { toast } = useToast();
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedBroadcastId, setSelectedBroadcastId] = useState<string | null>(null);
+  const [resendingDeliveryId, setResendingDeliveryId] = useState<string | null>(null);
 
   const { data: broadcasts = [], isLoading } = useQuery<BroadcastMessageWithDetails[]>({
     queryKey: [BROADCAST_ROUTES.MESSAGES],
@@ -927,6 +929,30 @@ function HistoryTab() {
       return res.json();
     },
     enabled: !!selectedBroadcastId,
+  });
+
+  const resendMutation = useMutation({
+    mutationFn: async (deliveryId: string) => {
+      setResendingDeliveryId(deliveryId);
+      return apiRequest("POST", BROADCAST_ROUTES.RESEND_DELIVERY(deliveryId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [BROADCAST_ROUTES.MESSAGES, selectedBroadcastId, "deliveries"] });
+      queryClient.invalidateQueries({ queryKey: [BROADCAST_ROUTES.MESSAGES] });
+      toast({
+        title: "Resent Successfully",
+        description: "The message has been resent.",
+      });
+      setResendingDeliveryId(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Resend Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+      setResendingDeliveryId(null);
+    },
   });
 
   const selectedBroadcast = broadcasts.find((b) => b.id === selectedBroadcastId);
@@ -1108,6 +1134,7 @@ function HistoryTab() {
                           <TableHead>Channel</TableHead>
                           <TableHead>Status</TableHead>
                           <TableHead>Error</TableHead>
+                          <TableHead className="w-[80px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1140,6 +1167,24 @@ function HistoryTab() {
                             </TableCell>
                             <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                               {delivery.errorMessage || "-"}
+                            </TableCell>
+                            <TableCell>
+                              {delivery.status === "FAILED" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  data-testid={`button-resend-${delivery.id}`}
+                                  disabled={resendMutation.isPending && resendingDeliveryId === delivery.id}
+                                  onClick={() => resendMutation.mutate(delivery.id)}
+                                >
+                                  {resendMutation.isPending && resendingDeliveryId === delivery.id ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Send className="h-3 w-3 mr-1" />
+                                  )}
+                                  Resend
+                                </Button>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
