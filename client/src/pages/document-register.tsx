@@ -1039,11 +1039,18 @@ export default function DocumentRegister() {
           </Button>
           <Button 
             variant="outline"
-            onClick={() => setIsBundleDialogOpen(true)} 
+            onClick={() => {
+              if (selectedDocIds.size > 0) {
+                setSelectedDocsForBundle(Array.from(selectedDocIds));
+              } else {
+                setSelectedDocsForBundle([]);
+              }
+              setIsBundleDialogOpen(true);
+            }} 
             data-testid="button-create-bundle"
           >
             <QrCode className="h-4 w-4 mr-2" />
-            Create Bundle
+            Create Bundle{selectedDocIds.size > 0 ? ` (${selectedDocIds.size})` : ""}
           </Button>
           <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
             <Upload className="h-4 w-4 mr-2" />
@@ -1869,9 +1876,12 @@ export default function DocumentRegister() {
               />
               
               <div className="space-y-2">
-                <Label>Select Documents ({selectedDocsForBundle.length} selected)</Label>
+                <Label>Documents ({selectedDocsForBundle.length} selected)</Label>
                 <div className="border rounded-lg max-h-48 overflow-y-auto p-2 space-y-1">
-                  {documents.map((doc) => (
+                  {(selectedDocIds.size > 0 
+                    ? documents.filter(doc => selectedDocsForBundle.includes(doc.id))
+                    : documents
+                  ).map((doc) => (
                     <div 
                       key={doc.id}
                       className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
@@ -1888,6 +1898,11 @@ export default function DocumentRegister() {
                       }}
                       data-testid={`bundle-doc-${doc.id}`}
                     >
+                      <Checkbox
+                        checked={selectedDocsForBundle.includes(doc.id)}
+                        className="pointer-events-none"
+                        data-testid={`checkbox-bundle-doc-${doc.id}`}
+                      />
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="flex-1 text-sm truncate">{doc.title}</span>
                       <Badge variant="outline" className="text-xs">{doc.revision}</Badge>
