@@ -1,6 +1,18 @@
 import Twilio from "twilio";
 import logger from "../lib/logger";
 
+function formatAustralianPhone(phone: string): string {
+  let cleaned = phone.replace(/[\s\-()]/g, "");
+  if (cleaned.startsWith("0") && cleaned.length === 10) {
+    cleaned = "+61" + cleaned.slice(1);
+  } else if (cleaned.startsWith("61") && !cleaned.startsWith("+")) {
+    cleaned = "+" + cleaned;
+  } else if (!cleaned.startsWith("+")) {
+    cleaned = "+61" + cleaned;
+  }
+  return cleaned;
+}
+
 class TwilioService {
   private client: ReturnType<typeof Twilio> | null = null;
   private phoneNumber: string | undefined;
@@ -38,12 +50,13 @@ class TwilioService {
     }
 
     try {
+      const formattedTo = formatAustralianPhone(to);
       const message = await this.client.messages.create({
-        to,
+        to: formattedTo,
         from: this.phoneNumber,
         body,
       });
-      logger.info({ messageId: message.sid, to }, "SMS sent successfully");
+      logger.info({ messageId: message.sid, to: formattedTo }, "SMS sent successfully");
       return { success: true, messageId: message.sid };
     } catch (err: any) {
       const errorMessage = err?.message || "Unknown Twilio SMS error";
@@ -61,7 +74,8 @@ class TwilioService {
     }
 
     try {
-      const whatsappTo = to.startsWith("whatsapp:") ? to : `whatsapp:${to}`;
+      const formattedTo = formatAustralianPhone(to.replace(/^whatsapp:/, ""));
+      const whatsappTo = `whatsapp:${formattedTo}`;
       const whatsappFrom = this.whatsappNumber.startsWith("whatsapp:")
         ? this.whatsappNumber
         : `whatsapp:${this.whatsappNumber}`;
@@ -71,7 +85,7 @@ class TwilioService {
         from: whatsappFrom,
         body,
       });
-      logger.info({ messageId: message.sid, to }, "WhatsApp message sent successfully");
+      logger.info({ messageId: message.sid, to: whatsappTo }, "WhatsApp message sent successfully");
       return { success: true, messageId: message.sid };
     } catch (err: any) {
       const errorMessage = err?.message || "Unknown Twilio WhatsApp error";
