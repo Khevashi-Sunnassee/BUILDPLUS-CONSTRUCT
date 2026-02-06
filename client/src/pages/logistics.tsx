@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
-import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Truck,
   Plus,
@@ -171,8 +171,29 @@ export default function LogisticsPage() {
   const [expandedLoadLists, setExpandedLoadLists] = useState<Set<string>>(new Set());
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [factoryFilter, setFactoryFilter] = useState("all");
+  const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
+    queryKey: [USER_ROUTES.SETTINGS],
+  });
+
+  const { data: factoriesList } = useQuery<{ id: string; name: string; code: string; state: string }[]>({
+    queryKey: [ADMIN_ROUTES.FACTORIES],
+  });
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings && factoriesList) {
+      if (userSettings.defaultFactoryId) {
+        const defaultFactory = factoriesList.find(f => f.id === userSettings.defaultFactoryId);
+        if (defaultFactory) {
+          setFactoryFilter(defaultFactory.state || defaultFactory.code);
+        }
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoriesList, factoryFilterInitialized]);
 
   const { data: loadLists, isLoading: loadListsLoading } = useQuery<LoadListWithDetails[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],

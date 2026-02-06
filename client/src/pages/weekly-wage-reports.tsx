@@ -7,7 +7,7 @@ import { format, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "da
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
-import { WEEKLY_REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { WEEKLY_REPORTS_ROUTES, SETTINGS_ROUTES, USER_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import {
   DollarSign,
   Plus,
@@ -213,8 +213,29 @@ export default function WeeklyWageReportsPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [factoryFilter, setFactoryFilter] = useState("all");
+  const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
+    queryKey: [USER_ROUTES.SETTINGS],
+  });
+
+  const { data: factoriesList } = useQuery<{ id: string; name: string; code: string; state: string }[]>({
+    queryKey: [ADMIN_ROUTES.FACTORIES],
+  });
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings && factoriesList) {
+      if (userSettings.defaultFactoryId) {
+        const defaultFactory = factoriesList.find(f => f.id === userSettings.defaultFactoryId);
+        if (defaultFactory) {
+          setFactoryFilter(defaultFactory.state || defaultFactory.code);
+        }
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoriesList, factoryFilterInitialized]);
   
   const today = new Date();
   const [selectedWeekStart, setSelectedWeekStart] = useState(() => 

@@ -5,7 +5,7 @@ import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, star
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
-import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Calendar,
   ChevronRight,
@@ -90,6 +90,7 @@ export default function ProductionReportPage() {
   const [dateRange, setDateRange] = useState<string>("month");
   const [searchQuery, setSearchQuery] = useState("");
   const [factoryFilter, setFactoryFilter] = useState("all");
+  const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
   const [newDayDate, setNewDayDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -98,6 +99,19 @@ export default function ProductionReportPage() {
   const [deletingDay, setDeletingDay] = useState<{ date: string; factory: string } | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
+    queryKey: [USER_ROUTES.SETTINGS],
+  });
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings) {
+      if (userSettings.defaultFactoryId) {
+        setFactoryFilter(userSettings.defaultFactoryId);
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoryFilterInitialized]);
 
   const deleteProductionDayMutation = useMutation({
     mutationFn: async ({ date, factory }: { date: string; factory: string }) => {

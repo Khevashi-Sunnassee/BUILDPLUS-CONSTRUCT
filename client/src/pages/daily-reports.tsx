@@ -68,7 +68,7 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES, TIMER_ROUTES } from "@shared/api-routes";
+import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES, TIMER_ROUTES, USER_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 
 type GroupBy = "none" | "user" | "date";
 
@@ -136,6 +136,7 @@ export default function DailyReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("week");
   const [factoryFilter, setFactoryFilter] = useState<string>("all");
+  const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [isNewDayDialogOpen, setIsNewDayDialogOpen] = useState(false);
@@ -146,6 +147,26 @@ export default function DailyReportsPage() {
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const reportRef = useRef<HTMLDivElement>(null);
+
+  const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
+    queryKey: [USER_ROUTES.SETTINGS],
+  });
+
+  const { data: factoriesList } = useQuery<{ id: string; name: string; code: string; state: string }[]>({
+    queryKey: [ADMIN_ROUTES.FACTORIES],
+  });
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings && factoriesList) {
+      if (userSettings.defaultFactoryId) {
+        const defaultFactory = factoriesList.find(f => f.id === userSettings.defaultFactoryId);
+        if (defaultFactory) {
+          setFactoryFilter(defaultFactory.state || defaultFactory.code);
+        }
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoriesList, factoryFilterInitialized]);
 
   const { data: logs, isLoading } = useQuery<DailyLogSummary[]>({
     queryKey: [DAILY_LOGS_ROUTES.LIST, { status: statusFilter, dateRange }],

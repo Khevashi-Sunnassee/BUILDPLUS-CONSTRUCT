@@ -894,6 +894,7 @@ export default function AdminPanelsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [jobFilter, setJobFilter] = useState<string>("all");
   const [factoryFilter, setFactoryFilter] = useState<string>("all");
+  const [factoryFilterInitialized, setFactoryFilterInitialized] = useState(false);
   const [panelTypeFilter, setPanelTypeFilter] = useState<string>("all");
   const [levelFilter, setLevelFilter] = useState<string>("all");
   const [groupByJob, setGroupByJob] = useState<boolean>(false);
@@ -1019,6 +1020,19 @@ export default function AdminPanelsPage() {
   const { data: factories } = useQuery<Factory[]>({
     queryKey: [ADMIN_ROUTES.FACTORIES],
   });
+
+  const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
+    queryKey: [USER_ROUTES.SETTINGS],
+  });
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings) {
+      if (userSettings.defaultFactoryId) {
+        setFactoryFilter(userSettings.defaultFactoryId);
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoryFilterInitialized]);
 
   const { data: panelTypes } = useQuery<PanelTypeConfig[]>({
     queryKey: [PANEL_TYPES_ROUTES.LIST],
