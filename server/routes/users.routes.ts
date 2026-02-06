@@ -66,14 +66,14 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   email: z.string().email("Invalid email address").optional(),
-  name: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
+  name: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
   password: z.string().min(6).optional().or(z.literal("")),
   role: z.enum(["USER", "MANAGER", "ADMIN"]).optional(),
   isActive: z.boolean().optional(),
   poApprover: z.boolean().optional(),
-  poApprovalLimit: z.string().optional(),
+  poApprovalLimit: z.string().nullable().optional(),
 });
 
 // Admin: Create user

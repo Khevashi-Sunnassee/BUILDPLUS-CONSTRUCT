@@ -304,7 +304,7 @@ export default function AdminUsersPage() {
         address: data.address,
         role: data.role,
         poApprover: data.poApprover,
-        poApprovalLimit: data.poApprovalLimit || null,
+        poApprovalLimit: data.poApprovalLimit || "",
       };
       if (data.password) {
         updateData.password = data.password;
