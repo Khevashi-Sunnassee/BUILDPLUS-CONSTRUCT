@@ -28,7 +28,7 @@ export default function DownloadsPage() {
   const { user } = useAuth();
 
   const downloadSourcePackage = (packageName: string) => {
-    const basePath = `/downloads/${packageName}`;
+    const basePath = `/download-files/${packageName}`;
     window.open(basePath, '_blank');
   };
 
@@ -67,7 +67,7 @@ export default function DownloadsPage() {
             data-testid="button-setup-guide"
             asChild
           >
-            <a href="/downloads/SETUP-GUIDE.md" target="_blank">
+            <a href="/download-files/SETUP-GUIDE.md" target="_blank">
               <FileText className="h-4 w-4 mr-2" />
               Open Complete Setup Guide
               <ExternalLink className="h-3 w-3 ml-2" />
@@ -122,7 +122,7 @@ export default function DownloadsPage() {
               data-testid="button-download-revit"
               asChild
             >
-              <a href="/downloads/revit-addin/" target="_blank">
+              <a href="/download-files/revit-addin/" target="_blank">
                 <Github className="h-4 w-4 mr-2" />
                 View Source Code
                 <ExternalLink className="h-3 w-3 ml-2" />
@@ -167,7 +167,7 @@ export default function DownloadsPage() {
               data-testid="button-download-acad"
               asChild
             >
-              <a href="/downloads/acad-addin/" target="_blank">
+              <a href="/download-files/acad-addin/" target="_blank">
                 <Github className="h-4 w-4 mr-2" />
                 View Source Code
                 <ExternalLink className="h-3 w-3 ml-2" />
@@ -217,7 +217,7 @@ export default function DownloadsPage() {
             data-testid="button-download-agent"
             asChild
           >
-            <a href="/downloads/windows-agent/" target="_blank">
+            <a href="/download-files/windows-agent/" target="_blank">
               <Github className="h-4 w-4 mr-2" />
               View Source Code
               <ExternalLink className="h-3 w-3 ml-2" />
