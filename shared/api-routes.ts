@@ -228,6 +228,8 @@ export const LOGISTICS_ROUTES = {
   LOAD_LIST_PANEL_REMOVE: (loadListId: string | number, panelId: string | number) => `/api/load-lists/${loadListId}/panels/${panelId}`,
   LOAD_LIST_DELIVERY: (id: string | number) => `/api/load-lists/${id}/delivery`,
   DELIVERY_RECORD_BY_ID: (id: string | number) => `/api/delivery-records/${id}`,
+  LOAD_LIST_RETURN: (id: string | number) => `/api/load-lists/${id}/return`,
+  LOAD_RETURN_BY_ID: (id: string | number) => `/api/load-returns/${id}`,
   TRAILER_TYPES: '/api/trailer-types',
   TRAILER_TYPE_BY_ID: (id: string | number) => `/api/trailer-types/${id}`,
 } as const;

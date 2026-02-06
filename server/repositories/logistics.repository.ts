@@ -2,11 +2,18 @@ import { eq, and, desc, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
   trailerTypes, loadLists, loadListPanels, deliveryRecords, panelRegister, jobs, users,
+  loadReturns, loadReturnPanels,
   type InsertTrailerType, type TrailerType,
   type InsertLoadList, type LoadList, type InsertLoadListPanel, type LoadListPanel,
   type InsertDeliveryRecord, type DeliveryRecord,
-  type PanelRegister, type Job, type User
+  type PanelRegister, type Job, type User,
+  type LoadReturn, type LoadReturnPanel
 } from "@shared/schema";
+
+export interface LoadReturnWithPanels extends LoadReturn {
+  panels: (LoadReturnPanel & { panel: PanelRegister })[];
+  returnedBy?: User;
+}
 
 export interface LoadListWithDetails extends LoadList {
   job?: Job;
@@ -14,6 +21,7 @@ export interface LoadListWithDetails extends LoadList {
   panels?: (LoadListPanel & { panel: PanelRegister })[];
   deliveryRecord?: DeliveryRecord;
   createdBy?: User;
+  loadReturn?: LoadReturnWithPanels;
 }
 
 export class LogisticsRepository {
@@ -80,13 +88,27 @@ export class LogisticsRepository {
       }
     }
     
+    let loadReturn: LoadReturnWithPanels | undefined;
+    const [returnRecord] = await db.select().from(loadReturns).where(eq(loadReturns.loadListId, list.id));
+    if (returnRecord) {
+      const returnPanelLinks = await db.select().from(loadReturnPanels).where(eq(loadReturnPanels.loadReturnId, returnRecord.id));
+      const returnPanels: (LoadReturnPanel & { panel: PanelRegister })[] = [];
+      for (const rp of returnPanelLinks) {
+        const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, rp.panelId));
+        if (panel) returnPanels.push({ ...rp, panel });
+      }
+      const [returnedByUser] = returnRecord.returnedById ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById)) : [];
+      loadReturn = { ...returnRecord, panels: returnPanels, returnedBy: returnedByUser || undefined };
+    }
+
     return {
       ...list,
       job: job || undefined,
       trailerType: trailer || undefined,
       panels,
       deliveryRecord: delivery || undefined,
-      createdBy: createdByUser || undefined
+      createdBy: createdByUser || undefined,
+      loadReturn,
     };
   }
 

@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { Truck, Package, Calendar, MapPin, ChevronLeft, Plus, ClipboardCheck, ChevronRight } from "lucide-react";
+import { Truck, Package, Calendar, MapPin, ChevronLeft, Plus, ClipboardCheck, ChevronRight, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -62,33 +62,45 @@ export default function MobileLogisticsPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
-        <div className="grid grid-cols-2 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-3 mb-6">
           <Link href="/mobile/logistics/create-load">
             <div
-              className="p-4 rounded-2xl border border-white/10 bg-white/5 active:scale-[0.99] flex flex-col items-center gap-3 min-h-[120px] justify-center"
+              className="p-3 rounded-2xl border border-white/10 bg-white/5 active:scale-[0.99] flex flex-col items-center gap-2 min-h-[100px] justify-center"
               data-testid="card-create-load-list"
             >
-              <div className="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
-                <Plus className="h-6 w-6 text-blue-400" />
+              <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <Plus className="h-5 w-5 text-blue-400" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-semibold text-white">Create Load List</p>
-                <p className="text-xs text-white/40 mt-0.5">Scan panels & build load</p>
+                <p className="text-xs font-semibold text-white">Create Load</p>
               </div>
             </div>
           </Link>
 
           <Link href="/mobile/logistics/record-delivery">
             <div
-              className="p-4 rounded-2xl border border-white/10 bg-white/5 active:scale-[0.99] flex flex-col items-center gap-3 min-h-[120px] justify-center"
+              className="p-3 rounded-2xl border border-white/10 bg-white/5 active:scale-[0.99] flex flex-col items-center gap-2 min-h-[100px] justify-center"
               data-testid="card-record-delivery"
             >
-              <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                <ClipboardCheck className="h-6 w-6 text-green-400" />
+              <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                <ClipboardCheck className="h-5 w-5 text-green-400" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-semibold text-white">Record Delivery</p>
-                <p className="text-xs text-white/40 mt-0.5">Log delivery details</p>
+                <p className="text-xs font-semibold text-white">Record Delivery</p>
+              </div>
+            </div>
+          </Link>
+
+          <Link href="/mobile/logistics/return-load">
+            <div
+              className="p-3 rounded-2xl border border-white/10 bg-white/5 active:scale-[0.99] flex flex-col items-center gap-2 min-h-[100px] justify-center"
+              data-testid="card-return-load"
+            >
+              <div className="w-10 h-10 rounded-full bg-orange-500/20 flex items-center justify-center">
+                <RotateCcw className="h-5 w-5 text-orange-400" />
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-semibold text-white">Return Load</p>
               </div>
             </div>
           </Link>

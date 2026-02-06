@@ -67,6 +67,7 @@ import MobilePanelsPage from "@/pages/mobile/panels";
 import MobileLogisticsPage from "@/pages/mobile/logistics";
 import MobileCreateLoadListPage from "@/pages/mobile/create-load-list";
 import MobileRecordDeliveryPage from "@/pages/mobile/record-delivery";
+import MobileReturnLoadPage from "@/pages/mobile/return-load";
 import MobilePurchaseOrdersPage from "@/pages/mobile/purchase-orders";
 import MobileMore from "@/pages/mobile/more";
 import MobileProfilePage from "@/pages/mobile/profile";
@@ -567,6 +568,11 @@ function Router() {
       <Route path="/mobile/logistics/record-delivery">
         <ProtectedRoute>
           <MobileRecordDeliveryPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/logistics/return-load">
+        <ProtectedRoute>
+          <MobileReturnLoadPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/purchase-orders">

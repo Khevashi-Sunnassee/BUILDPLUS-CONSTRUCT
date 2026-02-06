@@ -152,6 +152,57 @@ router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
   res.json(record);
 });
 
+// =============== LOAD RETURNS ===============
+
+router.get("/api/load-lists/:id/return", requireAuth, async (req, res) => {
+  try {
+    const loadReturn = await storage.getLoadReturn(req.params.id as string);
+    res.json(loadReturn || null);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to get load return" });
+  }
+});
+
+router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
+  try {
+    const loadList = await storage.getLoadList(req.params.id as string);
+    if (!loadList) return res.status(404).json({ error: "Load list not found" });
+
+    const existingReturn = await storage.getLoadReturn(req.params.id as string);
+    if (existingReturn) {
+      return res.status(400).json({ error: "A return record already exists for this load list" });
+    }
+
+    const { panelIds, ...returnData } = req.body;
+
+    if (!returnData.returnReason) {
+      return res.status(400).json({ error: "Return reason is required" });
+    }
+
+    if (!returnData.returnType || !["FULL", "PARTIAL"].includes(returnData.returnType)) {
+      return res.status(400).json({ error: "Return type must be FULL or PARTIAL" });
+    }
+
+    if (returnData.returnType === "PARTIAL" && (!panelIds || panelIds.length === 0)) {
+      return res.status(400).json({ error: "At least one panel must be selected for partial return" });
+    }
+
+    const selectedPanelIds = returnData.returnType === "FULL"
+      ? loadList.panels.map(p => p.panel.id)
+      : (panelIds || []);
+
+    const loadReturn = await storage.createLoadReturn({
+      ...returnData,
+      loadListId: req.params.id as string,
+      returnedById: req.session.userId || undefined,
+    }, selectedPanelIds);
+
+    res.json(loadReturn);
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Failed to create load return" });
+  }
+});
+
 router.post("/api/test-gmail", requireAuth, async (req, res) => {
   try {
     const { to } = req.body;

@@ -26,6 +26,7 @@ import {
   FileDown,
   QrCode,
   Layers,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -84,6 +85,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import type { Job, PanelRegister, TrailerType, PanelTypeConfig } from "@shared/schema";
 
 interface LoadListWithDetails {
@@ -102,6 +105,7 @@ interface LoadListWithDetails {
   trailerType?: TrailerType | null;
   panels: { id: string; loadListId: string; panelId: string; sequence: number; panel: PanelRegister }[];
   deliveryRecord?: DeliveryRecord | null;
+  loadReturn?: any;
   createdBy?: { id: string; name: string; email: string } | null;
 }
 
@@ -184,6 +188,16 @@ export default function LogisticsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [selectedReadyPanels, setSelectedReadyPanels] = useState<Set<string>>(new Set());
   const [readyPanelsExpanded, setReadyPanelsExpanded] = useState(true);
+  const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [returnLoadList, setReturnLoadList] = useState<LoadListWithDetails | null>(null);
+  const [returnType, setReturnType] = useState<"FULL" | "PARTIAL">("FULL");
+  const [returnReason, setReturnReason] = useState("");
+  const [returnDate, setReturnDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [leftFactoryTime, setLeftFactoryTime] = useState("");
+  const [arrivedFactoryTime, setArrivedFactoryTime] = useState("");
+  const [unloadedAtFactoryTime, setUnloadedAtFactoryTime] = useState("");
+  const [returnNotes, setReturnNotes] = useState("");
+  const [returnPanelIds, setReturnPanelIds] = useState<Set<string>>(new Set());
   const reportRef = useRef<HTMLDivElement>(null);
 
   const { data: userSettings } = useQuery<{ selectedFactoryIds: string[]; defaultFactoryId: string | null }>({
@@ -412,6 +426,64 @@ export default function LogisticsPage() {
       toast({ title: "Failed to create delivery record", description: error.message, variant: "destructive" });
     },
   });
+
+  const createReturnMutation = useMutation({
+    mutationFn: async ({ loadListId, data }: { loadListId: string; data: any }) => {
+      return apiRequest("POST", LOGISTICS_ROUTES.LOAD_LIST_RETURN(loadListId), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [LOGISTICS_ROUTES.LOAD_LISTS] });
+      toast({ title: "Return load recorded successfully" });
+      setReturnDialogOpen(false);
+      resetReturnForm();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to record return", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetReturnForm = () => {
+    setReturnType("FULL");
+    setReturnReason("");
+    setReturnDate(format(new Date(), "yyyy-MM-dd"));
+    setLeftFactoryTime("");
+    setArrivedFactoryTime("");
+    setUnloadedAtFactoryTime("");
+    setReturnNotes("");
+    setReturnPanelIds(new Set());
+    setReturnLoadList(null);
+  };
+
+  const openReturnDialog = (loadList: LoadListWithDetails) => {
+    setReturnLoadList(loadList);
+    setReturnDate(format(new Date(), "yyyy-MM-dd"));
+    setReturnDialogOpen(true);
+  };
+
+  const handleSubmitReturn = () => {
+    if (!returnLoadList) return;
+    if (!returnReason.trim()) {
+      toast({ title: "Return reason is required", variant: "destructive" });
+      return;
+    }
+    if (returnType === "PARTIAL" && returnPanelIds.size === 0) {
+      toast({ title: "Select at least one panel for partial return", variant: "destructive" });
+      return;
+    }
+    createReturnMutation.mutate({
+      loadListId: returnLoadList.id,
+      data: {
+        returnType,
+        returnReason: returnReason.trim(),
+        returnDate: returnDate || undefined,
+        leftFactoryTime: leftFactoryTime || undefined,
+        arrivedFactoryTime: arrivedFactoryTime || undefined,
+        unloadedAtFactoryTime: unloadedAtFactoryTime || undefined,
+        notes: returnNotes || undefined,
+        panelIds: returnType === "PARTIAL" ? Array.from(returnPanelIds) : [],
+      },
+    });
+  };
 
   const handleCreateLoadList = (data: LoadListFormData) => {
     // Transform empty trailerTypeId to undefined to avoid foreign key constraint error
@@ -1072,6 +1144,22 @@ export default function LogisticsPage() {
                             <QrCode className="h-4 w-4 mr-1" />
                             Print QR
                           </Button>
+                          {!loadList.loadReturn && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openReturnDialog(loadList)}
+                              data-testid={`button-return-load-${loadList.id}`}
+                            >
+                              <RotateCcw className="h-4 w-4 mr-1" />
+                              Return Load
+                            </Button>
+                          )}
+                          {loadList.loadReturn && (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 border-orange-300 dark:border-orange-700">
+                              {loadList.loadReturn.returnType === "FULL" ? "Full Return" : `Partial Return (${loadList.loadReturn.panels.length} panels)`}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -1643,6 +1731,116 @@ export default function LogisticsPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={returnDialogOpen} onOpenChange={(open) => { if (!open) resetReturnForm(); setReturnDialogOpen(open); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Return Load</DialogTitle>
+            <DialogDescription>
+              {returnLoadList && (
+                <>Record a return for {returnLoadList.job.jobNumber} - {returnLoadList.job.name} ({returnLoadList.panels.length} panels)</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 h-[60vh] pr-4">
+            <div className="space-y-4 pb-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Return Type</label>
+                <RadioGroup value={returnType} onValueChange={(v) => { setReturnType(v as "FULL" | "PARTIAL"); setReturnPanelIds(new Set()); }} className="flex gap-4">
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="FULL" id="return-full" data-testid="radio-return-full" />
+                    <Label htmlFor="return-full">Full Load Return</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="PARTIAL" id="return-partial" data-testid="radio-return-partial" />
+                    <Label htmlFor="return-partial">Partial Return</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Reason for Return *</label>
+                <Textarea
+                  placeholder="Enter reason for return..."
+                  value={returnReason}
+                  onChange={(e) => setReturnReason(e.target.value)}
+                  className="min-h-[80px]"
+                  data-testid="input-return-reason"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Return Date</label>
+                  <Input type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} data-testid="input-return-date" />
+                </div>
+              </div>
+
+              <div className="space-y-2 p-3 rounded-md border bg-muted/30">
+                <h4 className="font-medium text-sm flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Return Timestamps
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Left Factory</label>
+                    <Input type="time" value={leftFactoryTime} onChange={(e) => setLeftFactoryTime(e.target.value)} data-testid="input-left-factory" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Arrived Factory</label>
+                    <Input type="time" value={arrivedFactoryTime} onChange={(e) => setArrivedFactoryTime(e.target.value)} data-testid="input-arrived-factory" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Unloaded at Factory</label>
+                    <Input type="time" value={unloadedAtFactoryTime} onChange={(e) => setUnloadedAtFactoryTime(e.target.value)} data-testid="input-unloaded-factory" />
+                  </div>
+                </div>
+              </div>
+
+              {returnType === "PARTIAL" && returnLoadList && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Select Panels to Return ({returnPanelIds.size} selected)</label>
+                  <ScrollArea className="h-48 border rounded-md p-2">
+                    <div className="space-y-2">
+                      {returnLoadList.panels.sort((a, b) => a.sequence - b.sequence).map((lp) => (
+                        <div key={lp.id} className="flex items-center space-x-2 p-2 hover-elevate rounded-md" data-testid={`return-panel-${lp.panel.id}`}>
+                          <Checkbox
+                            id={`return-${lp.panel.id}`}
+                            checked={returnPanelIds.has(lp.panel.id)}
+                            onCheckedChange={(checked) => {
+                              const newSet = new Set(returnPanelIds);
+                              if (checked) { newSet.add(lp.panel.id); } else { newSet.delete(lp.panel.id); }
+                              setReturnPanelIds(newSet);
+                            }}
+                          />
+                          <label htmlFor={`return-${lp.panel.id}`} className="flex-1 cursor-pointer flex items-center justify-between">
+                            <span className="font-medium">{lp.panel.panelMark}</span>
+                            <span className="text-sm text-muted-foreground">
+                              {lp.panel.panelType} {lp.panel.panelMass ? `· ${parseFloat(lp.panel.panelMass).toLocaleString()} kg` : ""}
+                            </span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Notes</label>
+                <Input placeholder="Any additional notes..." value={returnNotes} onChange={(e) => setReturnNotes(e.target.value)} data-testid="input-return-notes" />
+              </div>
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { resetReturnForm(); setReturnDialogOpen(false); }}>Cancel</Button>
+            <Button onClick={handleSubmitReturn} disabled={createReturnMutation.isPending} data-testid="button-submit-return">
+              {createReturnMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Record Return
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

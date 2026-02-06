@@ -1057,6 +1057,47 @@ export const insertDeliveryRecordSchema = createInsertSchema(deliveryRecords).om
   updatedAt: true,
 });
 
+export const returnTypeEnum = pgEnum("return_type", ["FULL", "PARTIAL"]);
+
+export const loadReturns = pgTable("load_returns", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  loadListId: varchar("load_list_id", { length: 36 }).notNull().references(() => loadLists.id, { onDelete: "cascade" }),
+  returnType: returnTypeEnum("return_type").notNull(),
+  returnReason: text("return_reason").notNull(),
+  returnDate: text("return_date"),
+  leftFactoryTime: text("left_factory_time"),
+  arrivedFactoryTime: text("arrived_factory_time"),
+  unloadedAtFactoryTime: text("unloaded_at_factory_time"),
+  notes: text("notes"),
+  returnedById: varchar("returned_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  loadListIdIdx: index("load_returns_load_list_id_idx").on(table.loadListId),
+  returnDateIdx: index("load_returns_return_date_idx").on(table.returnDate),
+}));
+
+export const loadReturnPanels = pgTable("load_return_panels", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  loadReturnId: varchar("load_return_id", { length: 36 }).notNull().references(() => loadReturns.id, { onDelete: "cascade" }),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  loadReturnIdIdx: index("load_return_panels_return_id_idx").on(table.loadReturnId),
+  panelIdIdx: index("load_return_panels_panel_id_idx").on(table.panelId),
+}));
+
+export const insertLoadReturnSchema = createInsertSchema(loadReturns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertLoadReturnPanelSchema = createInsertSchema(loadReturnPanels).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertWeeklyWageReportSchema = createInsertSchema(weeklyWageReports).omit({
   id: true,
   createdById: true,
@@ -1206,6 +1247,11 @@ export type InsertLoadListPanel = z.infer<typeof insertLoadListPanelSchema>;
 export type LoadListPanel = typeof loadListPanels.$inferSelect;
 export type InsertDeliveryRecord = z.infer<typeof insertDeliveryRecordSchema>;
 export type DeliveryRecord = typeof deliveryRecords.$inferSelect;
+export type InsertLoadReturn = z.infer<typeof insertLoadReturnSchema>;
+export type LoadReturn = typeof loadReturns.$inferSelect;
+export type InsertLoadReturnPanel = z.infer<typeof insertLoadReturnPanelSchema>;
+export type LoadReturnPanel = typeof loadReturnPanels.$inferSelect;
+export type ReturnType = "FULL" | "PARTIAL";
 export type InsertWeeklyWageReport = z.infer<typeof insertWeeklyWageReportSchema>;
 export type WeeklyWageReport = typeof weeklyWageReports.$inferSelect;
 export type InsertWeeklyJobReport = z.infer<typeof insertWeeklyJobReportSchema>;

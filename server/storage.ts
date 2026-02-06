@@ -30,6 +30,8 @@ import {
   type InsertTrailerType, type TrailerType,
   type InsertLoadList, type LoadList, type InsertLoadListPanel, type LoadListPanel,
   type InsertDeliveryRecord, type DeliveryRecord,
+  loadReturns, loadReturnPanels,
+  type InsertLoadReturn, type LoadReturn, type InsertLoadReturnPanel, type LoadReturnPanel,
   type InsertWeeklyWageReport, type WeeklyWageReport,
   type InsertUserPermission, type UserPermission, type FunctionKey, type PermissionLevel,
   type InsertWeeklyJobReport, type WeeklyJobReport,
@@ -186,11 +188,17 @@ export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   schedules: (WeeklyJobReportSchedule & { job: Job })[];
 }
 
+export interface LoadReturnWithDetails extends LoadReturn {
+  returnedBy?: User | null;
+  panels: (LoadReturnPanel & { panel: PanelRegister })[];
+}
+
 export interface LoadListWithDetails extends LoadList {
   job: Job;
   trailerType?: TrailerType | null;
   panels: (LoadListPanel & { panel: PanelRegister })[];
   deliveryRecord?: DeliveryRecord | null;
+  loadReturn?: LoadReturnWithDetails | null;
   createdBy?: User | null;
 }
 
@@ -418,6 +426,10 @@ export interface IStorage {
   getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined>;
   createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord>;
   updateDeliveryRecord(id: string, data: Partial<InsertDeliveryRecord>): Promise<DeliveryRecord | undefined>;
+
+  // Logistics - Load Returns
+  getLoadReturn(loadListId: string): Promise<LoadReturnWithDetails | null>;
+  createLoadReturn(data: InsertLoadReturn, panelIds: string[]): Promise<LoadReturnWithDetails>;
 
   // Weekly Wage Reports
   getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]>;
@@ -2080,6 +2092,8 @@ export class DatabaseStorage implements IStorage {
 
     const [deliveryRecord] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, id));
 
+    const loadReturn = await this.getLoadReturn(id);
+
     let createdBy: User | null = null;
     if (loadList.createdById) {
       const [user] = await db.select().from(users).where(eq(users.id, loadList.createdById));
@@ -2092,6 +2106,7 @@ export class DatabaseStorage implements IStorage {
       trailerType,
       panels,
       deliveryRecord: deliveryRecord || null,
+      loadReturn,
       createdBy,
     };
   }
@@ -2183,6 +2198,46 @@ export class DatabaseStorage implements IStorage {
       .where(eq(deliveryRecords.id, id))
       .returning();
     return updated;
+  }
+
+  // Logistics - Load Returns
+  async getLoadReturn(loadListId: string): Promise<LoadReturnWithDetails | null> {
+    const [returnRecord] = await db.select().from(loadReturns).where(eq(loadReturns.loadListId, loadListId));
+    if (!returnRecord) return null;
+
+    const [returnedByUser] = returnRecord.returnedById
+      ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById))
+      : [];
+
+    const returnPanelLinks = await db.select().from(loadReturnPanels)
+      .where(eq(loadReturnPanels.loadReturnId, returnRecord.id));
+
+    const panels: (LoadReturnPanel & { panel: PanelRegister })[] = [];
+    for (const link of returnPanelLinks) {
+      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, link.panelId));
+      if (panel) {
+        panels.push({ ...link, panel });
+      }
+    }
+
+    return {
+      ...returnRecord,
+      returnedBy: returnedByUser || null,
+      panels,
+    };
+  }
+
+  async createLoadReturn(data: InsertLoadReturn, panelIds: string[]): Promise<LoadReturnWithDetails> {
+    const [returnRecord] = await db.insert(loadReturns).values(data).returning();
+
+    for (const panelId of panelIds) {
+      await db.insert(loadReturnPanels).values({
+        loadReturnId: returnRecord.id,
+        panelId,
+      });
+    }
+
+    return this.getLoadReturn(data.loadListId) as Promise<LoadReturnWithDetails>;
   }
 
   // Weekly Wage Reports
