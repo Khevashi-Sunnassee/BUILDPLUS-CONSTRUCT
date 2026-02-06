@@ -36,6 +36,7 @@ import {
   ExternalLink,
   Printer,
   History,
+  Combine,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -96,6 +97,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { MessageCircle, FileIcon, Send, UserPlus, Image, X, FileText as FileTextIcon, Smile } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 import { PANEL_LIFECYCLE_LABELS, PANEL_LIFECYCLE_COLORS } from "@shared/schema";
 import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES, DOCUMENT_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
@@ -982,6 +984,17 @@ export default function AdminPanelsPage() {
   const [collapsedLevels, setCollapsedLevels] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  const [consolidationMode, setConsolidationMode] = useState(false);
+  const [selectedConsolidationPanels, setSelectedConsolidationPanels] = useState<Set<string>>(new Set());
+  const [consolidationData, setConsolidationData] = useState<{
+    primaryPanelId: string;
+    panels: any[];
+    newPanelMark: string;
+    newWidth: string;
+    newHeight: string;
+  } | null>(null);
+  const [consolidationDialogOpen, setConsolidationDialogOpen] = useState(false);
+
   // Build dialog state
   const [buildDialogOpen, setBuildDialogOpen] = useState(false);
   const [buildingPanel, setBuildingPanel] = useState<PanelRegister | null>(null);
@@ -1209,13 +1222,13 @@ export default function AdminPanelsPage() {
   };
 
   const filteredPanels = panels?.filter(panel => {
+    if (panel.consolidatedIntoPanelId) return false;
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
     if (factoryFilter !== "all" && panel.job.factoryId !== factoryFilter) return false;
     if (statusFilter !== "all" && panel.status !== statusFilter) return false;
     if (panelTypeFilter !== "all" && panel.panelType !== panelTypeFilter) return false;
     if (levelFilter !== "all" && panel.level !== levelFilter) return false;
-    // Search by panel mark
     if (searchTerm && !panel.panelMark.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   })?.sort((a, b) => {
@@ -2000,6 +2013,100 @@ export default function AdminPanelsPage() {
     }
   };
 
+  const consolidateMutation = useMutation({
+    mutationFn: async (data: { panelIds: string[]; primaryPanelId: string; newPanelMark: string; newLoadWidth: string; newLoadHeight: string }) => {
+      const res = await apiRequest("POST", "/api/panels/consolidate", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/panels"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/panels/admin"] });
+      toast({ title: "Panels consolidated successfully" });
+      setConsolidationMode(false);
+      setSelectedConsolidationPanels(new Set());
+      setConsolidationDialogOpen(false);
+      setConsolidationData(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Consolidation Failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleConsolidationProceed = () => {
+    const selectedPanels = (filteredPanels || []).filter(p => selectedConsolidationPanels.has(p.id));
+    if (selectedPanels.length < 2) return;
+
+    const jobIds = new Set(selectedPanels.map(p => p.jobId));
+    if (jobIds.size > 1) {
+      toast({ title: "Validation Error", description: "All panels must belong to the same job", variant: "destructive" });
+      return;
+    }
+
+    const panelTypeSet = new Set(selectedPanels.map(p => p.panelType));
+    if (panelTypeSet.size > 1) {
+      toast({ title: "Validation Error", description: "All panels must be the same panel type", variant: "destructive" });
+      return;
+    }
+
+    const mpas = new Set(selectedPanels.map(p => p.concreteStrengthMpa || ""));
+    if (mpas.size > 1) {
+      toast({ title: "Validation Error", description: "Cannot consolidate panels with different concrete strengths (MPa)", variant: "destructive" });
+      return;
+    }
+
+    const thicknesses = new Set(selectedPanels.map(p => p.panelThickness || ""));
+    if (thicknesses.size > 1) {
+      toast({ title: "Validation Error", description: "Cannot consolidate panels with different panel thicknesses", variant: "destructive" });
+      return;
+    }
+
+    const sortedByLevel = [...selectedPanels].sort((a, b) => {
+      const levelOrder = ["basement", "ground", "g", "l0", "l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10", "roof"];
+      const aLevel = (a.level || "").toLowerCase();
+      const bLevel = (b.level || "").toLowerCase();
+      const aIdx = levelOrder.findIndex(l => aLevel.includes(l));
+      const bIdx = levelOrder.findIndex(l => bLevel.includes(l));
+      if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+      if (aIdx !== -1) return -1;
+      if (bIdx !== -1) return 1;
+      return (a.level || "").localeCompare(b.level || "", undefined, { numeric: true });
+    });
+
+    const primaryPanel = sortedByLevel[0];
+
+    const widths = selectedPanels.map(p => parseFloat(p.loadWidth || "0"));
+    const heights = selectedPanels.map(p => parseFloat(p.loadHeight || "0"));
+    const allWidthsSame = new Set(widths).size === 1;
+    const allHeightsSame = new Set(heights).size === 1;
+
+    let newWidth: string;
+    let newHeight: string;
+
+    if (allWidthsSame) {
+      newWidth = String(widths[0]);
+      newHeight = String(heights.reduce((sum, h) => sum + h, 0));
+    } else if (allHeightsSame) {
+      newWidth = String(widths.reduce((sum, w) => sum + w, 0));
+      newHeight = String(heights[0]);
+    } else {
+      toast({ title: "Validation Error", description: "Cannot consolidate panels: widths or heights must match across all selected panels", variant: "destructive" });
+      return;
+    }
+
+    const newPanelMark = primaryPanel.panelMark.endsWith("C") 
+      ? primaryPanel.panelMark 
+      : primaryPanel.panelMark + "C";
+
+    setConsolidationData({
+      primaryPanelId: primaryPanel.id,
+      panels: selectedPanels,
+      newPanelMark,
+      newWidth,
+      newHeight,
+    });
+    setConsolidationDialogOpen(true);
+  };
+
   const getStatusBadge = (status: string) => {
     const config: Record<string, { variant: "default" | "secondary" | "destructive" | "outline"; icon: any; className?: string }> = {
       NOT_STARTED: { variant: "outline", icon: AlertCircle },
@@ -2159,6 +2266,28 @@ export default function AdminPanelsPage() {
               </SelectContent>
             </Select>
           )}
+          <Button
+            variant={consolidationMode ? "destructive" : "outline"}
+            onClick={() => {
+              if (consolidationMode && selectedConsolidationPanels.size >= 2) {
+                handleConsolidationProceed();
+              } else if (consolidationMode) {
+                setConsolidationMode(false);
+                setSelectedConsolidationPanels(new Set());
+              } else {
+                setConsolidationMode(true);
+                setSelectedConsolidationPanels(new Set());
+              }
+            }}
+            data-testid="button-consolidate-panel"
+          >
+            <Combine className="h-4 w-4 mr-2" />
+            {consolidationMode 
+              ? selectedConsolidationPanels.size >= 2 
+                ? `Consolidate ${selectedConsolidationPanels.size} Panels`
+                : "Cancel Consolidation"
+              : "Consolidate Panel"}
+          </Button>
           <Button onClick={openCreateDialog} data-testid="button-create-panel">
             <Plus className="h-4 w-4 mr-2" />
             Add Panel
@@ -2474,6 +2603,7 @@ export default function AdminPanelsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                {consolidationMode && <TableHead className="w-10"></TableHead>}
                 {!filterJobId && !groupByJob && !groupByPanelType && <TableHead>Job</TableHead>}
                 <TableHead>Factory</TableHead>
                 <TableHead>Panel Mark</TableHead>
@@ -2506,7 +2636,7 @@ export default function AdminPanelsPage() {
                           onClick={() => togglePanelTypeCollapse(panelType)}
                           data-testid={`row-type-group-${panelType}`}
                         >
-                          <TableCell colSpan={16}>
+                          <TableCell colSpan={consolidationMode ? 17 : 16}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2530,6 +2660,23 @@ export default function AdminPanelsPage() {
                               borderLeft: `4px solid ${panel.job.productionSlotColor}` 
                             } : undefined}
                           >
+                            {consolidationMode && (
+                              <TableCell className="w-10">
+                                <Checkbox
+                                  checked={selectedConsolidationPanels.has(panel.id)}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedConsolidationPanels(prev => {
+                                      const newSet = new Set(prev);
+                                      if (checked) newSet.add(panel.id);
+                                      else newSet.delete(panel.id);
+                                      return newSet;
+                                    });
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`checkbox-consolidate-${panel.id}`}
+                                />
+                              </TableCell>
+                            )}
                             <TableCell className="text-sm">{getFactoryName(panel.job.factoryId)}</TableCell>
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
@@ -2635,7 +2782,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={consolidationMode ? 17 : 16} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2652,7 +2799,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleJobCollapse(jobId)}
                           data-testid={`row-job-group-${jobId}`}
                         >
-                          <TableCell colSpan={16}>
+                          <TableCell colSpan={consolidationMode ? 17 : 16}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2677,6 +2824,23 @@ export default function AdminPanelsPage() {
                               borderLeft: `4px solid ${panel.job.productionSlotColor}` 
                             } : undefined}
                           >
+                            {consolidationMode && (
+                              <TableCell className="w-10">
+                                <Checkbox
+                                  checked={selectedConsolidationPanels.has(panel.id)}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedConsolidationPanels(prev => {
+                                      const newSet = new Set(prev);
+                                      if (checked) newSet.add(panel.id);
+                                      else newSet.delete(panel.id);
+                                      return newSet;
+                                    });
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`checkbox-consolidate-${panel.id}`}
+                                />
+                              </TableCell>
+                            )}
                             <TableCell>
                               <div className="flex items-center gap-2 pl-6">
                                 <Hash className="h-4 w-4 text-muted-foreground" />
@@ -2795,7 +2959,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={consolidationMode ? 17 : 16} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2812,7 +2976,7 @@ export default function AdminPanelsPage() {
                           onClick={() => toggleLevelCollapse(level)}
                           data-testid={`row-level-group-${level}`}
                         >
-                          <TableCell colSpan={16}>
+                          <TableCell colSpan={consolidationMode ? 17 : 16}>
                             <div className="flex items-center gap-2">
                               {isCollapsed ? (
                                 <ChevronRight className="h-4 w-4" />
@@ -2836,6 +3000,23 @@ export default function AdminPanelsPage() {
                               borderLeft: `4px solid ${panel.job.productionSlotColor}` 
                             } : undefined}
                           >
+                            {consolidationMode && (
+                              <TableCell className="w-10">
+                                <Checkbox
+                                  checked={selectedConsolidationPanels.has(panel.id)}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedConsolidationPanels(prev => {
+                                      const newSet = new Set(prev);
+                                      if (checked) newSet.add(panel.id);
+                                      else newSet.delete(panel.id);
+                                      return newSet;
+                                    });
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`checkbox-consolidate-${panel.id}`}
+                                />
+                              </TableCell>
+                            )}
                             {!filterJobId && (
                               <TableCell>
                                 <span className="font-mono text-sm">{panel.job.jobNumber}</span>
@@ -2957,7 +3138,7 @@ export default function AdminPanelsPage() {
                   })
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={consolidationMode ? 17 : 16} className="text-center py-8 text-muted-foreground">
                       No panels found. Add a panel or import from Excel.
                     </TableCell>
                   </TableRow>
@@ -2974,6 +3155,23 @@ export default function AdminPanelsPage() {
                         borderLeft: `4px solid ${panel.job.productionSlotColor}` 
                       } : undefined}
                     >
+                      {consolidationMode && (
+                        <TableCell className="w-10">
+                          <Checkbox
+                            checked={selectedConsolidationPanels.has(panel.id)}
+                            onCheckedChange={(checked) => {
+                              setSelectedConsolidationPanels(prev => {
+                                const newSet = new Set(prev);
+                                if (checked) newSet.add(panel.id);
+                                else newSet.delete(panel.id);
+                                return newSet;
+                              });
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            data-testid={`checkbox-consolidate-${panel.id}`}
+                          />
+                        </TableCell>
+                      )}
                       {!filterJobId && (
                         <TableCell>
                           <span className="font-mono text-sm">{panel.job.jobNumber}</span>
@@ -3093,7 +3291,7 @@ export default function AdminPanelsPage() {
                   ))}
                   {(!filteredPanels || filteredPanels.length === 0) && (
                     <TableRow>
-                      <TableCell colSpan={filterJobId ? 15 : 16} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={filterJobId ? (consolidationMode ? 16 : 15) : (consolidationMode ? 17 : 16)} className="text-center py-8 text-muted-foreground">
                         No panels found. Add a panel or import from Excel.
                       </TableCell>
                     </TableRow>
@@ -4348,6 +4546,107 @@ export default function AdminPanelsPage() {
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
                   Open Details
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={consolidationDialogOpen} onOpenChange={(open) => { if (!open) { setConsolidationDialogOpen(false); setConsolidationData(null); } }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Consolidate Panels</DialogTitle>
+            <DialogDescription>
+              Review the consolidated panel details before processing
+            </DialogDescription>
+          </DialogHeader>
+          {consolidationData && (
+            <div className="space-y-4">
+              <div className="rounded-md border p-4 bg-muted/20">
+                <h4 className="font-medium mb-2">Panels Being Consolidated</h4>
+                <div className="space-y-1">
+                  {consolidationData.panels.map(p => (
+                    <div key={p.id} className="flex items-center justify-between text-sm" data-testid={`consolidation-panel-${p.id}`}>
+                      <span className="font-mono">{p.panelMark}</span>
+                      <span className="text-muted-foreground">
+                        {p.loadWidth || "?"} x {p.loadHeight || "?"} mm
+                        {p.id === consolidationData.primaryPanelId && (
+                          <Badge variant="outline" className="ml-2 text-xs">Primary</Badge>
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>New Panel Mark</Label>
+                  <Input
+                    value={consolidationData.newPanelMark}
+                    onChange={(e) => setConsolidationData(prev => prev ? { ...prev, newPanelMark: e.target.value } : null)}
+                    data-testid="input-consolidation-panel-mark"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Level</Label>
+                  <Input
+                    value={consolidationData.panels.find(p => p.id === consolidationData.primaryPanelId)?.level || ""}
+                    disabled
+                    data-testid="input-consolidation-level"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>New Width (mm)</Label>
+                  <Input
+                    value={consolidationData.newWidth}
+                    onChange={(e) => setConsolidationData(prev => prev ? { ...prev, newWidth: e.target.value } : null)}
+                    data-testid="input-consolidation-width"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>New Height (mm)</Label>
+                  <Input
+                    value={consolidationData.newHeight}
+                    onChange={(e) => setConsolidationData(prev => prev ? { ...prev, newHeight: e.target.value } : null)}
+                    data-testid="input-consolidation-height"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-md border border-amber-500/50 p-3 bg-amber-500/10 text-sm">
+                <p className="font-medium text-amber-600 dark:text-amber-400">
+                  The following panels will be retired from the register:
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                  {consolidationData.panels
+                    .filter(p => p.id !== consolidationData.primaryPanelId)
+                    .map(p => (
+                      <li key={p.id}>{p.panelMark} ({p.loadWidth} x {p.loadHeight}mm)</li>
+                    ))}
+                </ul>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => { setConsolidationDialogOpen(false); setConsolidationData(null); }} data-testid="button-cancel-consolidation">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!consolidationData) return;
+                    consolidateMutation.mutate({
+                      panelIds: consolidationData.panels.map(p => p.id),
+                      primaryPanelId: consolidationData.primaryPanelId,
+                      newPanelMark: consolidationData.newPanelMark,
+                      newLoadWidth: consolidationData.newWidth,
+                      newLoadHeight: consolidationData.newHeight,
+                    });
+                  }}
+                  disabled={consolidateMutation.isPending}
+                  data-testid="button-process-consolidation"
+                >
+                  {consolidateMutation.isPending ? "Processing..." : "Process Consolidation"}
                 </Button>
               </div>
             </div>

@@ -31,6 +31,8 @@ The frontend leverages TanStack Query for data fetching, Wouter for routing, `sh
 - **Chat System**: Teams-style messaging with DM, GROUP, CHANNEL types, @mentions, notifications, file attachments, job/panel linking, and read receipts.
 - **Document Management System**: Comprehensive document register with file upload/download via Replit Object Storage, version control, document bundles with QR code access, entity linking (jobs, panels, suppliers, purchase orders, tasks), and configurable document types/disciplines/categories.
 - **Advanced Templates System**: Dynamic, reusable checklist templates with JSONB storage for flexible sections and fields. Features include an admin builder with drag-and-drop field palette (20+ field types), a checklist form renderer with validation, and reports with multi-dimensional filtering and CSV export.
+- **Panel Lifecycle & Audit**: Integer lifecycle status (0-14) tracking panels from registration through production, delivery, and installation. Fire-and-forget audit logging captures all changes without latency impact. Panel register shows lifecycle badges and audit log tab.
+- **Panel Consolidation**: Merge multiple panels into one (e.g., double-height/double-width). Validates same job, panel type, MPa, and thickness. Geometry validation requires matching widths or heights. Primary panel gets "C" suffix, consumed panels are retired (lifecycleStatus=0, hidden from register). Full audit trail of consolidation actions.
 
 ## Mobile UI Standards
 All mobile pages live under `client/src/pages/mobile/` and follow these strict conventions:

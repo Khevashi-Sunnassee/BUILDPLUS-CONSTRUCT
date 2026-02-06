@@ -4,8 +4,9 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
 import { db } from "../db";
-import { panelAuditLogs, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import { panelAuditLogs, panelRegister, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { eq, desc, inArray } from "drizzle-orm";
+import { z } from "zod";
 
 const router = Router();
 
@@ -296,6 +297,140 @@ router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: 
     res.json(logs);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to get audit logs" });
+  }
+});
+
+const consolidateSchema = z.object({
+  panelIds: z.array(z.string()).min(2, "Must select at least 2 panels to consolidate"),
+  primaryPanelId: z.string(),
+  newPanelMark: z.string(),
+  newLoadWidth: z.string().optional(),
+  newLoadHeight: z.string().optional(),
+});
+
+router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const body = consolidateSchema.parse(req.body);
+    const { panelIds, primaryPanelId, newPanelMark, newLoadWidth, newLoadHeight } = body;
+
+    if (!panelIds.includes(primaryPanelId)) {
+      return res.status(400).json({ error: "Primary panel must be one of the selected panels" });
+    }
+
+    const panels = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds));
+    if (panels.length !== panelIds.length) {
+      return res.status(400).json({ error: "One or more panels not found" });
+    }
+
+    const primaryPanel = panels.find(p => p.id === primaryPanelId);
+    if (!primaryPanel) {
+      return res.status(400).json({ error: "Primary panel not found" });
+    }
+
+    const companyId = req.companyId;
+    if (companyId) {
+      const job = await storage.getJob(primaryPanel.jobId);
+      if (!job || job.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
+    const jobIds = new Set(panels.map(p => p.jobId));
+    if (jobIds.size > 1) {
+      return res.status(400).json({ error: "All panels must belong to the same job" });
+    }
+
+    const panelTypes = new Set(panels.map(p => p.panelType));
+    if (panelTypes.size > 1) {
+      return res.status(400).json({ error: "All panels must be the same panel type" });
+    }
+
+    const mpas = new Set(panels.map(p => p.concreteStrengthMpa || ""));
+    if (mpas.size > 1) {
+      return res.status(400).json({ error: "Cannot consolidate panels with different concrete strengths (MPa)" });
+    }
+
+    const thicknesses = new Set(panels.map(p => p.panelThickness || ""));
+    if (thicknesses.size > 1) {
+      return res.status(400).json({ error: "Cannot consolidate panels with different thicknesses" });
+    }
+
+    const widths = panels.map(p => parseFloat(p.loadWidth || "0"));
+    const heights = panels.map(p => parseFloat(p.loadHeight || "0"));
+    const allWidthsSame = new Set(widths).size === 1;
+    const allHeightsSame = new Set(heights).size === 1;
+
+    if (!allWidthsSame && !allHeightsSame) {
+      return res.status(400).json({ error: "Cannot consolidate panels: widths or heights must match across all selected panels" });
+    }
+
+    const consumedPanelIds = panelIds.filter(id => id !== primaryPanelId);
+
+    let widthNum: number, heightNum: number;
+    if (allWidthsSame) {
+      widthNum = widths[0];
+      heightNum = heights.reduce((sum, h) => sum + h, 0);
+    } else {
+      widthNum = widths.reduce((sum, w) => sum + w, 0);
+      heightNum = heights[0];
+    }
+    const width = newLoadWidth || String(widthNum);
+    const height = newLoadHeight || String(heightNum);
+    const thicknessNum = parseFloat(primaryPanel.panelThickness || "0");
+    const areaM2 = ((widthNum * heightNum) / 1_000_000).toFixed(4);
+    const volumeM3 = ((widthNum * heightNum * thicknessNum) / 1_000_000_000).toFixed(6);
+
+    await db.update(panelRegister)
+      .set({
+        panelMark: newPanelMark,
+        loadWidth: width,
+        loadHeight: height,
+        panelArea: areaM2,
+        panelVolume: volumeM3,
+        updatedAt: new Date(),
+      })
+      .where(eq(panelRegister.id, primaryPanelId));
+
+    logPanelChange(primaryPanelId, "Panel consolidated", req.session.userId, {
+      changedFields: {
+        panelMark: newPanelMark,
+        loadWidth: width,
+        loadHeight: height,
+        panelArea: areaM2,
+        panelVolume: volumeM3,
+        consolidatedFrom: consumedPanelIds,
+      },
+    });
+
+    for (const consumedId of consumedPanelIds) {
+      await db.update(panelRegister)
+        .set({
+          consolidatedIntoPanelId: primaryPanelId,
+          lifecycleStatus: 0,
+          status: "ON_HOLD",
+          updatedAt: new Date(),
+        })
+        .where(eq(panelRegister.id, consumedId));
+
+      const consumedPanel = panels.find(p => p.id === consumedId);
+      logPanelChange(consumedId, `Panel consolidated into ${newPanelMark}`, req.session.userId, {
+        changedFields: {
+          consolidatedIntoPanelId: primaryPanelId,
+          originalPanelMark: consumedPanel?.panelMark,
+        },
+        newLifecycleStatus: 0,
+        previousLifecycleStatus: consumedPanel?.lifecycleStatus ?? 0,
+      });
+    }
+
+    const updatedPanel = await storage.getPanelRegisterItem(primaryPanelId);
+    res.json({ panel: updatedPanel, consumedPanelIds });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: error.errors[0].message });
+    }
+    logger.error({ err: error }, "Panel consolidation error");
+    res.status(500).json({ error: error.message || "Failed to consolidate panels" });
   }
 });
 

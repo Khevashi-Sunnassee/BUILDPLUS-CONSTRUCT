@@ -538,6 +538,7 @@ export const panelRegister = pgTable("panel_register", {
   approvedAt: timestamp("approved_at"),
   approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
   lifecycleStatus: integer("lifecycle_status").default(0).notNull(),
+  consolidatedIntoPanelId: varchar("consolidated_into_panel_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
