@@ -247,13 +247,16 @@ export default function PurchaseOrderFormPage() {
   });
 
   const submitMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_SUBMIT(poId!));
+    mutationFn: async (overrideId?: string) => {
+      const targetId = overrideId || poId;
+      if (!targetId) throw new Error("Purchase order ID is required");
+      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_SUBMIT(targetId));
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, overrideId) => {
+      const targetId = overrideId || poId;
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
-      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, targetId] });
       toast({ title: "Purchase order submitted for approval" });
     },
     onError: (error: Error) => {
@@ -519,7 +522,7 @@ export default function PurchaseOrderFormPage() {
     if (isNew) {
       createMutation.mutate({ po: formData, items: lineItems }, {
         onSuccess: (data) => {
-          submitMutation.mutate();
+          submitMutation.mutate(data.id);
         },
       });
     } else {
