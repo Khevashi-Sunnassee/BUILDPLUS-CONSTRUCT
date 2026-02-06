@@ -2,7 +2,7 @@ import { eq, and, desc, sql, asc, gte, lte, inArray, isNull, notInArray } from "
 import { db } from "./db";
 export { db };
 import {
-  companies,
+  companies, departments,
   users, devices, mappingRules, dailyLogs, logRows,
   approvalEvents, auditEvents, globalSettings, jobs, jobLevelCycleTimes, panelRegister, productionEntries,
   panelTypes, jobPanelRates, workTypes, panelTypeCostComponents, jobCostOverrides,
@@ -264,6 +264,12 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   validatePassword(user: User, password: string): Promise<boolean>;
   updateUserSettings(userId: string, settings: { selectedFactoryIds?: string[] | null; defaultFactoryId?: string | null }): Promise<void>;
+
+  getDepartment(id: string): Promise<any | undefined>;
+  getDepartmentsByCompany(companyId: string): Promise<any[]>;
+  createDepartment(data: any): Promise<any>;
+  updateDepartment(id: string, data: any): Promise<any | undefined>;
+  deleteDepartment(id: string): Promise<void>;
 
   getDevice(id: string): Promise<(Device & { user: User }) | undefined>;
   getDeviceByApiKey(apiKeyHash: string): Promise<(Device & { user: User }) | undefined>;
@@ -775,6 +781,29 @@ export class DatabaseStorage implements IStorage {
     await db.update(users)
       .set(updateData)
       .where(eq(users.id, userId));
+  }
+
+  async getDepartment(id: string): Promise<any | undefined> {
+    const result = await db.select().from(departments).where(eq(departments.id, id));
+    return result[0];
+  }
+
+  async getDepartmentsByCompany(companyId: string): Promise<any[]> {
+    return db.select().from(departments).where(eq(departments.companyId, companyId)).orderBy(departments.name);
+  }
+
+  async createDepartment(data: any): Promise<any> {
+    const [department] = await db.insert(departments).values(data).returning();
+    return department;
+  }
+
+  async updateDepartment(id: string, data: any): Promise<any | undefined> {
+    const [department] = await db.update(departments).set({ ...data, updatedAt: new Date() }).where(eq(departments.id, id)).returning();
+    return department;
+  }
+
+  async deleteDepartment(id: string): Promise<void> {
+    await db.delete(departments).where(eq(departments.id, id));
   }
 
   async getDevice(id: string): Promise<(Device & { user: User }) | undefined> {

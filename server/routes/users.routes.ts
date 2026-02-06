@@ -69,6 +69,8 @@ const createUserSchema = z.object({
   address: z.string().min(1, "Address is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["USER", "MANAGER", "ADMIN"]).default("USER"),
+  userType: z.enum(["EMPLOYEE", "EXTERNAL"]).default("EMPLOYEE"),
+  departmentId: z.string().nullable().optional(),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
   defaultFactoryId: z.string().nullable().optional(),
@@ -81,6 +83,8 @@ const updateUserSchema = z.object({
   address: z.string().nullable().optional(),
   password: z.string().min(6).optional().or(z.literal("")),
   role: z.enum(["USER", "MANAGER", "ADMIN"]).optional(),
+  userType: z.enum(["EMPLOYEE", "EXTERNAL"]).optional(),
+  departmentId: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().nullable().optional(),
@@ -96,6 +100,15 @@ router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
     const validated = createUserSchema.parse(req.body);
     if (validated.poApprovalLimit === "") {
       validated.poApprovalLimit = undefined;
+    }
+    if (validated.userType === "EXTERNAL") {
+      validated.departmentId = null;
+    }
+    if (validated.departmentId) {
+      const dept = await storage.getDepartment(validated.departmentId);
+      if (!dept || dept.companyId !== req.companyId) {
+        return res.status(400).json({ error: "Invalid department" });
+      }
     }
     const existing = await storage.getUserByEmail(validated.email);
     if (existing) {
@@ -133,6 +146,15 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     }
     if (updateData.poApprovalLimit === "") {
       updateData.poApprovalLimit = null;
+    }
+    if (updateData.userType === "EXTERNAL") {
+      updateData.departmentId = null;
+    }
+    if (updateData.departmentId) {
+      const dept = await storage.getDepartment(updateData.departmentId);
+      if (!dept || dept.companyId !== req.companyId) {
+        return res.status(400).json({ error: "Invalid department" });
+      }
     }
     const user = await storage.updateUser(req.params.id as string, updateData);
     res.json({ ...user, passwordHash: undefined });
@@ -231,6 +253,81 @@ router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMI
     permissionLevel
   );
   res.json(permission);
+});
+
+// ============================================================================
+// DEPARTMENTS
+// ============================================================================
+
+const createDepartmentSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  code: z.string().min(1, "Code is required"),
+  description: z.string().optional(),
+  isActive: z.boolean().optional(),
+});
+
+const updateDepartmentSchema = z.object({
+  name: z.string().min(1).optional(),
+  code: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
+router.get("/api/admin/departments", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const departments = await storage.getDepartmentsByCompany(req.companyId!);
+    res.json(departments);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to fetch departments" });
+  }
+});
+
+router.post("/api/admin/departments", requireRole("ADMIN"), async (req, res) => {
+  try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
+    const validated = createDepartmentSchema.parse(req.body);
+    const department = await storage.createDepartment({ ...validated, companyId: req.companyId });
+    res.json(department);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: error.errors });
+    }
+    res.status(400).json({ error: error.message || "Failed to create department" });
+  }
+});
+
+router.put("/api/admin/departments/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await storage.getDepartment(id);
+    if (!existing || existing.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+    const validated = updateDepartmentSchema.parse(req.body);
+    const department = await storage.updateDepartment(id, validated);
+    res.json(department);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Validation failed", details: error.errors });
+    }
+    res.status(400).json({ error: error.message || "Failed to update department" });
+  }
+});
+
+router.delete("/api/admin/departments/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await storage.getDepartment(id);
+    if (!existing || existing.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Department not found" });
+    }
+    await storage.deleteDepartment(id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Failed to delete department" });
+  }
 });
 
 export const usersRouter = router;

@@ -333,6 +333,10 @@ export const ADMIN_ROUTES = {
   FACTORY_BEDS: (id: string | number) => `/api/admin/factories/${id}/beds`,
   FACTORY_BED_BY_ID: (factoryId: string | number, bedId: string | number) => `/api/admin/factories/${factoryId}/beds/${bedId}`,
   
+  // Departments
+  DEPARTMENTS: '/api/admin/departments',
+  DEPARTMENT_BY_ID: (id: string | number) => `/api/admin/departments/${id}`,
+  
   // Devices
   DEVICES: '/api/admin/devices',
   DEVICE_BY_ID: (id: string | number) => `/api/admin/devices/${id}`,

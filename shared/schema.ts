@@ -4,6 +4,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const roleEnum = pgEnum("role", ["USER", "MANAGER", "ADMIN"]);
+export const userTypeEnum = pgEnum("user_type", ["EMPLOYEE", "EXTERNAL"]);
 export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
 export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
@@ -38,6 +39,24 @@ export const insertCompanySchema = createInsertSchema(companies).omit({ id: true
 export type InsertCompany = z.infer<typeof insertCompanySchema>;
 export type Company = typeof companies.$inferSelect;
 
+export const departments = pgTable("departments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  code: text("code").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  codeCompanyIdx: uniqueIndex("departments_code_company_idx").on(table.code, table.companyId),
+  companyIdx: index("departments_company_idx").on(table.companyId),
+}));
+
+export const insertDepartmentSchema = createInsertSchema(departments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertDepartment = z.infer<typeof insertDepartmentSchema>;
+export type Department = typeof departments.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -47,6 +66,8 @@ export const users = pgTable("users", {
   address: text("address"),
   passwordHash: text("password_hash"),
   role: roleEnum("role").default("USER").notNull(),
+  userType: userTypeEnum("user_type").default("EMPLOYEE").notNull(),
+  departmentId: varchar("department_id", { length: 36 }).references(() => departments.id),
   isActive: boolean("is_active").default(true).notNull(),
   poApprover: boolean("po_approver").default(false),
   poApprovalLimit: decimal("po_approval_limit", { precision: 12, scale: 2 }),

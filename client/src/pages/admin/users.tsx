@@ -75,7 +75,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import type { User as UserType, Role } from "@shared/schema";
+import type { User as UserType, Role, Department } from "@shared/schema";
 
 const createUserSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
@@ -84,6 +84,8 @@ const createUserSchema = z.object({
   address: z.string().min(1, "Address is required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
+  userType: z.enum(["EMPLOYEE", "EXTERNAL"]),
+  departmentId: z.string().nullable().optional(),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
   defaultFactoryId: z.string().nullable().optional(),
@@ -99,6 +101,8 @@ const editUserSchema = z.object({
     { message: "Password must be at least 6 characters" }
   ),
   role: z.enum(["USER", "MANAGER", "ADMIN"]),
+  userType: z.enum(["EMPLOYEE", "EXTERNAL"]),
+  departmentId: z.string().nullable().optional(),
   poApprover: z.boolean().optional(),
   poApprovalLimit: z.string().optional(),
   defaultFactoryId: z.string().nullable().optional(),
@@ -158,6 +162,11 @@ export default function AdminUsersPage() {
     queryKey: [ADMIN_ROUTES.FACTORIES],
   });
 
+  const { data: departmentsList = [] } = useQuery<Department[]>({
+    queryKey: [ADMIN_ROUTES.DEPARTMENTS],
+  });
+
+  const activeDepartments = departmentsList.filter((d) => d.isActive);
   const activeFactories = factories.filter((f) => f.isActive);
 
   const form = useForm<UserFormData>({
@@ -169,6 +178,8 @@ export default function AdminUsersPage() {
       address: "",
       password: "",
       role: "USER",
+      userType: "EMPLOYEE",
+      departmentId: null,
       poApprover: false,
       poApprovalLimit: "",
       defaultFactoryId: null,
@@ -305,6 +316,8 @@ export default function AdminUsersPage() {
       address: user.address || "",
       password: "",
       role: user.role as "USER" | "MANAGER" | "ADMIN",
+      userType: (user.userType as "EMPLOYEE" | "EXTERNAL") || "EMPLOYEE",
+      departmentId: user.departmentId || null,
       poApprover: user.poApprover || false,
       poApprovalLimit: user.poApprovalLimit || "",
       defaultFactoryId: (user as any).defaultFactoryId || null,
@@ -314,7 +327,7 @@ export default function AdminUsersPage() {
 
   const openNewUser = () => {
     setEditingUser(null);
-    form.reset({ email: "", name: "", phone: "", address: "", password: "", role: "USER", poApprover: false, poApprovalLimit: "", defaultFactoryId: null });
+    form.reset({ email: "", name: "", phone: "", address: "", password: "", role: "USER", userType: "EMPLOYEE", departmentId: null, poApprover: false, poApprovalLimit: "", defaultFactoryId: null });
     setDialogOpen(true);
   };
 
@@ -326,6 +339,8 @@ export default function AdminUsersPage() {
         phone: data.phone,
         address: data.address,
         role: data.role,
+        userType: data.userType,
+        departmentId: data.userType === "EMPLOYEE" ? (data.departmentId || null) : null,
         poApprover: data.poApprover,
         poApprovalLimit: data.poApprovalLimit || "",
         defaultFactoryId: data.defaultFactoryId || null,
@@ -409,8 +424,8 @@ export default function AdminUsersPage() {
                   <TableRow>
                     <TableHead>User</TableHead>
                     <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Address</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Department</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
@@ -434,11 +449,15 @@ export default function AdminUsersPage() {
                           {user.email}
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground" data-testid={`text-phone-${user.id}`}>
-                        {user.phone || "—"}
+                      <TableCell data-testid={`text-user-type-${user.id}`}>
+                        <Badge variant={user.userType === "EMPLOYEE" ? "default" : "outline"}>
+                          {user.userType === "EMPLOYEE" ? "Employee" : "External"}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-muted-foreground max-w-[200px] truncate" data-testid={`text-address-${user.id}`}>
-                        {user.address || "—"}
+                      <TableCell className="text-muted-foreground" data-testid={`text-department-${user.id}`}>
+                        {user.userType === "EMPLOYEE" && user.departmentId
+                          ? (departmentsList.find(d => d.id === user.departmentId)?.name || "—")
+                          : "—"}
                       </TableCell>
                       <TableCell>
                         {getRoleBadge(user.role as Role)}
@@ -628,6 +647,68 @@ export default function AdminUsersPage() {
                   </FormItem>
                 )}
               />
+              <FormField
+                control={form.control}
+                name="userType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>User Type</FormLabel>
+                    <Select onValueChange={(val) => {
+                      field.onChange(val);
+                      if (val === "EXTERNAL") {
+                        form.setValue("departmentId", null);
+                      }
+                    }} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-user-type">
+                          <SelectValue placeholder="Select user type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                        <SelectItem value="EXTERNAL">External</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Employee users are internal staff. External users are contractors or third parties.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {form.watch("userType") === "EMPLOYEE" && (
+                <FormField
+                  control={form.control}
+                  name="departmentId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Department</FormLabel>
+                      <Select
+                        onValueChange={(val) => field.onChange(val === "none" ? null : val)}
+                        value={field.value || "none"}
+                      >
+                        <FormControl>
+                          <SelectTrigger data-testid="select-department">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="none">No department</SelectItem>
+                          {activeDepartments.map((dept) => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name} ({dept.code})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        The department this employee works in.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
               <FormField
                 control={form.control}
                 name="defaultFactoryId"
