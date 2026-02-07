@@ -2406,23 +2406,21 @@ export default function TasksPage() {
     setIsExporting(true);
     try {
       const pdf = new jsPDF({
-        orientation: "portrait",
+        orientation: "landscape",
         unit: "mm",
         format: "a4",
+        compress: true,
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       const margin = 15;
-      const headerHeight = 30;
-      const footerHeight = 12;
-      let yPos = headerHeight + 5;
+      const contentWidth = pageWidth - margin * 2;
+      let currentY = margin;
 
-      const maxLogoHeight = 12;
-      const maxLogoWidth = 30;
-      let logoWidth = maxLogoWidth;
-      let logoHeight = maxLogoHeight;
-      
+      const logoHeight = 20;
+      let headerTextX = margin;
+
       try {
         const img = document.createElement("img");
         img.src = reportLogo;
@@ -2430,189 +2428,169 @@ export default function TasksPage() {
           img.onload = () => resolve();
           img.onerror = () => resolve();
         });
-        
         if (img.naturalWidth && img.naturalHeight) {
           const aspectRatio = img.naturalWidth / img.naturalHeight;
-          if (aspectRatio > maxLogoWidth / maxLogoHeight) {
-            logoWidth = maxLogoWidth;
-            logoHeight = maxLogoWidth / aspectRatio;
-          } else {
-            logoHeight = maxLogoHeight;
-            logoWidth = maxLogoHeight * aspectRatio;
-          }
+          const lw = Math.min(25, logoHeight * aspectRatio);
+          const lh = lw / aspectRatio;
+          pdf.addImage(reportLogo, "PNG", margin, margin - 5, lw, lh, undefined, "FAST");
+          headerTextX = margin + 30;
         }
-        
-        pdf.addImage(reportLogo, "PNG", margin, 8, logoWidth, logoHeight, undefined, "FAST");
-      } catch (e) {}
+      } catch (_e) {}
 
-      pdf.setTextColor(0, 0, 0);
+      pdf.setTextColor(31, 41, 55);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text("Task List", margin + maxLogoWidth + 8, 14);
+      pdf.text(companyName || "LTE Precast Concrete Structures", headerTextX, margin + 2);
 
-      pdf.setFontSize(10);
+      pdf.setFontSize(20);
+      pdf.setTextColor(107, 114, 128);
+      pdf.text("TASK LIST", headerTextX, margin + 12);
+
+      pdf.setFillColor(249, 250, 251);
+      pdf.setDrawColor(229, 231, 235);
+      pdf.roundedRect(pageWidth - margin - 55, margin - 5, 55, 22, 2, 2, "FD");
+      pdf.setTextColor(107, 114, 128);
+      pdf.setFontSize(9);
       pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(100, 100, 100);
-      pdf.text(companyName, margin + maxLogoWidth + 8, 20);
-
-      pdf.setFontSize(8);
-      pdf.setTextColor(120, 120, 120);
-      pdf.text(`Generated: ${format(new Date(), "dd/MM/yyyy HH:mm")}`, pdfWidth - margin, 14, { align: "right" });
+      pdf.text("Generated", pageWidth - margin - 50, margin + 2);
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(31, 41, 55);
+      pdf.text(format(new Date(), "dd/MM/yyyy"), pageWidth - margin - 50, margin + 10);
 
       if (jobFilter !== "all") {
-        const filterLabel = jobFilter === "none" 
-          ? "No Job Assigned" 
+        const filterLabel = jobFilter === "none"
+          ? "No Job Assigned"
           : jobs.find(j => j.id === jobFilter)?.name || "";
-        pdf.text(`Filter: ${filterLabel}`, pdfWidth - margin, 20, { align: "right" });
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(107, 114, 128);
+        pdf.text(`Filter: ${filterLabel}`, pageWidth - margin - 50, margin + 16);
       }
 
-      pdf.setDrawColor(200, 200, 200);
-      pdf.line(margin, headerHeight - 2, pdfWidth - margin, headerHeight - 2);
+      pdf.setDrawColor(229, 231, 235);
+      pdf.line(margin, margin + 20, pageWidth - margin, margin + 20);
+      currentY = margin + 28;
 
-      const getStatusColor = (status: string): [number, number, number] => {
+      const formatStatus = (status: string) => {
         switch (status) {
-          case "NOT_STARTED": return [107, 114, 128];
-          case "IN_PROGRESS": return [59, 130, 246];
-          case "STUCK": return [239, 68, 68];
-          case "DONE": return [34, 197, 94];
-          case "ON_HOLD": return [245, 158, 11];
-          default: return [107, 114, 128];
+          case "NOT_STARTED": return "Not Started";
+          case "IN_PROGRESS": return "In Progress";
+          case "STUCK": return "Stuck";
+          case "DONE": return "Done";
+          case "ON_HOLD": return "On Hold";
+          default: return status.replace(/_/g, " ");
         }
       };
 
-      const formatStatus = (status: string) => {
-        return status.replace(/_/g, " ");
+      const formatPriority = (priority: string | null) => {
+        if (!priority) return "-";
+        return priority.charAt(0) + priority.slice(1).toLowerCase();
       };
 
-      const checkNewPage = (requiredHeight: number) => {
-        if (yPos + requiredHeight > pdfHeight - footerHeight - 10) {
-          addFooter();
+      const checkPageBreak = (requiredHeight: number) => {
+        if (currentY + requiredHeight > pageHeight - margin - 5) {
           pdf.addPage();
-          yPos = margin;
+          currentY = margin;
           return true;
         }
         return false;
       };
 
-      const addFooter = () => {
-        pdf.setFillColor(248, 250, 252);
-        pdf.rect(0, pdfHeight - footerHeight, pdfWidth, footerHeight, "F");
-        pdf.setDrawColor(226, 232, 240);
-        pdf.line(0, pdfHeight - footerHeight, pdfWidth, pdfHeight - footerHeight);
+      const colWidths = [90, 28, 22, 40, 28, contentWidth - 90 - 28 - 22 - 40 - 28];
+      const colHeaders = ["Task", "Status", "Priority", "Assignee", "Due Date", "Job"];
+
+      const drawTableHeaders = () => {
+        pdf.setFillColor(75, 85, 99);
+        pdf.rect(margin, currentY, contentWidth, 8, "F");
+        pdf.setTextColor(255, 255, 255);
         pdf.setFontSize(8);
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
-        pdf.text(`Page ${pdf.getNumberOfPages()}`, pdfWidth - margin, pdfHeight - 5, { align: "right" });
+        pdf.setFont("helvetica", "bold");
+        let hx = margin;
+        colHeaders.forEach((header, i) => {
+          pdf.text(header, hx + 3, currentY + 5.5);
+          hx += colWidths[i];
+        });
+        currentY += 8;
       };
 
       for (const group of filteredGroups) {
         if (group.tasks.length === 0) continue;
 
-        checkNewPage(25);
+        checkPageBreak(25);
 
-        pdf.setFillColor(241, 245, 249);
-        pdf.roundedRect(margin, yPos, pdfWidth - margin * 2, 8, 1, 1, "F");
-        pdf.setTextColor(51, 65, 85);
+        pdf.setFillColor(249, 250, 251);
+        pdf.setDrawColor(229, 231, 235);
+        pdf.roundedRect(margin, currentY, contentWidth, 9, 2, 2, "FD");
+        pdf.setTextColor(31, 41, 55);
         pdf.setFontSize(11);
         pdf.setFont("helvetica", "bold");
-        pdf.text(group.name, margin + 3, yPos + 5.5);
-        const groupNameWidth = pdf.getTextWidth(group.name);
+        pdf.text(group.name.toUpperCase(), margin + 5, currentY + 6.5);
+        const groupNameWidth = pdf.getTextWidth(group.name.toUpperCase());
         pdf.setFontSize(9);
         pdf.setFont("helvetica", "normal");
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(`(${group.tasks.length} tasks)`, margin + 3 + groupNameWidth + 4, yPos + 5.5);
-        yPos += 12;
+        pdf.setTextColor(107, 114, 128);
+        pdf.text(`(${group.tasks.length} task${group.tasks.length !== 1 ? "s" : ""})`, margin + 5 + groupNameWidth + 4, currentY + 6.5);
+        currentY += 13;
 
-        const colWidths = {
-          task: 60,
-          status: 25,
-          priority: 20,
-          assignee: 30,
-          dueDate: 25,
-          job: 20,
-        };
-        const tableWidth = pdfWidth - margin * 2;
-        const startX = margin;
+        drawTableHeaders();
 
-        pdf.setFillColor(248, 250, 252);
-        pdf.rect(startX, yPos, tableWidth, 7, "F");
-        pdf.setDrawColor(226, 232, 240);
-        pdf.line(startX, yPos, startX + tableWidth, yPos);
-        pdf.line(startX, yPos + 7, startX + tableWidth, yPos + 7);
-
-        pdf.setFontSize(8);
-        pdf.setFont("helvetica", "bold");
-        pdf.setTextColor(71, 85, 105);
-        let xPos = startX + 2;
-        pdf.text("Task", xPos, yPos + 5);
-        xPos += colWidths.task;
-        pdf.text("Status", xPos, yPos + 5);
-        xPos += colWidths.status;
-        pdf.text("Priority", xPos, yPos + 5);
-        xPos += colWidths.priority;
-        pdf.text("Assignee", xPos, yPos + 5);
-        xPos += colWidths.assignee;
-        pdf.text("Due Date", xPos, yPos + 5);
-        xPos += colWidths.dueDate;
-        pdf.text("Job", xPos, yPos + 5);
-        yPos += 8;
-
+        let rowIndex = 0;
         const drawTask = (task: Task, indent: number = 0) => {
-          checkNewPage(8);
+          const rowHeight = 7;
+          checkPageBreak(rowHeight);
 
-          pdf.setDrawColor(241, 245, 249);
-          pdf.line(startX, yPos + 6, startX + tableWidth, yPos + 6);
-
-          let xPos = startX + 2 + indent;
-          pdf.setFont("helvetica", "normal");
-          pdf.setTextColor(30, 41, 59);
-          pdf.setFontSize(8);
-
-          const taskTitle = task.title.length > 40 - indent / 2 
-            ? task.title.substring(0, 37 - indent / 2) + "..." 
-            : task.title;
-          pdf.text(indent > 0 ? `└ ${taskTitle}` : taskTitle, xPos, yPos + 4);
-
-          xPos = startX + 2 + colWidths.task;
-          const statusColor = getStatusColor(task.status);
-          pdf.setFillColor(statusColor[0], statusColor[1], statusColor[2]);
-          pdf.roundedRect(xPos, yPos + 0.5, 20, 5, 1, 1, "F");
-          pdf.setTextColor(255, 255, 255);
-          pdf.setFontSize(6);
-          pdf.text(formatStatus(task.status), xPos + 1, yPos + 4);
-
-          xPos += colWidths.status;
-          if (task.priority) {
-            const priorityColor: Record<string, [number, number, number]> = {
-              LOW: [100, 116, 139], MEDIUM: [234, 179, 8], HIGH: [249, 115, 22], CRITICAL: [239, 68, 68],
-            };
-            const pColor = priorityColor[task.priority] || [100, 116, 139];
-            pdf.setFillColor(pColor[0], pColor[1], pColor[2]);
-            pdf.roundedRect(xPos, yPos + 0.5, 16, 5, 1, 1, "F");
-            pdf.setTextColor(255, 255, 255);
-            pdf.setFontSize(6);
-            pdf.text(task.priority, xPos + 1, yPos + 4);
-          } else {
-            pdf.setTextColor(71, 85, 105);
-            pdf.setFontSize(8);
-            pdf.text("-", xPos, yPos + 4);
+          if (rowIndex % 2 === 0) {
+            pdf.setFillColor(249, 250, 251);
+            pdf.rect(margin, currentY, contentWidth, rowHeight, "F");
           }
 
-          xPos += colWidths.priority;
-          pdf.setTextColor(71, 85, 105);
+          let rx = margin;
+
+          pdf.setFont("helvetica", "normal");
+          pdf.setTextColor(31, 41, 55);
           pdf.setFontSize(8);
+          const maxTitleLen = Math.floor((colWidths[0] - 6 - indent) / 1.8);
+          const title = task.title.length > maxTitleLen
+            ? task.title.substring(0, maxTitleLen - 2) + "..."
+            : task.title;
+          if (indent > 0) {
+            pdf.setTextColor(107, 114, 128);
+            pdf.text("  " + title, rx + 3 + indent, currentY + 5);
+          } else {
+            pdf.text(title, rx + 3, currentY + 5);
+          }
+          rx += colWidths[0];
+
+          pdf.setTextColor(31, 41, 55);
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(formatStatus(task.status), rx + 3, currentY + 5);
+          rx += colWidths[1];
+
+          pdf.text(formatPriority(task.priority), rx + 3, currentY + 5);
+          rx += colWidths[2];
+
+          pdf.setTextColor(107, 114, 128);
           const assignees = task.assignees?.map(a => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";
-          const assigneeText = assignees.length > 18 ? assignees.substring(0, 15) + "..." : assignees;
-          pdf.text(assigneeText, xPos, yPos + 4);
+          const maxAssLen = Math.floor((colWidths[3] - 6) / 1.8);
+          const assigneeText = assignees.length > maxAssLen ? assignees.substring(0, maxAssLen - 2) + "..." : assignees;
+          pdf.text(assigneeText, rx + 3, currentY + 5);
+          rx += colWidths[3];
 
-          xPos += colWidths.assignee;
-          pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yy") : "-", xPos, yPos + 4);
+          pdf.setTextColor(31, 41, 55);
+          pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "-", rx + 3, currentY + 5);
+          rx += colWidths[4];
 
-          xPos += colWidths.dueDate;
-          const jobText = task.job ? `${(task.job as any).jobNumber}` : "-";
-          pdf.text(jobText.length > 12 ? jobText.substring(0, 9) + "..." : jobText, xPos, yPos + 4);
+          const jobText = task.job ? `${(task.job as any).jobNumber || (task.job as any).name || ""}` : "-";
+          const maxJobLen = Math.floor((colWidths[5] - 6) / 1.8);
+          pdf.text(jobText.length > maxJobLen ? jobText.substring(0, maxJobLen - 2) + "..." : jobText, rx + 3, currentY + 5);
 
-          yPos += 7;
+          pdf.setDrawColor(229, 231, 235);
+          pdf.line(margin, currentY + rowHeight, margin + contentWidth, currentY + rowHeight);
+
+          currentY += rowHeight;
+          rowIndex++;
 
           if (task.subtasks && task.subtasks.length > 0) {
             for (const subtask of task.subtasks) {
@@ -2625,10 +2603,18 @@ export default function TasksPage() {
           drawTask(task);
         }
 
-        yPos += 6;
+        currentY += 8;
       }
 
-      addFooter();
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setTextColor(156, 163, 175);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`${companyName} - Confidential`, margin, pageHeight - 8);
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+      }
 
       pdf.save(`LTE-Tasks-${format(new Date(), "yyyy-MM-dd")}.pdf`);
       toast({ title: "PDF exported successfully" });
