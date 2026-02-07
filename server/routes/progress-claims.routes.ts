@@ -127,7 +127,7 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
         updatedAt: progressClaims.updatedAt,
         jobName: jobs.name,
         jobNumber: jobs.jobNumber,
-        createdByName: users.fullName,
+        createdByName: users.name,
       })
       .from(progressClaims)
       .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
