@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { format } from "date-fns";
+import { format, isBefore, startOfDay } from "date-fns";
 import { 
   CheckCircle2, 
   Clock, 
@@ -283,7 +283,7 @@ export default function MobileTasksPage() {
                                   </Badge>
                                 )}
                                 {task.dueDate && (
-                                  <span className="text-xs text-white/50 flex items-center gap-1">
+                                  <span className={`text-xs flex items-center gap-1 ${isBefore(new Date(task.dueDate), startOfDay(new Date())) && task.status !== "DONE" ? "text-red-500" : "text-white/50"}`}>
                                     <Calendar className="h-3 w-3" />
                                     {format(new Date(task.dueDate), "dd MMM")}
                                   </span>

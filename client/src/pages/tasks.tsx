@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { format, isBefore, startOfDay } from "date-fns";
 import { TASKS_ROUTES, USER_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -317,7 +317,7 @@ function TaskRow({
   const [newSubtaskAssignees, setNewSubtaskAssignees] = useState<string[]>([]);
   const [newSubtaskJobId, setNewSubtaskJobId] = useState<string | null>(null);
   const [newSubtaskStatus, setNewSubtaskStatus] = useState<TaskStatus>("NOT_STARTED");
-  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<Date | null>(null);
+  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState<Date | null>(new Date());
   const [newSubtaskReminderDate, setNewSubtaskReminderDate] = useState<Date | null>(null);
   const [newSubtaskProjectStage, setNewSubtaskProjectStage] = useState<string | null>(null);
   const [showNewSubtaskAssigneePopover, setShowNewSubtaskAssigneePopover] = useState(false);
@@ -458,7 +458,7 @@ function TaskRow({
       setNewSubtaskAssignees([]);
       setNewSubtaskJobId(null);
       setNewSubtaskStatus("NOT_STARTED");
-      setNewSubtaskDueDate(null);
+      setNewSubtaskDueDate(new Date());
       setNewSubtaskReminderDate(null);
       setNewSubtaskProjectStage(null);
       setTimeout(() => subtaskInputRef.current?.focus(), 50);
@@ -789,10 +789,13 @@ function TaskRow({
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs justify-start"
+              className={cn(
+                "h-7 px-2 text-xs justify-start",
+                task.dueDate && isBefore(new Date(task.dueDate), startOfDay(new Date())) && task.status !== "DONE" && "text-red-500 hover:text-red-600"
+              )}
               data-testid={`btn-date-${task.id}`}
             >
-              <CalendarIcon className="h-3 w-3 mr-1" />
+              <CalendarIcon className={cn("h-3 w-3 mr-1", task.dueDate && isBefore(new Date(task.dueDate), startOfDay(new Date())) && task.status !== "DONE" && "text-red-500")} />
               {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yy") : "No date"}
             </Button>
           </PopoverTrigger>
@@ -2224,7 +2227,7 @@ function SendTasksEmailDialog({
                           </div>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span>Due: {t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "No date"}</span>
+                          <span className={cn(t.dueDate && isBefore(new Date(t.dueDate), startOfDay(new Date())) && t.status !== "DONE" && "text-red-500")}>Due: {t.dueDate ? format(new Date(t.dueDate), "dd/MM/yyyy") : "No date"}</span>
                           <span>
                             Assigned: {(t.assignees || []).map(a => a.user?.name || "?").join(", ") || "Unassigned"}
                           </span>
