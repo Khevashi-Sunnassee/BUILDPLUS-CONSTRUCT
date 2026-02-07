@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import crypto from "crypto";
+import OpenAI from "openai";
 import logger from "../lib/logger";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import { documentRegisterService } from "./document-register.service";
@@ -11,6 +12,11 @@ import { storage } from "../storage";
 
 const execFileAsync = promisify(execFile);
 const objectStorageService = new ObjectStorageService();
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const PYTHON_SCRIPT = path.join(process.cwd(), "server", "visual-diff.py");
 const SUPPORTED_MIME_TYPES = [
@@ -42,6 +48,7 @@ export interface VisualDiffResult {
   pagesDoc1?: number;
   pagesDoc2?: number;
   comparedPage?: number;
+  aiSummary?: string;
   error?: string;
 }
 
@@ -65,6 +72,79 @@ function getMimeExtension(mimeType: string): string {
     "image/bmp": ".bmp",
   };
   return map[mimeType] || ".bin";
+}
+
+async function generateAiComparisonSummary(
+  overlayImagePath: string,
+  doc1Name: string,
+  doc2Name: string,
+  changePercentage: number,
+  changedPixels: number,
+  totalPixels: number,
+): Promise<string> {
+  try {
+    if (!process.env.AI_INTEGRATIONS_OPENAI_API_KEY) {
+      logger.warn("OpenAI API key not configured, skipping AI comparison summary");
+      return "";
+    }
+
+    const imageBuffer = await fs.promises.readFile(overlayImagePath);
+    const maxSize = 4 * 1024 * 1024;
+    if (imageBuffer.length > maxSize) {
+      logger.info({ size: imageBuffer.length }, "Overlay image too large for AI analysis, using text-only summary");
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a document comparison analyst for construction/engineering design documents. Provide a concise, professional summary of design changes based on comparison statistics.",
+          },
+          {
+            role: "user",
+            content: `A visual overlay comparison was performed between two documents:\n- Document A: "${doc1Name}"\n- Document B: "${doc2Name}"\n\nResults: ${changePercentage}% of pixels changed (${changedPixels.toLocaleString()} of ${totalPixels.toLocaleString()} pixels).\n\nProvide a brief 2-3 sentence professional summary of the comparison results, noting the significance of the change level for construction/engineering document review.`,
+          },
+        ],
+        max_completion_tokens: 200,
+      });
+      return completion.choices[0]?.message?.content?.trim() || "";
+    }
+
+    const base64Image = imageBuffer.toString("base64");
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a document comparison analyst specializing in construction and engineering design documents (shop drawings, panel layouts, structural plans). Analyze the visual overlay comparison image and provide a concise, professional summary of what changed between the two versions. Red regions indicate removed content. Blue regions indicate added content. Focus on identifying the nature and location of changes (e.g., dimension changes, added/removed elements, layout shifts, text modifications).",
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `This is a visual overlay comparison between:\n- Document A (original): "${doc1Name}"\n- Document B (revised): "${doc2Name}"\n\nChange statistics: ${changePercentage}% of pixels changed (${changedPixels.toLocaleString()} of ${totalPixels.toLocaleString()} pixels).\n\nAnalyze the overlay image and provide a concise 2-4 sentence summary describing the key differences. Identify specific areas of change if visible (e.g., dimensions, annotations, structural elements, layout changes). Be factual and professional.`,
+            },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/png;base64,${base64Image}`,
+                detail: "low",
+              },
+            },
+          ],
+        },
+      ],
+      max_completion_tokens: 300,
+    });
+
+    const summary = completion.choices[0]?.message?.content?.trim() || "";
+    logger.info({ summaryLength: summary.length }, "AI comparison summary generated");
+    return summary;
+  } catch (error: any) {
+    logger.warn({ error: error.message }, "Failed to generate AI comparison summary, continuing without it");
+    return "";
+  }
 }
 
 async function cleanupFiles(...paths: string[]) {
@@ -232,10 +312,37 @@ export async function generateVisualDiff(options: VisualDiffOptions): Promise<Vi
       result.sideBySideDocumentId = sbsDoc.id;
     }
 
+    const overlayExists = pythonResult.output_files.overlay && fs.existsSync(outputPath);
+    if (overlayExists) {
+      const aiSummary = await generateAiComparisonSummary(
+        outputPath,
+        doc1.originalName,
+        doc2.originalName,
+        pythonResult.change_percentage,
+        pythonResult.changed_pixels,
+        pythonResult.total_pixels,
+      );
+
+      if (aiSummary && result.overlayDocumentId) {
+        result.aiSummary = aiSummary;
+        try {
+          const existingDoc = await storage.getDocument(result.overlayDocumentId);
+          if (existingDoc) {
+            await storage.updateDocument(result.overlayDocumentId, {
+              description: `${existingDoc.description}\n\nAI Analysis: ${aiSummary}`,
+            });
+          }
+        } catch (updateErr: any) {
+          logger.warn({ error: updateErr.message }, "Failed to update overlay document with AI summary");
+        }
+      }
+    }
+
     logger.info({
       overlayId: result.overlayDocumentId,
       sbsId: result.sideBySideDocumentId,
       changePercentage: result.changePercentage,
+      hasAiSummary: !!result.aiSummary,
     }, "Visual diff completed");
 
     return result;

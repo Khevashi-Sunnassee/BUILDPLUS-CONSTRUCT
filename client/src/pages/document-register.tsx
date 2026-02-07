@@ -31,6 +31,7 @@ import {
   Mail,
   Send,
   Paperclip,
+  Sparkles,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -2461,6 +2462,20 @@ export default function DocumentRegister() {
                           <span className="inline-block w-3 h-3 rounded-sm bg-blue-500/60 ml-2" /> Added content
                         </div>
                       </div>
+                    )}
+
+                    {overlayResult.aiSummary && (
+                      <Card className="bg-muted/50" data-testid="card-ai-summary">
+                        <CardContent className="p-3">
+                          <div className="flex items-start gap-2">
+                            <Sparkles className="h-4 w-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                            <div>
+                              <div className="text-xs font-medium text-muted-foreground mb-1">AI Comparison Summary</div>
+                              <p className="text-sm leading-relaxed" data-testid="text-ai-summary">{overlayResult.aiSummary}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     )}
 
                     {overlayResult.sideBySideDocumentId && (
