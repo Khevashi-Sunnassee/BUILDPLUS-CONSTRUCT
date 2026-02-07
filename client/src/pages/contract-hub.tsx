@@ -99,17 +99,27 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const [currentFont, setCurrentFont] = useState("Arial");
   const [currentFontSize, setCurrentFontSize] = useState("3");
+  const [editorReady, setEditorReady] = useState(false);
 
   const { data: termsData, isLoading } = useQuery<{ poTermsHtml: string; includePOTerms: boolean }>({
     queryKey: [SETTINGS_ROUTES.PO_TERMS],
     enabled: open,
+    staleTime: 0,
   });
 
   useEffect(() => {
-    if (open && editorRef.current && termsData) {
+    if (open) {
+      setEditorReady(false);
+      const timer = setTimeout(() => setEditorReady(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (open && editorReady && editorRef.current && termsData) {
       editorRef.current.innerHTML = termsData.poTermsHtml || "";
     }
-  }, [open, termsData]);
+  }, [open, editorReady, termsData]);
 
   const saveMutation = useMutation({
     mutationFn: async (html: string) => {
@@ -119,8 +129,8 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
       queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.PO_TERMS] });
       toast({ title: "PO Terms & Conditions saved" });
     },
-    onError: () => {
-      toast({ title: "Failed to save PO Terms", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ title: "Failed to save PO Terms", description: error.message, variant: "destructive" });
     },
   });
 
@@ -154,8 +164,8 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col overflow-hidden" style={{ minHeight: "500px" }}>
-          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/30">
+        <div className="flex flex-col" style={{ height: "calc(85vh - 80px)", maxHeight: "600px" }}>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/30 shrink-0">
             <Select value={currentFont} onValueChange={handleFontChange}>
               <SelectTrigger className="w-[150px]" data-testid="select-font-family">
                 <Type className="h-3.5 w-3.5 mr-1.5" />
@@ -235,7 +245,7 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
             </Button>
           </div>
 
-          <div className="flex-1 overflow-auto p-4" style={{ minHeight: 0 }}>
+          <div className="flex-1 overflow-hidden p-4" style={{ minHeight: 0 }}>
             {isLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-4 w-full" />
@@ -247,14 +257,14 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
                 ref={editorRef}
                 contentEditable
                 className="h-full p-4 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm leading-relaxed overflow-y-auto"
-                style={{ fontFamily: "Arial", minHeight: "200px" }}
+                style={{ fontFamily: "Arial" }}
                 data-testid="editor-po-terms"
                 suppressContentEditableWarning
               />
             )}
           </div>
 
-          <div className="flex items-center justify-between px-6 py-3 border-t bg-muted/30">
+          <div className="flex items-center justify-between px-6 py-3 border-t bg-muted/30 shrink-0">
             <p className="text-xs text-muted-foreground">
               These terms will be attached to printed Purchase Orders when enabled in Settings
             </p>
