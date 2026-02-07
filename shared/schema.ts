@@ -2439,6 +2439,8 @@ export type ChecklistField = {
   min?: number | null;
   max?: number | null;
   step?: number | null;
+  dependsOn?: string;
+  dependsOnValue?: string;
 };
 
 export type ChecklistFieldOption = {

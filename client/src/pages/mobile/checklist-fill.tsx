@@ -19,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
 import { normalizeSections } from "@/components/checklist/normalize-sections";
-import { calculateCompletionRate, getMissingRequiredFields } from "@/components/checklist/checklist-form";
+import { calculateCompletionRate, getMissingRequiredFields, isFieldVisible } from "@/components/checklist/checklist-form";
 import type { ChecklistInstance, ChecklistTemplate, ChecklistSection, ChecklistField, ChecklistFieldOption } from "@shared/schema";
 
 function compressImage(file: File, maxDimension = 1280, quality = 0.7): Promise<string> {
@@ -170,6 +170,8 @@ export default function MobileChecklistFillPage() {
     let total = 0;
     sections.forEach(section => {
       section.items?.forEach((field: ChecklistField) => {
+        const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+        if (!isFieldVisible(extField, responses)) return;
         if (field.required) {
           total++;
           const v = responses[field.id];
@@ -258,12 +260,16 @@ export default function MobileChecklistFillPage() {
         {sections.map((section, sectionIndex) => {
           const isCollapsed = collapsedSections.has(section.id);
           const sectionFields = section.items || [];
-          const sectionCompleted = sectionFields.filter(f => {
+          const visibleFields = sectionFields.filter(f => {
+            const ext = f as typeof f & { dependsOn?: string; dependsOnValue?: string };
+            return isFieldVisible(ext, responses);
+          });
+          const sectionCompleted = visibleFields.filter(f => {
             if (!f.required) return false;
             const v = responses[f.id];
             return v !== undefined && v !== null && v !== "" && !(Array.isArray(v) && v.length === 0);
           }).length;
-          const sectionRequired = sectionFields.filter(f => f.required).length;
+          const sectionRequired = visibleFields.filter(f => f.required).length;
 
           return (
             <div key={section.id} className="rounded-2xl border border-white/10 bg-white/5 overflow-hidden" data-testid={`mobile-section-${section.id}`}>
@@ -302,10 +308,7 @@ export default function MobileChecklistFillPage() {
                 <div className="px-4 pb-4 space-y-5">
                   {sectionFields.map((field, fieldIndex) => {
                     const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
-                    if (extField.dependsOn) {
-                      const depValue = responses[extField.dependsOn];
-                      if (depValue !== extField.dependsOnValue) return null;
-                    }
+                    if (!isFieldVisible(extField, responses)) return null;
                     return (
                     <div key={field.id} data-testid={`mobile-field-${field.id}`}>
                       {fieldIndex > 0 && <div className="border-t border-white/5 mb-5" />}

@@ -17,6 +17,15 @@ interface ChecklistFormProps {
   showProgress?: boolean;
 }
 
+export function isFieldVisible(
+  field: ChecklistField & { dependsOn?: string; dependsOnValue?: string },
+  responses: Record<string, unknown>
+): boolean {
+  if (!field.dependsOn) return true;
+  const depValue = responses[field.dependsOn];
+  return depValue === field.dependsOnValue;
+}
+
 export function ChecklistForm({
   template,
   responses,
@@ -40,6 +49,8 @@ export function ChecklistForm({
 
     sections.forEach((section) => {
       section.items?.forEach((field: ChecklistField) => {
+        const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+        if (!isFieldVisible(extField, responses)) return;
         if (field.required) {
           total++;
           const value = responses[field.id];
@@ -111,7 +122,10 @@ export function ChecklistForm({
           </CardHeader>
           <CardContent>
             <div className="space-y-6">
-              {section.items?.map((field: ChecklistField, fieldIndex: number) => (
+              {section.items?.map((field: ChecklistField, fieldIndex: number) => {
+                const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+                if (!isFieldVisible(extField, responses)) return null;
+                return (
                 <div key={field.id} data-testid={`checklist-field-${field.id}`}>
                   {fieldIndex > 0 && <Separator className="mb-6" />}
                   <div className="space-y-2">
@@ -142,7 +156,8 @@ export function ChecklistForm({
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
               {(!section.items || section.items.length === 0) && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                   No fields in this section
@@ -166,6 +181,8 @@ export function calculateCompletionRate(
 
   sections.forEach((section: ChecklistSection) => {
     section.items?.forEach((field: ChecklistField) => {
+      const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+      if (!isFieldVisible(extField, responses)) return;
       if (field.required) {
         total++;
         const value = responses[field.id];
@@ -193,6 +210,8 @@ export function getMissingRequiredFields(
 
   sections.forEach((section: ChecklistSection) => {
     section.items?.forEach((field: ChecklistField) => {
+      const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+      if (!isFieldVisible(extField, responses)) return;
       if (field.required) {
         const value = responses[field.id];
         const hasValue =

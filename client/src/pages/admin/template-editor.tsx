@@ -187,6 +187,8 @@ export default function TemplateEditorPage() {
 
   const [fieldOptionsDialogOpen, setFieldOptionsDialogOpen] = useState(false);
   const [editingFieldOptions, setEditingFieldOptions] = useState<ChecklistFieldOption[]>([]);
+  const [editingFieldDependsOn, setEditingFieldDependsOn] = useState<string>("");
+  const [editingFieldDependsOnValue, setEditingFieldDependsOnValue] = useState<string>("");
 
   const { data: template, isLoading } = useQuery<ChecklistTemplate>({
     queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(id!)],
@@ -265,6 +267,8 @@ export default function TemplateEditorPage() {
     if (field) {
       setEditingField(field);
       setEditingFieldOptions(field.options || []);
+      setEditingFieldDependsOn(field.dependsOn || "");
+      setEditingFieldDependsOnValue(field.dependsOnValue || "");
       fieldForm.reset({
         name: field.name,
         type: field.type,
@@ -280,6 +284,8 @@ export default function TemplateEditorPage() {
     } else {
       setEditingField(null);
       setEditingFieldOptions([]);
+      setEditingFieldDependsOn("");
+      setEditingFieldDependsOnValue("");
       fieldForm.reset({
         name: "",
         type: "text_field",
@@ -338,6 +344,8 @@ export default function TemplateEditorPage() {
       min: data.min,
       max: data.max,
       step: data.step,
+      dependsOn: editingFieldDependsOn || undefined,
+      dependsOnValue: editingFieldDependsOnValue || undefined,
     };
 
     setSections((prev) =>
@@ -678,6 +686,11 @@ export default function TemplateEditorPage() {
                                 {field.required && (
                                   <Badge variant="destructive" className="text-xs">
                                     Required
+                                  </Badge>
+                                )}
+                                {field.dependsOn && (
+                                  <Badge variant="outline" className="text-xs">
+                                    Conditional
                                   </Badge>
                                 )}
                               </div>
@@ -1037,6 +1050,74 @@ export default function TemplateEditorPage() {
                   />
                 </div>
               )}
+
+              <Separator />
+
+              <div className="space-y-3">
+                <FormLabel>Conditional Visibility (Depends On)</FormLabel>
+                <FormDescription className="text-xs">
+                  Show this field only when a parent field has a specific value
+                </FormDescription>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Parent Field</label>
+                    <Select value={editingFieldDependsOn || "__none__"} onValueChange={(v) => { setEditingFieldDependsOn(v === "__none__" ? "" : v); if (v === "__none__") setEditingFieldDependsOnValue(""); }}>
+                      <SelectTrigger data-testid="select-depends-on">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {sections.flatMap((s) =>
+                          (s.items || [])
+                            .filter((f) => f.id !== editingField?.id)
+                            .map((f) => (
+                              <SelectItem key={f.id} value={f.id}>
+                                {s.name} / {f.name}
+                              </SelectItem>
+                            ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Required Value</label>
+                    {(() => {
+                      const parentField = editingFieldDependsOn && editingFieldDependsOn !== "__none__"
+                        ? sections.flatMap(s => s.items || []).find(f => f.id === editingFieldDependsOn)
+                        : null;
+                      const parentOptions = parentField?.options?.length
+                        ? parentField.options
+                        : parentField?.type === "yes_no_na"
+                        ? [{ text: "Yes", value: "yes" }, { text: "No", value: "no" }, { text: "N/A", value: "na" }]
+                        : parentField?.type === "pass_fail_flag"
+                        ? [{ text: "Pass", value: "pass" }, { text: "Fail", value: "fail" }]
+                        : null;
+                      
+                      return parentOptions ? (
+                        <Select value={editingFieldDependsOnValue} onValueChange={setEditingFieldDependsOnValue}>
+                          <SelectTrigger data-testid="select-depends-on-value">
+                            <SelectValue placeholder="Select value" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {parentOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.text}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          placeholder="Value to match..."
+                          value={editingFieldDependsOnValue}
+                          onChange={(e) => setEditingFieldDependsOnValue(e.target.value)}
+                          data-testid="input-depends-on-value"
+                        />
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
 
               <Separator />
 
