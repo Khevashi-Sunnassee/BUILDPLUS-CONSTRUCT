@@ -61,7 +61,77 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
       .where(and(...conditions))
       .orderBy(desc(progressClaims.createdAt));
 
-    res.json(claims);
+    const uniqueJobIds = [...new Set(claims.map(c => c.jobId))];
+
+    const claimedToDateByJob: Record<string, number> = {};
+    const contractValueByJob: Record<string, number> = {};
+
+    if (uniqueJobIds.length > 0) {
+      const [approvedClaimTotals, allPT] = await Promise.all([
+        db
+          .select({
+            jobId: progressClaims.jobId,
+            totalApproved: sql<string>`COALESCE(SUM(CAST(${progressClaims.subtotal} AS DECIMAL)), 0)`,
+          })
+          .from(progressClaims)
+          .where(and(
+            eq(progressClaims.companyId, companyId),
+            eq(progressClaims.status, "APPROVED"),
+            inArray(progressClaims.jobId, uniqueJobIds),
+          ))
+          .groupBy(progressClaims.jobId),
+        db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId)),
+      ]);
+
+      for (const row of approvedClaimTotals) {
+        claimedToDateByJob[row.jobId] = parseFloat(row.totalApproved || "0");
+      }
+
+      const ptMap = new Map(allPT.map(pt => [pt.code, pt]));
+
+      await Promise.all(uniqueJobIds.map(async (jId) => {
+        const [panels, allJR] = await Promise.all([
+          db
+            .select({
+              panelType: panelRegister.panelType,
+              panelArea: panelRegister.panelArea,
+              panelVolume: panelRegister.panelVolume,
+            })
+            .from(panelRegister)
+            .where(and(eq(panelRegister.jobId, jId), eq(panelRegister.companyId, companyId))),
+          db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jId)),
+        ]);
+
+        const jrMap = new Map(allJR.map(jr => [jr.panelTypeId, jr]));
+        let totalValue = 0;
+        for (const panel of panels) {
+          const pt = ptMap.get(panel.panelType);
+          const ptId = pt?.id;
+          const jr = ptId ? jrMap.get(ptId) : null;
+          const sellRateM2 = parseFloat(jr?.sellRatePerM2 || pt?.sellRatePerM2 || "0");
+          const sellRateM3 = parseFloat(jr?.sellRatePerM3 || pt?.sellRatePerM3 || "0");
+          const area = parseFloat(panel.panelArea || "0");
+          const volume = parseFloat(panel.panelVolume || "0");
+          if (sellRateM2 > 0 && area > 0) totalValue += sellRateM2 * area;
+          else if (sellRateM3 > 0 && volume > 0) totalValue += sellRateM3 * volume;
+        }
+        contractValueByJob[jId] = totalValue;
+      }));
+    }
+
+    const enrichedClaims = claims.map(claim => {
+      const claimedToDate = claimedToDateByJob[claim.jobId] || 0;
+      const contractValue = contractValueByJob[claim.jobId] || 0;
+      const remaining = contractValue - claimedToDate;
+      return {
+        ...claim,
+        contractValue: contractValue.toFixed(2),
+        claimedToDate: claimedToDate.toFixed(2),
+        remainingValue: remaining.toFixed(2),
+      };
+    });
+
+    res.json(enrichedClaims);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching progress claims");
     res.status(500).json({ error: error.message || "Failed to fetch progress claims" });
@@ -246,6 +316,64 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
     res.json(panelsWithRevenue);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching claimable panels");
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const jobId = req.params.jobId;
+
+    const approvedTotals = await db
+      .select({
+        totalApproved: sql<string>`COALESCE(SUM(CAST(${progressClaims.subtotal} AS DECIMAL)), 0)`,
+      })
+      .from(progressClaims)
+      .where(and(
+        eq(progressClaims.companyId, companyId),
+        eq(progressClaims.jobId, jobId),
+        eq(progressClaims.status, "APPROVED"),
+      ));
+
+    const claimedToDate = parseFloat(approvedTotals[0]?.totalApproved || "0");
+
+    const panels = await db
+      .select({
+        panelType: panelRegister.panelType,
+        panelArea: panelRegister.panelArea,
+        panelVolume: panelRegister.panelVolume,
+      })
+      .from(panelRegister)
+      .where(and(eq(panelRegister.jobId, jobId), eq(panelRegister.companyId, companyId)));
+
+    const allPT = await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId));
+    const allJR = await db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jobId));
+    const ptMap = new Map(allPT.map(pt => [pt.code, pt]));
+    const jrMap = new Map(allJR.map(jr => [jr.panelTypeId, jr]));
+
+    let contractValue = 0;
+    for (const panel of panels) {
+      const pt = ptMap.get(panel.panelType);
+      const ptId = pt?.id;
+      const jr = ptId ? jrMap.get(ptId) : null;
+      const sellRateM2 = parseFloat(jr?.sellRatePerM2 || pt?.sellRatePerM2 || "0");
+      const sellRateM3 = parseFloat(jr?.sellRatePerM3 || pt?.sellRatePerM3 || "0");
+      const area = parseFloat(panel.panelArea || "0");
+      const volume = parseFloat(panel.panelVolume || "0");
+      if (sellRateM2 > 0 && area > 0) contractValue += sellRateM2 * area;
+      else if (sellRateM3 > 0 && volume > 0) contractValue += sellRateM3 * volume;
+    }
+
+    const remaining = contractValue - claimedToDate;
+
+    res.json({
+      contractValue: contractValue.toFixed(2),
+      claimedToDate: claimedToDate.toFixed(2),
+      remainingValue: remaining.toFixed(2),
+    });
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching job claim summary");
     res.status(500).json({ error: error.message });
   }
 });

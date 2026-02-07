@@ -26,6 +26,9 @@ import {
   Filter,
   Eye,
   EyeOff,
+  DollarSign,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -165,6 +168,11 @@ export default function ProgressClaimFormPage() {
 
   const { data: claimablePanels = [], isLoading: loadingPanels } = useQuery<ClaimablePanel[]>({
     queryKey: [PROGRESS_CLAIMS_ROUTES.CLAIMABLE_PANELS(jobId!)],
+    enabled: !!jobId,
+  });
+
+  const { data: jobSummary } = useQuery<{ contractValue: string; claimedToDate: string; remainingValue: string }>({
+    queryKey: [PROGRESS_CLAIMS_ROUTES.JOB_SUMMARY(jobId!)],
     enabled: !!jobId,
   });
 
@@ -463,6 +471,59 @@ export default function ProgressClaimFormPage() {
             <p className="text-sm text-muted-foreground">{existingClaim.rejectionReason}</p>
           </CardContent>
         </Card>
+      )}
+
+      {jobId && jobSummary && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card data-testid="card-this-claim">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">This Claim</p>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1" data-testid="text-this-claim-value">{formatCurrency(subtotal)}</p>
+              <p className="text-xs text-muted-foreground mt-1">{activeItems.length} panels</p>
+            </CardContent>
+          </Card>
+          <Card data-testid="card-contract-value">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Contract Value</p>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1" data-testid="text-contract-value">{formatCurrency(jobSummary.contractValue)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Total job value</p>
+            </CardContent>
+          </Card>
+          <Card data-testid="card-claimed-to-date">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Claimed to Date</p>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1" data-testid="text-claimed-to-date">{formatCurrency(jobSummary.claimedToDate)}</p>
+              {parseFloat(jobSummary.contractValue) > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {((parseFloat(jobSummary.claimedToDate) / parseFloat(jobSummary.contractValue)) * 100).toFixed(1)}% of contract
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card data-testid="card-remaining-value">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">Remaining</p>
+                <TrendingDown className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <p className="text-2xl font-bold mt-1" data-testid="text-remaining-value">{formatCurrency(jobSummary.remainingValue)}</p>
+              {parseFloat(jobSummary.contractValue) > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {((parseFloat(jobSummary.remainingValue) / parseFloat(jobSummary.contractValue)) * 100).toFixed(1)}% remaining
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

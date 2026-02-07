@@ -583,6 +583,7 @@ export const PROGRESS_CLAIMS_ROUTES = {
   APPROVE: (id: string | number) => `/api/progress-claims/${id}/approve`,
   REJECT: (id: string | number) => `/api/progress-claims/${id}/reject`,
   CLAIMABLE_PANELS: (jobId: string | number) => `/api/progress-claims/job/${jobId}/claimable-panels`,
+  JOB_SUMMARY: (jobId: string | number) => `/api/progress-claims/job/${jobId}/summary`,
 } as const;
 
 export const CONTRACT_ROUTES = {

@@ -35,6 +35,9 @@ interface ProgressClaimListItem {
   rejectionReason: string | null;
   submittedAt: string | null;
   createdAt: string;
+  contractValue: string;
+  claimedToDate: string;
+  remainingValue: string;
 }
 
 type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
@@ -93,13 +96,28 @@ export default function ProgressClaimsPage() {
   }, [claims, statusFilter, searchQuery]);
 
   const stats = useMemo(() => {
+    const approvedClaims = claims.filter((c) => c.status === "APPROVED");
+    const uniqueJobIds = [...new Set(claims.map(c => c.jobId))];
+    let totalContractValue = 0;
+    let totalClaimedToDate = 0;
+    const seenJobs = new Set<string>();
+    for (const claim of claims) {
+      if (!seenJobs.has(claim.jobId)) {
+        seenJobs.add(claim.jobId);
+        totalContractValue += parseFloat(claim.contractValue || "0");
+        totalClaimedToDate += parseFloat(claim.claimedToDate || "0");
+      }
+    }
     return {
       total: claims.length,
       draft: claims.filter((c) => c.status === "DRAFT").length,
       submitted: claims.filter((c) => c.status === "SUBMITTED").length,
-      approved: claims.filter((c) => c.status === "APPROVED").length,
+      approved: approvedClaims.length,
       rejected: claims.filter((c) => c.status === "REJECTED").length,
-      totalValue: claims.filter((c) => c.status === "APPROVED").reduce((sum, c) => sum + parseFloat(c.total || "0"), 0),
+      totalApprovedValue: approvedClaims.reduce((sum, c) => sum + parseFloat(c.subtotal || "0"), 0),
+      totalContractValue,
+      totalClaimedToDate,
+      totalRemaining: totalContractValue - totalClaimedToDate,
     };
   }, [claims]);
 
@@ -130,23 +148,14 @@ export default function ProgressClaimsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card data-testid="stat-total">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Claims</p>
             <p className="text-2xl font-bold">{stats.total}</p>
-          </CardContent>
-        </Card>
-        <Card data-testid="stat-draft">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Draft</p>
-            <p className="text-2xl font-bold">{stats.draft}</p>
-          </CardContent>
-        </Card>
-        <Card data-testid="stat-submitted">
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground">Pending Approval</p>
-            <p className="text-2xl font-bold">{stats.submitted}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {stats.draft} draft, {stats.submitted} pending
+            </p>
           </CardContent>
         </Card>
         <Card data-testid="stat-approved">
@@ -155,10 +164,28 @@ export default function ProgressClaimsPage() {
             <p className="text-2xl font-bold">{stats.approved}</p>
           </CardContent>
         </Card>
-        <Card data-testid="stat-total-value">
+        <Card data-testid="stat-contract-value">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Contract Value</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.totalContractValue)}</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-approved-value">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Approved Value</p>
-            <p className="text-2xl font-bold">{formatCurrency(stats.totalValue)}</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.totalApprovedValue)}</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-claimed-to-date">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Claimed to Date</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.totalClaimedToDate)}</p>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-remaining">
+          <CardContent className="p-4">
+            <p className="text-sm text-muted-foreground">Remaining</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats.totalRemaining)}</p>
           </CardContent>
         </Card>
       </div>
@@ -228,10 +255,10 @@ export default function ProgressClaimsPage() {
                   <TableRow>
                     <TableHead>Claim #</TableHead>
                     <TableHead>Job</TableHead>
-                    <TableHead>Created By</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="text-right">This Claim</TableHead>
+                    <TableHead className="text-right">Claimed to Date</TableHead>
+                    <TableHead className="text-right">Remaining</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -239,8 +266,12 @@ export default function ProgressClaimsPage() {
                 <TableBody>
                   {filteredClaims.map((claim) => (
                     <TableRow key={claim.id} data-testid={`row-claim-${claim.id}`}>
-                      <TableCell className="font-mono font-medium" data-testid={`text-claim-number-${claim.id}`}>
-                        {claim.claimNumber}
+                      <TableCell data-testid={`text-claim-number-${claim.id}`}>
+                        <span className="font-mono font-medium">{claim.claimNumber}</span>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {claim.claimType === "SUMMARY" ? "Summary" : "Detail"}
+                          {claim.createdByName && <span className="ml-1">by {claim.createdByName}</span>}
+                        </div>
                       </TableCell>
                       <TableCell data-testid={`text-claim-job-${claim.id}`}>
                         <div>
@@ -248,21 +279,19 @@ export default function ProgressClaimsPage() {
                           <span className="text-muted-foreground ml-1 text-sm">{claim.jobName}</span>
                         </div>
                       </TableCell>
-                      <TableCell data-testid={`text-claim-creator-${claim.id}`}>
-                        {claim.createdByName || "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {claim.claimType === "SUMMARY" ? "Summary" : "Detail"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-claim-total-${claim.id}`}>
-                        {formatCurrency(claim.total)}
-                      </TableCell>
                       <TableCell>
                         <Badge variant={statusBadgeVariant[claim.status] || "secondary"} data-testid={`badge-status-${claim.id}`}>
                           {claim.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-claim-total-${claim.id}`}>
+                        {formatCurrency(claim.subtotal)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-claimed-to-date-${claim.id}`}>
+                        {formatCurrency(claim.claimedToDate)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-remaining-${claim.id}`}>
+                        {formatCurrency(claim.remainingValue)}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {claim.claimDate ? format(new Date(claim.claimDate), "dd/MM/yyyy") : "—"}
