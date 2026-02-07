@@ -10,6 +10,8 @@ import {
   FolderOpen,
   ClipboardCheck,
   Radio,
+  ScanLine,
+  ListTodo,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -52,6 +54,28 @@ export default function MobileMore() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-3">
+        <Link href="/mobile/scan">
+          <button
+            className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 text-left active:scale-[0.99] mb-2"
+            data-testid="menu-qr-scanner"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
+              <ScanLine className="h-6 w-6 text-blue-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-base font-semibold text-white">QR Scanner</div>
+              <div className="text-xs text-white/50">Scan panels and document bundles</div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-blue-400/60" />
+          </button>
+        </Link>
+
+        <MenuItem
+          icon={<ListTodo className="h-5 w-5 text-blue-400" />}
+          iconBg="bg-blue-500/20"
+          label="Tasks"
+          href="/mobile/tasks"
+        />
         <MenuItem
           icon={<ClipboardList className="h-5 w-5 text-amber-400" />}
           iconBg="bg-amber-500/20"

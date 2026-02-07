@@ -77,6 +77,7 @@ import MobileDocumentsPage from "@/pages/mobile/documents";
 import MobileChecklistsPage from "@/pages/mobile/checklists";
 import MobileChecklistFillPage from "@/pages/mobile/checklist-fill";
 import MobileBroadcastPage from "@/pages/mobile/broadcast";
+import MobileQrScanner from "@/pages/mobile/qr-scanner";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -614,6 +615,11 @@ function Router() {
       <Route path="/mobile/checklists">
         <ProtectedRoute>
           <MobileChecklistsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/scan">
+        <ProtectedRoute>
+          <MobileQrScanner />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/broadcast">

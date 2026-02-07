@@ -517,4 +517,54 @@ router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGE
   }
 });
 
+const ALLOWED_MOBILE_TRANSITIONS: Record<number, { action: string }> = {
+  [PANEL_LIFECYCLE_STATUS.QA_PASSED]: { action: "QA passed (mobile)" },
+  [PANEL_LIFECYCLE_STATUS.RETURNED]: { action: "Panel returned (mobile)" },
+};
+
+router.post("/api/panels/:id/lifecycle", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const panelId = req.params.id as string;
+    const { targetStatus } = req.body;
+
+    if (typeof targetStatus !== "number" || !ALLOWED_MOBILE_TRANSITIONS[targetStatus]) {
+      return res.status(400).json({ error: "Invalid lifecycle transition" });
+    }
+
+    const panel = await storage.getPanelRegisterItem(panelId);
+    if (!panel) return res.status(404).json({ error: "Panel not found" });
+
+    const job = await storage.getJob(panel.jobId);
+    if (!job || job.companyId !== companyId) {
+      return res.status(404).json({ error: "Panel not found" });
+    }
+
+    const transition = ALLOWED_MOBILE_TRANSITIONS[targetStatus];
+
+    if (targetStatus === PANEL_LIFECYCLE_STATUS.QA_PASSED) {
+      if (panel.lifecycleStatus < PANEL_LIFECYCLE_STATUS.PRODUCED) {
+        return res.status(400).json({ error: "Panel must be produced before QA" });
+      }
+      if (panel.lifecycleStatus >= PANEL_LIFECYCLE_STATUS.QA_PASSED) {
+        return res.status(400).json({ error: "Panel has already passed QA" });
+      }
+    }
+
+    if (targetStatus === PANEL_LIFECYCLE_STATUS.RETURNED && panel.lifecycleStatus !== PANEL_LIFECYCLE_STATUS.SHIPPED) {
+      return res.status(400).json({ error: "Only shipped panels can be returned" });
+    }
+
+    await updatePanelLifecycleStatus(panelId, targetStatus, transition.action, req.session.userId);
+
+    const updated = await storage.getPanelRegisterItem(panelId);
+    res.json(updated);
+  } catch (error: any) {
+    logger.error({ err: error }, "Panel lifecycle update error");
+    res.status(500).json({ error: "Failed to update panel lifecycle" });
+  }
+});
+
 export const panelsRouter = router;

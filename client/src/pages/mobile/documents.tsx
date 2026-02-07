@@ -87,10 +87,31 @@ export default function MobileDocumentsPage() {
     return params.get("panelId");
   }, [searchString]);
 
-  const { data: docsResult, isLoading } = useQuery<{ documents: Document[]; total: number }>({
-    queryKey: [DOCUMENT_ROUTES.LIST, { search: searchQuery, typeId: selectedTypeId, jobId: selectedJobId, panelId: queryPanelId, showLatestOnly: "true", limit: "50" }],
+  const queryBundleId = useMemo(() => {
+    const params = new URLSearchParams(searchString);
+    return params.get("bundleId");
+  }, [searchString]);
+
+  const { data: bundleData, isLoading: isBundleLoading } = useQuery<any>({
+    queryKey: [DOCUMENT_ROUTES.BUNDLES, queryBundleId],
     queryFn: async () => {
-      const params = new URLSearchParams({ showLatestOnly: "true", limit: "50" });
+      const res = await fetch(`${DOCUMENT_ROUTES.BUNDLE_BY_ID(queryBundleId!)}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch bundle");
+      return res.json();
+    },
+    enabled: !!queryBundleId,
+  });
+
+  const bundleDocIds = useMemo(() => {
+    if (!queryBundleId || !bundleData?.items) return null;
+    return new Set(bundleData.items.map((item: any) => item.documentId));
+  }, [queryBundleId, bundleData]);
+
+  const docsLimit = queryBundleId ? "200" : "50";
+  const { data: docsResult, isLoading } = useQuery<{ documents: Document[]; total: number }>({
+    queryKey: [DOCUMENT_ROUTES.LIST, { search: searchQuery, typeId: selectedTypeId, jobId: selectedJobId, panelId: queryPanelId, bundleId: queryBundleId, showLatestOnly: "true", limit: docsLimit }],
+    queryFn: async () => {
+      const params = new URLSearchParams({ showLatestOnly: "true", limit: docsLimit });
       if (searchQuery) params.set("search", searchQuery);
       if (selectedTypeId) params.set("typeId", selectedTypeId);
       if (selectedJobId) params.set("jobId", selectedJobId);
@@ -99,6 +120,7 @@ export default function MobileDocumentsPage() {
       if (!res.ok) throw new Error("Failed to fetch documents");
       return res.json();
     },
+    enabled: !queryBundleId || !!bundleData,
   });
 
   const { data: docTypes = [] } = useQuery<DocumentType[]>({
@@ -109,7 +131,10 @@ export default function MobileDocumentsPage() {
     queryKey: [JOBS_ROUTES.LIST],
   });
 
-  const documents = docsResult?.documents || [];
+  const allDocuments = docsResult?.documents || [];
+  const documents = bundleDocIds
+    ? allDocuments.filter(d => bundleDocIds.has(d.id))
+    : allDocuments;
 
   const handleView = (doc: Document) => {
     setSelectedDoc(doc);
@@ -215,16 +240,23 @@ export default function MobileDocumentsPage() {
         <div className="px-4 py-4">
           <div className="flex items-center gap-3 mb-3">
             <button
-              onClick={() => setLocation(queryPanelId ? `/mobile/panels/${queryPanelId}` : "/mobile/more")}
+              onClick={() => {
+                if (queryPanelId) setLocation(`/mobile/panels/${queryPanelId}`);
+                else if (queryBundleId) setLocation("/mobile/scan");
+                else setLocation("/mobile/more");
+              }}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 active:scale-[0.99]"
               data-testid="button-back-to-more"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <div>
-              <div className="text-2xl font-bold">{queryPanelId ? "Panel Documents" : "Documents"}</div>
+              <div className="text-2xl font-bold">{queryPanelId ? "Panel Documents" : queryBundleId ? "Bundle Documents" : "Documents"}</div>
               {queryPanelId && (
                 <p className="text-xs text-white/50">Showing drawings for this panel</p>
+              )}
+              {queryBundleId && bundleData && (
+                <p className="text-xs text-white/50">{bundleData.bundleName}</p>
               )}
             </div>
           </div>

@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { Link, useLocation } from "wouter";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Link, useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { LOGISTICS_ROUTES, PANELS_ROUTES, ADMIN_ROUTES, FACTORIES_ROUTES } from "@shared/api-routes";
 import { cn } from "@/lib/utils";
@@ -43,6 +43,7 @@ interface ScannedPanel {
 export default function MobileCreateLoadListPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const [scannedPanels, setScannedPanels] = useState<ScannedPanel[]>([]);
   const [scanning, setScanning] = useState(false);
   const [scannerError, setScannerError] = useState<string | null>(null);
@@ -54,6 +55,39 @@ export default function MobileCreateLoadListPage() {
   const [notes, setNotes] = useState("");
   const scannerRef = useRef<any>(null);
   const scannerContainerId = "qr-reader";
+  const preloadedRef = useRef(false);
+
+  const queryPanelId = useMemo(() => {
+    const params = new URLSearchParams(searchString);
+    return params.get("panelId");
+  }, [searchString]);
+
+  useEffect(() => {
+    if (queryPanelId && !preloadedRef.current) {
+      preloadedRef.current = true;
+      fetch(PANELS_ROUTES.DETAILS(queryPanelId), { credentials: "include" })
+        .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+        .then(panelData => {
+          const newPanel: ScannedPanel = {
+            id: panelData.id,
+            panelMark: panelData.panelMark || "Unknown",
+            panelType: panelData.panelType || null,
+            panelMass: panelData.panelMass || null,
+            jobId: panelData.jobId,
+            jobNumber: panelData.job?.jobNumber,
+            jobName: panelData.job?.name,
+          };
+          setScannedPanels(prev => {
+            if (prev.some(p => p.id === panelData.id)) return prev;
+            return [...prev, newPanel];
+          });
+          if (!selectedJobId && panelData.jobId) {
+            setSelectedJobId(panelData.jobId);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [queryPanelId]);
 
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [ADMIN_ROUTES.JOBS],

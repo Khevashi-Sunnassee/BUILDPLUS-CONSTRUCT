@@ -161,6 +161,7 @@ export const PANELS_ROUTES = {
   READY_FOR_LOADING: '/api/panels/ready-for-loading',
   DOCUMENT_STATUS: (id: string | number) => `/api/panels/${id}/document-status`,
   AUDIT_LOGS: (id: string | number) => `/api/panels/${id}/audit-logs`,
+  LIFECYCLE: (id: string | number) => `/api/panels/${id}/lifecycle`,
 } as const;
 
 export const PANEL_TYPES_ROUTES = {

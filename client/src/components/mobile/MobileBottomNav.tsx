@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Briefcase, MessageSquare, ListTodo, MoreHorizontal } from "lucide-react";
+import { Home, Briefcase, MessageSquare, ListTodo, MoreHorizontal, ScanLine } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { CHAT_ROUTES } from "@shared/api-routes";
 
@@ -55,6 +55,8 @@ export default function MobileBottomNav() {
     return location.startsWith(path);
   };
 
+  const scanActive = isActive("/mobile/scan");
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0D1117]">
       <div className="grid h-16 grid-cols-5 items-center" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
@@ -70,6 +72,17 @@ export default function MobileBottomNav() {
           href="/mobile/jobs" 
           icon={<Briefcase className="h-5 w-5" />} 
         />
+        <Link href="/mobile/scan">
+          <div
+            className="flex flex-col items-center justify-center py-1"
+            data-testid="tab-scan"
+          >
+            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${scanActive ? "bg-blue-500" : "bg-blue-500/20"}`}>
+              <ScanLine className={`h-5 w-5 ${scanActive ? "text-white" : "text-blue-400"}`} />
+            </div>
+            <span className={`mt-0.5 text-[10px] font-medium ${scanActive ? "text-blue-400" : "text-white/60"}`}>Scan</span>
+          </div>
+        </Link>
         <TabButton 
           label="Chat" 
           active={isActive("/mobile/chat")} 
@@ -78,14 +91,8 @@ export default function MobileBottomNav() {
           badge={unreadCount}
         />
         <TabButton 
-          label="Tasks" 
-          active={isActive("/mobile/tasks")} 
-          href="/mobile/tasks" 
-          icon={<ListTodo className="h-5 w-5" />} 
-        />
-        <TabButton 
           label="More" 
-          active={isActive("/mobile/more") || isActive("/mobile/profile") || isActive("/mobile/panels") || isActive("/mobile/logistics") || isActive("/mobile/purchase-orders") || isActive("/mobile/weekly-report") || isActive("/mobile/documents") || isActive("/mobile/checklists")} 
+          active={isActive("/mobile/more") || isActive("/mobile/profile") || isActive("/mobile/panels") || isActive("/mobile/logistics") || isActive("/mobile/purchase-orders") || isActive("/mobile/weekly-report") || isActive("/mobile/documents") || isActive("/mobile/checklists") || isActive("/mobile/tasks")} 
           href="/mobile/more" 
           icon={<MoreHorizontal className="h-5 w-5" />} 
         />
