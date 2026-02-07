@@ -9,6 +9,8 @@ export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPR
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
 export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"]);
 export const opportunityStatusEnum = pgEnum("opportunity_status", ["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]);
+export const salesStageEnum = pgEnum("sales_stage", ["OPPORTUNITY", "PRE_QUALIFICATION", "ESTIMATING", "SUBMITTED", "AWARDED", "LOST"]);
+export const opportunityTypeEnum = pgEnum("opportunity_type", ["BUILDER_SELECTED", "OPEN_TENDER", "NEGOTIATED_CONTRACT", "GENERAL_PRICING"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING"]);
 export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
@@ -296,6 +298,10 @@ export const jobs = pgTable("jobs", {
   estimatedValue: decimal("estimated_value", { precision: 12, scale: 2 }),
   numberOfLevels: integer("number_of_levels"),
   opportunityStatus: opportunityStatusEnum("opportunity_status"),
+  salesStage: salesStageEnum("sales_stage"),
+  salesStatus: text("sales_status"),
+  opportunityType: opportunityTypeEnum("opportunity_type"),
+  primaryContact: text("primary_contact"),
   probability: integer("probability"),
   estimatedStartDate: timestamp("estimated_start_date"),
   comments: text("comments"),
@@ -1049,6 +1055,28 @@ export const insertJobSchema = createInsertSchema(jobs).omit({
   createdAt: true,
   updatedAt: true,
 });
+
+export const salesStatusHistory = pgTable("sales_status_history", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  salesStage: text("sales_stage").notNull(),
+  salesStatus: text("sales_status").notNull(),
+  note: text("note"),
+  changedByUserId: varchar("changed_by_user_id", { length: 36 }).references(() => users.id),
+  changedByName: text("changed_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("sales_status_history_job_idx").on(table.jobId),
+  companyIdx: index("sales_status_history_company_idx").on(table.companyId),
+}));
+
+export const insertSalesStatusHistorySchema = createInsertSchema(salesStatusHistory).omit({
+  id: true,
+  createdAt: true,
+});
+export type InsertSalesStatusHistory = z.infer<typeof insertSalesStatusHistorySchema>;
+export type SalesStatusHistory = typeof salesStatusHistory.$inferSelect;
 
 export const insertWorkTypeSchema = createInsertSchema(workTypes).omit({
   createdAt: true,

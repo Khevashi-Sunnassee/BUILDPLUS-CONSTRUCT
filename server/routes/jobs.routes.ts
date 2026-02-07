@@ -2,9 +2,10 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories, customers, contracts } from "@shared/schema";
+import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
 
 const router = Router();
 
@@ -33,6 +34,10 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       numberOfBuildings: jobs.numberOfBuildings,
       numberOfLevels: jobs.numberOfLevels,
       opportunityStatus: jobs.opportunityStatus,
+      salesStage: jobs.salesStage,
+      salesStatus: jobs.salesStatus,
+      opportunityType: jobs.opportunityType,
+      primaryContact: jobs.primaryContact,
       probability: jobs.probability,
       estimatedStartDate: jobs.estimatedStartDate,
       comments: jobs.comments,
@@ -85,6 +90,10 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       numberOfBuildings: z.number().int().min(0).optional().nullable(),
       numberOfLevels: z.number().int().min(0).optional().nullable(),
       opportunityStatus: z.enum(["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]).optional().default("NEW"),
+      salesStage: z.enum(["OPPORTUNITY", "PRE_QUALIFICATION", "ESTIMATING", "SUBMITTED", "AWARDED", "LOST"] as const).optional().default("OPPORTUNITY"),
+      salesStatus: z.string().optional().nullable(),
+      opportunityType: z.enum(["BUILDER_SELECTED", "OPEN_TENDER", "NEGOTIATED_CONTRACT", "GENERAL_PRICING"] as const).optional().nullable(),
+      primaryContact: z.string().max(255).optional().nullable(),
       probability: z.number().int().min(0).max(100).optional().nullable(),
       estimatedStartDate: z.string().optional().nullable(),
       comments: z.string().optional().nullable(),
@@ -118,6 +127,13 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       }
     }
 
+    const stage = parsed.data.salesStage || "OPPORTUNITY";
+    const status = parsed.data.salesStatus || getDefaultStatus(stage as any);
+
+    if (status && !isValidStatusForStage(stage as any, status)) {
+      return res.status(400).json({ error: `Status "${status}" is not valid for stage "${stage}"` });
+    }
+
     const data: any = {
       companyId: req.companyId,
       jobNumber: nextNum,
@@ -133,12 +149,31 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       numberOfBuildings: parsed.data.numberOfBuildings || null,
       numberOfLevels: parsed.data.numberOfLevels || null,
       opportunityStatus: parsed.data.opportunityStatus,
+      salesStage: stage,
+      salesStatus: status,
+      opportunityType: parsed.data.opportunityType || null,
+      primaryContact: parsed.data.primaryContact || null,
       probability: parsed.data.probability ?? null,
       estimatedStartDate: parsed.data.estimatedStartDate ? new Date(parsed.data.estimatedStartDate) : null,
       comments: parsed.data.comments || null,
     };
 
     const job = await storage.createJob(data);
+
+    try {
+      await db.insert(salesStatusHistory).values({
+        jobId: job.id,
+        companyId: req.companyId,
+        salesStage: stage,
+        salesStatus: status,
+        note: "Opportunity created",
+        changedByUserId: req.session.userId || null,
+        changedByName: req.session.name || null,
+      });
+    } catch (e) {
+      logger.warn({ err: e }, "Failed to log sales status history on create");
+    }
+
     res.json(job);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating opportunity");
@@ -167,9 +202,14 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       numberOfBuildings: z.number().int().min(0).optional().nullable(),
       numberOfLevels: z.number().int().min(0).optional().nullable(),
       opportunityStatus: z.enum(["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]).optional(),
+      salesStage: z.enum(["OPPORTUNITY", "PRE_QUALIFICATION", "ESTIMATING", "SUBMITTED", "AWARDED", "LOST"] as const).optional(),
+      salesStatus: z.string().optional().nullable(),
+      opportunityType: z.enum(["BUILDER_SELECTED", "OPEN_TENDER", "NEGOTIATED_CONTRACT", "GENERAL_PRICING"] as const).optional().nullable(),
+      primaryContact: z.string().max(255).optional().nullable(),
       probability: z.number().int().min(0).max(100).optional().nullable(),
       estimatedStartDate: z.string().optional().nullable(),
       comments: z.string().optional().nullable(),
+      statusNote: z.string().max(500).optional(),
     });
 
     const parsed = updateSchema.safeParse(req.body);
@@ -184,16 +224,66 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       }
     }
 
-    const updateData: any = { ...parsed.data };
+    const { statusNote, ...rest } = parsed.data;
+    const updateData: any = { ...rest };
     if (updateData.estimatedStartDate) {
       updateData.estimatedStartDate = new Date(updateData.estimatedStartDate);
     }
 
+    if (updateData.salesStage && !updateData.salesStatus) {
+      updateData.salesStatus = getDefaultStatus(updateData.salesStage as any);
+    }
+
+    const effectiveStage = updateData.salesStage || job.salesStage || "OPPORTUNITY";
+    const effectiveStatus = updateData.salesStatus || job.salesStatus;
+    if (effectiveStatus && !isValidStatusForStage(effectiveStage as any, effectiveStatus)) {
+      return res.status(400).json({ error: `Status "${effectiveStatus}" is not valid for stage "${effectiveStage}"` });
+    }
+
     const updated = await storage.updateJob(req.params.id, updateData);
+
+    if (parsed.data.salesStage || parsed.data.salesStatus) {
+      const newStage = updated.salesStage || job.salesStage || "OPPORTUNITY";
+      const newStatus = updated.salesStatus || job.salesStatus || "";
+      try {
+        await db.insert(salesStatusHistory).values({
+          jobId: job.id,
+          companyId: req.companyId!,
+          salesStage: newStage,
+          salesStatus: newStatus,
+          note: statusNote || null,
+          changedByUserId: req.session.userId || null,
+          changedByName: req.session.name || null,
+        });
+      } catch (e) {
+        logger.warn({ err: e }, "Failed to log sales status history on update");
+      }
+    }
+
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating opportunity");
     res.status(400).json({ error: error.message || "Failed to update opportunity" });
+  }
+});
+
+// GET /api/jobs/opportunities/:id/history - Get sales status history for an opportunity
+router.get("/api/jobs/opportunities/:id/history", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.id);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Opportunity not found" });
+    }
+
+    const history = await db.select()
+      .from(salesStatusHistory)
+      .where(eq(salesStatusHistory.jobId, req.params.id))
+      .orderBy(desc(salesStatusHistory.createdAt));
+
+    res.json(history);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching sales status history");
+    res.status(500).json({ error: "Failed to fetch history" });
   }
 });
 

@@ -150,6 +150,7 @@ export const JOBS_ROUTES = {
   TOTALS: (id: string | number) => `/api/jobs/${id}/totals`,
   OPPORTUNITIES: '/api/jobs/opportunities',
   OPPORTUNITY_BY_ID: (id: string | number) => `/api/jobs/opportunities/${id}`,
+  OPPORTUNITY_HISTORY: (id: string | number) => `/api/jobs/opportunities/${id}/history`,
 } as const;
 
 export const PANELS_ROUTES = {

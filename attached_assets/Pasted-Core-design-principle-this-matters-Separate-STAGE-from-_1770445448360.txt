@@ -1,0 +1,333 @@
+Core design principle (this matters)
+🔑 Separate STAGE from STATUS
+
+Stage = where the job is in the pipeline (big buckets)
+
+Status = what is currently happening / what’s blocking it (actionable)
+
+Field staff mostly touch status.
+Sales/admin own stage transitions.
+
+This keeps it simple without losing control.
+
+1️⃣ High-level sales stages (do NOT overdo this)
+
+Keep stages few and stable.
+I’d strongly recommend 6 stages max.
+
+Recommended stages
+
+Opportunity
+
+Pre-Qualification
+
+Estimating / Tender
+
+Submitted
+
+Awarded
+
+Lost
+
+These should almost never change once agreed.
+
+2️⃣ Statuses inside each stage (this is where clarity lives)
+
+Statuses are contextual to a stage and answer:
+
+“What’s happening right now?”
+“What is the next action?”
+
+Stage 1 — OPPORTUNITY (field-driven)
+
+Purpose: fast capture, minimal friction
+
+Statuses:
+
+New opportunity logged
+
+Client contacted
+
+Awaiting drawings
+
+Awaiting scope info
+
+Site visit required
+
+Site visit completed
+
+Not suitable (scope mismatch)
+
+Duplicate / already quoted
+
+👉 Field guys should be able to:
+
+create opportunity
+
+change status in one tap
+
+add a short note or photo
+
+Stage 2 — PRE-QUALIFICATION (office-led, but visible)
+
+Purpose: decide if it’s worth estimating
+
+Statuses:
+
+Reviewing client
+
+Reviewing scope fit
+
+Capacity check
+
+Pricing strategy review
+
+Approved for estimating
+
+Declined – capacity
+
+Declined – risk profile
+
+Declined – not our market
+
+Rule of thumb:
+
+Only 1–2 people can move it out of this stage
+
+Field guys can still see what’s happening
+
+Stage 3 — ESTIMATING / TENDER
+
+Purpose: real work happens here
+
+Statuses:
+
+Drawings received
+
+Reviewing drawings
+
+RFIs issued
+
+Awaiting RFI response
+
+Estimating in progress
+
+Internal review
+
+Tender pricing approved
+
+Tender being prepared
+
+Ready to submit
+
+Optional (but useful):
+
+“Estimator assigned” (user field)
+
+“Target submission date”
+
+Stage 4 — SUBMITTED
+
+Purpose: waiting, chasing, clarifying
+
+Statuses:
+
+Tender submitted
+
+Awaiting feedback
+
+Clarification requested
+
+Clarification provided
+
+Value engineering requested
+
+Pricing revision submitted
+
+Shortlisted
+
+This stage should feel calm and transparent.
+
+Stage 5 — AWARDED
+
+Purpose: convert to contract cleanly
+
+Statuses:
+
+Letter of intent received
+
+Contract under review
+
+Contract negotiations
+
+Contract executed
+
+Handed over to delivery
+
+🚨 This is where your sales → contract → onboarding system plugs in.
+
+Stage 6 — LOST (close it properly)
+
+Purpose: learn, don’t just bin it
+
+Statuses:
+
+Lost – price
+
+Lost – scope
+
+Lost – timing
+
+Lost – client decision
+
+Lost – competitor
+
+Lost – no feedback
+
+Make lost reason mandatory before closing.
+
+This data becomes gold later.
+
+3️⃣ “What’s next?” without complexity
+
+Every status should optionally define:
+
+Next action
+
+Owner
+
+Suggested due date
+
+Example:
+
+Status: Awaiting drawings
+
+Next action: “Follow up client”
+
+Owner: Field rep
+
+Due: +3 days
+
+But keep this optional, not forced.
+
+4️⃣ Field workflow (speed matters)
+
+For guys in the field, the UI should be:
+
+Create opportunity (≤ 60 seconds)
+
+Client name
+
+Project name
+
+Location
+
+Rough scope (free text)
+
+Estimated value (optional)
+
+Photo upload (optional)
+
+Status auto-set to “New opportunity logged”
+
+Update status
+
+One dropdown
+
+Optional note
+
+Optional photo
+
+No mandatory long forms. Ever.
+
+5️⃣ Admin / sales workflow (control matters)
+
+Admin users can:
+
+Change stage
+
+Assign estimator
+
+Set target dates
+
+Lock certain statuses (e.g. “Approved for estimating”)
+
+Convert Awarded → Contract record
+
+Rules:
+
+Stage change = deliberate
+
+Status change = lightweight
+
+6️⃣ Simple data model (buildable, not over-engineered)
+sales_opportunities
+
+id
+
+project_name
+
+client_name
+
+location
+
+rough_scope
+
+estimated_value
+
+stage (enum)
+
+status (enum)
+
+owner_user_id (field rep)
+
+assigned_sales_user_id
+
+assigned_estimator_user_id
+
+created_at / updated_at
+
+sales_status_history
+
+opportunity_id
+
+stage
+
+status
+
+note
+
+changed_by_user_id
+
+created_at
+
+This gives you:
+
+audit trail
+
+analytics
+
+zero complexity in UI
+
+7️⃣ Guardrails to keep it simple
+
+✔ Limit stages
+✔ Status list changes per stage
+✔ One-tap status updates
+✔ Notes optional, not mandatory
+✔ Admin owns stage movement
+✔ Field owns status updates
+
+8️⃣ What I’d avoid (based on experience)
+
+🚫 Too many stages
+🚫 Global status list (confusing)
+🚫 Mandatory fields on every update
+🚫 Forcing CRM-style “activities”
+🚫 Letting everyone change everything
+
+9️⃣ Replit build prompt (clean and focused)
+
+You can paste this directly:
+
+“Implement a sales workflow module with a small fixed set of pipeline stages (Opportunity, Pre-Qualification, Estimating, Submitted, Awarded, Lost) and stage-specific statuses. Field users must be able to quickly create opportunities and update status with optional notes/photos. Admin users manage stage transitions, assignments, and conversions to contracts. Track full status history. Design the UI to be fast, minimal, and mobile-friendly. Do not overcomplicate with CRM-style tasks.”

@@ -21,6 +21,14 @@ import {
   X,
 } from "lucide-react";
 import { Link } from "wouter";
+import {
+  SALES_STAGES,
+  STAGE_STATUSES,
+  STAGE_LABELS,
+  OPPORTUNITY_TYPES,
+  getDefaultStatus,
+  type SalesStage,
+} from "@shared/sales-pipeline";
 
 interface Customer {
   id: string;
@@ -98,10 +106,14 @@ export default function MobileNewOpportunity() {
     state: "",
     referrer: "",
     engineerOnJob: "",
+    primaryContact: "",
     estimatedValue: "",
     numberOfBuildings: "",
     numberOfLevels: "",
     opportunityStatus: "NEW",
+    salesStage: "OPPORTUNITY" as SalesStage,
+    salesStatus: getDefaultStatus("OPPORTUNITY"),
+    opportunityType: "",
     probability: "",
     estimatedStartDate: "",
     comments: "",
@@ -182,15 +194,19 @@ export default function MobileNewOpportunity() {
       address: form.address,
       city: form.city,
       opportunityStatus: form.opportunityStatus,
+      salesStage: form.salesStage,
+      salesStatus: form.salesStatus,
     };
 
     if (form.customerId) data.customerId = form.customerId;
     if (form.state) data.state = form.state;
     if (form.referrer) data.referrer = form.referrer;
     if (form.engineerOnJob) data.engineerOnJob = form.engineerOnJob;
+    if (form.primaryContact) data.primaryContact = form.primaryContact;
     if (form.estimatedValue) data.estimatedValue = form.estimatedValue;
     if (form.numberOfBuildings) data.numberOfBuildings = parseInt(form.numberOfBuildings);
     if (form.numberOfLevels) data.numberOfLevels = parseInt(form.numberOfLevels);
+    if (form.opportunityType) data.opportunityType = form.opportunityType;
     if (form.probability) data.probability = parseInt(form.probability);
     if (form.estimatedStartDate) data.estimatedStartDate = form.estimatedStartDate;
     if (form.comments) data.comments = form.comments;
@@ -326,6 +342,16 @@ export default function MobileNewOpportunity() {
                 data-testid="input-engineer"
               />
             </FormField>
+            <FormField label="Primary Contact">
+              <input
+                type="text"
+                className={inputClass}
+                placeholder="Main point of contact"
+                value={form.primaryContact}
+                onChange={(e) => setForm((f) => ({ ...f, primaryContact: e.target.value }))}
+                data-testid="input-primary-contact"
+              />
+            </FormField>
           </div>
         </div>
 
@@ -374,24 +400,66 @@ export default function MobileNewOpportunity() {
           </div>
         </div>
 
-        {/* Section 4: Status & Likelihood */}
+        {/* Section 4: Sales Pipeline */}
         <div className="mt-6">
           <SectionHeader
             icon={<BarChart3 className="h-4 w-4 text-purple-400" />}
-            title="Status & Likelihood"
+            title="Sales Pipeline"
           />
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+            <FormField label="Sales Stage">
+              <div className="relative">
+                <select
+                  className={selectClass}
+                  value={form.salesStage}
+                  onChange={(e) => {
+                    const newStage = e.target.value as SalesStage;
+                    setForm((f) => ({
+                      ...f,
+                      salesStage: newStage,
+                      salesStatus: getDefaultStatus(newStage),
+                    }));
+                  }}
+                  data-testid="select-sales-stage"
+                >
+                  {SALES_STAGES.map((stage) => (
+                    <option key={stage} value={stage} className="bg-[#0D1117]">
+                      {STAGE_LABELS[stage]}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
+              </div>
+            </FormField>
             <FormField label="Status">
               <div className="relative">
                 <select
                   className={selectClass}
-                  value={form.opportunityStatus}
-                  onChange={(e) => setForm((f) => ({ ...f, opportunityStatus: e.target.value }))}
-                  data-testid="select-opportunity-status"
+                  value={form.salesStatus}
+                  onChange={(e) => setForm((f) => ({ ...f, salesStatus: e.target.value }))}
+                  data-testid="select-sales-status"
                 >
-                  {OPPORTUNITY_STATUS_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value} className="bg-[#0D1117]">
-                      {opt.label}
+                  {STAGE_STATUSES[form.salesStage]?.map((s) => (
+                    <option key={s.value} value={s.value} className="bg-[#0D1117]">
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
+              </div>
+            </FormField>
+            <FormField label="Opportunity Type">
+              <div className="relative">
+                <select
+                  className={selectClass}
+                  value={form.opportunityType}
+                  onChange={(e) => setForm((f) => ({ ...f, opportunityType: e.target.value }))}
+                  data-testid="select-opportunity-type"
+                >
+                  <option value="" className="bg-[#0D1117]">Select type...</option>
+                  {OPPORTUNITY_TYPES.map((t) => (
+                    <option key={t.value} value={t.value} className="bg-[#0D1117]">
+                      {t.label}
                     </option>
                   ))}
                 </select>
