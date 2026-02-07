@@ -48,12 +48,12 @@ router.get("/api/contracts/hub", requireAuth, async (req: Request, res: Response
         maxLifecycleStatus: sql<number>`COALESCE((
           SELECT MAX(pr.lifecycle_status) 
           FROM panel_register pr 
-          WHERE pr.job_id = ${jobs.id} AND pr.company_id = ${companyId}
+          WHERE pr.job_id = ${jobs.id}
         ), 0)`.as("max_lifecycle_status"),
         panelCount: sql<number>`COALESCE((
           SELECT COUNT(*) 
           FROM panel_register pr 
-          WHERE pr.job_id = ${jobs.id} AND pr.company_id = ${companyId}
+          WHERE pr.job_id = ${jobs.id}
         ), 0)`.as("panel_count"),
       })
       .from(jobs)
