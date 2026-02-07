@@ -9,9 +9,6 @@ import multer from "multer";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import crypto from "crypto";
 import logger from "../lib/logger";
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
 
 const router = Router();
 
@@ -290,38 +287,25 @@ For boolean fields, use true/false.
 For numeric fields, use numbers without currency symbols.
 Be thorough in your risk analysis - this serves as legal advisory for the precast company.`;
 
-    let messages: any[];
-
-    if (mimeType === "application/pdf") {
-      const pdfData = await pdfParse(file.buffer);
-      const pdfText = pdfData.text.slice(0, 100000);
-      messages = [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: `Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.\n\n--- CONTRACT TEXT ---\n${pdfText}`,
-        },
-      ];
-    } else {
-      messages = [
-        { role: "system", content: systemPrompt },
-        {
-          role: "user",
-          content: [
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:${mimeType};base64,${fileContent}`,
-              },
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          {
+            type: "file",
+            file: {
+              filename: file.originalname,
+              file_data: `data:${mimeType};base64,${fileContent}`,
             },
-            {
-              type: "text",
-              text: "Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.",
-            },
-          ],
-        },
-      ];
-    }
+          },
+          {
+            type: "text",
+            text: "Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.",
+          },
+        ],
+      },
+    ];
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
