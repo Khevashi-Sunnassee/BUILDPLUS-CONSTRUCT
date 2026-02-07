@@ -539,7 +539,7 @@ export default function AdminUsersPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingUser ? "Edit User" : "New User"}
@@ -551,203 +551,217 @@ export default function AdminUsersPage() {
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.error("Form validation errors:", JSON.stringify(errors)))} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="email" placeholder="user@company.com" data-testid="input-email" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="John Smith" data-testid="input-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="tel" placeholder="0412 345 678" data-testid="input-phone" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Address</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="123 Main St, Melbourne VIC" data-testid="input-address" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>{editingUser ? "New Password (optional)" : "Password"}</FormLabel>
-                    <FormControl>
-                      <Input {...field} type="password" placeholder="••••••••" data-testid="input-password" />
-                    </FormControl>
-                    {editingUser && (
-                      <FormDescription>
-                        Leave blank to keep current password
-                      </FormDescription>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Role</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-role">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="USER">User</SelectItem>
-                        <SelectItem value="MANAGER">Manager</SelectItem>
-                        <SelectItem value="ADMIN">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Managers can approve time entries. Admins have full access.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="userType"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>User Type</FormLabel>
-                    <Select onValueChange={(val) => {
-                      field.onChange(val);
-                      if (val === "EXTERNAL") {
-                        form.setValue("departmentId", null);
-                      }
-                    }} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-user-type">
-                          <SelectValue placeholder="Select user type" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="EMPLOYEE">Employee</SelectItem>
-                        <SelectItem value="EXTERNAL">External</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Employee users are internal staff. External users are contractors or third parties.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              {form.watch("userType") === "EMPLOYEE" && (
-                <FormField
-                  control={form.control}
-                  name="departmentId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Department</FormLabel>
-                      <Select
-                        onValueChange={(val) => field.onChange(val === "none" ? null : val)}
-                        value={field.value || "none"}
-                      >
+            <form onSubmit={form.handleSubmit(onSubmit, (errors) => console.error("Form validation errors:", JSON.stringify(errors)))} className="space-y-5">
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Account Details</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-department">
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
+                          <Input {...field} type="email" placeholder="user@company.com" data-testid="input-email" />
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="none">No department</SelectItem>
-                          {activeDepartments.map((dept) => (
-                            <SelectItem key={dept.id} value={dept.id}>
-                              {dept.name} ({dept.code})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        The department this employee works in.
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{editingUser ? "New Password (optional)" : "Password"}</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="password" placeholder="••••••••" data-testid="input-password" />
+                        </FormControl>
+                        {editingUser && (
+                          <FormDescription>
+                            Leave blank to keep current password
+                          </FormDescription>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Personal Information</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="John Smith" data-testid="input-name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone</FormLabel>
+                        <FormControl>
+                          <Input {...field} type="tel" placeholder="0412 345 678" data-testid="input-phone" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="col-span-2">
+                    <FormField
+                      control={form.control}
+                      name="address"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Address</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="123 Main St, Melbourne VIC" data-testid="input-address" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Role & Assignment</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="role"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Role</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-role">
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="USER">User</SelectItem>
+                            <SelectItem value="MANAGER">Manager</SelectItem>
+                            <SelectItem value="ADMIN">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Managers approve time entries. Admins have full access.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="userType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>User Type</FormLabel>
+                        <Select onValueChange={(val) => {
+                          field.onChange(val);
+                          if (val === "EXTERNAL") {
+                            form.setValue("departmentId", null);
+                          }
+                        }} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-user-type">
+                              <SelectValue placeholder="Select user type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                            <SelectItem value="EXTERNAL">External</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Employee = internal staff. External = contractors.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {form.watch("userType") === "EMPLOYEE" && (
+                    <FormField
+                      control={form.control}
+                      name="departmentId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Department</FormLabel>
+                          <Select
+                            onValueChange={(val) => field.onChange(val === "none" ? null : val)}
+                            value={field.value || "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-department">
+                                <SelectValue placeholder="Select department" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">No department</SelectItem>
+                              {activeDepartments.map((dept) => (
+                                <SelectItem key={dept.id} value={dept.id}>
+                                  {dept.name} ({dept.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   )}
-                />
-              )}
-              <FormField
-                control={form.control}
-                name="defaultFactoryId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Default Factory</FormLabel>
-                    <Select
-                      onValueChange={(val) => field.onChange(val === "none" ? null : val)}
-                      value={field.value || "none"}
-                    >
-                      <FormControl>
-                        <SelectTrigger data-testid="select-default-factory">
-                          <SelectValue placeholder="Select default factory" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="none">No default</SelectItem>
-                        {activeFactories.map((factory) => (
-                          <SelectItem key={factory.id} value={factory.id}>
-                            {factory.name} ({factory.code})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Auto-selects this factory on production and scheduling pages.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="border-t pt-4 mt-4">
-                <h4 className="text-sm font-medium mb-3">Purchase Order Approval</h4>
-                <div className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="defaultFactoryId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Default Factory</FormLabel>
+                        <Select
+                          onValueChange={(val) => field.onChange(val === "none" ? null : val)}
+                          value={field.value || "none"}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-default-factory">
+                              <SelectValue placeholder="Select default factory" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No default</SelectItem>
+                            {activeFactories.map((factory) => (
+                              <SelectItem key={factory.id} value={factory.id}>
+                                {factory.name} ({factory.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Auto-selects on production and scheduling pages.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Purchase Order Approval</h4>
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="poApprover"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <FormItem className="flex flex-row items-center justify-between gap-2 rounded-lg border p-3">
                         <div className="space-y-0.5">
                           <FormLabel>PO Approver</FormLabel>
                           <FormDescription>
@@ -782,7 +796,7 @@ export default function AdminUsersPage() {
                             />
                           </FormControl>
                           <FormDescription>
-                            Maximum PO value this user can approve. Leave blank for unlimited.
+                            Max PO value this user can approve. Blank = unlimited.
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
