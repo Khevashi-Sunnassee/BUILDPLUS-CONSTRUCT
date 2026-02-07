@@ -287,35 +287,32 @@ For boolean fields, use true/false.
 For numeric fields, use numbers without currency symbols.
 Be thorough in your risk analysis - this serves as legal advisory for the precast company.`;
 
-    const messages: any[] = [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: [
-          {
-            type: "file",
-            file: {
-              filename: file.originalname,
-              file_data: `data:${mimeType};base64,${fileContent}`,
-            },
-          },
-          {
-            type: "text",
-            text: "Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.",
-          },
-        ],
-      },
-    ];
-
-    const completion = await openai.chat.completions.create({
+    const response = await openai.responses.create({
       model: "gpt-4o",
-      messages,
-      max_tokens: 4096,
+      instructions: systemPrompt,
+      input: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "input_file",
+              file_data: `data:${mimeType};base64,${fileContent}`,
+              filename: file.originalname,
+            },
+            {
+              type: "input_text",
+              text: "Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.",
+            },
+          ],
+        },
+      ],
+      text: {
+        format: { type: "json_object" },
+      },
       temperature: 0.1,
-      response_format: { type: "json_object" },
     });
 
-    const responseText = completion.choices[0]?.message?.content || "{}";
+    const responseText = response.output_text || "{}";
     let parsed;
     try {
       parsed = JSON.parse(responseText);
