@@ -37,6 +37,7 @@ import { reoScheduleRouter } from "./reo-schedule.routes";
 import checklistRouter from "./checklist.routes";
 import { broadcastRouter } from "./broadcast.routes";
 import { contractsRouter } from "./contracts.routes";
+import { progressClaimsRouter } from "./progress-claims.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -133,6 +134,9 @@ export async function setupRoutes(app: Express): Promise<void> {
   
   // Contracts router - for contract hub
   app.use(contractsRouter);
+  
+  // Progress Claims router - for progress claim management
+  app.use(progressClaimsRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

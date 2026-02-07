@@ -80,6 +80,7 @@ const userNavItems = [
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Broadcast", url: "/broadcast", icon: Radio },
   { title: "Contract Hub", url: "/contracts", icon: Scale },
+  { title: "Progress Claims", url: "/progress-claims", icon: FileText },
 ];
 
 const managerNavItems = [
@@ -136,6 +137,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/checklist-reports": "checklists",
   "/manager/review": "daily_reports",
   "/contracts": "contract_hub",
+  "/progress-claims": "progress_claims",
 };
 
 export function AppSidebar() {

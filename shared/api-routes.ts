@@ -574,6 +574,17 @@ export const BROADCAST_ROUTES = {
 // ============================================================================
 // CONTRACT HUB
 // ============================================================================
+export const PROGRESS_CLAIMS_ROUTES = {
+  LIST: '/api/progress-claims',
+  NEXT_NUMBER: '/api/progress-claims/next-number',
+  BY_ID: (id: string | number) => `/api/progress-claims/${id}`,
+  ITEMS: (id: string | number) => `/api/progress-claims/${id}/items`,
+  SUBMIT: (id: string | number) => `/api/progress-claims/${id}/submit`,
+  APPROVE: (id: string | number) => `/api/progress-claims/${id}/approve`,
+  REJECT: (id: string | number) => `/api/progress-claims/${id}/reject`,
+  CLAIMABLE_PANELS: (jobId: string | number) => `/api/progress-claims/job/${jobId}/claimable-panels`,
+} as const;
+
 export const CONTRACT_ROUTES = {
   LIST: '/api/contracts',
   BY_ID: (id: string | number) => `/api/contracts/${id}`,
@@ -612,4 +623,5 @@ export type DocumentRoutes = typeof DOCUMENT_ROUTES;
 export type ReoScheduleRoutes = typeof REO_SCHEDULE_ROUTES;
 export type ChecklistRoutes = typeof CHECKLIST_ROUTES;
 export type BroadcastRoutes = typeof BROADCAST_ROUTES;
+export type ProgressClaimsRoutes = typeof PROGRESS_CLAIMS_ROUTES;
 export type ContractRoutes = typeof CONTRACT_ROUTES;

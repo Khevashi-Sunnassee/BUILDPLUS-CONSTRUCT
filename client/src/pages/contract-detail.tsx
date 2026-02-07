@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PANEL_LIFECYCLE_LABELS } from "@shared/schema";
 import {
   ChevronLeft,
   Save,
@@ -125,6 +126,7 @@ interface Contract {
   omManualsRequired: boolean | null;
   warrantyStartDate: string | null;
   warrantyEndDate: string | null;
+  claimableAtPhase: number | null;
   riskRating: number | null;
   riskOverview: string | null;
   riskHighlights: any;
@@ -507,6 +509,26 @@ export default function ContractDetailPage() {
                 <TextField label="Payment Terms" value={currentData.paymentTerms || ""} onChange={(v) => updateField("paymentTerms", v)} testId="input-payment-terms" placeholder="e.g. Net 30" />
                 <TextField label="Billing Method" value={currentData.billingMethod || ""} onChange={(v) => updateField("billingMethod", v)} testId="input-billing-method" placeholder="Progress / Milestone / Delivery" />
                 <TextField label="Tax Responsibility" value={currentData.taxResponsibility || ""} onChange={(v) => updateField("taxResponsibility", v)} testId="input-tax-responsibility" />
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Claimable At Phase</Label>
+                  <Select
+                    value={currentData.claimableAtPhase != null ? String(currentData.claimableAtPhase) : ""}
+                    onValueChange={(v) => updateField("claimableAtPhase", v ? parseInt(v) : null)}
+                    data-testid="select-claimable-phase"
+                  >
+                    <SelectTrigger data-testid="select-claimable-phase-trigger">
+                      <SelectValue placeholder="Select phase..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PANEL_LIFECYCLE_LABELS)
+                        .filter(([key]) => parseInt(key) >= 8 && parseInt(key) <= 13)
+                        .map(([key, label]) => (
+                          <SelectItem key={key} value={key} data-testid={`select-phase-${key}`}>{label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">Phase at which panels become claimable for progress claims</p>
+                </div>
                 <BooleanField label="Escalation Clause" value={currentData.escalationClause} onChange={(v) => updateField("escalationClause", v)} testId="switch-escalation" />
               </div>
               {currentData.escalationClause && (

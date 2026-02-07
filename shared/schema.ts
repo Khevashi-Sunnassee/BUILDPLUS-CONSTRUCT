@@ -18,6 +18,7 @@ export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED
 export const draftingProgramStatusEnum = pgEnum("drafting_program_status", ["NOT_SCHEDULED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
 export const contractStatusEnum = pgEnum("contract_status", ["AWAITING_CONTRACT", "CONTRACT_REVIEW", "CONTRACT_EXECUTED"]);
 export const contractTypeEnum = pgEnum("contract_type", ["LUMP_SUM", "UNIT_PRICE", "TIME_AND_MATERIALS", "GMP"]);
+export const progressClaimStatusEnum = pgEnum("progress_claim_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 
 export const companies = pgTable("companies", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -133,6 +134,8 @@ export const FUNCTION_KEYS = [
   "admin_item_catalog",
   "admin_factories",
   "admin_customers",
+  "contract_hub",
+  "progress_claims",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -608,6 +611,7 @@ export const PANEL_LIFECYCLE_STATUS = {
   RETURNED: 12,
   INSTALLED: 13,
   DEFECTED: 14,
+  CLAIMED: 15,
 } as const;
 
 export type PanelLifecycleStatus = typeof PANEL_LIFECYCLE_STATUS[keyof typeof PANEL_LIFECYCLE_STATUS];
@@ -628,6 +632,7 @@ export const PANEL_LIFECYCLE_LABELS: Record<number, string> = {
   12: "Returned",
   13: "Installed",
   14: "Defected",
+  15: "Claimed",
 };
 
 export const PANEL_LIFECYCLE_COLORS: Record<number, { bg: string; text: string; border: string }> = {
@@ -646,6 +651,7 @@ export const PANEL_LIFECYCLE_COLORS: Record<number, { bg: string; text: string; 
   12: { bg: "bg-rose-100 dark:bg-rose-900/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-300 dark:border-rose-700" },
   13: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-300", border: "border-emerald-300 dark:border-emerald-700" },
   14: { bg: "bg-red-100 dark:bg-red-900/30", text: "text-red-700 dark:text-red-300", border: "border-red-300 dark:border-red-700" },
+  15: { bg: "bg-indigo-100 dark:bg-indigo-900/30", text: "text-indigo-700 dark:text-indigo-300", border: "border-indigo-300 dark:border-indigo-700" },
 };
 
 export const mappingRules = pgTable("mapping_rules", {
@@ -2643,6 +2649,9 @@ export const contracts = pgTable("contracts", {
   warrantyStartDate: timestamp("warranty_start_date"),
   warrantyEndDate: timestamp("warranty_end_date"),
 
+  // 11. Progress Claim Configuration
+  claimableAtPhase: integer("claimable_at_phase"),
+
   // AI Risk Assessment
   riskRating: integer("risk_rating"),
   riskOverview: text("risk_overview"),
@@ -2662,3 +2671,60 @@ export const contracts = pgTable("contracts", {
 export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
+
+export const progressClaims = pgTable("progress_claims", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  claimNumber: text("claim_number").notNull(),
+  status: progressClaimStatusEnum("status").default("DRAFT").notNull(),
+  claimDate: timestamp("claim_date").defaultNow().notNull(),
+  claimType: text("claim_type").default("DETAIL").notNull(),
+  subtotal: decimal("subtotal", { precision: 14, scale: 2 }).default("0"),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 2 }).default("10"),
+  taxAmount: decimal("tax_amount", { precision: 14, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 14, scale: 2 }).default("0"),
+  notes: text("notes"),
+  internalNotes: text("internal_notes"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectedById: varchar("rejected_by_id", { length: 36 }).references(() => users.id),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  claimNumberCompanyIdx: uniqueIndex("progress_claims_claim_number_company_idx").on(table.claimNumber, table.companyId),
+  statusIdx: index("progress_claims_status_idx").on(table.status),
+  jobIdIdx: index("progress_claims_job_id_idx").on(table.jobId),
+  companyIdIdx: index("progress_claims_company_id_idx").on(table.companyId),
+  createdByIdx: index("progress_claims_created_by_idx").on(table.createdById),
+}));
+
+export const progressClaimItems = pgTable("progress_claim_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  progressClaimId: varchar("progress_claim_id", { length: 36 }).notNull().references(() => progressClaims.id, { onDelete: "cascade" }),
+  panelId: varchar("panel_id", { length: 36 }).notNull().references(() => panelRegister.id),
+  panelMark: text("panel_mark").notNull(),
+  level: text("level"),
+  panelRevenue: decimal("panel_revenue", { precision: 14, scale: 2 }).notNull(),
+  percentComplete: decimal("percent_complete", { precision: 5, scale: 2 }).default("0").notNull(),
+  lineTotal: decimal("line_total", { precision: 14, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  claimIdx: index("progress_claim_items_claim_idx").on(table.progressClaimId),
+  panelIdx: index("progress_claim_items_panel_idx").on(table.panelId),
+}));
+
+export const insertProgressClaimSchema = createInsertSchema(progressClaims).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProgressClaim = z.infer<typeof insertProgressClaimSchema>;
+export type ProgressClaim = typeof progressClaims.$inferSelect;
+
+export const insertProgressClaimItemSchema = createInsertSchema(progressClaimItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertProgressClaimItem = z.infer<typeof insertProgressClaimItemSchema>;
+export type ProgressClaimItem = typeof progressClaimItems.$inferSelect;
+
+export type ProgressClaimStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
