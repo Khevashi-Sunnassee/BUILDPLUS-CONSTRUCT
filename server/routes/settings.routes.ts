@@ -1,4 +1,5 @@
 import { Router } from "express";
+import sanitizeHtml from "sanitize-html";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 
@@ -149,7 +150,24 @@ router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
     if (typeof poTermsHtml !== "string") {
       return res.status(400).json({ error: "PO terms content is required" });
     }
-    const settings = await storage.updateGlobalSettings({ poTermsHtml });
+    const cleanHtml = sanitizeHtml(poTermsHtml, {
+      allowedTags: sanitizeHtml.defaults.allowedTags.concat(["h1", "h2", "u", "s", "span", "div"]),
+      allowedAttributes: {
+        ...sanitizeHtml.defaults.allowedAttributes,
+        span: ["style"],
+        div: ["style"],
+        p: ["style"],
+      },
+      allowedStyles: {
+        "*": {
+          "text-align": [/^left$/, /^right$/, /^center$/, /^justify$/],
+          "text-decoration": [/^underline$/, /^line-through$/],
+          "font-weight": [/^bold$/, /^normal$/, /^\d+$/],
+          "font-style": [/^italic$/, /^normal$/],
+        },
+      },
+    });
+    const settings = await storage.updateGlobalSettings({ poTermsHtml: cleanHtml });
     res.json({ success: true, poTermsHtml: settings.poTermsHtml });
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to save PO terms" });
