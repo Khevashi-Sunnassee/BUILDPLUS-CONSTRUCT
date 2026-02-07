@@ -64,6 +64,7 @@ import MobileTasksPage from "@/pages/mobile/tasks";
 import MobileChatPage from "@/pages/mobile/chat";
 import MobileJobsPage from "@/pages/mobile/jobs";
 import MobilePanelsPage from "@/pages/mobile/panels";
+import MobilePanelDetailPage from "@/pages/mobile/panel-detail";
 import MobileLogisticsPage from "@/pages/mobile/logistics";
 import MobileCreateLoadListPage from "@/pages/mobile/create-load-list";
 import MobileRecordDeliveryPage from "@/pages/mobile/record-delivery";
@@ -553,6 +554,11 @@ function Router() {
       <Route path="/mobile/panels">
         <ProtectedRoute>
           <MobilePanelsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/panels/:id">
+        <ProtectedRoute>
+          <MobilePanelDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/logistics">

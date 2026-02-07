@@ -1,13 +1,9 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { PANELS_ROUTES } from "@shared/api-routes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ClipboardList, Layers, Building2, ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -39,38 +35,16 @@ const statusConfig: Record<PanelStatus, { label: string; color: string; bgColor:
   ON_HOLD: { label: "On Hold", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", bgColor: "bg-yellow-500" },
 };
 
-const statusOrder: PanelStatus[] = ["NOT_STARTED", "IN_PROGRESS", "ON_HOLD", "COMPLETED"];
-
 export default function MobilePanelsPage() {
-  const { toast } = useToast();
-  const [selectedPanel, setSelectedPanel] = useState<Panel | null>(null);
+  const [, setLocation] = useLocation();
 
   const { data: panels = [], isLoading } = useQuery<Panel[]>({
     queryKey: [PANELS_ROUTES.LIST],
   });
 
-  const updatePanelMutation = useMutation({
-    mutationFn: async ({ panelId, status }: { panelId: string; status: PanelStatus }) => {
-      return apiRequest("PATCH", PANELS_ROUTES.BY_ID(panelId), { status });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.LIST] });
-    },
-    onError: () => {
-      toast({ title: "Failed to update panel", variant: "destructive" });
-    },
-  });
-
   const inProgressPanels = panels.filter(p => p.status === "IN_PROGRESS");
   const notStartedPanels = panels.filter(p => p.status === "NOT_STARTED").slice(0, 10);
   const otherPanels = panels.filter(p => !["IN_PROGRESS", "NOT_STARTED"].includes(p.status)).slice(0, 5);
-
-  const handleStatusChange = (panelId: string, status: PanelStatus) => {
-    updatePanelMutation.mutate({ panelId, status });
-    if (selectedPanel?.id === panelId) {
-      setSelectedPanel({ ...selectedPanel, status });
-    }
-  };
 
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
@@ -115,7 +89,7 @@ export default function MobilePanelsPage() {
                     <PanelCard 
                       key={panel.id} 
                       panel={panel} 
-                      onSelect={() => setSelectedPanel(panel)} 
+                      onSelect={() => setLocation(`/mobile/panels/${panel.id}`)} 
                     />
                   ))}
                 </div>
@@ -132,7 +106,7 @@ export default function MobilePanelsPage() {
                     <PanelCard 
                       key={panel.id} 
                       panel={panel} 
-                      onSelect={() => setSelectedPanel(panel)} 
+                      onSelect={() => setLocation(`/mobile/panels/${panel.id}`)} 
                     />
                   ))}
                 </div>
@@ -149,7 +123,7 @@ export default function MobilePanelsPage() {
                     <PanelCard 
                       key={panel.id} 
                       panel={panel} 
-                      onSelect={() => setSelectedPanel(panel)}
+                      onSelect={() => setLocation(`/mobile/panels/${panel.id}`)}
                       muted 
                     />
                   ))}
@@ -159,18 +133,6 @@ export default function MobilePanelsPage() {
           </div>
         )}
       </div>
-
-      <Sheet open={!!selectedPanel} onOpenChange={(open) => !open && setSelectedPanel(null)}>
-        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl bg-[#0D1117] border-white/10">
-          {selectedPanel && (
-            <PanelDetailSheet 
-              panel={selectedPanel}
-              onStatusChange={(status) => handleStatusChange(selectedPanel.id, status)}
-              onClose={() => setSelectedPanel(null)}
-            />
-          )}
-        </SheetContent>
-      </Sheet>
 
       <MobileBottomNav />
     </div>
@@ -234,104 +196,3 @@ function PanelCard({
   );
 }
 
-function PanelDetailSheet({ 
-  panel, 
-  onStatusChange,
-  onClose 
-}: { 
-  panel: Panel;
-  onStatusChange: (status: PanelStatus) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="flex flex-col h-full text-white">
-      <SheetHeader className="pb-4">
-        <SheetTitle className="text-left text-white">{panel.panelMark}</SheetTitle>
-        {panel.job && (
-          <p className="text-sm text-white/60 text-left">
-            {panel.job.jobNumber} - {panel.job.name}
-          </p>
-        )}
-      </SheetHeader>
-
-      <div className="flex-1 overflow-auto space-y-4">
-        <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Status</label>
-          <div className="flex flex-wrap gap-2">
-            {statusOrder.map((status) => {
-              const config = statusConfig[status];
-              const isActive = panel.status === status;
-              
-              return (
-                <Button
-                  key={status}
-                  variant={isActive ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => onStatusChange(status)}
-                  className={cn(
-                    isActive ? config.bgColor : "border-white/20 text-white/70"
-                  )}
-                  data-testid={`status-option-${status}`}
-                >
-                  {config.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-
-        {panel.description && (
-          <div>
-            <label className="text-sm font-medium text-white/60 mb-1 block">Description</label>
-            <p className="text-sm text-white">{panel.description}</p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-          {panel.panelType && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Type</label>
-              <p className="text-sm text-white">{panel.panelType}</p>
-            </div>
-          )}
-          {panel.building && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Building</label>
-              <p className="text-sm text-white">{panel.building}</p>
-            </div>
-          )}
-          {panel.level && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Level</label>
-              <p className="text-sm text-white">{panel.level}</p>
-            </div>
-          )}
-          {panel.panelThickness && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Thickness</label>
-              <p className="text-sm text-white">{panel.panelThickness}mm</p>
-            </div>
-          )}
-          {panel.panelArea && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Area</label>
-              <p className="text-sm text-white">{panel.panelArea}m</p>
-            </div>
-          )}
-          {panel.panelMass && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Mass</label>
-              <p className="text-sm text-white">{panel.panelMass}kg</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <div className="pt-4 border-t border-white/10 mt-4">
-        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose}>
-          Close
-        </Button>
-      </div>
-    </div>
-  );
-}

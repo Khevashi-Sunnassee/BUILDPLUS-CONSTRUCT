@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
 import { db } from "../db";
-import { panelAuditLogs, panelRegister, logRows, timerSessions, loadListPanels, jobs, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { panelAuditLogs, panelRegister, logRows, timerSessions, loadListPanels, jobs, users, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 import { z } from "zod";
 
@@ -170,6 +170,20 @@ router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: 
   }
 });
 
+router.get("/api/panels/:id/details", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const panel = await storage.getPanelRegisterItem(req.params.id as string);
+    if (!panel) return res.status(404).json({ error: "Panel not found" });
+    const job = await storage.getJob(panel.jobId);
+    if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
+    res.json(panel);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching panel details");
+    res.status(500).json({ error: "Failed to fetch panel details" });
+  }
+});
+
 router.get("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const companyId = req.companyId;
   const panel = await storage.getPanelRegisterItem(req.params.id as string);
@@ -288,7 +302,18 @@ router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: 
     const limit = parseInt(req.query.limit as string) || 100;
     const offset = parseInt(req.query.offset as string) || 0;
     
-    const logs = await db.select().from(panelAuditLogs)
+    const logs = await db.select({
+      id: panelAuditLogs.id,
+      panelId: panelAuditLogs.panelId,
+      action: panelAuditLogs.action,
+      changedFields: panelAuditLogs.changedFields,
+      previousLifecycleStatus: panelAuditLogs.previousLifecycleStatus,
+      newLifecycleStatus: panelAuditLogs.newLifecycleStatus,
+      changedById: panelAuditLogs.changedById,
+      createdAt: panelAuditLogs.createdAt,
+      changedByName: users.name,
+    }).from(panelAuditLogs)
+      .leftJoin(users, eq(panelAuditLogs.changedById, users.id))
       .where(eq(panelAuditLogs.panelId, panelId))
       .orderBy(desc(panelAuditLogs.createdAt))
       .limit(limit)
@@ -296,7 +321,8 @@ router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: 
     
     res.json(logs);
   } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to get audit logs" });
+    logger.error({ err: error }, "Error fetching panel audit logs");
+    res.status(500).json({ error: "Failed to get audit logs" });
   }
 });
 

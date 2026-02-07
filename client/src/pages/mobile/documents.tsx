@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 import {
   Search,
   FileText,
@@ -74,6 +74,7 @@ function getStatusColor(status: string): string {
 
 export default function MobileDocumentsPage() {
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
@@ -81,13 +82,19 @@ export default function MobileDocumentsPage() {
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [viewingDoc, setViewingDoc] = useState(false);
 
+  const queryPanelId = useMemo(() => {
+    const params = new URLSearchParams(searchString);
+    return params.get("panelId");
+  }, [searchString]);
+
   const { data: docsResult, isLoading } = useQuery<{ documents: Document[]; total: number }>({
-    queryKey: [DOCUMENT_ROUTES.LIST, { search: searchQuery, typeId: selectedTypeId, jobId: selectedJobId, showLatestOnly: "true", limit: "50" }],
+    queryKey: [DOCUMENT_ROUTES.LIST, { search: searchQuery, typeId: selectedTypeId, jobId: selectedJobId, panelId: queryPanelId, showLatestOnly: "true", limit: "50" }],
     queryFn: async () => {
       const params = new URLSearchParams({ showLatestOnly: "true", limit: "50" });
       if (searchQuery) params.set("search", searchQuery);
       if (selectedTypeId) params.set("typeId", selectedTypeId);
       if (selectedJobId) params.set("jobId", selectedJobId);
+      if (queryPanelId) params.set("panelId", queryPanelId);
       const res = await fetch(`${DOCUMENT_ROUTES.LIST}?${params}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch documents");
       return res.json();
@@ -208,13 +215,18 @@ export default function MobileDocumentsPage() {
         <div className="px-4 py-4">
           <div className="flex items-center gap-3 mb-3">
             <button
-              onClick={() => setLocation("/mobile/more")}
+              onClick={() => setLocation(queryPanelId ? `/mobile/panels/${queryPanelId}` : "/mobile/more")}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 active:scale-[0.99]"
               data-testid="button-back-to-more"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <div className="text-2xl font-bold">Documents</div>
+            <div>
+              <div className="text-2xl font-bold">{queryPanelId ? "Panel Documents" : "Documents"}</div>
+              {queryPanelId && (
+                <p className="text-xs text-white/50">Showing drawings for this panel</p>
+              )}
+            </div>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
