@@ -5,6 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { eq, and, desc, or } from "drizzle-orm";
 import { format } from "date-fns";
 import logger from "../lib/logger";
+import { logPanelChange } from "../services/panel-audit.service";
 
 // Helper function to record timer events
 async function recordTimerEvent(
@@ -200,6 +201,13 @@ router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
     // Record START event
     await recordTimerEvent(newSession.id, userId, "START", 0);
 
+    // Log to panel audit if panel is linked
+    if (newSession.panelRegisterId) {
+      logPanelChange(newSession.panelRegisterId, "TIMER_START", userId, {
+        changedFields: { timerSessionId: newSession.id, jobId: newSession.jobId },
+      });
+    }
+
     logger.info(`Timer session started: ${newSession.id} for user: ${userId}`);
     res.json(newSession);
   } catch (error) {
@@ -250,6 +258,13 @@ router.post("/api/timer-sessions/:id/pause", requireAuth, async (req, res) => {
     // Record PAUSE event
     await recordTimerEvent(sessionId, userId, "PAUSE", newTotalElapsed);
 
+    // Log to panel audit if panel is linked
+    if (session.panelRegisterId) {
+      logPanelChange(session.panelRegisterId, "TIMER_PAUSE", userId, {
+        changedFields: { timerSessionId: sessionId, totalElapsedMs: newTotalElapsed, pauseCount: session.pauseCount + 1 },
+      });
+    }
+
     logger.info(`Timer session paused: ${sessionId}, totalElapsedMs: ${newTotalElapsed}`);
     res.json(updatedSession);
   } catch (error) {
@@ -296,6 +311,13 @@ router.post("/api/timer-sessions/:id/resume", requireAuth, async (req, res) => {
 
     // Record RESUME event
     await recordTimerEvent(sessionId, userId, "RESUME", session.totalElapsedMs);
+
+    // Log to panel audit if panel is linked
+    if (session.panelRegisterId) {
+      logPanelChange(session.panelRegisterId, "TIMER_RESUME", userId, {
+        changedFields: { timerSessionId: sessionId, totalElapsedMs: session.totalElapsedMs },
+      });
+    }
 
     logger.info(`Timer session resumed: ${sessionId}`);
     res.json(updatedSession);
@@ -435,6 +457,14 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
     // Record STOP event
     await recordTimerEvent(sessionId, userId, "STOP", totalElapsed, notes || undefined);
 
+    // Log to panel audit if panel is linked
+    const finalPanelId = panelRegisterId || session.panelRegisterId;
+    if (finalPanelId) {
+      logPanelChange(finalPanelId, "TIMER_STOP", userId, {
+        changedFields: { timerSessionId: sessionId, totalElapsedMs: totalElapsed, durationMinutes, logRowId: logRow.id },
+      });
+    }
+
     logger.info(`Timer session stopped: ${sessionId}, logRowId: ${logRow.id}, durationMinutes: ${durationMinutes}`);
 
     res.json({ session: updatedSession, logRow });
@@ -545,6 +575,13 @@ router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
       elapsedAtCancel += now.getTime() - session.startedAt.getTime();
     }
     await recordTimerEvent(sessionId, userId, "CANCEL", elapsedAtCancel);
+
+    // Log to panel audit if panel is linked
+    if (session.panelRegisterId) {
+      logPanelChange(session.panelRegisterId, "TIMER_CANCEL", userId, {
+        changedFields: { timerSessionId: sessionId, totalElapsedMs: elapsedAtCancel },
+      });
+    }
 
     logger.info(`Timer session cancelled: ${sessionId}`);
     res.json(updatedSession);

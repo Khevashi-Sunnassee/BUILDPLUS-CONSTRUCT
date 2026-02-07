@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -31,6 +31,7 @@ import {
   Timer,
   ChevronDown,
   ChevronRight,
+  History,
 } from "lucide-react";
 import {
   Dialog,
@@ -280,13 +281,20 @@ export default function ManualEntryPage() {
   const hasActiveTimer = !!activeTimer;
 
   // Timer mutations
+  const invalidateTimerRelatedQueries = () => {
+    queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+    if (selectedPanelId && selectedPanelId !== "none") {
+      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.PANEL_HISTORY(selectedPanelId)] });
+      queryClient.invalidateQueries({ queryKey: [PANELS_ROUTES.AUDIT_LOGS(selectedPanelId)] });
+    }
+  };
+
   const startTimerMutation = useMutation({
     mutationFn: async (data: { jobId: string; panelRegisterId: string }) => {
       return await apiRequest("POST", TIMER_ROUTES.START, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
-      // Set start time to now, end time to blank
+      invalidateTimerRelatedQueries();
       const now = new Date();
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
       form.setValue("startTime", currentTime);
@@ -303,7 +311,7 @@ export default function ManualEntryPage() {
       return await apiRequest("POST", TIMER_ROUTES.PAUSE(timerId), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      invalidateTimerRelatedQueries();
       toast({ title: "Timer paused" });
     },
   });
@@ -313,7 +321,7 @@ export default function ManualEntryPage() {
       return await apiRequest("POST", TIMER_ROUTES.RESUME(timerId), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      invalidateTimerRelatedQueries();
       toast({ title: "Timer resumed" });
     },
   });
@@ -323,7 +331,7 @@ export default function ManualEntryPage() {
       return await apiRequest("POST", TIMER_ROUTES.STOP(data.timerId), { notes: data.notes, workTypeId: data.workTypeId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      invalidateTimerRelatedQueries();
       queryClient.invalidateQueries({ queryKey: [DAILY_LOGS_ROUTES.LIST] });
       toast({ title: "Timer stopped", description: "Time entry saved" });
     },
@@ -337,7 +345,7 @@ export default function ManualEntryPage() {
       return await apiRequest("POST", TIMER_ROUTES.CANCEL(timerId), {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [TIMER_ROUTES.ACTIVE] });
+      invalidateTimerRelatedQueries();
       toast({ title: "Timer cancelled" });
     },
   });
@@ -962,236 +970,364 @@ export default function ManualEntryPage() {
     return <Badge variant={variants[status] || "default"} className="ml-2 text-xs">{status.replace("_", " ")}</Badge>;
   };
 
+  // Fetch panel audit logs for the selected panel (collapsible history)
+  interface PanelAuditLogEntry {
+    id: string;
+    panelId: string;
+    action: string;
+    changedFields: Record<string, any> | null;
+    previousLifecycleStatus: number | null;
+    newLifecycleStatus: number | null;
+    changedById: string | null;
+    createdAt: string;
+  }
+
+  const { data: panelAuditLogs } = useQuery<PanelAuditLogEntry[]>({
+    queryKey: [PANELS_ROUTES.AUDIT_LOGS(selectedPanelId || "")],
+    enabled: !!selectedPanelId && selectedPanelId !== "none",
+  });
+
+  const [auditHistoryExpanded, setAuditHistoryExpanded] = useState(false);
+
+  const formatAuditAction = (action: string) => {
+    const map: Record<string, string> = {
+      TIMER_START: "Timer Started",
+      TIMER_STOP: "Timer Stopped",
+      TIMER_PAUSE: "Timer Paused",
+      TIMER_RESUME: "Timer Resumed",
+      TIMER_CANCEL: "Timer Cancelled",
+    };
+    return map[action] || action.replace(/_/g, " ");
+  };
+
+  const getAuditActionColor = (action: string) => {
+    if (action === "TIMER_START" || action === "TIMER_RESUME") return "text-green-600 dark:text-green-400";
+    if (action === "TIMER_STOP") return "text-blue-600 dark:text-blue-400";
+    if (action === "TIMER_PAUSE") return "text-amber-600 dark:text-amber-400";
+    if (action === "TIMER_CANCEL") return "text-red-600 dark:text-red-400";
+    return "text-muted-foreground";
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
-              Manual Time Entry
-            </h1>
-            <p className="text-muted-foreground">
-              Log time manually when the add-in is not available
-            </p>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
+            Manual Time Entry
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Log time manually when the add-in is not available
+          </p>
         </div>
-
-        {/* Timer Widget - Top Right Corner */}
-        {(hasActiveTimer || selectedPanelId) && (
-          <div className="flex items-center gap-3 p-3 rounded-lg border bg-card">
-            <Timer className="h-5 w-5 text-muted-foreground" />
-            <div className="text-right">
-              <p className="font-medium text-sm">
-                {hasActiveTimer 
-                  ? (isTimerForSelectedPanel 
-                      ? `Timer: ${selectedPanel?.panelMark || "Panel"}` 
-                      : `Timer: ${activeTimer?.panelMark || "Unknown Panel"}`)
-                  : `Panel: ${selectedPanel?.panelMark || "None"}`}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {hasActiveTimer ? activeTimer?.status : "No timer"}
-              </p>
-            </div>
-            
-            {hasActiveTimer && (
-              <div className="text-2xl font-mono font-bold tabular-nums min-w-[100px] text-right">
-                {formatTimer(timerElapsed)}
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              {!hasActiveTimer && selectedPanelId && selectedPanelId !== "none" && (
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    const jobId = form.getValues("jobId");
-                    if (jobId && selectedPanelId) {
-                      startTimerMutation.mutate({ jobId, panelRegisterId: selectedPanelId });
-                    }
-                  }}
-                  disabled={startTimerMutation.isPending || !selectedJobId}
-                  data-testid="button-start-timer-header"
-                >
-                  {startTimerMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                  ) : (
-                    <Play className="h-4 w-4 mr-1" />
-                  )}
-                  Start
-                </Button>
-              )}
-
-              {isTimerForSelectedPanel && activeTimer?.status === "RUNNING" && activeTimer?.id && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => pauseTimerMutation.mutate(activeTimer.id)}
-                  disabled={pauseTimerMutation.isPending}
-                  data-testid="button-pause-timer-header"
-                >
-                  <Pause className="h-4 w-4" />
-                </Button>
-              )}
-
-              {isTimerForSelectedPanel && activeTimer?.status === "PAUSED" && activeTimer?.id && (
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => resumeTimerMutation.mutate(activeTimer.id)}
-                  disabled={resumeTimerMutation.isPending}
-                  data-testid="button-resume-timer-header"
-                >
-                  <Play className="h-4 w-4" />
-                </Button>
-              )}
-
-              {isTimerForSelectedPanel && activeTimer?.id && (
-                <>
-                  <Button
-                    type="button"
-                    variant="default"
-                    size="sm"
-                    onClick={() => {
-                      const workTypeId = form.getValues("workTypeId");
-                      stopTimerMutation.mutate({ 
-                        timerId: activeTimer.id,
-                        workTypeId: workTypeId && workTypeId !== "none" ? parseInt(workTypeId) : undefined 
-                      });
-                    }}
-                    disabled={stopTimerMutation.isPending}
-                    data-testid="button-stop-timer-header"
-                  >
-                    <Square className="h-4 w-4 mr-1" />
-                    Save
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
-                    disabled={cancelTimerMutation.isPending}
-                    data-testid="button-cancel-timer-header"
-                  >
-                    <XCircle className="h-4 w-4" />
-                  </Button>
-                </>
-              )}
-
-              {hasActiveTimer && !isTimerForSelectedPanel && activeTimer?.id && (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
-                  disabled={cancelTimerMutation.isPending}
-                  data-testid="button-cancel-other-timer-header"
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Stop
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Total Elapsed Time for Selected Panel */}
-        {selectedPanelId && selectedPanelId !== "none" && panelTimerHistory && panelTimerHistory.totalElapsedMs > 0 && (
-          <div className="mt-4">
-            <Card className="border-dashed">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Total time logged for this panel:</span>
-                    <Badge variant="secondary" className="font-mono text-base" data-testid="badge-total-elapsed-time">
-                      {formatTimer(panelTimerHistory.totalElapsedMs)}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">
-                      ({panelTimerHistory.sessionCount} session{panelTimerHistory.sessionCount !== 1 ? 's' : ''})
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setHistoryExpanded(!historyExpanded)}
-                    data-testid="button-toggle-timer-history"
-                  >
-                    {historyExpanded ? (
-                      <><ChevronDown className="h-4 w-4 mr-1" /> Hide History</>
-                    ) : (
-                      <><ChevronRight className="h-4 w-4 mr-1" /> View History</>
-                    )}
-                  </Button>
-                </div>
-                
-                {historyExpanded && panelTimerHistory.sessions.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <div className="text-sm font-medium text-muted-foreground mb-2">Timer Sessions</div>
-                    <div className="divide-y divide-border rounded-lg border">
-                      {panelTimerHistory.sessions.map((session) => (
-                        <div key={session.id} className="p-3 flex items-center justify-between" data-testid={`timer-session-${session.id}`}>
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-medium">
-                                {session.completedAt ? format(new Date(session.completedAt), "MMM d, yyyy h:mm a") : "In Progress"}
-                              </span>
-                              {session.workTypeName && (
-                                <Badge variant="outline" className="text-xs">{session.workTypeName}</Badge>
-                              )}
-                            </div>
-                            {session.notes && (
-                              <span className="text-xs text-muted-foreground">{session.notes}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="font-mono">
-                              {formatTimer(session.totalElapsedMs)}
-                            </Badge>
-                            {session.pauseCount > 0 && (
-                              <span className="text-xs text-muted-foreground">
-                                ({session.pauseCount} pause{session.pauseCount !== 1 ? 's' : ''})
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            New Time Entry
-          </CardTitle>
-          <CardDescription>
-            Enter your time worked with the same detail as the automatic tracking
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-3">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              {/* SECTION 1: Panel Selection at top */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                  <ClipboardList className="h-4 w-4" />
+                  Panel Selection
+                </div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <Checkbox 
+                    id="add-new-panel" 
+                    checked={addNewPanel}
+                    onCheckedChange={(checked) => {
+                      setAddNewPanel(checked === true);
+                      if (checked) {
+                        form.setValue("panelRegisterId", "");
+                      } else {
+                        setNewPanelMark("");
+                      }
+                    }}
+                    disabled={!selectedJobId || selectedJobId === "none"}
+                    data-testid="checkbox-add-new-panel"
+                  />
+                  <label 
+                    htmlFor="add-new-panel" 
+                    className={`text-sm leading-none ${(!selectedJobId || selectedJobId === "none") ? 'text-muted-foreground' : 'cursor-pointer'}`}
+                  >
+                    Add new panel to register
+                  </label>
+                </div>
+
+                {addNewPanel && newPanelMark && (
+                  <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                    <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <AlertDescription className="text-blue-800 dark:text-blue-200">
+                      Panel "<strong>{newPanelMark}</strong>" will be added to the Panel Register when you save.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="jobId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1 text-xs">
+                          <Briefcase className="h-3 w-3" />
+                          Job
+                        </FormLabel>
+                        <Select onValueChange={handleJobChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-job">
+                              <SelectValue placeholder="Select job" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No job selected</SelectItem>
+                            {jobs?.filter(j => j.status === "ACTIVE").map((job) => (
+                              <SelectItem key={job.id} value={job.id}>
+                                {job.jobNumber} - {job.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {!addNewPanel ? (
+                    <FormField
+                      control={form.control}
+                      name="panelRegisterId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1 text-xs">
+                            <ClipboardList className="h-3 w-3" />
+                            Panel
+                          </FormLabel>
+                          <Select 
+                            onValueChange={field.onChange} 
+                            value={field.value || ""}
+                            disabled={!selectedJobId || selectedJobId === "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-panel">
+                                <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-[400px]">
+                              <SelectItem value="none">No panel selected</SelectItem>
+                              {groupedPanels && Object.entries(groupedPanels)
+                                .sort(([keyA], [keyB]) => keyA.localeCompare(keyB, undefined, { numeric: true }))
+                                .map(([key, { building, level, panels: groupPanels }]) => (
+                                <SelectGroup key={key}>
+                                  <SelectLabel className="bg-muted/50 text-xs font-semibold py-1.5">
+                                    Bldg: {building} / Level: {level}
+                                  </SelectLabel>
+                                  {groupPanels?.map((panel) => (
+                                    <SelectItem key={panel.id} value={panel.id}>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-mono font-medium">{panel.panelMark}</span>
+                                        <span className="text-muted-foreground text-xs">
+                                          {panel.panelType || "WALL"}
+                                        </span>
+                                        {getStatusBadge(panel.status)}
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                </SelectGroup>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  ) : (
+                    <div className="space-y-2">
+                      <FormLabel className="flex items-center gap-1 text-xs">
+                        <ClipboardList className="h-3 w-3" />
+                        New Panel Mark
+                      </FormLabel>
+                      <Input 
+                        placeholder="e.g., PM-001" 
+                        value={newPanelMark}
+                        onChange={(e) => setNewPanelMark(e.target.value)}
+                        disabled={!selectedJobId || selectedJobId === "none"}
+                        data-testid="input-new-panel-mark"
+                      />
+                    </div>
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="workTypeId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1 text-xs">
+                          <Briefcase className="h-3 w-3" />
+                          Work Type
+                        </FormLabel>
+                        <Select 
+                          onValueChange={field.onChange} 
+                          value={field.value || ""}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-work-type">
+                              <SelectValue placeholder="Select work type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No work type</SelectItem>
+                            {workTypes?.map((wt) => (
+                              <SelectItem key={wt.id} value={String(wt.id)}>
+                                {wt.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Timer Widget - inline, compact */}
+              {(hasActiveTimer || (selectedPanelId && selectedPanelId !== "none")) && (
+                <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 flex-wrap">
+                  <Timer className="h-5 w-5 text-muted-foreground shrink-0" />
+                  <div className="shrink-0">
+                    <p className="font-medium text-sm">
+                      {hasActiveTimer 
+                        ? (isTimerForSelectedPanel 
+                            ? `${selectedPanel?.panelMark || "Panel"}` 
+                            : `${activeTimer?.panelMark || "Unknown Panel"}`)
+                        : `${selectedPanel?.panelMark || "None"}`}
+                    </p>
+                  </div>
+                  
+                  {hasActiveTimer && (
+                    <div className="text-xl font-mono font-bold tabular-nums shrink-0 text-red-500">
+                      {formatTimer(timerElapsed)}
+                    </div>
+                  )}
+
+                  {/* Elapsed time from previous sessions in red */}
+                  {selectedPanelId && selectedPanelId !== "none" && panelTimerHistory && panelTimerHistory.totalElapsedMs > 0 && (
+                    <span className="text-sm font-mono font-semibold text-red-500 shrink-0" data-testid="badge-total-elapsed-time">
+                      ({formatTimer(panelTimerHistory.totalElapsedMs)} total)
+                    </span>
+                  )}
+
+                  <div className="flex items-center gap-2 ml-auto shrink-0">
+                    {!hasActiveTimer && selectedPanelId && selectedPanelId !== "none" && (
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={() => {
+                          const jobId = form.getValues("jobId");
+                          if (jobId && selectedPanelId) {
+                            startTimerMutation.mutate({ jobId, panelRegisterId: selectedPanelId });
+                          }
+                        }}
+                        disabled={startTimerMutation.isPending || !selectedJobId}
+                        data-testid="button-start-timer-header"
+                      >
+                        {startTimerMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                        ) : (
+                          <Play className="h-4 w-4 mr-1" />
+                        )}
+                        Start
+                      </Button>
+                    )}
+
+                    {isTimerForSelectedPanel && activeTimer?.status === "RUNNING" && activeTimer?.id && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => pauseTimerMutation.mutate(activeTimer.id)}
+                        disabled={pauseTimerMutation.isPending}
+                        data-testid="button-pause-timer-header"
+                      >
+                        <Pause className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {isTimerForSelectedPanel && activeTimer?.status === "PAUSED" && activeTimer?.id && (
+                      <Button
+                        type="button"
+                        variant="default"
+                        size="sm"
+                        onClick={() => resumeTimerMutation.mutate(activeTimer.id)}
+                        disabled={resumeTimerMutation.isPending}
+                        data-testid="button-resume-timer-header"
+                      >
+                        <Play className="h-4 w-4" />
+                      </Button>
+                    )}
+
+                    {isTimerForSelectedPanel && activeTimer?.id && (
+                      <>
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={() => {
+                            const workTypeId = form.getValues("workTypeId");
+                            stopTimerMutation.mutate({ 
+                              timerId: activeTimer.id,
+                              workTypeId: workTypeId && workTypeId !== "none" ? parseInt(workTypeId) : undefined 
+                            });
+                          }}
+                          disabled={stopTimerMutation.isPending}
+                          data-testid="button-stop-timer-header"
+                        >
+                          <Square className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
+                          disabled={cancelTimerMutation.isPending}
+                          data-testid="button-cancel-timer-header"
+                        >
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      </>
+                    )}
+
+                    {hasActiveTimer && !isTimerForSelectedPanel && activeTimer?.id && (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => cancelTimerMutation.mutate(activeTimer.id)}
+                        disabled={cancelTimerMutation.isPending}
+                        data-testid="button-cancel-other-timer-header"
+                      >
+                        <XCircle className="h-4 w-4 mr-1" />
+                        Stop
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 2: Consolidated Date/Time/Application/Status */}
+              <div className="grid gap-3 md:grid-cols-5">
                 <FormField
                   control={form.control}
                   name="logDay"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Date</FormLabel>
+                      <FormLabel className="text-xs">Date</FormLabel>
                       <FormControl>
                         <Input 
                           type="date" 
@@ -1211,7 +1347,7 @@ export default function ManualEntryPage() {
                   name="startTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Start Time</FormLabel>
+                      <FormLabel className="text-xs">Start</FormLabel>
                       <FormControl>
                         <Input type="time" {...field} data-testid="input-start-time" />
                       </FormControl>
@@ -1225,7 +1361,7 @@ export default function ManualEntryPage() {
                   name="endTime"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>End Time</FormLabel>
+                      <FormLabel className="text-xs">End</FormLabel>
                       <FormControl>
                         <Input type="time" {...field} data-testid="input-end-time" />
                       </FormControl>
@@ -1233,19 +1369,17 @@ export default function ManualEntryPage() {
                     </FormItem>
                   )}
                 />
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="app"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Application</FormLabel>
+                      <FormLabel className="text-xs">Application</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger data-testid="select-app">
-                            <SelectValue placeholder="Select application" />
+                            <SelectValue placeholder="App" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -1258,22 +1392,17 @@ export default function ManualEntryPage() {
                   )}
                 />
 
-                {/* Document Status next to Application - only show when panel selected */}
-                {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" && (
+                {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" ? (
                   <FormItem>
-                    <FormLabel>Document Status</FormLabel>
+                    <FormLabel className="text-xs">Doc Status</FormLabel>
                     <Select
                       value={selectedPanel.documentStatus || "DRAFT"}
                       onValueChange={(value) => {
-                        // When changing from DRAFT to IFA, expand panel details and validate
                         if (value === "IFA" && selectedPanel.documentStatus === "DRAFT") {
-                          // Expand panel details
                           setPanelDetailsExpanded(true);
-                          // Check if required fields are filled
                           const loadWidth = form.getValues("panelLoadWidth");
                           const loadHeight = form.getValues("panelLoadHeight");
                           const thickness = form.getValues("panelThickness");
-                          
                           if (!loadWidth || !loadHeight || !thickness) {
                             toast({
                               title: "Panel Details Required",
@@ -1295,202 +1424,25 @@ export default function ManualEntryPage() {
                       disabled={updateDocumentStatusMutation.isPending}
                     >
                       <SelectTrigger data-testid="select-document-status-header">
-                        <SelectValue placeholder="Select status" />
+                        <SelectValue placeholder="Status" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="DRAFT">DRAFT</SelectItem>
-                        <SelectItem value="IFA">IFA (Issued for Approval)</SelectItem>
-                        <SelectItem value="IFC">IFC (Issued for Construction)</SelectItem>
+                        <SelectItem value="IFA">IFA</SelectItem>
+                        <SelectItem value="IFC">IFC</SelectItem>
                         <SelectItem 
                           value="APPROVED" 
                           disabled={!canApproveForProduction || selectedPanel.documentStatus !== "IFC"}
                         >
-                          Approved for Production {!canApproveForProduction && "(Manager/Admin only)"}
+                          Approved
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
-                      DRAFT → IFA → IFC → Approved
-                    </p>
                   </FormItem>
+                ) : (
+                  <div />
                 )}
               </div>
-
-              <Card className="bg-muted/30">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <ClipboardList className="h-4 w-4" />
-                    Panel Register Selection
-                  </CardTitle>
-                  <CardDescription className="text-sm">
-                    Link this entry to a panel from the register for automatic tracking
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id="add-new-panel" 
-                      checked={addNewPanel}
-                      onCheckedChange={(checked) => {
-                        setAddNewPanel(checked === true);
-                        if (checked) {
-                          form.setValue("panelRegisterId", "");
-                        } else {
-                          setNewPanelMark("");
-                        }
-                      }}
-                      disabled={!selectedJobId || selectedJobId === "none"}
-                      data-testid="checkbox-add-new-panel"
-                    />
-                    <label 
-                      htmlFor="add-new-panel" 
-                      className={`text-sm font-medium leading-none ${(!selectedJobId || selectedJobId === "none") ? 'text-muted-foreground' : 'cursor-pointer'}`}
-                    >
-                      Add new panel to register
-                    </label>
-                  </div>
-
-                  {addNewPanel && newPanelMark && (
-                    <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                      <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                      <AlertDescription className="text-blue-800 dark:text-blue-200">
-                        Panel "<strong>{newPanelMark}</strong>" will be automatically added to the Panel Register for this job when you save this entry.
-                      </AlertDescription>
-                    </Alert>
-                  )}
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <FormField
-                      control={form.control}
-                      name="jobId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-1">
-                            <Briefcase className="h-3 w-3" />
-                            Job
-                          </FormLabel>
-                          <Select onValueChange={handleJobChange} value={field.value || ""}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-job">
-                                <SelectValue placeholder="Select job (optional)" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No job selected</SelectItem>
-                              {jobs?.filter(j => j.status === "ACTIVE").map((job) => (
-                                <SelectItem key={job.id} value={job.id}>
-                                  {job.jobNumber} - {job.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription className="text-xs">Select job to filter panels</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {!addNewPanel ? (
-                      <FormField
-                        control={form.control}
-                        name="panelRegisterId"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="flex items-center gap-1">
-                              <ClipboardList className="h-3 w-3" />
-                              Panel
-                            </FormLabel>
-                            <Select 
-                              onValueChange={field.onChange} 
-                              value={field.value || ""}
-                              disabled={!selectedJobId || selectedJobId === "none"}
-                            >
-                              <FormControl>
-                                <SelectTrigger data-testid="select-panel">
-                                  <SelectValue placeholder={selectedJobId ? "Select panel" : "Select job first"} />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent className="max-h-[400px]">
-                                <SelectItem value="none">No panel selected</SelectItem>
-                                {groupedPanels && Object.entries(groupedPanels)
-                                  .sort(([keyA], [keyB]) => keyA.localeCompare(keyB, undefined, { numeric: true }))
-                                  .map(([key, { building, level, panels: groupPanels }]) => (
-                                  <SelectGroup key={key}>
-                                    <SelectLabel className="bg-muted/50 text-xs font-semibold py-1.5">
-                                      Bldg: {building} / Level: {level}
-                                    </SelectLabel>
-                                    {groupPanels?.map((panel) => (
-                                      <SelectItem key={panel.id} value={panel.id}>
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-mono font-medium">{panel.panelMark}</span>
-                                          <span className="text-muted-foreground text-xs">
-                                            {panel.panelType || "WALL"}
-                                          </span>
-                                          {getStatusBadge(panel.status)}
-                                        </div>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectGroup>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormDescription className="text-xs">Auto-fills drawing code when selected</FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        <FormLabel className="flex items-center gap-1">
-                          <ClipboardList className="h-3 w-3" />
-                          New Panel Mark
-                        </FormLabel>
-                        <Input 
-                          placeholder="e.g., PM-001" 
-                          value={newPanelMark}
-                          onChange={(e) => setNewPanelMark(e.target.value)}
-                          disabled={!selectedJobId || selectedJobId === "none"}
-                          data-testid="input-new-panel-mark"
-                        />
-                        <p className="text-xs text-muted-foreground">Enter the panel mark for the new panel</p>
-                      </div>
-                    )}
-
-                    <FormField
-                      control={form.control}
-                      name="workTypeId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="flex items-center gap-1">
-                            <Briefcase className="h-3 w-3" />
-                            Work Type
-                          </FormLabel>
-                          <Select 
-                            onValueChange={field.onChange} 
-                            value={field.value || ""}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-work-type">
-                                <SelectValue placeholder="Select work type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="none">No work type</SelectItem>
-                              {workTypes?.map((wt) => (
-                                <SelectItem key={wt.id} value={String(wt.id)}>
-                                  {wt.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription className="text-xs">Categorize the type of drafting work</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
 
               {/* Panel Details Section - collapsible, shows when panel is selected */}
               {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" && (
@@ -1651,39 +1603,40 @@ export default function ManualEntryPage() {
                 </Card>
               )}
 
-              <FormField
-                control={form.control}
-                name="drawingCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Drawing Code</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
-                    </FormControl>
-                    <FormDescription>Drawing reference code (auto-filled when panel selected)</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid gap-3 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="drawingCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Drawing Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Textarea 
-                        placeholder="Any additional notes about this time entry..." 
-                        className="resize-none"
-                        {...field} 
-                        data-testid="input-notes"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Notes</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Any additional notes..." 
+                          className="resize-none"
+                          {...field} 
+                          data-testid="input-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="flex justify-end gap-3">
                 <Button 
@@ -1707,6 +1660,114 @@ export default function ManualEntryPage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Collapsible Audit History Pane */}
+      {selectedPanelId && selectedPanelId !== "none" && panelAuditLogs && panelAuditLogs.length > 0 && (
+        <Card>
+          <CardHeader 
+            className="pb-3 cursor-pointer select-none"
+            onClick={() => setAuditHistoryExpanded(!auditHistoryExpanded)}
+            data-testid="audit-history-header"
+          >
+            <CardTitle className="text-base flex items-center gap-2">
+              {auditHistoryExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+              <History className="h-4 w-4" />
+              Panel Audit History
+              <Badge variant="secondary" className="ml-1">{panelAuditLogs.length}</Badge>
+            </CardTitle>
+          </CardHeader>
+          {auditHistoryExpanded && (
+            <CardContent className="pt-0">
+              <div className="divide-y divide-border rounded-lg border max-h-[300px] overflow-y-auto">
+                {panelAuditLogs.map((log) => (
+                  <div key={log.id} className="p-3 flex items-center justify-between gap-2" data-testid={`audit-log-${log.id}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-sm font-medium shrink-0 ${getAuditActionColor(log.action)}`}>
+                        {formatAuditAction(log.action)}
+                      </span>
+                      {log.changedFields && log.changedFields.totalElapsedMs && (
+                        <span className="text-xs text-red-500 font-mono font-semibold shrink-0">
+                          {formatTimer(log.changedFields.totalElapsedMs)}
+                        </span>
+                      )}
+                      {log.changedFields && log.changedFields.durationMinutes && (
+                        <Badge variant="outline" className="text-xs shrink-0">
+                          {log.changedFields.durationMinutes} min
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {format(new Date(log.createdAt), "MMM d, h:mm a")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
+
+      {/* Timer Session History */}
+      {selectedPanelId && selectedPanelId !== "none" && panelTimerHistory && panelTimerHistory.sessions.length > 0 && (
+        <Card>
+          <CardHeader 
+            className="pb-3 cursor-pointer select-none"
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            data-testid="button-toggle-timer-history"
+          >
+            <CardTitle className="text-base flex items-center gap-2">
+              {historyExpanded ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+              <Clock className="h-4 w-4" />
+              Timer Sessions
+              <Badge variant="secondary" className="ml-1">{panelTimerHistory.sessionCount}</Badge>
+              <span className="text-sm font-mono text-red-500 font-semibold ml-auto" data-testid="badge-total-elapsed-sessions">
+                Total: {formatTimer(panelTimerHistory.totalElapsedMs)}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          {historyExpanded && (
+            <CardContent className="pt-0">
+              <div className="divide-y divide-border rounded-lg border">
+                {panelTimerHistory.sessions.map((session) => (
+                  <div key={session.id} className="p-3 flex items-center justify-between" data-testid={`timer-session-${session.id}`}>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {session.completedAt ? format(new Date(session.completedAt), "MMM d, yyyy h:mm a") : "In Progress"}
+                        </span>
+                        {session.workTypeName && (
+                          <Badge variant="outline" className="text-xs">{session.workTypeName}</Badge>
+                        )}
+                      </div>
+                      {session.notes && (
+                        <span className="text-xs text-muted-foreground">{session.notes}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="secondary" className="font-mono">
+                        {formatTimer(session.totalElapsedMs)}
+                      </Badge>
+                      {session.pauseCount > 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          ({session.pauseCount} pause{session.pauseCount !== 1 ? 's' : ''})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      )}
 
       {/* Production Approval Dialog */}
       <Dialog open={productionDialogOpen} onOpenChange={(open) => !open && closeProductionDialog()}>
