@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import {
@@ -14,6 +14,10 @@ import {
   Loader2,
   Filter,
   Briefcase,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ExternalLink,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
@@ -70,6 +74,265 @@ function getStatusColor(status: string): string {
     case "SUPERSEDED": return "text-white/40 bg-white/10";
     default: return "text-white/60 bg-white/10";
   }
+}
+
+function PinchZoomImageViewer({ src, alt }: { src: string; alt: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const scaleRef = useRef(1);
+  const translateRef = useRef({ x: 0, y: 0 });
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const [loading, setLoading] = useState(true);
+  const [isGesturing, setIsGesturing] = useState(false);
+
+  const pinchRef = useRef<{ dist: number; cx: number; cy: number; scale: number; tx: number; ty: number } | null>(null);
+  const panRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null);
+  const lastTapRef = useRef(0);
+
+  const [imgLoaded, setImgLoaded] = useState(false);
+
+  const getContentBounds = useCallback(() => {
+    if (!containerRef.current || !imgRef.current || !imgLoaded) return { maxX: 0, maxY: 0 };
+    const cRect = containerRef.current.getBoundingClientRect();
+    const img = imgRef.current;
+    const natW = img.naturalWidth;
+    const natH = img.naturalHeight;
+    if (!natW || !natH) return { maxX: 0, maxY: 0 };
+    const fitScale = Math.min(cRect.width / natW, cRect.height / natH);
+    const displayW = natW * fitScale * scaleRef.current;
+    const displayH = natH * fitScale * scaleRef.current;
+    return {
+      maxX: Math.max(0, (displayW - cRect.width) / 2),
+      maxY: Math.max(0, (displayH - cRect.height) / 2),
+    };
+  }, [imgLoaded]);
+
+  const clamp = useCallback((tx: number, ty: number) => {
+    const { maxX, maxY } = getContentBounds();
+    return {
+      x: Math.max(-maxX, Math.min(maxX, tx)),
+      y: Math.max(-maxY, Math.min(maxY, ty)),
+    };
+  }, [getContentBounds]);
+
+  const applyTransform = useCallback((s: number, t: { x: number; y: number }, animate = false) => {
+    scaleRef.current = s;
+    translateRef.current = t;
+    setScale(s);
+    setTranslate(t);
+    setIsGesturing(!animate);
+  }, []);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchRef.current = {
+        dist: Math.hypot(dx, dy),
+        cx: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        cy: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+        scale: scaleRef.current,
+        tx: translateRef.current.x,
+        ty: translateRef.current.y,
+      };
+      panRef.current = null;
+      setIsGesturing(true);
+    } else if (e.touches.length === 1 && scaleRef.current > 1.01) {
+      panRef.current = {
+        startX: e.touches[0].clientX,
+        startY: e.touches[0].clientY,
+        tx: translateRef.current.x,
+        ty: translateRef.current.y,
+      };
+      setIsGesturing(true);
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const ratio = newDist / pinchRef.current.dist;
+      const newScale = Math.max(0.5, Math.min(5, pinchRef.current.scale * ratio));
+
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (rect) {
+        const originX = cx - rect.left - rect.width / 2;
+        const originY = cy - rect.top - rect.height / 2;
+        const scaleDelta = newScale / pinchRef.current.scale;
+        const newTx = pinchRef.current.tx + originX * (1 - scaleDelta);
+        const newTy = pinchRef.current.ty + originY * (1 - scaleDelta);
+
+        const clamped = clamp(newTx, newTy);
+        applyTransform(newScale, clamped);
+      }
+    } else if (e.touches.length === 1 && panRef.current && scaleRef.current > 1.01) {
+      e.preventDefault();
+      const dx = e.touches[0].clientX - panRef.current.startX;
+      const dy = e.touches[0].clientY - panRef.current.startY;
+      const clamped = clamp(panRef.current.tx + dx, panRef.current.ty + dy);
+      applyTransform(scaleRef.current, clamped);
+    }
+  }, [clamp, applyTransform]);
+
+  const resetGesture = useCallback(() => {
+    pinchRef.current = null;
+    panRef.current = null;
+    setIsGesturing(false);
+    if (scaleRef.current < 1) {
+      applyTransform(1, { x: 0, y: 0 }, true);
+    }
+  }, [applyTransform]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    resetGesture();
+    if (e.touches.length === 0) {
+      const now = Date.now();
+      if (now - lastTapRef.current < 300) {
+        if (scaleRef.current > 1.1) {
+          applyTransform(1, { x: 0, y: 0 }, true);
+        } else {
+          applyTransform(2.5, { x: 0, y: 0 }, true);
+        }
+        lastTapRef.current = 0;
+      } else {
+        lastTapRef.current = now;
+      }
+    }
+  }, [applyTransform, resetGesture]);
+
+  const zoomIn = useCallback(() => {
+    const s = Math.min(5, scaleRef.current * 1.5);
+    applyTransform(s, clamp(translateRef.current.x, translateRef.current.y), true);
+  }, [clamp, applyTransform]);
+
+  const zoomOut = useCallback(() => {
+    const s = Math.max(1, scaleRef.current / 1.5);
+    const t = s <= 1 ? { x: 0, y: 0 } : clamp(translateRef.current.x, translateRef.current.y);
+    applyTransform(s, t, true);
+  }, [clamp, applyTransform]);
+
+  const resetZoom = useCallback(() => {
+    applyTransform(1, { x: 0, y: 0 }, true);
+  }, [applyTransform]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div
+        ref={containerRef}
+        className="flex-1 overflow-hidden relative bg-[#1a1a2e]"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={resetGesture}
+        style={{ touchAction: scale > 1.01 ? "none" : "pan-y" }}
+        data-testid="pinch-zoom-container"
+      >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+          </div>
+        )}
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{
+            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+            transformOrigin: "center center",
+            transition: isGesturing ? "none" : "transform 0.2s ease-out",
+            willChange: "transform",
+          }}
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt={alt}
+            className="max-w-full max-h-full object-contain select-none"
+            onLoad={() => { setLoading(false); setImgLoaded(true); }}
+            draggable={false}
+            data-testid="doc-viewer-image"
+          />
+        </div>
+      </div>
+      <ZoomControls scale={scale} onZoomIn={zoomIn} onZoomOut={zoomOut} onReset={resetZoom} />
+    </div>
+  );
+}
+
+function PdfViewer({ src, alt }: { src: string; alt: string }) {
+  const [loading, setLoading] = useState(true);
+
+  const openInBrowser = useCallback(() => {
+    window.open(src, "_blank");
+  }, [src]);
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden">
+      <div
+        className="flex-1 overflow-auto relative bg-white"
+        style={{ WebkitOverflowScrolling: "touch" } as any}
+        data-testid="pdf-scroll-container"
+      >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center z-10 bg-[#1a1a2e]">
+            <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+          </div>
+        )}
+        <iframe
+          src={src}
+          className="w-full h-full border-0"
+          title={alt}
+          onLoad={() => setLoading(false)}
+          data-testid="doc-viewer-iframe"
+        />
+      </div>
+      <div className="flex-shrink-0 flex items-center justify-center gap-3 py-2 bg-[#0D1117] border-t border-white/10">
+        <button
+          onClick={openInBrowser}
+          className="flex items-center justify-center gap-2 h-9 rounded-xl bg-blue-500/20 px-4 active:scale-[0.99]"
+          data-testid="button-open-pdf-browser"
+        >
+          <ExternalLink className="h-4 w-4 text-blue-400" />
+          <span className="text-sm text-blue-400 font-medium">Open for Full Zoom</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ZoomControls({ scale, onZoomIn, onZoomOut, onReset }: { scale: number; onZoomIn: () => void; onZoomOut: () => void; onReset: () => void }) {
+  return (
+    <div className="flex-shrink-0 flex items-center justify-center gap-4 py-2 bg-[#0D1117] border-t border-white/10">
+      <button
+        onClick={onZoomOut}
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 active:scale-[0.99]"
+        data-testid="button-zoom-out"
+      >
+        <ZoomOut className="h-4 w-4 text-white/80" />
+      </button>
+      <button
+        onClick={onReset}
+        className="flex h-9 items-center justify-center rounded-xl bg-white/10 px-3 active:scale-[0.99]"
+        data-testid="button-zoom-reset"
+      >
+        <RotateCcw className="h-3.5 w-3.5 text-white/80 mr-1.5" />
+        <span className="text-xs text-white/80 font-medium">{Math.round(scale * 100)}%</span>
+      </button>
+      <button
+        onClick={onZoomIn}
+        className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 active:scale-[0.99]"
+        data-testid="button-zoom-in"
+      >
+        <ZoomIn className="h-4 w-4 text-white/80" />
+      </button>
+    </div>
+  );
 }
 
 export default function MobileDocumentsPage() {
@@ -192,14 +455,19 @@ export default function MobileDocumentsPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden flex flex-col relative">
           {isViewable ? (
-            <iframe
-              src={`/api/documents/${selectedDoc.id}/view`}
-              className="flex-1 w-full bg-white"
-              title={selectedDoc.title}
-              data-testid="doc-viewer-iframe"
-            />
+            selectedDoc.mimeType.startsWith("image/") ? (
+              <PinchZoomImageViewer
+                src={`/api/documents/${selectedDoc.id}/view`}
+                alt={selectedDoc.title}
+              />
+            ) : (
+              <PdfViewer
+                src={`/api/documents/${selectedDoc.id}/view`}
+                alt={selectedDoc.title}
+              />
+            )
           ) : (
             <div className="flex-1 flex flex-col items-center justify-center px-4">
               <FileIcon className="h-16 w-16 text-white/40 mb-4" />
