@@ -13,11 +13,14 @@ import { pool } from "./db";
 
 const app = express();
 
+const isDev = process.env.NODE_ENV !== "production";
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "blob:"],
+      scriptSrc: isDev
+        ? ["'self'", "'unsafe-inline'", "'unsafe-eval'", "blob:"]
+        : ["'self'", "'unsafe-inline'", "blob:"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],

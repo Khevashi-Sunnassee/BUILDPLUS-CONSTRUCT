@@ -331,7 +331,22 @@ export default function AdminJobsPage() {
       client: "",
       customerId: null,
       address: "",
+      city: "",
+      state: null,
       description: "",
+      craneCapacity: "",
+      numberOfBuildings: null,
+      levels: "",
+      lowestLevel: "",
+      highestLevel: "",
+      productionStartDate: "",
+      expectedCycleTimePerFloor: null,
+      daysInAdvance: null,
+      daysToAchieveIfc: null,
+      productionWindowDays: null,
+      productionDaysInAdvance: null,
+      procurementDaysInAdvance: null,
+      procurementTimeDays: null,
       siteContact: "",
       siteContactPhone: "",
       status: "ACTIVE",
@@ -352,7 +367,15 @@ export default function AdminJobsPage() {
       jobForm.reset();
     },
     onError: (error: any) => {
-      toast({ title: "Failed to create job", description: error.message, variant: "destructive" });
+      let msg = error.message || "Unknown error";
+      try {
+        const jsonMatch = msg.match(/\{.*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          msg = parsed.error || parsed.message || msg;
+        }
+      } catch {}
+      toast({ title: "Failed to create job", description: msg, variant: "destructive" });
     },
   });
 
@@ -390,7 +413,15 @@ export default function AdminJobsPage() {
       }
     },
     onError: (error: any) => {
-      toast({ title: "Failed to update job", description: error.message, variant: "destructive" });
+      let msg = error.message || "Unknown error";
+      try {
+        const jsonMatch = msg.match(/\{.*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          msg = parsed.error || parsed.message || msg;
+        }
+      } catch {}
+      toast({ title: "Failed to update job", description: msg, variant: "destructive" });
     },
   });
 
@@ -792,6 +823,13 @@ export default function AdminJobsPage() {
     } else {
       createJobMutation.mutate(data);
     }
+  };
+
+  const onFormError = (errors: any) => {
+    const errorMessages = Object.entries(errors)
+      .map(([field, err]: [string, any]) => `${field}: ${err?.message || "invalid"}`)
+      .join(", ");
+    toast({ title: "Please fix form errors", description: errorMessages, variant: "destructive" });
   };
 
   const getStatusBadge = (status: string) => {
@@ -1236,7 +1274,7 @@ export default function AdminJobsPage() {
           </DialogHeader>
           
           <Form {...jobForm}>
-            <form onSubmit={jobForm.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={jobForm.handleSubmit(onSubmit, onFormError)} className="space-y-4">
           <Tabs value={editDialogTab} onValueChange={setEditDialogTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="details" data-testid="tab-job-details">Job Details</TabsTrigger>
