@@ -1444,6 +1444,41 @@ export default function ManualEntryPage() {
                 )}
               </div>
 
+              <div className="grid gap-3 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="drawingCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Drawing Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Notes</FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          placeholder="Any additional notes..." 
+                          className="resize-none"
+                          {...field} 
+                          data-testid="input-notes"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               {/* Panel Details Section - collapsible, shows when panel is selected */}
               {selectedPanel && watchedPanelRegisterId && watchedPanelRegisterId !== "none" && (
                 <Card className="bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
@@ -1602,41 +1637,6 @@ export default function ManualEntryPage() {
                   )}
                 </Card>
               )}
-
-              <div className="grid gap-3 md:grid-cols-2">
-                <FormField
-                  control={form.control}
-                  name="drawingCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Drawing Code</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., DWG-001" {...field} data-testid="input-drawing-code" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Notes</FormLabel>
-                      <FormControl>
-                        <Textarea 
-                          placeholder="Any additional notes..." 
-                          className="resize-none"
-                          {...field} 
-                          data-testid="input-notes"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
 
               <div className="flex justify-end gap-3">
                 <Button 
