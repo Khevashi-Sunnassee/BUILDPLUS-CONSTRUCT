@@ -1,0 +1,183 @@
+Complete Document Overlay Reproduction Prompt
+Here's the detailed prompt you'd give to Replit Agent in a new project:
+
+SYSTEM OVERVIEW
+Build a PDF Document Visual Comparison Tool that lets users:
+
+Upload two PDF documents (original and revised versions)
+Generate a visual diff overlay showing differences highlighted in color
+View results page-by-page with navigation
+Download individual diff pages or a combined PDF
+TECH STACK
+Frontend: React + TypeScript + Vite + Tailwind CSS + shadcn/ui
+Backend: Node.js + Express
+Database: PostgreSQL with Drizzle ORM
+PDF Processing: Python script using PyMuPDF (fitz), Pillow (PIL), and NumPy
+AI Summary (optional): OpenAI GPT-4o for text comparison summaries
+DATABASE TABLES NEEDED
+documents table:
+
+- id (serial, primary key)
+- name (varchar) - document title
+- description (text, nullable)
+- category (varchar, nullable)
+- file_path (varchar) - relative path from uploads/
+- file_type (varchar) - mime type e.g. "application/pdf"
+- file_size (integer)
+- original_name (varchar) - original uploaded filename
+- uploaded_by (varchar) - user who uploaded
+- uploaded_at (timestamp, default now())
+- company_id (integer, nullable) - for multi-tenant
+- version (varchar, nullable) - version label
+- revision (varchar, nullable) - revision label
+- overlay_file_url (text, nullable) - path to generated overlay
+- overlay_summary (text, nullable) - AI-generated summary
+BACKEND API ENDPOINTS
+1. GET /api/documents/search?limit=100
+Returns list of documents, filtered by company. Response: { documents: [...] }
+
+2. POST /api/documents/visual-diff
+Main endpoint. Accepts:
+
+{
+  "originalDocumentId": 123,
+  "revisedDocumentId": 456,
+  "mode": "overlay",       // or "side_by_side"
+  "sensitivity": 30,       // pixel diff threshold, 5-100
+  "dpi": 150               // PDF render resolution
+}
+This endpoint:
+
+Looks up both documents in the database
+Gets their file paths on disk
+Creates a temp output directory under /tmp/visual_diff_{timestamp}/
+Spawns a Python child process running visualDiffService.py with arguments: original_path revised_path --output-dir /tmp/... --mode overlay --sensitivity 30 --dpi 150
+Parses the JSON output from the Python script
+Returns response:
+{
+  "success": true,
+  "totalPages": 5,
+  "changesDetected": true,
+  "pages": [
+    { "page": 1, "hasChanges": true, "url": "/api/documents/visual-diff-output?path=/tmp/..." },
+    { "page": 2, "hasChanges": false, "url": "..." }
+  ],
+  "combinedPdfUrl": "/api/documents/visual-diff-output?path=/tmp/.../visual_diff.pdf"
+}
+3. GET /api/documents/visual-diff-output?path=...
+Serves generated diff images/PDFs from the temp directory. Validates the path starts with /tmp/ for security.
+
+PYTHON VISUAL DIFF ENGINE (server/visualDiffService.py - 329 lines)
+This is the core processing engine. It requires these Python packages: PyMuPDF, Pillow, numpy.
+
+Key Functions:
+
+pdf_to_images(pdf_path, dpi=150) - Converts each PDF page to a PIL Image using PyMuPDF. Uses matrix scaling for DPI (zoom = dpi / 72).
+
+normalize_image_sizes(img1, img2) - Pads the smaller image with white background so both are the same dimensions.
+
+create_overlay_diff(original, revised, sensitivity=30) - THE CORE ALGORITHM:
+
+Convert both images to numpy arrays (int16)
+Calculate absolute pixel difference per channel
+Sum RGB differences to get diff_magnitude
+Create changed_mask where magnitude > sensitivity threshold
+Compare brightness: if original is darker = "removed", if revised is darker = "added"
+Start with revised document as base
+Apply 40% alpha color overlays:
+Red (255,150,150) for removed content
+Green (150,255,150) for added content
+Return the composited image
+create_diff_image(original, revised, sensitivity=30) - Alternative mode showing:
+
+Gray blended base of both documents
+Red (255,100,100) for removed content
+Green (100,255,100) for added content
+Orange (255,200,100) for modified content
+create_side_by_side(original, revised, diff) - Creates a triple-width image: Original | Revised | Differences with labels
+
+process_pdfs(original_path, revised_path, output_dir, mode, sensitivity, dpi) - Main orchestrator:
+
+Converts both PDFs to images
+Processes each page pair
+Saves diff images as PNG
+Creates a combined PDF of all diff pages using PIL's PDF export
+Returns JSON with pages array and change detection flags
+FRONTEND PAGE (/document-overlay route - 600 lines)
+Layout: Two-column grid on desktop (1/3 controls + 2/3 results)
+
+Left Panel - Document Selection Card:
+
+Two <Select> dropdowns listing all PDF documents from GET /api/documents/search
+Documents filtered to show only application/pdf mime types
+Labels show: title | version/revision (size KB)
+Sensitivity slider (range 5-100, step 5, default 30) with description
+"Comparison Preview" box showing selected document names
+"Generate Visual Diff" button (disabled during loading)
+Color Legend box: Red = Removed, Green = Added, Orange = Modified
+Right Panel - Results Card:
+
+Loading state with spinner during processing
+Success/failure alert banner
+Page selector dropdown showing Page X (changes) labels
+"View PDF" button to open combined PDF in new tab
+"Download Page" button for individual page PNG download
+Main image display area (max-height 70vh, object-fit contain)
+Page thumbnail strip at bottom for multi-page docs (horizontal scrollable)
+URL Parameter Support:
+
+Supports ?original=123&revised=456 URL params
+Auto-triggers comparison when both params present
+Mutation: POST /api/documents/visual-diff via TanStack Query mutation
+
+SECONDARY OVERLAY SERVICE (Nutrient/PDF4me - Optional)
+There are two alternative overlay services for different approaches:
+
+nutrientOverlayService.ts (470 lines) - Uses Python PyMuPDF directly:
+
+Creates transparent blue-tinted overlay of revised doc on top of original
+Original renders in black, revised renders in semi-transparent blue
+Adds "OVERLAY LEGEND" box on each page
+Renders at 300 DPI (2.5x matrix scaling)
+Saves with PDF compression (garbage=4, deflate=True)
+Also has generateAiChangeSummary() using OpenAI to compare extracted text
+pdf4meOverlayService.ts (328 lines) - Uses PDF4me cloud API:
+
+Sends both PDFs as base64 to PDF4ME_BASE_URL/Merge/MergePdfOverlay
+Uses Basic Auth
+Saves result to uploads/overlays/
+Has OpenAI Vision integration for AI summary (converts PDFs to images, sends to GPT-4o)
+Supports batch version comparison via createVersionOverlays()
+SYSTEM DEPENDENCIES NEEDED
+Python packages (install via pip):
+
+PyMuPDF (imported as fitz)
+Pillow (imported as PIL)
+numpy
+Node packages:
+
+express, drizzle-orm, openai, form-data, node-fetch
+Frontend packages:
+
+react, @tanstack/react-query, wouter, lucide-react
+shadcn/ui components: Card, Select, Button, Slider, Alert, Label
+FILE STRUCTURE
+client/src/pages/DocumentOverlay.tsx    (600 lines - frontend page)
+server/visualDiffService.py             (329 lines - Python diff engine)
+server/services/nutrientOverlayService.ts  (470 lines - alternative overlay)
+server/services/pdf4meOverlayService.ts    (328 lines - alternative overlay)
+server/routes.ts                        (visual-diff endpoints)
+HOW THE FLOW WORKS END-TO-END
+User navigates to /document-overlay
+Page loads all PDF documents from the database
+User selects Original document and Revised document from dropdowns
+User adjusts sensitivity slider (optional)
+User clicks "Generate Visual Diff"
+Frontend POSTs to /api/documents/visual-diff
+Backend retrieves both document file paths from database
+Backend spawns Python process: python3 visualDiffService.py <original> <revised> -o /tmp/dir -m overlay -s 30 -d 150
+Python converts PDFs to images, computes pixel-level differences, creates color-coded overlay images
+Python outputs JSON with page paths and change detection
+Backend transforms paths into URLs: /api/documents/visual-diff-output?path=...
+Frontend displays result page-by-page with navigation, thumbnails, download options
+That's the complete blueprint. You can copy this entire prompt and give it to Replit Agent in a new project to reproduce the overlay functionality.
