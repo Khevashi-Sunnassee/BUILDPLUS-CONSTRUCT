@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
@@ -13,8 +13,6 @@ import {
   Trash2,
   ChevronDown,
   ChevronRight,
-  Layers,
-  Briefcase,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,18 +47,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import type { ChecklistInstance, ChecklistTemplate, Job } from "@shared/schema";
 import { CHECKLIST_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
-
-type GroupByOption = "status" | "job" | "none";
+import { format } from "date-fns";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
   draft: { label: "Draft", variant: "secondary", icon: FileText },
@@ -70,15 +59,15 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
   cancelled: { label: "Cancelled", variant: "destructive", icon: AlertCircle },
 };
 
-const STATUS_ORDER = ["draft", "in_progress", "completed", "signed_off", "cancelled"];
+const STATUS_ORDER = ["in_progress", "draft", "completed", "signed_off", "cancelled"];
 
 export default function ChecklistsPage() {
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [groupBy, setGroupBy] = useState<GroupByOption>("status");
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
+  const [collapsedStatuses, setCollapsedStatuses] = useState<Record<string, boolean>>({});
   const [newChecklistDialogOpen, setNewChecklistDialogOpen] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [selectedJobId, setSelectedJobId] = useState<string>("");
@@ -161,94 +150,73 @@ export default function ChecklistsPage() {
     });
   }, [instances, searchTerm, statusFilter, templates, jobs]);
 
-  type GroupItem = {
-    key: string;
+  type StatusGroup = {
+    status: string;
     label: string;
-    items: ChecklistInstance[];
-    icon: React.ElementType | null;
+    icon: React.ElementType;
     variant: "default" | "secondary" | "destructive" | "outline";
+    items: ChecklistInstance[];
   };
 
-  const groupedInstances = useMemo((): GroupItem[] => {
+  type ModuleGroup = {
+    templateId: string;
+    templateName: string;
+    totalCount: number;
+    statusGroups: StatusGroup[];
+  };
+
+  const groupedByModule = useMemo((): ModuleGroup[] => {
     if (!filteredInstances.length) return [];
 
-    if (groupBy === "none") {
-      return [{ key: "all", label: "All Checklists", items: filteredInstances, icon: null, variant: "secondary" }];
-    }
+    const moduleMap: Record<string, ChecklistInstance[]> = {};
+    filteredInstances.forEach((instance) => {
+      const key = instance.templateId;
+      if (!moduleMap[key]) moduleMap[key] = [];
+      moduleMap[key].push(instance);
+    });
 
-    if (groupBy === "status") {
-      const groups: Record<string, ChecklistInstance[]> = {};
-      filteredInstances.forEach((instance) => {
-        const key = instance.status;
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(instance);
-      });
-      return STATUS_ORDER
-        .filter((status) => groups[status]?.length > 0)
-        .map((status) => {
-          const config = STATUS_CONFIG[status];
-          return {
-            key: status,
-            label: config?.label || status,
-            items: groups[status],
-            icon: config?.icon || FileText,
-            variant: config?.variant || "secondary",
-          };
+    return Object.entries(moduleMap)
+      .map(([templateId, items]) => {
+        const templateName = getTemplateName(templateId);
+
+        const statusMap: Record<string, ChecklistInstance[]> = {};
+        items.forEach((item) => {
+          if (!statusMap[item.status]) statusMap[item.status] = [];
+          statusMap[item.status].push(item);
         });
-    }
 
-    if (groupBy === "job") {
-      const groups: Record<string, ChecklistInstance[]> = {};
-      const unassigned: ChecklistInstance[] = [];
-      filteredInstances.forEach((instance) => {
-        if (instance.jobId) {
-          if (!groups[instance.jobId]) groups[instance.jobId] = [];
-          groups[instance.jobId].push(instance);
-        } else {
-          unassigned.push(instance);
-        }
-      });
+        const statusGroups: StatusGroup[] = STATUS_ORDER
+          .filter((s) => statusMap[s]?.length > 0)
+          .map((s) => {
+            const config = STATUS_CONFIG[s];
+            const sortedItems = [...statusMap[s]].sort(
+              (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+            );
+            return {
+              status: s,
+              label: config?.label || s,
+              icon: config?.icon || FileText,
+              variant: config?.variant || ("secondary" as const),
+              items: sortedItems,
+            };
+          });
 
-      const result: GroupItem[] = Object.entries(groups)
-        .map(([jobId, items]) => {
-          const jobName = getJobName(jobId) || "Unknown Job";
-          return {
-            key: jobId,
-            label: jobName,
-            items,
-            icon: Briefcase as React.ElementType,
-            variant: "outline" as const,
-          };
-        })
-        .sort((a, b) => a.label.localeCompare(b.label));
+        return {
+          templateId,
+          templateName,
+          totalCount: items.length,
+          statusGroups,
+        };
+      })
+      .sort((a, b) => a.templateName.localeCompare(b.templateName));
+  }, [filteredInstances, templates]);
 
-      if (unassigned.length > 0) {
-        result.push({
-          key: "unassigned",
-          label: "No Job Assigned",
-          items: unassigned,
-          icon: FileText,
-          variant: "secondary",
-        });
-      }
-
-      return result;
-    }
-
-    return [];
-  }, [filteredInstances, groupBy, jobs]);
-
-  const toggleGroupCollapse = (key: string) => {
-    setCollapsedGroups((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  const toggleModuleCollapse = (key: string) => {
+    setCollapsedModules((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const getGroupProgress = (items: ChecklistInstance[]) => {
-    if (!items.length) return 0;
-    const total = items.reduce((sum, item) => sum + Number(item.completionRate || 0), 0);
-    return Math.round(total / items.length);
+  const toggleStatusCollapse = (key: string) => {
+    setCollapsedStatuses((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   const activeTemplates = templates?.filter((t) => t.isActive) || [];
@@ -270,7 +238,7 @@ export default function ChecklistsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-checklists-title">
             <FileText className="h-6 w-6" />
             Checklists
           </h1>
@@ -314,17 +282,6 @@ export default function ChecklistsPage() {
                 <SelectItem value="signed_off" data-testid="option-status-signed-off">Signed Off</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={groupBy} onValueChange={(v) => { setGroupBy(v as GroupByOption); setCollapsedGroups({}); }}>
-              <SelectTrigger className="w-[180px]" data-testid="select-group-by">
-                <Layers className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Group by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="status" data-testid="option-group-status">Group by Status</SelectItem>
-                <SelectItem value="job" data-testid="option-group-job">Group by Job</SelectItem>
-                <SelectItem value="none" data-testid="option-group-none">No Grouping</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
         </CardContent>
       </Card>
@@ -348,148 +305,142 @@ export default function ChecklistsPage() {
           )}
         </Card>
       ) : (
-        <div className="space-y-0">
-          <Table className="table-fixed w-full">
-            <colgroup>
-              <col style={{ width: "40%" }} />
-              {groupBy !== "job" && <col style={{ width: "15%" }} />}
-              {groupBy !== "status" && <col style={{ width: "12%" }} />}
-              <col style={{ width: "18%" }} />
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "15%" }} />
-            </colgroup>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Template</TableHead>
-                {groupBy !== "job" && <TableHead>Job</TableHead>}
-                {groupBy !== "status" && <TableHead>Status</TableHead>}
-                <TableHead>Progress</TableHead>
-                <TableHead>Started</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groupedInstances.map((group) => {
-                const isCollapsed = collapsedGroups[group.key] === true;
-                const avgProgress = getGroupProgress(group.items);
-                const GroupIcon = group.icon;
-                const colSpan = 4 + (groupBy !== "job" ? 1 : 0) + (groupBy !== "status" ? 1 : 0);
+        <div className="space-y-4">
+          {groupedByModule.map((module) => {
+            const isModuleCollapsed = collapsedModules[module.templateId] === true;
 
-                return (
-                  <Fragment key={group.key}>
-                    {groupBy !== "none" && (
-                      <TableRow
-                        className="hover:bg-transparent cursor-pointer"
-                        data-testid={`group-${group.key}`}
-                      >
-                        <TableCell
-                          colSpan={colSpan}
-                          className="px-0 py-0"
-                        >
-                          <button
-                            onClick={() => toggleGroupCollapse(group.key)}
-                            className="flex items-center gap-3 w-full py-3 px-4 text-left hover-elevate rounded-md"
-                            data-testid={`button-toggle-group-${group.key}`}
-                          >
-                            {isCollapsed ? (
-                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                            ) : (
-                              <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                            )}
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              {GroupIcon && <GroupIcon className="h-4 w-4 shrink-0" />}
-                              <span className="font-semibold truncate" data-testid={`text-group-label-${group.key}`}>{group.label}</span>
-                              <Badge variant="secondary" className="shrink-0" data-testid={`badge-group-count-${group.key}`}>
-                                {group.items.length}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                              <Progress value={avgProgress} className="h-2 w-24" />
-                              <span className="text-xs text-muted-foreground w-10 text-right" data-testid={`text-group-progress-${group.key}`}>
-                                {avgProgress}%
-                              </span>
-                            </div>
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                    {!isCollapsed && group.items.map((instance) => {
-                      const statusConfig = STATUS_CONFIG[instance.status];
-                      const StatusIcon = statusConfig?.icon || FileText;
-                      const completionRate = Number(instance.completionRate || 0);
+            return (
+              <Card key={module.templateId} data-testid={`module-group-${module.templateId}`}>
+                <button
+                  onClick={() => toggleModuleCollapse(module.templateId)}
+                  className="flex items-center gap-3 w-full py-3 px-4 text-left hover-elevate rounded-t-md"
+                  data-testid={`button-toggle-module-${module.templateId}`}
+                >
+                  {isModuleCollapsed ? (
+                    <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-muted-foreground shrink-0" />
+                  )}
+                  <FileText className="h-5 w-5 shrink-0 text-primary" />
+                  <span className="font-semibold text-base truncate" data-testid={`text-module-name-${module.templateId}`}>
+                    {module.templateName}
+                  </span>
+                  <Badge variant="secondary" className="shrink-0 ml-auto" data-testid={`badge-module-count-${module.templateId}`}>
+                    {module.totalCount}
+                  </Badge>
+                </button>
 
-                      return (
-                        <TableRow key={instance.id} data-testid={`row-checklist-${instance.id}`}>
-                          <TableCell className="font-medium truncate">
-                            <div className="truncate">
-                              {getTemplateName(instance.templateId)}
-                              {instance.instanceNumber && (
-                                <span className="text-xs text-muted-foreground ml-2">
-                                  #{instance.instanceNumber}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          {groupBy !== "job" && (
-                            <TableCell>
-                              {instance.jobId ? (
-                                <span className="text-sm">{getJobName(instance.jobId)}</span>
+                {!isModuleCollapsed && (
+                  <CardContent className="pt-0 pb-3 px-3">
+                    <div className="space-y-2">
+                      {module.statusGroups.map((sg) => {
+                        const statusKey = `${module.templateId}-${sg.status}`;
+                        const isStatusCollapsed = collapsedStatuses[statusKey] === true;
+                        const StatusIcon = sg.icon;
+
+                        return (
+                          <div key={sg.status} className="border rounded-md" data-testid={`status-group-${statusKey}`}>
+                            <button
+                              onClick={() => toggleStatusCollapse(statusKey)}
+                              className="flex items-center gap-2 w-full py-2 px-3 text-left text-sm hover-elevate rounded-md"
+                              data-testid={`button-toggle-status-${statusKey}`}
+                            >
+                              {isStatusCollapsed ? (
+                                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                               ) : (
-                                <span className="text-muted-foreground">-</span>
+                                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                               )}
-                            </TableCell>
-                          )}
-                          {groupBy !== "status" && (
-                            <TableCell>
-                              <Badge variant={statusConfig?.variant || "secondary"}>
+                              <Badge variant={sg.variant} className="shrink-0">
                                 <StatusIcon className="h-3 w-3 mr-1" />
-                                {statusConfig?.label || instance.status}
+                                {sg.label}
                               </Badge>
-                            </TableCell>
-                          )}
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Progress value={completionRate} className="h-2 flex-1" />
-                              <span className="text-xs text-muted-foreground w-10">
-                                {completionRate.toFixed(0)}%
+                              <span className="text-xs text-muted-foreground ml-auto shrink-0">
+                                {sg.items.length} item{sg.items.length !== 1 ? "s" : ""}
                               </span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {new Date(instance.startedAt).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button variant="outline" size="sm" asChild data-testid={`button-open-checklist-${instance.id}`}>
-                                <Link href={`/checklists/${instance.id}`}>
-                                  {instance.status === "completed" || instance.status === "signed_off"
-                                    ? "View"
-                                    : "Continue"}
-                                </Link>
-                              </Button>
-                              {instance.status === "draft" && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => {
-                                    setDeletingInstanceId(instance.id);
-                                    setDeleteDialogOpen(true);
-                                  }}
-                                  data-testid={`button-delete-checklist-${instance.id}`}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </Fragment>
-                );
-              })}
-            </TableBody>
-          </Table>
+                            </button>
+
+                            {!isStatusCollapsed && (
+                              <div className="border-t">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-xs text-muted-foreground border-b">
+                                      <th className="text-left py-2 px-3 font-medium">Checklist #</th>
+                                      <th className="text-left py-2 px-3 font-medium">Job</th>
+                                      <th className="text-left py-2 px-3 font-medium">Progress</th>
+                                      <th className="text-left py-2 px-3 font-medium">Date</th>
+                                      <th className="text-right py-2 px-3 font-medium">Actions</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {sg.items.map((instance, idx) => {
+                                      const completionRate = Number(instance.completionRate || 0);
+                                      return (
+                                        <tr
+                                          key={instance.id}
+                                          className={idx % 2 === 0 ? "bg-muted/30" : ""}
+                                          data-testid={`row-checklist-${instance.id}`}
+                                        >
+                                          <td className="py-2 px-3 font-medium">
+                                            {instance.instanceNumber ? `#${instance.instanceNumber}` : "-"}
+                                          </td>
+                                          <td className="py-2 px-3">
+                                            {instance.jobId ? (
+                                              <span className="text-sm">{getJobName(instance.jobId)}</span>
+                                            ) : (
+                                              <span className="text-muted-foreground">-</span>
+                                            )}
+                                          </td>
+                                          <td className="py-2 px-3">
+                                            <div className="flex items-center gap-2">
+                                              <Progress value={completionRate} className="h-2 w-20" />
+                                              <span className="text-xs text-muted-foreground w-10">
+                                                {completionRate.toFixed(0)}%
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="py-2 px-3 text-muted-foreground">
+                                            {format(new Date(instance.startedAt), "dd/MM/yyyy")}
+                                          </td>
+                                          <td className="py-2 px-3 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                              <Button variant="outline" size="sm" asChild data-testid={`button-open-checklist-${instance.id}`}>
+                                                <Link href={`/checklists/${instance.id}`}>
+                                                  {instance.status === "completed" || instance.status === "signed_off"
+                                                    ? "View"
+                                                    : "Continue"}
+                                                </Link>
+                                              </Button>
+                                              {instance.status === "draft" && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="icon"
+                                                  onClick={() => {
+                                                    setDeletingInstanceId(instance.id);
+                                                    setDeleteDialogOpen(true);
+                                                  }}
+                                                  data-testid={`button-delete-checklist-${instance.id}`}
+                                                >
+                                                  <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
 
