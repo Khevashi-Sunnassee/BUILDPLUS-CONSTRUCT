@@ -15,8 +15,12 @@ async function verifyEotClaimOwnership(claimJobId: string, companyId: string): P
 
 router.get("/api/eot-claims", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId!;
     const claims = await storage.getEotClaims();
-    res.json(claims);
+    const companyJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, companyId));
+    const companyJobIds = new Set(companyJobs.map(j => j.id));
+    const filtered = claims.filter(c => companyJobIds.has(c.jobId));
+    res.json(filtered);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching EOT claims");
     res.status(500).json({ error: "Failed to fetch EOT claims" });
@@ -25,7 +29,13 @@ router.get("/api/eot-claims", requireAuth, async (req, res) => {
 
 router.get("/api/eot-claims/by-job/:jobId", requireAuth, async (req, res) => {
   try {
-    const claims = await storage.getEotClaimsByJob(String(req.params.jobId));
+    const companyId = req.companyId!;
+    const jobId = String(req.params.jobId);
+    const [job] = await db.select({ companyId: jobs.companyId }).from(jobs).where(eq(jobs.id, jobId));
+    if (!job || job.companyId !== companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const claims = await storage.getEotClaimsByJob(jobId);
     res.json(claims);
   } catch (error: any) {
     logger.error({ err: error }, "Error fetching EOT claims by job");
@@ -35,8 +45,13 @@ router.get("/api/eot-claims/by-job/:jobId", requireAuth, async (req, res) => {
 
 router.get("/api/eot-claims/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.companyId!;
     const claim = await storage.getEotClaim(String(req.params.id));
     if (!claim) {
+      return res.status(404).json({ error: "EOT claim not found" });
+    }
+    const isOwned = await verifyEotClaimOwnership(claim.jobId, companyId);
+    if (!isOwned) {
       return res.status(404).json({ error: "EOT claim not found" });
     }
     res.json(claim);
