@@ -1,10 +1,11 @@
 import { db } from "../db";
 import { panelAuditLogs, panelRegister, type InsertPanelAuditLog } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import logger from "../lib/logger";
 
 export function logPanelAudit(entry: InsertPanelAuditLog): void {
   db.insert(panelAuditLogs).values(entry).catch((err) => {
-    console.error("[PanelAudit] Failed to log audit entry:", err?.message || err);
+    logger.error({ err, panelId: entry.panelId }, "Failed to log panel audit entry");
   });
 }
 
@@ -54,7 +55,7 @@ export async function updatePanelLifecycleStatus(
       newLifecycleStatus: newStatus,
     });
   } catch (err: any) {
-    console.error("[PanelAudit] Failed to update lifecycle status:", err?.message || err);
+    logger.error({ err, panelId }, "Failed to update panel lifecycle status");
   }
 }
 
@@ -86,6 +87,6 @@ export async function advancePanelLifecycleIfLower(
       newLifecycleStatus: targetStatus,
     });
   } catch (err: any) {
-    console.error("[PanelAudit] Failed to advance lifecycle status:", err?.message || err);
+    logger.error({ err, panelId }, "Failed to advance panel lifecycle status");
   }
 }

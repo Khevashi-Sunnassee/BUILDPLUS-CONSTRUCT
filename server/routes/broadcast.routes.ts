@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { broadcastService } from "../services/broadcast.service";
 import { insertBroadcastTemplateSchema, insertBroadcastMessageSchema } from "@shared/schema";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -147,7 +148,7 @@ router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
     });
 
     broadcastService.sendBroadcast(broadcastMessage.id).catch((err) => {
-      console.error("Broadcast send error:", err);
+      logger.error({ err, broadcastId: broadcastMessage.id }, "Broadcast send error");
     });
 
     res.status(201).json(broadcastMessage);

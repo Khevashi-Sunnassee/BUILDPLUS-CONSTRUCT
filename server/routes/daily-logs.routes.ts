@@ -9,18 +9,22 @@ import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 const router = Router();
 
 router.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), async (req, res) => {
-  const user = await storage.getUser(req.session.userId!);
-  if (!user) return res.status(401).json({ error: "Unauthorized" });
+  try {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
 
-  const logs = await storage.getDailyLogsByUser(user.id, {
-    status: req.query.status as string,
-    dateRange: req.query.dateRange as string,
-  });
+    const logs = await storage.getDailyLogsByUser(user.id, {
+      status: req.query.status as string,
+      dateRange: req.query.dateRange as string,
+    });
 
-  const logsWithStats = [];
-  for (const log of logs) {
-    const fullLog = await storage.getDailyLog(log.id);
-    if (fullLog) {
+    const enrichedLogs = await Promise.all(
+      logs.map(log => storage.getDailyLog(log.id))
+    );
+
+    const logsWithStats = [];
+    for (const fullLog of enrichedLogs) {
+      if (!fullLog) continue;
       const totalMinutes = fullLog.rows.reduce((sum, r) => sum + r.durationMin, 0);
       const idleMinutes = fullLog.rows.reduce((sum, r) => sum + r.idleMin, 0);
       const missingPanelMarkMinutes = fullLog.rows.filter(r => !r.panelMark).reduce((sum, r) => sum + r.durationMin, 0);
@@ -35,10 +39,10 @@ router.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), a
       }
       
       logsWithStats.push({
-        id: log.id,
-        logDay: log.logDay,
-        factory: log.factory,
-        status: log.status,
+        id: fullLog.id,
+        logDay: fullLog.logDay,
+        factory: fullLog.factory,
+        status: fullLog.status,
         totalMinutes,
         idleMinutes,
         missingPanelMarkMinutes,
@@ -67,8 +71,11 @@ router.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), a
         },
       });
     }
+    res.json(logsWithStats);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching daily logs");
+    res.status(500).json({ error: "Failed to fetch daily logs" });
   }
-  res.json(logsWithStats);
 });
 
 router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "VIEW_AND_UPDATE"), async (req, res) => {

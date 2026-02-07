@@ -1,4 +1,4 @@
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   trailerTypes, loadLists, loadListPanels, deliveryRecords, panelRegister, jobs, users,
@@ -71,30 +71,47 @@ export class LogisticsRepository {
   }
 
   private async getLoadListDetails(list: LoadList): Promise<LoadListWithDetails> {
-    const [job] = list.jobId ? await db.select().from(jobs).where(eq(jobs.id, list.jobId)) : [];
-    const [trailer] = list.trailerTypeId ? await db.select().from(trailerTypes).where(eq(trailerTypes.id, list.trailerTypeId)) : [];
-    const [delivery] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, list.id));
-    const [createdByUser] = list.createdById ? await db.select().from(users).where(eq(users.id, list.createdById)) : [];
-    
-    const panelLinks = await db.select().from(loadListPanels)
-      .where(eq(loadListPanels.loadListId, list.id))
-      .orderBy(asc(loadListPanels.sequence));
+    const [jobPromise, trailerPromise, deliveryPromise, createdByPromise, panelLinksPromise, returnRecordPromise] = await Promise.all([
+      list.jobId ? db.select().from(jobs).where(eq(jobs.id, list.jobId)) : Promise.resolve([]),
+      list.trailerTypeId ? db.select().from(trailerTypes).where(eq(trailerTypes.id, list.trailerTypeId)) : Promise.resolve([]),
+      db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, list.id)),
+      list.createdById ? db.select().from(users).where(eq(users.id, list.createdById)) : Promise.resolve([]),
+      db.select().from(loadListPanels).where(eq(loadListPanels.loadListId, list.id)).orderBy(asc(loadListPanels.sequence)),
+      db.select().from(loadReturns).where(eq(loadReturns.loadListId, list.id)),
+    ]);
+
+    const [job] = jobPromise;
+    const [trailer] = trailerPromise;
+    const [delivery] = deliveryPromise;
+    const [createdByUser] = createdByPromise;
+    const panelLinks = panelLinksPromise;
+    const [returnRecord] = returnRecordPromise;
+
+    const panelIds = panelLinks.map(l => l.panelId);
+    const panelsMap = new Map<string, PanelRegister>();
+    if (panelIds.length > 0) {
+      const panelsList = await db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds));
+      for (const p of panelsList) panelsMap.set(p.id, p);
+    }
     
     const panels: (LoadListPanel & { panel: PanelRegister })[] = [];
     for (const link of panelLinks) {
-      const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, link.panelId));
-      if (panel) {
-        panels.push({ ...link, panel });
-      }
+      const panel = panelsMap.get(link.panelId);
+      if (panel) panels.push({ ...link, panel });
     }
     
     let loadReturn: LoadReturnWithPanels | undefined;
-    const [returnRecord] = await db.select().from(loadReturns).where(eq(loadReturns.loadListId, list.id));
     if (returnRecord) {
       const returnPanelLinks = await db.select().from(loadReturnPanels).where(eq(loadReturnPanels.loadReturnId, returnRecord.id));
+      const returnPanelIds = returnPanelLinks.map(rp => rp.panelId);
+      const returnPanelsMap = new Map<string, PanelRegister>();
+      if (returnPanelIds.length > 0) {
+        const rpList = await db.select().from(panelRegister).where(inArray(panelRegister.id, returnPanelIds));
+        for (const p of rpList) returnPanelsMap.set(p.id, p);
+      }
       const returnPanels: (LoadReturnPanel & { panel: PanelRegister })[] = [];
       for (const rp of returnPanelLinks) {
-        const [panel] = await db.select().from(panelRegister).where(eq(panelRegister.id, rp.panelId));
+        const panel = returnPanelsMap.get(rp.panelId);
         if (panel) returnPanels.push({ ...rp, panel });
       }
       const [returnedByUser] = returnRecord.returnedById ? await db.select().from(users).where(eq(users.id, returnRecord.returnedById)) : [];

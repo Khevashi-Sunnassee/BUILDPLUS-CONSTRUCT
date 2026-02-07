@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   dailyLogs, logRows, approvalEvents, weeklyWageReports, weeklyJobReports, weeklyJobReportSchedules,
@@ -26,12 +26,20 @@ export class ReportsRepository {
     if (!user) return undefined;
     
     const rows = await db.select().from(logRows).where(eq(logRows.dailyLogId, id)).orderBy(asc(logRows.startAt));
-    const enrichedRows: (LogRow & { job?: Job })[] = [];
     
-    for (const row of rows) {
-      const [job] = row.jobId ? await db.select().from(jobs).where(eq(jobs.id, row.jobId)) : [];
-      enrichedRows.push({ ...row, job: job || undefined });
+    const jobIds = [...new Set(rows.filter(r => r.jobId).map(r => r.jobId!))];
+    const jobsMap = new Map<string, Job>();
+    if (jobIds.length > 0) {
+      const jobsList = await db.select().from(jobs).where(inArray(jobs.id, jobIds));
+      for (const job of jobsList) {
+        jobsMap.set(job.id, job);
+      }
     }
+    
+    const enrichedRows = rows.map(row => ({
+      ...row,
+      job: row.jobId ? jobsMap.get(row.jobId) : undefined,
+    }));
     
     return { ...log, rows: enrichedRows, user };
   }
@@ -45,11 +53,36 @@ export class ReportsRepository {
 
   async getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]> {
     const logs = await db.select().from(dailyLogs).where(eq(dailyLogs.status, "SUBMITTED")).orderBy(desc(dailyLogs.logDay));
-    const result: (DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[] = [];
+    if (logs.length === 0) return [];
     
+    const logIds = logs.map(l => l.id);
+    const userIds = [...new Set(logs.map(l => l.userId))];
+    
+    const [allRows, allUsers] = await Promise.all([
+      db.select().from(logRows).where(inArray(logRows.dailyLogId, logIds)).orderBy(asc(logRows.startAt)),
+      db.select().from(users).where(inArray(users.id, userIds)),
+    ]);
+    
+    const jobIds = [...new Set(allRows.filter(r => r.jobId).map(r => r.jobId!))];
+    const jobsMap = new Map<string, Job>();
+    if (jobIds.length > 0) {
+      const jobsList = await db.select().from(jobs).where(inArray(jobs.id, jobIds));
+      for (const job of jobsList) jobsMap.set(job.id, job);
+    }
+    
+    const usersMap = new Map(allUsers.map(u => [u.id, u]));
+    const rowsByLog = new Map<string, (LogRow & { job?: Job })[]>();
+    for (const row of allRows) {
+      const enriched = { ...row, job: row.jobId ? jobsMap.get(row.jobId) : undefined };
+      if (!rowsByLog.has(row.dailyLogId)) rowsByLog.set(row.dailyLogId, []);
+      rowsByLog.get(row.dailyLogId)!.push(enriched);
+    }
+    
+    const result: (DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[] = [];
     for (const log of logs) {
-      const enriched = await this.getDailyLog(log.id);
-      if (enriched) result.push(enriched);
+      const user = usersMap.get(log.userId);
+      if (!user) continue;
+      result.push({ ...log, rows: rowsByLog.get(log.id) || [], user });
     }
     
     return result;
