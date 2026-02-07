@@ -17,12 +17,24 @@ import logger from "../lib/logger";
 
 const router = Router();
 
+function safeParseFinancial(value: string | null | undefined, fallback: number = 0): number {
+  if (value === null || value === undefined || value === "") return fallback;
+  const parsed = parseFloat(value);
+  if (isNaN(parsed) || !isFinite(parsed)) return fallback;
+  return parsed;
+}
+
 async function calculateRetention(
   companyId: string,
   jobId: string,
   subtotal: number,
   excludeClaimId?: string
 ): Promise<{ retentionRate: number; retentionAmount: number; retentionHeldToDate: number }> {
+  if (isNaN(subtotal) || !isFinite(subtotal)) {
+    logger.warn({ companyId, jobId, subtotal }, "Invalid subtotal passed to calculateRetention");
+    return { retentionRate: 0, retentionAmount: 0, retentionHeldToDate: 0 };
+  }
+
   const [contract] = await db
     .select({
       retentionPercentage: contracts.retentionPercentage,
@@ -33,9 +45,14 @@ async function calculateRetention(
     .from(contracts)
     .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId)));
 
-  const retentionRate = parseFloat(contract?.retentionPercentage || "10");
-  const retentionCapPct = parseFloat(contract?.retentionCap || "5");
-  const contractValue = parseFloat(contract?.revisedContractValue || contract?.originalContractValue || "0");
+  const retentionRate = safeParseFinancial(contract?.retentionPercentage, 10);
+  const retentionCapPct = safeParseFinancial(contract?.retentionCap, 5);
+  const contractValue = safeParseFinancial(contract?.revisedContractValue || contract?.originalContractValue, 0);
+
+  if (retentionRate < 0 || retentionRate > 100) {
+    logger.warn({ retentionRate, jobId }, "Retention rate out of valid range (0-100)");
+    return { retentionRate: 0, retentionAmount: 0, retentionHeldToDate: 0 };
+  }
 
   const retentionCapAmount = contractValue > 0 ? contractValue * retentionCapPct / 100 : Infinity;
 
@@ -55,7 +72,7 @@ async function calculateRetention(
     .from(progressClaims)
     .where(and(...conditions));
 
-  const previousRetention = parseFloat(existingRetention[0]?.totalRetention || "0");
+  const previousRetention = safeParseFinancial(existingRetention[0]?.totalRetention, 0);
 
   let thisClaimRetention = subtotal * retentionRate / 100;
 
@@ -65,8 +82,8 @@ async function calculateRetention(
 
   return {
     retentionRate,
-    retentionAmount: parseFloat(thisClaimRetention.toFixed(2)),
-    retentionHeldToDate: parseFloat((previousRetention + thisClaimRetention).toFixed(2)),
+    retentionAmount: safeParseFinancial(thisClaimRetention.toFixed(2), 0),
+    retentionHeldToDate: safeParseFinancial((previousRetention + thisClaimRetention).toFixed(2), 0),
   };
 }
 
@@ -141,7 +158,7 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
       ]);
 
       for (const row of approvedClaimTotals) {
-        claimedToDateByJob[row.jobId] = parseFloat(row.totalApproved || "0");
+        claimedToDateByJob[row.jobId] = safeParseFinancial(row.totalApproved, 0);
       }
 
       const ptMap = new Map(allPT.map(pt => [pt.code, pt]));
@@ -165,10 +182,10 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
           const pt = ptMap.get(panel.panelType);
           const ptId = pt?.id;
           const jr = ptId ? jrMap.get(ptId) : null;
-          const sellRateM2 = parseFloat(jr?.sellRatePerM2 || pt?.sellRatePerM2 || "0");
-          const sellRateM3 = parseFloat(jr?.sellRatePerM3 || pt?.sellRatePerM3 || "0");
-          const area = parseFloat(panel.panelArea || "0");
-          const volume = parseFloat(panel.panelVolume || "0");
+          const sellRateM2 = safeParseFinancial(jr?.sellRatePerM2 || pt?.sellRatePerM2, 0);
+          const sellRateM3 = safeParseFinancial(jr?.sellRatePerM3 || pt?.sellRatePerM3, 0);
+          const area = safeParseFinancial(panel.panelArea, 0);
+          const volume = safeParseFinancial(panel.panelVolume, 0);
           if (sellRateM2 > 0 && area > 0) totalValue += sellRateM2 * area;
           else if (sellRateM3 > 0 && volume > 0) totalValue += sellRateM3 * volume;
         }
@@ -251,9 +268,9 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
         .where(and(eq(contracts.companyId, companyId), inArray(contracts.jobId, jobIds)));
 
       for (const c of allContracts) {
-        const rate = parseFloat(c.retentionPercentage || "10");
-        const capPct = parseFloat(c.retentionCap || "5");
-        const cv = parseFloat(c.revisedContractValue || c.originalContractValue || "0");
+        const rate = safeParseFinancial(c.retentionPercentage, 10);
+        const capPct = safeParseFinancial(c.retentionCap, 5);
+        const cv = safeParseFinancial(c.revisedContractValue || c.originalContractValue, 0);
         contractMap[c.jobId] = {
           retentionRate: rate,
           retentionCapPct: capPct,
@@ -285,7 +302,7 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
     for (const group of Object.values(jobGroups) as any[]) {
       let running = 0;
       for (const claim of group.claims) {
-        running += parseFloat(claim.retentionAmount || "0");
+        running += safeParseFinancial(claim.retentionAmount, 0);
         claim.cumulativeRetention = running.toFixed(2);
       }
       group.totalRetentionHeld = running.toFixed(2);
@@ -438,10 +455,10 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
       const ptId = pt?.id;
       const jobRate = ptId ? jobRateMap.get(ptId) : null;
 
-      const sellRateM2 = parseFloat(jobRate?.sellRatePerM2 || pt?.sellRatePerM2 || "0");
-      const sellRateM3 = parseFloat(jobRate?.sellRatePerM3 || pt?.sellRatePerM3 || "0");
-      const area = parseFloat(panel.panelArea || "0");
-      const volume = parseFloat(panel.panelVolume || "0");
+      const sellRateM2 = safeParseFinancial(jobRate?.sellRatePerM2 || pt?.sellRatePerM2, 0);
+      const sellRateM3 = safeParseFinancial(jobRate?.sellRatePerM3 || pt?.sellRatePerM3, 0);
+      const area = safeParseFinancial(panel.panelArea, 0);
+      const volume = safeParseFinancial(panel.panelVolume, 0);
 
       let revenue = 0;
       if (sellRateM2 > 0 && area > 0) {
@@ -487,7 +504,7 @@ router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: R
         eq(progressClaims.status, "APPROVED"),
       ));
 
-    const claimedToDate = parseFloat(approvedTotals[0]?.totalApproved || "0");
+    const claimedToDate = safeParseFinancial(approvedTotals[0]?.totalApproved, 0);
 
     const panels = await db
       .select({
@@ -508,10 +525,10 @@ router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: R
       const pt = ptMap.get(panel.panelType);
       const ptId = pt?.id;
       const jr = ptId ? jrMap.get(ptId) : null;
-      const sellRateM2 = parseFloat(jr?.sellRatePerM2 || pt?.sellRatePerM2 || "0");
-      const sellRateM3 = parseFloat(jr?.sellRatePerM3 || pt?.sellRatePerM3 || "0");
-      const area = parseFloat(panel.panelArea || "0");
-      const volume = parseFloat(panel.panelVolume || "0");
+      const sellRateM2 = safeParseFinancial(jr?.sellRatePerM2 || pt?.sellRatePerM2, 0);
+      const sellRateM3 = safeParseFinancial(jr?.sellRatePerM3 || pt?.sellRatePerM3, 0);
+      const area = safeParseFinancial(panel.panelArea, 0);
+      const volume = safeParseFinancial(panel.panelVolume, 0);
       if (sellRateM2 > 0 && area > 0) contractValue += sellRateM2 * area;
       else if (sellRateM3 > 0 && volume > 0) contractValue += sellRateM3 * volume;
     }
@@ -557,12 +574,12 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
     }).returning();
 
     if (claimItems && claimItems.length > 0) {
-      const validItems = claimItems.filter((item: any) => parseFloat(item.percentComplete || "0") > 0);
+      const validItems = claimItems.filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
       if (validItems.length > 0) {
         await db.insert(progressClaimItems).values(
           validItems.map((item: any) => {
-            const revenue = parseFloat(item.panelRevenue || "0");
-            const pct = parseFloat(item.percentComplete || "0");
+            const revenue = safeParseFinancial(item.panelRevenue, 0);
+            const pct = safeParseFinancial(item.percentComplete, 0);
             const lineTotal = (revenue * pct / 100).toFixed(2);
             return {
               progressClaimId: claim.id,
@@ -578,11 +595,11 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
       }
 
       const subtotal = validItems.reduce((sum: number, item: any) => {
-        const revenue = parseFloat(item.panelRevenue || "0");
-        const pct = parseFloat(item.percentComplete || "0");
+        const revenue = safeParseFinancial(item.panelRevenue, 0);
+        const pct = safeParseFinancial(item.percentComplete, 0);
         return sum + (revenue * pct / 100);
       }, 0);
-      const taxRate = parseFloat(claimData.taxRate || "10");
+      const taxRate = safeParseFinancial(claimData.taxRate, 10);
       const taxAmount = subtotal * taxRate / 100;
       const total = subtotal + taxAmount;
 
@@ -625,12 +642,12 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
     if (claimItems !== undefined) {
       await db.delete(progressClaimItems).where(eq(progressClaimItems.progressClaimId, claim.id));
 
-      const validItems = (claimItems || []).filter((item: any) => parseFloat(item.percentComplete || "0") > 0);
+      const validItems = (claimItems || []).filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
       if (validItems.length > 0) {
         await db.insert(progressClaimItems).values(
           validItems.map((item: any) => {
-            const revenue = parseFloat(item.panelRevenue || "0");
-            const pct = parseFloat(item.percentComplete || "0");
+            const revenue = safeParseFinancial(item.panelRevenue, 0);
+            const pct = safeParseFinancial(item.percentComplete, 0);
             const lineTotal = (revenue * pct / 100).toFixed(2);
             return {
               progressClaimId: claim.id,
@@ -646,11 +663,11 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
       }
 
       const subtotal = validItems.reduce((sum: number, item: any) => {
-        const revenue = parseFloat(item.panelRevenue || "0");
-        const pct = parseFloat(item.percentComplete || "0");
+        const revenue = safeParseFinancial(item.panelRevenue, 0);
+        const pct = safeParseFinancial(item.percentComplete, 0);
         return sum + (revenue * pct / 100);
       }, 0);
-      const taxRate = parseFloat(claimData.taxRate || claim.taxRate || "10");
+      const taxRate = safeParseFinancial(claimData.taxRate || claim.taxRate, 10);
       const taxAmount = subtotal * taxRate / 100;
       const total = subtotal + taxAmount;
 
@@ -722,7 +739,7 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
       .where(eq(progressClaimItems.progressClaimId, claim.id));
 
     const fullClaimPanelIds = items
-      .filter(item => parseFloat(item.percentComplete || "0") >= 100)
+      .filter(item => safeParseFinancial(item.percentComplete, 0) >= 100)
       .map(item => item.panelId);
 
     if (fullClaimPanelIds.length > 0) {
@@ -781,9 +798,9 @@ router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, asy
       .from(contracts)
       .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId)));
 
-    const retentionRate = parseFloat(contract?.retentionPercentage || "10");
-    const retentionCapPct = parseFloat(contract?.retentionCap || "5");
-    const contractValue = parseFloat(contract?.revisedContractValue || contract?.originalContractValue || "0");
+    const retentionRate = safeParseFinancial(contract?.retentionPercentage, 10);
+    const retentionCapPct = safeParseFinancial(contract?.retentionCap, 5);
+    const contractValue = safeParseFinancial(contract?.revisedContractValue || contract?.originalContractValue, 0);
     const retentionCapAmount = contractValue > 0 ? contractValue * retentionCapPct / 100 : 0;
 
     const claims = await db
@@ -807,7 +824,7 @@ router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, asy
       .orderBy(progressClaims.claimDate);
 
     const totalRetentionHeld = claims.reduce(
-      (sum, c) => sum + parseFloat(c.retentionAmount || "0"), 0
+      (sum, c) => sum + safeParseFinancial(c.retentionAmount, 0), 0
     );
 
     res.json({
@@ -819,7 +836,7 @@ router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, asy
       remainingRetention: Math.max(0, retentionCapAmount - totalRetentionHeld).toFixed(2),
       claims: claims.map((c, idx) => {
         const runningTotal = claims.slice(0, idx + 1).reduce(
-          (sum, cl) => sum + parseFloat(cl.retentionAmount || "0"), 0
+          (sum, cl) => sum + safeParseFinancial(cl.retentionAmount, 0), 0
         );
         return {
           ...c,
