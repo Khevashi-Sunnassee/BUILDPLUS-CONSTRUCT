@@ -9,8 +9,9 @@ import multer from "multer";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import crypto from "crypto";
 import logger from "../lib/logger";
-import * as pdfParseModule from "pdf-parse";
-const pdfParse = (pdfParseModule as any).default || pdfParseModule;
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const router = Router();
 
