@@ -219,10 +219,10 @@ function generatePoPdf(
   const statusColors: Record<string, { bg: number[]; text: number[] }> = {
     DRAFT: { bg: [156, 163, 175], text: [255, 255, 255] },
     SUBMITTED: { bg: [59, 130, 246], text: [255, 255, 255] },
-    APPROVED: { bg: [34, 197, 94], text: [255, 255, 255] },
+    APPROVED: { bg: [249, 115, 22], text: [255, 255, 255] },
     REJECTED: { bg: [239, 68, 68], text: [255, 255, 255] },
-    RECEIVED: { bg: [4, 120, 87], text: [255, 255, 255] },
-    RECEIVED_IN_PART: { bg: [217, 119, 6], text: [255, 255, 255] },
+    RECEIVED: { bg: [22, 163, 74], text: [255, 255, 255] },
+    RECEIVED_IN_PART: { bg: [21, 128, 61], text: [255, 255, 255] },
   };
   const statusStyle = statusColors[po.status] || statusColors.DRAFT;
   pdf.setFillColor(statusStyle.bg[0], statusStyle.bg[1], statusStyle.bg[2]);
@@ -834,13 +834,13 @@ export default function PurchaseOrdersPage() {
       case "SUBMITTED":
         return <Badge className="bg-blue-600" data-testid={`badge-status-submitted`}>Submitted</Badge>;
       case "APPROVED":
-        return <Badge className="bg-green-600" data-testid={`badge-status-approved`}>Approved</Badge>;
+        return <Badge className="bg-orange-500" data-testid={`badge-status-approved`}>Approved</Badge>;
       case "REJECTED":
         return <Badge variant="destructive" data-testid={`badge-status-rejected`}>Rejected</Badge>;
       case "RECEIVED":
-        return <Badge className="bg-emerald-700" data-testid={`badge-status-received`}>Received</Badge>;
+        return <Badge className="bg-green-600" data-testid={`badge-status-received`}>Received</Badge>;
       case "RECEIVED_IN_PART":
-        return <Badge className="bg-amber-600" data-testid={`badge-status-received-in-part`}>Received in Part</Badge>;
+        return <Badge className="bg-green-700" data-testid={`badge-status-received-in-part`}>Received in Part</Badge>;
       default:
         return <Badge variant="outline" data-testid={`badge-status-unknown`}>{status}</Badge>;
     }

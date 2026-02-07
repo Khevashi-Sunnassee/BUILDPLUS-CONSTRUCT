@@ -964,13 +964,13 @@ export default function PurchaseOrderFormPage() {
       case "SUBMITTED":
         return <Badge className="bg-blue-600" data-testid="badge-status">Submitted</Badge>;
       case "APPROVED":
-        return <Badge className="bg-green-600" data-testid="badge-status">Approved</Badge>;
+        return <Badge className="bg-orange-500" data-testid="badge-status">Approved</Badge>;
       case "REJECTED":
         return <Badge variant="destructive" data-testid="badge-status">Rejected</Badge>;
       case "RECEIVED":
-        return <Badge className="bg-emerald-700" data-testid="badge-status">Received</Badge>;
+        return <Badge className="bg-green-600" data-testid="badge-status">Received</Badge>;
       case "RECEIVED_IN_PART":
-        return <Badge className="bg-amber-600" data-testid="badge-status">Received in Part</Badge>;
+        return <Badge className="bg-green-700" data-testid="badge-status">Received in Part</Badge>;
       default:
         return <Badge variant="outline" data-testid="badge-status">{status}</Badge>;
     }
@@ -1024,6 +1024,50 @@ export default function PurchaseOrderFormPage() {
                     Rejected by {existingPO.rejectedBy.name || existingPO.rejectedBy.email} on{" "}
                     {existingPO.rejectedAt ? format(new Date(existingPO.rejectedAt), "dd/MM/yyyy HH:mm") : ""}
                   </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {canReceive && (
+        <Card className="border-emerald-300 dark:border-emerald-700 print:hidden">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <PackageCheck className="h-5 w-5 text-emerald-600" />
+                <span className="font-medium">
+                  {receivingMode ? "Select received items in the table below, then confirm" : "Mark items as received"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={handleReceiveItems}
+                  disabled={receiveMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  data-testid="button-receive-items"
+                >
+                  {receiveMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <PackageCheck className="h-4 w-4 mr-2" />
+                  )}
+                  {receiveMutation.isPending 
+                    ? "Saving..." 
+                    : receivingMode 
+                      ? "Confirm Received Items" 
+                      : "Receive Items"}
+                </Button>
+                {receivingMode && (
+                  <Button
+                    variant="outline"
+                    onClick={cancelReceiving}
+                    data-testid="button-cancel-receiving"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
                 )}
               </div>
             </div>
@@ -1632,38 +1676,6 @@ export default function PurchaseOrderFormPage() {
                   <X className="h-4 w-4 mr-2" />
                   Reject
                 </Button>
-              </>
-            )}
-
-            {canReceive && (
-              <>
-                <Button
-                  onClick={handleReceiveItems}
-                  disabled={receiveMutation.isPending}
-                  className="bg-emerald-600 hover:bg-emerald-700"
-                  data-testid="button-receive-items"
-                >
-                  {receiveMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <PackageCheck className="h-4 w-4 mr-2" />
-                  )}
-                  {receiveMutation.isPending 
-                    ? "Saving..." 
-                    : receivingMode 
-                      ? "Confirm Received Items" 
-                      : "Receive Items"}
-                </Button>
-                {receivingMode && (
-                  <Button
-                    variant="outline"
-                    onClick={cancelReceiving}
-                    data-testid="button-cancel-receiving"
-                  >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel
-                  </Button>
-                )}
               </>
             )}
 

@@ -478,8 +478,17 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       return res.status(400).json({ error: "Job with this number already exists" });
     }
     const data = { ...parsed.data, companyId: req.companyId } as any;
-    if (data.productionStartDate && typeof data.productionStartDate === 'string') {
+    if (typeof data.productionStartDate === 'string' && data.productionStartDate.trim() !== '') {
       data.productionStartDate = new Date(data.productionStartDate);
+    } else if (!data.productionStartDate || data.productionStartDate === '') {
+      data.productionStartDate = null;
+    }
+    const emptyStringFields = [
+      "client", "address", "city", "description", "craneCapacity",
+      "levels", "lowestLevel", "highestLevel", "siteContact", "siteContactPhone", "code"
+    ];
+    for (const field of emptyStringFields) {
+      if (data[field] === "") data[field] = null;
     }
     const globalSettings = await storage.getGlobalSettings();
     if (data.procurementDaysInAdvance !== undefined && data.procurementDaysInAdvance !== null) {
