@@ -9,6 +9,8 @@ import multer from "multer";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import crypto from "crypto";
 import logger from "../lib/logger";
+import * as pdfParseModule from "pdf-parse";
+const pdfParse = (pdfParseModule as any).default || pdfParseModule;
 
 const router = Router();
 
@@ -279,23 +281,13 @@ Be thorough in your risk analysis - this serves as legal advisory for the precas
     let messages: any[];
 
     if (mimeType === "application/pdf") {
+      const pdfData = await pdfParse(file.buffer);
+      const pdfText = pdfData.text.slice(0, 100000);
       messages = [
         { role: "system", content: systemPrompt },
         {
           role: "user",
-          content: [
-            {
-              type: "file",
-              file: {
-                filename: file.originalname,
-                file_data: `data:application/pdf;base64,${fileContent}`,
-              },
-            },
-            {
-              type: "text",
-              text: "Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.",
-            },
-          ],
+          content: `Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.\n\n--- CONTRACT TEXT ---\n${pdfText}`,
         },
       ];
     } else {
