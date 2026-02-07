@@ -12,10 +12,12 @@ interface LegacyField {
   placeholder?: string;
   photoRequired?: boolean;
   instructions?: string;
-  options?: Array<{ text?: string; label?: string; value: string; color?: string }>;
+  options?: Array<{ text?: string; label?: string; value: string; color?: string }> | string[];
   min?: number | null;
   max?: number | null;
   step?: number | null;
+  dependsOn?: string;
+  dependsOnValue?: string;
   [key: string]: unknown;
 }
 
@@ -50,6 +52,8 @@ const LEGACY_TYPE_MAP: Record<string, ChecklistFieldType> = {
   file_upload: "file_upload",
   progress: "progress_bar",
   measurement: "measurement_field",
+  yes_no: "yes_no_na",
+  select: "dropdown",
 };
 
 function normalizeFieldType(rawType: string | undefined): ChecklistFieldType {
@@ -59,14 +63,19 @@ function normalizeFieldType(rawType: string | undefined): ChecklistFieldType {
 
 function normalizeOptions(raw: LegacyField["options"]): ChecklistField["options"] {
   if (!raw || !Array.isArray(raw)) return undefined;
-  return raw.map((opt) => ({
-    text: opt.text || opt.label || "",
-    value: opt.value,
-    color: opt.color,
-  }));
+  return raw.map((opt) => {
+    if (typeof opt === "string") {
+      return { text: opt, value: opt };
+    }
+    return {
+      text: opt.text || opt.label || "",
+      value: opt.value,
+      color: opt.color,
+    };
+  });
 }
 
-function normalizeField(raw: LegacyField): ChecklistField {
+function normalizeField(raw: LegacyField): ChecklistField & { dependsOn?: string; dependsOnValue?: string } {
   return {
     id: raw.id,
     name: raw.name || raw.label || "Unnamed Field",
@@ -80,6 +89,8 @@ function normalizeField(raw: LegacyField): ChecklistField {
     min: raw.min,
     max: raw.max,
     step: raw.step,
+    dependsOn: raw.dependsOn,
+    dependsOnValue: raw.dependsOnValue,
   };
 }
 

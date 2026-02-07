@@ -70,6 +70,10 @@ export default function MobileChecklistFillPage() {
     enabled: !!id,
   });
 
+  const backPath = instance?.panelId
+    ? `/mobile/panels/${instance.panelId}`
+    : "/mobile/checklists";
+
   const { data: template, isLoading: templateLoading } = useQuery<ChecklistTemplate>({
     queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(instance?.templateId || "")],
     enabled: !!instance?.templateId,
@@ -114,9 +118,12 @@ export default function MobileChecklistFillPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(id!)] });
+      if (instance?.panelId) {
+        queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES_BY_PANEL(instance.panelId)] });
+      }
       setHasChanges(false);
       setShowCompleteConfirm(false);
-      navigate("/mobile/checklists");
+      navigate(backPath);
     },
     onError: (error: Error) => {
       const msg = error.message?.includes("413")
@@ -187,11 +194,11 @@ export default function MobileChecklistFillPage() {
         <AlertCircle className="h-12 w-12 text-white/20 mb-3" />
         <p className="text-white/40 text-sm mb-4">Checklist not found</p>
         <button
-          onClick={() => navigate("/mobile/checklists")}
+          onClick={() => navigate(backPath)}
           className="px-4 py-2 rounded-xl bg-white/10 text-white text-sm active:scale-[0.99]"
           data-testid="button-back-not-found"
         >
-          Back to Checklists
+          Go Back
         </button>
       </div>
     );
@@ -203,7 +210,7 @@ export default function MobileChecklistFillPage() {
         <div className="px-4 py-3">
           <div className="flex items-center gap-3 mb-2">
             <button
-              onClick={() => navigate("/mobile/checklists")}
+              onClick={() => navigate(backPath)}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 active:scale-[0.99]"
               data-testid="button-back-from-fill"
             >
@@ -293,7 +300,13 @@ export default function MobileChecklistFillPage() {
 
               {!isCollapsed && (
                 <div className="px-4 pb-4 space-y-5">
-                  {sectionFields.map((field, fieldIndex) => (
+                  {sectionFields.map((field, fieldIndex) => {
+                    const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+                    if (extField.dependsOn) {
+                      const depValue = responses[extField.dependsOn];
+                      if (depValue !== extField.dependsOnValue) return null;
+                    }
+                    return (
                     <div key={field.id} data-testid={`mobile-field-${field.id}`}>
                       {fieldIndex > 0 && <div className="border-t border-white/5 mb-5" />}
                       <div className="space-y-2">
@@ -326,7 +339,8 @@ export default function MobileChecklistFillPage() {
                         </div>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                   {sectionFields.length === 0 && (
                     <p className="text-sm text-white/30 text-center py-4">No fields in this section</p>
                   )}

@@ -7,7 +7,7 @@ import rateLimit from "express-rate-limit";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
-import { seedDatabase } from "./seed";
+import { seedDatabase, ensureSystemChecklistModules } from "./seed";
 import logger from "./lib/logger";
 import { pool } from "./db";
 
@@ -202,6 +202,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
   await seedDatabase();
+  await ensureSystemChecklistModules();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

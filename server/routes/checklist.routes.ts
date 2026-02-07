@@ -96,14 +96,21 @@ router.delete("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const [existing] = await db.select().from(entityTypes)
+      .where(and(eq(entityTypes.id, typeId), eq(entityTypes.companyId, companyId!)));
+
+    if (!existing) {
+      return res.status(404).json({ error: "Entity type not found" });
+    }
+
+    if (existing.isSystem) {
+      return res.status(403).json({ error: "System modules cannot be deleted" });
+    }
+
     const [deleted] = await db.update(entityTypes)
       .set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(entityTypes.id, typeId), eq(entityTypes.companyId, companyId!)))
       .returning();
-
-    if (!deleted) {
-      return res.status(404).json({ error: "Entity type not found" });
-    }
 
     res.json({ success: true });
   } catch (error) {
@@ -441,14 +448,21 @@ router.delete("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN"),
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const [existing] = await db.select().from(checklistTemplates)
+      .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)));
+
+    if (!existing) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+
+    if (existing.isSystem) {
+      return res.status(403).json({ error: "System templates cannot be deleted" });
+    }
+
     const [deleted] = await db.update(checklistTemplates)
       .set({ isActive: false, updatedAt: new Date() })
       .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
-
-    if (!deleted) {
-      return res.status(404).json({ error: "Template not found" });
-    }
 
     res.json({ success: true });
   } catch (error) {
