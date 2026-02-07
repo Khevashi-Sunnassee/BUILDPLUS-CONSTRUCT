@@ -60,32 +60,38 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const userNavItems = [
+const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Tasks", url: "/tasks", icon: ListTodo },
   { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
+  { title: "Document Register", url: "/documents", icon: FolderOpen },
+  { title: "Checklists", url: "/checklists", icon: CheckSquare },
+  { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
+  { title: "Broadcast", url: "/broadcast", icon: Radio },
+];
+
+const productionNavItems = [
   { title: "Production Slots", url: "/production-slots", icon: Calendar },
   { title: "Production Schedule", url: "/production-schedule", icon: CalendarDays },
   { title: "Drafting Program", url: "/drafting-program", icon: Clock },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
-  { title: "Document Register", url: "/documents", icon: FolderOpen },
-  { title: "Checklists", url: "/checklists", icon: CheckSquare },
-  { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
-  { title: "Production Report", url: "/production-report", icon: Factory },
-  { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
   { title: "Reo Scheduling", url: "/procurement-reo", icon: Layers },
   { title: "Logistics", url: "/logistics", icon: Truck },
-  { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
-  { title: "Broadcast", url: "/broadcast", icon: Radio },
+];
+
+const adminFinanceNavItems = [
   { title: "Contract Hub", url: "/contracts", icon: Scale },
   { title: "Progress Claims", url: "/progress-claims", icon: FileText },
+  { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
+  { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
 ];
 
 const managerNavItems = [
   { title: "KPI Dashboard", url: "/kpi-dashboard", icon: BarChart3 },
   { title: "Manager Review", url: "/manager/review", icon: CheckSquare },
+  { title: "Production Report", url: "/production-report", icon: Factory },
   { title: "Checklist Reports", url: "/checklist-reports", icon: BarChart3 },
   { title: "Reports", url: "/reports", icon: Clock },
 ];
@@ -145,6 +151,8 @@ export function AppSidebar() {
   const { user, logout } = useAuth();
   
   const [mainExpanded, setMainExpanded] = useState(true);
+  const [productionExpanded, setProductionExpanded] = useState(true);
+  const [adminFinanceExpanded, setAdminFinanceExpanded] = useState(true);
   const [managementExpanded, setManagementExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(false);
 
@@ -203,7 +211,69 @@ export function AppSidebar() {
             <CollapsibleContent>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {userNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
+                  {mainNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.url)}
+                        className="transition-colors"
+                      >
+                        <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
+
+        <Collapsible open={productionExpanded} onOpenChange={setProductionExpanded}>
+          <SidebarGroup>
+            <CollapsibleTrigger className="w-full">
+              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+                <span>Production</span>
+                {productionExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </SidebarGroupLabel>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {productionNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.url)}
+                        className="transition-colors"
+                      >
+                        <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </CollapsibleContent>
+          </SidebarGroup>
+        </Collapsible>
+
+        <Collapsible open={adminFinanceExpanded} onOpenChange={setAdminFinanceExpanded}>
+          <SidebarGroup>
+            <CollapsibleTrigger className="w-full">
+              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+                <span>Admin & Finance</span>
+                {adminFinanceExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </SidebarGroupLabel>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {adminFinanceNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
