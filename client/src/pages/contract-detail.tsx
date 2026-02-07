@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
@@ -198,6 +198,8 @@ export default function ContractDetailPage() {
   const [aiResult, setAiResult] = useState<any>(null);
   const [docUploadOpen, setDocUploadOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
+  const aiFileInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: job, isLoading: jobLoading } = useQuery<Job>({
     queryKey: [JOBS_ROUTES.BY_ID(jobId!), jobId],
@@ -843,16 +845,16 @@ export default function ContractDetailPage() {
                     <p className="text-sm text-muted-foreground">Our AI legal adviser is reviewing your contract document</p>
                   </div>
                 ) : (
-                  <label className="cursor-pointer flex flex-col items-center gap-3">
+                  <div className="flex flex-col items-center gap-3">
                     <Upload className="h-10 w-10 text-muted-foreground" />
                     <p className="font-medium">Upload Contract Document</p>
                     <p className="text-sm text-muted-foreground">PDF, Word, or image files supported</p>
-                    <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleAiUpload} data-testid="input-ai-file-upload" />
-                    <span className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover-elevate">
-                      <FileUp className="h-4 w-4" />
+                    <input ref={aiFileInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleAiUpload} data-testid="input-ai-file-upload" />
+                    <Button variant="outline" type="button" onClick={() => aiFileInputRef.current?.click()} data-testid="button-select-ai-file">
+                      <FileUp className="h-4 w-4 mr-2" />
                       Select File
-                    </span>
-                  </label>
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>
@@ -908,11 +910,12 @@ export default function ContractDetailPage() {
             <DialogDescription>Upload multiple documents to the project register</DialogDescription>
           </DialogHeader>
           <div className="border-2 border-dashed rounded-md p-8 text-center">
-            <label className="cursor-pointer flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3">
               <Upload className="h-10 w-10 text-muted-foreground" />
               <p className="font-medium">Select Files</p>
               <p className="text-sm text-muted-foreground">PDF, Word, Excel, images, and other file types</p>
               <input
+                ref={docFileInputRef}
                 type="file"
                 className="hidden"
                 multiple
@@ -923,11 +926,11 @@ export default function ContractDetailPage() {
                 }}
                 data-testid="input-project-doc-upload"
               />
-              <span className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover-elevate">
-                <FileUp className="h-4 w-4" />
+              <Button variant="outline" type="button" onClick={() => docFileInputRef.current?.click()} data-testid="button-browse-files">
+                <FileUp className="h-4 w-4 mr-2" />
                 Browse Files
-              </span>
-            </label>
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
