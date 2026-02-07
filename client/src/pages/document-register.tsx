@@ -44,7 +44,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -541,8 +541,10 @@ export default function DocumentRegister() {
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      const csrfToken = getCsrfToken();
       const response = await fetch(DOCUMENT_ROUTES.UPLOAD, {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
@@ -610,8 +612,10 @@ export default function DocumentRegister() {
 
   const newVersionMutation = useMutation({
     mutationFn: async ({ documentId, formData }: { documentId: string; formData: FormData }) => {
+      const csrfToken = getCsrfToken();
       const response = await fetch(DOCUMENT_ROUTES.NEW_VERSION(documentId), {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
@@ -704,8 +708,10 @@ export default function DocumentRegister() {
       formData.append("file", file);
       formData.append("originalDocumentId", selectedDocumentForVersion.id);
       
+      const csrfToken = getCsrfToken();
       const response = await fetch(DOCUMENT_ROUTES.ANALYZE_VERSION, {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });

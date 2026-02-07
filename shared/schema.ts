@@ -2698,6 +2698,7 @@ export const contracts = pgTable("contracts", {
   aiAnalyzedAt: timestamp("ai_analyzed_at"),
   aiSourceDocumentId: varchar("ai_source_document_id", { length: 36 }).references(() => documents.id),
 
+  version: integer("version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -2707,7 +2708,7 @@ export const contracts = pgTable("contracts", {
   jobCompanyUniqueIdx: uniqueIndex("contracts_job_company_unique_idx").on(table.jobId, table.companyId),
 }));
 
-export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true, version: true });
 export type InsertContract = z.infer<typeof insertContractSchema>;
 export type Contract = typeof contracts.$inferSelect;
 
@@ -2736,6 +2737,7 @@ export const progressClaims = pgTable("progress_claims", {
   rejectedAt: timestamp("rejected_at"),
   rejectionReason: text("rejection_reason"),
   submittedAt: timestamp("submitted_at"),
+  version: integer("version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

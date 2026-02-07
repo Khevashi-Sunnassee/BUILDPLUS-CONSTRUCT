@@ -4,6 +4,7 @@ import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { twilioService } from "../services/twilio.service";
+import { insertPurchaseOrderSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -115,10 +116,14 @@ router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     }
     
     const { items: lineItems, ...poData } = req.body;
-    if (poData.supplierId === "") {
-      poData.supplierId = null;
+    const parsed = insertPurchaseOrderSchema.partial().safeParse(poData);
+    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+
+    const validatedData = { ...parsed.data };
+    if (validatedData.supplierId === "") {
+      validatedData.supplierId = null;
     }
-    const updated = await storage.updatePurchaseOrder(String(req.params.id), poData, lineItems);
+    const updated = await storage.updatePurchaseOrder(String(req.params.id), validatedData, lineItems);
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating purchase order");

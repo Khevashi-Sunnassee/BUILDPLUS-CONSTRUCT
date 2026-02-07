@@ -1,5 +1,29 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+export function getCsrfToken(): string {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : "";
+}
+
+export async function apiUpload(
+  url: string,
+  formData: FormData,
+): Promise<Response> {
+  const token = getCsrfToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["x-csrf-token"] = token;
+  }
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: formData,
+    credentials: "include",
+  });
+  await throwIfResNotOk(res);
+  return res;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -12,9 +36,20 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const headers: Record<string, string> = {};
+  if (data) {
+    headers["Content-Type"] = "application/json";
+  }
+  const upperMethod = method.toUpperCase();
+  if (upperMethod !== "GET" && upperMethod !== "HEAD" && upperMethod !== "OPTIONS") {
+    const token = getCsrfToken();
+    if (token) {
+      headers["x-csrf-token"] = token;
+    }
+  }
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });

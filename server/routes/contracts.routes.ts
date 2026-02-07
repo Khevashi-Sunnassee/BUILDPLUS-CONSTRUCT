@@ -24,6 +24,8 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
+const updateContractSchema = insertContractSchema.partial().omit({ companyId: true });
+
 router.get("/api/contracts/hub", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
@@ -167,30 +169,43 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
       return res.status(404).json({ error: "Contract not found" });
     }
 
-    const updateData = { ...req.body, updatedAt: new Date() };
-    delete updateData.id;
-    delete updateData.companyId;
-    delete updateData.createdAt;
+    const parsed = updateContractSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const { version: clientVersion, ...rest } = parsed.data as any;
+    const updateData = { ...rest, updatedAt: new Date(), version: sql`${contracts.version} + 1` };
 
-    const [updated] = await db
-      .update(contracts)
-      .set(updateData)
-      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const whereClause = clientVersion !== undefined
+        ? and(eq(contracts.id, id), eq(contracts.companyId, companyId), eq(contracts.version, clientVersion))
+        : and(eq(contracts.id, id), eq(contracts.companyId, companyId));
 
-    if (updateData.requiredDeliveryStartDate !== undefined) {
-      try {
+      const [contractResult] = await tx
+        .update(contracts)
+        .set(updateData)
+        .where(whereClause)
+        .returning();
+
+      if (!contractResult) {
+        throw Object.assign(new Error("Contract was modified by another user. Please refresh and try again."), { statusCode: 409 });
+      }
+
+      if (updateData.requiredDeliveryStartDate !== undefined) {
         const newDate = updateData.requiredDeliveryStartDate ? new Date(updateData.requiredDeliveryStartDate) : null;
-        await db.update(jobs)
+        await tx.update(jobs)
           .set({ productionStartDate: newDate })
           .where(and(eq(jobs.id, existing.jobId), eq(jobs.companyId, companyId)));
-      } catch (syncError: any) {
-        logger.warn({ err: syncError }, "Failed to sync Required Delivery Start to job");
       }
-    }
+
+      return contractResult;
+    });
 
     res.json(updated);
   } catch (error: any) {
+    if (error.statusCode === 409) {
+      return res.status(409).json({ error: error.message });
+    }
     logger.error({ err: error }, "Error updating contract");
     res.status(500).json({ error: error.message || "Failed to update contract" });
   }

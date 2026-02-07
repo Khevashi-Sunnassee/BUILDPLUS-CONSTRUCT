@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, getCsrfToken } from "@/lib/queryClient";
 import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip } from "lucide-react";
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
@@ -313,8 +313,10 @@ export default function PurchaseOrderFormPage() {
     mutationFn: async (files: File[]) => {
       const formData = new FormData();
       files.forEach(file => formData.append("files", file));
+      const csrfToken = getCsrfToken();
       const response = await fetch(PROCUREMENT_ROUTES.PURCHASE_ORDER_ATTACHMENTS(poId!), {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });

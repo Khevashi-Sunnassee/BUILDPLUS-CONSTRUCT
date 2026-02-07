@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage, db } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { 
-  insertWorkTypeSchema,
+  insertWorkTypeSchema, insertDeviceSchema,
   jobs, productionSlots, panelRegister, draftingProgram, dailyLogs, logRows, productionEntries, 
   weeklyWageReports, weeklyJobReports, weeklyJobReportSchedules,
   loadLists, loadListPanels, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments, 
@@ -41,7 +41,11 @@ router.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) =>
   if (!existing || existing.companyId !== companyId) {
     return res.status(404).json({ error: "Device not found" });
   }
-  const device = await storage.updateDevice(req.params.id as string, req.body);
+  const parsed = insertDeviceSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+  }
+  const device = await storage.updateDevice(req.params.id as string, parsed.data);
   res.json(device);
 });
 

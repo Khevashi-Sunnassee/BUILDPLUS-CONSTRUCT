@@ -71,8 +71,13 @@ router.put("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN"),
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const parsed = insertEntityTypeSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
     const [updated] = await db.update(entityTypes)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(entityTypes.id, typeId), eq(entityTypes.companyId, companyId!)))
       .returning();
 
@@ -199,8 +204,13 @@ router.put("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("ADMIN
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const parsed = insertEntitySubtypeSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
     const [updated] = await db.update(entitySubtypes)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(entitySubtypes.id, subtypeId), eq(entitySubtypes.companyId, companyId!)))
       .returning();
 
@@ -389,8 +399,13 @@ router.put("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN", "MA
     if (body.entityTypeId === "") body.entityTypeId = null;
     if (body.entitySubtypeId === "") body.entitySubtypeId = null;
 
+    const parsed = insertChecklistTemplateSchema.partial().safeParse(body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
     const [updated] = await db.update(checklistTemplates)
-      .set({ ...body, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(checklistTemplates.id, templateId), eq(checklistTemplates.companyId, companyId!)))
       .returning();
 
@@ -649,8 +664,13 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const parsed = insertChecklistInstanceSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
     const [updated] = await db.update(checklistInstances)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(checklistInstances.id, instanceId), eq(checklistInstances.companyId, companyId!)))
       .returning();
 

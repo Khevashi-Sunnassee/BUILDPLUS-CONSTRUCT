@@ -755,7 +755,11 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
 
 router.patch("/api/documents/:id", requireAuth, async (req, res) => {
   try {
-    const document = await storage.updateDocument(String(req.params.id), req.body);
+    const parsed = insertDocumentSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const document = await storage.updateDocument(String(req.params.id), parsed.data);
     if (!document) return res.status(404).json({ error: "Document not found" });
     res.json(document);
   } catch (error: any) {
@@ -906,8 +910,12 @@ router.post("/api/document-bundles", requireAuth, async (req, res) => {
 
 router.patch("/api/document-bundles/:id", requireAuth, async (req, res) => {
   try {
+    const parsed = insertDocumentBundleSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
     const bundle = await storage.updateDocumentBundle(String(req.params.id), {
-      ...req.body,
+      ...parsed.data,
       updatedBy: req.session.userId,
     });
     if (!bundle) return res.status(404).json({ error: "Document bundle not found" });

@@ -463,48 +463,58 @@ router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGE
     const areaM2 = ((widthNum * heightNum) / 1_000_000).toFixed(4);
     const volumeM3 = ((widthNum * heightNum * thicknessNum) / 1_000_000_000).toFixed(6);
 
-    await db.update(panelRegister)
-      .set({
-        panelMark: newPanelMark,
-        loadWidth: width,
-        loadHeight: height,
-        panelArea: areaM2,
-        panelVolume: volumeM3,
-        updatedAt: new Date(),
-      })
-      .where(eq(panelRegister.id, primaryPanelId));
-
-    logPanelChange(primaryPanelId, "Panel consolidated", req.session.userId, {
-      changedFields: {
-        panelMark: newPanelMark,
-        loadWidth: width,
-        loadHeight: height,
-        panelArea: areaM2,
-        panelVolume: volumeM3,
-        consolidatedFrom: consumedPanelIds,
-      },
-    });
-
-    for (const consumedId of consumedPanelIds) {
-      await db.update(panelRegister)
+    await db.transaction(async (tx) => {
+      await tx.update(panelRegister)
         .set({
-          consolidatedIntoPanelId: primaryPanelId,
-          lifecycleStatus: 0,
-          status: "ON_HOLD",
+          panelMark: newPanelMark,
+          loadWidth: width,
+          loadHeight: height,
+          panelArea: areaM2,
+          panelVolume: volumeM3,
           updatedAt: new Date(),
         })
-        .where(eq(panelRegister.id, consumedId));
+        .where(eq(panelRegister.id, primaryPanelId));
 
-      const consumedPanel = panels.find(p => p.id === consumedId);
-      logPanelChange(consumedId, `Panel consolidated into ${newPanelMark}`, req.session.userId, {
+      await tx.insert(panelAuditLogs).values({
+        panelId: primaryPanelId,
+        action: "Panel consolidated",
+        changedById: req.session.userId || null,
         changedFields: {
-          consolidatedIntoPanelId: primaryPanelId,
-          originalPanelMark: consumedPanel?.panelMark,
+          panelMark: newPanelMark,
+          loadWidth: width,
+          loadHeight: height,
+          panelArea: areaM2,
+          panelVolume: volumeM3,
+          consolidatedFrom: consumedPanelIds,
         },
-        newLifecycleStatus: 0,
-        previousLifecycleStatus: consumedPanel?.lifecycleStatus ?? 0,
+        previousLifecycleStatus: null,
+        newLifecycleStatus: null,
       });
-    }
+
+      for (const consumedId of consumedPanelIds) {
+        await tx.update(panelRegister)
+          .set({
+            consolidatedIntoPanelId: primaryPanelId,
+            lifecycleStatus: 0,
+            status: "ON_HOLD",
+            updatedAt: new Date(),
+          })
+          .where(eq(panelRegister.id, consumedId));
+
+        const consumedPanel = panels.find(p => p.id === consumedId);
+        await tx.insert(panelAuditLogs).values({
+          panelId: consumedId,
+          action: `Panel consolidated into ${newPanelMark}`,
+          changedById: req.session.userId || null,
+          changedFields: {
+            consolidatedIntoPanelId: primaryPanelId,
+            originalPanelMark: consumedPanel?.panelMark,
+          },
+          newLifecycleStatus: 0,
+          previousLifecycleStatus: consumedPanel?.lifecycleStatus ?? 0,
+        });
+      }
+    });
 
     const updatedPanel = await storage.getPanelRegisterItem(primaryPanelId);
     res.json({ panel: updatedPanel, consumedPanelIds });

@@ -48,7 +48,7 @@ import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -220,8 +220,10 @@ function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: stri
       formData.append("mentionedUserIds", JSON.stringify([]));
       files.forEach((file) => formData.append("files", file));
       
+      const csrfToken = getCsrfToken();
       const res = await fetch(CHAT_ROUTES.MESSAGES(conversation?.id || ""), {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
@@ -660,8 +662,10 @@ function PanelDocumentsTab({ panelId, productionPdfUrl }: { panelId: string; pro
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
+      const csrfToken = getCsrfToken();
       const response = await fetch(DOCUMENT_ROUTES.PANEL_DOCUMENT_UPLOAD(panelId), {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         credentials: "include",
         body: formData,
       });
@@ -1088,9 +1092,10 @@ export default function AdminPanelsPage() {
     queryKey: [CHAT_ROUTES.PANELS_COUNTS, panelIds],
     queryFn: async () => {
       if (panelIds.length === 0) return {};
+      const csrfToken = getCsrfToken();
       const res = await fetch(CHAT_ROUTES.PANELS_COUNTS, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(csrfToken ? { "x-csrf-token": csrfToken } : {}) },
         body: JSON.stringify({ panelIds }),
         credentials: "include",
       });

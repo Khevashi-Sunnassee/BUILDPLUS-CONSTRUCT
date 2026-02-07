@@ -51,7 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await fetch(AUTH_ROUTES.LOGOUT, { method: "POST", credentials: "include" });
+    const csrfMatch = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+    const csrfToken = csrfMatch ? decodeURIComponent(csrfMatch[1]) : "";
+    await fetch(AUTH_ROUTES.LOGOUT, {
+      method: "POST",
+      credentials: "include",
+      headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+    });
     setUser(null);
   };
 

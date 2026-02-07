@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -253,8 +253,10 @@ export default function ContractDetailPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      const csrfToken = getCsrfToken();
       const res = await fetch(CONTRACT_ROUTES.AI_ANALYZE, {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
@@ -320,8 +322,10 @@ export default function ContractDetailPage() {
       formDataUpload.append("status", "DRAFT");
 
       try {
+        const csrfToken = getCsrfToken();
         await fetch(DOCUMENT_ROUTES.UPLOAD, {
           method: "POST",
+          headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
           body: formDataUpload,
           credentials: "include",
         });

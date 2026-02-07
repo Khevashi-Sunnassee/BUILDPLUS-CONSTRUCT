@@ -48,7 +48,15 @@ router.post("/api/broadcast-templates", requireAuth, async (req, res) => {
 router.patch("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
   try {
     const id = req.params.id as string;
-    const template = await storage.updateBroadcastTemplate(id, req.body);
+    const companyId = req.session.companyId;
+    const existing = await storage.getBroadcastTemplate(id);
+    if (!existing || existing.companyId !== companyId) {
+      return res.status(404).json({ error: "Template not found" });
+    }
+    const parsed = insertBroadcastTemplateSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+
+    const template = await storage.updateBroadcastTemplate(id, parsed.data);
     if (!template) return res.status(404).json({ error: "Template not found" });
     res.json(template);
   } catch (error: any) {
@@ -58,6 +66,11 @@ router.patch("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
 
 router.delete("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
   try {
+    const companyId = req.session.companyId;
+    const existing = await storage.getBroadcastTemplate(req.params.id);
+    if (!existing || existing.companyId !== companyId) {
+      return res.status(404).json({ error: "Template not found" });
+    }
     await storage.deleteBroadcastTemplate(req.params.id);
     res.json({ success: true });
   } catch (error: any) {

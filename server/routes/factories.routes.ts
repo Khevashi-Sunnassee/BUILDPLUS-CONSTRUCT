@@ -210,8 +210,12 @@ router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) 
     const companyId = req.companyId;
     const { beds, ...factoryData } = req.body;
     const factoryId = String(req.params.id);
+    const parsed = insertFactorySchema.partial().safeParse(factoryData);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
     const [updated] = await db.update(factories)
-      .set({ ...factoryData, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(factories.id, factoryId), eq(factories.companyId, companyId!)))
       .returning();
     if (!updated) {
@@ -270,8 +274,12 @@ router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN")
     const companyId = req.companyId;
     const factory = await db.select().from(factories).where(and(eq(factories.id, String(req.params.factoryId)), eq(factories.companyId, companyId!))).limit(1);
     if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
+    const parsed = insertProductionBedSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
     const [updated] = await db.update(productionBeds)
-      .set({ ...req.body, updatedAt: new Date() })
+      .set({ ...parsed.data, updatedAt: new Date() })
       .where(and(eq(productionBeds.id, String(req.params.bedId)), eq(productionBeds.factoryId, String(req.params.factoryId))))
       .returning();
     if (!updated) {

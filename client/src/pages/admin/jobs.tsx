@@ -40,7 +40,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -464,8 +464,10 @@ export default function AdminJobsPage() {
       formData.append("file", file);
       formData.append("replace", String(replace));
       
+      const csrfToken = getCsrfToken();
       const res = await fetch(JOBS_ROUTES.PANELS_IMPORT_ESTIMATE(jobId), {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         credentials: "include",
         body: formData,
       });

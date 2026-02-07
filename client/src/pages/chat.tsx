@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { CHAT_ROUTES, USER_ROUTES, JOBS_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
@@ -198,8 +198,10 @@ export default function ChatPage() {
         formData.append("mentionedUserIds", JSON.stringify(mentionedUserIds));
         files.forEach(f => formData.append("files", f));
 
+        const csrfToken = getCsrfToken();
         const res = await fetch(CHAT_ROUTES.MESSAGES(selectedConversationId!), {
           method: "POST",
+          headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
           body: formData,
           credentials: "include",
         });

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, isBefore, startOfDay } from "date-fns";
 import { TASKS_ROUTES, USER_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
@@ -1622,8 +1622,10 @@ function TaskSidebar({
       const formData = new FormData();
       formData.append("file", file);
       if (updateId) formData.append("updateId", updateId);
+      const csrfToken = getCsrfToken();
       const res = await fetch(TASKS_ROUTES.FILES(task?.id || ""), {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });

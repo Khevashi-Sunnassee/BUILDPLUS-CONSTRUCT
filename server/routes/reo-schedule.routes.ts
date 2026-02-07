@@ -141,7 +141,10 @@ router.patch("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Re
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const updated = await storage.updateReoSchedule(id, req.body);
+    const parsed = insertReoScheduleSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+
+    const updated = await storage.updateReoSchedule(id, parsed.data);
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating reo schedule");
@@ -216,7 +219,10 @@ router.patch("/api/reo-schedules/:scheduleId/items/:itemId", requireAuth, async 
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const updated = await storage.updateReoScheduleItem(itemId, req.body);
+    const parsed = insertReoScheduleItemSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+
+    const updated = await storage.updateReoScheduleItem(itemId, parsed.data);
     if (!updated) {
       return res.status(404).json({ message: "Reo schedule item not found" });
     }

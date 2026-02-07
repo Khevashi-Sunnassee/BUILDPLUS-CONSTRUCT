@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CHAT_ROUTES, USER_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
@@ -151,8 +151,10 @@ export default function MobileChatPage() {
         const formData = new FormData();
         formData.append("content", content);
         files.forEach(f => formData.append("files", f));
+        const csrfToken = getCsrfToken();
         const res = await fetch(CHAT_ROUTES.MESSAGES(selectedConversationId!), {
           method: "POST",
+          headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
           body: formData,
           credentials: "include",
         });

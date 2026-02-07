@@ -4,7 +4,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import { emailService } from "../services/email.service";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
-import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { PANEL_LIFECYCLE_STATUS, insertTrailerTypeSchema, insertZoneSchema, insertLoadListSchema, insertDeliveryRecordSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -26,7 +26,11 @@ router.post("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) =
 });
 
 router.put("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
-  const trailerType = await storage.updateTrailerType(req.params.id as string, req.body);
+  const parsed = insertTrailerTypeSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+  }
+  const trailerType = await storage.updateTrailerType(req.params.id as string, parsed.data);
   res.json(trailerType);
 });
 
@@ -62,7 +66,11 @@ router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
 });
 
 router.put("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
-  const zone = await storage.updateZone(req.params.id as string, req.body);
+  const parsed = insertZoneSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+  }
+  const zone = await storage.updateZone(req.params.id as string, parsed.data);
   res.json(zone);
 });
 
@@ -109,11 +117,25 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
 });
 
 router.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
-  const loadList = await storage.updateLoadList(req.params.id as string, req.body);
+  const companyId = req.session.companyId;
+  const existing = await storage.getLoadList(req.params.id as string);
+  if (!existing || existing.companyId !== companyId) {
+    return res.status(404).json({ error: "Load list not found" });
+  }
+  const parsed = insertLoadListSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+  }
+  const loadList = await storage.updateLoadList(req.params.id as string, parsed.data);
   res.json(loadList);
 });
 
 router.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
+  const companyId = req.session.companyId;
+  const existing = await storage.getLoadList(req.params.id as string);
+  if (!existing || existing.companyId !== companyId) {
+    return res.status(404).json({ error: "Load list not found" });
+  }
   await storage.deleteLoadList(req.params.id as string);
   res.json({ success: true });
 });
@@ -158,8 +180,21 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
 });
 
 router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
-  const record = await storage.updateDeliveryRecord(req.params.id as string, req.body);
-  res.json(record);
+  const record = await storage.getDeliveryRecordById(req.params.id as string);
+  if (!record) {
+    return res.status(404).json({ error: "Delivery record not found" });
+  }
+  const loadList = await storage.getLoadList(record.loadListId);
+  const companyId = req.session.companyId;
+  if (!loadList || loadList.companyId !== companyId) {
+    return res.status(404).json({ error: "Delivery record not found" });
+  }
+  const parsed = insertDeliveryRecordSchema.partial().safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+  }
+  const updated = await storage.updateDeliveryRecord(req.params.id as string, parsed.data);
+  res.json(updated);
 });
 
 // =============== LOAD RETURNS ===============

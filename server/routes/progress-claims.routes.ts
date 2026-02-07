@@ -559,69 +559,72 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
     const nextNum = (result[0]?.cnt || 0) + 1;
     const claimNumber = `PC-${String(nextNum).padStart(4, "0")}`;
 
-    const [claim] = await db.insert(progressClaims).values({
-      companyId,
-      jobId: claimData.jobId,
-      claimNumber,
-      claimDate: claimData.claimDate ? new Date(claimData.claimDate) : new Date(),
-      claimType: claimData.claimType || "DETAIL",
-      notes: claimData.notes,
-      internalNotes: claimData.internalNotes,
-      createdById: userId,
-      subtotal: "0",
-      taxAmount: "0",
-      total: "0",
-    }).returning();
+    const updated = await db.transaction(async (tx) => {
+      const [claim] = await tx.insert(progressClaims).values({
+        companyId,
+        jobId: claimData.jobId,
+        claimNumber,
+        claimDate: claimData.claimDate ? new Date(claimData.claimDate) : new Date(),
+        claimType: claimData.claimType || "DETAIL",
+        notes: claimData.notes,
+        internalNotes: claimData.internalNotes,
+        createdById: userId,
+        subtotal: "0",
+        taxAmount: "0",
+        total: "0",
+      }).returning();
 
-    if (claimItems && claimItems.length > 0) {
-      const validItems = claimItems.filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
-      if (validItems.length > 0) {
-        await db.insert(progressClaimItems).values(
-          validItems.map((item: any) => {
-            const revenue = safeParseFinancial(item.panelRevenue, 0);
-            const pct = safeParseFinancial(item.percentComplete, 0);
-            const lineTotal = (revenue * pct / 100).toFixed(2);
-            return {
-              progressClaimId: claim.id,
-              panelId: item.panelId,
-              panelMark: item.panelMark,
-              level: item.level || null,
-              panelRevenue: String(revenue.toFixed(2)),
-              percentComplete: String(pct.toFixed(2)),
-              lineTotal,
-            };
+      if (claimItems && claimItems.length > 0) {
+        const validItems = claimItems.filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
+        if (validItems.length > 0) {
+          await tx.insert(progressClaimItems).values(
+            validItems.map((item: any) => {
+              const revenue = safeParseFinancial(item.panelRevenue, 0);
+              const pct = safeParseFinancial(item.percentComplete, 0);
+              const lineTotal = (revenue * pct / 100).toFixed(2);
+              return {
+                progressClaimId: claim.id,
+                panelId: item.panelId,
+                panelMark: item.panelMark,
+                level: item.level || null,
+                panelRevenue: String(revenue.toFixed(2)),
+                percentComplete: String(pct.toFixed(2)),
+                lineTotal,
+              };
+            })
+          );
+        }
+
+        const subtotal = validItems.reduce((sum: number, item: any) => {
+          const revenue = safeParseFinancial(item.panelRevenue, 0);
+          const pct = safeParseFinancial(item.percentComplete, 0);
+          return sum + (revenue * pct / 100);
+        }, 0);
+        const taxRate = safeParseFinancial(claimData.taxRate, 10);
+        const taxAmount = subtotal * taxRate / 100;
+        const total = subtotal + taxAmount;
+
+        const retention = await calculateRetention(companyId, claimData.jobId, subtotal, claim.id);
+        const netClaimAmount = total - retention.retentionAmount;
+
+        await tx.update(progressClaims)
+          .set({
+            subtotal: subtotal.toFixed(2),
+            taxAmount: taxAmount.toFixed(2),
+            total: total.toFixed(2),
+            taxRate: String(taxRate),
+            retentionRate: String(retention.retentionRate),
+            retentionAmount: retention.retentionAmount.toFixed(2),
+            retentionHeldToDate: retention.retentionHeldToDate.toFixed(2),
+            netClaimAmount: netClaimAmount.toFixed(2),
+            updatedAt: new Date(),
           })
-        );
+          .where(eq(progressClaims.id, claim.id));
       }
 
-      const subtotal = validItems.reduce((sum: number, item: any) => {
-        const revenue = safeParseFinancial(item.panelRevenue, 0);
-        const pct = safeParseFinancial(item.percentComplete, 0);
-        return sum + (revenue * pct / 100);
-      }, 0);
-      const taxRate = safeParseFinancial(claimData.taxRate, 10);
-      const taxAmount = subtotal * taxRate / 100;
-      const total = subtotal + taxAmount;
-
-      const retention = await calculateRetention(companyId, claimData.jobId, subtotal, claim.id);
-      const netClaimAmount = total - retention.retentionAmount;
-
-      await db.update(progressClaims)
-        .set({
-          subtotal: subtotal.toFixed(2),
-          taxAmount: taxAmount.toFixed(2),
-          total: total.toFixed(2),
-          taxRate: String(taxRate),
-          retentionRate: String(retention.retentionRate),
-          retentionAmount: retention.retentionAmount.toFixed(2),
-          retentionHeldToDate: retention.retentionHeldToDate.toFixed(2),
-          netClaimAmount: netClaimAmount.toFixed(2),
-          updatedAt: new Date(),
-        })
-        .where(eq(progressClaims.id, claim.id));
-    }
-
-    const [updated] = await db.select().from(progressClaims).where(eq(progressClaims.id, claim.id));
+      const [result] = await tx.select().from(progressClaims).where(eq(progressClaims.id, claim.id));
+      return result;
+    });
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating progress claim");
@@ -637,31 +640,10 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "DRAFT") return res.status(400).json({ error: "Only draft claims can be edited" });
 
-    const { items: claimItems, ...claimData } = req.body;
+    const { items: claimItems, version: clientVersion, ...claimData } = req.body;
 
     if (claimItems !== undefined) {
-      await db.delete(progressClaimItems).where(eq(progressClaimItems.progressClaimId, claim.id));
-
       const validItems = (claimItems || []).filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
-      if (validItems.length > 0) {
-        await db.insert(progressClaimItems).values(
-          validItems.map((item: any) => {
-            const revenue = safeParseFinancial(item.panelRevenue, 0);
-            const pct = safeParseFinancial(item.percentComplete, 0);
-            const lineTotal = (revenue * pct / 100).toFixed(2);
-            return {
-              progressClaimId: claim.id,
-              panelId: item.panelId,
-              panelMark: item.panelMark,
-              level: item.level || null,
-              panelRevenue: String(revenue.toFixed(2)),
-              percentComplete: String(pct.toFixed(2)),
-              lineTotal,
-            };
-          })
-        );
-      }
-
       const subtotal = validItems.reduce((sum: number, item: any) => {
         const revenue = safeParseFinancial(item.panelRevenue, 0);
         const pct = safeParseFinancial(item.percentComplete, 0);
@@ -671,26 +653,76 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
       const taxAmount = subtotal * taxRate / 100;
       const total = subtotal + taxAmount;
 
-      const retention = await calculateRetention(companyId, claim.jobId, subtotal, claim.id);
-      const netClaimAmount = total - retention.retentionAmount;
+      const retentionResult = await calculateRetention(companyId, claim.jobId, subtotal, claim.id);
+      const netClaimAmount = total - retentionResult.retentionAmount;
 
       claimData.subtotal = subtotal.toFixed(2);
       claimData.taxAmount = taxAmount.toFixed(2);
       claimData.total = total.toFixed(2);
       claimData.taxRate = String(taxRate);
-      claimData.retentionRate = String(retention.retentionRate);
-      claimData.retentionAmount = retention.retentionAmount.toFixed(2);
-      claimData.retentionHeldToDate = retention.retentionHeldToDate.toFixed(2);
+      claimData.retentionRate = String(retentionResult.retentionRate);
+      claimData.retentionAmount = retentionResult.retentionAmount.toFixed(2);
+      claimData.retentionHeldToDate = retentionResult.retentionHeldToDate.toFixed(2);
       claimData.netClaimAmount = netClaimAmount.toFixed(2);
+
+      const [updated] = await db.transaction(async (tx) => {
+        const versionWhere = clientVersion !== undefined
+          ? and(eq(progressClaims.id, claim.id), eq(progressClaims.version, clientVersion))
+          : eq(progressClaims.id, claim.id);
+
+        await tx.delete(progressClaimItems).where(eq(progressClaimItems.progressClaimId, claim.id));
+
+        if (validItems.length > 0) {
+          await tx.insert(progressClaimItems).values(
+            validItems.map((item: any) => {
+              const revenue = safeParseFinancial(item.panelRevenue, 0);
+              const pct = safeParseFinancial(item.percentComplete, 0);
+              const lineTotal = (revenue * pct / 100).toFixed(2);
+              return {
+                progressClaimId: claim.id,
+                panelId: item.panelId,
+                panelMark: item.panelMark,
+                level: item.level || null,
+                panelRevenue: String(revenue.toFixed(2)),
+                percentComplete: String(pct.toFixed(2)),
+                lineTotal,
+              };
+            })
+          );
+        }
+
+        const result = await tx.update(progressClaims)
+          .set({ ...claimData, updatedAt: new Date(), version: sql`${progressClaims.version} + 1` })
+          .where(versionWhere)
+          .returning();
+
+        if (result.length === 0) {
+          throw Object.assign(new Error("Claim was modified by another user. Please refresh and try again."), { statusCode: 409 });
+        }
+        return result;
+      });
+
+      res.json(updated);
+      return;
     }
 
+    const versionWhere = clientVersion !== undefined
+      ? and(eq(progressClaims.id, claim.id), eq(progressClaims.version, clientVersion))
+      : eq(progressClaims.id, claim.id);
     const [updated] = await db.update(progressClaims)
-      .set({ ...claimData, updatedAt: new Date() })
-      .where(eq(progressClaims.id, claim.id))
+      .set({ ...claimData, updatedAt: new Date(), version: sql`${progressClaims.version} + 1` })
+      .where(versionWhere)
       .returning();
+
+    if (!updated && clientVersion !== undefined) {
+      return res.status(409).json({ error: "Claim was modified by another user. Please refresh and try again." });
+    }
 
     res.json(updated);
   } catch (error: any) {
+    if ((error as any).statusCode === 409) {
+      return res.status(409).json({ error: error.message });
+    }
     logger.error({ err: error }, "Error updating progress claim");
     res.status(500).json({ error: error.message });
   }
@@ -725,28 +757,32 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted claims can be approved" });
 
-    const [updated] = await db.update(progressClaims)
-      .set({
-        status: "APPROVED",
-        approvedById: userId,
-        approvedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(progressClaims.id, claim.id))
-      .returning();
+    const updated = await db.transaction(async (tx) => {
+      const [approvedClaim] = await tx.update(progressClaims)
+        .set({
+          status: "APPROVED",
+          approvedById: userId,
+          approvedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(progressClaims.id, claim.id))
+        .returning();
 
-    const items = await db.select().from(progressClaimItems)
-      .where(eq(progressClaimItems.progressClaimId, claim.id));
+      const items = await tx.select().from(progressClaimItems)
+        .where(eq(progressClaimItems.progressClaimId, claim.id));
 
-    const fullClaimPanelIds = items
-      .filter(item => safeParseFinancial(item.percentComplete, 0) >= 100)
-      .map(item => item.panelId);
+      const fullClaimPanelIds = items
+        .filter(item => safeParseFinancial(item.percentComplete, 0) >= 100)
+        .map(item => item.panelId);
 
-    if (fullClaimPanelIds.length > 0) {
-      await db.update(panelRegister)
-        .set({ lifecycleStatus: PANEL_LIFECYCLE_STATUS.CLAIMED, updatedAt: new Date() })
-        .where(inArray(panelRegister.id, fullClaimPanelIds));
-    }
+      if (fullClaimPanelIds.length > 0) {
+        await tx.update(panelRegister)
+          .set({ lifecycleStatus: PANEL_LIFECYCLE_STATUS.CLAIMED, updatedAt: new Date() })
+          .where(inArray(panelRegister.id, fullClaimPanelIds));
+      }
+
+      return approvedClaim;
+    });
 
     res.json(updated);
   } catch (error: any) {
@@ -865,7 +901,10 @@ router.delete("/api/progress-claims/:id", requireAuth, async (req: Request, res:
       return res.status(403).json({ error: "Only the creator can delete this claim" });
     }
 
-    await db.delete(progressClaims).where(eq(progressClaims.id, claim.id));
+    await db.transaction(async (tx) => {
+      await tx.delete(progressClaimItems).where(eq(progressClaimItems.progressClaimId, claim.id));
+      await tx.delete(progressClaims).where(eq(progressClaims.id, claim.id));
+    });
     res.json({ success: true });
   } catch (error: any) {
     logger.error({ err: error }, "Error deleting progress claim");

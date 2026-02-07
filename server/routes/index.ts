@@ -1,6 +1,8 @@
 import type { Express } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import cookieParser from "cookie-parser";
+import { csrfTokenGenerator, csrfProtection } from "../middleware/csrf";
 
 import { authRouter } from "./auth.routes";
 import { usersRouter } from "./users.routes";
@@ -84,8 +86,10 @@ export async function setupRoutes(app: Express): Promise<void> {
     })
   );
 
-  // Mount domain routers
-  // Auth router has relative paths (/login, /logout, /me)
+  app.use(cookieParser());
+  app.use(csrfTokenGenerator);
+  app.use("/api", csrfProtection);
+
   app.use("/api/auth", authRouter);
   
   // These routers have full paths starting with /api/ in their route definitions

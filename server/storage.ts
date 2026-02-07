@@ -438,6 +438,7 @@ export interface IStorage {
 
   // Logistics - Delivery Records
   getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined>;
+  getDeliveryRecordById(id: string): Promise<DeliveryRecord | undefined>;
   createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord>;
   updateDeliveryRecord(id: string, data: Partial<InsertDeliveryRecord>): Promise<DeliveryRecord | undefined>;
 
@@ -2232,6 +2233,11 @@ export class DatabaseStorage implements IStorage {
   // Logistics - Delivery Records
   async getDeliveryRecord(loadListId: string): Promise<DeliveryRecord | undefined> {
     const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.loadListId, loadListId));
+    return record;
+  }
+
+  async getDeliveryRecordById(id: string): Promise<DeliveryRecord | undefined> {
+    const [record] = await db.select().from(deliveryRecords).where(eq(deliveryRecords.id, id));
     return record;
   }
 
