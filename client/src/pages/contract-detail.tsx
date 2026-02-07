@@ -506,8 +506,8 @@ export default function ContractDetailPage() {
                 <TextField label="Original Contract Value" value={currentData.originalContractValue || ""} onChange={(v) => updateField("originalContractValue", v)} testId="input-original-value" type="number" placeholder="0.00" />
                 <TextField label="Revised Contract Value" value={currentData.revisedContractValue || ""} onChange={(v) => updateField("revisedContractValue", v)} testId="input-revised-value" type="number" placeholder="0.00" />
                 <TextField label="Unit Prices" value={currentData.unitPrices || ""} onChange={(v) => updateField("unitPrices", v)} testId="input-unit-prices" />
-                <TextField label="Retention %" value={currentData.retentionPercentage || ""} onChange={(v) => updateField("retentionPercentage", v)} testId="input-retention-pct" type="number" />
-                <TextField label="Retention Cap" value={currentData.retentionCap || ""} onChange={(v) => updateField("retentionCap", v)} testId="input-retention-cap" type="number" />
+                <TextField label="Retention Rate (%)" value={currentData.retentionPercentage || ""} onChange={(v) => updateField("retentionPercentage", v)} testId="input-retention-pct" type="number" placeholder="Default: 10%" />
+                <TextField label="Retention Cap (% of Contract)" value={currentData.retentionCap || ""} onChange={(v) => updateField("retentionCap", v)} testId="input-retention-cap" type="number" placeholder="Default: 5%" />
                 <TextField label="Payment Terms" value={currentData.paymentTerms || ""} onChange={(v) => updateField("paymentTerms", v)} testId="input-payment-terms" placeholder="e.g. Net 30" />
                 <TextField label="Billing Method" value={currentData.billingMethod || ""} onChange={(v) => updateField("billingMethod", v)} testId="input-billing-method" placeholder="Progress / Milestone / Delivery" />
                 <TextField label="Tax Responsibility" value={currentData.taxResponsibility || ""} onChange={(v) => updateField("taxResponsibility", v)} testId="input-tax-responsibility" />

@@ -17,6 +17,59 @@ import logger from "../lib/logger";
 
 const router = Router();
 
+async function calculateRetention(
+  companyId: string,
+  jobId: string,
+  subtotal: number,
+  excludeClaimId?: string
+): Promise<{ retentionRate: number; retentionAmount: number; retentionHeldToDate: number }> {
+  const [contract] = await db
+    .select({
+      retentionPercentage: contracts.retentionPercentage,
+      retentionCap: contracts.retentionCap,
+      originalContractValue: contracts.originalContractValue,
+      revisedContractValue: contracts.revisedContractValue,
+    })
+    .from(contracts)
+    .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId)));
+
+  const retentionRate = parseFloat(contract?.retentionPercentage || "10");
+  const retentionCapPct = parseFloat(contract?.retentionCap || "5");
+  const contractValue = parseFloat(contract?.revisedContractValue || contract?.originalContractValue || "0");
+
+  const retentionCapAmount = contractValue > 0 ? contractValue * retentionCapPct / 100 : Infinity;
+
+  let conditions: any[] = [
+    eq(progressClaims.companyId, companyId),
+    eq(progressClaims.jobId, jobId),
+    inArray(progressClaims.status, ["APPROVED", "SUBMITTED", "DRAFT"]),
+  ];
+  if (excludeClaimId) {
+    conditions.push(sql`${progressClaims.id} != ${excludeClaimId}`);
+  }
+
+  const existingRetention = await db
+    .select({
+      totalRetention: sql<string>`COALESCE(SUM(CAST(${progressClaims.retentionAmount} AS DECIMAL)), 0)`,
+    })
+    .from(progressClaims)
+    .where(and(...conditions));
+
+  const previousRetention = parseFloat(existingRetention[0]?.totalRetention || "0");
+
+  let thisClaimRetention = subtotal * retentionRate / 100;
+
+  if (previousRetention + thisClaimRetention > retentionCapAmount) {
+    thisClaimRetention = Math.max(0, retentionCapAmount - previousRetention);
+  }
+
+  return {
+    retentionRate,
+    retentionAmount: parseFloat(thisClaimRetention.toFixed(2)),
+    retentionHeldToDate: parseFloat((previousRetention + thisClaimRetention).toFixed(2)),
+  };
+}
+
 router.get("/api/progress-claims", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
@@ -40,6 +93,10 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
         taxRate: progressClaims.taxRate,
         taxAmount: progressClaims.taxAmount,
         total: progressClaims.total,
+        retentionRate: progressClaims.retentionRate,
+        retentionAmount: progressClaims.retentionAmount,
+        retentionHeldToDate: progressClaims.retentionHeldToDate,
+        netClaimAmount: progressClaims.netClaimAmount,
         notes: progressClaims.notes,
         internalNotes: progressClaims.internalNotes,
         createdById: progressClaims.createdById,
@@ -153,6 +210,96 @@ router.get("/api/progress-claims/next-number", requireAuth, async (req: Request,
   }
 });
 
+router.get("/api/progress-claims/retention-report", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+
+    const allClaims = await db
+      .select({
+        id: progressClaims.id,
+        jobId: progressClaims.jobId,
+        claimNumber: progressClaims.claimNumber,
+        status: progressClaims.status,
+        claimDate: progressClaims.claimDate,
+        subtotal: progressClaims.subtotal,
+        total: progressClaims.total,
+        retentionRate: progressClaims.retentionRate,
+        retentionAmount: progressClaims.retentionAmount,
+        retentionHeldToDate: progressClaims.retentionHeldToDate,
+        netClaimAmount: progressClaims.netClaimAmount,
+        jobName: jobs.name,
+        jobNumber: jobs.jobNumber,
+      })
+      .from(progressClaims)
+      .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
+      .where(eq(progressClaims.companyId, companyId))
+      .orderBy(jobs.jobNumber, progressClaims.claimDate);
+
+    const jobIds = [...new Set(allClaims.map(c => c.jobId))];
+    const contractMap: Record<string, { retentionRate: number; retentionCapPct: number; contractValue: number; retentionCapAmount: number }> = {};
+
+    if (jobIds.length > 0) {
+      const allContracts = await db
+        .select({
+          jobId: contracts.jobId,
+          retentionPercentage: contracts.retentionPercentage,
+          retentionCap: contracts.retentionCap,
+          originalContractValue: contracts.originalContractValue,
+          revisedContractValue: contracts.revisedContractValue,
+        })
+        .from(contracts)
+        .where(and(eq(contracts.companyId, companyId), inArray(contracts.jobId, jobIds)));
+
+      for (const c of allContracts) {
+        const rate = parseFloat(c.retentionPercentage || "10");
+        const capPct = parseFloat(c.retentionCap || "5");
+        const cv = parseFloat(c.revisedContractValue || c.originalContractValue || "0");
+        contractMap[c.jobId] = {
+          retentionRate: rate,
+          retentionCapPct: capPct,
+          contractValue: cv,
+          retentionCapAmount: cv > 0 ? cv * capPct / 100 : 0,
+        };
+      }
+    }
+
+    const jobGroups: Record<string, any> = {};
+    for (const claim of allClaims) {
+      if (!jobGroups[claim.jobId]) {
+        const ci = contractMap[claim.jobId] || { retentionRate: 10, retentionCapPct: 5, contractValue: 0, retentionCapAmount: 0 };
+        jobGroups[claim.jobId] = {
+          jobId: claim.jobId,
+          jobNumber: claim.jobNumber,
+          jobName: claim.jobName,
+          contractValue: ci.contractValue.toFixed(2),
+          retentionRate: ci.retentionRate,
+          retentionCapPct: ci.retentionCapPct,
+          retentionCapAmount: ci.retentionCapAmount.toFixed(2),
+          totalRetentionHeld: "0",
+          claims: [],
+        };
+      }
+      jobGroups[claim.jobId].claims.push(claim);
+    }
+
+    for (const group of Object.values(jobGroups) as any[]) {
+      let running = 0;
+      for (const claim of group.claims) {
+        running += parseFloat(claim.retentionAmount || "0");
+        claim.cumulativeRetention = running.toFixed(2);
+      }
+      group.totalRetentionHeld = running.toFixed(2);
+      const ci = contractMap[group.jobId];
+      group.remainingRetention = ci ? Math.max(0, ci.retentionCapAmount - running).toFixed(2) : "0";
+    }
+
+    res.json(Object.values(jobGroups));
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching retention report");
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get("/api/progress-claims/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
@@ -169,6 +316,10 @@ router.get("/api/progress-claims/:id", requireAuth, async (req: Request, res: Re
         taxRate: progressClaims.taxRate,
         taxAmount: progressClaims.taxAmount,
         total: progressClaims.total,
+        retentionRate: progressClaims.retentionRate,
+        retentionAmount: progressClaims.retentionAmount,
+        retentionHeldToDate: progressClaims.retentionHeldToDate,
+        netClaimAmount: progressClaims.netClaimAmount,
         notes: progressClaims.notes,
         internalNotes: progressClaims.internalNotes,
         createdById: progressClaims.createdById,
@@ -435,12 +586,19 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
       const taxAmount = subtotal * taxRate / 100;
       const total = subtotal + taxAmount;
 
+      const retention = await calculateRetention(companyId, claimData.jobId, subtotal, claim.id);
+      const netClaimAmount = total - retention.retentionAmount;
+
       await db.update(progressClaims)
         .set({
           subtotal: subtotal.toFixed(2),
           taxAmount: taxAmount.toFixed(2),
           total: total.toFixed(2),
           taxRate: String(taxRate),
+          retentionRate: String(retention.retentionRate),
+          retentionAmount: retention.retentionAmount.toFixed(2),
+          retentionHeldToDate: retention.retentionHeldToDate.toFixed(2),
+          netClaimAmount: netClaimAmount.toFixed(2),
           updatedAt: new Date(),
         })
         .where(eq(progressClaims.id, claim.id));
@@ -496,10 +654,17 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
       const taxAmount = subtotal * taxRate / 100;
       const total = subtotal + taxAmount;
 
+      const retention = await calculateRetention(companyId, claim.jobId, subtotal, claim.id);
+      const netClaimAmount = total - retention.retentionAmount;
+
       claimData.subtotal = subtotal.toFixed(2);
       claimData.taxAmount = taxAmount.toFixed(2);
       claimData.total = total.toFixed(2);
       claimData.taxRate = String(taxRate);
+      claimData.retentionRate = String(retention.retentionRate);
+      claimData.retentionAmount = retention.retentionAmount.toFixed(2);
+      claimData.retentionHeldToDate = retention.retentionHeldToDate.toFixed(2);
+      claimData.netClaimAmount = netClaimAmount.toFixed(2);
     }
 
     const [updated] = await db.update(progressClaims)
@@ -597,6 +762,73 @@ router.post("/api/progress-claims/:id/reject", requireAuth, async (req: Request,
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error rejecting progress claim");
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const jobId = req.params.jobId;
+
+    const [contract] = await db
+      .select({
+        retentionPercentage: contracts.retentionPercentage,
+        retentionCap: contracts.retentionCap,
+        originalContractValue: contracts.originalContractValue,
+        revisedContractValue: contracts.revisedContractValue,
+      })
+      .from(contracts)
+      .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId)));
+
+    const retentionRate = parseFloat(contract?.retentionPercentage || "10");
+    const retentionCapPct = parseFloat(contract?.retentionCap || "5");
+    const contractValue = parseFloat(contract?.revisedContractValue || contract?.originalContractValue || "0");
+    const retentionCapAmount = contractValue > 0 ? contractValue * retentionCapPct / 100 : 0;
+
+    const claims = await db
+      .select({
+        id: progressClaims.id,
+        claimNumber: progressClaims.claimNumber,
+        status: progressClaims.status,
+        claimDate: progressClaims.claimDate,
+        subtotal: progressClaims.subtotal,
+        total: progressClaims.total,
+        retentionRate: progressClaims.retentionRate,
+        retentionAmount: progressClaims.retentionAmount,
+        retentionHeldToDate: progressClaims.retentionHeldToDate,
+        netClaimAmount: progressClaims.netClaimAmount,
+      })
+      .from(progressClaims)
+      .where(and(
+        eq(progressClaims.companyId, companyId),
+        eq(progressClaims.jobId, jobId),
+      ))
+      .orderBy(progressClaims.claimDate);
+
+    const totalRetentionHeld = claims.reduce(
+      (sum, c) => sum + parseFloat(c.retentionAmount || "0"), 0
+    );
+
+    res.json({
+      retentionRate,
+      retentionCapPct,
+      contractValue: contractValue.toFixed(2),
+      retentionCapAmount: retentionCapAmount.toFixed(2),
+      totalRetentionHeld: totalRetentionHeld.toFixed(2),
+      remainingRetention: Math.max(0, retentionCapAmount - totalRetentionHeld).toFixed(2),
+      claims: claims.map((c, idx) => {
+        const runningTotal = claims.slice(0, idx + 1).reduce(
+          (sum, cl) => sum + parseFloat(cl.retentionAmount || "0"), 0
+        );
+        return {
+          ...c,
+          cumulativeRetention: runningTotal.toFixed(2),
+        };
+      }),
+    });
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching retention summary");
     res.status(500).json({ error: error.message });
   }
 });

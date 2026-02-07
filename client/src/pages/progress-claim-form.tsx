@@ -80,6 +80,10 @@ interface ProgressClaim {
   taxRate: string;
   taxAmount: string;
   total: string;
+  retentionRate: string | null;
+  retentionAmount: string | null;
+  retentionHeldToDate: string | null;
+  netClaimAmount: string | null;
   notes: string | null;
   internalNotes: string | null;
   jobName: string | null;
@@ -173,6 +177,19 @@ export default function ProgressClaimFormPage() {
 
   const { data: jobSummary } = useQuery<{ contractValue: string; claimedToDate: string; remainingValue: string }>({
     queryKey: [PROGRESS_CLAIMS_ROUTES.JOB_SUMMARY(jobId!)],
+    enabled: !!jobId,
+  });
+
+  const { data: retentionSummary } = useQuery<{
+    retentionRate: string;
+    retentionCapPct: string;
+    contractValue: string;
+    retentionCapAmount: string;
+    totalRetentionHeld: string;
+    remainingRetentionCapacity: string;
+    claimCount: number;
+  }>({
+    queryKey: [PROGRESS_CLAIMS_ROUTES.RETENTION_SUMMARY(jobId!)],
     enabled: !!jobId,
   });
 
@@ -277,6 +294,17 @@ export default function ProgressClaimFormPage() {
   }, [activeItems]);
   const taxAmount = subtotal * taxRate / 100;
   const total = subtotal + taxAmount;
+
+  const retentionCalc = useMemo(() => {
+    if (!retentionSummary) return { rate: 0, amount: 0, netClaim: total };
+    const rate = parseFloat(retentionSummary.retentionRate || "0");
+    const capAmount = parseFloat(retentionSummary.retentionCapAmount || "0");
+    const prevHeld = parseFloat(retentionSummary.totalRetentionHeld || "0");
+    const rawRetention = subtotal * rate / 100;
+    const remainingCap = Math.max(0, capAmount - prevHeld);
+    const retentionAmount = Math.min(rawRetention, remainingCap);
+    return { rate, amount: retentionAmount, netClaim: total - retentionAmount };
+  }, [retentionSummary, subtotal, total]);
 
   const summaryByLevel = useMemo(() => {
     const summary: Record<string, { level: string; count: number; total: number }> = {};
@@ -720,9 +748,34 @@ export default function ProgressClaimFormPage() {
                 </div>
                 <Separator />
                 <div className="flex items-center justify-between font-semibold">
-                  <span>Total</span>
+                  <span>Gross Total</span>
                   <span className="font-mono text-lg" data-testid="text-total">{formatCurrency(total)}</span>
                 </div>
+                {retentionCalc.rate > 0 && (
+                  <>
+                    <div className="flex items-center justify-between text-sm text-orange-600 dark:text-orange-400">
+                      <span>Retention ({retentionCalc.rate}%)</span>
+                      <span className="font-mono" data-testid="text-retention-amount">-{formatCurrency(retentionCalc.amount)}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between font-semibold text-green-700 dark:text-green-400">
+                      <span>Net Claim Amount</span>
+                      <span className="font-mono text-lg" data-testid="text-net-claim">{formatCurrency(retentionCalc.netClaim)}</span>
+                    </div>
+                    {retentionSummary && (
+                      <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span>Retention held to date</span>
+                          <span className="font-mono">{formatCurrency(parseFloat(retentionSummary.totalRetentionHeld || "0") + retentionCalc.amount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Retention cap ({retentionSummary.retentionCapPct}% of contract)</span>
+                          <span className="font-mono">{formatCurrency(retentionSummary.retentionCapAmount)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {isDraftMode && (

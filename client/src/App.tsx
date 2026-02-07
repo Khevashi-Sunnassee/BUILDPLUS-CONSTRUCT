@@ -61,6 +61,7 @@ import ContractHubPage from "@/pages/contract-hub";
 import ContractDetailPage from "@/pages/contract-detail";
 import ProgressClaimsPage from "@/pages/progress-claims";
 import ProgressClaimFormPage from "@/pages/progress-claim-form";
+import RetentionReportPage from "@/pages/retention-report";
 
 import MobileLoginPage from "@/pages/mobile/login";
 import MobileDashboard from "@/pages/mobile/dashboard";
@@ -544,6 +545,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ContractHubPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/progress-claims/retention-report">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <RetentionReportPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

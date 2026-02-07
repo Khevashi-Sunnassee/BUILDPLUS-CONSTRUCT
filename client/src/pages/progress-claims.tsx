@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Eye, Edit, Search, X, Trash2, FileText } from "lucide-react";
+import { Plus, Eye, Edit, Search, X, Trash2, FileText, Shield } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -25,6 +25,10 @@ interface ProgressClaimListItem {
   subtotal: string;
   taxAmount: string;
   total: string;
+  retentionRate: string | null;
+  retentionAmount: string | null;
+  retentionHeldToDate: string | null;
+  netClaimAmount: string | null;
   jobId: string;
   jobName: string | null;
   jobNumber: string | null;
@@ -142,10 +146,16 @@ export default function ProgressClaimsPage() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Progress Claims</h1>
           <p className="text-sm text-muted-foreground">Manage progress claims across all jobs</p>
         </div>
-        <Button onClick={() => navigate("/progress-claims/new")} data-testid="button-new-claim">
-          <Plus className="h-4 w-4 mr-2" />
-          New Claim
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => navigate("/progress-claims/retention-report")} data-testid="button-retention-report">
+            <Shield className="h-4 w-4 mr-2" />
+            Retention Report
+          </Button>
+          <Button onClick={() => navigate("/progress-claims/new")} data-testid="button-new-claim">
+            <Plus className="h-4 w-4 mr-2" />
+            New Claim
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -257,6 +267,8 @@ export default function ProgressClaimsPage() {
                     <TableHead>Job</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">This Claim</TableHead>
+                    <TableHead className="text-right">Retention</TableHead>
+                    <TableHead className="text-right">Net Claim</TableHead>
                     <TableHead className="text-right">Claimed to Date</TableHead>
                     <TableHead className="text-right">Remaining</TableHead>
                     <TableHead>Date</TableHead>
@@ -286,6 +298,14 @@ export default function ProgressClaimsPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-claim-total-${claim.id}`}>
                         {formatCurrency(claim.subtotal)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-orange-600 dark:text-orange-400" data-testid={`text-retention-${claim.id}`}>
+                        {parseFloat(claim.retentionAmount || "0") > 0
+                          ? `-${formatCurrency(claim.retentionAmount)}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-net-claim-${claim.id}`}>
+                        {claim.netClaimAmount ? formatCurrency(claim.netClaimAmount) : formatCurrency(claim.total)}
                       </TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-claimed-to-date-${claim.id}`}>
                         {formatCurrency(claim.claimedToDate)}
