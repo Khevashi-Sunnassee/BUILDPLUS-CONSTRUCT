@@ -110,7 +110,7 @@ export default function MobileTasksPage() {
 
   const createTaskMutation = useMutation({
     mutationFn: async ({ groupId, title }: { groupId: string; title: string }) => {
-      return apiRequest("POST", TASKS_ROUTES.LIST, { groupId, title });
+      return apiRequest("POST", TASKS_ROUTES.LIST, { groupId, title, priority: "MEDIUM", status: "NOT_STARTED" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });

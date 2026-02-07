@@ -438,6 +438,7 @@ function TaskRow({
         parentId: task.id,
         title: data.title,
         status: data.status,
+        priority: "MEDIUM",
         jobId: data.jobId,
         dueDate: formatDate(data.dueDate),
         reminderDate: formatDate(data.reminderDate),
@@ -1317,6 +1318,8 @@ function TaskGroupComponent({
         groupId: group.id,
         title,
         dueDate: new Date().toISOString(),
+        priority: "MEDIUM",
+        status: "NOT_STARTED",
       });
     },
     onSuccess: () => {
