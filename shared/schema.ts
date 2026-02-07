@@ -181,6 +181,8 @@ export const globalSettings = pgTable("global_settings", {
   productionWorkDays: json("production_work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
   draftingWorkDays: json("drafting_work_days").$type<boolean[]>().default([false, true, true, true, true, true, false]),
   cfmeuCalendar: cfmeuCalendarEnum("cfmeu_calendar").default("NONE").notNull(),
+  poTermsHtml: text("po_terms_html"),
+  includePOTerms: boolean("include_po_terms").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

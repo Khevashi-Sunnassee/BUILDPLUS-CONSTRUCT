@@ -131,4 +131,29 @@ router.get("/api/settings/logo", async (req, res) => {
   }
 });
 
+router.get("/api/settings/po-terms", requireAuth, async (req, res) => {
+  try {
+    const settings = await storage.getGlobalSettings();
+    res.json({
+      poTermsHtml: settings?.poTermsHtml || "",
+      includePOTerms: settings?.includePOTerms || false,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to load PO terms" });
+  }
+});
+
+router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const { poTermsHtml } = req.body;
+    if (typeof poTermsHtml !== "string") {
+      return res.status(400).json({ error: "PO terms content is required" });
+    }
+    const settings = await storage.updateGlobalSettings({ poTermsHtml });
+    res.json({ success: true, poTermsHtml: settings.poTermsHtml });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message || "Failed to save PO terms" });
+  }
+});
+
 export const settingsRouter = router;

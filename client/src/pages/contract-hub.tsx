@@ -1,13 +1,17 @@
-import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { CONTRACT_ROUTES } from "@shared/api-routes";
+import { CONTRACT_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Search,
   FileText,
@@ -19,6 +23,14 @@ import {
   Scale,
   Building2,
   Filter,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Save,
+  Loader2,
+  Type,
 } from "lucide-react";
 
 interface ContractHubItem {
@@ -53,13 +65,6 @@ function formatCurrency(value: string | null): string {
   return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
 }
 
-function getRiskColor(rating: number | null): string {
-  if (!rating) return "text-muted-foreground";
-  if (rating <= 3) return "text-green-600 dark:text-green-400";
-  if (rating <= 6) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
-}
-
 function getRiskBadgeVariant(rating: number | null): "default" | "secondary" | "outline" | "destructive" {
   if (!rating) return "outline";
   if (rating <= 3) return "default";
@@ -67,11 +72,218 @@ function getRiskBadgeVariant(rating: number | null): "default" | "secondary" | "
   return "destructive";
 }
 
+const FONT_OPTIONS = [
+  { value: "Arial", label: "Arial" },
+  { value: "Times New Roman", label: "Times New Roman" },
+  { value: "Helvetica", label: "Helvetica" },
+  { value: "Georgia", label: "Georgia" },
+  { value: "Verdana", label: "Verdana" },
+  { value: "Courier New", label: "Courier New" },
+];
+
+const FONT_SIZE_OPTIONS = [
+  { value: "1", label: "Small" },
+  { value: "3", label: "Normal" },
+  { value: "4", label: "Medium" },
+  { value: "5", label: "Large" },
+  { value: "6", label: "X-Large" },
+];
+
+interface POTermsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
+  const { toast } = useToast();
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [currentFont, setCurrentFont] = useState("Arial");
+  const [currentFontSize, setCurrentFontSize] = useState("3");
+
+  const { data: termsData, isLoading } = useQuery<{ poTermsHtml: string; includePOTerms: boolean }>({
+    queryKey: [SETTINGS_ROUTES.PO_TERMS],
+    enabled: open,
+  });
+
+  useEffect(() => {
+    if (open && editorRef.current && termsData) {
+      editorRef.current.innerHTML = termsData.poTermsHtml || "";
+    }
+  }, [open, termsData]);
+
+  const saveMutation = useMutation({
+    mutationFn: async (html: string) => {
+      return apiRequest("PUT", SETTINGS_ROUTES.PO_TERMS, { poTermsHtml: html });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [SETTINGS_ROUTES.PO_TERMS] });
+      toast({ title: "PO Terms & Conditions saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save PO Terms", variant: "destructive" });
+    },
+  });
+
+  const handleSave = useCallback(() => {
+    if (!editorRef.current) return;
+    saveMutation.mutate(editorRef.current.innerHTML);
+  }, [saveMutation]);
+
+  const execCommand = useCallback((command: string, value?: string) => {
+    editorRef.current?.focus();
+    document.execCommand(command, false, value);
+  }, []);
+
+  const handleFontChange = useCallback((font: string) => {
+    setCurrentFont(font);
+    execCommand("fontName", font);
+  }, [execCommand]);
+
+  const handleFontSizeChange = useCallback((size: string) => {
+    setCurrentFontSize(size);
+    execCommand("fontSize", size);
+  }, [execCommand]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-[800px] max-h-[85vh] p-0 gap-0 overflow-hidden" data-testid="dialog-po-terms">
+        <DialogHeader className="px-6 py-4 border-b">
+          <DialogTitle className="flex items-center gap-2" data-testid="text-po-terms-title">
+            <FileText className="h-5 w-5" />
+            PO Terms & Conditions
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-col overflow-hidden" style={{ minHeight: "500px" }}>
+          <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b bg-muted/30">
+            <Select value={currentFont} onValueChange={handleFontChange}>
+              <SelectTrigger className="w-[150px]" data-testid="select-font-family">
+                <Type className="h-3.5 w-3.5 mr-1.5" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_OPTIONS.map((f) => (
+                  <SelectItem key={f.value} value={f.value} style={{ fontFamily: f.value }}>
+                    {f.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={currentFontSize} onValueChange={handleFontSizeChange}>
+              <SelectTrigger className="w-[110px]" data-testid="select-font-size">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {FONT_SIZE_OPTIONS.map((s) => (
+                  <SelectItem key={s.value} value={s.value}>
+                    {s.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Separator orientation="vertical" className="h-6" />
+
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => execCommand("bold")}
+              data-testid="button-bold"
+              title="Bold"
+            >
+              <Bold className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => execCommand("italic")}
+              data-testid="button-italic"
+              title="Italic"
+            >
+              <Italic className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => execCommand("underline")}
+              data-testid="button-underline"
+              title="Underline"
+            >
+              <Underline className="h-4 w-4" />
+            </Button>
+
+            <Separator orientation="vertical" className="h-6" />
+
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => execCommand("insertUnorderedList")}
+              data-testid="button-bullet-list"
+              title="Bullet List"
+            >
+              <List className="h-4 w-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => execCommand("insertOrderedList")}
+              data-testid="button-numbered-list"
+              title="Numbered List"
+            >
+              <ListOrdered className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-auto p-4">
+            {isLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            ) : (
+              <div
+                ref={editorRef}
+                contentEditable
+                className="min-h-[350px] p-4 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm leading-relaxed"
+                style={{ fontFamily: "Arial" }}
+                data-testid="editor-po-terms"
+                suppressContentEditableWarning
+              />
+            )}
+          </div>
+
+          <div className="flex items-center justify-between px-6 py-3 border-t bg-muted/30">
+            <p className="text-xs text-muted-foreground">
+              These terms will be attached to printed Purchase Orders when enabled in Settings
+            </p>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel-terms">
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={saveMutation.isPending} data-testid="button-save-terms">
+                {saveMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="mr-2 h-4 w-4" />
+                )}
+                Save Terms
+              </Button>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ContractHubPage() {
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [workStatusFilter, setWorkStatusFilter] = useState<string>("all");
+  const [termsDialogOpen, setTermsDialogOpen] = useState(false);
 
   const { data: hubItems = [], isLoading } = useQuery<ContractHubItem[]>({
     queryKey: [CONTRACT_ROUTES.HUB],
@@ -117,6 +329,14 @@ export default function ContractHubPage() {
           <p className="text-muted-foreground">Manage contracts and legal documentation for all projects</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setTermsDialogOpen(true)}
+            data-testid="button-view-po-terms"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            View PO Terms & Conditions
+          </Button>
           <Scale className="h-5 w-5 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">Legal Adviser</span>
         </div>
@@ -308,6 +528,8 @@ export default function ContractHubPage() {
           })
         )}
       </div>
+
+      <POTermsDialog open={termsDialogOpen} onOpenChange={setTermsDialogOpen} />
     </div>
   );
 }

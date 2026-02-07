@@ -39,6 +39,7 @@ export const USER_ROUTES = {
 // ============================================================================
 export const SETTINGS_ROUTES = {
   LOGO: '/api/settings/logo',
+  PO_TERMS: '/api/settings/po-terms',
   WORK_TYPES: '/api/work-types',
   WORK_TYPE_BY_ID: (id: string | number) => `/api/work-types/${id}`,
 } as const;

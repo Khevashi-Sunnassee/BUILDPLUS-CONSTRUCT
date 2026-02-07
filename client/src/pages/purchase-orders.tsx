@@ -40,10 +40,89 @@ interface PurchaseOrderWithDetails extends PurchaseOrder {
 
 type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
+function isLightOnTransparent(img: HTMLImageElement): boolean {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return false;
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  let transparentPixels = 0;
+  let lightPixels = 0;
+  let totalVisiblePixels = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
+    if (a < 30) {
+      transparentPixels++;
+    } else {
+      totalVisiblePixels++;
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+      if (luminance > 200) lightPixels++;
+    }
+  }
+  const totalPixels = data.length / 4;
+  const hasSignificantTransparency = transparentPixels / totalPixels > 0.3;
+  const mostlyLight = totalVisiblePixels > 0 && lightPixels / totalVisiblePixels > 0.6;
+  return hasSignificantTransparency && mostlyLight;
+}
+
+function invertLogoForPrint(img: HTMLImageElement): string {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return "";
+  ctx.drawImage(img, 0, 0);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] > 30) {
+      data[i] = 255 - data[i];
+      data[i + 1] = 255 - data[i + 1];
+      data[i + 2] = 255 - data[i + 2];
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  const resultCanvas = document.createElement("canvas");
+  resultCanvas.width = img.width;
+  resultCanvas.height = img.height;
+  const rCtx = resultCanvas.getContext("2d");
+  if (!rCtx) return canvas.toDataURL("image/png");
+  rCtx.fillStyle = "#FFFFFF";
+  rCtx.fillRect(0, 0, resultCanvas.width, resultCanvas.height);
+  rCtx.drawImage(canvas, 0, 0);
+  return resultCanvas.toDataURL("image/png");
+}
+
 function compressLogoForPdf(logoBase64: string, maxWidth = 200, quality = 0.75): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
+      if (isLightOnTransparent(img)) {
+        const inverted = invertLogoForPrint(img);
+        if (inverted) {
+          const invertedImg = new Image();
+          invertedImg.onload = () => {
+            const scale = Math.min(maxWidth / invertedImg.width, 1);
+            const w = Math.round(invertedImg.width * scale);
+            const h = Math.round(invertedImg.height * scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) { resolve(logoBase64); return; }
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, w, h);
+            ctx.drawImage(invertedImg, 0, 0, w, h);
+            resolve(canvas.toDataURL("image/jpeg", quality));
+          };
+          invertedImg.onerror = () => resolve(logoBase64);
+          invertedImg.src = inverted;
+          return;
+        }
+      }
       const scale = Math.min(maxWidth / img.width, 1);
       const w = Math.round(img.width * scale);
       const h = Math.round(img.height * scale);
@@ -62,11 +141,19 @@ function compressLogoForPdf(logoBase64: string, maxWidth = 200, quality = 0.75):
   });
 }
 
+function htmlToPlainTextLines(html: string): string[] {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  const text = div.innerText || div.textContent || "";
+  return text.split("\n").filter((line) => line.trim() !== "");
+}
+
 function generatePoPdf(
   po: PurchaseOrderWithDetails,
   lineItems: PurchaseOrderItem[],
   settings?: { logoBase64: string | null; companyName: string } | null,
-  compressedLogo?: string | null
+  compressedLogo?: string | null,
+  poTermsData?: { poTermsHtml: string; includePOTerms: boolean } | null
 ): jsPDF {
   const pdf = new jsPDF({
     orientation: "portrait",
@@ -137,7 +224,7 @@ function generatePoPdf(
   };
   const statusStyle = statusColors[po.status] || statusColors.DRAFT;
   pdf.setFillColor(statusStyle.bg[0], statusStyle.bg[1], statusStyle.bg[2]);
-  const statusText = po.status.charAt(0) + po.status.slice(1).toLowerCase();
+  const statusText = po.status === "SUBMITTED" ? "Submitted - Pending Approval" : po.status.charAt(0) + po.status.slice(1).toLowerCase();
   const statusWidth = pdf.getTextWidth(statusText) + 8;
   pdf.roundedRect(margin, currentY, statusWidth, 7, 1.5, 1.5, "F");
   pdf.setTextColor(statusStyle.text[0], statusStyle.text[1], statusStyle.text[2]);
@@ -344,6 +431,47 @@ function generatePoPdf(
     }
   }
 
+  if (poTermsData?.includePOTerms && poTermsData.poTermsHtml) {
+    const termsLines = htmlToPlainTextLines(poTermsData.poTermsHtml);
+    if (termsLines.length > 0) {
+      const lastContentPage = pdf.getNumberOfPages();
+      pdf.setPage(lastContentPage);
+      pdf.setDrawColor(200, 200, 200);
+      pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
+      pdf.setTextColor(120, 120, 120);
+      pdf.setFontSize(7);
+      pdf.setFont("helvetica", "italic");
+      pdf.text("This Purchase Order is subject to Terms & Conditions. See attached page.", margin, pageHeight - 16);
+
+      pdf.addPage();
+      let tcY = 20;
+      pdf.setTextColor(30, 30, 30);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("Terms & Conditions", margin, tcY);
+      tcY += 10;
+      pdf.setDrawColor(59, 130, 246);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, tcY, margin + 40, tcY);
+      tcY += 8;
+
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.setTextColor(60, 60, 60);
+      const tcContentWidth = pageWidth - margin * 2;
+      for (const line of termsLines) {
+        const wrapped = pdf.splitTextToSize(line, tcContentWidth);
+        const lineHeight = wrapped.length * 4.5;
+        if (tcY + lineHeight > pageHeight - 15) {
+          pdf.addPage();
+          tcY = 20;
+        }
+        pdf.text(wrapped, margin, tcY);
+        tcY += lineHeight + 2;
+      }
+    }
+  }
+
   const totalPages = pdf.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
@@ -386,6 +514,11 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
+  const { data: poTermsData } = useQuery<{ poTermsHtml: string; includePOTerms: boolean }>({
+    queryKey: [SETTINGS_ROUTES.PO_TERMS],
+    enabled: open,
+  });
+
   useEffect(() => {
     if (open && po) {
       const supplierEmail = po.supplierEmail || po.supplier?.email || "";
@@ -415,7 +548,7 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
           if (settings?.logoBase64) {
             compressedLogo = await compressLogoForPdf(settings.logoBase64);
           }
-          const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo);
+          const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
           const base64String = pdf.output("datauristring").split(",")[1] || "";
           setPdfBase64(base64String);
 
@@ -753,6 +886,10 @@ export default function PurchaseOrdersPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
+  const { data: poTermsData } = useQuery<{ poTermsHtml: string; includePOTerms: boolean }>({
+    queryKey: [SETTINGS_ROUTES.PO_TERMS],
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest("DELETE", PROCUREMENT_ROUTES.PURCHASE_ORDER_BY_ID(id));
@@ -777,7 +914,7 @@ export default function PurchaseOrdersPage() {
       if (settings?.logoBase64) {
         compressedLogo = await compressLogoForPdf(settings.logoBase64);
       }
-      const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo);
+      const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
       pdf.autoPrint();
       const pdfDataUri = pdf.output("dataurlnewwindow");
       if (!pdfDataUri) {
@@ -788,7 +925,7 @@ export default function PurchaseOrdersPage() {
     } catch (error) {
       toast({ title: "Failed to generate PDF", variant: "destructive" });
     }
-  }, [settings, toast]);
+  }, [settings, poTermsData, toast]);
 
   return (
     <div className="space-y-6">

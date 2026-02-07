@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,7 @@ export default function AdminSettingsPage() {
   const [productionWorkDays, setProductionWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
   const [draftingWorkDays, setDraftingWorkDays] = useState<boolean[]>([false, true, true, true, true, true, false]);
   const [cfmeuCalendar, setCfmeuCalendar] = useState<string>("NONE");
+  const [includePOTerms, setIncludePOTerms] = useState(false);
   const [showDeletePanel, setShowDeletePanel] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
@@ -129,7 +130,10 @@ export default function AdminSettingsPage() {
     if (settings?.cfmeuCalendar) {
       setCfmeuCalendar(settings.cfmeuCalendar);
     }
-  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.procurementDaysInAdvance, settings?.procurementTimeDays, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar]);
+    if (settings?.includePOTerms !== undefined) {
+      setIncludePOTerms(settings.includePOTerms);
+    }
+  }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.procurementDaysInAdvance, settings?.procurementTimeDays, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar, settings?.includePOTerms]);
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -275,6 +279,19 @@ export default function AdminSettingsPage() {
     },
     onError: () => {
       toast({ title: "Failed to save CFMEU calendar", variant: "destructive" });
+    },
+  });
+
+  const saveIncludePOTermsMutation = useMutation({
+    mutationFn: async (val: boolean) => {
+      return apiRequest("PUT", ADMIN_ROUTES.SETTINGS, { includePOTerms: val });
+    },
+    onSuccess: (_data, val) => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.SETTINGS] });
+      toast({ title: val ? "PO Terms will be included on printed Purchase Orders" : "PO Terms will not be included on printed Purchase Orders" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save setting", variant: "destructive" });
     },
   });
 
@@ -1155,6 +1172,37 @@ export default function AdminSettingsPage() {
                   </FormItem>
                 )}
               />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Purchase Order Settings
+              </CardTitle>
+              <CardDescription>
+                Configure how Purchase Orders are printed and distributed
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-row items-center justify-between rounded-lg border p-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base">Include PO Terms & Conditions</Label>
+                  <p className="text-sm text-muted-foreground">
+                    When enabled, printed Purchase Orders will include a separate page with your Terms & Conditions
+                  </p>
+                </div>
+                <Switch
+                  checked={includePOTerms}
+                  onCheckedChange={(checked) => {
+                    setIncludePOTerms(checked);
+                    saveIncludePOTermsMutation.mutate(checked);
+                  }}
+                  disabled={saveIncludePOTermsMutation.isPending}
+                  data-testid="switch-include-po-terms"
+                />
+              </div>
             </CardContent>
           </Card>
 
