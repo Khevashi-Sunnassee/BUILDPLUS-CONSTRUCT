@@ -39,6 +39,9 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  pointerWithin,
+  useDroppable,
+  CollisionDetection,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -1180,6 +1183,7 @@ function TaskGroupComponent({
   showCompleted,
   selectedTaskIds,
   onToggleTaskSelected,
+  isDropTarget,
 }: {
   group: TaskGroup;
   users: User[];
@@ -1189,8 +1193,13 @@ function TaskGroupComponent({
   showCompleted: boolean;
   selectedTaskIds: Set<string>;
   onToggleTaskSelected: (taskId: string) => void;
+  isDropTarget?: boolean;
 }) {
   const { toast } = useToast();
+  const { setNodeRef: setDroppableRef, isOver } = useDroppable({
+    id: `group-droppable-${group.id}`,
+    data: { type: "group", groupId: group.id },
+  });
   const [isCollapsed, setIsCollapsed] = useState(group.isCollapsed);
   const [isEditingName, setIsEditingName] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
@@ -1344,7 +1353,11 @@ function TaskGroupComponent({
   };
 
   return (
-    <div className="mb-6" data-testid={`task-group-${group.id}`}>
+    <div
+      ref={setDroppableRef}
+      className={cn("mb-6 transition-all duration-150", isDropTarget && "ring-2 ring-primary/50 rounded-lg")}
+      data-testid={`task-group-${group.id}`}
+    >
       <div
         className="flex items-center gap-2 py-2 px-2 rounded-t-lg"
         style={{ backgroundColor: `${group.color}20`, borderLeft: `4px solid ${group.color}` }}
@@ -2260,6 +2273,7 @@ export default function TasksPage() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [overGroupId, setOverGroupId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
 
@@ -2270,6 +2284,20 @@ export default function TasksPage() {
       },
     })
   );
+
+  const customCollisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length === 0) {
+      return closestCenter(args);
+    }
+    const taskItemCollisions = pointerCollisions.filter(
+      (c) => !String(c.id).startsWith("group-droppable-")
+    );
+    if (taskItemCollisions.length > 0) {
+      return taskItemCollisions;
+    }
+    return pointerCollisions;
+  }, []);
 
   const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
     queryKey: [TASKS_ROUTES.GROUPS],
@@ -2669,11 +2697,46 @@ export default function TasksPage() {
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
+    setOverGroupId(null);
+  };
+
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) {
+      setOverGroupId(null);
+      return;
+    }
+
+    const overId = over.id as string;
+
+    if (overId.startsWith("group-droppable-")) {
+      const groupId = overId.replace("group-droppable-", "");
+      const activeTaskInfo = findTaskById(active.id as string);
+      if (activeTaskInfo && activeTaskInfo.groupId !== groupId) {
+        setOverGroupId(groupId);
+      } else {
+        setOverGroupId(null);
+      }
+      return;
+    }
+
+    const overTaskInfo = findTaskById(overId);
+    if (overTaskInfo) {
+      const activeTaskInfo = findTaskById(active.id as string);
+      if (activeTaskInfo && activeTaskInfo.groupId !== overTaskInfo.groupId) {
+        setOverGroupId(overTaskInfo.groupId);
+      } else {
+        setOverGroupId(null);
+      }
+    } else {
+      setOverGroupId(null);
+    }
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setOverGroupId(null);
 
     if (!over) return;
 
@@ -2682,6 +2745,19 @@ export default function TasksPage() {
 
     const overId = over.id as string;
     
+    if (overId.startsWith("group-droppable-")) {
+      const targetGroupId = overId.replace("group-droppable-", "");
+      const targetGroup = filteredGroups.find(g => g.id === targetGroupId);
+      if (targetGroup && activeTaskInfo.groupId !== targetGroupId) {
+        moveTaskMutation.mutate({
+          taskId: active.id as string,
+          targetGroupId,
+          targetIndex: targetGroup.tasks.length,
+        });
+      }
+      return;
+    }
+
     const overGroup = filteredGroups.find(g => g.id === overId);
     if (overGroup) {
       if (activeTaskInfo.groupId !== overId) {
@@ -2868,8 +2944,9 @@ export default function TasksPage() {
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCenter}
+        collisionDetection={customCollisionDetection}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         {groups.length === 0 ? (
@@ -2898,6 +2975,7 @@ export default function TasksPage() {
                 showCompleted={showCompleted}
                 selectedTaskIds={selectedTaskIds}
                 onToggleTaskSelected={toggleTaskSelected}
+                isDropTarget={overGroupId === group.id}
               />
             ))}
           </div>
