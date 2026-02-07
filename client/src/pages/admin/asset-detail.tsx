@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import DOMPurify from "dompurify";
 import { ASSET_ROUTES } from "@shared/api-routes";
 import type { Asset, AssetMaintenance, AssetTransfer } from "@shared/schema";
 import {
@@ -738,7 +739,7 @@ export default function AssetDetailPage() {
                 <div>
                   <div
                     className="prose dark:prose-invert max-w-none"
-                    dangerouslySetInnerHTML={{ __html: asset.aiSummary }}
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(asset.aiSummary) }}
                     data-testid="text-ai-summary"
                   />
                   <p className="text-xs text-muted-foreground mt-4">

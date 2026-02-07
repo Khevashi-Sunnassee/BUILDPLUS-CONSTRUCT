@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
+import DOMPurify from "dompurify";
 import jsPDF from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 import { format, parseISO } from "date-fns";
@@ -143,7 +144,7 @@ function compressLogoForPdf(logoBase64: string, maxWidth = 200, quality = 0.75):
 
 function htmlToPlainTextLines(html: string): string[] {
   const div = document.createElement("div");
-  div.innerHTML = html;
+  div.innerHTML = DOMPurify.sanitize(html);
   const text = div.innerText || div.textContent || "";
   return text.split("\n").filter((line) => line.trim() !== "");
 }

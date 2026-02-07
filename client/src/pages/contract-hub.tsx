@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import DOMPurify from "dompurify";
 import { CONTRACT_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -117,7 +118,7 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
 
   useEffect(() => {
     if (open && editorReady && editorRef.current && termsData) {
-      editorRef.current.innerHTML = termsData.poTermsHtml || "";
+      editorRef.current.innerHTML = DOMPurify.sanitize(termsData.poTermsHtml || "");
     }
   }, [open, editorReady, termsData]);
 
