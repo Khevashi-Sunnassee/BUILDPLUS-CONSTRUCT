@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { WEEKLY_REPORTS_ROUTES, JOBS_ROUTES, PRODUCTION_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
+import { WEEKLY_REPORTS_ROUTES, JOBS_ROUTES, PRODUCTION_ROUTES, ADMIN_ROUTES, EOT_CLAIMS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -13,10 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Send, Check, X, Trash2, Edit, Eye, ChevronDown, ChevronRight, User as UserIcon } from "lucide-react";
+import { Plus, Send, Check, X, Trash2, Edit, Eye, ChevronDown, ChevronRight, User as UserIcon, AlertTriangle, Clock } from "lucide-react";
 import { format, parseISO, addDays, getDay } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule, ProductionSlot, GlobalSettings } from "@shared/schema";
+import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule, ProductionSlot, GlobalSettings, EotClaim } from "@shared/schema";
 
 interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   projectManager: User;
@@ -277,6 +277,147 @@ export default function WeeklyJobLogsPage() {
       toast({ title: "Failed to delete report", description: error.message, variant: "destructive" });
     },
   });
+
+  const [showEotDialog, setShowEotDialog] = useState(false);
+  const [eotJobId, setEotJobId] = useState("");
+  const [eotReportId, setEotReportId] = useState<string | null>(null);
+  const [eotScheduleId, setEotScheduleId] = useState<string | null>(null);
+  const [eotDelayCategory, setEotDelayCategory] = useState("");
+  const [eotDescription, setEotDescription] = useState("");
+  const [eotRequestedDays, setEotRequestedDays] = useState("");
+  const [eotCurrentDate, setEotCurrentDate] = useState("");
+  const [eotRequestedDate, setEotRequestedDate] = useState("");
+  const [eotSupportingNotes, setEotSupportingNotes] = useState("");
+  const [showEotListDialog, setShowEotListDialog] = useState(false);
+  const [eotListJobId, setEotListJobId] = useState("");
+  const [eotListJobName, setEotListJobName] = useState("");
+
+  interface EotClaimWithDetails extends EotClaim {
+    job: Job;
+    createdBy: User;
+    reviewedBy?: User | null;
+  }
+
+  const { data: eotClaimsForJob = [] } = useQuery<EotClaimWithDetails[]>({
+    queryKey: [EOT_CLAIMS_ROUTES.BY_JOB(eotListJobId), eotListJobId],
+    enabled: !!eotListJobId,
+  });
+
+  const createEotMutation = useMutation({
+    mutationFn: async (data: {
+      jobId: string;
+      weeklyReportId?: string | null;
+      reportScheduleId?: string | null;
+      delayCategory: string;
+      description: string;
+      requestedDays: number;
+      currentCompletionDate?: string;
+      requestedCompletionDate?: string;
+      supportingNotes?: string;
+    }) => {
+      const response = await apiRequest("POST", EOT_CLAIMS_ROUTES.LIST, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [EOT_CLAIMS_ROUTES.LIST] });
+      if (eotListJobId) {
+        queryClient.invalidateQueries({ queryKey: [EOT_CLAIMS_ROUTES.BY_JOB(eotListJobId)] });
+      }
+      toast({ title: "EOT claim created successfully" });
+      resetEotForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create EOT claim", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const submitEotMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await apiRequest("POST", EOT_CLAIMS_ROUTES.SUBMIT(id), {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [EOT_CLAIMS_ROUTES.LIST] });
+      if (eotListJobId) {
+        queryClient.invalidateQueries({ queryKey: [EOT_CLAIMS_ROUTES.BY_JOB(eotListJobId)] });
+      }
+      toast({ title: "EOT claim submitted for review" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to submit EOT claim", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetEotForm = () => {
+    setShowEotDialog(false);
+    setEotJobId("");
+    setEotReportId(null);
+    setEotScheduleId(null);
+    setEotDelayCategory("");
+    setEotDescription("");
+    setEotRequestedDays("");
+    setEotCurrentDate("");
+    setEotRequestedDate("");
+    setEotSupportingNotes("");
+  };
+
+  const handleInitiateEot = (jobId: string, reportId?: string, scheduleId?: string) => {
+    setEotJobId(jobId);
+    setEotReportId(reportId || null);
+    setEotScheduleId(scheduleId || null);
+    setShowEotDialog(true);
+  };
+
+  const handleViewEotClaims = (jobId: string, jobName: string) => {
+    setEotListJobId(jobId);
+    setEotListJobName(jobName);
+    setShowEotListDialog(true);
+  };
+
+  const handleSubmitEot = () => {
+    if (!eotJobId || !eotDelayCategory || !eotDescription || !eotRequestedDays) {
+      toast({ title: "Please fill in all required fields", variant: "destructive" });
+      return;
+    }
+    createEotMutation.mutate({
+      jobId: eotJobId,
+      weeklyReportId: eotReportId,
+      reportScheduleId: eotScheduleId,
+      delayCategory: eotDelayCategory,
+      description: eotDescription,
+      requestedDays: parseInt(eotRequestedDays),
+      currentCompletionDate: eotCurrentDate || undefined,
+      requestedCompletionDate: eotRequestedDate || undefined,
+      supportingNotes: eotSupportingNotes || undefined,
+    });
+  };
+
+  const getEotStatusBadge = (status: string) => {
+    switch (status) {
+      case "DRAFT":
+        return <Badge variant="secondary" data-testid="badge-eot-draft">Draft</Badge>;
+      case "SUBMITTED":
+        return <Badge variant="default" className="bg-blue-500" data-testid="badge-eot-submitted">Submitted</Badge>;
+      case "UNDER_REVIEW":
+        return <Badge variant="default" className="bg-amber-500" data-testid="badge-eot-review">Under Review</Badge>;
+      case "APPROVED":
+        return <Badge variant="default" className="bg-green-600" data-testid="badge-eot-approved">Approved</Badge>;
+      case "REJECTED":
+        return <Badge variant="destructive" data-testid="badge-eot-rejected">Rejected</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const delayCategoryLabels: Record<string, string> = {
+    WEATHER: "Weather",
+    CLIENT_DELAY: "Client Delay",
+    DESIGN_CHANGE: "Design Change",
+    SITE_CONDITIONS: "Site Conditions",
+    SUPPLY_CHAIN: "Supply Chain",
+    SUBCONTRACTOR: "Subcontractor",
+    OTHER: "Other",
+  };
 
   const resetForm = () => {
     setShowForm(false);
@@ -849,6 +990,7 @@ export default function WeeklyJobLogsPage() {
                         <TableHead>28-Day</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Notes</TableHead>
+                        <TableHead>EOT</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -908,6 +1050,30 @@ export default function WeeklyJobLogsPage() {
                             {!schedule.scheduleStatus && "-"}
                           </TableCell>
                           <TableCell className="max-w-[250px] whitespace-pre-wrap">{schedule.siteProgress || "-"}</TableCell>
+                          <TableCell>
+                            {schedule.scheduleStatus === "RUNNING_BEHIND" && (
+                              <div className="flex flex-col gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleInitiateEot(schedule.jobId, selectedReport.id, schedule.id)}
+                                  data-testid={`button-eot-initiate-${schedule.id}`}
+                                >
+                                  <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                                  EOT Claim
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleViewEotClaims(schedule.jobId, `${schedule.job?.jobNumber} - ${schedule.job?.name}`)}
+                                  data-testid={`button-eot-view-${schedule.id}`}
+                                >
+                                  <Clock className="h-3.5 w-3.5 mr-1" />
+                                  View Claims
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
                         </TableRow>
                         );
                       })}
@@ -970,6 +1136,7 @@ export default function WeeklyJobLogsPage() {
                         <TableHead>28-Day</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Notes</TableHead>
+                        <TableHead>EOT</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1029,6 +1196,19 @@ export default function WeeklyJobLogsPage() {
                             {!schedule.scheduleStatus && "-"}
                           </TableCell>
                           <TableCell className="max-w-[250px] whitespace-pre-wrap">{schedule.siteProgress || "-"}</TableCell>
+                          <TableCell>
+                            {schedule.scheduleStatus === "RUNNING_BEHIND" && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleViewEotClaims(schedule.jobId, `${schedule.job?.jobNumber} - ${schedule.job?.name}`)}
+                                data-testid={`button-eot-view-approval-${schedule.id}`}
+                              >
+                                <Clock className="h-3.5 w-3.5 mr-1" />
+                                EOT Claims
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                         );
                       })}
@@ -1067,6 +1247,182 @@ export default function WeeklyJobLogsPage() {
             >
               <Check className="h-4 w-4 mr-1" />
               Approve
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEotDialog} onOpenChange={(open) => { if (!open) resetEotForm(); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle data-testid="text-eot-form-title">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+                Initiate Extension of Time (EOT) Claim
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20">
+              <p className="text-sm">
+                This job schedule is marked as <span className="font-semibold">Running Behind</span>. 
+                Submit an EOT claim to request a contract time extension.
+              </p>
+            </div>
+
+            <div>
+              <Label>Job</Label>
+              <p className="text-sm font-medium mt-1" data-testid="text-eot-job">
+                {activeJobs.find(j => j.id === eotJobId)?.jobNumber} - {activeJobs.find(j => j.id === eotJobId)?.name}
+              </p>
+            </div>
+
+            <div>
+              <Label>Delay Category *</Label>
+              <Select value={eotDelayCategory} onValueChange={setEotDelayCategory}>
+                <SelectTrigger data-testid="select-eot-delay-category">
+                  <SelectValue placeholder="Select delay category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="WEATHER">Weather</SelectItem>
+                  <SelectItem value="CLIENT_DELAY">Client Delay</SelectItem>
+                  <SelectItem value="DESIGN_CHANGE">Design Change</SelectItem>
+                  <SelectItem value="SITE_CONDITIONS">Site Conditions</SelectItem>
+                  <SelectItem value="SUPPLY_CHAIN">Supply Chain</SelectItem>
+                  <SelectItem value="SUBCONTRACTOR">Subcontractor</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label>Description of Delay *</Label>
+              <Textarea
+                value={eotDescription}
+                onChange={(e) => setEotDescription(e.target.value)}
+                placeholder="Describe the reason for the delay and its impact on the schedule..."
+                className="min-h-[80px]"
+                data-testid="input-eot-description"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label>Requested Extension (days) *</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={eotRequestedDays}
+                  onChange={(e) => setEotRequestedDays(e.target.value)}
+                  placeholder="e.g. 14"
+                  data-testid="input-eot-requested-days"
+                />
+              </div>
+              <div>
+                <Label>Current Completion Date</Label>
+                <Input
+                  type="date"
+                  value={eotCurrentDate}
+                  onChange={(e) => setEotCurrentDate(e.target.value)}
+                  data-testid="input-eot-current-date"
+                />
+              </div>
+              <div>
+                <Label>Requested Completion Date</Label>
+                <Input
+                  type="date"
+                  value={eotRequestedDate}
+                  onChange={(e) => setEotRequestedDate(e.target.value)}
+                  data-testid="input-eot-requested-date"
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label>Supporting Notes</Label>
+              <Textarea
+                value={eotSupportingNotes}
+                onChange={(e) => setEotSupportingNotes(e.target.value)}
+                placeholder="Any additional supporting information..."
+                data-testid="input-eot-supporting-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={resetEotForm} data-testid="button-eot-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitEot}
+              disabled={createEotMutation.isPending}
+              data-testid="button-eot-create"
+            >
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              {createEotMutation.isPending ? "Creating..." : "Create EOT Claim"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showEotListDialog} onOpenChange={(open) => { if (!open) { setShowEotListDialog(false); setEotListJobId(""); setEotListJobName(""); } }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle data-testid="text-eot-list-title">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                EOT Claims - {eotListJobName}
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          {eotClaimsForJob.length === 0 ? (
+            <div className="text-center py-8">
+              <Clock className="h-10 w-10 mx-auto text-muted-foreground/50 mb-2" />
+              <p className="text-muted-foreground">No EOT claims for this job yet.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Claim #</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Requested Days</TableHead>
+                  <TableHead>Approved Days</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {eotClaimsForJob.map((claim) => (
+                  <TableRow key={claim.id} data-testid={`row-eot-claim-${claim.id}`}>
+                    <TableCell className="font-medium">{claim.claimNumber}</TableCell>
+                    <TableCell>{delayCategoryLabels[claim.delayCategory] || claim.delayCategory}</TableCell>
+                    <TableCell>{claim.requestedDays}</TableCell>
+                    <TableCell>{claim.approvedDays ?? "-"}</TableCell>
+                    <TableCell>{getEotStatusBadge(claim.status)}</TableCell>
+                    <TableCell>{formatDate(claim.createdAt.toString().split("T")[0])}</TableCell>
+                    <TableCell>
+                      {claim.status === "DRAFT" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => submitEotMutation.mutate(claim.id)}
+                          disabled={submitEotMutation.isPending}
+                          data-testid={`button-eot-submit-${claim.id}`}
+                        >
+                          <Send className="h-3.5 w-3.5 mr-1" />
+                          Submit
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowEotListDialog(false); setEotListJobId(""); setEotListJobName(""); }} data-testid="button-eot-list-close">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

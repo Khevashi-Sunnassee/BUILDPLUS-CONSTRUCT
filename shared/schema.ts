@@ -2758,6 +2758,43 @@ export const progressClaimItems = pgTable("progress_claim_items", {
   panelIdx: index("progress_claim_items_panel_idx").on(table.panelId),
 }));
 
+export const eotClaimStatusEnum = pgEnum("eot_claim_status", ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED"]);
+export const eotDelayCategoryEnum = pgEnum("eot_delay_category", ["WEATHER", "CLIENT_DELAY", "DESIGN_CHANGE", "SITE_CONDITIONS", "SUPPLY_CHAIN", "SUBCONTRACTOR", "OTHER"]);
+
+export const eotClaims = pgTable("eot_claims", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  weeklyReportId: varchar("weekly_report_id", { length: 36 }).references(() => weeklyJobReports.id),
+  reportScheduleId: varchar("report_schedule_id", { length: 36 }).references(() => weeklyJobReportSchedules.id),
+  status: eotClaimStatusEnum("status").default("DRAFT").notNull(),
+  claimNumber: text("claim_number").notNull(),
+  delayCategory: eotDelayCategoryEnum("delay_category").notNull(),
+  description: text("description").notNull(),
+  requestedDays: integer("requested_days").notNull(),
+  currentCompletionDate: text("current_completion_date"),
+  requestedCompletionDate: text("requested_completion_date"),
+  supportingNotes: text("supporting_notes"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  submittedAt: timestamp("submitted_at"),
+  reviewedById: varchar("reviewed_by_id", { length: 36 }).references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewNotes: text("review_notes"),
+  approvedDays: integer("approved_days"),
+}, (table) => ({
+  jobIdx: index("eot_claims_job_idx").on(table.jobId),
+  statusIdx: index("eot_claims_status_idx").on(table.status),
+  createdByIdx: index("eot_claims_created_by_idx").on(table.createdById),
+  weeklyReportIdx: index("eot_claims_weekly_report_idx").on(table.weeklyReportId),
+}));
+
+export const insertEotClaimSchema = createInsertSchema(eotClaims).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEotClaim = z.infer<typeof insertEotClaimSchema>;
+export type EotClaim = typeof eotClaims.$inferSelect;
+export type EotClaimStatus = "DRAFT" | "SUBMITTED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED";
+export type EotDelayCategory = "WEATHER" | "CLIENT_DELAY" | "DESIGN_CHANGE" | "SITE_CONDITIONS" | "SUPPLY_CHAIN" | "SUBCONTRACTOR" | "OTHER";
+
 export const insertProgressClaimSchema = createInsertSchema(progressClaims).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertProgressClaim = z.infer<typeof insertProgressClaimSchema>;
 export type ProgressClaim = typeof progressClaims.$inferSelect;

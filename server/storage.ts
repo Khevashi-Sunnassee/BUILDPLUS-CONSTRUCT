@@ -67,6 +67,8 @@ import {
   type InsertBroadcastTemplate, type BroadcastTemplate,
   type InsertBroadcastMessage, type BroadcastMessage, type BroadcastMessageWithDetails,
   type InsertBroadcastDelivery, type BroadcastDelivery,
+  eotClaims,
+  type InsertEotClaim, type EotClaim,
 } from "@shared/schema";
 
 // Working days calculation utilities
@@ -186,6 +188,12 @@ export interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   projectManager: User;
   approvedBy?: User | null;
   schedules: (WeeklyJobReportSchedule & { job: Job })[];
+}
+
+export interface EotClaimWithDetails extends EotClaim {
+  job: Job;
+  createdBy: User;
+  reviewedBy?: User | null;
 }
 
 export interface LoadReturnWithDetails extends LoadReturn {
@@ -458,6 +466,18 @@ export interface IStorage {
   deleteWeeklyJobReport(id: string): Promise<void>;
   getJobsForProjectManager(projectManagerId: string): Promise<Job[]>;
   getApprovedWeeklyJobReports(): Promise<WeeklyJobReportWithDetails[]>;
+
+  // EOT Claims
+  getEotClaims(): Promise<EotClaimWithDetails[]>;
+  getEotClaim(id: string): Promise<EotClaimWithDetails | undefined>;
+  getEotClaimsByJob(jobId: string): Promise<EotClaimWithDetails[]>;
+  createEotClaim(data: InsertEotClaim): Promise<EotClaim>;
+  updateEotClaim(id: string, data: Partial<InsertEotClaim>): Promise<EotClaim | undefined>;
+  submitEotClaim(id: string): Promise<EotClaim | undefined>;
+  approveEotClaim(id: string, reviewedById: string, reviewNotes: string, approvedDays: number): Promise<EotClaim | undefined>;
+  rejectEotClaim(id: string, reviewedById: string, reviewNotes: string): Promise<EotClaim | undefined>;
+  deleteEotClaim(id: string): Promise<void>;
+  getNextEotClaimNumber(jobId: string): Promise<string>;
 
   // User Permissions
   getUserPermissions(userId: string): Promise<UserPermission[]>;
@@ -2446,6 +2466,86 @@ export class DatabaseStorage implements IStorage {
       .where(eq(weeklyJobReports.status, "APPROVED"))
       .orderBy(desc(weeklyJobReports.reportDate));
     return Promise.all(reports.map(r => this.enrichWeeklyJobReport(r)));
+  }
+
+  // EOT Claims
+  private async enrichEotClaim(claim: EotClaim): Promise<EotClaimWithDetails> {
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, claim.jobId));
+    const [createdBy] = await db.select().from(users).where(eq(users.id, claim.createdById));
+    let reviewedBy = null;
+    if (claim.reviewedById) {
+      const [reviewer] = await db.select().from(users).where(eq(users.id, claim.reviewedById));
+      reviewedBy = reviewer || null;
+    }
+    return { ...claim, job, createdBy, reviewedBy };
+  }
+
+  async getEotClaims(): Promise<EotClaimWithDetails[]> {
+    const claims = await db.select().from(eotClaims).orderBy(desc(eotClaims.createdAt));
+    return Promise.all(claims.map(c => this.enrichEotClaim(c)));
+  }
+
+  async getEotClaim(id: string): Promise<EotClaimWithDetails | undefined> {
+    const [claim] = await db.select().from(eotClaims).where(eq(eotClaims.id, id));
+    if (!claim) return undefined;
+    return this.enrichEotClaim(claim);
+  }
+
+  async getEotClaimsByJob(jobId: string): Promise<EotClaimWithDetails[]> {
+    const claims = await db.select().from(eotClaims)
+      .where(eq(eotClaims.jobId, jobId))
+      .orderBy(desc(eotClaims.createdAt));
+    return Promise.all(claims.map(c => this.enrichEotClaim(c)));
+  }
+
+  async createEotClaim(data: InsertEotClaim): Promise<EotClaim> {
+    const [claim] = await db.insert(eotClaims).values(data).returning();
+    return claim;
+  }
+
+  async updateEotClaim(id: string, data: Partial<InsertEotClaim>): Promise<EotClaim | undefined> {
+    const [updated] = await db.update(eotClaims)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(eotClaims.id, id))
+      .returning();
+    return updated;
+  }
+
+  async submitEotClaim(id: string): Promise<EotClaim | undefined> {
+    const [updated] = await db.update(eotClaims)
+      .set({ status: "SUBMITTED", submittedAt: new Date(), updatedAt: new Date() })
+      .where(eq(eotClaims.id, id))
+      .returning();
+    return updated;
+  }
+
+  async approveEotClaim(id: string, reviewedById: string, reviewNotes: string, approvedDays: number): Promise<EotClaim | undefined> {
+    const [updated] = await db.update(eotClaims)
+      .set({ status: "APPROVED", reviewedById, reviewedAt: new Date(), reviewNotes, approvedDays, updatedAt: new Date() })
+      .where(eq(eotClaims.id, id))
+      .returning();
+    return updated;
+  }
+
+  async rejectEotClaim(id: string, reviewedById: string, reviewNotes: string): Promise<EotClaim | undefined> {
+    const [updated] = await db.update(eotClaims)
+      .set({ status: "REJECTED", reviewedById, reviewedAt: new Date(), reviewNotes, updatedAt: new Date() })
+      .where(eq(eotClaims.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteEotClaim(id: string): Promise<void> {
+    await db.delete(eotClaims).where(eq(eotClaims.id, id));
+  }
+
+  async getNextEotClaimNumber(jobId: string): Promise<string> {
+    const existing = await db.select().from(eotClaims)
+      .where(eq(eotClaims.jobId, jobId));
+    const count = existing.length + 1;
+    const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
+    const jobNum = job?.jobNumber || "UNK";
+    return `EOT-${jobNum}-${String(count).padStart(3, "0")}`;
   }
 
   // User Permissions

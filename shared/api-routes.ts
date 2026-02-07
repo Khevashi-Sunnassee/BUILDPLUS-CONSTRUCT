@@ -64,6 +64,18 @@ export const WEEKLY_REPORTS_ROUTES = {
 } as const;
 
 // ============================================================================
+// EOT CLAIMS
+// ============================================================================
+export const EOT_CLAIMS_ROUTES = {
+  LIST: '/api/eot-claims',
+  BY_ID: (id: string | number) => `/api/eot-claims/${id}`,
+  BY_JOB: (jobId: string | number) => `/api/eot-claims/by-job/${jobId}`,
+  SUBMIT: (id: string | number) => `/api/eot-claims/${id}/submit`,
+  APPROVE: (id: string | number) => `/api/eot-claims/${id}/approve`,
+  REJECT: (id: string | number) => `/api/eot-claims/${id}/reject`,
+} as const;
+
+// ============================================================================
 // MANUAL ENTRY & LOG ROWS
 // ============================================================================
 export const MANUAL_ENTRY_ROUTES = {
