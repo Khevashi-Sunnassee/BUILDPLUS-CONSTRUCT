@@ -57,6 +57,8 @@ import ChecklistFillPage from "@/pages/checklist-fill";
 import ChecklistReportsPage from "@/pages/checklist-reports";
 import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
 import BroadcastPage from "@/pages/broadcast";
+import ContractHubPage from "@/pages/contract-hub";
+import ContractDetailPage from "@/pages/contract-detail";
 
 import MobileLoginPage from "@/pages/mobile/login";
 import MobileDashboard from "@/pages/mobile/dashboard";
@@ -522,6 +524,22 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <BroadcastPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/contracts/:jobId">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ContractDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/contracts">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <ContractHubPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

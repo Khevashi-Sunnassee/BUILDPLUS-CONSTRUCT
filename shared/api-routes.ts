@@ -572,6 +572,17 @@ export const BROADCAST_ROUTES = {
 } as const;
 
 // ============================================================================
+// CONTRACT HUB
+// ============================================================================
+export const CONTRACT_ROUTES = {
+  LIST: '/api/contracts',
+  BY_ID: (id: string | number) => `/api/contracts/${id}`,
+  BY_JOB: (jobId: string | number) => `/api/contracts/job/${jobId}`,
+  HUB: '/api/contracts/hub',
+  AI_ANALYZE: '/api/contracts/ai-analyze',
+} as const;
+
+// ============================================================================
 // TYPE EXPORTS for frontend usage
 // ============================================================================
 export type AuthRoutes = typeof AUTH_ROUTES;
@@ -601,3 +612,4 @@ export type DocumentRoutes = typeof DOCUMENT_ROUTES;
 export type ReoScheduleRoutes = typeof REO_SCHEDULE_ROUTES;
 export type ChecklistRoutes = typeof CHECKLIST_ROUTES;
 export type BroadcastRoutes = typeof BROADCAST_ROUTES;
+export type ContractRoutes = typeof CONTRACT_ROUTES;

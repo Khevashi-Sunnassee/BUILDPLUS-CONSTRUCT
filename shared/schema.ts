@@ -16,6 +16,8 @@ export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IF
 export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHEDULED", "PENDING_UPDATE", "BOOKED", "COMPLETED"]);
 export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const draftingProgramStatusEnum = pgEnum("drafting_program_status", ["NOT_SCHEDULED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
+export const contractStatusEnum = pgEnum("contract_status", ["AWAITING_CONTRACT", "CONTRACT_REVIEW", "CONTRACT_EXECUTED"]);
+export const contractTypeEnum = pgEnum("contract_type", ["LUMP_SUM", "UNIT_PRICE", "TIME_AND_MATERIALS", "GMP"]);
 
 export const companies = pgTable("companies", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -2534,3 +2536,129 @@ export type BroadcastMessageWithDetails = BroadcastMessage & {
   sentByUser?: SafeUser | null;
   deliveries?: BroadcastDelivery[];
 };
+
+// ============================================================================
+// CONTRACT HUB
+// ============================================================================
+
+export const contracts = pgTable("contracts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+
+  // 1. Core Contract Identification
+  contractNumber: text("contract_number"),
+  projectName: text("project_name"),
+  projectAddress: text("project_address"),
+  ownerClientName: text("owner_client_name"),
+  generalContractor: text("general_contractor"),
+  architectEngineer: text("architect_engineer"),
+  contractStatus: contractStatusEnum("contract_status").default("AWAITING_CONTRACT").notNull(),
+  contractType: contractTypeEnum("contract_type"),
+  originalContractDate: timestamp("original_contract_date"),
+  noticeToProceedDate: timestamp("notice_to_proceed_date"),
+
+  // 2. Financial & Commercial Terms
+  originalContractValue: decimal("original_contract_value", { precision: 14, scale: 2 }),
+  revisedContractValue: decimal("revised_contract_value", { precision: 14, scale: 2 }),
+  unitPrices: text("unit_prices"),
+  retentionPercentage: decimal("retention_percentage", { precision: 5, scale: 2 }),
+  retentionCap: decimal("retention_cap", { precision: 14, scale: 2 }),
+  paymentTerms: text("payment_terms"),
+  billingMethod: text("billing_method"),
+  taxResponsibility: text("tax_responsibility"),
+  escalationClause: boolean("escalation_clause"),
+  escalationClauseDetails: text("escalation_clause_details"),
+  liquidatedDamagesRate: text("liquidated_damages_rate"),
+  liquidatedDamagesStartDate: timestamp("liquidated_damages_start_date"),
+
+  // 3. Scope of Work (Precast-Specific)
+  precastScopeDescription: text("precast_scope_description"),
+  precastElementsIncluded: jsonb("precast_elements_included"),
+  estimatedPieceCount: integer("estimated_piece_count"),
+  estimatedTotalWeight: text("estimated_total_weight"),
+  estimatedTotalVolume: text("estimated_total_volume"),
+  finishRequirements: text("finish_requirements"),
+  connectionTypeResponsibility: text("connection_type_responsibility"),
+
+  // 4. Schedule & Milestones
+  requiredDeliveryStartDate: timestamp("required_delivery_start_date"),
+  requiredDeliveryEndDate: timestamp("required_delivery_end_date"),
+  productionStartDate: timestamp("production_start_date"),
+  productionFinishDate: timestamp("production_finish_date"),
+  erectionStartDate: timestamp("erection_start_date"),
+  erectionFinishDate: timestamp("erection_finish_date"),
+  criticalMilestones: text("critical_milestones"),
+  weekendNightWorkAllowed: boolean("weekend_night_work_allowed"),
+  weatherAllowances: text("weather_allowances"),
+
+  // 5. Engineering & Submittals
+  designResponsibility: text("design_responsibility"),
+  shopDrawingRequired: boolean("shop_drawing_required"),
+  submittalDueDate: timestamp("submittal_due_date"),
+  submittalApprovalDate: timestamp("submittal_approval_date"),
+  revisionCount: integer("revision_count"),
+  connectionDesignIncluded: boolean("connection_design_included"),
+  stampedCalculationsRequired: boolean("stamped_calculations_required"),
+
+  // 6. Logistics & Site Constraints
+  deliveryRestrictions: text("delivery_restrictions"),
+  siteAccessConstraints: text("site_access_constraints"),
+  craneTypeCapacity: text("crane_type_capacity"),
+  unloadingResponsibility: text("unloading_responsibility"),
+  laydownAreaAvailable: boolean("laydown_area_available"),
+  returnLoadsAllowed: boolean("return_loads_allowed"),
+
+  // 7. Change Management
+  approvedChangeOrderValue: decimal("approved_change_order_value", { precision: 14, scale: 2 }),
+  pendingChangeOrderValue: decimal("pending_change_order_value", { precision: 14, scale: 2 }),
+  changeOrderCount: integer("change_order_count"),
+  changeOrderReferenceNumbers: text("change_order_reference_numbers"),
+  changeReasonCodes: text("change_reason_codes"),
+  timeImpactDays: integer("time_impact_days"),
+
+  // 8. Risk, Legal & Compliance
+  performanceBondRequired: boolean("performance_bond_required"),
+  paymentBondRequired: boolean("payment_bond_required"),
+  insuranceRequirements: text("insurance_requirements"),
+  warrantyPeriod: text("warranty_period"),
+  indemnificationClauseNotes: text("indemnification_clause_notes"),
+  disputeResolutionMethod: text("dispute_resolution_method"),
+  governingLaw: text("governing_law"),
+  forceMajeureClause: boolean("force_majeure_clause"),
+
+  // 9. Quality & Acceptance
+  qualityStandardReference: text("quality_standard_reference"),
+  mockupsRequired: boolean("mockups_required"),
+  acceptanceCriteria: text("acceptance_criteria"),
+  punchListResponsibility: text("punch_list_responsibility"),
+  finalAcceptanceDate: timestamp("final_acceptance_date"),
+
+  // 10. Closeout & Completion
+  substantialCompletionDate: timestamp("substantial_completion_date"),
+  finalCompletionDate: timestamp("final_completion_date"),
+  finalRetentionReleaseDate: timestamp("final_retention_release_date"),
+  asBuiltsRequired: boolean("as_builts_required"),
+  omManualsRequired: boolean("om_manuals_required"),
+  warrantyStartDate: timestamp("warranty_start_date"),
+  warrantyEndDate: timestamp("warranty_end_date"),
+
+  // AI Risk Assessment
+  riskRating: integer("risk_rating"),
+  riskOverview: text("risk_overview"),
+  riskHighlights: jsonb("risk_highlights"),
+  aiAnalyzedAt: timestamp("ai_analyzed_at"),
+  aiSourceDocumentId: varchar("ai_source_document_id", { length: 36 }).references(() => documents.id),
+
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdIdx: index("contracts_company_id_idx").on(table.companyId),
+  jobIdIdx: index("contracts_job_id_idx").on(table.jobId),
+  contractStatusIdx: index("contracts_contract_status_idx").on(table.contractStatus),
+  jobCompanyUniqueIdx: uniqueIndex("contracts_job_company_unique_idx").on(table.jobId, table.companyId),
+}));
+
+export const insertContractSchema = createInsertSchema(contracts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertContract = z.infer<typeof insertContractSchema>;
+export type Contract = typeof contracts.$inferSelect;

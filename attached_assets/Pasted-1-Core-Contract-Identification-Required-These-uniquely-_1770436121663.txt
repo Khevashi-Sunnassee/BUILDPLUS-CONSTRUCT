@@ -1,0 +1,203 @@
+1️⃣ Core Contract Identification (Required)
+
+These uniquely define the contract and tie everything together.
+
+Contract ID / Number
+
+Project Name
+
+Project Address
+
+Owner / Client Name
+
+General Contractor
+
+Architect / Engineer (EOR)
+
+Contract Status (Draft / Executed / Closed / Cancelled)
+
+Contract Type (Lump Sum / Unit Price / T&M / GMP)
+
+Original Contract Date
+
+Notice to Proceed (NTP) Date
+
+2️⃣ Financial & Commercial Terms (Critical)
+
+These drive billing, risk, and profitability.
+
+Original Contract Value
+
+Revised Contract Value (Current)
+
+Unit Prices (if applicable)
+
+Retention Percentage
+
+Retention Cap
+
+Payment Terms (Net 30 / Net 45 / etc.)
+
+Billing Method (Progress / Milestone / Delivery-based)
+
+Tax Responsibility (Included / Excluded)
+
+Escalation Clause (Yes/No + details)
+
+Liquidated Damages Rate
+
+Liquidated Damages Start Date
+
+3️⃣ Scope of Work (Precast-Specific)
+
+This is where precast differs from generic construction contracts.
+
+Precast Scope Description
+
+Precast Elements Included
+
+Panels
+
+Beams
+
+Columns
+
+Double Tees
+
+Hollow Core
+
+Stairs
+
+Estimated Piece Count
+
+Estimated Total Weight
+
+Estimated Total Volume (CY / m³)
+
+Finish Requirements (Architectural, Sandblast, Formliner, etc.)
+
+Connection Type Responsibility (Design / Supply / Install)
+
+4️⃣ Schedule & Milestones (Production + Erection)
+
+This ties directly into plant scheduling and trucking.
+
+Required Delivery Start Date
+
+Required Delivery End Date
+
+Production Start Date
+
+Production Finish Date
+
+Erection Start Date
+
+Erection Finish Date
+
+Critical Milestones
+
+Weekend / Night Work Allowed (Y/N)
+
+Weather Allowances
+
+5️⃣ Engineering & Submittals
+
+Precast lives and dies by drawings and approvals.
+
+Design Responsibility (Engineer of Record / Precaster / Delegated)
+
+Shop Drawing Required (Y/N)
+
+Submittal Due Date
+
+Submittal Approval Date
+
+Revision Count
+
+Connection Design Included (Y/N)
+
+Stamped Calculations Required (Y/N)
+
+6️⃣ Logistics & Site Constraints
+
+Often overlooked — but critical.
+
+Delivery Restrictions (Time windows, escorts, etc.)
+
+Site Access Constraints
+
+Crane Type / Capacity
+
+Unloading Responsibility
+
+Laydown Area Available (Y/N)
+
+Return Loads Allowed (Y/N)
+
+7️⃣ Change Management (High Risk Area)
+
+This is where profit is lost if not tracked properly.
+
+Approved Change Order Value
+
+Pending Change Order Value
+
+Change Order Count
+
+Change Order Reference Numbers
+
+Change Reason Codes
+
+Time Impact (Days)
+
+8️⃣ Risk, Legal & Compliance
+
+These protect the company.
+
+Performance Bond Required (Y/N)
+
+Payment Bond Required (Y/N)
+
+Insurance Requirements
+
+Warranty Period
+
+Indemnification Clause Notes
+
+Dispute Resolution Method
+
+Governing Law
+
+Force Majeure Clause (Y/N)
+
+9️⃣ Quality & Acceptance
+
+Especially important for architectural precast.
+
+Quality Standard Reference
+
+Mockups Required (Y/N)
+
+Acceptance Criteria
+
+Punch List Responsibility
+
+Final Acceptance Date
+
+🔟 Closeout & Completion
+
+These matter more than people think.
+
+Substantial Completion Date
+
+Final Completion Date
+
+Final Retention Release Date
+
+As-Builts Required (Y/N)
+
+O&M Manuals Required (Y/N)
+
+Warranty Start Date
+
+Warranty End Date

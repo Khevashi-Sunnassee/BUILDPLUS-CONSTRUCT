@@ -34,6 +34,7 @@ import {
   MessageSquare,
   Handshake,
   Radio,
+  Scale,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -78,6 +79,7 @@ const userNavItems = [
   { title: "Logistics", url: "/logistics", icon: Truck },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Broadcast", url: "/broadcast", icon: Radio },
+  { title: "Contract Hub", url: "/contracts", icon: Scale },
 ];
 
 const managerNavItems = [
@@ -133,6 +135,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/checklists": "checklists",
   "/checklist-reports": "checklists",
   "/manager/review": "daily_reports",
+  "/contracts": "contract_hub",
 };
 
 export function AppSidebar() {
