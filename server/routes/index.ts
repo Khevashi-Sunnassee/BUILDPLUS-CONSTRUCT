@@ -41,6 +41,7 @@ import { broadcastRouter } from "./broadcast.routes";
 import { contractsRouter } from "./contracts.routes";
 import { progressClaimsRouter } from "./progress-claims.routes";
 import { eotClaimsRouter } from "./eot-claims.routes";
+import { assetsRouter } from "./assets.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -143,6 +144,8 @@ export async function setupRoutes(app: Express): Promise<void> {
   // Progress Claims router - for progress claim management
   app.use(progressClaimsRouter);
   app.use(eotClaimsRouter);
+  
+  app.use(assetsRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

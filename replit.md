@@ -26,6 +26,7 @@ The frontend employs TanStack Query for data fetching, Wouter for routing, `shad
 - **Sales & Document Management:** A mobile-first pre-sales opportunity management system with a detailed sales pipeline, and a comprehensive document management system with version control, bundles, and entity linking.
 - **Mobile Functionality:** Dedicated QR scanner for panels and document bundles, and mobile panel checklists (e.g., Pre-Pour, Post-Pour Quality Inspections) with conditional fields and system-locked templates.
 - **Advanced Features:** Panel consolidation (merging multiple panels), contract retention tracking with automated deductions and caps, and visual document comparison with pixel-level overlay and AI summarization.
+- **Asset Register:** Comprehensive asset lifecycle management with 50+ fields across 8 tabs (Basic Info, Photos, Financial, Technical, Insurance, Maintenance Records, Transfer History, AI Summary). Supports 40+ asset categories, auto-generated asset tags (AST-YYMM-NNNN), depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis via OpenAI. Database tables: `assets`, `asset_maintenance_records`, `asset_transfers`. Admin-only access with company isolation.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.

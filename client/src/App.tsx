@@ -51,6 +51,8 @@ import PublicBundlePage from "@/pages/public-bundle";
 import AdminDocumentConfigPage from "@/pages/admin/document-config";
 import AdminCompaniesPage from "@/pages/admin/companies";
 import AdminChecklistTemplatesPage from "@/pages/admin/checklist-templates";
+import AssetRegisterPage from "@/pages/admin/asset-register";
+import AssetDetailPage from "@/pages/admin/asset-detail";
 import TemplateEditorPage from "@/pages/admin/template-editor";
 import ChecklistsPage from "@/pages/checklists";
 import ChecklistFillPage from "@/pages/checklist-fill";
@@ -481,6 +483,22 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminItemsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/asset-register">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AssetRegisterPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/assets/:id">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AssetDetailPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

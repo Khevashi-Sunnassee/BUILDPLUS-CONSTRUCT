@@ -139,6 +139,7 @@ export const FUNCTION_KEYS = [
   "admin_customers",
   "contract_hub",
   "progress_claims",
+  "admin_assets",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -2812,3 +2813,147 @@ export type InsertProgressClaimItem = z.infer<typeof insertProgressClaimItemSche
 export type ProgressClaimItem = typeof progressClaimItems.$inferSelect;
 
 export type ProgressClaimStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+
+export const ASSET_CATEGORIES = [
+  "Heavy Equipment", "Excavation", "Lifting", "Concrete", "Earthmoving", "Compaction",
+  "Site Preparation", "Road Construction", "Drilling", "Demolition",
+  "Molds", "Concrete Mixers", "Prestressing", "Casting", "Curing", "Finishing",
+  "Material Handling", "Quality Control", "Steam Curing Systems", "Aggregate Processing",
+  "Survey", "Planning & Design", "Environmental Testing", "Geotechnical", "Infrastructure",
+  "Utility Installation", "Landscaping", "Testing & Inspection", "Safety", "Site Security",
+  "Vehicles & Transportation", "Hand Tools & Power Tools", "IT Equipment", "Office Equipment",
+  "Workshop Equipment", "Maintenance Equipment", "Storage Systems", "Communication Equipment",
+  "Generators & Power Systems", "Furniture", "General Machinery", "Other",
+] as const;
+
+export type AssetCategory = typeof ASSET_CATEGORIES[number];
+
+export const ASSET_STATUSES = ["active", "disposed", "sold", "stolen", "lost"] as const;
+export type AssetStatus = typeof ASSET_STATUSES[number];
+
+export const ASSET_CONDITIONS = ["new", "excellent", "good", "fair", "poor"] as const;
+export type AssetCondition = typeof ASSET_CONDITIONS[number];
+
+export const ASSET_FUNDING_METHODS = ["purchased", "leased", "financed", "donated", "rented"] as const;
+export type AssetFundingMethod = typeof ASSET_FUNDING_METHODS[number];
+
+export const assets = pgTable("assets", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  assetTag: text("asset_tag").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category").notNull(),
+  status: text("status").default("active"),
+  condition: text("condition"),
+  location: text("location"),
+  department: text("department"),
+  assignedTo: text("assigned_to"),
+  fundingMethod: text("funding_method"),
+  photos: jsonb("photos").default([]),
+  purchasePrice: decimal("purchase_price", { precision: 14, scale: 2 }),
+  currentValue: decimal("current_value", { precision: 14, scale: 2 }),
+  depreciationMethod: text("depreciation_method"),
+  depreciationRate: decimal("depreciation_rate", { precision: 6, scale: 2 }),
+  accumulatedDepreciation: decimal("accumulated_depreciation", { precision: 14, scale: 2 }),
+  depreciationThisPeriod: decimal("depreciation_this_period", { precision: 14, scale: 2 }),
+  bookValue: decimal("book_value", { precision: 14, scale: 2 }),
+  yearsDepreciated: integer("years_depreciated"),
+  usefulLifeYears: integer("useful_life_years"),
+  purchaseDate: text("purchase_date"),
+  supplier: text("supplier"),
+  warrantyExpiry: text("warranty_expiry"),
+  leaseStartDate: text("lease_start_date"),
+  leaseEndDate: text("lease_end_date"),
+  leaseMonthlyPayment: decimal("lease_monthly_payment", { precision: 14, scale: 2 }),
+  balloonPayment: decimal("balloon_payment", { precision: 14, scale: 2 }),
+  leaseTerm: integer("lease_term"),
+  lessor: text("lessor"),
+  loanAmount: decimal("loan_amount", { precision: 14, scale: 2 }),
+  interestRate: decimal("interest_rate", { precision: 6, scale: 2 }),
+  loanTerm: integer("loan_term"),
+  lender: text("lender"),
+  manufacturer: text("manufacturer"),
+  model: text("model"),
+  serialNumber: text("serial_number"),
+  registrationNumber: text("registration_number"),
+  engineNumber: text("engine_number"),
+  vinNumber: text("vin_number"),
+  yearOfManufacture: text("year_of_manufacture"),
+  countryOfOrigin: text("country_of_origin"),
+  specifications: text("specifications"),
+  operatingHours: decimal("operating_hours", { precision: 10, scale: 1 }),
+  insuranceProvider: text("insurance_provider"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insurancePremium: decimal("insurance_premium", { precision: 14, scale: 2 }),
+  insuranceExcess: decimal("insurance_excess", { precision: 14, scale: 2 }),
+  insuranceStartDate: text("insurance_start_date"),
+  insuranceExpiryDate: text("insurance_expiry_date"),
+  insuranceStatus: text("insurance_status"),
+  insuranceNotes: text("insurance_notes"),
+  quantity: integer("quantity").default(1),
+  barcode: text("barcode"),
+  qrCode: text("qr_code"),
+  remarks: text("remarks"),
+  capexRequestId: text("capex_request_id"),
+  capexDescription: text("capex_description"),
+  aiSummary: text("ai_summary"),
+  lastAudited: timestamp("last_audited"),
+  auditNotes: text("audit_notes"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("assets_company_idx").on(table.companyId),
+  statusIdx: index("assets_status_idx").on(table.status),
+  categoryIdx: index("assets_category_idx").on(table.category),
+  assetTagIdx: uniqueIndex("assets_asset_tag_idx").on(table.assetTag, table.companyId),
+}));
+
+export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+export type Asset = typeof assets.$inferSelect;
+
+export const assetMaintenanceRecords = pgTable("asset_maintenance_records", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id", { length: 36 }).notNull().references(() => assets.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  maintenanceType: text("maintenance_type").notNull(),
+  maintenanceDate: text("maintenance_date").notNull(),
+  cost: decimal("cost", { precision: 14, scale: 2 }),
+  serviceProvider: text("service_provider"),
+  description: text("description"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  assetIdx: index("maintenance_asset_idx").on(table.assetId),
+  companyIdx: index("maintenance_company_idx").on(table.companyId),
+}));
+
+export const insertAssetMaintenanceSchema = createInsertSchema(assetMaintenanceRecords).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAssetMaintenance = z.infer<typeof insertAssetMaintenanceSchema>;
+export type AssetMaintenance = typeof assetMaintenanceRecords.$inferSelect;
+
+export const assetTransfers = pgTable("asset_transfers", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  assetId: varchar("asset_id", { length: 36 }).notNull().references(() => assets.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  fromLocation: text("from_location"),
+  toLocation: text("to_location"),
+  fromDepartment: text("from_department"),
+  toDepartment: text("to_department"),
+  fromAssignee: text("from_assignee"),
+  toAssignee: text("to_assignee"),
+  transferDate: text("transfer_date").notNull(),
+  reason: text("reason"),
+  transferredBy: text("transferred_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  assetIdx: index("transfer_asset_idx").on(table.assetId),
+  companyIdx: index("transfer_company_idx").on(table.companyId),
+}))
+
+export const insertAssetTransferSchema = createInsertSchema(assetTransfers).omit({ id: true, createdAt: true });
+export type InsertAssetTransfer = z.infer<typeof insertAssetTransferSchema>;
+export type AssetTransfer = typeof assetTransfers.$inferSelect;

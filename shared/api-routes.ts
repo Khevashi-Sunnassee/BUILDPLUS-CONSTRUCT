@@ -645,3 +645,15 @@ export type ChecklistRoutes = typeof CHECKLIST_ROUTES;
 export type BroadcastRoutes = typeof BROADCAST_ROUTES;
 export type ProgressClaimsRoutes = typeof PROGRESS_CLAIMS_ROUTES;
 export type ContractRoutes = typeof CONTRACT_ROUTES;
+
+export const ASSET_ROUTES = {
+  LIST: '/api/admin/assets',
+  BY_ID: (id: string) => `/api/admin/assets/${id}`,
+  CREATE: '/api/admin/assets',
+  AI_SUMMARY: (id: string) => `/api/admin/assets/${id}/ai-summary`,
+  MAINTENANCE: (id: string) => `/api/admin/assets/${id}/maintenance`,
+  MAINTENANCE_BY_ID: (assetId: string, id: string) => `/api/admin/assets/${assetId}/maintenance/${id}`,
+  TRANSFERS: (id: string) => `/api/admin/assets/${id}/transfers`,
+  TRANSFER_BY_ID: (assetId: string, id: string) => `/api/admin/assets/${assetId}/transfers/${id}`,
+} as const;
+export type AssetRoutes = typeof ASSET_ROUTES;

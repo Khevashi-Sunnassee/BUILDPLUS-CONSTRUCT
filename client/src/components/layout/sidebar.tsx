@@ -36,6 +36,7 @@ import {
   Radio,
   Scale,
   Target,
+  Boxes,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -102,6 +103,7 @@ const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Companies", url: "/admin/companies", icon: Building2 },
   { title: "Factories", url: "/admin/factories", icon: Factory },
+  { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
@@ -135,6 +137,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/customers": "admin_customers",
   "/admin/suppliers": "admin_suppliers",
   "/admin/items": "admin_item_catalog",
+  "/admin/asset-register": "admin_assets",
   "/admin/devices": "admin_devices",
   "/admin/users": "admin_users",
   "/admin/settings": "admin_settings",

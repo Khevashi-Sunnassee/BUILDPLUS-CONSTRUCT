@@ -1,0 +1,152 @@
+Asset Register (Asset Management) - Complete Guide
+What It Does
+A comprehensive asset tracking and lifecycle management system for construction, precast manufacturing, and development companies. It tracks every physical asset from purchase (or lease) through its entire lifespan - including depreciation, maintenance, insurance, transfers, and disposal. Assets can be linked to approved CAPEX requests, and AI can generate asset analysis summaries.
+________________________________________
+Lifecycle / Workflow
+ASSETS CAN BE IMPORTED OR ADDED – A REVIEW OF ASSETS IS DONE PERIODICALLY AND WE UPDATE THE STATUS IN THE SYSTEM - Maintenance/Transfers → Disposed/Sold/Lost/Stolen
+________________________________________
+All Fields Across 8 Tabs
+Tab 1: Basic Information
+Field	Type	Required	Description
+assetTag	Text	Auto-generated	Unique asset number (format: AST-2502-1234)
+name	Text	YES	Asset name (e.g. "CAT 320 Excavator")
+description	Textarea	No	Detailed description of the asset
+category	Dropdown	YES	Asset category (40+ options - see below)
+status	Dropdown	No	active / disposed / sold / stolen / lost
+condition	Dropdown	No	good / fair / poor / excellent / new
+location	Text	No	Physical location of asset
+department	Text	No	Department that owns/uses it
+assignedTo	Multi-select (staff)	No	Staff member(s) responsible (comma-separated)
+fundingMethod	Dropdown	No	purchased / leased / financed / donated / rented
+
+Tab 2: Photos – MUST BE STORED IN THE DOCUMENT REGISTER – ON UPLOAD WE NEED TO ADD THE METADATA RELATING TO THE INFORMATION
+Field	Type	Description
+photos	JSON array	Array of photo objects with filename, size, type, and metadata (tags, description, category)
+Each photo object:
+{
+  "filename": "excavator_front.jpg",
+  "size": 1048576,
+  "type": "image/jpeg",
+  "metadata": {
+    "tags": ["front view", "exterior"],
+    "description": "Front view of excavator",
+    "category": "identification"
+  }
+}
+Tab 3: Financial
+Field	Type	Description
+purchaseValue / purchasePrice	Currency (AUD)	Original purchase price
+currentValue	Currency (AUD)	Current assessed value
+depreciationMethod	Text	Depreciation calculation method
+depreciationRate	Percentage	Annual depreciation rate
+accumulatedDepreciation	Currency	Total depreciation to date
+depreciationThisPeriod	Currency	Current period depreciation
+bookValue	Currency	Book value (purchase - accumulated depreciation)
+yearsDepreciated	Number	Years depreciated so far
+usefulLife / usefulLifeYears	Number	Expected useful life in years
+purchaseDate	Date	When the asset was purchased
+supplier	Text/Dropdown	Supplier the asset was purchased from
+warrantyExpiry	Date	When warranty expires
+If Leased (fundingMethod = 'leased'):
+Field	Type	Description
+leaseStartDate	Date	Lease commencement date
+leaseEndDate	Date	Lease end date
+leaseMonthlyPayment / monthlyPayment	Currency	Monthly lease payment
+balloonPayment	Currency	Balloon payment at end of lease
+leaseTerm	Number	Lease term in months
+lessor	Text	Leasing company name
+If Financed (fundingMethod = 'financed'):
+Field	Type	Description
+loanAmount	Currency	Total loan amount
+interestRate	Percentage	Annual interest rate
+loanTerm	Number	Loan term in months
+lender	Text	Lending institution
+Tab 4: Technical
+Field	Type	Description
+manufacturer	Text	Equipment manufacturer (e.g. "Caterpillar")
+model	Text	Model number/name (e.g. "320F L")
+serialNumber	Text	Manufacturer serial number
+registrationNumber	Text	Vehicle/equipment registration
+engineNumber	Text	Engine number
+vinNumber	Text	VIN or chassis number
+yearOfManufacture	Text	Year manufactured
+countryOfOrigin	Text	Country of manufacture
+specifications	Textarea	Technical specifications
+operatingHours	Number	Total operating hours logged
+Tab 5: Insurance
+Field	Type	Description
+insuranceProvider	Text	Insurance company name
+insurancePolicyNumber	Text	Policy number
+insurancePremium	Currency	Annual premium amount
+insuranceExcess	Currency	Excess/deductible amount
+insuranceStartDate	Date	Policy start date
+insuranceExpiryDate	Date	Policy expiry date
+insuranceStatus	Text	active / expired / pending
+insuranceNotes	Textarea	Notes about coverage
+Tab 6: Maintenance Records (sub-table)
+Field	Type	Description
+maintenanceType	Text	Type of maintenance performed
+maintenanceDate	Date	When maintenance was done
+cost	Currency	Cost of maintenance
+serviceProvider	Text	Who performed the service
+description	Textarea	What was done
+Tab 7: Transfer History (sub-table)
+Tracks when assets are moved between locations, departments, or staff.
+Tab 8: Documents
+Embedded document register (Universal Documents) linked to this specific asset - for attaching manuals, certificates, invoices, photos, etc.
+________________________________________
+System/Audit Fields
+Field	Type	Description
+id	Serial	Primary key
+companyId	Integer	Multi-tenant company isolation
+createdBy	Text	User who created the record
+createdAt	Timestamp	When created
+updatedAt	Timestamp	Last modified
+lastAudited	Timestamp	Last physical audit date
+auditNotes	Text	Notes from last audit
+quantity	Number	Quantity (if tracking multiples)
+barcode	Text	Barcode identifier
+qrCode	Text	QR code identifier
+remarks	Text	General remarks
+capexRequestId	Integer	FK to approved CAPEX request
+capexDescription	Text	CAPEX request description
+aiSummary	HTML Text	AI-generated asset analysis
+________________________________________
+Special Features
+1. CAPEX Integration
+•	Assets can be linked to approved CAPEX requests
+•	When a CAPEX request is approved, a "Create Purchase Order" button appears
+•	Asset records can reference the CAPEX that justified the purchase
+2. AI Asset Analysis
+•	Uses OpenAI (GPT-4o) to generate asset summaries
+•	Requires manufacturer, model, and condition to be filled in
+•	Generates HTML-formatted analysis including market value, lifecycle info, and recommendations
+•	Stored in aiSummary field and displayed in the details view
+3. Bulk Import
+•	Import assets from spreadsheet (CSV/Excel)
+•	Validates data and reports errors
+•	Handles partial imports (imports valid rows, reports invalid ones)
+4. 40+ Asset Categories
+Construction: Heavy Equipment, Excavation, Lifting, Concrete, Earthmoving, Compaction, Site Preparation, Road Construction, Drilling, Demolition
+Precast: Molds, Concrete Mixers, Prestressing, Casting, Curing, Finishing, Material Handling, Quality Control, Steam Curing Systems, Aggregate Processing
+Development: Survey, Planning & Design, Environmental Testing, Geotechnical, Infrastructure, Utility Installation, Landscaping, Testing & Inspection, Safety, Site Security
+General: Vehicles & Transportation, Hand Tools & Power Tools, IT Equipment, Office Equipment, Workshop Equipment, Maintenance Equipment, Storage Systems, Communication Equipment, Generators & Power Systems, Furniture, General Machinery, Other
+________________________________________
+Dashboard Statistics
+Stat	Description
+Total Assets	Count of all assets
+Total Value	Sum of all currentValue
+Active Assets	Count where status = 'active'
+Leased Assets	Count where fundingMethod = 'leased'
+________________________________________
+API Endpoints
+Method	URL	Purpose
+GET	/api/assets	List all assets (company-filtered)
+POST	/api/assets	Create new asset
+PUT	/api/assets/:id	Update asset
+POST	/api/assets/import	Bulk import from spreadsheet
+POST	/api/assets/:id/ai-summary	Generate AI analysis
+GET	/api/assets/maintenance	Get maintenance records
+________________________________________
+Database Table: assets
+Approximately 50+ columns across core data, financial, technical, insurance, and system fields. All queries filtered by company_id for multi-tenant isolation.
