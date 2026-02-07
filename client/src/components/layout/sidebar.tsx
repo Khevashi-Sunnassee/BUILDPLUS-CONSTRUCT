@@ -331,7 +331,7 @@ export function AppSidebar() {
             <SidebarGroup>
               <CollapsibleTrigger className="w-full">
                 <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
-                  <span>Administration</span>
+                  <span>Settings</span>
                   {adminExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </SidebarGroupLabel>
               </CollapsibleTrigger>
