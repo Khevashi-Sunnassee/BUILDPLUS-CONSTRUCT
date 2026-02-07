@@ -155,7 +155,7 @@ export default function MobilePanelDetailPage() {
     enabled: !!panelId,
   });
 
-  const { data: panelDocs = [] } = useQuery<PanelDocument[]>({
+  const { data: panelDocsResult } = useQuery<{ documents: PanelDocument[]; total: number }>({
     queryKey: [DOCUMENT_ROUTES.PANEL_DOCUMENTS(panelId!), panelId],
     queryFn: async () => {
       const res = await fetch(DOCUMENT_ROUTES.PANEL_DOCUMENTS(panelId!), { credentials: "include" });
@@ -165,6 +165,7 @@ export default function MobilePanelDetailPage() {
     enabled: !!panelId,
   });
 
+  const panelDocs = panelDocsResult?.documents ?? [];
   const drawingDocs = panelDocs.filter(d =>
     d.mimeType.includes("pdf") || d.mimeType.startsWith("image/")
   );
