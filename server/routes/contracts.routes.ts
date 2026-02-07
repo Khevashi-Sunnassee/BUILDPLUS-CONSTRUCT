@@ -181,6 +181,17 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
       .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)))
       .returning();
 
+    if (updateData.requiredDeliveryStartDate !== undefined) {
+      try {
+        const newDate = updateData.requiredDeliveryStartDate ? new Date(updateData.requiredDeliveryStartDate) : null;
+        await db.update(jobs)
+          .set({ productionStartDate: newDate })
+          .where(and(eq(jobs.id, existing.jobId), eq(jobs.companyId, companyId)));
+      } catch (syncError: any) {
+        logger.warn({ err: syncError }, "Failed to sync Required Delivery Start to job");
+      }
+    }
+
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating contract");

@@ -1646,7 +1646,7 @@ export default function AdminJobsPage() {
                     name="productionStartDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Onsite Start Date</FormLabel>
+                        <FormLabel>Required Delivery Start</FormLabel>
                         <FormControl>
                           <Input 
                             type="date" 
@@ -2569,7 +2569,7 @@ export default function AdminJobsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  Changing production settings (Onsite Start Date or IFC Days in Advance) will affect all production and drafting dates.
+                  Changing production settings (Required Delivery Start or IFC Days in Advance) will affect all production and drafting dates.
                 </p>
                 <p>
                   This will regenerate the production slots and update the drafting program dates accordingly.

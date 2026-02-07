@@ -1646,7 +1646,7 @@ export default function ProductionSlotsPage() {
                         <TableHeader>
                           <TableRow>
                             <TableHead>Panel Production Due</TableHead>
-                            <TableHead>Onsite Start Date</TableHead>
+                            <TableHead>Required Delivery Start</TableHead>
                             {groupBy !== "job" && <TableHead>Job</TableHead>}
                             {groupBy !== "factory" && <TableHead>Factory</TableHead>}
                             {groupBy !== "client" && <TableHead>Client</TableHead>}
@@ -1782,7 +1782,7 @@ export default function ProductionSlotsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Panel Production Due</TableHead>
-                  <TableHead>Onsite Start Date</TableHead>
+                  <TableHead>Required Delivery Start</TableHead>
                   <TableHead>Job</TableHead>
                   <TableHead>Factory</TableHead>
                   <TableHead>Client</TableHead>
@@ -2159,7 +2159,7 @@ export default function ProductionSlotsPage() {
                   <span className="text-xs">
                     Panel Production Due: {format(new Date(selectedSlot.productionSlotDate), "dd/MM/yyyy")}
                     {" → "}
-                    Onsite Start: {format(addDays(new Date(selectedSlot.productionSlotDate), selectedSlot.job.productionDaysInAdvance ?? 10), "dd/MM/yyyy")}
+                    Required Delivery Start: {format(addDays(new Date(selectedSlot.productionSlotDate), selectedSlot.job.productionDaysInAdvance ?? 10), "dd/MM/yyyy")}
                   </span>
                 </span>
               )}

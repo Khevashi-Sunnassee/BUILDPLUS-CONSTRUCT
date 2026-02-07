@@ -2721,7 +2721,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
     
-    // Calculate date range for fetching holidays (2 years forward/back from onsite start)
+    // Calculate date range for fetching holidays (2 years forward/back from required delivery start)
     const onsiteStartBaseDate = new Date(job.productionStartDate);
     const holidayRangeStart = new Date(onsiteStartBaseDate);
     holidayRangeStart.setFullYear(holidayRangeStart.getFullYear() - 2);
@@ -2731,12 +2731,12 @@ export class DatabaseStorage implements IStorage {
     const holidays = await getCfmeuHolidaysInRange(cfmeuCalendarType, holidayRangeStart, holidayRangeEnd);
 
     // Date calculation logic using WORKING DAYS:
-    // 1. productionStartDate = Onsite Start Date (when builder wants us to start on site)
-    // 2. Each level's onsite date = productionStartDate + cumulative WORKING days
-    // 3. productionSlotDate = Onsite Date - production_days_in_advance WORKING days (Panel Production Due)
+    // 1. productionStartDate = Required Delivery Start (when builder wants us to start delivering on site)
+    // 2. Each level's delivery date = productionStartDate + cumulative WORKING days
+    // 3. productionSlotDate = Delivery Date - production_days_in_advance WORKING days (Panel Production Due)
     // 
-    // Full timeline (working backwards from Onsite Start Date):
-    // Drafting Start → Drawing Due (IFC) → Production Window Start → Panel Production Due → Onsite Start
+    // Full timeline (working backwards from Required Delivery Start):
+    // Drafting Start → Drawing Due (IFC) → Production Window Start → Panel Production Due → Required Delivery Start
     // All day values are now WORKING DAYS (excludes weekends per factory config and CFMEU holidays)
     
     const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
@@ -2747,7 +2747,7 @@ export class DatabaseStorage implements IStorage {
     for (let i = 0; i < levelsToProcess.length; i++) {
       const level = levelsToProcess[i];
       
-      // Calculate onsite start date for this level using working days
+      // Calculate required delivery start date for this level using working days
       const onsiteDate = addWorkingDays(onsiteStartBaseDate, cumulativeWorkingDays, workDays, holidays);
       
       // Calculate panel production due date (when panel must be cast) using working days

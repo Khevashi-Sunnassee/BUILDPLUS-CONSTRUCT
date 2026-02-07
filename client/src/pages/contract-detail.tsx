@@ -589,7 +589,13 @@ export default function ContractDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <TextField label="Required Delivery Start" value={formatDate(currentData.requiredDeliveryStartDate)} onChange={(v) => updateField("requiredDeliveryStartDate", v)} testId="input-delivery-start" type="date" />
+                <div className="space-y-1">
+                  <Label className="text-sm flex items-center gap-1.5">
+                    Required Delivery Start
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">Synced with Job</Badge>
+                  </Label>
+                  <Input type="date" value={formatDate(currentData.requiredDeliveryStartDate)} onChange={(e) => updateField("requiredDeliveryStartDate", e.target.value)} data-testid="input-delivery-start" />
+                </div>
                 <TextField label="Required Delivery End" value={formatDate(currentData.requiredDeliveryEndDate)} onChange={(v) => updateField("requiredDeliveryEndDate", v)} testId="input-delivery-end" type="date" />
                 <TextField label="Production Start" value={formatDate(currentData.productionStartDate)} onChange={(v) => updateField("productionStartDate", v)} testId="input-production-start" type="date" />
                 <TextField label="Production Finish" value={formatDate(currentData.productionFinishDate)} onChange={(v) => updateField("productionFinishDate", v)} testId="input-production-finish" type="date" />

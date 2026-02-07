@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { eq, inArray, desc, sql } from "drizzle-orm";
+import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories, customers } from "@shared/schema";
+import { insertJobSchema, jobs, factories, customers, contracts } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 
@@ -483,6 +483,22 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       data.procurementTimeDays = val;
     }
     const job = await storage.updateJob(req.params.id as string, data);
+
+    if (data.productionStartDate !== undefined) {
+      try {
+        const [existingContract] = await db.select()
+          .from(contracts)
+          .where(and(eq(contracts.jobId, req.params.id as string), eq(contracts.companyId, req.companyId!)));
+        if (existingContract) {
+          await db.update(contracts)
+            .set({ requiredDeliveryStartDate: data.productionStartDate, updatedAt: new Date() })
+            .where(eq(contracts.id, existingContract.id));
+        }
+      } catch (syncError: any) {
+        logger.warn({ err: syncError }, "Failed to sync Required Delivery Start to contract");
+      }
+    }
+
     res.json(job);
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to update job" });
