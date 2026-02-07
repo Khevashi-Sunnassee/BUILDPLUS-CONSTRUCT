@@ -848,10 +848,10 @@ export default function ContractDetailPage() {
                     <p className="font-medium">Upload Contract Document</p>
                     <p className="text-sm text-muted-foreground">PDF, Word, or image files supported</p>
                     <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleAiUpload} data-testid="input-ai-file-upload" />
-                    <Button variant="outline" type="button">
-                      <FileUp className="h-4 w-4 mr-2" />
+                    <span className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover-elevate">
+                      <FileUp className="h-4 w-4" />
                       Select File
-                    </Button>
+                    </span>
                   </label>
                 )}
               </div>
@@ -923,10 +923,10 @@ export default function ContractDetailPage() {
                 }}
                 data-testid="input-project-doc-upload"
               />
-              <Button variant="outline" type="button">
-                <FileUp className="h-4 w-4 mr-2" />
+              <span className="inline-flex items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover-elevate">
+                <FileUp className="h-4 w-4" />
                 Browse Files
-              </Button>
+              </span>
             </label>
           </div>
         </DialogContent>
