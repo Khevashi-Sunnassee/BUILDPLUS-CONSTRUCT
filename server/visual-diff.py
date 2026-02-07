@@ -98,26 +98,31 @@ def generate_overlay(
     mask = diff_result["mask"]
     h, w = mask.shape
 
-    base = img1.copy().convert("RGBA")
-    overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(overlay)
-
+    arr1 = np.array(img1.convert("RGBA"))
     arr2 = np.array(img2)
 
-    changed_y, changed_x = np.where(mask)
+    brightness = np.mean(arr2, axis=2)
+    dark_mask = mask & (brightness < 128)
+    light_mask = mask & (brightness >= 128)
 
-    if len(changed_x) > 0:
-        for y_coord, x_coord in zip(changed_y, changed_x):
-            r, g, b = int(arr2[y_coord, x_coord, 0]), int(arr2[y_coord, x_coord, 1]), int(arr2[y_coord, x_coord, 2])
-            brightness = (r + g + b) / 3
-            if brightness < 128:
-                draw.point((int(x_coord), int(y_coord)), fill=(255, 50, 50, 180))
-            else:
-                draw.point((int(x_coord), int(y_coord)), fill=(50, 50, 255, 140))
+    overlay_arr = np.zeros((h, w, 4), dtype=np.uint8)
+    overlay_arr[dark_mask] = [255, 50, 50, 180]
+    overlay_arr[light_mask] = [50, 50, 255, 140]
 
-    result = Image.alpha_composite(base, overlay)
-    result_rgb = result.convert("RGB")
-    result_rgb.save(output_path, "PNG", optimize=True)
+    alpha_o = overlay_arr[:, :, 3:4].astype(np.float32) / 255.0
+    alpha_b = arr1[:, :, 3:4].astype(np.float32) / 255.0
+
+    out_alpha = alpha_o + alpha_b * (1 - alpha_o)
+    safe_alpha = np.where(out_alpha > 0, out_alpha, 1)
+
+    out_rgb = (overlay_arr[:, :, :3].astype(np.float32) * alpha_o +
+               arr1[:, :, :3].astype(np.float32) * alpha_b * (1 - alpha_o)) / safe_alpha
+
+    result_arr = np.zeros((h, w, 3), dtype=np.uint8)
+    result_arr[:, :, :3] = np.clip(out_rgb, 0, 255).astype(np.uint8)
+
+    result_img = Image.fromarray(result_arr, "RGB")
+    result_img.save(output_path, "PNG", optimize=True)
 
     return {
         "width": w,
@@ -145,23 +150,22 @@ def generate_side_by_side(
 
     canvas.paste(img1, (0, 40))
 
-    img2_highlighted = img2.copy().convert("RGBA")
-    highlight_overlay = Image.new("RGBA", (w, h), (0, 0, 0, 0))
-    highlight_draw = ImageDraw.Draw(highlight_overlay)
-
-    changed_y, changed_x = np.where(mask)
-    if len(changed_x) > 0:
-        from PIL import ImageFilter as IF
-
-        region_mask = Image.fromarray((mask * 255).astype(np.uint8), "L")
-        dilated = region_mask.filter(IF.MaxFilter(7))
+    arr2 = np.array(img2)
+    if np.any(mask):
+        region_mask_img = Image.fromarray((mask * 255).astype(np.uint8), "L")
+        dilated = region_mask_img.filter(ImageFilter.MaxFilter(7))
         dilated_arr = np.array(dilated)
-        border_y, border_x = np.where((dilated_arr > 0) & ~mask)
+        border_mask = (dilated_arr > 0) & ~mask
 
-        for y_coord, x_coord in zip(border_y, border_x):
-            highlight_draw.point((int(x_coord), int(y_coord)), fill=(255, 0, 0, 100))
+        highlight = np.zeros((h, w, 4), dtype=np.uint8)
+        highlight[border_mask] = [255, 0, 0, 100]
 
-    img2_result = Image.alpha_composite(img2_highlighted, highlight_overlay).convert("RGB")
+        img2_rgba = img2.copy().convert("RGBA")
+        overlay_img = Image.fromarray(highlight, "RGBA")
+        img2_result = Image.alpha_composite(img2_rgba, overlay_img).convert("RGB")
+    else:
+        img2_result = img2.copy().convert("RGB")
+
     canvas.paste(img2_result, (w + gap, 40))
 
     canvas.save(output_path, "PNG", optimize=True)

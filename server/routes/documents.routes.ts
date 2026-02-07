@@ -639,8 +639,9 @@ router.post("/api/documents/visual-diff", requireAuth, async (req: Request, res:
       return res.status(400).json({ error: "Invalid parameters", details: parsed.error.flatten() });
     }
 
-    const user = (req as any).user;
-    if (!user?.id || !user?.companyId) {
+    const userId = req.session.userId;
+    const companyId = req.companyId;
+    if (!userId || !companyId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -648,8 +649,8 @@ router.post("/api/documents/visual-diff", requireAuth, async (req: Request, res:
 
     const result = await generateVisualDiff({
       ...parsed.data,
-      uploadedBy: user.id,
-      companyId: user.companyId,
+      uploadedBy: userId,
+      companyId,
     });
 
     if (!result.success) {

@@ -12,7 +12,7 @@ import { storage } from "../storage";
 const execFileAsync = promisify(execFile);
 const objectStorageService = new ObjectStorageService();
 
-const PYTHON_SCRIPT = path.join(__dirname, "..", "visual-diff.py");
+const PYTHON_SCRIPT = path.join(process.cwd(), "server", "visual-diff.py");
 const SUPPORTED_MIME_TYPES = [
   "application/pdf",
   "image/png",
