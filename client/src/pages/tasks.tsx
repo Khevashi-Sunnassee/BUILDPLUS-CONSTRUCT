@@ -2497,8 +2497,22 @@ export default function TasksPage() {
         return false;
       };
 
-      const colWidths = [90, 28, 22, 40, 28, contentWidth - 90 - 28 - 22 - 40 - 28];
-      const colHeaders = ["Task", "Status", "Priority", "Assignee", "Due Date", "Job"];
+      const checkboxCol = 8;
+      const taskCol = 82;
+      const statusCol = 28;
+      const priorityCol = 22;
+      const assigneeCol = 38;
+      const dueDateCol = 28;
+      const jobCol = contentWidth - checkboxCol - taskCol - statusCol - priorityCol - assigneeCol - dueDateCol;
+      const colWidths = [checkboxCol, taskCol, statusCol, priorityCol, assigneeCol, dueDateCol, jobCol];
+      const colHeaders = ["", "Task", "Status", "Priority", "Assignee", "Due Date", "Job"];
+
+      const drawCheckbox = (x: number, y: number, size: number = 3.5) => {
+        pdf.setDrawColor(150, 150, 150);
+        pdf.setLineWidth(0.3);
+        pdf.rect(x, y, size, size, "S");
+        pdf.setLineWidth(0.2);
+      };
 
       const drawTableHeaders = () => {
         pdf.setFillColor(75, 85, 99);
@@ -2508,6 +2522,10 @@ export default function TasksPage() {
         pdf.setFont("helvetica", "bold");
         let hx = margin;
         colHeaders.forEach((header, i) => {
+          if (i === 0) {
+            hx += colWidths[i];
+            return;
+          }
           pdf.text(header, hx + 3, currentY + 5.5);
           hx += colWidths[i];
         });
@@ -2537,7 +2555,15 @@ export default function TasksPage() {
 
         let rowIndex = 0;
         const drawTask = (task: Task, indent: number = 0) => {
-          const rowHeight = 7;
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          const taskTextX = margin + colWidths[0] + 3 + indent;
+          const taskColWidth = colWidths[1] - 6 - indent;
+          const titlePrefix = indent > 0 ? "  " : "";
+          const titleLines: string[] = pdf.splitTextToSize(titlePrefix + task.title, taskColWidth);
+          const lineHeight = 4;
+          const rowHeight = Math.max(7, titleLines.length * lineHeight + 3);
+
           checkPageBreak(rowHeight);
 
           if (rowIndex % 2 === 0) {
@@ -2545,46 +2571,42 @@ export default function TasksPage() {
             pdf.rect(margin, currentY, contentWidth, rowHeight, "F");
           }
 
-          let rx = margin;
+          drawCheckbox(margin + 2.5, currentY + 2);
 
-          pdf.setFont("helvetica", "normal");
-          pdf.setTextColor(31, 41, 55);
-          pdf.setFontSize(8);
-          const maxTitleLen = Math.floor((colWidths[0] - 6 - indent) / 1.8);
-          const title = task.title.length > maxTitleLen
-            ? task.title.substring(0, maxTitleLen - 2) + "..."
-            : task.title;
           if (indent > 0) {
             pdf.setTextColor(107, 114, 128);
-            pdf.text("  " + title, rx + 3 + indent, currentY + 5);
           } else {
-            pdf.text(title, rx + 3, currentY + 5);
+            pdf.setTextColor(31, 41, 55);
           }
-          rx += colWidths[0];
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(8);
+          pdf.text(titleLines, taskTextX, currentY + 4.5);
+
+          let rx = margin + colWidths[0] + colWidths[1];
 
           pdf.setTextColor(31, 41, 55);
           pdf.setFontSize(8);
           pdf.setFont("helvetica", "normal");
-          pdf.text(formatStatus(task.status), rx + 3, currentY + 5);
-          rx += colWidths[1];
-
-          pdf.text(formatPriority(task.priority), rx + 3, currentY + 5);
+          pdf.text(formatStatus(task.status), rx + 3, currentY + 4.5);
           rx += colWidths[2];
+
+          pdf.text(formatPriority(task.priority), rx + 3, currentY + 4.5);
+          rx += colWidths[3];
 
           pdf.setTextColor(107, 114, 128);
           const assignees = task.assignees?.map(a => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";
-          const maxAssLen = Math.floor((colWidths[3] - 6) / 1.8);
+          const maxAssLen = Math.floor((colWidths[4] - 6) / 1.8);
           const assigneeText = assignees.length > maxAssLen ? assignees.substring(0, maxAssLen - 2) + "..." : assignees;
-          pdf.text(assigneeText, rx + 3, currentY + 5);
-          rx += colWidths[3];
-
-          pdf.setTextColor(31, 41, 55);
-          pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "-", rx + 3, currentY + 5);
+          pdf.text(assigneeText, rx + 3, currentY + 4.5);
           rx += colWidths[4];
 
+          pdf.setTextColor(31, 41, 55);
+          pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "-", rx + 3, currentY + 4.5);
+          rx += colWidths[5];
+
           const jobText = task.job ? `${(task.job as any).jobNumber || (task.job as any).name || ""}` : "-";
-          const maxJobLen = Math.floor((colWidths[5] - 6) / 1.8);
-          pdf.text(jobText.length > maxJobLen ? jobText.substring(0, maxJobLen - 2) + "..." : jobText, rx + 3, currentY + 5);
+          const maxJobLen = Math.floor((colWidths[6] - 6) / 1.8);
+          pdf.text(jobText.length > maxJobLen ? jobText.substring(0, maxJobLen - 2) + "..." : jobText, rx + 3, currentY + 4.5);
 
           pdf.setDrawColor(229, 231, 235);
           pdf.line(margin, currentY + rowHeight, margin + contentWidth, currentY + rowHeight);
