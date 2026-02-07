@@ -1,10 +1,17 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
-import { insertEotClaimSchema } from "@shared/schema";
+import { insertEotClaimSchema, jobs } from "@shared/schema";
+import { db } from "../db";
+import { eq } from "drizzle-orm";
 import logger from "../lib/logger";
 
 const router = Router();
+
+async function verifyEotClaimOwnership(claimJobId: string, companyId: string): Promise<boolean> {
+  const [job] = await db.select({ companyId: jobs.companyId }).from(jobs).where(eq(jobs.id, claimJobId));
+  return job?.companyId === companyId;
+}
 
 router.get("/api/eot-claims", requireAuth, async (req, res) => {
   try {
@@ -67,9 +74,9 @@ router.post("/api/eot-claims", requireAuth, async (req, res) => {
 
 router.put("/api/eot-claims/:id", requireAuth, async (req, res) => {
   try {
-    const companyId = req.session.companyId;
+    const companyId = req.session.companyId!;
     const claim = await storage.getEotClaim(String(req.params.id));
-    if (!claim || claim.companyId !== companyId) {
+    if (!claim || !(await verifyEotClaimOwnership(claim.jobId, companyId))) {
       return res.status(404).json({ error: "EOT claim not found" });
     }
     if (claim.status !== "DRAFT") {
@@ -89,9 +96,9 @@ router.put("/api/eot-claims/:id", requireAuth, async (req, res) => {
 
 router.post("/api/eot-claims/:id/submit", requireAuth, async (req, res) => {
   try {
-    const companyId = req.session.companyId;
+    const companyId = req.session.companyId!;
     const claim = await storage.getEotClaim(String(req.params.id));
-    if (!claim || claim.companyId !== companyId) {
+    if (!claim || !(await verifyEotClaimOwnership(claim.jobId, companyId))) {
       return res.status(404).json({ error: "EOT claim not found" });
     }
     if (claim.status !== "DRAFT") {
@@ -108,9 +115,9 @@ router.post("/api/eot-claims/:id/submit", requireAuth, async (req, res) => {
 
 router.post("/api/eot-claims/:id/approve", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const companyId = req.session.companyId;
+    const companyId = req.session.companyId!;
     const claim = await storage.getEotClaim(String(req.params.id));
-    if (!claim || claim.companyId !== companyId) {
+    if (!claim || !(await verifyEotClaimOwnership(claim.jobId, companyId))) {
       return res.status(404).json({ error: "EOT claim not found" });
     }
     if (claim.status !== "SUBMITTED" && claim.status !== "UNDER_REVIEW") {
@@ -134,9 +141,9 @@ router.post("/api/eot-claims/:id/approve", requireRole("ADMIN", "MANAGER"), asyn
 
 router.post("/api/eot-claims/:id/reject", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const companyId = req.session.companyId;
+    const companyId = req.session.companyId!;
     const claim = await storage.getEotClaim(String(req.params.id));
-    if (!claim || claim.companyId !== companyId) {
+    if (!claim || !(await verifyEotClaimOwnership(claim.jobId, companyId))) {
       return res.status(404).json({ error: "EOT claim not found" });
     }
     if (claim.status !== "SUBMITTED" && claim.status !== "UNDER_REVIEW") {
@@ -159,9 +166,9 @@ router.post("/api/eot-claims/:id/reject", requireRole("ADMIN", "MANAGER"), async
 
 router.delete("/api/eot-claims/:id", requireAuth, async (req, res) => {
   try {
-    const companyId = req.session.companyId;
+    const companyId = req.session.companyId!;
     const claim = await storage.getEotClaim(String(req.params.id));
-    if (!claim || claim.companyId !== companyId) {
+    if (!claim || !(await verifyEotClaimOwnership(claim.jobId, companyId))) {
       return res.status(404).json({ error: "EOT claim not found" });
     }
     if (claim.status !== "DRAFT") {
