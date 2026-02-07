@@ -38,7 +38,7 @@ interface PurchaseOrderWithDetails extends PurchaseOrder {
   attachmentCount?: number;
 }
 
-type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+type StatusFilter = "ALL" | "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "RECEIVED" | "RECEIVED_IN_PART";
 
 function isLightOnTransparent(img: HTMLImageElement): boolean {
   const canvas = document.createElement("canvas");
@@ -221,10 +221,16 @@ function generatePoPdf(
     SUBMITTED: { bg: [59, 130, 246], text: [255, 255, 255] },
     APPROVED: { bg: [34, 197, 94], text: [255, 255, 255] },
     REJECTED: { bg: [239, 68, 68], text: [255, 255, 255] },
+    RECEIVED: { bg: [4, 120, 87], text: [255, 255, 255] },
+    RECEIVED_IN_PART: { bg: [217, 119, 6], text: [255, 255, 255] },
   };
   const statusStyle = statusColors[po.status] || statusColors.DRAFT;
   pdf.setFillColor(statusStyle.bg[0], statusStyle.bg[1], statusStyle.bg[2]);
-  const statusText = po.status === "SUBMITTED" ? "Submitted - Pending Approval" : po.status.charAt(0) + po.status.slice(1).toLowerCase();
+  const statusLabels: Record<string, string> = {
+    SUBMITTED: "Submitted - Pending Approval",
+    RECEIVED_IN_PART: "Received in Part",
+  };
+  const statusText = statusLabels[po.status] || po.status.charAt(0) + po.status.slice(1).toLowerCase();
   const statusWidth = pdf.getTextWidth(statusText) + 8;
   pdf.roundedRect(margin, currentY, statusWidth, 7, 1.5, 1.5, "F");
   pdf.setTextColor(statusStyle.text[0], statusStyle.text[1], statusStyle.text[2]);
@@ -831,6 +837,10 @@ export default function PurchaseOrdersPage() {
         return <Badge className="bg-green-600" data-testid={`badge-status-approved`}>Approved</Badge>;
       case "REJECTED":
         return <Badge variant="destructive" data-testid={`badge-status-rejected`}>Rejected</Badge>;
+      case "RECEIVED":
+        return <Badge className="bg-emerald-700" data-testid={`badge-status-received`}>Received</Badge>;
+      case "RECEIVED_IN_PART":
+        return <Badge className="bg-amber-600" data-testid={`badge-status-received-in-part`}>Received in Part</Badge>;
       default:
         return <Badge variant="outline" data-testid={`badge-status-unknown`}>{status}</Badge>;
     }
@@ -976,11 +986,13 @@ export default function PurchaseOrdersPage() {
           </div>
 
           <Tabs value={statusFilter} onValueChange={(value) => setStatusFilter(value as StatusFilter)} className="mb-6">
-            <TabsList data-testid="tabs-status-filter">
+            <TabsList className="flex-wrap" data-testid="tabs-status-filter">
               <TabsTrigger value="ALL" data-testid="tab-all">All ({purchaseOrders.length})</TabsTrigger>
               <TabsTrigger value="DRAFT" data-testid="tab-draft">Draft</TabsTrigger>
               <TabsTrigger value="SUBMITTED" data-testid="tab-submitted">Submitted</TabsTrigger>
               <TabsTrigger value="APPROVED" data-testid="tab-approved">Approved</TabsTrigger>
+              <TabsTrigger value="RECEIVED_IN_PART" data-testid="tab-received-in-part">Received in Part</TabsTrigger>
+              <TabsTrigger value="RECEIVED" data-testid="tab-received">Received</TabsTrigger>
               <TabsTrigger value="REJECTED" data-testid="tab-rejected">Rejected</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -1069,7 +1081,7 @@ export default function PurchaseOrdersPage() {
                           </TooltipTrigger>
                           <TooltipContent>View</TooltipContent>
                         </Tooltip>
-                        {po.status === "APPROVED" && (
+                        {(po.status === "APPROVED" || po.status === "RECEIVED" || po.status === "RECEIVED_IN_PART") && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
@@ -1112,7 +1124,7 @@ export default function PurchaseOrdersPage() {
                             <TooltipContent>Edit</TooltipContent>
                           </Tooltip>
                         )}
-                        {po.status !== "APPROVED" && (
+                        {po.status !== "APPROVED" && po.status !== "RECEIVED" && po.status !== "RECEIVED_IN_PART" && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button

@@ -17,7 +17,7 @@ export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW",
 export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IFC", "APPROVED"]);
 export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHEDULED", "PENDING_UPDATE", "BOOKED", "COMPLETED"]);
-export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
+export const poStatusEnum = pgEnum("po_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "RECEIVED", "RECEIVED_IN_PART"]);
 export const draftingProgramStatusEnum = pgEnum("drafting_program_status", ["NOT_SCHEDULED", "SCHEDULED", "IN_PROGRESS", "COMPLETED", "ON_HOLD"]);
 export const contractStatusEnum = pgEnum("contract_status", ["AWAITING_CONTRACT", "CONTRACT_REVIEW", "CONTRACT_EXECUTED"]);
 export const contractTypeEnum = pgEnum("contract_type", ["LUMP_SUM", "UNIT_PRICE", "TIME_AND_MATERIALS", "GMP"]);
@@ -1589,6 +1589,7 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 12, scale: 2 }).notNull(),
   sortOrder: integer("sort_order").default(0),
+  received: boolean("received").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

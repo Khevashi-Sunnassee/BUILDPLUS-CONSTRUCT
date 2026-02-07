@@ -24,7 +24,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient, getCsrfToken } from "@/lib/queryClient";
-import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2 } from "lucide-react";
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
 
@@ -108,6 +109,8 @@ export default function PurchaseOrderFormPage() {
   const [selectedLineIdForJob, setSelectedLineIdForJob] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [receivingMode, setReceivingMode] = useState(false);
+  const [receivedItemIds, setReceivedItemIds] = useState<Set<string>>(new Set());
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
@@ -308,6 +311,63 @@ export default function PurchaseOrderFormPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const receiveMutation = useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDER_RECEIVE(poId!), { receivedItemIds: itemIds });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId] });
+      setReceivingMode(false);
+      toast({ title: "Items received successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  useEffect(() => {
+    if (existingPO?.items) {
+      const alreadyReceived = new Set(
+        existingPO.items.filter((item: any) => item.received).map((item: any) => item.id)
+      );
+      setReceivedItemIds(alreadyReceived);
+    }
+  }, [existingPO?.items]);
+
+  const toggleReceiveItem = useCallback((itemId: string) => {
+    setReceivedItemIds(prev => {
+      const next = new Set(prev);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleReceiveItems = useCallback(() => {
+    if (!receivingMode) {
+      setReceivingMode(true);
+      return;
+    }
+    receiveMutation.mutate(Array.from(receivedItemIds));
+  }, [receivingMode, receivedItemIds, receiveMutation]);
+
+  const cancelReceiving = useCallback(() => {
+    setReceivingMode(false);
+    if (existingPO?.items) {
+      const alreadyReceived = new Set(
+        existingPO.items.filter((item: any) => item.received).map((item: any) => item.id)
+      );
+      setReceivedItemIds(alreadyReceived);
+    }
+  }, [existingPO?.items]);
+
+  const canReceive = existingPO?.status === "APPROVED" || existingPO?.status === "RECEIVED_IN_PART";
 
   const uploadAttachmentsMutation = useMutation({
     mutationFn: async (files: File[]) => {
@@ -608,10 +668,16 @@ export default function PurchaseOrderFormPage() {
       SUBMITTED: { bg: [59, 130, 246], text: [255, 255, 255] },
       APPROVED: { bg: [34, 197, 94], text: [255, 255, 255] },
       REJECTED: { bg: [239, 68, 68], text: [255, 255, 255] },
+      RECEIVED: { bg: [4, 120, 87], text: [255, 255, 255] },
+      RECEIVED_IN_PART: { bg: [217, 119, 6], text: [255, 255, 255] },
     };
     const statusStyle = statusColors[existingPO.status] || statusColors.DRAFT;
     pdf.setFillColor(statusStyle.bg[0], statusStyle.bg[1], statusStyle.bg[2]);
-    const statusText = existingPO.status.charAt(0) + existingPO.status.slice(1).toLowerCase();
+    const statusLabels: Record<string, string> = {
+      SUBMITTED: "Submitted - Pending Approval",
+      RECEIVED_IN_PART: "Received in Part",
+    };
+    const statusText = statusLabels[existingPO.status] || existingPO.status.charAt(0) + existingPO.status.slice(1).toLowerCase();
     const statusWidth = pdf.getTextWidth(statusText) + 8;
     pdf.roundedRect(margin, currentY, statusWidth, 7, 1.5, 1.5, "F");
     pdf.setTextColor(statusStyle.text[0], statusStyle.text[1], statusStyle.text[2]);
@@ -911,6 +977,10 @@ export default function PurchaseOrderFormPage() {
         return <Badge className="bg-green-600" data-testid="badge-status">Approved</Badge>;
       case "REJECTED":
         return <Badge variant="destructive" data-testid="badge-status">Rejected</Badge>;
+      case "RECEIVED":
+        return <Badge className="bg-emerald-700" data-testid="badge-status">Received</Badge>;
+      case "RECEIVED_IN_PART":
+        return <Badge className="bg-amber-600" data-testid="badge-status">Received in Part</Badge>;
       default:
         return <Badge variant="outline" data-testid="badge-status">{status}</Badge>;
     }
@@ -1195,6 +1265,7 @@ export default function PurchaseOrderFormPage() {
               <Table data-testid="table-line-items">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
+                    {receivingMode && <TableHead className="w-[50px]">Received</TableHead>}
                     <TableHead className="w-[200px]">Item</TableHead>
                     <TableHead className="w-[120px]">Job</TableHead>
                     <TableHead className="min-w-[200px]">Description</TableHead>
@@ -1209,7 +1280,7 @@ export default function PurchaseOrderFormPage() {
                   {lineItems.length === 0 ? (
                     <TableRow>
                       <TableCell 
-                        colSpan={canEdit ? 8 : 7} 
+                        colSpan={(canEdit ? 8 : 7) + (receivingMode ? 1 : 0)} 
                         className="text-center py-8 text-muted-foreground"
                         data-testid="text-no-items"
                       >
@@ -1219,6 +1290,15 @@ export default function PurchaseOrderFormPage() {
                   ) : (
                     lineItems.map((line, index) => (
                       <TableRow key={line.id} data-testid={`row-line-item-${index}`}>
+                        {receivingMode && (
+                          <TableCell className="p-1 text-center">
+                            <Checkbox
+                              checked={receivedItemIds.has(line.id)}
+                              onCheckedChange={() => toggleReceiveItem(line.id)}
+                              data-testid={`checkbox-receive-${index}`}
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="p-1">
                           {canEdit ? (
                             <Select
@@ -1496,7 +1576,7 @@ export default function PurchaseOrderFormPage() {
             )}
           </div>
 
-          {isApproved && existingPO?.approvedBy && (
+          {(isApproved || existingPO?.status === "RECEIVED" || existingPO?.status === "RECEIVED_IN_PART") && existingPO?.approvedBy && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <div className="flex items-center gap-2">
                 <Check className="h-5 w-5 text-green-600" />
@@ -1565,7 +1645,39 @@ export default function PurchaseOrderFormPage() {
               </>
             )}
 
-            {isApproved && (
+            {canReceive && (
+              <>
+                <Button
+                  onClick={handleReceiveItems}
+                  disabled={receiveMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700"
+                  data-testid="button-receive-items"
+                >
+                  {receiveMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <PackageCheck className="h-4 w-4 mr-2" />
+                  )}
+                  {receiveMutation.isPending 
+                    ? "Saving..." 
+                    : receivingMode 
+                      ? "Confirm Received Items" 
+                      : "Receive Items"}
+                </Button>
+                {receivingMode && (
+                  <Button
+                    variant="outline"
+                    onClick={cancelReceiving}
+                    data-testid="button-cancel-receiving"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                )}
+              </>
+            )}
+
+            {(isApproved || existingPO?.status === "RECEIVED" || existingPO?.status === "RECEIVED_IN_PART") && (
               <Button onClick={handlePrint} variant="outline" data-testid="button-print">
                 <Printer className="h-4 w-4 mr-2" />
                 Print / PDF

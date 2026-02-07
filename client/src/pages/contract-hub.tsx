@@ -235,7 +235,7 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
             </Button>
           </div>
 
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-4" style={{ minHeight: 0 }}>
             {isLoading ? (
               <div className="space-y-2">
                 <Skeleton className="h-4 w-full" />
@@ -246,8 +246,8 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
               <div
                 ref={editorRef}
                 contentEditable
-                className="min-h-[350px] p-4 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm leading-relaxed"
-                style={{ fontFamily: "Arial" }}
+                className="h-full p-4 border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring text-sm leading-relaxed overflow-y-auto"
+                style={{ fontFamily: "Arial", minHeight: "200px" }}
                 data-testid="editor-po-terms"
                 suppressContentEditableWarning
               />

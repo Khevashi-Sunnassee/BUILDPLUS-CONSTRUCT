@@ -4,7 +4,9 @@ import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { twilioService } from "../services/twilio.service";
-import { insertPurchaseOrderSchema } from "@shared/schema";
+import { insertPurchaseOrderSchema, purchaseOrderItems, purchaseOrders } from "@shared/schema";
+import { db } from "../db";
+import { eq, and, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -242,6 +244,67 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
   } catch (error: any) {
     logger.error({ err: error }, "Error rejecting purchase order");
     res.status(500).json({ error: error.message || "Failed to reject purchase order" });
+  }
+});
+
+router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const order = await storage.getPurchaseOrder(String(req.params.id));
+    if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
+
+    if (order.status !== "APPROVED" && order.status !== "RECEIVED_IN_PART") {
+      return res.status(400).json({ error: "Only approved or partially received POs can have items received" });
+    }
+
+    const { receivedItemIds } = req.body;
+    if (!Array.isArray(receivedItemIds)) {
+      return res.status(400).json({ error: "receivedItemIds must be an array" });
+    }
+
+    const allItems = await db.select().from(purchaseOrderItems)
+      .where(eq(purchaseOrderItems.purchaseOrderId, String(req.params.id)));
+
+    if (allItems.length === 0) {
+      return res.status(400).json({ error: "No items found for this purchase order" });
+    }
+
+    const validIds = new Set(allItems.map(i => i.id));
+    for (const id of receivedItemIds) {
+      if (!validIds.has(id)) {
+        return res.status(400).json({ error: `Item ${id} not found in this purchase order` });
+      }
+    }
+
+    for (const item of allItems) {
+      const shouldBeReceived = receivedItemIds.includes(item.id);
+      if (item.received !== shouldBeReceived) {
+        await db.update(purchaseOrderItems)
+          .set({ received: shouldBeReceived, updatedAt: new Date() })
+          .where(eq(purchaseOrderItems.id, item.id));
+      }
+    }
+
+    const receivedCount = receivedItemIds.length;
+    const totalCount = allItems.length;
+    let newStatus: string;
+    if (receivedCount === 0) {
+      newStatus = "APPROVED";
+    } else if (receivedCount >= totalCount) {
+      newStatus = "RECEIVED";
+    } else {
+      newStatus = "RECEIVED_IN_PART";
+    }
+
+    await db.update(purchaseOrders)
+      .set({ status: newStatus as any, updatedAt: new Date() })
+      .where(eq(purchaseOrders.id, String(req.params.id)));
+
+    const updated = await storage.getPurchaseOrder(String(req.params.id));
+    res.json(updated);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error receiving purchase order items");
+    res.status(500).json({ error: error.message || "Failed to receive items" });
   }
 });
 
