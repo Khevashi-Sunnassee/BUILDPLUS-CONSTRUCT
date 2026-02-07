@@ -1,11 +1,225 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { eq, inArray, desc, sql } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories } from "@shared/schema";
+import { insertJobSchema, jobs, factories, customers } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import logger from "../lib/logger";
 
 const router = Router();
+
+const OPPORTUNITY_STATUSES = ["OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"] as const;
+
+// GET /api/jobs/opportunities - List all opportunity-phase jobs
+router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
+
+    const result = await db.select({
+      id: jobs.id,
+      jobNumber: jobs.jobNumber,
+      name: jobs.name,
+      client: jobs.client,
+      customerId: jobs.customerId,
+      address: jobs.address,
+      city: jobs.city,
+      state: jobs.state,
+      status: jobs.status,
+      referrer: jobs.referrer,
+      engineerOnJob: jobs.engineerOnJob,
+      estimatedValue: jobs.estimatedValue,
+      numberOfBuildings: jobs.numberOfBuildings,
+      numberOfLevels: jobs.numberOfLevels,
+      opportunityStatus: jobs.opportunityStatus,
+      probability: jobs.probability,
+      estimatedStartDate: jobs.estimatedStartDate,
+      comments: jobs.comments,
+      createdAt: jobs.createdAt,
+      updatedAt: jobs.updatedAt,
+    })
+    .from(jobs)
+    .where(sql`${inArray(jobs.status, [...OPPORTUNITY_STATUSES])} AND ${eq(jobs.companyId, req.companyId)}`)
+    .orderBy(desc(jobs.createdAt));
+
+    const customerIds = [...new Set(result.filter(j => j.customerId).map(j => j.customerId!))];
+    let customerMap = new Map<string, { id: string; name: string }>();
+    if (customerIds.length > 0) {
+      const custRows = await db.select({ id: customers.id, name: customers.name })
+        .from(customers)
+        .where(inArray(customers.id, customerIds));
+      for (const c of custRows) {
+        customerMap.set(c.id, c);
+      }
+    }
+
+    const enriched = result.map(j => ({
+      ...j,
+      customerName: j.customerId ? customerMap.get(j.customerId)?.name || null : null,
+    }));
+
+    res.json(enriched);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching opportunities");
+    res.status(500).json({ error: "Failed to fetch opportunities" });
+  }
+});
+
+// POST /api/jobs/opportunities - Create a new opportunity (lightweight)
+router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
+
+    const opportunitySchema = z.object({
+      name: z.string().min(1, "Project name is required").max(255),
+      customerId: z.string().max(36).optional().nullable(),
+      address: z.string().min(1, "Address is required").max(500),
+      city: z.string().min(1, "City is required").max(100),
+      state: z.enum(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"]).optional().nullable(),
+      referrer: z.string().max(255).optional().nullable(),
+      engineerOnJob: z.string().max(255).optional().nullable(),
+      estimatedValue: z.string().optional().nullable(),
+      numberOfBuildings: z.number().int().min(0).optional().nullable(),
+      numberOfLevels: z.number().int().min(0).optional().nullable(),
+      opportunityStatus: z.enum(["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]).optional().default("NEW"),
+      probability: z.number().int().min(0).max(100).optional().nullable(),
+      estimatedStartDate: z.string().optional().nullable(),
+      comments: z.string().optional().nullable(),
+    });
+
+    const parsed = opportunitySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const maxResult = await db.select({ maxNum: sql<string>`MAX(job_number)` }).from(jobs).where(eq(jobs.companyId, req.companyId));
+    const currentMax = maxResult[0]?.maxNum;
+    let nextNum = "OPP-001";
+    if (currentMax) {
+      const match = currentMax.match(/\d+/);
+      if (match) {
+        const num = parseInt(match[0], 10) + 1;
+        nextNum = `OPP-${String(num).padStart(3, '0')}`;
+      }
+    }
+    const existingOpp = await storage.getJobByNumber(nextNum);
+    if (existingOpp && existingOpp.companyId === req.companyId) {
+      const timestamp = Date.now().toString(36).toUpperCase();
+      nextNum = `OPP-${timestamp}`;
+    }
+
+    if (parsed.data.customerId) {
+      const customer = await storage.getCustomer(parsed.data.customerId);
+      if (!customer || customer.companyId !== req.companyId) {
+        return res.status(400).json({ error: "Customer not found or belongs to another company" });
+      }
+    }
+
+    const data: any = {
+      companyId: req.companyId,
+      jobNumber: nextNum,
+      name: parsed.data.name,
+      status: "OPPORTUNITY" as const,
+      customerId: parsed.data.customerId || null,
+      address: parsed.data.address,
+      city: parsed.data.city,
+      state: parsed.data.state || null,
+      referrer: parsed.data.referrer || null,
+      engineerOnJob: parsed.data.engineerOnJob || null,
+      estimatedValue: parsed.data.estimatedValue || null,
+      numberOfBuildings: parsed.data.numberOfBuildings || null,
+      numberOfLevels: parsed.data.numberOfLevels || null,
+      opportunityStatus: parsed.data.opportunityStatus,
+      probability: parsed.data.probability ?? null,
+      estimatedStartDate: parsed.data.estimatedStartDate ? new Date(parsed.data.estimatedStartDate) : null,
+      comments: parsed.data.comments || null,
+    };
+
+    const job = await storage.createJob(data);
+    res.json(job);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error creating opportunity");
+    res.status(400).json({ error: error.message || "Failed to create opportunity" });
+  }
+});
+
+// PATCH /api/jobs/opportunities/:id - Update opportunity status/details
+router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.id);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Opportunity not found" });
+    }
+
+    const updateSchema = z.object({
+      name: z.string().min(1).max(255).optional(),
+      customerId: z.string().max(36).optional().nullable(),
+      address: z.string().max(500).optional(),
+      city: z.string().max(100).optional(),
+      state: z.enum(["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"]).optional().nullable(),
+      status: z.enum(["OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS", "ACTIVE"]).optional(),
+      referrer: z.string().max(255).optional().nullable(),
+      engineerOnJob: z.string().max(255).optional().nullable(),
+      estimatedValue: z.string().optional().nullable(),
+      numberOfBuildings: z.number().int().min(0).optional().nullable(),
+      numberOfLevels: z.number().int().min(0).optional().nullable(),
+      opportunityStatus: z.enum(["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]).optional(),
+      probability: z.number().int().min(0).max(100).optional().nullable(),
+      estimatedStartDate: z.string().optional().nullable(),
+      comments: z.string().optional().nullable(),
+    });
+
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    if (parsed.data.customerId) {
+      const customer = await storage.getCustomer(parsed.data.customerId);
+      if (!customer || customer.companyId !== req.companyId) {
+        return res.status(400).json({ error: "Customer not found or belongs to another company" });
+      }
+    }
+
+    const updateData: any = { ...parsed.data };
+    if (updateData.estimatedStartDate) {
+      updateData.estimatedStartDate = new Date(updateData.estimatedStartDate);
+    }
+
+    const updated = await storage.updateJob(req.params.id, updateData);
+    res.json(updated);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error updating opportunity");
+    res.status(400).json({ error: error.message || "Failed to update opportunity" });
+  }
+});
+
+// POST /api/customers/quick - Quick customer creation for sales team (any auth user)
+router.post("/api/customers/quick", requireAuth, async (req: Request, res: Response) => {
+  try {
+    if (!req.companyId) {
+      return res.status(403).json({ error: "Company context required" });
+    }
+    const quickCustomerSchema = z.object({
+      name: z.string().min(1, "Company name is required").max(255),
+      contactName: z.string().max(255).optional().nullable(),
+      phone: z.string().max(50).optional().nullable(),
+      email: z.string().email().max(255).optional().nullable(),
+    });
+    const parsed = quickCustomerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const customer = await storage.createCustomer({ ...parsed.data, companyId: req.companyId } as any);
+    res.json(customer);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error creating quick customer");
+    res.status(500).json({ error: error.message || "Failed to create customer" });
+  }
+});
 
 // GET /api/projects - Legacy endpoint for backward compatibility
 router.get("/api/projects", requireAuth, async (req: Request, res: Response) => {
@@ -162,7 +376,7 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       productionDaysInAdvance: z.number().int().min(1).optional().nullable(),
       procurementDaysInAdvance: z.number().int().min(1).optional().nullable(),
       procurementTimeDays: z.number().int().min(1).optional().nullable(),
-      status: z.enum(["ACTIVE", "COMPLETED", "ON_HOLD"]).optional(),
+      status: z.enum(["ACTIVE", "COMPLETED", "ON_HOLD", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"]).optional(),
       factoryId: z.string().max(36).optional().nullable(),
     }).passthrough();
     const parsed = jobCreateSchema.safeParse(body);

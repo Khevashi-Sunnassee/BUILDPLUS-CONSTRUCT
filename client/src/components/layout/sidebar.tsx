@@ -35,6 +35,7 @@ import {
   Handshake,
   Radio,
   Scale,
+  Target,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -82,6 +83,7 @@ const productionNavItems = [
 ];
 
 const adminFinanceNavItems = [
+  { title: "Sales Pipeline", url: "/sales-pipeline", icon: Target },
   { title: "Contract Hub", url: "/contracts", icon: Scale },
   { title: "Progress Claims", url: "/progress-claims", icon: FileText },
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
@@ -144,6 +146,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/manager/review": "daily_reports",
   "/contracts": "contract_hub",
   "/progress-claims": "progress_claims",
+  "/sales-pipeline": "sales_pipeline",
 };
 
 export function AppSidebar() {

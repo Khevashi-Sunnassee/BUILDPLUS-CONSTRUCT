@@ -12,6 +12,7 @@ import {
   Radio,
   ScanLine,
   ListTodo,
+  Target,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -67,6 +68,22 @@ export default function MobileMore() {
               <div className="text-xs text-white/50">Scan panels and document bundles</div>
             </div>
             <ChevronRight className="h-5 w-5 text-blue-400/60" />
+          </button>
+        </Link>
+
+        <Link href="/mobile/opportunities/new">
+          <button
+            className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-green-500/30 bg-green-500/10 px-4 text-left active:scale-[0.99] mb-2"
+            data-testid="menu-new-opportunity"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
+              <Target className="h-6 w-6 text-green-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-base font-semibold text-white">New Opportunity</div>
+              <div className="text-xs text-white/50">Quick entry for field sales</div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-green-400/60" />
           </button>
         </Link>
 

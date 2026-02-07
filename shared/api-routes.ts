@@ -104,6 +104,7 @@ export const PROCUREMENT_ROUTES = {
   // Customers
   CUSTOMERS: '/api/customers',
   CUSTOMERS_ACTIVE: '/api/customers/active',
+  CUSTOMERS_QUICK: '/api/customers/quick',
   CUSTOMER_BY_ID: (id: string | number) => `/api/customers/${id}`,
 
   // Suppliers
@@ -147,6 +148,8 @@ export const JOBS_ROUTES = {
   PANEL_RATES: (id: string | number) => `/api/jobs/${id}/panel-rates`,
   PANEL_RATE_BY_TYPE: (jobId: string | number, panelTypeId: string | number) => `/api/jobs/${jobId}/panel-rates/${panelTypeId}`,
   TOTALS: (id: string | number) => `/api/jobs/${id}/totals`,
+  OPPORTUNITIES: '/api/jobs/opportunities',
+  OPPORTUNITY_BY_ID: (id: string | number) => `/api/jobs/opportunities/${id}`,
 } as const;
 
 export const PANELS_ROUTES = {

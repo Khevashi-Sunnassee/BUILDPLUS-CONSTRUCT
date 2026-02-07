@@ -7,7 +7,8 @@ export const roleEnum = pgEnum("role", ["USER", "MANAGER", "ADMIN"]);
 export const userTypeEnum = pgEnum("user_type", ["EMPLOYEE", "EXTERNAL"]);
 export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
-export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]);
+export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"]);
+export const opportunityStatusEnum = pgEnum("opportunity_status", ["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING"]);
 export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
 export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
@@ -290,6 +291,14 @@ export const jobs = pgTable("jobs", {
   factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   productionSlotColor: text("production_slot_color"),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
+  referrer: text("referrer"),
+  engineerOnJob: text("engineer_on_job"),
+  estimatedValue: decimal("estimated_value", { precision: 12, scale: 2 }),
+  numberOfLevels: integer("number_of_levels"),
+  opportunityStatus: opportunityStatusEnum("opportunity_status"),
+  probability: integer("probability"),
+  estimatedStartDate: timestamp("estimated_start_date"),
+  comments: text("comments"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
