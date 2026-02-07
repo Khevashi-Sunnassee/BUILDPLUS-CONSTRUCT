@@ -141,7 +141,7 @@ export default function MobilePanelDetailPage() {
   const panelId = params?.id;
 
   const { data: panel, isLoading: panelLoading } = useQuery<PanelDetail>({
-    queryKey: [PANELS_ROUTES.DETAILS(panelId!), panelId],
+    queryKey: [PANELS_ROUTES.DETAILS(panelId!)],
     enabled: !!panelId,
   });
 
