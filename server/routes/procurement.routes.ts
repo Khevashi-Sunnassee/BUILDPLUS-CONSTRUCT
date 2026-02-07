@@ -12,12 +12,17 @@ const router = Router();
 
 const supplierSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
-  code: z.string().max(50).optional(),
-  contactName: z.string().max(255).optional().nullable(),
-  email: z.string().email().optional().nullable(),
+  keyContact: z.string().max(255).optional().nullable(),
+  email: z.string().email().optional().nullable().or(z.literal("")),
   phone: z.string().max(50).optional().nullable(),
-  address: z.string().max(500).optional().nullable(),
-  website: z.string().max(255).optional().nullable(),
+  abn: z.string().max(50).optional().nullable(),
+  acn: z.string().max(50).optional().nullable(),
+  addressLine1: z.string().max(255).optional().nullable(),
+  addressLine2: z.string().max(255).optional().nullable(),
+  city: z.string().max(100).optional().nullable(),
+  state: z.string().max(50).optional().nullable(),
+  postcode: z.string().max(20).optional().nullable(),
+  paymentTerms: z.string().max(255).optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
   isActive: z.boolean().optional(),
 });
