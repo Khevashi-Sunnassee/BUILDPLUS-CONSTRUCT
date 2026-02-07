@@ -4,8 +4,8 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
 import { db } from "../db";
-import { panelAuditLogs, panelRegister, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { panelAuditLogs, panelRegister, logRows, timerSessions, loadListPanels, jobs, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { eq, desc, inArray, sql, and } from "drizzle-orm";
 import { z } from "zod";
 
 const router = Router();
@@ -297,6 +297,63 @@ router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: 
     res.json(logs);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to get audit logs" });
+  }
+});
+
+router.post("/api/panels/consolidation-check", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+
+    const { panelIds } = req.body as { panelIds: string[] };
+    if (!panelIds || !Array.isArray(panelIds) || panelIds.length < 2) {
+      return res.status(400).json({ error: "Must provide at least 2 panel IDs" });
+    }
+
+    const panels = await db.select({ panel: panelRegister, job: jobs })
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(and(inArray(panelRegister.id, panelIds), eq(jobs.companyId, companyId)));
+
+    if (panels.length === 0) {
+      return res.status(404).json({ error: "No authorized panels found" });
+    }
+
+    const [draftingCounts, timerCounts, loadListCounts] = await Promise.all([
+      db.select({ panelId: logRows.panelRegisterId, count: sql<number>`count(*)::int` })
+        .from(logRows)
+        .where(inArray(logRows.panelRegisterId, panelIds))
+        .groupBy(logRows.panelRegisterId),
+      db.select({ panelId: timerSessions.panelRegisterId, count: sql<number>`count(*)::int` })
+        .from(timerSessions)
+        .where(inArray(timerSessions.panelRegisterId, panelIds))
+        .groupBy(timerSessions.panelRegisterId),
+      db.select({ panelId: loadListPanels.panelId, count: sql<number>`count(*)::int` })
+        .from(loadListPanels)
+        .where(inArray(loadListPanels.panelId, panelIds))
+        .groupBy(loadListPanels.panelId),
+    ]);
+
+    const draftingMap = new Map(draftingCounts.map(r => [r.panelId, r.count]));
+    const timerMap = new Map(timerCounts.map(r => [r.panelId, r.count]));
+    const loadListMap = new Map(loadListCounts.map(r => [r.panelId, r.count]));
+
+    const results: Record<string, { panelMark: string; draftingLogs: number; timerSessions: number; loadListEntries: number; lifecycleStatus: number }> = {};
+
+    for (const { panel } of panels) {
+      results[panel.id] = {
+        panelMark: panel.panelMark,
+        draftingLogs: draftingMap.get(panel.id) ?? 0,
+        timerSessions: timerMap.get(panel.id) ?? 0,
+        loadListEntries: loadListMap.get(panel.id) ?? 0,
+        lifecycleStatus: panel.lifecycleStatus ?? 0,
+      };
+    }
+
+    res.json(results);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error checking panel consolidation records");
+    res.status(500).json({ error: error.message || "Failed to check panel records" });
   }
 });
 

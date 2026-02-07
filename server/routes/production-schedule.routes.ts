@@ -111,6 +111,7 @@ router.get("/api/production-schedule/ready-panels", requireAuth, requirePermissi
     let filteredPanels = panels.filter(p => 
       (p.documentStatus === "IFC" || p.documentStatus === "APPROVED") &&
       p.approvedForProduction === true &&
+      (p.lifecycleStatus ?? 1) !== 0 &&
       !scheduledPanelIds.has(p.id)
     );
     

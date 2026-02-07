@@ -994,6 +994,8 @@ export default function AdminPanelsPage() {
     newHeight: string;
   } | null>(null);
   const [consolidationDialogOpen, setConsolidationDialogOpen] = useState(false);
+  const [consolidationWarnings, setConsolidationWarnings] = useState<Record<string, { panelMark: string; draftingLogs: number; timerSessions: number; loadListEntries: number; lifecycleStatus: number }> | null>(null);
+  const [consolidationCheckLoading, setConsolidationCheckLoading] = useState(false);
 
   // Build dialog state
   const [buildDialogOpen, setBuildDialogOpen] = useState(false);
@@ -2032,7 +2034,7 @@ export default function AdminPanelsPage() {
     },
   });
 
-  const handleConsolidationProceed = () => {
+  const handleConsolidationProceed = async () => {
     const selectedPanels = (filteredPanels || []).filter(p => selectedConsolidationPanels.has(p.id));
     if (selectedPanels.length < 2) return;
 
@@ -2105,6 +2107,18 @@ export default function AdminPanelsPage() {
       newHeight,
     });
     setConsolidationDialogOpen(true);
+
+    setConsolidationCheckLoading(true);
+    setConsolidationWarnings(null);
+    try {
+      const res = await apiRequest("POST", "/api/panels/consolidation-check", { panelIds: selectedPanels.map(p => p.id) });
+      const data = await res.json();
+      setConsolidationWarnings(data);
+    } catch (err) {
+      console.error("Failed to check consolidation records:", err);
+    } finally {
+      setConsolidationCheckLoading(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -4553,7 +4567,7 @@ export default function AdminPanelsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={consolidationDialogOpen} onOpenChange={(open) => { if (!open) { setConsolidationDialogOpen(false); setConsolidationData(null); } }}>
+      <Dialog open={consolidationDialogOpen} onOpenChange={(open) => { if (!open) { setConsolidationDialogOpen(false); setConsolidationData(null); setConsolidationWarnings(null); } }}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Consolidate Panels</DialogTitle>
@@ -4615,6 +4629,41 @@ export default function AdminPanelsPage() {
                 </div>
               </div>
 
+              {consolidationCheckLoading && (
+                <div className="rounded-md border p-3 bg-muted/20 text-sm text-muted-foreground">
+                  Checking for existing records...
+                </div>
+              )}
+
+              {consolidationWarnings && (() => {
+                const panelsWithRecords = Object.entries(consolidationWarnings).filter(
+                  ([, w]) => w.draftingLogs > 0 || w.timerSessions > 0 || w.loadListEntries > 0
+                );
+                if (panelsWithRecords.length === 0) return null;
+                return (
+                  <div className="rounded-md border border-red-500/50 p-3 bg-red-500/10 text-sm" data-testid="consolidation-warnings">
+                    <p className="font-medium text-red-600 dark:text-red-400">
+                      Warning: The following panels have existing records that will be affected:
+                    </p>
+                    <ul className="mt-2 space-y-1 text-muted-foreground">
+                      {panelsWithRecords.map(([id, w]) => (
+                        <li key={id} className="flex flex-col">
+                          <span className="font-mono font-medium">{w.panelMark}</span>
+                          <span className="pl-4">
+                            {w.draftingLogs > 0 && <span className="mr-3">{w.draftingLogs} drafting log{w.draftingLogs !== 1 ? "s" : ""}</span>}
+                            {w.timerSessions > 0 && <span className="mr-3">{w.timerSessions} timer session{w.timerSessions !== 1 ? "s" : ""}</span>}
+                            {w.loadListEntries > 0 && <span>{w.loadListEntries} load list entr{w.loadListEntries !== 1 ? "ies" : "y"}</span>}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+                      Consumed panels will be retired. Their existing records will remain but the panels will be hidden from selection dropdowns.
+                    </p>
+                  </div>
+                );
+              })()}
+
               <div className="rounded-md border border-amber-500/50 p-3 bg-amber-500/10 text-sm">
                 <p className="font-medium text-amber-600 dark:text-amber-400">
                   The following panels will be retired from the register:
@@ -4643,10 +4692,10 @@ export default function AdminPanelsPage() {
                       newLoadHeight: consolidationData.newHeight,
                     });
                   }}
-                  disabled={consolidateMutation.isPending}
+                  disabled={consolidateMutation.isPending || consolidationCheckLoading}
                   data-testid="button-process-consolidation"
                 >
-                  {consolidateMutation.isPending ? "Processing..." : "Process Consolidation"}
+                  {consolidateMutation.isPending ? "Processing..." : consolidationCheckLoading ? "Checking Records..." : "Process Consolidation"}
                 </Button>
               </div>
             </div>

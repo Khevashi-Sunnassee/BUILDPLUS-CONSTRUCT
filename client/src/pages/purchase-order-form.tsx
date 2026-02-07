@@ -374,13 +374,13 @@ export default function PurchaseOrderFormPage() {
   };
 
   const handleSupplierChange = useCallback((supplierId: string) => {
-    form.setValue("supplierId", supplierId);
+    form.setValue("supplierId", supplierId, { shouldDirty: true });
     const supplier = suppliers.find(s => s.id === supplierId);
     if (supplier) {
-      form.setValue("supplierName", supplier.name || "");
-      form.setValue("supplierContact", supplier.keyContact || "");
-      form.setValue("supplierEmail", supplier.email || "");
-      form.setValue("supplierPhone", supplier.phone || "");
+      form.setValue("supplierName", supplier.name || "", { shouldDirty: true });
+      form.setValue("supplierContact", supplier.keyContact || "", { shouldDirty: true });
+      form.setValue("supplierEmail", supplier.email || "", { shouldDirty: true });
+      form.setValue("supplierPhone", supplier.phone || "", { shouldDirty: true });
       const addressParts = [
         supplier.addressLine1,
         supplier.addressLine2,
@@ -389,7 +389,7 @@ export default function PurchaseOrderFormPage() {
         supplier.postcode,
         supplier.country,
       ].filter(Boolean);
-      form.setValue("supplierAddress", addressParts.join(", "));
+      form.setValue("supplierAddress", addressParts.join(", "), { shouldDirty: true });
     }
   }, [suppliers, form]);
 

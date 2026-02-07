@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, asc, gte, lte, inArray, isNull, notInArray } from "drizzle-orm";
+import { eq, and, desc, sql, asc, gte, lte, inArray, isNull, notInArray, ne } from "drizzle-orm";
 import { db } from "./db";
 export { db };
 import {
@@ -317,8 +317,8 @@ export interface IStorage {
   importJobs(data: InsertJob[]): Promise<{ imported: number; skipped: number }>;
 
   getPanelRegisterItem(id: string): Promise<(PanelRegister & { job: Job }) | undefined>;
-  getPanelsByJob(jobId: string): Promise<PanelRegister[]>;
-  getPanelsByJobAndLevel(jobId: string, level: string): Promise<PanelRegister[]>;
+  getPanelsByJob(jobId: string, includeRetired?: boolean): Promise<PanelRegister[]>;
+  getPanelsByJobAndLevel(jobId: string, level: string, includeRetired?: boolean): Promise<PanelRegister[]>;
   createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister>;
   updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined>;
   deletePanelRegisterItem(id: string): Promise<void>;
@@ -1327,13 +1327,21 @@ export class DatabaseStorage implements IStorage {
     return { ...result[0].panel_register, job: result[0].jobs };
   }
 
-  async getPanelsByJob(jobId: string): Promise<PanelRegister[]> {
-    return db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId)).orderBy(asc(panelRegister.panelMark));
+  async getPanelsByJob(jobId: string, includeRetired: boolean = false): Promise<PanelRegister[]> {
+    const conditions = [eq(panelRegister.jobId, jobId)];
+    if (!includeRetired) {
+      conditions.push(ne(panelRegister.lifecycleStatus, 0));
+    }
+    return db.select().from(panelRegister).where(and(...conditions)).orderBy(asc(panelRegister.panelMark));
   }
 
-  async getPanelsByJobAndLevel(jobId: string, level: string): Promise<PanelRegister[]> {
+  async getPanelsByJobAndLevel(jobId: string, level: string, includeRetired: boolean = false): Promise<PanelRegister[]> {
+    const conditions = [eq(panelRegister.jobId, jobId), eq(panelRegister.level, level)];
+    if (!includeRetired) {
+      conditions.push(ne(panelRegister.lifecycleStatus, 0));
+    }
     return db.select().from(panelRegister)
-      .where(and(eq(panelRegister.jobId, jobId), eq(panelRegister.level, level)))
+      .where(and(...conditions))
       .orderBy(asc(panelRegister.panelMark));
   }
 
@@ -2030,6 +2038,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(panelRegister.approvedForProduction, true),
         eq(panelRegister.status, "COMPLETED"),
+        ne(panelRegister.lifecycleStatus, 0),
         notInArray(panelRegister.id, panelsOnLoadListsSubquery)
       ))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
@@ -2037,22 +2046,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]> {
-    let query = db.select()
-      .from(panelRegister)
-      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .where(eq(panelRegister.approvedForProduction, true));
-    
+    const conditions = [eq(panelRegister.approvedForProduction, true), ne(panelRegister.lifecycleStatus, 0)];
     if (jobId) {
-      query = db.select()
-        .from(panelRegister)
-        .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-        .where(and(
-          eq(panelRegister.approvedForProduction, true),
-          eq(panelRegister.jobId, jobId)
-        ));
+      conditions.push(eq(panelRegister.jobId, jobId));
     }
     
-    const results = await query;
+    const results = await db.select()
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(and(...conditions));
     return results.map(r => ({ ...r.panel_register, job: r.jobs }));
   }
 

@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, sql, like, or, inArray, notInArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, like, or, inArray, notInArray, ne } from "drizzle-orm";
 import { db } from "../db";
 import {
   panelRegister, jobs, panelTypes, jobPanelRates, panelTypeCostComponents, jobCostOverrides, loadListPanels,
@@ -18,13 +18,21 @@ export class PanelRepository {
     return { ...result[0].panel_register, job: result[0].jobs };
   }
 
-  async getPanelsByJob(jobId: string): Promise<PanelRegister[]> {
-    return db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId)).orderBy(asc(panelRegister.panelMark));
+  async getPanelsByJob(jobId: string, includeRetired: boolean = false): Promise<PanelRegister[]> {
+    const conditions = [eq(panelRegister.jobId, jobId)];
+    if (!includeRetired) {
+      conditions.push(ne(panelRegister.lifecycleStatus, 0));
+    }
+    return db.select().from(panelRegister).where(and(...conditions)).orderBy(asc(panelRegister.panelMark));
   }
 
-  async getPanelsByJobAndLevel(jobId: string, level: string): Promise<PanelRegister[]> {
+  async getPanelsByJobAndLevel(jobId: string, level: string, includeRetired: boolean = false): Promise<PanelRegister[]> {
+    const conditions = [eq(panelRegister.jobId, jobId), eq(panelRegister.level, level)];
+    if (!includeRetired) {
+      conditions.push(ne(panelRegister.lifecycleStatus, 0));
+    }
     return db.select().from(panelRegister)
-      .where(and(eq(panelRegister.jobId, jobId), eq(panelRegister.level, level)))
+      .where(and(...conditions))
       .orderBy(asc(panelRegister.panelMark));
   }
 
@@ -215,6 +223,7 @@ export class PanelRepository {
       .where(and(
         eq(panelRegister.approvedForProduction, true),
         eq(panelRegister.status, "COMPLETED"),
+        ne(panelRegister.lifecycleStatus, 0),
         notInArray(panelRegister.id, panelsOnLoadLists)
       ))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
@@ -222,7 +231,7 @@ export class PanelRepository {
   }
 
   async getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]> {
-    const conditions = [eq(panelRegister.approvedForProduction, true)];
+    const conditions = [eq(panelRegister.approvedForProduction, true), ne(panelRegister.lifecycleStatus, 0)];
     if (jobId) conditions.push(eq(panelRegister.jobId, jobId));
     
     const result = await db.select().from(panelRegister)
