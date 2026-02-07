@@ -619,6 +619,50 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
   }
 });
 
+// ============================================================================
+// Visual Diff / Overlay Comparison
+// ============================================================================
+
+const visualDiffSchema = z.object({
+  docId1: z.string().min(1),
+  docId2: z.string().min(1),
+  page: z.number().int().min(0).default(0),
+  dpi: z.number().int().min(72).max(300).default(150),
+  sensitivity: z.number().int().min(1).max(255).default(30),
+  mode: z.enum(["overlay", "side-by-side", "both"]).default("overlay"),
+});
+
+router.post("/api/documents/visual-diff", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const parsed = visualDiffSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid parameters", details: parsed.error.flatten() });
+    }
+
+    const user = (req as any).user;
+    if (!user?.id || !user?.companyId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { generateVisualDiff } = await import("../services/visual-diff.service");
+
+    const result = await generateVisualDiff({
+      ...parsed.data,
+      uploadedBy: user.id,
+      companyId: user.companyId,
+    });
+
+    if (!result.success) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.json(result);
+  } catch (error: any) {
+    logger.error({ err: error }, "Visual diff endpoint error");
+    res.status(500).json({ error: error.message || "Failed to generate visual diff" });
+  }
+});
+
 const sendDocumentsEmailSchema = z.object({
   to: z.string().email("Valid email address is required"),
   cc: z.string().optional(),
