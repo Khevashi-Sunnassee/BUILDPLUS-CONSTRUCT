@@ -26,6 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ReportSummary {
   total: number;
@@ -181,10 +182,13 @@ export default function ChecklistReportsPage() {
     <div className="space-y-6" data-testid="page-checklist-reports">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
             <BarChart3 className="h-6 w-6" />
             Checklist Reports
           </h1>
+            <PageHelpButton pageHelpKey="page.checklist-reports" />
+          </div>
           <p className="text-muted-foreground">
             Analytics and insights for checklist completion
           </p>

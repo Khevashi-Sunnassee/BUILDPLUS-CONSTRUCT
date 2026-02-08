@@ -81,6 +81,7 @@ import {
 } from "@/components/ui/collapsible";
 import type { Item, ItemCategory, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const itemSchema = z.object({
   code: z.string().optional(),
@@ -630,7 +631,10 @@ export default function AdminItemsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-items-title">Item Catalog</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-items-title">Item Catalog</h1>
+            <PageHelpButton pageHelpKey="page.admin.items" />
+          </div>
           <p className="text-muted-foreground">Manage categories and inventory items</p>
         </div>
       </div>

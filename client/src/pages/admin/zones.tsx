@@ -56,6 +56,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Zone } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const zoneSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -180,7 +181,10 @@ export default function AdminZonesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-zones-title">Zone Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-zones-title">Zone Management</h1>
+            <PageHelpButton pageHelpKey="page.admin.zones" />
+          </div>
           <p className="text-muted-foreground">Define and organize zones for your projects</p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-create-zone">

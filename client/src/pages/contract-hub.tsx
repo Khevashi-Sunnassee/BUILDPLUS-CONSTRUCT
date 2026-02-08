@@ -33,6 +33,7 @@ import {
   Loader2,
   Type,
 } from "lucide-react";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ContractHubItem {
   jobId: string;
@@ -336,7 +337,10 @@ export default function ContractHubPage() {
     <div className="space-y-6" data-testid="contract-hub-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Contract Hub</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Contract Hub</h1>
+            <PageHelpButton pageHelpKey="page.contracts" />
+          </div>
           <p className="text-muted-foreground">Manage contracts and legal documentation for all projects</p>
         </div>
         <div className="flex items-center gap-2">

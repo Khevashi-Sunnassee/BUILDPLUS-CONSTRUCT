@@ -42,6 +42,7 @@ import { contractsRouter } from "./contracts.routes";
 import { progressClaimsRouter } from "./progress-claims.routes";
 import { eotClaimsRouter } from "./eot-claims.routes";
 import { assetsRouter } from "./assets.routes";
+import { helpRouter } from "./help.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -147,6 +148,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(eotClaimsRouter);
   
   app.use(assetsRouter);
+  app.use(helpRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

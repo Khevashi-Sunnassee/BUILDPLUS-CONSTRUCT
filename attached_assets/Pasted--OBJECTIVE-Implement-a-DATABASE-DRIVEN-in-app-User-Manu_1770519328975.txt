@@ -1,0 +1,235 @@
+# OBJECTIVE
+Implement a DATABASE-DRIVEN in-app User Manual / Help system for our Next.js (App Router) application.
+We must have:
+1) Micro-help ("?") on every important UI element (fields/buttons/columns)
+2) Page-level help ("ⓘ") on every page in the page header
+3) A Help Center (search + categories + What’s New)
+4) Admin UI to manage help content in the database (CRUD, versioning/audit)
+5) Coding standards + enforcement so new pages/components MUST include help keys and we never need to re-prompt again.
+
+# TECH STACK ASSUMPTIONS
+- Next.js App Router
+- TypeScript
+- Postgres (Neon/Supabase/local) via Prisma
+If we are not using Prisma/Postgres, adapt but keep the same data model and API behavior.
+
+# NON-NEGOTIABLE RULES
+- Help content is NOT hardcoded in pages. Pages reference stable help keys.
+- Every page must define a page help key.
+- Every major control must have a micro-help key (at minimum: form fields, primary actions, table columns).
+- Add a "Docs missing" dev overlay/warnings in development.
+- Add an automated script/check that fails CI/build when new pages or UI controls are missing help keys (strict mode).
+- Create/maintain Replit.md with these standards and required patterns.
+
+# DELIVERABLES
+A) Database schema + migrations
+B) Server APIs for help entries (Next.js route handlers)
+C) Client components: HelpIcon, PageHelpButton, HelpDrawer, HelpProvider, HelpSearch
+D) Help Center page
+E) Admin Docs page with CRUD + audit history
+F) Dev-only missing-help warnings and a check script for CI
+G) Update ALL existing pages to include page help + minimal micro-help keys for primary controls
+H) Add/Update Replit.md (coding standards) so future development always includes help, without re-prompting.
+
+------------------------------------------------------------
+# A) DATABASE SCHEMA (PRISMA)
+1) Add Prisma if not present and ensure DATABASE_URL works.
+2) Create prisma models:
+
+model HelpEntry {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  scope         HelpScope // PAGE | FIELD | ACTION | COLUMN | ERROR | GENERAL
+  title         String
+  shortText     String?   // tooltip
+  bodyMd        String?   // page drawer / full article in Markdown
+  keywords      String[]  @default([])
+  category      String?   // e.g. Tasks, Chat, Jobs, Panels, Logistics, Purchase Orders
+  pageRoute     String?   // optional: "/jobs"
+  roleVisibility String[] @default([]) // empty means all roles
+  status        HelpStatus @default(PUBLISHED) // DRAFT | PUBLISHED | ARCHIVED
+
+  // audit/versioning
+  version       Int      @default(1)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?
+  updatedBy     String?
+
+  // optional: ordering/pinning
+  rank          Int      @default(0)
+}
+
+model HelpEntryVersion {
+  id          String   @id @default(cuid())
+  helpEntryId String
+  key         String
+  version     Int
+  snapshot    Json     // store full snapshot of HelpEntry at the time
+  createdAt   DateTime @default(now())
+  createdBy   String?
+
+  HelpEntry   HelpEntry @relation(fields: [helpEntryId], references: [id], onDelete: Cascade)
+  @@index([helpEntryId])
+  @@index([key])
+}
+
+enum HelpScope {
+  PAGE
+  FIELD
+  ACTION
+  COLUMN
+  ERROR
+  GENERAL
+}
+
+enum HelpStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+3) Generate and run migrations.
+4) Seed initial help entries for ALL existing pages and core modules.
+
+------------------------------------------------------------
+# B) SERVER API (NEXT.JS ROUTE HANDLERS)
+Create route handlers under /app/api/help
+
+1) GET /api/help?key=... -> returns single help entry (published unless admin)
+2) POST /api/help/search -> body: { query, category?, scope?, route? } -> returns ranked results:
+   - match by key/title/keywords/bodyMd
+3) Admin endpoints (protect with existing auth/role checks; if no auth exists, implement minimal admin guard for now):
+   - POST /api/help (create)
+   - PUT /api/help/:id (update; auto-increment version; write HelpEntryVersion snapshot)
+   - DELETE /api/help/:id (soft-archive by setting status=ARCHIVED)
+   - GET /api/help/admin/list (list all, including drafts/archived)
+
+Implementation notes:
+- Use Prisma
+- Ensure key uniqueness
+- Versioning: on update, create a HelpEntryVersion row with a snapshot of the prior state, then update HelpEntry and increment version.
+
+------------------------------------------------------------
+# C) CLIENT HELP SYSTEM (COMPONENTS)
+Create /components/help/*
+
+1) HelpProvider:
+   - client provider that caches help entries in memory (Map by key)
+   - exposes hooks:
+     - useHelp(key) -> fetches from /api/help?key=... and caches
+     - useHelpSearch() -> calls /api/help/search
+   - handles loading/errors
+
+2) HelpIcon (micro-help):
+Props:
+- helpKey: string (required)
+- variant?: "question" | "info" (default question)
+- placement?: "top" | "right" | "bottom" | "left"
+Behavior:
+- Desktop: hover tooltip with shortText (fallback: title)
+- Click/tap: opens popover with shortText + "Learn more" button (if bodyMd exists) opening HelpDrawer for that key.
+- Mobile: tap-only popover.
+
+3) PageHelpButton (page-level help):
+Props:
+- pageHelpKey: string (required)
+Behavior:
+- Renders "ⓘ" icon in header actions area on EVERY page
+- On click opens HelpDrawer preloaded with that pageHelpKey content.
+
+4) HelpDrawer:
+- slide-over drawer/modal
+- shows:
+  - title
+  - bodyMd rendered as Markdown
+  - related links (search results by same category/keywords)
+  - "Report unclear docs" button -> creates a ticket/log entry (create a minimal /api/help/feedback endpoint storing to DB table HelpFeedback)
+
+5) Optional helpers:
+- HelpHeader: small header area component to standardize page headers: <HelpHeader title="Jobs" pageHelpKey="page.jobs" />
+
+------------------------------------------------------------
+# D) HELP CENTER PAGE
+Create /app/help/page.tsx
+Features:
+- Search bar (debounced)
+- Category filters
+- Result list (title + shortText)
+- Clicking result opens HelpDrawer
+- "What’s New" section: list of latest updated help entries (order by updatedAt desc, published only)
+- Add it to main navigation and optionally a top-right global Help icon.
+
+------------------------------------------------------------
+# E) ADMIN DOCS PAGE (CRUD)
+Create /app/admin/help/page.tsx (admin-only)
+Features:
+- Table list: key, title, scope, category, status, updatedAt, version
+- Create/Edit form with fields for all HelpEntry properties
+- Markdown editor textarea for bodyMd
+- Save creates version history
+- View version history per entry (shows snapshots)
+
+------------------------------------------------------------
+# F) ENFORCEMENT: CODING STANDARDS + CHECKS
+1) Replit.md (create/update):
+Add a section: "Documentation & Help Standards"
+Rules:
+- Every page must export const pageHelpKey = "page.<routeName>"
+- Every page header must include <PageHelpButton pageHelpKey={pageHelpKey} />
+- Every primary action must include <HelpIcon helpKey="action...." />
+- Every form field wrapper must include helpKey
+- Every table column must include helpKey
+- New features must add help entries in DB seed OR admin UI before merge.
+
+2) Implement a lightweight static check script:
+- Create /scripts/check-help-keys.ts
+- It scans /app for page.tsx files and verifies each has `export const pageHelpKey =`
+- It scans for usage of <HelpHeader ... pageHelpKey=...> or <PageHelpButton ...>
+- It optionally scans for common UI wrappers (FormField, DataTable column defs) requiring helpKey.
+- On violations, it exits with non-zero code and prints actionable errors.
+
+3) Add package.json scripts:
+- "check:help": "ts-node scripts/check-help-keys.ts"
+- Hook it into "build" or CI pipeline (or pre-commit if present).
+- In dev mode, show a non-blocking overlay listing missing keys on the current page.
+
+------------------------------------------------------------
+# G) UPDATE ALL EXISTING PAGES NOW
+For every existing page in /app:
+- Add `export const pageHelpKey = "page.<name>"`
+- Ensure header includes PageHelpButton or HelpHeader
+- Add micro-help icons to:
+  - primary action buttons
+  - major form fields
+  - table column headers
+Use stable help keys. Example:
+- page.dashboard
+- page.jobs
+- action.jobs.create
+- field.jobs.status
+- column.panels.thicknessMm
+
+After updating code, add seed help entries for each of those keys with at least:
+- title
+- shortText
+- bodyMd for pages (minimum: Purpose + Workflow + Common issues)
+
+------------------------------------------------------------
+# H) FINAL QUALITY BAR
+- No page should render without page-level help icon.
+- Dev mode must clearly indicate missing help keys.
+- Admin can edit docs without redeploy.
+- Search works (by title, keywords, and body).
+- All help content is served from DB (with optional fallback if DB missing).
+- Ensure tooltips/popovers are accessible (keyboard focus, aria-labels).
+- Ensure mobile behavior works (tap).
+
+# START NOW
+1) Inspect current repo structure to confirm Next.js App Router usage.
+2) Implement schema/migrations and seed.
+3) Implement APIs.
+4) Implement UI components.
+5) Update all existing pages.
+6) Add Replit.md and check script + package scripts.
+7) Provide a short README section describing how to add help for a new page/field/action.

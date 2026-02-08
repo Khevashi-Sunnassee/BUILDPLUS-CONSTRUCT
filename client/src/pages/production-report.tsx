@@ -65,6 +65,7 @@ import {
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ProductionReportSummary {
   date: string;
@@ -426,9 +427,12 @@ export default function ProductionReportPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-production-reports-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-production-reports-title">
             Production Schedule
           </h1>
+            <PageHelpButton pageHelpKey="page.production-report" />
+          </div>
           <p className="text-muted-foreground">
             Track production work and costs for panels by date
           </p>

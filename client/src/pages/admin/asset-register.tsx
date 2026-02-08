@@ -72,6 +72,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const formatCurrency = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return "-";
@@ -293,9 +294,12 @@ export default function AssetRegisterPage() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <Package className="h-6 w-6 text-muted-foreground" />
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold" data-testid="text-page-title">
             Asset Register
           </h1>
+            <PageHelpButton pageHelpKey="page.admin.asset-register" />
+          </div>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-add-asset">
           <Plus className="h-4 w-4 mr-2" />

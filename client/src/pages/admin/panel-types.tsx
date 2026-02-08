@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { PanelTypeConfig } from "@shared/schema";
 import { ADMIN_ROUTES, PANEL_TYPES_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const panelTypeSchema = z.object({
   code: z.string().min(1, "Code is required").toUpperCase(),
@@ -432,10 +433,13 @@ export default function AdminPanelTypesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-panel-types-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-panel-types-title">
             <Layers className="h-6 w-6" />
             Panel Types
           </h1>
+            <PageHelpButton pageHelpKey="page.admin.panel-types" />
+          </div>
           <p className="text-muted-foreground mt-1">
             Configure panel types with default rates for labour, supply, and revenue tracking
           </p>

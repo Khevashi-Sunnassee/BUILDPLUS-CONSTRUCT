@@ -52,6 +52,45 @@ This project has CSRF (Cross-Site Request Forgery) protection enabled globally. 
 - `client/src/lib/queryClient.ts` — `getCsrfToken()`, `apiRequest()`, `apiUpload()` with automatic CSRF header injection
 - `server/routes/index.ts` — Global middleware registration (csrf is applied before all routes)
 
+## In-App Help System
+
+The system includes a database-driven help system providing contextual help throughout the application.
+
+**Architecture:**
+- Database tables: `help_entries`, `help_entry_versions`, `help_feedback` (Drizzle ORM)
+- Backend: `server/routes/help.routes.ts` — CRUD, search, feedback endpoints
+- Frontend components: `client/src/components/help/` — HelpProvider, HelpIcon, PageHelpButton, HelpDrawer, HelpHeader
+- Help Center page: `/help` — Search, browse by category, recently updated articles
+- Admin page: `/admin/help` — CRUD management with version history
+- Seed data: `server/seed-help.ts` — Initial page-level help entries
+
+**Help Entry Scopes:** PAGE, FIELD, ACTION, COLUMN, ERROR, GENERAL
+
+**Help Key Conventions:**
+- Page-level: `page.<routeName>` (e.g., `page.dashboard`, `page.admin.users`)
+- Field-level: `field.<page>.<fieldName>` (e.g., `field.jobs.status`)
+- Action-level: `action.<page>.<actionName>` (e.g., `action.jobs.create`)
+- Column-level: `column.<page>.<columnName>` (e.g., `column.panels.thicknessMm`)
+
+**Standards for New Pages/Features:**
+1. Every page MUST include `<PageHelpButton pageHelpKey="page.<routeName>" />` next to its `<h1>` title
+2. Import from `@/components/help/page-help-button`
+3. Major form fields, actions, and table columns SHOULD include `<HelpIcon helpKey="..." />` from `@/components/help/help-icon`
+4. Add corresponding help entries in the database via the Admin Help page (`/admin/help`) or the seed file
+5. Help content is stored in the database, NOT hardcoded — pages only reference help keys
+
+**Key Files:**
+- `shared/schema.ts` — helpEntries, helpEntryVersions, helpFeedback table definitions
+- `server/routes/help.routes.ts` — API endpoints for help system
+- `server/seed-help.ts` — Seed data for initial help entries
+- `client/src/components/help/help-provider.tsx` — Context provider and hooks
+- `client/src/components/help/help-icon.tsx` — Micro-help "?" icon component
+- `client/src/components/help/page-help-button.tsx` — Page-level "i" button
+- `client/src/components/help/help-drawer.tsx` — Slide-over help content drawer
+- `client/src/components/help/help-header.tsx` — Convenience header with built-in help button
+- `client/src/pages/help-center.tsx` — Help Center page
+- `client/src/pages/admin/help.tsx` — Admin help management page
+
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
 - **OpenAI**: AI services for PDF analysis and visual comparison summaries.

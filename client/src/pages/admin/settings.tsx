@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/form";
 import type { GlobalSettings } from "@shared/schema";
 import { ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const settingsSchema = z.object({
   tz: z.string().min(1, "Timezone is required"),
@@ -506,9 +507,12 @@ export default function AdminSettingsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">
           Global Settings
         </h1>
+          <PageHelpButton pageHelpKey="page.admin.settings" />
+        </div>
         <p className="text-muted-foreground">
           Configure system-wide time tracking parameters
         </p>

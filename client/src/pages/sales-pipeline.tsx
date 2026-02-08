@@ -43,6 +43,7 @@ import {
   getStatusLabel,
   type SalesStage,
 } from "@shared/sales-pipeline";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface Opportunity {
   id: string;
@@ -206,7 +207,10 @@ export default function SalesPipelinePage() {
   return (
     <div className="flex-1 overflow-y-auto p-6" data-testid="page-sales-pipeline">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" data-testid="text-page-title">Sales Pipeline</h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold" data-testid="text-page-title">Sales Pipeline</h1>
+          <PageHelpButton pageHelpKey="page.sales-pipeline" />
+        </div>
         <p className="text-muted-foreground mt-1">Manage pre-sales opportunities and track conversions</p>
       </div>
 

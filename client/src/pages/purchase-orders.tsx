@@ -18,6 +18,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -943,7 +944,10 @@ export default function PurchaseOrdersPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
-            <CardTitle data-testid="text-page-title">Purchase Orders</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle data-testid="text-page-title">Purchase Orders</CardTitle>
+              <PageHelpButton pageHelpKey="page.purchase-orders" />
+            </div>
             <CardDescription>Manage and track purchase orders</CardDescription>
           </div>
           <Link href="/purchase-orders/new">

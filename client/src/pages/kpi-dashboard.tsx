@@ -47,6 +47,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import defaultLogo from "@/assets/lte-logo.png";
 import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ProductionDailyData {
   date: string;
@@ -509,10 +510,13 @@ export default function KPIDashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
             <BarChart3 className="h-6 w-6" />
             KPI Dashboard
           </h1>
+            <PageHelpButton pageHelpKey="page.kpi-dashboard" />
+          </div>
           <p className="text-muted-foreground">
             Performance metrics and drafting analytics
           </p>

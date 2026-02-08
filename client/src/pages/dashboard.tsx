@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ChatConversation {
   id: string;
@@ -135,9 +136,12 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-dashboard-title">
           Dashboard
         </h1>
+          <PageHelpButton pageHelpKey="page.dashboard" />
+        </div>
         <p className="text-muted-foreground">
           Welcome back, {user?.name || user?.email?.split("@")[0]}
         </p>

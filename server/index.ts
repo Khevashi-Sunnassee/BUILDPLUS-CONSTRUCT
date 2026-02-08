@@ -8,6 +8,7 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase, ensureSystemChecklistModules } from "./seed";
+import { seedHelpEntries } from "./seed-help";
 import logger from "./lib/logger";
 import { pool } from "./db";
 
@@ -220,6 +221,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 (async () => {
   await seedDatabase();
   await ensureSystemChecklistModules();
+  await seedHelpEntries();
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

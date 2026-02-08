@@ -88,6 +88,10 @@ import MobileQrScanner from "@/pages/mobile/qr-scanner";
 import MobileNewOpportunity from "@/pages/mobile/new-opportunity";
 import MobileJobDetailPage from "@/pages/mobile/job-detail";
 import SalesPipelinePage from "@/pages/sales-pipeline";
+import HelpCenterPage from "@/pages/help-center";
+import AdminHelpPage from "@/pages/admin/help";
+import { HelpProvider } from "@/components/help/help-provider";
+import { HelpDrawer } from "@/components/help/help-drawer";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -616,6 +620,22 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/help">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <HelpCenterPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/help">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminHelpPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       {/* Mobile Routes */}
       <Route path="/mobile">
         <ProtectedRoute>
@@ -739,8 +759,11 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <TooltipProvider>
-            <Router />
-            <Toaster />
+            <HelpProvider>
+              <Router />
+              <HelpDrawer />
+              <Toaster />
+            </HelpProvider>
           </TooltipProvider>
         </AuthProvider>
       </ThemeProvider>

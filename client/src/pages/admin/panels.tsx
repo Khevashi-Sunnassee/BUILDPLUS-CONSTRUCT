@@ -103,6 +103,7 @@ import { PANEL_LIFECYCLE_LABELS, PANEL_LIFECYCLE_COLORS } from "@shared/schema";
 import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES, DOCUMENT_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import defaultLogo from "@/assets/lte-logo.png";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const panelSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
@@ -2233,10 +2234,13 @@ export default function AdminPanelsPage() {
             </Button>
           )}
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-panels-title">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-panels-title">
               Panel Register
               {currentJob && <span className="text-muted-foreground ml-2">- {currentJob.jobNumber}</span>}
             </h1>
+              <PageHelpButton pageHelpKey="page.panels" />
+            </div>
             <p className="text-muted-foreground">
               {filterJobId ? `Panels for ${currentJob?.name || "job"}` : "Manage panel register for all jobs"}
             </p>

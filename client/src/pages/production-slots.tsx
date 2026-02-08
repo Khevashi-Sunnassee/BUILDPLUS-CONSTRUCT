@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, getDay } from "date-fns";
 import jsPDF from "jspdf";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory, CfmeuHoliday } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ProductionSlotWithDetails extends ProductionSlot {
   job: Job;
@@ -1416,7 +1417,10 @@ export default function ProductionSlotsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Production Slots</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Production Slots</h1>
+            <PageHelpButton pageHelpKey="page.production-slots" />
+          </div>
           <p className="text-muted-foreground">Manage and schedule panel production by level</p>
         </div>
         {isManagerOrAdmin && jobsWithoutSlots.length > 0 && (

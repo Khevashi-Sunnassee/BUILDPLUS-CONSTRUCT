@@ -66,6 +66,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "re
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Factory as FactoryType, ProductionBed } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -379,7 +380,10 @@ export default function AdminFactoriesPage() {
         <div className="flex items-center gap-3">
           <Factory className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-semibold">Factory Management</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold">Factory Management</h1>
+              <PageHelpButton pageHelpKey="page.admin.factories" />
+            </div>
             <p className="text-sm text-muted-foreground">Manage production facilities and their beds</p>
           </div>
         </div>

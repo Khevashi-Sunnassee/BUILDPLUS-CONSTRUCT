@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/tabs";
 import type { DocumentTypeConfig, DocumentDiscipline, DocumentCategory, DocumentTypeStatus } from "@shared/schema";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const typeSchema = z.object({
   typeName: z.string().min(1, "Name is required"),
@@ -465,7 +466,10 @@ export default function AdminDocumentConfigPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold" data-testid="text-page-title">Document Configuration</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold" data-testid="text-page-title">Document Configuration</h1>
+            <PageHelpButton pageHelpKey="page.admin.document-config" />
+          </div>
           <p className="text-muted-foreground">
             Manage document types, disciplines, and categories
           </p>

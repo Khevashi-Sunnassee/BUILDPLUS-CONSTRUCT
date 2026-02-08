@@ -91,6 +91,7 @@ import type {
   ChecklistSection,
 } from "@shared/schema";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const TYPE_COLORS: Record<string, { bg: string; border: string; text: string; badge: string; dot: string }> = {
   default: { bg: "bg-slate-500/10", border: "border-slate-500/30", text: "text-slate-400", badge: "bg-slate-500/20 text-slate-300", dot: "bg-slate-400" },
@@ -1033,10 +1034,13 @@ export default function AdminChecklistTemplatesPage() {
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
           <CheckSquare className="h-6 w-6" />
           Checklist Templates
         </h1>
+          <PageHelpButton pageHelpKey="page.admin.checklist-templates" />
+        </div>
         <p className="text-muted-foreground">
           Create and manage dynamic checklist templates for inspections, quality control, and data collection
         </p>

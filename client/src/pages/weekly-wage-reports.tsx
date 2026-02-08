@@ -73,6 +73,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 function CurrencyInput({ 
   value, 
@@ -479,10 +480,13 @@ export default function WeeklyWageReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
             <DollarSign className="h-6 w-6" />
             Weekly Wage Reports
           </h1>
+            <PageHelpButton pageHelpKey="page.weekly-wages" />
+          </div>
           <p className="text-muted-foreground">
             Track weekly payroll costs by category and compare against production-based estimates
           </p>

@@ -63,6 +63,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const supplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -234,7 +235,10 @@ export default function AdminSuppliersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-suppliers-title">Supplier Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-suppliers-title">Supplier Management</h1>
+            <PageHelpButton pageHelpKey="page.admin.suppliers" />
+          </div>
           <p className="text-muted-foreground">Manage suppliers and their contact information</p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-create-supplier">

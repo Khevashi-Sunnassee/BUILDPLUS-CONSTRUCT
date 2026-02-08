@@ -15,6 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { PROGRESS_CLAIMS_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface ProgressClaimListItem {
   id: string;
@@ -143,7 +144,10 @@ export default function ProgressClaimsPage() {
     <div className="p-4 md:p-6 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">Progress Claims</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">Progress Claims</h1>
+            <PageHelpButton pageHelpKey="page.progress-claims" />
+          </div>
           <p className="text-sm text-muted-foreground">Manage progress claims across all jobs</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

@@ -97,6 +97,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 type TaskStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD";
 
@@ -2812,7 +2813,10 @@ export default function TasksPage() {
     <div className="space-y-6" data-testid="tasks-page">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Tasks</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold">Tasks</h1>
+            <PageHelpButton pageHelpKey="page.tasks" />
+          </div>
           <p className="text-muted-foreground">Manage your team's work and track progress</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

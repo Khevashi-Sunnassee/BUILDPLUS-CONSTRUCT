@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Check, ChevronDown, ChevronRight, Search, Plus, ClipboardList, FileCheck, FileClock, FileEdit, Package } from "lucide-react";
 import { format, parseISO, addDays } from "date-fns";
 import type { Job } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface PanelStats {
   draft: number;
@@ -268,7 +269,10 @@ export default function ProductionSchedulePage() {
     <div className="space-y-6" data-testid="page-production-schedule">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Production Schedule</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Production Schedule</h1>
+            <PageHelpButton pageHelpKey="page.production-schedule" />
+          </div>
           <p className="text-muted-foreground">
             Manage panel production scheduling and track progress
           </p>

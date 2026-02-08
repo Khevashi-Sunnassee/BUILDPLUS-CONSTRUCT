@@ -89,6 +89,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import type { Job, PanelRegister, TrailerType, PanelTypeConfig } from "@shared/schema";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface LoadListWithDetails {
   id: string;
@@ -765,10 +766,13 @@ export default function LogisticsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
             <Truck className="h-6 w-6" />
             Logistics
           </h1>
+            <PageHelpButton pageHelpKey="page.logistics" />
+          </div>
           <p className="text-muted-foreground">
             Manage load lists and track deliveries
           </p>

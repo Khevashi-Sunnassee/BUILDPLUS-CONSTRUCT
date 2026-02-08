@@ -51,6 +51,7 @@ import type { ChecklistInstance, ChecklistTemplate, Job } from "@shared/schema";
 import { CHECKLIST_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import { format } from "date-fns";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
   draft: { label: "Draft", variant: "secondary", icon: FileText },
@@ -239,10 +240,13 @@ export default function ChecklistsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-checklists-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-checklists-title">
             <FileText className="h-6 w-6" />
             Checklists
           </h1>
+            <PageHelpButton pageHelpKey="page.checklists" />
+          </div>
           <p className="text-muted-foreground">
             View and fill out checklists based on templates
           </p>

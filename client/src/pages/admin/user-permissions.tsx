@@ -41,6 +41,7 @@ import {
 import type { User, UserPermission, PermissionLevel } from "@shared/schema";
 import { FUNCTION_KEYS } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface UserWithPermissions {
   user: User;
@@ -162,7 +163,10 @@ export default function UserPermissionsPage() {
         <div className="flex items-center gap-3">
           <Shield className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold">User Permissions</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">User Permissions</h1>
+              <PageHelpButton pageHelpKey="page.admin.user-permissions" />
+            </div>
             <p className="text-muted-foreground">Control access to functions for each user</p>
           </div>
         </div>

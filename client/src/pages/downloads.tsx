@@ -23,6 +23,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 export default function DownloadsPage() {
   const { user } = useAuth();
@@ -35,9 +36,12 @@ export default function DownloadsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-downloads-title">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-downloads-title">
           Downloads & Setup
         </h1>
+          <PageHelpButton pageHelpKey="page.downloads" />
+        </div>
         <p className="text-muted-foreground">
           Download and configure the LTE Time Tracking tools for your workstation
         </p>

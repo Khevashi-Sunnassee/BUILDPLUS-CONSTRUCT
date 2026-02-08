@@ -69,6 +69,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Device, User as UserType } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface DeviceWithUser extends Device {
   user: UserType;
@@ -178,9 +179,12 @@ export default function AdminDevicesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-devices-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-devices-title">
             Device Management
           </h1>
+            <PageHelpButton pageHelpKey="page.admin.devices" />
+          </div>
           <p className="text-muted-foreground">
             Provision and manage Windows Agent devices
           </p>

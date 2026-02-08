@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, AlertTriangle, Check, RefreshCw, Pencil, User, ChevronDown, ChevronRight, Briefcase, CalendarDays, Search, Layers, Play, Pause } from "lucide-react";
 import { format, parseISO, differenceInDays, addDays, startOfWeek, endOfWeek } from "date-fns";
 import type { Job, PanelRegister, ProductionSlot, User as UserType, GlobalSettings, DraftingProgram } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface DraftingProgramWithDetails extends DraftingProgram {
   panel: PanelRegister;
@@ -317,7 +318,10 @@ export default function DraftingProgramPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Drafting Program</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold">Drafting Program</h1>
+            <PageHelpButton pageHelpKey="page.drafting-program" />
+          </div>
           <p className="text-muted-foreground">
             Schedule and assign drafting resources to panels. 
             Drawing Due = Production Date - {productionWindowDays} - {ifcDaysInAdvance} days, 

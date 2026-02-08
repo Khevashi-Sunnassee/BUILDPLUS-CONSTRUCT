@@ -71,6 +71,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import type { Job, PanelRegister, WorkType } from "@shared/schema";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface LogRowWithTimes {
   id: string;
@@ -1016,9 +1017,12 @@ export default function ManualEntryPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manual-entry-title">
             Manual Time Entry
           </h1>
+            <PageHelpButton pageHelpKey="page.manual-entry" />
+          </div>
           <p className="text-muted-foreground text-sm">
             Log time manually when the add-in is not available
           </p>

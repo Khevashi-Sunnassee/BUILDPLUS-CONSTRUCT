@@ -44,6 +44,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import type { DailyLog, LogRow, Job, User as UserType } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface SubmittedLog extends DailyLog {
   rows: (LogRow & { job?: Job })[];
@@ -136,9 +137,12 @@ export default function ManagerReviewPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manager-review-title">
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manager-review-title">
           Manager Review
         </h1>
+          <PageHelpButton pageHelpKey="page.manager-review" />
+        </div>
         <p className="text-muted-foreground">
           Review and approve submitted daily logs
         </p>

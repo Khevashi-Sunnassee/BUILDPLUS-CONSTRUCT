@@ -69,6 +69,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { DAILY_LOGS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES, TIMER_ROUTES, USER_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 type GroupBy = "none" | "user" | "date";
 
@@ -513,9 +514,12 @@ export default function DailyReportsPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-daily-reports-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-daily-reports-title">
             Drafting Register
           </h1>
+            <PageHelpButton pageHelpKey="page.daily-reports" />
+          </div>
           <p className="text-muted-foreground">
             Review and manage your drafting time entries
           </p>

@@ -2981,3 +2981,61 @@ export const assetTransfers = pgTable("asset_transfers", {
 export const insertAssetTransferSchema = createInsertSchema(assetTransfers).omit({ id: true, createdAt: true });
 export type InsertAssetTransfer = z.infer<typeof insertAssetTransferSchema>;
 export type AssetTransfer = typeof assetTransfers.$inferSelect;
+
+export const helpScopeEnum = pgEnum("help_scope", ["PAGE", "FIELD", "ACTION", "COLUMN", "ERROR", "GENERAL"]);
+export const helpStatusEnum = pgEnum("help_status", ["DRAFT", "PUBLISHED", "ARCHIVED"]);
+
+export const helpEntries = pgTable("help_entries", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  key: text("key").notNull().unique(),
+  scope: helpScopeEnum("scope").notNull().default("GENERAL"),
+  title: text("title").notNull(),
+  shortText: text("short_text"),
+  bodyMd: text("body_md"),
+  keywords: text("keywords").array().default([]),
+  category: text("category"),
+  pageRoute: text("page_route"),
+  roleVisibility: text("role_visibility").array().default([]),
+  status: helpStatusEnum("status").notNull().default("PUBLISHED"),
+  version: integer("version").notNull().default(1),
+  rank: integer("rank").notNull().default(0),
+  createdBy: text("created_by"),
+  updatedBy: text("updated_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  keyIdx: uniqueIndex("help_key_idx").on(table.key),
+  scopeIdx: index("help_scope_idx").on(table.scope),
+  categoryIdx: index("help_category_idx").on(table.category),
+  routeIdx: index("help_route_idx").on(table.pageRoute),
+}));
+
+export const insertHelpEntrySchema = createInsertSchema(helpEntries).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertHelpEntry = z.infer<typeof insertHelpEntrySchema>;
+export type HelpEntry = typeof helpEntries.$inferSelect;
+
+export const helpEntryVersions = pgTable("help_entry_versions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  helpEntryId: varchar("help_entry_id", { length: 36 }).notNull().references(() => helpEntries.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  version: integer("version").notNull(),
+  snapshot: jsonb("snapshot").notNull(),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  entryIdx: index("help_version_entry_idx").on(table.helpEntryId),
+  keyIdx: index("help_version_key_idx").on(table.key),
+}));
+
+export type HelpEntryVersion = typeof helpEntryVersions.$inferSelect;
+
+export const helpFeedback = pgTable("help_feedback", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  helpEntryId: varchar("help_entry_id", { length: 36 }).references(() => helpEntries.id, { onDelete: "set null" }),
+  helpKey: text("help_key"),
+  userId: text("user_id"),
+  rating: integer("rating"),
+  comment: text("comment"),
+  pageUrl: text("page_url"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

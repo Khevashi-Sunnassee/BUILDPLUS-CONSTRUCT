@@ -72,6 +72,7 @@ import {
 import type { BroadcastTemplate, BroadcastMessage, BroadcastMessageWithDetails, BroadcastDelivery } from "@shared/schema";
 import type { User } from "@shared/schema";
 import { BROADCAST_ROUTES, USER_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 type ChannelStatus = { sms: boolean; whatsapp: boolean; email: boolean };
 type CustomContact = { name: string; phone: string; email: string };
@@ -1217,7 +1218,10 @@ export default function BroadcastPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Broadcast Messaging</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight">Broadcast Messaging</h1>
+            <PageHelpButton pageHelpKey="page.broadcast" />
+          </div>
           <p className="text-muted-foreground text-sm">Send messages to users via SMS, WhatsApp, and Email</p>
         </div>
       </div>

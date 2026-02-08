@@ -57,6 +57,7 @@ import {
   Area,
 } from "recharts";
 import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface SheetData {
   sheetNumber: string;
@@ -362,9 +363,12 @@ export default function ReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-reports-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-reports-title">
             Reports & Analytics
           </h1>
+            <PageHelpButton pageHelpKey="page.reports" />
+          </div>
           <p className="text-muted-foreground">
             Comprehensive time tracking analysis across users, jobs, and sheets
           </p>

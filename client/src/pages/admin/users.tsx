@@ -76,6 +76,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import type { User as UserType, Role, Department } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const createUserSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
@@ -402,9 +403,12 @@ export default function AdminUsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-users-title">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-users-title">
             User Management
           </h1>
+            <PageHelpButton pageHelpKey="page.admin.users" />
+          </div>
           <p className="text-muted-foreground">
             Manage users and their roles
           </p>

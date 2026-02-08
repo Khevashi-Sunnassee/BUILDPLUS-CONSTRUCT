@@ -17,6 +17,7 @@ import { Plus, Send, Check, X, Trash2, Edit, Eye, ChevronDown, ChevronRight, Use
 import { format, parseISO, addDays, getDay } from "date-fns";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { Job, User, WeeklyJobReport, WeeklyJobReportSchedule, ProductionSlot, GlobalSettings, EotClaim } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface WeeklyJobReportWithDetails extends WeeklyJobReport {
   projectManager: User;
@@ -548,7 +549,10 @@ export default function WeeklyJobLogsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">Weekly Job Logs</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold" data-testid="text-page-title">Weekly Job Logs</h1>
+            <PageHelpButton pageHelpKey="page.weekly-job-logs" />
+          </div>
           <p className="text-muted-foreground">Submit weekly progress reports for your assigned jobs</p>
         </div>
         <Button onClick={() => setShowForm(true)} data-testid="button-new-report">

@@ -113,6 +113,7 @@ import type {
   PurchaseOrder,
   Task
 } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const uploadFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -1042,7 +1043,10 @@ export default function DocumentRegister() {
         <div className="flex items-center gap-3">
           <FileText className="h-8 w-8 text-primary" />
           <div>
-            <h1 className="text-2xl font-bold" data-testid="text-page-title">Document Register</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold" data-testid="text-page-title">Document Register</h1>
+              <PageHelpButton pageHelpKey="page.documents" />
+            </div>
             <p className="text-muted-foreground">Manage project documents, versions, and bundles</p>
           </div>
         </div>

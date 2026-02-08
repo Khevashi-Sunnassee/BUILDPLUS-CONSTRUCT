@@ -96,6 +96,7 @@ import {
   getPhaseLabel, getStatusLabel,
 } from "@shared/job-phases";
 import type { JobPhase, JobStatus } from "@shared/job-phases";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -1111,7 +1112,10 @@ export default function AdminJobsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-jobs-title">Jobs</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-jobs-title">Jobs</h1>
+            <PageHelpButton pageHelpKey="page.jobs" />
+          </div>
           <p className="text-muted-foreground">Manage job list for panel tracking</p>
         </div>
         <div className="flex items-center gap-2">

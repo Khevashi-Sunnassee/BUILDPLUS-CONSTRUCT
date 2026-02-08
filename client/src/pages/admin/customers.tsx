@@ -64,6 +64,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Customer } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -251,7 +252,10 @@ export default function AdminCustomersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-customers-title">Customer Management</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-customers-title">Customer Management</h1>
+            <PageHelpButton pageHelpKey="page.admin.customers" />
+          </div>
           <p className="text-muted-foreground">Manage customers and their contact information</p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-create-customer">
