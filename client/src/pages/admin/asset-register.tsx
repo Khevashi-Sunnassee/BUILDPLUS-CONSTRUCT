@@ -325,7 +325,7 @@ export default function AssetRegisterPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [groupByCategory, setGroupByCategory] = useState(false);
+  const [groupByCategory, setGroupByCategory] = useState(true);
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
@@ -611,14 +611,14 @@ export default function AssetRegisterPage() {
       onClick={() => openEditDialog(asset)}
       data-testid={`row-asset-${asset.id}`}
     >
+      <TableCell className="text-sm" data-testid={`text-asset-category-${asset.id}`}>
+        {asset.category || "-"}
+      </TableCell>
       <TableCell className="font-mono text-xs" data-testid={`text-asset-tag-${asset.id}`}>
         {asset.assetTag}
       </TableCell>
       <TableCell className="font-medium max-w-[240px] truncate" data-testid={`text-asset-name-${asset.id}`}>
         {asset.name}
-      </TableCell>
-      <TableCell className="text-sm" data-testid={`text-asset-category-${asset.id}`}>
-        {asset.category || "-"}
       </TableCell>
       <TableCell>
         <StatusBadge status={asset.status} />
@@ -670,11 +670,11 @@ export default function AssetRegisterPage() {
 
   const tableHeaders = (
     <TableRow>
+      <TableHead>Category</TableHead>
       <TableHead className="w-[90px]">Tag</TableHead>
       <TableHead>
         <SortableHeader label="Name" field="name" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
       </TableHead>
-      <TableHead>Category</TableHead>
       <TableHead>Status</TableHead>
       <TableHead>
         <SortableHeader label="Purchase Date" field="purchaseDate" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />

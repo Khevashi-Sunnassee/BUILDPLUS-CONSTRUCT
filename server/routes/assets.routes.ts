@@ -184,20 +184,85 @@ TEMPLATE_COLUMNS.forEach(c => { HEADER_TO_KEY[c.header.toLowerCase().trim()] = c
 
 const SPREADSHEET_ALIASES: Record<string, string> = {
   "item": "_skip",
+  "no": "_skip",
+  "no.": "_skip",
+  "#": "_skip",
   "asset name": "name",
+  "asset description": "name",
   "asset no.": "registrationNumber",
+  "asset no": "registrationNumber",
+  "asset number": "registrationNumber",
+  "reg no": "registrationNumber",
+  "reg no.": "registrationNumber",
+  "registration no": "registrationNumber",
+  "registration no.": "registrationNumber",
   "acquisition date": "purchaseDate",
+  "date acquired": "purchaseDate",
+  "date of acquisition": "purchaseDate",
+  "date of purchase": "purchaseDate",
+  "date purchased": "purchaseDate",
+  "purchase date": "purchaseDate",
+  "acquired date": "purchaseDate",
   "acquisition cost": "purchasePrice",
+  "cost": "purchasePrice",
+  "cost price": "purchasePrice",
+  "purchase cost": "purchasePrice",
+  "original cost": "purchasePrice",
+  "price": "purchasePrice",
+  "useful life": "usefulLifeYears",
   "useful life (years)": "usefulLifeYears",
+  "useful life (yrs)": "usefulLifeYears",
+  "useful life yrs": "usefulLifeYears",
+  "expected life": "usefulLifeYears",
+  "life (years)": "usefulLifeYears",
   "salvage value": "_skip",
   "acc depreciation": "accumulatedDepreciation",
+  "accumulated depreciation": "accumulatedDepreciation",
+  "accum depreciation": "accumulatedDepreciation",
+  "total depreciation": "accumulatedDepreciation",
   "depreciation this period (initial)": "depreciationThisPeriod",
+  "depreciation this period": "depreciationThisPeriod",
+  "period depreciation": "depreciationThisPeriod",
   "no of years depreciation": "yearsDepreciated",
+  "no. of years depreciation": "yearsDepreciated",
+  "years depreciated": "yearsDepreciated",
   "serial no.": "serialNumber",
+  "serial no": "serialNumber",
+  "serial": "serialNumber",
+  "s/n": "serialNumber",
   "description": "category",
+  "type": "category",
+  "asset type": "category",
+  "asset category": "category",
+  "class": "category",
+  "asset class": "category",
   "quantity": "quantity",
+  "qty": "quantity",
   "book value": "bookValue",
+  "net book value": "bookValue",
+  "nbv": "bookValue",
+  "written down value": "bookValue",
+  "wdv": "bookValue",
+  "current value": "currentValue",
+  "market value": "currentValue",
   "remarks": "remarks",
+  "notes": "remarks",
+  "comment": "remarks",
+  "comments": "remarks",
+  "supplier": "supplier",
+  "vendor": "supplier",
+  "make": "manufacturer",
+  "brand": "manufacturer",
+  "dept": "department",
+  "site": "location",
+  "assigned": "assignedTo",
+  "user": "assignedTo",
+  "operator": "assignedTo",
+  "depreciation rate": "depreciationRate",
+  "dep rate": "depreciationRate",
+  "dep rate (%)": "depreciationRate",
+  "depreciation method": "depreciationMethod",
+  "dep method": "depreciationMethod",
 };
 
 function mapCategoryFromSpreadsheet(desc: string | null): string {
@@ -270,7 +335,18 @@ function parseExcelDate(value: any): string | null {
   if (value instanceof Date) {
     return value.toISOString().split("T")[0];
   }
+  if (typeof value === "number" && value > 1 && value < 200000) {
+    const epoch = new Date(Date.UTC(1899, 11, 30));
+    epoch.setUTCDate(epoch.getUTCDate() + value);
+    return epoch.toISOString().split("T")[0];
+  }
   const str = String(value).trim();
+  const ddmmyyyy = str.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (ddmmyyyy) {
+    const [, d, m, y] = ddmmyyyy;
+    const dateObj = new Date(parseInt(y), parseInt(m) - 1, parseInt(d));
+    if (!isNaN(dateObj.getTime())) return dateObj.toISOString().split("T")[0];
+  }
   const dateObj = new Date(str);
   if (!isNaN(dateObj.getTime())) {
     return dateObj.toISOString().split("T")[0];
@@ -596,12 +672,24 @@ router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response)
       location: assets.location,
       department: assets.department,
       fundingMethod: assets.fundingMethod,
+      purchaseDate: assets.purchaseDate,
       purchasePrice: assets.purchasePrice,
       currentValue: assets.currentValue,
+      usefulLifeYears: assets.usefulLifeYears,
+      accumulatedDepreciation: assets.accumulatedDepreciation,
+      depreciationThisPeriod: assets.depreciationThisPeriod,
+      bookValue: assets.bookValue,
+      yearsDepreciated: assets.yearsDepreciated,
+      depreciationRate: assets.depreciationRate,
+      depreciationMethod: assets.depreciationMethod,
       manufacturer: assets.manufacturer,
       model: assets.model,
       serialNumber: assets.serialNumber,
+      registrationNumber: assets.registrationNumber,
       assignedTo: assets.assignedTo,
+      supplier: assets.supplier,
+      quantity: assets.quantity,
+      remarks: assets.remarks,
       createdAt: assets.createdAt,
     }).from(assets)
       .where(eq(assets.companyId, companyId))
