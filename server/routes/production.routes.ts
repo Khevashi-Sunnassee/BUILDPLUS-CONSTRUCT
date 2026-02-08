@@ -138,7 +138,7 @@ router.get("/api/production-reports", requireAuth, async (req: Request, res: Res
   
   for (const entry of entries) {
     const date = entry.productionDate;
-    const factory = (entry as any).factory || "QLD";
+    const factory = (entry as Record<string, unknown>).factory as string || "QLD";
     const key = `${date}-${factory}`;
     
     if (!reportsByKey.has(key)) {
@@ -162,7 +162,7 @@ router.get("/api/production-reports", requireAuth, async (req: Request, res: Res
     report.totalAreaM2 += parseFloat(entry.areaM2 || "0");
     report.jobIds.add(entry.jobId);
     
-    const status = (entry as any).status || "PENDING";
+    const status = (entry as Record<string, unknown>).status as string || "PENDING";
     if (status === "COMPLETED") {
       report.completedCount++;
     } else {

@@ -6,6 +6,7 @@ import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHist
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
+import type { SalesStage } from "@shared/sales-pipeline";
 import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceToPhase, getDefaultStatusForPhase, intToPhase, phaseToInt } from "@shared/job-phases";
 import type { JobPhase, JobStatus } from "@shared/job-phases";
 import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
@@ -158,9 +159,9 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
     }
 
     const stage = parsed.data.salesStage || "OPPORTUNITY";
-    const status = parsed.data.salesStatus || getDefaultStatus(stage as any);
+    const status = parsed.data.salesStatus || getDefaultStatus(stage as SalesStage);
 
-    if (status && !isValidStatusForStage(stage as any, status)) {
+    if (status && !isValidStatusForStage(stage as SalesStage, status)) {
       return res.status(400).json({ error: `Status "${status}" is not valid for stage "${stage}"` });
     }
 
@@ -261,12 +262,12 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
     }
 
     if (updateData.salesStage && !updateData.salesStatus) {
-      updateData.salesStatus = getDefaultStatus(updateData.salesStage as any);
+      updateData.salesStatus = getDefaultStatus(updateData.salesStage as SalesStage);
     }
 
     const effectiveStage = updateData.salesStage || job.salesStage || "OPPORTUNITY";
     const effectiveStatus = updateData.salesStatus || job.salesStatus;
-    if (effectiveStatus && !isValidStatusForStage(effectiveStage as any, effectiveStatus)) {
+    if (effectiveStatus && !isValidStatusForStage(effectiveStage as SalesStage, effectiveStatus)) {
       return res.status(400).json({ error: `Status "${effectiveStatus}" is not valid for stage "${effectiveStage}"` });
     }
 
@@ -664,7 +665,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       }
       data.procurementTimeDays = val;
     }
-    const existingPhaseStr = intToPhase((existingJob as any).jobPhase ?? 0);
+    const existingPhaseStr = intToPhase(existingJob.jobPhase ?? 0);
     if (data.jobPhase || data.status) {
       const targetPhase = (data.jobPhase || existingPhaseStr || "CONTRACTED") as JobPhase;
       const targetStatus = (data.status || existingJob.status) as JobStatus;
@@ -686,8 +687,8 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
 
     const changedFields: Record<string, any> = {};
     for (const [key, val] of Object.entries(data)) {
-      if ((existingJob as any)[key] !== val) {
-        changedFields[key] = { from: (existingJob as any)[key], to: val };
+      if ((existingJob as Record<string, unknown>)[key] !== val) {
+        changedFields[key] = { from: (existingJob as Record<string, unknown>)[key], to: val };
       }
     }
 
@@ -854,7 +855,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
     }
 
     const schema = z.object({
-      jobPhase: z.enum(JOB_PHASES as any).optional(),
+      jobPhase: z.enum(JOB_PHASES as unknown as [string, ...string[]]).optional(),
       status: z.string().optional(),
     });
 
@@ -864,7 +865,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
     }
 
     const { jobPhase: newPhase, status: newStatus } = parsed.data;
-    const currentPhase = intToPhase((job as any).jobPhase ?? 0);
+    const currentPhase = intToPhase(job.jobPhase ?? 0);
     const currentStatus = job.status;
 
     if (newPhase && newPhase !== currentPhase) {
@@ -915,7 +916,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
       }
 
       await db.update(jobs)
-        .set({ status: newStatus as any, updatedAt: new Date() })
+        .set({ status: newStatus as typeof jobs.status.enumValues[number], updatedAt: new Date() })
         .where(eq(jobs.id, job.id));
 
       const statusUserName = await resolveUserName(req);

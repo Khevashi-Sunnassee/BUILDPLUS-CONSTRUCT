@@ -177,7 +177,7 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
       helpEntryId: existing.id,
       key: existing.key,
       version: existing.version,
-      snapshot: existing as any,
+      snapshot: existing as Record<string, unknown>,
       createdBy: req.session.userId || null,
     });
 

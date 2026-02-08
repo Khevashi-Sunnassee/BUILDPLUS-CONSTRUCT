@@ -120,7 +120,7 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
         AND deleted_at IS NULL
       ORDER BY conversation_id, created_at DESC
     `);
-    const lastMsgMap = new Map((lastMessages.rows as any[]).map(m => [m.conversation_id, m]));
+    const lastMsgMap = new Map((lastMessages.rows as Record<string, unknown>[]).map(m => [m.conversation_id, m]));
 
     // Batch fetch unread counts per conversation in a single query
     const membershipMap = new Map(memberships.map(m => [m.conversationId, m.lastReadAt ?? new Date(0)]));

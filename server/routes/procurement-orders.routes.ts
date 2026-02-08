@@ -297,7 +297,7 @@ router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) =>
     }
 
     await db.update(purchaseOrders)
-      .set({ status: newStatus as any, updatedAt: new Date() })
+      .set({ status: newStatus as typeof purchaseOrders.status.enumValues[number], updatedAt: new Date() })
       .where(eq(purchaseOrders.id, String(req.params.id)));
 
     const updated = await storage.getPurchaseOrder(String(req.params.id));
@@ -349,7 +349,7 @@ router.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res)
 
 router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("files", 10), async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const userId = req.session.userId;
     const files = req.files as Express.Multer.File[];
     if (!files || files.length === 0) {
       return res.status(400).json({ error: "No files uploaded" });
@@ -413,7 +413,7 @@ router.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => 
 
 router.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
   try {
-    const userId = (req.session as any).userId;
+    const userId = req.session.userId;
     const user = await storage.getUser(userId);
     const attachment = await storage.getPurchaseOrderAttachment(String(req.params.id));
     if (!attachment) return res.status(404).json({ error: "Attachment not found" });

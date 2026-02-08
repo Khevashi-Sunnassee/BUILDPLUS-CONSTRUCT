@@ -259,7 +259,7 @@ export class TaskRepository {
         await db.insert(taskNotifications).values({
           userId: assignee.userId,
           taskId,
-          type: type as any,
+          type: type as typeof taskNotifications.type.enumValues[number],
           title,
           body,
           taskUpdateId: updateId

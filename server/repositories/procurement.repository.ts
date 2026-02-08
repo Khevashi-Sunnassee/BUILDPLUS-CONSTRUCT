@@ -137,7 +137,7 @@ export class ProcurementRepository {
   }
 
   async getPurchaseOrdersByStatus(status: string): Promise<PurchaseOrderWithDetails[]> {
-    const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.status, status as any)).orderBy(desc(purchaseOrders.createdAt));
+    const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.status, status as typeof purchaseOrders.status.enumValues[number])).orderBy(desc(purchaseOrders.createdAt));
     return this.enrichPurchaseOrders(orders);
   }
 

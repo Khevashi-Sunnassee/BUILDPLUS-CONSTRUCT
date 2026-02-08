@@ -174,7 +174,7 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const { version: clientVersion, ...rest } = parsed.data as any;
+    const { version: clientVersion, ...rest } = parsed.data as Record<string, unknown>;
     const updateData = { ...rest, updatedAt: new Date(), version: sql`${contracts.version} + 1` };
 
     const updated = await db.transaction(async (tx) => {

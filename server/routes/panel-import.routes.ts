@@ -498,7 +498,7 @@ router.post("/api/jobs/:jobId/import-estimate",
         const sheet = workbook.getWorksheet(sheetName)!;
         const data: any[][] = [];
         sheet.eachRow({ includeEmpty: true }, (row, _rowNumber) => {
-          const rowValues = row.values as any[];
+          const rowValues = row.values as unknown[];
           data.push(rowValues.slice(1));
         });
         

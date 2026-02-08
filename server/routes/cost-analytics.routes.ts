@@ -256,7 +256,7 @@ router.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => 
     profit: Math.round(result.reduce((s, d) => s + d.profit, 0) * 100) / 100,
     entryCount: result.reduce((s, d) => s + d.entryCount, 0),
     byComponent: componentNames.reduce((acc, name) => {
-      acc[name] = Math.round(result.reduce((s, d) => s + ((d as any)[name] || 0), 0) * 100) / 100;
+      acc[name] = Math.round(result.reduce((s, d) => s + ((d as Record<string, number>)[name] || 0), 0) * 100) / 100;
       return acc;
     }, {} as Record<string, number>),
   };

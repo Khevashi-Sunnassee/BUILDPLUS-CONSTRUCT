@@ -5,6 +5,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import { emailService } from "../services/email.service";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS, insertTrailerTypeSchema, insertZoneSchema, insertLoadListSchema, insertDeliveryRecordSchema } from "@shared/schema";
+import type { JobPhase } from "@shared/job-phases";
 
 const router = Router();
 
@@ -168,8 +169,8 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
       const job = await storage.getJob(loadListForPhaseCheck.jobId);
       if (job) {
         const { intToPhase } = await import("@shared/job-phases");
-        const phase = (typeof (job as any).jobPhase === 'number' ? intToPhase((job as any).jobPhase) : ((job as any).jobPhase || "CONTRACTED")) as string;
-        if (!jobHasCapability(phase as any, "DELIVER_PANELS")) {
+        const phase = (typeof job.jobPhase === 'number' ? intToPhase(job.jobPhase) : (job.jobPhase || "CONTRACTED")) as string;
+        if (!jobHasCapability(phase as JobPhase, "DELIVER_PANELS")) {
           return res.status(403).json({ error: `Cannot record deliveries while job is in "${phase}" phase` });
         }
       }

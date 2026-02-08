@@ -71,7 +71,7 @@ import {
 } from "./types";
 import { PanelEditDialog } from "./PanelEditDialog";
 import { PanelBuildDialog } from "./PanelBuildDialog";
-import { ImportDialog, DeleteDialog, DeleteSourceDialog, TemplateDownloadDialog, QrCodeDialog, ConsolidationDialog } from "./PanelDialogs";
+import { ImportDialog, DeleteDialog, DeleteSourceDialog, TemplateDialog, QrCodeDialog, ConsolidationDialog } from "./PanelDialogs";
 import { PanelTableRow } from "./PanelTableRow";
 
 export default function AdminPanelsPage() {
@@ -973,7 +973,7 @@ export default function AdminPanelsPage() {
     const panelsSheet = wb.addWorksheet("Panels");
     const panelHeaders = Object.keys(template[0]);
     panelsSheet.addRow(panelHeaders);
-    template.forEach(row => panelsSheet.addRow(panelHeaders.map(h => (row as any)[h])));
+    template.forEach(row => panelsSheet.addRow(panelHeaders.map(h => row[h as keyof typeof row])));
     const panelTypesData = panelTypes.map(pt => ({
       "Panel Type": pt.name,
       "Code": pt.code,
@@ -985,7 +985,7 @@ export default function AdminPanelsPage() {
     const panelTypesSheet = wb.addWorksheet("Panel Types Reference");
     const ptHeaders = Object.keys(panelTypesData[0]);
     panelTypesSheet.addRow(ptHeaders);
-    panelTypesData.forEach(row => panelTypesSheet.addRow(ptHeaders.map(h => (row as any)[h])));
+    panelTypesData.forEach(row => panelTypesSheet.addRow(ptHeaders.map(h => row[h as keyof typeof row])));
     const jobsData = jobs.map(j => ({
       "Job Number": j.jobNumber,
       "Job Name": j.name,
@@ -996,7 +996,7 @@ export default function AdminPanelsPage() {
     const jobsSheet = wb.addWorksheet("Jobs Reference");
     const jobHeaders = Object.keys(jobsData[0]);
     jobsSheet.addRow(jobHeaders);
-    jobsData.forEach(row => jobsSheet.addRow(jobHeaders.map(h => (row as any)[h])));
+    jobsData.forEach(row => jobsSheet.addRow(jobHeaders.map(h => row[h as keyof typeof row])));
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
@@ -1531,7 +1531,7 @@ export default function AdminPanelsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Jobs</SelectItem>
-                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map(job => (
+                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map(job => (
                         <SelectItem key={job.id} value={job.id}>
                           {job.jobNumber} - {job.name}
                         </SelectItem>
@@ -1966,7 +1966,7 @@ export default function AdminPanelsPage() {
         onCancel={() => setSourceToDelete(null)}
       />
 
-      <TemplateDownloadDialog
+      <TemplateDialog
         open={templateDialogOpen}
         onOpenChange={setTemplateDialogOpen}
         jobs={jobs}

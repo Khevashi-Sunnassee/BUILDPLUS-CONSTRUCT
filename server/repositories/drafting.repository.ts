@@ -18,7 +18,7 @@ export class DraftingRepository {
     const conditions: any[] = [];
     
     if (filters?.jobId) conditions.push(eq(draftingProgram.jobId, filters.jobId));
-    if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as any));
+    if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as typeof draftingProgram.status.enumValues[number]));
     if (filters?.assignedToId) conditions.push(eq(draftingProgram.assignedToId, filters.assignedToId));
     if (filters?.dateFrom) conditions.push(gte(draftingProgram.drawingDueDate, filters.dateFrom));
     if (filters?.dateTo) conditions.push(lte(draftingProgram.drawingDueDate, filters.dateTo));

@@ -153,7 +153,7 @@ export function PanelEditDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
+                          {jobs?.filter(j => isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((job) => (
                             <SelectItem key={job.id} value={job.id}>
                               {job.jobNumber} - {job.name}
                             </SelectItem>

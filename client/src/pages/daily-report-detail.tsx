@@ -576,7 +576,7 @@ export default function DailyReportDetailPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((j) => (
+                            {jobs?.filter(j => isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((j) => (
                               <SelectItem key={j.id} value={j.id}>
                                 {j.code || j.name}
                               </SelectItem>

@@ -298,7 +298,7 @@ export default function ContractDetailPage() {
 
     Object.entries(fields).forEach(([key, value]) => {
       if (value !== null && value !== undefined && value !== "") {
-        (updates as any)[key] = value;
+        (updates as Record<string, unknown>)[key] = value;
       }
     });
 
@@ -349,7 +349,7 @@ export default function ContractDetailPage() {
   }
 
   const riskRating = currentData.riskRating;
-  const riskHighlights = currentData.riskHighlights as any[] || [];
+  const riskHighlights = (currentData.riskHighlights || []) as Array<{ title: string; description: string; severity: string }>;
 
   return (
     <div className="space-y-6" data-testid="contract-detail-page">

@@ -339,17 +339,17 @@ export function TaskRow({
   };
 
   const handlePriorityChange = (priority: string) => {
-    updateTaskMutation.mutate({ priority: priority === "none" ? null : priority } as any);
+    updateTaskMutation.mutate({ priority: priority === "none" ? null : priority });
   };
 
   const handleDateChange = (date: Date | undefined) => {
     const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
-    updateTaskMutation.mutate({ dueDate: isoDate } as any);
+    updateTaskMutation.mutate({ dueDate: isoDate });
   };
 
   const handleReminderChange = (date: Date | undefined) => {
     const isoDate = date instanceof Date && !isNaN(date.getTime()) ? date.toISOString() : null;
-    updateTaskMutation.mutate({ reminderDate: isoDate } as any);
+    updateTaskMutation.mutate({ reminderDate: isoDate });
   };
 
   const handleStageChange = (stage: string) => {
@@ -362,7 +362,7 @@ export function TaskRow({
       jobId: jobId === "none" ? null : jobId,
       job: selectedJob || null 
     };
-    updateTaskMutation.mutate(updateData as any);
+    updateTaskMutation.mutate(updateData);
   };
 
   const handleToggleAssignee = (userId: string) => {
@@ -375,7 +375,7 @@ export function TaskRow({
 
   const hasSubtasks = task.subtasks && task.subtasks.length > 0;
 
-  const jobColor = (task.job as any)?.productionSlotColor || null;
+  const jobColor = task.job?.productionSlotColor || null;
 
   return (
     <>

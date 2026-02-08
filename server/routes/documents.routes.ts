@@ -710,7 +710,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
         attachments.push({
           filename: doc.originalName,
           content: Buffer.concat(chunks),
-          contentType: (metadata as any).contentType || "application/octet-stream",
+          contentType: (metadata as Record<string, string>).contentType || "application/octet-stream",
         });
       } catch (err) {
         logger.warn({ docId, err }, "Failed to load document for email attachment, skipping");

@@ -46,7 +46,7 @@ export class ReportsRepository {
 
   async getDailyLogsByUser(userId: string, filters?: { status?: string; dateRange?: string }): Promise<DailyLog[]> {
     const conditions = [eq(dailyLogs.userId, userId)];
-    if (filters?.status) conditions.push(eq(dailyLogs.status, filters.status as any));
+    if (filters?.status) conditions.push(eq(dailyLogs.status, filters.status as typeof dailyLogs.status.enumValues[number]));
     
     return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
   }

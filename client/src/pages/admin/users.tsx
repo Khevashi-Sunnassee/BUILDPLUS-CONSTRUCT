@@ -284,20 +284,20 @@ export default function AdminUsersPage() {
   const openWorkHoursDialog = (user: UserType) => {
     setWorkHoursUser(user);
     workHoursForm.reset({
-      mondayStartTime: (user as any).mondayStartTime || "08:00",
-      mondayHours: (user as any).mondayHours || "8",
-      tuesdayStartTime: (user as any).tuesdayStartTime || "08:00",
-      tuesdayHours: (user as any).tuesdayHours || "8",
-      wednesdayStartTime: (user as any).wednesdayStartTime || "08:00",
-      wednesdayHours: (user as any).wednesdayHours || "8",
-      thursdayStartTime: (user as any).thursdayStartTime || "08:00",
-      thursdayHours: (user as any).thursdayHours || "8",
-      fridayStartTime: (user as any).fridayStartTime || "08:00",
-      fridayHours: (user as any).fridayHours || "8",
-      saturdayStartTime: (user as any).saturdayStartTime || "08:00",
-      saturdayHours: (user as any).saturdayHours || "0",
-      sundayStartTime: (user as any).sundayStartTime || "08:00",
-      sundayHours: (user as any).sundayHours || "0",
+      mondayStartTime: user.mondayStartTime || "08:00",
+      mondayHours: user.mondayHours || "8",
+      tuesdayStartTime: user.tuesdayStartTime || "08:00",
+      tuesdayHours: user.tuesdayHours || "8",
+      wednesdayStartTime: user.wednesdayStartTime || "08:00",
+      wednesdayHours: user.wednesdayHours || "8",
+      thursdayStartTime: user.thursdayStartTime || "08:00",
+      thursdayHours: user.thursdayHours || "8",
+      fridayStartTime: user.fridayStartTime || "08:00",
+      fridayHours: user.fridayHours || "8",
+      saturdayStartTime: user.saturdayStartTime || "08:00",
+      saturdayHours: user.saturdayHours || "0",
+      sundayStartTime: user.sundayStartTime || "08:00",
+      sundayHours: user.sundayHours || "0",
     });
     setWorkHoursDialogOpen(true);
   };
@@ -321,7 +321,7 @@ export default function AdminUsersPage() {
       departmentId: user.departmentId || null,
       poApprover: user.poApprover || false,
       poApprovalLimit: user.poApprovalLimit || "",
-      defaultFactoryId: (user as any).defaultFactoryId || null,
+      defaultFactoryId: user.defaultFactoryId || null,
     });
     setDialogOpen(true);
   };

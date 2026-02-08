@@ -1089,7 +1089,7 @@ export default function ManualEntryPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No job selected</SelectItem>
-                            {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
+                            {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((job) => (
                               <SelectItem key={job.id} value={job.id}>
                                 {job.jobNumber} - {job.name}
                               </SelectItem>

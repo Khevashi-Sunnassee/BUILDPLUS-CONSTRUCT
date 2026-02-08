@@ -410,7 +410,7 @@ export default function TasksPage() {
           pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yyyy") : "-", rx + 3, currentY + 4.5);
           rx += colWidths[5];
 
-          const jobText = task.job ? `${(task.job as any).jobNumber || (task.job as any).name || ""}` : "-";
+          const jobText = task.job ? `${task.job.jobNumber || task.job.name || ""}` : "-";
           const maxJobLen = Math.floor((colWidths[6] - 6) / 1.8);
           pdf.text(jobText.length > maxJobLen ? jobText.substring(0, maxJobLen - 2) + "..." : jobText, rx + 3, currentY + 4.5);
 

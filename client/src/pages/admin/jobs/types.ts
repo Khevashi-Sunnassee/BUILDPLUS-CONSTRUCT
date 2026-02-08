@@ -43,7 +43,7 @@ export const jobSchema = z.object({
   procurementTimeDays: z.number().int().min(1).optional().nullable(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
-  jobPhase: z.enum(JOB_PHASES as any).optional(),
+  jobPhase: z.enum(JOB_PHASES as unknown as [string, ...string[]]).optional(),
   status: z.string(),
   projectManagerId: z.string().optional().nullable(),
   factoryId: z.string().optional().nullable(),

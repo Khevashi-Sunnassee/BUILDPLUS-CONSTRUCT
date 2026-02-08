@@ -160,7 +160,7 @@ export const documentMethods = {
       const searchTerm = `%${filters.search.toLowerCase()}%`;
       conditions.push(sql`(LOWER(${documents.title}) LIKE ${searchTerm} OR LOWER(${documents.documentNumber}) LIKE ${searchTerm} OR LOWER(${documents.tags}) LIKE ${searchTerm})`);
     }
-    if (filters.status) conditions.push(eq(documents.status, filters.status as any));
+    if (filters.status) conditions.push(eq(documents.status, filters.status as typeof documents.status.enumValues[number]));
     if (filters.typeId) conditions.push(eq(documents.typeId, filters.typeId));
     if (filters.disciplineId) conditions.push(eq(documents.disciplineId, filters.disciplineId));
     if (filters.categoryId) conditions.push(eq(documents.categoryId, filters.categoryId));

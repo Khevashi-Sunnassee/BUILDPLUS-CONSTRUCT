@@ -186,7 +186,7 @@ export default function AdminJobsPage() {
 
   const filteredAndSortedJobs = (jobs || [])
     .filter((job) => {
-      if (phaseFilter !== "all" && (job as any).jobPhase !== phaseFilter) return false;
+      if (phaseFilter !== "all" && job.jobPhase !== phaseFilter) return false;
       if (statusFilter !== "all" && job.status !== statusFilter) return false;
       if (stateFilter !== "all") {
         if (stateFilter === "none" && job.state) return false;
@@ -629,7 +629,7 @@ export default function AdminJobsPage() {
     const ws = wb.addWorksheet("Jobs");
     const headers = Object.keys(template[0]);
     ws.addRow(headers);
-    template.forEach(row => ws.addRow(headers.map(h => (row as any)[h])));
+    template.forEach(row => ws.addRow(headers.map(h => row[h as keyof typeof row])));
     const buffer = await wb.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
@@ -708,7 +708,7 @@ export default function AdminJobsPage() {
       procurementTimeDays: job.procurementTimeDays ?? globalSettings?.procurementTimeDays ?? 14,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
-      jobPhase: (job as any).jobPhase || "CONTRACTED",
+      jobPhase: job.jobPhase || "CONTRACTED",
       status: job.status,
       projectManagerId: job.projectManagerId || null,
       factoryId: job.factoryId || null,
@@ -1122,7 +1122,7 @@ export default function AdminJobsPage() {
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const phase = ((job as any).jobPhase || "CONTRACTED") as JobPhase;
+                          const phase = (job.jobPhase || "CONTRACTED") as JobPhase;
                           const colors = PHASE_COLORS[phase] || PHASE_COLORS.CONTRACTED;
                           return (
                             <Badge variant="outline" className={`${colors} text-xs`} data-testid={`badge-phase-${job.id}`}>

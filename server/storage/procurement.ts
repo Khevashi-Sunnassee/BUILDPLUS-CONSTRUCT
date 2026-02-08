@@ -252,7 +252,7 @@ export const procurementMethods = {
 
   async getPurchaseOrdersByStatus(status: string, companyId?: string): Promise<PurchaseOrderWithDetails[]> {
     const poRows = await db.select().from(purchaseOrders)
-      .where(companyId ? and(eq(purchaseOrders.companyId, companyId), eq(purchaseOrders.status, status as any)) : eq(purchaseOrders.status, status as any))
+      .where(companyId ? and(eq(purchaseOrders.companyId, companyId), eq(purchaseOrders.status, status as typeof purchaseOrders.status.enumValues[number])) : eq(purchaseOrders.status, status as typeof purchaseOrders.status.enumValues[number]))
       .orderBy(desc(purchaseOrders.createdAt));
     const results: PurchaseOrderWithDetails[] = [];
     for (const po of poRows) {

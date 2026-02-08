@@ -176,7 +176,7 @@ router.put("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request, r
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", issues: parsed.error.issues });
     }
-    const { id: _id, companyId: _cid, assetTag: _tag, createdAt: _ca, ...safeData } = parsed.data as any;
+    const { id: _id, companyId: _cid, assetTag: _tag, createdAt: _ca, ...safeData } = parsed.data as Record<string, unknown>;
     const [updated] = await db.update(assets)
       .set({ ...safeData, updatedAt: new Date() })
       .where(eq(assets.id, req.params.id))

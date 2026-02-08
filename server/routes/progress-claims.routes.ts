@@ -94,7 +94,7 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
     const jobId = req.query.jobId as string | undefined;
 
     let conditions = [eq(progressClaims.companyId, companyId)];
-    if (status) conditions.push(eq(progressClaims.status, status as any));
+    if (status) conditions.push(eq(progressClaims.status, status as typeof progressClaims.status.enumValues[number]));
     if (jobId) conditions.push(eq(progressClaims.jobId, jobId));
 
     const claims = await db
@@ -301,7 +301,7 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
       jobGroups[claim.jobId].claims.push(claim);
     }
 
-    for (const group of Object.values(jobGroups) as any[]) {
+    for (const group of Object.values(jobGroups)) {
       let running = 0;
       for (const claim of group.claims) {
         running += safeParseFinancial(claim.retentionAmount, 0);
@@ -724,7 +724,7 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
 
     res.json(updated);
   } catch (error: any) {
-    if ((error as any).statusCode === 409) {
+    if ((error as { statusCode?: number }).statusCode === 409) {
       return res.status(409).json({ error: error.message });
     }
     logger.error({ err: error }, "Error updating progress claim");

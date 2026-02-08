@@ -505,7 +505,7 @@ router.get("/api/checklist/instances", requireAuth, async (req: Request, res: Re
       conditions.push(eq(checklistInstances.templateId, templateId as string));
     }
     if (status) {
-      conditions.push(eq(checklistInstances.status, status as any));
+      conditions.push(eq(checklistInstances.status, status as typeof checklistInstances.status.enumValues[number]));
     }
     if (jobId) {
       conditions.push(eq(checklistInstances.jobId, jobId as string));

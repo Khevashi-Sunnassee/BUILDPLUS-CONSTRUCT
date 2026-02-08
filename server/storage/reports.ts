@@ -276,7 +276,7 @@ export const reportMethods = {
 
   async getWeeklyJobReportsByStatus(status: string): Promise<WeeklyJobReportWithDetails[]> {
     const reports = await db.select().from(weeklyJobReports)
-      .where(eq(weeklyJobReports.status, status as any))
+      .where(eq(weeklyJobReports.status, status as typeof weeklyJobReports.status.enumValues[number]))
       .orderBy(desc(weeklyJobReports.reportDate));
     return Promise.all(reports.map(r => enrichWeeklyJobReport(r)));
   },

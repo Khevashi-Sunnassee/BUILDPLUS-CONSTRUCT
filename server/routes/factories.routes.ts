@@ -8,7 +8,8 @@ import logger from "../lib/logger";
 
 const router = Router();
 
-const CFMEU_CALENDAR_URLS: Record<string, { url: string; years: number[] }[]> = {
+type CfmeuCalendarType = "VIC_ONSITE" | "VIC_OFFSITE" | "QLD";
+const CFMEU_CALENDAR_URLS: Record<CfmeuCalendarType, { url: string; years: number[] }[]> = {
   VIC_ONSITE: [
     { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-onsite-2025.ics", years: [2025] },
     { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/36hr-onsite-rdo-calendar.ics", years: [2026] },
@@ -94,7 +95,7 @@ export async function syncAllCfmeuCalendars(): Promise<Record<string, { imported
   const results: Record<string, { imported: number; skipped: number }> = {};
   logger.info("[CFMEU] Starting automatic calendar sync...");
 
-  for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
+  for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS) as CfmeuCalendarType[]) {
     const urls = CFMEU_CALENDAR_URLS[calendarType];
     let totalImported = 0;
     let totalSkipped = 0;
@@ -107,7 +108,7 @@ export async function syncAllCfmeuCalendars(): Promise<Record<string, { imported
           continue;
         }
         const icsContent = await response.text();
-        const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+        const result = await parseIcsAndSaveHolidays(calendarType, icsContent, years);
         totalImported += result.imported;
         totalSkipped += result.skipped;
       } catch (err) {
@@ -327,7 +328,7 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
       .from(cfmeuHolidays)
       .where(
         and(
-          eq(cfmeuHolidays.calendarType, calendarType as any),
+          eq(cfmeuHolidays.calendarType, calendarType as CfmeuCalendarType),
           gte(cfmeuHolidays.date, new Date(startDate as string)),
           lte(cfmeuHolidays.date, new Date(endDate as string))
         )
@@ -384,7 +385,7 @@ router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req,
         continue;
       }
       const icsContent = await response.text();
-      const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+      const result = await parseIcsAndSaveHolidays(calendarType as CfmeuCalendarType, icsContent, years);
       totalImported += result.imported;
       totalSkipped += result.skipped;
     }
@@ -418,7 +419,7 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
             continue;
           }
           const icsContent = await response.text();
-          const result = await parseIcsAndSaveHolidays(calendarType as any, icsContent, years);
+          const result = await parseIcsAndSaveHolidays(calendarType as CfmeuCalendarType, icsContent, years);
           totalImported += result.imported;
           totalSkipped += result.skipped;
         } catch (err) {
@@ -444,7 +445,7 @@ router.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), 
   }
 
   try {
-    const result = await db.delete(cfmeuHolidays).where(eq(cfmeuHolidays.calendarType, calendarType as any));
+    const result = await db.delete(cfmeuHolidays).where(eq(cfmeuHolidays.calendarType, calendarType as CfmeuCalendarType));
     res.json({ success: true, deleted: result.rowCount || 0 });
   } catch (error: any) {
     logger.error({ err: error }, "Error deleting CFMEU calendar");

@@ -25,7 +25,7 @@ export const dailyLogMethods = {
     const conditions = [eq(dailyLogs.userId, userId)];
     
     if (filters?.status && filters.status !== "all") {
-      conditions.push(eq(dailyLogs.status, filters.status as any));
+      conditions.push(eq(dailyLogs.status, filters.status as typeof dailyLogs.status.enumValues[number]));
     }
     
     if (filters?.dateRange && filters.dateRange !== "all") {

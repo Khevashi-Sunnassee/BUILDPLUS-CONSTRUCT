@@ -88,7 +88,7 @@ export class FactoryRepository {
   async getAllCfmeuHolidays(calendarType?: string): Promise<CfmeuHoliday[]> {
     if (calendarType) {
       return db.select().from(cfmeuHolidays)
-        .where(eq(cfmeuHolidays.calendarType, calendarType as any))
+        .where(eq(cfmeuHolidays.calendarType, calendarType as "VIC_ONSITE" | "VIC_OFFSITE" | "QLD"))
         .orderBy(cfmeuHolidays.date);
     }
     return db.select().from(cfmeuHolidays).orderBy(cfmeuHolidays.date);

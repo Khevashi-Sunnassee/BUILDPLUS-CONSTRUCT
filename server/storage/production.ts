@@ -238,7 +238,7 @@ export const productionMethods = {
   async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<ProductionSlotWithDetails[]> {
     const conditions: any[] = [];
     if (filters?.jobId) conditions.push(eq(productionSlots.jobId, filters.jobId));
-    if (filters?.status) conditions.push(eq(productionSlots.status, filters.status as any));
+    if (filters?.status) conditions.push(eq(productionSlots.status, filters.status as typeof productionSlots.status.enumValues[number]));
     if (filters?.dateFrom) conditions.push(gte(productionSlots.productionSlotDate, filters.dateFrom));
     if (filters?.dateTo) conditions.push(lte(productionSlots.productionSlotDate, filters.dateTo));
     

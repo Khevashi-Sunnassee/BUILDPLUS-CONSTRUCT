@@ -166,7 +166,7 @@ export default function ProductionReportDetailPage() {
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
-  const activeJobs = jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")) || [];
+  const activeJobs = jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")) || [];
 
   const selectedJobPanels = useMemo(() => {
     if (!selectedJobId || !jobs) return [];

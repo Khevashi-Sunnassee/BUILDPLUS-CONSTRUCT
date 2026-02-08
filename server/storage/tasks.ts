@@ -431,7 +431,7 @@ export const taskMethods = {
         userId: assignee.userId,
         taskId,
         updateId,
-        type: type as any,
+        type: type as typeof taskNotifications.type.enumValues[number],
         title,
         body,
         fromUserId: excludeUserId,

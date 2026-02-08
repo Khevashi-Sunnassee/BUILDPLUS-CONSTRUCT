@@ -3,6 +3,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import type { FunctionKey } from "@shared/schema";
 
 const router = Router();
 
@@ -249,7 +250,7 @@ router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMI
   }
   const permission = await storage.setUserPermission(
     String(req.params.userId),
-    req.params.functionKey as any,
+    req.params.functionKey as FunctionKey,
     permissionLevel
   );
   res.json(permission);

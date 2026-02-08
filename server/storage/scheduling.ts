@@ -15,7 +15,7 @@ export const schedulingMethods = {
   async getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<DraftingProgramWithDetails[]> {
     const conditions: any[] = [];
     if (filters?.jobId) conditions.push(eq(draftingProgram.jobId, filters.jobId));
-    if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as any));
+    if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as typeof draftingProgram.status.enumValues[number]));
     if (filters?.assignedToId) conditions.push(eq(draftingProgram.assignedToId, filters.assignedToId));
     if (filters?.dateFrom) conditions.push(sql`${draftingProgram.drawingDueDate} >= ${filters.dateFrom}`);
     if (filters?.dateTo) conditions.push(sql`${draftingProgram.drawingDueDate} <= ${filters.dateTo}`);

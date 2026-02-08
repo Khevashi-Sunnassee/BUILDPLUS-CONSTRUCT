@@ -11,6 +11,7 @@ export interface Job {
   jobNumber: string;
   name: string;
   status: string;
+  productionSlotColor?: string | null;
 }
 
 export interface TaskAssignee {

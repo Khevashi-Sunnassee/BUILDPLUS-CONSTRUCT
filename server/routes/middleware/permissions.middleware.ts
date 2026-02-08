@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { storage } from "../../storage";
+import type { FunctionKey } from "@shared/schema";
 
 export type PermissionLevel = "VIEW" | "VIEW_AND_UPDATE";
 
@@ -18,7 +19,7 @@ export const requirePermission = (functionKey: string, minimumLevel: PermissionL
       return next();
     }
     
-    const permission = await storage.getUserPermission(req.session.userId, functionKey as any);
+    const permission = await storage.getUserPermission(req.session.userId, functionKey as FunctionKey);
     
     if (!permission || permission.permissionLevel === "HIDDEN") {
       return res.status(403).json({ error: "Access denied to this function" });

@@ -23,7 +23,7 @@ export function requireJobCapability(capability: JobCapability, jobIdExtractor?:
         return res.status(404).json({ error: "Job not found" });
       }
 
-      const phase = (typeof (job as any).jobPhase === 'number' ? intToPhase((job as any).jobPhase) : ((job as any).jobPhase || "CONTRACTED")) as JobPhase;
+      const phase = (typeof job.jobPhase === 'number' ? intToPhase(job.jobPhase) : (job.jobPhase || "CONTRACTED")) as JobPhase;
 
       if (!jobHasCapability(phase, capability)) {
         return res.status(403).json({

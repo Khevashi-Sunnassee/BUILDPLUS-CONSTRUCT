@@ -221,7 +221,7 @@ router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, r
   const panel = await storage.updatePanelRegisterItem(req.params.id as string, req.body);
   const diff: Record<string, any> = {};
   for (const key of Object.keys(req.body)) {
-    if (req.body[key] !== (existing as any)[key]) {
+    if (req.body[key] !== (existing as Record<string, unknown>)[key]) {
       diff[key] = req.body[key];
     }
   }

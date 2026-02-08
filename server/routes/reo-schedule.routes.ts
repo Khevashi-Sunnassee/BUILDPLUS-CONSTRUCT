@@ -324,14 +324,14 @@ router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: R
       return res.status(400).json({ message: "No PDF data available for processing" });
     }
 
-    await storage.updateReoSchedule(scheduleId, { status: "PROCESSING" as any });
+    await storage.updateReoSchedule(scheduleId, { status: "PROCESSING" });
 
     const panelMark = schedule.panel?.panelMark || `Panel-${schedule.panelId}`;
     const extractionResult = await extractReoFromPdf(pdfData, panelMark);
 
     if (!extractionResult.success) {
       await storage.updateReoSchedule(scheduleId, { 
-        status: "FAILED" as any,
+        status: "FAILED",
         aiResponseRaw: extractionResult.rawResponse,
         notes: extractionResult.error,
       });
@@ -349,7 +349,7 @@ router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: R
     const createdItems = await storage.createReoScheduleItemsBulk(itemsToCreate);
 
     await storage.updateReoSchedule(scheduleId, { 
-      status: "COMPLETED" as any,
+      status: "COMPLETED",
       processedAt: new Date(),
       aiModelUsed: extractionResult.modelUsed,
       aiResponseRaw: extractionResult.rawResponse,
