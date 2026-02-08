@@ -397,6 +397,28 @@ export const ADMIN_ROUTES = {
   DATA_DELETION_JOBS: '/api/admin/data-deletion/jobs',
   DATA_DELETION_USERS: '/api/admin/data-deletion/users',
   DATA_DELETION_DAILY_LOGS: '/api/admin/data-deletion/daily-logs',
+
+  // Data Management (individual record deletion)
+  DATA_MGMT_ITEMS: '/api/admin/data-management/items',
+  DATA_MGMT_ITEM_DELETE: (id: string) => `/api/admin/data-management/items/${id}`,
+  DATA_MGMT_ITEM_CATEGORIES: '/api/admin/data-management/item-categories',
+  DATA_MGMT_ITEM_CATEGORY_DELETE: (id: string) => `/api/admin/data-management/item-categories/${id}`,
+  DATA_MGMT_ASSETS: '/api/admin/data-management/assets',
+  DATA_MGMT_ASSET_DELETE: (id: string) => `/api/admin/data-management/assets/${id}`,
+  DATA_MGMT_PROGRESS_CLAIMS: '/api/admin/data-management/progress-claims',
+  DATA_MGMT_PROGRESS_CLAIM_DELETE: (id: string) => `/api/admin/data-management/progress-claims/${id}`,
+  DATA_MGMT_BROADCASTS: '/api/admin/data-management/broadcasts',
+  DATA_MGMT_BROADCAST_DELETE: (id: string) => `/api/admin/data-management/broadcasts/${id}`,
+  DATA_MGMT_BROADCAST_TEMPLATES: '/api/admin/data-management/broadcast-templates',
+  DATA_MGMT_BROADCAST_TEMPLATE_DELETE: (id: string) => `/api/admin/data-management/broadcast-templates/${id}`,
+  DATA_MGMT_DOCUMENTS: '/api/admin/data-management/documents',
+  DATA_MGMT_DOCUMENT_DELETE: (id: string) => `/api/admin/data-management/documents/${id}`,
+  DATA_MGMT_CONTRACTS: '/api/admin/data-management/contracts',
+  DATA_MGMT_CONTRACT_DELETE: (id: string) => `/api/admin/data-management/contracts/${id}`,
+  DATA_MGMT_DELIVERIES: '/api/admin/data-management/deliveries',
+  DATA_MGMT_DELIVERY_DELETE: (id: string) => `/api/admin/data-management/deliveries/${id}`,
+  DATA_MGMT_LOAD_LISTS: '/api/admin/data-management/load-lists',
+  DATA_MGMT_LOAD_LIST_DELETE: (id: string) => `/api/admin/data-management/load-lists/${id}`,
 } as const;
 
 // ============================================================================
