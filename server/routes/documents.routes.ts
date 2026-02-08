@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import multer from "multer";
 import crypto from "crypto";
 import OpenAI from "openai";
+import sharp from "sharp";
 import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
@@ -24,6 +25,19 @@ const openai = new OpenAI({
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
+
+const THUMBNAIL_WIDTH = 300;
+const THUMBNAIL_MAX_CACHE = 500;
+const thumbnailCache = new Map<string, { buffer: Buffer; contentType: string; timestamp: number }>();
+
+function evictOldestThumbnails() {
+  if (thumbnailCache.size <= THUMBNAIL_MAX_CACHE) return;
+  const entries = [...thumbnailCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+  const toRemove = entries.slice(0, thumbnailCache.size - THUMBNAIL_MAX_CACHE);
+  for (const [key] of toRemove) {
+    thumbnailCache.delete(key);
+  }
+}
 
 function buildContentDisposition(disposition: "attachment" | "inline", originalName: string): string {
   const asciiName = originalName.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
@@ -592,6 +606,80 @@ router.get("/api/documents/:id/view", requireAuth, async (req: Request, res: Res
     }
     logger.error({ err: error }, "Error viewing document");
     res.status(500).json({ error: error.message || "Failed to view document" });
+  }
+});
+
+router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const docId = String(req.params.id);
+    const cached = thumbnailCache.get(docId);
+    if (cached) {
+      cached.timestamp = Date.now();
+      res.set({
+        "Content-Type": cached.contentType,
+        "Content-Length": String(cached.buffer.length),
+        "Cache-Control": "private, max-age=86400",
+      });
+      return res.send(cached.buffer);
+    }
+
+    const document = await storage.getDocument(docId);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    const mimeType = (document.mimeType || "").toLowerCase();
+    if (!mimeType.startsWith("image/")) {
+      return res.status(415).json({ error: "Thumbnails only available for image files" });
+    }
+
+    const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
+    const stream = objectFile.createReadStream();
+
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+    stream.on("error", (err) => {
+      logger.error({ err }, "Error streaming for thumbnail");
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Error generating thumbnail" });
+      }
+    });
+    stream.on("end", async () => {
+      try {
+        const original = Buffer.concat(chunks);
+        const resized = await sharp(original)
+          .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
+          .jpeg({ quality: 75 })
+          .toBuffer();
+
+        thumbnailCache.set(docId, {
+          buffer: resized,
+          contentType: "image/jpeg",
+          timestamp: Date.now(),
+        });
+        evictOldestThumbnails();
+
+        res.set({
+          "Content-Type": "image/jpeg",
+          "Content-Length": String(resized.length),
+          "Cache-Control": "private, max-age=86400",
+        });
+        res.send(resized);
+      } catch (sharpErr) {
+        logger.error({ err: sharpErr }, "Error resizing image for thumbnail");
+        if (!res.headersSent) {
+          res.status(500).json({ error: "Error generating thumbnail" });
+        }
+      }
+    });
+  } catch (error: any) {
+    if (error instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "File not found in storage" });
+    }
+    logger.error({ err: error }, "Error generating thumbnail");
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message || "Failed to generate thumbnail" });
+    }
   }
 });
 

@@ -72,7 +72,7 @@ function ThumbnailCard({
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
-  const viewUrl = DOCUMENT_ROUTES.VIEW(doc.id);
+  const thumbnailUrl = DOCUMENT_ROUTES.THUMBNAIL(doc.id);
   const downloadUrl = DOCUMENT_ROUTES.DOWNLOAD(doc.id);
 
   return (
@@ -105,7 +105,7 @@ function ThumbnailCard({
           </div>
         ) : (
           <img
-            src={viewUrl}
+            src={thumbnailUrl}
             alt={doc.title}
             className={`w-full h-full object-cover transition-opacity ${imgLoaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setImgLoaded(true)}

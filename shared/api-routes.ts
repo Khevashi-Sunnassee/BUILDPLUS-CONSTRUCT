@@ -492,6 +492,7 @@ export const DOCUMENT_ROUTES = {
   BY_ID: (id: string | number) => `/api/documents/${id}`,
   UPLOAD: '/api/documents/upload',
   VIEW: (id: string | number) => `/api/documents/${id}/view`,
+  THUMBNAIL: (id: string | number) => `/api/documents/${id}/thumbnail`,
   DOWNLOAD: (id: string | number) => `/api/documents/${id}/download`,
   NEW_VERSION: (id: string | number) => `/api/documents/${id}/new-version`,
   VERSIONS: (id: string | number) => `/api/documents/${id}/versions`,
