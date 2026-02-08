@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { db } from "../db";
-import { assets, assetMaintenanceRecords, assetTransfers, ASSET_CATEGORIES, ASSET_STATUSES, ASSET_CONDITIONS, ASSET_FUNDING_METHODS } from "@shared/schema";
+import { assets, assetMaintenanceRecords, assetTransfers, suppliers, ASSET_CATEGORIES, ASSET_STATUSES, ASSET_CONDITIONS, ASSET_FUNDING_METHODS } from "@shared/schema";
 import { eq, and, sql, desc, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -32,6 +32,7 @@ const createAssetSchema = z.object({
   usefulLifeYears: z.number().optional().nullable(),
   purchaseDate: z.string().optional().nullable(),
   supplier: z.string().optional().nullable(),
+  supplierId: z.string().optional().nullable(),
   warrantyExpiry: z.string().optional().nullable(),
   leaseStartDate: z.string().optional().nullable(),
   leaseEndDate: z.string().optional().nullable(),
@@ -437,6 +438,24 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
       logger.info(`AI categorized ${Object.keys(aiResults).length}/${needsAI.length} assets`);
     }
 
+    const supplierCache: Record<string, string> = {};
+    const existingSuppliers = await db.select({ id: suppliers.id, name: suppliers.name }).from(suppliers).where(eq(suppliers.companyId, companyId));
+    for (const s of existingSuppliers) {
+      supplierCache[s.name.toLowerCase().trim()] = s.id;
+    }
+
+    async function findOrCreateSupplier(supplierName: string): Promise<string> {
+      const key = supplierName.toLowerCase().trim();
+      if (supplierCache[key]) return supplierCache[key];
+      const [newSupplier] = await db.insert(suppliers).values({
+        companyId,
+        name: supplierName.trim(),
+        isActive: true,
+      }).returning({ id: suppliers.id });
+      supplierCache[key] = newSupplier.id;
+      return newSupplier.id;
+    }
+
     for (const parsedRow of parsedRows) {
       const { name, rowData } = parsedRow;
       let category = parsedRow.manualCategory
@@ -455,8 +474,15 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
           createdBy: req.session?.userId || null,
         };
 
-        if (rowData.description) insertData.description = String(rowData.description).trim();
-        if (rowData.supplier) insertData.supplier = String(rowData.supplier).trim();
+        if (rowData.supplier) {
+          const supplierName = String(rowData.supplier).trim();
+          insertData.supplier = supplierName;
+          try {
+            insertData.supplierId = await findOrCreateSupplier(supplierName);
+          } catch (err: any) {
+            logger.warn(`Failed to create supplier "${supplierName}": ${err.message}`);
+          }
+        }
         if (rowData.serialNumber) insertData.serialNumber = String(rowData.serialNumber).trim();
         if (rowData.registrationNumber) insertData.registrationNumber = String(rowData.registrationNumber).trim();
         if (rowData.remarks) insertData.remarks = String(rowData.remarks).trim();
@@ -623,7 +649,7 @@ router.post("/api/admin/assets", requireRole("ADMIN"), async (req: Request, res:
   }
 });
 
-router.put("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });

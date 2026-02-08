@@ -23,7 +23,7 @@ import {
   Clock,
   TrendingDown,
 } from "lucide-react";
-import { ASSET_ROUTES } from "@shared/api-routes";
+import { ASSET_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import type { Asset } from "@shared/schema";
 import {
   ASSET_CATEGORIES,
@@ -130,6 +130,7 @@ const assetFormSchema = z.object({
   fundingMethod: z.string().optional(),
   remarks: z.string().optional(),
   supplier: z.string().optional(),
+  supplierId: z.string().optional(),
   purchaseDate: z.string().optional(),
   purchasePrice: z.string().optional(),
   warrantyExpiry: z.string().optional(),
@@ -189,6 +190,7 @@ const defaultFormValues: AssetFormData = {
   fundingMethod: "purchased",
   remarks: "",
   supplier: "",
+  supplierId: "",
   purchaseDate: "",
   purchasePrice: "",
   warrantyExpiry: "",
@@ -327,6 +329,10 @@ export default function AssetRegisterPage() {
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
+  });
+
+  const { data: suppliersList = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
   });
 
   const form = useForm<AssetFormData>({
@@ -487,6 +493,7 @@ export default function AssetRegisterPage() {
       fundingMethod: asset.fundingMethod || "purchased",
       remarks: asset.remarks || "",
       supplier: asset.supplier || "",
+      supplierId: asset.supplierId || "",
       purchaseDate: asset.purchaseDate || "",
       purchasePrice: asset.purchasePrice ? String(asset.purchasePrice) : "",
       warrantyExpiry: asset.warrantyExpiry || "",
@@ -560,6 +567,7 @@ export default function AssetRegisterPage() {
       } else {
         setImportResult({ imported: result.imported || 0, errors: result.errorDetails || [] });
         queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
+        queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE] });
         toast({ title: `Successfully imported ${result.imported || 0} assets` });
       }
     } catch (err: any) {
@@ -1078,13 +1086,35 @@ export default function AssetRegisterPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="supplier"
+                    name="supplierId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Supplier</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-asset-supplier" />
-                        </FormControl>
+                        <Select
+                          value={field.value || "none"}
+                          onValueChange={(val) => {
+                            if (val === "none") {
+                              field.onChange("");
+                              form.setValue("supplier", "");
+                            } else {
+                              field.onChange(val);
+                              const selected = suppliersList.find(s => s.id === val);
+                              if (selected) form.setValue("supplier", selected.name);
+                            }
+                          }}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-supplier">
+                              <SelectValue placeholder="Select supplier" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No Supplier</SelectItem>
+                            {suppliersList.map((s) => (
+                              <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
