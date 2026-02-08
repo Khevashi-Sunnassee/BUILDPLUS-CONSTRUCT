@@ -55,6 +55,9 @@ dataManagementRouter.delete("/api/admin/data-management/items/:id", requireRole(
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
 
+    const [item] = await db.select({ id: items.id }).from(items).where(and(eq(items.id, id), eq(items.companyId, companyId)));
+    if (!item) return res.status(404).json({ error: "Item not found or does not belong to your company" });
+
     const [poItemCount] = await db
       .select({ count: count() })
       .from(purchaseOrderItems)
@@ -112,6 +115,9 @@ dataManagementRouter.delete("/api/admin/data-management/item-categories/:id", re
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
 
+    const [cat] = await db.select({ id: itemCategories.id }).from(itemCategories).where(and(eq(itemCategories.id, id), eq(itemCategories.companyId, companyId)));
+    if (!cat) return res.status(404).json({ error: "Item category not found or does not belong to your company" });
+
     const [itemCount] = await db
       .select({ count: count() })
       .from(items)
@@ -159,8 +165,11 @@ dataManagementRouter.delete("/api/admin/data-management/assets/:id", requireRole
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
 
-    await db.delete(assetMaintenanceRecords).where(eq(assetMaintenanceRecords.assetId, id));
-    await db.delete(assetTransfers).where(eq(assetTransfers.assetId, id));
+    const [asset] = await db.select({ id: assets.id }).from(assets).where(and(eq(assets.id, id), eq(assets.companyId, companyId)));
+    if (!asset) return res.status(404).json({ error: "Asset not found or does not belong to your company" });
+
+    await db.delete(assetMaintenanceRecords).where(and(eq(assetMaintenanceRecords.assetId, id), eq(assetMaintenanceRecords.companyId, companyId)));
+    await db.delete(assetTransfers).where(and(eq(assetTransfers.assetId, id), eq(assetTransfers.companyId, companyId)));
     await db.delete(assets).where(and(eq(assets.id, id), eq(assets.companyId, companyId)));
     res.json({ success: true });
   } catch (error: any) {
@@ -199,6 +208,9 @@ dataManagementRouter.delete("/api/admin/data-management/progress-claims/:id", re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
+
+    const [claim] = await db.select({ id: progressClaims.id }).from(progressClaims).where(and(eq(progressClaims.id, id), eq(progressClaims.companyId, companyId)));
+    if (!claim) return res.status(404).json({ error: "Progress claim not found or does not belong to your company" });
 
     await db.delete(progressClaimItems).where(eq(progressClaimItems.progressClaimId, id));
     await db.delete(progressClaims).where(and(eq(progressClaims.id, id), eq(progressClaims.companyId, companyId)));
@@ -246,6 +258,9 @@ dataManagementRouter.delete("/api/admin/data-management/broadcast-templates/:id"
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
+
+    const [template] = await db.select({ id: broadcastTemplates.id }).from(broadcastTemplates).where(and(eq(broadcastTemplates.id, id), eq(broadcastTemplates.companyId, companyId)));
+    if (!template) return res.status(404).json({ error: "Broadcast template not found or does not belong to your company" });
 
     const [msgCount] = await db
       .select({ count: count() })
@@ -296,6 +311,9 @@ dataManagementRouter.delete("/api/admin/data-management/documents/:id", requireR
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
+
+    const [doc] = await db.select({ id: documents.id }).from(documents).where(and(eq(documents.id, id), eq(documents.companyId, companyId)));
+    if (!doc) return res.status(404).json({ error: "Document not found or does not belong to your company" });
 
     const [childDocCount] = await db
       .select({ count: count() })
@@ -358,6 +376,9 @@ dataManagementRouter.delete("/api/admin/data-management/contracts/:id", requireR
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const { id } = req.params;
+
+    const [contract] = await db.select({ id: contracts.id }).from(contracts).where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)));
+    if (!contract) return res.status(404).json({ error: "Contract not found or does not belong to your company" });
 
     await db.delete(contracts).where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)));
     res.json({ success: true });
