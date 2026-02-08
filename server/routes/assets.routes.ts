@@ -87,10 +87,16 @@ const createTransferSchema = z.object({
   reason: z.string().optional().nullable(),
 });
 
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    _openai = new OpenAI({
+      apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+      baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    });
+  }
+  return _openai;
+}
 
 async function generateAssetTag(companyId: string): Promise<string> {
   const now = new Date();
@@ -116,7 +122,24 @@ router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response)
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
-    const result = await db.select().from(assets)
+    const result = await db.select({
+      id: assets.id,
+      assetTag: assets.assetTag,
+      name: assets.name,
+      category: assets.category,
+      status: assets.status,
+      condition: assets.condition,
+      location: assets.location,
+      department: assets.department,
+      fundingMethod: assets.fundingMethod,
+      purchasePrice: assets.purchasePrice,
+      currentValue: assets.currentValue,
+      manufacturer: assets.manufacturer,
+      model: assets.model,
+      serialNumber: assets.serialNumber,
+      assignedTo: assets.assignedTo,
+      createdAt: assets.createdAt,
+    }).from(assets)
       .where(eq(assets.companyId, companyId))
       .orderBy(desc(assets.createdAt))
       .limit(safeLimit);
@@ -244,7 +267,7 @@ Please provide:
 
 Format as clean HTML with headings and bullet points.`;
 
-    const response = await openai.chat.completions.create({
+    const response = await getOpenAI().chat.completions.create({
       model: "gpt-4o",
       messages: [
         { role: "system", content: "You are an asset management specialist for construction and manufacturing companies. Provide practical, data-driven analysis." },

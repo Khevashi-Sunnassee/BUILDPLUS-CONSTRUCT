@@ -94,6 +94,7 @@ const adminFinanceNavItems = [
   { title: "Progress Claims", url: "/progress-claims", icon: FileText },
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
+  { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
 ];
 
 const managerNavItems = [
@@ -108,7 +109,6 @@ const adminNavItems = [
   { title: "Settings", url: "/admin/settings", icon: Settings },
   { title: "Companies", url: "/admin/companies", icon: Building2 },
   { title: "Factories", url: "/admin/factories", icon: Factory },
-  { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
