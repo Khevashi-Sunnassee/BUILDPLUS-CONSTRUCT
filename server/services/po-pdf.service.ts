@@ -7,6 +7,7 @@ export function generatePurchaseOrderPdf(
   po: PurchaseOrderWithDetails,
   lineItems: PurchaseOrderItem[],
   settings?: { logoBase64: string | null; companyName: string | null } | null,
+  termsData?: { poTermsHtml: string | null; includePOTerms: boolean } | null,
 ): Buffer {
   const pdf = new jsPDF({
     orientation: "portrait",
@@ -283,6 +284,67 @@ export function generatePurchaseOrderPdf(
     if (po.rejectionReason) {
       const reasonLines = pdf.splitTextToSize(`Reason: ${po.rejectionReason}`, contentWidth - 10);
       pdf.text(reasonLines.slice(0, 2), margin + 5, currentY + 12);
+    }
+  }
+
+  if (termsData?.includePOTerms && termsData.poTermsHtml) {
+    const termsText = termsData.poTermsHtml
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/li>/gi, "\n")
+      .replace(/<li>/gi, "  - ")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+
+    if (termsText.length > 0) {
+      pdf.addPage();
+      currentY = margin;
+
+      pdf.setTextColor(31, 41, 55);
+      pdf.setFontSize(14);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("TERMS AND CONDITIONS", margin, currentY);
+      currentY += 8;
+
+      pdf.setDrawColor(59, 130, 246);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, currentY, margin + 50, currentY);
+      currentY += 8;
+
+      pdf.setTextColor(60, 60, 60);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+
+      const tcFullWidth = pageWidth - margin * 2;
+      const termsLines = pdf.splitTextToSize(termsText, tcFullWidth);
+      const lineHeight = 4;
+
+      for (let i = 0; i < termsLines.length; i++) {
+        if (currentY + lineHeight > pageHeight - margin - 10) {
+          pdf.addPage();
+          currentY = margin;
+
+          pdf.setTextColor(107, 114, 128);
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "italic");
+          pdf.text(`${po.poNumber} - Terms and Conditions (continued)`, margin, currentY);
+          currentY += 10;
+
+          pdf.setTextColor(60, 60, 60);
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "normal");
+        }
+        pdf.text(termsLines[i], margin, currentY);
+        currentY += lineHeight;
+      }
     }
   }
 
