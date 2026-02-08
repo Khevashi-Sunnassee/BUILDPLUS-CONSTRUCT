@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,9 @@ import {
   Activity,
   Truck,
   Loader2,
+  Upload,
+  Download,
+  ChevronDown,
 } from "lucide-react";
 import { ASSET_ROUTES } from "@shared/api-routes";
 import type { Asset } from "@shared/schema";
@@ -88,15 +91,117 @@ const assetFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   category: z.string().min(1, "Category is required"),
   description: z.string().optional(),
+  quantity: z.coerce.number().optional().nullable(),
   status: z.string().optional(),
   condition: z.string().optional(),
   location: z.string().optional(),
   department: z.string().optional(),
   assignedTo: z.string().optional(),
   fundingMethod: z.string().optional(),
+  remarks: z.string().optional(),
+  supplier: z.string().optional(),
+  purchaseDate: z.string().optional(),
+  purchasePrice: z.string().optional(),
+  warrantyExpiry: z.string().optional(),
+  currentValue: z.string().optional(),
+  usefulLifeYears: z.coerce.number().optional().nullable(),
+  depreciationMethod: z.string().optional(),
+  depreciationRate: z.string().optional(),
+  accumulatedDepreciation: z.string().optional(),
+  depreciationThisPeriod: z.string().optional(),
+  bookValue: z.string().optional(),
+  yearsDepreciated: z.coerce.number().optional().nullable(),
+  manufacturer: z.string().optional(),
+  model: z.string().optional(),
+  serialNumber: z.string().optional(),
+  registrationNumber: z.string().optional(),
+  engineNumber: z.string().optional(),
+  vinNumber: z.string().optional(),
+  yearOfManufacture: z.string().optional(),
+  countryOfOrigin: z.string().optional(),
+  specifications: z.string().optional(),
+  operatingHours: z.coerce.number().optional().nullable(),
+  barcode: z.string().optional(),
+  leaseStartDate: z.string().optional(),
+  leaseEndDate: z.string().optional(),
+  leaseMonthlyPayment: z.string().optional(),
+  balloonPayment: z.string().optional(),
+  leaseTerm: z.coerce.number().optional().nullable(),
+  lessor: z.string().optional(),
+  loanAmount: z.string().optional(),
+  interestRate: z.string().optional(),
+  loanTerm: z.coerce.number().optional().nullable(),
+  lender: z.string().optional(),
+  insuranceProvider: z.string().optional(),
+  insurancePolicyNumber: z.string().optional(),
+  insurancePremium: z.string().optional(),
+  insuranceExcess: z.string().optional(),
+  insuranceStartDate: z.string().optional(),
+  insuranceExpiryDate: z.string().optional(),
+  insuranceStatus: z.string().optional(),
+  insuranceNotes: z.string().optional(),
+  capexRequestId: z.string().optional(),
+  capexDescription: z.string().optional(),
 });
 
 type AssetFormData = z.infer<typeof assetFormSchema>;
+
+const defaultFormValues: AssetFormData = {
+  name: "",
+  category: "",
+  description: "",
+  quantity: null,
+  status: "active",
+  condition: "good",
+  location: "",
+  department: "",
+  assignedTo: "",
+  fundingMethod: "purchased",
+  remarks: "",
+  supplier: "",
+  purchaseDate: "",
+  purchasePrice: "",
+  warrantyExpiry: "",
+  currentValue: "",
+  usefulLifeYears: null,
+  depreciationMethod: "",
+  depreciationRate: "",
+  accumulatedDepreciation: "",
+  depreciationThisPeriod: "",
+  bookValue: "",
+  yearsDepreciated: null,
+  manufacturer: "",
+  model: "",
+  serialNumber: "",
+  registrationNumber: "",
+  engineNumber: "",
+  vinNumber: "",
+  yearOfManufacture: "",
+  countryOfOrigin: "",
+  specifications: "",
+  operatingHours: null,
+  barcode: "",
+  leaseStartDate: "",
+  leaseEndDate: "",
+  leaseMonthlyPayment: "",
+  balloonPayment: "",
+  leaseTerm: null,
+  lessor: "",
+  loanAmount: "",
+  interestRate: "",
+  loanTerm: null,
+  lender: "",
+  insuranceProvider: "",
+  insurancePolicyNumber: "",
+  insurancePremium: "",
+  insuranceExcess: "",
+  insuranceStartDate: "",
+  insuranceExpiryDate: "",
+  insuranceStatus: "",
+  insuranceNotes: "",
+  capexRequestId: "",
+  capexDescription: "",
+};
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return <span>-</span>;
@@ -122,6 +227,28 @@ function ConditionBadge({ condition }: { condition: string | null | undefined })
   );
 }
 
+function FormSection({ title, defaultOpen, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  return (
+    <div className="border rounded-md">
+      <button
+        type="button"
+        className="flex items-center gap-2 w-full p-3 cursor-pointer font-medium text-sm text-left"
+        onClick={() => setOpen(!open)}
+        data-testid={`section-toggle-${title.toLowerCase().replace(/[^a-z0-9]/g, "-")}`}
+      >
+        <ChevronDown className={`h-4 w-4 transition-transform ${open ? "" : "-rotate-90"}`} />
+        {title}
+      </button>
+      {open && (
+        <div className="p-4 pt-0 space-y-4">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AssetRegisterPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -133,6 +260,10 @@ export default function AssetRegisterPage() {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingAssetId, setDeletingAssetId] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ imported?: number; errors?: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
@@ -140,18 +271,10 @@ export default function AssetRegisterPage() {
 
   const form = useForm<AssetFormData>({
     resolver: zodResolver(assetFormSchema),
-    defaultValues: {
-      name: "",
-      category: "",
-      description: "",
-      status: "active",
-      condition: "good",
-      location: "",
-      department: "",
-      assignedTo: "",
-      fundingMethod: "purchased",
-    },
+    defaultValues: { ...defaultFormValues },
   });
+
+  const watchedFundingMethod = form.watch("fundingMethod");
 
   const filteredAssets = useMemo(() => {
     if (!assets) return [];
@@ -234,17 +357,7 @@ export default function AssetRegisterPage() {
 
   const openCreateDialog = () => {
     setEditingAsset(null);
-    form.reset({
-      name: "",
-      category: "",
-      description: "",
-      status: "active",
-      condition: "good",
-      location: "",
-      department: "",
-      assignedTo: "",
-      fundingMethod: "purchased",
-    });
+    form.reset({ ...defaultFormValues });
     setDialogOpen(true);
   };
 
@@ -254,12 +367,57 @@ export default function AssetRegisterPage() {
       name: asset.name,
       category: asset.category,
       description: asset.description || "",
+      quantity: asset.quantity ?? null,
       status: asset.status || "active",
       condition: asset.condition || "",
       location: asset.location || "",
       department: asset.department || "",
       assignedTo: asset.assignedTo || "",
       fundingMethod: asset.fundingMethod || "",
+      remarks: asset.remarks || "",
+      supplier: asset.supplier || "",
+      purchaseDate: asset.purchaseDate || "",
+      purchasePrice: asset.purchasePrice ? String(asset.purchasePrice) : "",
+      warrantyExpiry: asset.warrantyExpiry || "",
+      currentValue: asset.currentValue ? String(asset.currentValue) : "",
+      usefulLifeYears: asset.usefulLifeYears ?? null,
+      depreciationMethod: asset.depreciationMethod || "",
+      depreciationRate: asset.depreciationRate ? String(asset.depreciationRate) : "",
+      accumulatedDepreciation: asset.accumulatedDepreciation ? String(asset.accumulatedDepreciation) : "",
+      depreciationThisPeriod: asset.depreciationThisPeriod ? String(asset.depreciationThisPeriod) : "",
+      bookValue: asset.bookValue ? String(asset.bookValue) : "",
+      yearsDepreciated: asset.yearsDepreciated ?? null,
+      manufacturer: asset.manufacturer || "",
+      model: asset.model || "",
+      serialNumber: asset.serialNumber || "",
+      registrationNumber: asset.registrationNumber || "",
+      engineNumber: asset.engineNumber || "",
+      vinNumber: asset.vinNumber || "",
+      yearOfManufacture: asset.yearOfManufacture || "",
+      countryOfOrigin: asset.countryOfOrigin || "",
+      specifications: asset.specifications || "",
+      operatingHours: asset.operatingHours ?? null,
+      barcode: asset.barcode || "",
+      leaseStartDate: asset.leaseStartDate || "",
+      leaseEndDate: asset.leaseEndDate || "",
+      leaseMonthlyPayment: asset.leaseMonthlyPayment ? String(asset.leaseMonthlyPayment) : "",
+      balloonPayment: asset.balloonPayment ? String(asset.balloonPayment) : "",
+      leaseTerm: asset.leaseTerm ?? null,
+      lessor: asset.lessor || "",
+      loanAmount: asset.loanAmount ? String(asset.loanAmount) : "",
+      interestRate: asset.interestRate ? String(asset.interestRate) : "",
+      loanTerm: asset.loanTerm ?? null,
+      lender: asset.lender || "",
+      insuranceProvider: asset.insuranceProvider || "",
+      insurancePolicyNumber: asset.insurancePolicyNumber || "",
+      insurancePremium: asset.insurancePremium ? String(asset.insurancePremium) : "",
+      insuranceExcess: asset.insuranceExcess ? String(asset.insuranceExcess) : "",
+      insuranceStartDate: asset.insuranceStartDate || "",
+      insuranceExpiryDate: asset.insuranceExpiryDate || "",
+      insuranceStatus: asset.insuranceStatus || "",
+      insuranceNotes: asset.insuranceNotes || "",
+      capexRequestId: asset.capexRequestId || "",
+      capexDescription: asset.capexDescription || "",
     });
     setDialogOpen(true);
   };
@@ -269,6 +427,32 @@ export default function AssetRegisterPage() {
       updateMutation.mutate({ id: editingAsset.id, data });
     } else {
       createMutation.mutate(data);
+    }
+  };
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(ASSET_ROUTES.IMPORT, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setImportResult({ errors: [result.error || result.message || "Import failed"] });
+      } else {
+        setImportResult({ imported: result.imported || 0, errors: result.errorDetails || [] });
+        queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
+        toast({ title: `Successfully imported ${result.imported || 0} assets` });
+      }
+    } catch (err: any) {
+      setImportResult({ errors: [err.message || "Import failed"] });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -301,10 +485,22 @@ export default function AssetRegisterPage() {
             <PageHelpButton pageHelpKey="page.admin.asset-register" />
           </div>
         </div>
-        <Button onClick={openCreateDialog} data-testid="button-add-asset">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Asset
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <a href={ASSET_ROUTES.TEMPLATE} download>
+            <Button variant="outline" data-testid="button-download-template">
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
+          </a>
+          <Button variant="outline" onClick={() => { setImportResult(null); setImportDialogOpen(true); }} data-testid="button-import-assets">
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={openCreateDialog} data-testid="button-add-asset">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Asset
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -499,7 +695,7 @@ export default function AssetRegisterPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingAsset ? "Edit Asset" : "Add Asset"}</DialogTitle>
             <DialogDescription>
@@ -508,75 +704,787 @@ export default function AssetRegisterPage() {
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Name</FormLabel>
-                    <FormControl>
-                      <Input {...field} data-testid="input-asset-name" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-asset-category">
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ASSET_CATEGORIES.map((cat) => (
-                          <SelectItem key={cat} value={cat}>
-                            {cat}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea {...field} data-testid="input-asset-description" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
+              <FormSection title="General Information" defaultOpen>
                 <FormField
                   control={form.control}
-                  name="status"
+                  name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
+                      <FormLabel>Name *</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-asset-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category *</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
-                          <SelectTrigger data-testid="select-asset-status">
+                          <SelectTrigger data-testid="select-asset-category">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {ASSET_CATEGORIES.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-asset-description" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quantity</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-quantity" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="status"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-status">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ASSET_STATUSES.map((s) => (
+                              <SelectItem key={s} value={s} className="capitalize">
+                                {s}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="condition"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Condition</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-condition">
+                              <SelectValue placeholder="Select condition" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ASSET_CONDITIONS.map((c) => (
+                              <SelectItem key={c} value={c} className="capitalize">
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="fundingMethod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Funding Method</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-funding-method">
+                              <SelectValue placeholder="Select funding method" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ASSET_FUNDING_METHODS.map((f) => (
+                              <SelectItem key={f} value={f} className="capitalize">
+                                {f}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Input {...field} data-testid="input-asset-location" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="department"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Department</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-department" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="assignedTo"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assigned To</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-assigned-to" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="remarks"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Remarks</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-asset-remarks" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </FormSection>
+
+              <FormSection title="Purchase & Supplier">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="supplier"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Supplier</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-supplier" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="purchasePrice"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purchase Price</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-purchase-price" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="purchaseDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Purchase Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-asset-purchase-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="warrantyExpiry"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Warranty Expiry</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-asset-warranty-expiry" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Depreciation & Valuation">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="currentValue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Current Value</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-current-value" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="usefulLifeYears"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Useful Life (Years)</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-useful-life" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="depreciationMethod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Depreciation Method</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-depreciation-method">
+                              <SelectValue placeholder="Select method" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="Straight Line">Straight Line</SelectItem>
+                            <SelectItem value="Diminishing Value">Diminishing Value</SelectItem>
+                            <SelectItem value="Units of Production">Units of Production</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="depreciationRate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Depreciation Rate</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-depreciation-rate" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="accumulatedDepreciation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Accumulated Depreciation</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-accumulated-depreciation" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="depreciationThisPeriod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Depreciation This Period</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-depreciation-this-period" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="bookValue"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Book Value</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-book-value" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="yearsDepreciated"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Years Depreciated</FormLabel>
+                        <FormControl>
+                          <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-years-depreciated" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </FormSection>
+
+              <FormSection title="Technical / Identification">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="manufacturer"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Manufacturer</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-manufacturer" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="model"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Model</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-model" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="serialNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Serial Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-serial-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="registrationNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Asset No.</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-registration-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="engineNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Engine Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-engine-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="vinNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>VIN Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-vin-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="yearOfManufacture"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Year of Manufacture</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-year-of-manufacture" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="countryOfOrigin"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country of Origin</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-country-of-origin" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="specifications"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Specifications</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-asset-specifications" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="operatingHours"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Operating Hours</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-operating-hours" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="barcode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Barcode</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-barcode" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </FormSection>
+
+              {(watchedFundingMethod === "leased" || watchedFundingMethod === "financed") && (
+                <FormSection title="Lease / Finance">
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="leaseStartDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lease Start Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-asset-lease-start-date" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="leaseEndDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lease End Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} data-testid="input-asset-lease-end-date" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="leaseMonthlyPayment"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Monthly Payment</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} data-testid="input-asset-lease-monthly-payment" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="balloonPayment"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Balloon Payment</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} data-testid="input-asset-balloon-payment" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="leaseTerm"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lease Term (Months)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-lease-term" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lessor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lessor</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-asset-lessor" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="loanAmount"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Loan Amount</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} data-testid="input-asset-loan-amount" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="interestRate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Interest Rate</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" {...field} data-testid="input-asset-interest-rate" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="loanTerm"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Loan Term (Months)</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-loan-term" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="lender"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Lender</FormLabel>
+                          <FormControl>
+                            <Input {...field} data-testid="input-asset-lender" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </FormSection>
+              )}
+
+              <FormSection title="Insurance">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="insuranceProvider"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Insurance Provider</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-insurance-provider" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="insurancePolicyNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Policy Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} data-testid="input-asset-insurance-policy-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="insurancePremium"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Premium</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-insurance-premium" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="insuranceExcess"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Excess</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.01" {...field} data-testid="input-asset-insurance-excess" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="insuranceStartDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Start Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-asset-insurance-start-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="insuranceExpiryDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Expiry Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-asset-insurance-expiry-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="insuranceStatus"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Insurance Status</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-asset-insurance-status">
                             <SelectValue placeholder="Select status" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {ASSET_STATUSES.map((s) => (
-                            <SelectItem key={s} value={s} className="capitalize">
-                              {s}
-                            </SelectItem>
-                          ))}
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="expired">Expired</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -585,94 +1493,50 @@ export default function AssetRegisterPage() {
                 />
                 <FormField
                   control={form.control}
-                  name="condition"
+                  name="insuranceNotes"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Condition</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <FormLabel>Insurance Notes</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} data-testid="input-asset-insurance-notes" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </FormSection>
+
+              <FormSection title="CAPEX">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="capexRequestId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>CAPEX Request ID</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-asset-condition">
-                            <SelectValue placeholder="Select condition" />
-                          </SelectTrigger>
+                          <Input {...field} data-testid="input-asset-capex-request-id" />
                         </FormControl>
-                        <SelectContent>
-                          {ASSET_CONDITIONS.map((c) => (
-                            <SelectItem key={c} value={c} className="capitalize">
-                              {c}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input {...field} data-testid="input-asset-location" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <div className="grid grid-cols-2 gap-4">
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={form.control}
-                  name="department"
+                  name="capexDescription"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Department</FormLabel>
+                      <FormLabel>CAPEX Description</FormLabel>
                       <FormControl>
-                        <Input {...field} data-testid="input-asset-department" />
+                        <Textarea {...field} data-testid="input-asset-capex-description" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="assignedTo"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assigned To</FormLabel>
-                      <FormControl>
-                        <Input {...field} data-testid="input-asset-assigned-to" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <FormField
-                control={form.control}
-                name="fundingMethod"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Funding Method</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger data-testid="select-asset-funding-method">
-                          <SelectValue placeholder="Select funding method" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {ASSET_FUNDING_METHODS.map((f) => (
-                          <SelectItem key={f} value={f} className="capitalize">
-                            {f}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              </FormSection>
+
               <DialogFooter>
                 <Button
                   type="button"
@@ -695,6 +1559,61 @@ export default function AssetRegisterPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Import Assets</DialogTitle>
+            <DialogDescription>
+              Upload an Excel file (.xlsx/.xls) to import assets. Use the Download Template button for the correct format.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImportFile(file);
+              }}
+              disabled={importing}
+              data-testid="input-import-file"
+            />
+            {importing && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Importing...
+              </div>
+            )}
+            {importResult && (
+              <div className="space-y-2">
+                {importResult.imported !== undefined && importResult.imported > 0 && (
+                  <p className="text-sm text-green-600" data-testid="text-import-success">
+                    Successfully imported {importResult.imported} assets.
+                  </p>
+                )}
+                {importResult.errors && importResult.errors.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-destructive">Errors:</p>
+                    <ul className="text-sm text-destructive list-disc pl-4 max-h-40 overflow-y-auto">
+                      {importResult.errors.map((err, i) => (
+                        <li key={i} data-testid={`text-import-error-${i}`}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)} data-testid="button-close-import">
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

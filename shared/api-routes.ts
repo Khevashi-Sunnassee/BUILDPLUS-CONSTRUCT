@@ -697,6 +697,8 @@ export const ASSET_ROUTES = {
   LIST: '/api/admin/assets',
   BY_ID: (id: string) => `/api/admin/assets/${id}`,
   CREATE: '/api/admin/assets',
+  IMPORT: '/api/admin/assets/import',
+  TEMPLATE: '/api/admin/assets/template',
   AI_SUMMARY: (id: string) => `/api/admin/assets/${id}/ai-summary`,
   MAINTENANCE: (id: string) => `/api/admin/assets/${id}/maintenance`,
   MAINTENANCE_BY_ID: (assetId: string, id: string) => `/api/admin/assets/${assetId}/maintenance/${id}`,

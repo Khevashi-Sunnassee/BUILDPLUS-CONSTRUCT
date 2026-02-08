@@ -6,6 +6,8 @@ import { eq, and, sql, desc, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import OpenAI from "openai";
 import logger from "../lib/logger";
+import multer from "multer";
+import ExcelJS from "exceljs";
 
 const router = Router();
 
@@ -116,6 +118,362 @@ async function generateAssetTag(companyId: string): Promise<string> {
   }
   return `${prefix}${String(nextNum).padStart(4, "0")}`;
 }
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+const TEMPLATE_COLUMNS = [
+  { header: "Asset Name", key: "name", width: 30 },
+  { header: "Category", key: "category", width: 22 },
+  { header: "Description", key: "description", width: 35 },
+  { header: "Quantity", key: "quantity", width: 10 },
+  { header: "Status", key: "status", width: 12 },
+  { header: "Condition", key: "condition", width: 12 },
+  { header: "Location", key: "location", width: 20 },
+  { header: "Department", key: "department", width: 18 },
+  { header: "Assigned To", key: "assignedTo", width: 18 },
+  { header: "Funding Method", key: "fundingMethod", width: 16 },
+  { header: "Supplier", key: "supplier", width: 25 },
+  { header: "Purchase Date", key: "purchaseDate", width: 14 },
+  { header: "Purchase Price", key: "purchasePrice", width: 14 },
+  { header: "Current Value", key: "currentValue", width: 14 },
+  { header: "Useful Life (Years)", key: "usefulLifeYears", width: 18 },
+  { header: "Depreciation Method", key: "depreciationMethod", width: 18 },
+  { header: "Depreciation Rate", key: "depreciationRate", width: 16 },
+  { header: "Acc Depreciation", key: "accumulatedDepreciation", width: 16 },
+  { header: "Depreciation This Period", key: "depreciationThisPeriod", width: 20 },
+  { header: "Book Value", key: "bookValue", width: 14 },
+  { header: "Years Depreciated", key: "yearsDepreciated", width: 16 },
+  { header: "Manufacturer", key: "manufacturer", width: 20 },
+  { header: "Model", key: "model", width: 20 },
+  { header: "Serial Number", key: "serialNumber", width: 20 },
+  { header: "Asset No.", key: "registrationNumber", width: 16 },
+  { header: "Engine Number", key: "engineNumber", width: 18 },
+  { header: "VIN Number", key: "vinNumber", width: 20 },
+  { header: "Year of Manufacture", key: "yearOfManufacture", width: 18 },
+  { header: "Country of Origin", key: "countryOfOrigin", width: 16 },
+  { header: "Specifications", key: "specifications", width: 30 },
+  { header: "Operating Hours", key: "operatingHours", width: 14 },
+  { header: "Warranty Expiry", key: "warrantyExpiry", width: 14 },
+  { header: "Lease Start Date", key: "leaseStartDate", width: 14 },
+  { header: "Lease End Date", key: "leaseEndDate", width: 14 },
+  { header: "Lease Monthly Payment", key: "leaseMonthlyPayment", width: 18 },
+  { header: "Balloon Payment", key: "balloonPayment", width: 14 },
+  { header: "Lease Term (Months)", key: "leaseTerm", width: 18 },
+  { header: "Lessor", key: "lessor", width: 20 },
+  { header: "Loan Amount", key: "loanAmount", width: 14 },
+  { header: "Interest Rate", key: "interestRate", width: 12 },
+  { header: "Loan Term (Months)", key: "loanTerm", width: 16 },
+  { header: "Lender", key: "lender", width: 20 },
+  { header: "Insurance Provider", key: "insuranceProvider", width: 20 },
+  { header: "Insurance Policy No.", key: "insurancePolicyNumber", width: 20 },
+  { header: "Insurance Premium", key: "insurancePremium", width: 16 },
+  { header: "Insurance Excess", key: "insuranceExcess", width: 14 },
+  { header: "Insurance Start Date", key: "insuranceStartDate", width: 16 },
+  { header: "Insurance Expiry Date", key: "insuranceExpiryDate", width: 16 },
+  { header: "Insurance Status", key: "insuranceStatus", width: 14 },
+  { header: "Insurance Notes", key: "insuranceNotes", width: 25 },
+  { header: "Barcode", key: "barcode", width: 18 },
+  { header: "Remarks", key: "remarks", width: 30 },
+  { header: "CAPEX Request ID", key: "capexRequestId", width: 16 },
+  { header: "CAPEX Description", key: "capexDescription", width: 25 },
+];
+
+const HEADER_TO_KEY: Record<string, string> = {};
+TEMPLATE_COLUMNS.forEach(c => { HEADER_TO_KEY[c.header.toLowerCase().trim()] = c.key; });
+
+const SPREADSHEET_ALIASES: Record<string, string> = {
+  "item": "_skip",
+  "asset name": "name",
+  "asset no.": "registrationNumber",
+  "acquisition date": "purchaseDate",
+  "acquisition cost": "purchasePrice",
+  "useful life (years)": "usefulLifeYears",
+  "salvage value": "_skip",
+  "acc depreciation": "accumulatedDepreciation",
+  "depreciation this period (initial)": "depreciationThisPeriod",
+  "no of years depreciation": "yearsDepreciated",
+  "serial no.": "serialNumber",
+  "description": "category",
+  "quantity": "quantity",
+  "book value": "bookValue",
+  "remarks": "remarks",
+};
+
+function mapCategoryFromSpreadsheet(desc: string | null): string {
+  if (!desc) return "Other";
+  const lower = desc.toLowerCase().trim();
+  if (lower === "tools") return "Hand Tools & Power Tools";
+  if (lower === "machinery") return "General Machinery";
+  if (lower === "computer equipment") return "IT Equipment";
+  if (lower === "buildings") return "Infrastructure";
+  if (lower === "yard equipment") return "Workshop Equipment";
+  if (lower.includes("magnet") || lower.includes("formwork") || lower.includes("klipform")) return "Molds";
+  const match = ASSET_CATEGORIES.find(c => c.toLowerCase() === lower);
+  if (match) return match;
+  return "Other";
+}
+
+function parseExcelDate(value: any): string | null {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return value.toISOString().split("T")[0];
+  }
+  const str = String(value).trim();
+  const dateObj = new Date(str);
+  if (!isNaN(dateObj.getTime())) {
+    return dateObj.toISOString().split("T")[0];
+  }
+  return null;
+}
+
+function parseNumber(value: any): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value === "number") return value;
+  const cleaned = String(value).replace(/[,$\s]/g, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
+router.get("/api/admin/assets/template", requireAuth, async (_req: Request, res: Response) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Asset Register Template");
+    sheet.columns = TEMPLATE_COLUMNS.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, size: 11 };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+
+    const catSheet = workbook.addWorksheet("Validation Data");
+    catSheet.getColumn(1).width = 30;
+    catSheet.getCell("A1").value = "Valid Categories";
+    catSheet.getCell("A1").font = { bold: true };
+    ASSET_CATEGORIES.forEach((cat, i) => {
+      catSheet.getCell(`A${i + 2}`).value = cat;
+    });
+    catSheet.getColumn(2).width = 15;
+    catSheet.getCell("B1").value = "Valid Statuses";
+    catSheet.getCell("B1").font = { bold: true };
+    ASSET_STATUSES.forEach((s, i) => {
+      catSheet.getCell(`B${i + 2}`).value = s;
+    });
+    catSheet.getColumn(3).width = 15;
+    catSheet.getCell("C1").value = "Valid Conditions";
+    catSheet.getCell("C1").font = { bold: true };
+    ASSET_CONDITIONS.forEach((c, i) => {
+      catSheet.getCell(`C${i + 2}`).value = c;
+    });
+    catSheet.getColumn(4).width = 15;
+    catSheet.getCell("D1").value = "Funding Methods";
+    catSheet.getCell("D1").font = { bold: true };
+    ASSET_FUNDING_METHODS.forEach((f, i) => {
+      catSheet.getCell(`D${i + 2}`).value = f;
+    });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=Asset_Register_Template.xlsx");
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    logger.error("Failed to generate asset template", { error: error.message });
+    res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
+router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+
+    let sheet = workbook.worksheets[0];
+    for (const ws of workbook.worksheets) {
+      const name = ws.name.toLowerCase().trim();
+      if (name.includes("all assets") || name.includes("fy 24") || name === "asset register template") {
+        sheet = ws;
+        break;
+      }
+    }
+
+    let headerRowIndex = 0;
+    const columnMap: Record<number, string> = {};
+    for (let r = 1; r <= Math.min(10, sheet.rowCount); r++) {
+      const row = sheet.getRow(r);
+      let matchCount = 0;
+      for (let c = 1; c <= sheet.columnCount; c++) {
+        const cell = row.getCell(c);
+        let val = cell.value;
+        if (val && typeof val === "object" && "richText" in val) {
+          val = (val as any).richText.map((t: any) => t.text).join("");
+        }
+        if (!val) continue;
+        const headerStr = String(val).toLowerCase().trim();
+        const mappedKey = HEADER_TO_KEY[headerStr] || SPREADSHEET_ALIASES[headerStr];
+        if (mappedKey) {
+          matchCount++;
+          if (mappedKey !== "_skip") {
+            columnMap[c] = mappedKey;
+          }
+        }
+      }
+      if (matchCount >= 3) {
+        headerRowIndex = r;
+        break;
+      }
+    }
+
+    if (!headerRowIndex) {
+      return res.status(400).json({ error: "Could not find header row. Please ensure the spreadsheet has recognizable column headers." });
+    }
+
+    const imported: any[] = [];
+    const errors: string[] = [];
+    let rowNum = 0;
+
+    for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
+      const row = sheet.getRow(r);
+      const rowData: Record<string, any> = {};
+      let hasData = false;
+
+      for (const [colStr, key] of Object.entries(columnMap)) {
+        const col = parseInt(colStr);
+        const cell = row.getCell(col);
+        let val = cell.value;
+        if (val && typeof val === "object" && "result" in val) val = (val as any).result;
+        if (val && typeof val === "object" && "richText" in val) val = (val as any).richText.map((t: any) => t.text).join("");
+        if (val !== null && val !== undefined && val !== "") {
+          hasData = true;
+          rowData[key] = val;
+        }
+      }
+
+      if (!hasData) continue;
+      rowNum++;
+
+      const name = rowData.name ? String(rowData.name).trim() : null;
+      if (!name) {
+        errors.push(`Row ${rowNum}: Missing asset name, skipped`);
+        continue;
+      }
+
+      let category = rowData.category ? String(rowData.category).trim() : null;
+      if (category && !ASSET_CATEGORIES.includes(category as any)) {
+        category = mapCategoryFromSpreadsheet(category);
+      }
+      if (!category) category = "Other";
+
+      try {
+        const assetTag = await generateAssetTag(companyId);
+        const insertData: any = {
+          companyId,
+          assetTag,
+          name,
+          category,
+          status: "active",
+          createdBy: req.session?.userId || null,
+        };
+
+        if (rowData.description) insertData.description = String(rowData.description).trim();
+        if (rowData.supplier) insertData.supplier = String(rowData.supplier).trim();
+        if (rowData.serialNumber) insertData.serialNumber = String(rowData.serialNumber).trim();
+        if (rowData.registrationNumber) insertData.registrationNumber = String(rowData.registrationNumber).trim();
+        if (rowData.remarks) insertData.remarks = String(rowData.remarks).trim();
+        if (rowData.manufacturer) insertData.manufacturer = String(rowData.manufacturer).trim();
+        if (rowData.model) insertData.model = String(rowData.model).trim();
+        if (rowData.location) insertData.location = String(rowData.location).trim();
+        if (rowData.department) insertData.department = String(rowData.department).trim();
+        if (rowData.assignedTo) insertData.assignedTo = String(rowData.assignedTo).trim();
+        if (rowData.fundingMethod) insertData.fundingMethod = String(rowData.fundingMethod).trim();
+        if (rowData.depreciationMethod) insertData.depreciationMethod = String(rowData.depreciationMethod).trim();
+        if (rowData.engineNumber) insertData.engineNumber = String(rowData.engineNumber).trim();
+        if (rowData.vinNumber) insertData.vinNumber = String(rowData.vinNumber).trim();
+        if (rowData.yearOfManufacture) insertData.yearOfManufacture = String(rowData.yearOfManufacture).trim();
+        if (rowData.countryOfOrigin) insertData.countryOfOrigin = String(rowData.countryOfOrigin).trim();
+        if (rowData.specifications) insertData.specifications = String(rowData.specifications).trim();
+        if (rowData.barcode) insertData.barcode = String(rowData.barcode).trim();
+        if (rowData.capexRequestId) insertData.capexRequestId = String(rowData.capexRequestId).trim();
+        if (rowData.capexDescription) insertData.capexDescription = String(rowData.capexDescription).trim();
+        if (rowData.lessor) insertData.lessor = String(rowData.lessor).trim();
+        if (rowData.lender) insertData.lender = String(rowData.lender).trim();
+        if (rowData.insuranceProvider) insertData.insuranceProvider = String(rowData.insuranceProvider).trim();
+        if (rowData.insurancePolicyNumber) insertData.insurancePolicyNumber = String(rowData.insurancePolicyNumber).trim();
+        if (rowData.insuranceStatus) insertData.insuranceStatus = String(rowData.insuranceStatus).trim();
+        if (rowData.insuranceNotes) insertData.insuranceNotes = String(rowData.insuranceNotes).trim();
+
+        const purchaseDate = parseExcelDate(rowData.purchaseDate);
+        if (purchaseDate) insertData.purchaseDate = purchaseDate;
+        const warrantyExpiry = parseExcelDate(rowData.warrantyExpiry);
+        if (warrantyExpiry) insertData.warrantyExpiry = warrantyExpiry;
+        const leaseStartDate = parseExcelDate(rowData.leaseStartDate);
+        if (leaseStartDate) insertData.leaseStartDate = leaseStartDate;
+        const leaseEndDate = parseExcelDate(rowData.leaseEndDate);
+        if (leaseEndDate) insertData.leaseEndDate = leaseEndDate;
+        const insuranceStartDate = parseExcelDate(rowData.insuranceStartDate);
+        if (insuranceStartDate) insertData.insuranceStartDate = insuranceStartDate;
+        const insuranceExpiryDate = parseExcelDate(rowData.insuranceExpiryDate);
+        if (insuranceExpiryDate) insertData.insuranceExpiryDate = insuranceExpiryDate;
+
+        const purchasePrice = parseNumber(rowData.purchasePrice);
+        if (purchasePrice !== null) insertData.purchasePrice = String(purchasePrice);
+        const currentValue = parseNumber(rowData.currentValue);
+        if (currentValue !== null) insertData.currentValue = String(currentValue);
+        const accDep = parseNumber(rowData.accumulatedDepreciation);
+        if (accDep !== null) insertData.accumulatedDepreciation = String(accDep);
+        const depThisPeriod = parseNumber(rowData.depreciationThisPeriod);
+        if (depThisPeriod !== null) insertData.depreciationThisPeriod = String(depThisPeriod);
+        const bookVal = parseNumber(rowData.bookValue);
+        if (bookVal !== null) insertData.bookValue = String(bookVal);
+        const depRate = parseNumber(rowData.depreciationRate);
+        if (depRate !== null) insertData.depreciationRate = String(depRate);
+        const opHours = parseNumber(rowData.operatingHours);
+        if (opHours !== null) insertData.operatingHours = String(opHours);
+        const leasePmt = parseNumber(rowData.leaseMonthlyPayment);
+        if (leasePmt !== null) insertData.leaseMonthlyPayment = String(leasePmt);
+        const balloon = parseNumber(rowData.balloonPayment);
+        if (balloon !== null) insertData.balloonPayment = String(balloon);
+        const loanAmt = parseNumber(rowData.loanAmount);
+        if (loanAmt !== null) insertData.loanAmount = String(loanAmt);
+        const intRate = parseNumber(rowData.interestRate);
+        if (intRate !== null) insertData.interestRate = String(intRate);
+        const insPrem = parseNumber(rowData.insurancePremium);
+        if (insPrem !== null) insertData.insurancePremium = String(insPrem);
+        const insExcess = parseNumber(rowData.insuranceExcess);
+        if (insExcess !== null) insertData.insuranceExcess = String(insExcess);
+
+        const qty = parseNumber(rowData.quantity);
+        if (qty !== null) insertData.quantity = Math.round(qty);
+        const usefulLife = parseNumber(rowData.usefulLifeYears);
+        if (usefulLife !== null) insertData.usefulLifeYears = Math.round(usefulLife);
+        const yearsDep = parseNumber(rowData.yearsDepreciated);
+        if (yearsDep !== null) insertData.yearsDepreciated = Math.round(yearsDep);
+        const leaseTerm = parseNumber(rowData.leaseTerm);
+        if (leaseTerm !== null) insertData.leaseTerm = Math.round(leaseTerm);
+        const loanTerm = parseNumber(rowData.loanTerm);
+        if (loanTerm !== null) insertData.loanTerm = Math.round(loanTerm);
+
+        const [created] = await db.insert(assets).values(insertData).returning();
+        imported.push({ id: created.id, name: created.name, assetTag: created.assetTag });
+      } catch (rowError: any) {
+        errors.push(`Row ${rowNum} (${name}): ${rowError.message}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      imported: imported.length,
+      errors: errors.length,
+      errorDetails: errors.slice(0, 50),
+      assets: imported.slice(0, 20),
+    });
+  } catch (error: any) {
+    logger.error("Failed to import assets", { error: error.message });
+    res.status(500).json({ error: error.message || "Failed to import assets" });
+  }
+});
 
 router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response) => {
   try {
