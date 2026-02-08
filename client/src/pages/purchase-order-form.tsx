@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { useForm } from "react-hook-form";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO, addDays } from "date-fns";
@@ -170,6 +171,8 @@ export default function PurchaseOrderFormPage() {
       notes: "",
     },
   });
+
+  useUnsavedChanges(form.formState.isDirty);
 
   useEffect(() => {
     if (existingPO) {

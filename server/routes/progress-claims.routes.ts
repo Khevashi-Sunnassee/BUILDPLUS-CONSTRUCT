@@ -207,9 +207,9 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
     });
 
     res.json(enrichedClaims);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching progress claims");
-    res.status(500).json({ error: error.message || "Failed to fetch progress claims" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch progress claims" });
   }
 });
 
@@ -222,9 +222,9 @@ router.get("/api/progress-claims/next-number", requireAuth, async (req: Request,
       .where(eq(progressClaims.companyId, companyId));
     const nextNum = (result[0]?.cnt || 0) + 1;
     res.json({ claimNumber: `PC-${String(nextNum).padStart(4, "0")}` });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next claim number");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -313,9 +313,9 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
     }
 
     res.json(Object.values(jobGroups));
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching retention report");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -359,9 +359,9 @@ router.get("/api/progress-claims/:id", requireAuth, async (req: Request, res: Re
 
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     res.json(claim);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching progress claim");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -393,9 +393,9 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
       .limit(safeLimit);
 
     res.json(items);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching claim items");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -483,9 +483,9 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
     });
 
     res.json(panelsWithRevenue);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching claimable panels");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -541,9 +541,9 @@ router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: R
       claimedToDate: claimedToDate.toFixed(2),
       remainingValue: remaining.toFixed(2),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job claim summary");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -627,9 +627,9 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
       return result;
     });
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating progress claim");
-    res.status(500).json({ error: error.message || "Failed to create progress claim" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create progress claim" });
   }
 });
 
@@ -720,12 +720,12 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
     }
 
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if ((error as { statusCode?: number }).statusCode === 409) {
-      return res.status(409).json({ error: error.message });
+      return res.status(409).json({ error: error instanceof Error ? error.message : "Internal server error" });
     }
     logger.error({ err: error }, "Error updating progress claim");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -743,9 +743,9 @@ router.post("/api/progress-claims/:id/submit", requireAuth, async (req: Request,
       .returning();
 
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error submitting progress claim");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -786,9 +786,9 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
     });
 
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error approving progress claim");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -814,9 +814,9 @@ router.post("/api/progress-claims/:id/reject", requireAuth, async (req: Request,
       .returning();
 
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error rejecting progress claim");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -881,9 +881,9 @@ router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, asy
         };
       }),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching retention summary");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 
@@ -907,9 +907,9 @@ router.delete("/api/progress-claims/:id", requireAuth, async (req: Request, res:
       await tx.delete(progressClaims).where(eq(progressClaims.id, claim.id));
     });
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting progress claim");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
   }
 });
 

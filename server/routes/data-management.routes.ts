@@ -44,8 +44,8 @@ dataManagementRouter.get("/api/admin/data-management/items", requireRole("ADMIN"
       .where(eq(items.companyId, companyId))
       .orderBy(asc(items.name));
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch items" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });
   }
 });
 
@@ -71,8 +71,8 @@ dataManagementRouter.delete("/api/admin/data-management/items/:id", requireRole(
 
     await db.delete(items).where(and(eq(items.id, id), eq(items.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete item" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete item" });
   }
 });
 
@@ -104,8 +104,8 @@ dataManagementRouter.get("/api/admin/data-management/item-categories", requireRo
     );
 
     res.json(catsWithCounts);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch item categories" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch item categories" });
   }
 });
 
@@ -131,8 +131,8 @@ dataManagementRouter.delete("/api/admin/data-management/item-categories/:id", re
 
     await db.delete(itemCategories).where(and(eq(itemCategories.id, id), eq(itemCategories.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete item category" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete item category" });
   }
 });
 
@@ -154,8 +154,8 @@ dataManagementRouter.get("/api/admin/data-management/assets", requireRole("ADMIN
       .where(eq(assets.companyId, companyId))
       .orderBy(asc(assets.name));
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch assets" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch assets" });
   }
 });
 
@@ -172,8 +172,8 @@ dataManagementRouter.delete("/api/admin/data-management/assets/:id", requireRole
     await db.delete(assetTransfers).where(and(eq(assetTransfers.assetId, id), eq(assetTransfers.companyId, companyId)));
     await db.delete(assets).where(and(eq(assets.id, id), eq(assets.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete asset" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete asset" });
   }
 });
 
@@ -198,8 +198,8 @@ dataManagementRouter.get("/api/admin/data-management/progress-claims", requireRo
       .where(eq(progressClaims.companyId, companyId))
       .orderBy(desc(progressClaims.createdAt));
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch progress claims" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch progress claims" });
   }
 });
 
@@ -215,8 +215,8 @@ dataManagementRouter.delete("/api/admin/data-management/progress-claims/:id", re
     await db.delete(progressClaimItems).where(eq(progressClaimItems.progressClaimId, id));
     await db.delete(progressClaims).where(and(eq(progressClaims.id, id), eq(progressClaims.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete progress claim" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete progress claim" });
   }
 });
 
@@ -248,8 +248,8 @@ dataManagementRouter.get("/api/admin/data-management/broadcast-templates", requi
     );
 
     res.json(templatesWithCounts);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch broadcast templates" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch broadcast templates" });
   }
 });
 
@@ -275,8 +275,8 @@ dataManagementRouter.delete("/api/admin/data-management/broadcast-templates/:id"
 
     await db.delete(broadcastTemplates).where(and(eq(broadcastTemplates.id, id), eq(broadcastTemplates.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete broadcast template" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete broadcast template" });
   }
 });
 
@@ -301,8 +301,8 @@ dataManagementRouter.get("/api/admin/data-management/documents", requireRole("AD
       .where(eq(documents.companyId, companyId))
       .orderBy(desc(documents.createdAt));
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch documents" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch documents" });
   }
 });
 
@@ -340,8 +340,8 @@ dataManagementRouter.delete("/api/admin/data-management/documents/:id", requireR
     await db.delete(documentBundleItems).where(eq(documentBundleItems.documentId, id));
     await db.delete(documents).where(and(eq(documents.id, id), eq(documents.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete document" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document" });
   }
 });
 
@@ -366,8 +366,8 @@ dataManagementRouter.get("/api/admin/data-management/contracts", requireRole("AD
       .where(eq(contracts.companyId, companyId))
       .orderBy(desc(contracts.createdAt));
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch contracts" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch contracts" });
   }
 });
 
@@ -382,8 +382,8 @@ dataManagementRouter.delete("/api/admin/data-management/contracts/:id", requireR
 
     await db.delete(contracts).where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete contract" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete contract" });
   }
 });
 
@@ -411,8 +411,8 @@ dataManagementRouter.get("/api/admin/data-management/deliveries", requireRole("A
       .orderBy(desc(deliveryRecords.createdAt));
 
     res.json(allDeliveries);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch deliveries" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch deliveries" });
   }
 });
 
@@ -443,8 +443,8 @@ dataManagementRouter.delete("/api/admin/data-management/deliveries/:id", require
 
     await db.delete(deliveryRecords).where(eq(deliveryRecords.id, id));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete delivery record" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete delivery record" });
   }
 });
 
@@ -469,8 +469,8 @@ dataManagementRouter.get("/api/admin/data-management/load-lists", requireRole("A
       .where(eq(jobs.companyId, companyId))
       .orderBy(desc(loadLists.createdAt));
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch load lists" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch load lists" });
   }
 });
 
@@ -504,7 +504,7 @@ dataManagementRouter.delete("/api/admin/data-management/load-lists/:id", require
     await db.delete(loadListPanels).where(eq(loadListPanels.loadListId, id));
     await db.delete(loadLists).where(eq(loadLists.id, id));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete load list" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete load list" });
   }
 });

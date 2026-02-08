@@ -123,7 +123,7 @@ router.get("/api/daily-logs", requireAuth, requirePermission("daily_reports"), a
       });
     }
     res.json(logsWithStats);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching daily logs");
     res.status(500).json({ error: "Failed to fetch daily logs" });
   }
@@ -155,9 +155,9 @@ router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "
     });
     
     res.status(201).json(newLog);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating daily log");
-    res.status(500).json({ error: error.message || "Failed to create daily log" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create daily log" });
   }
 });
 
@@ -282,9 +282,9 @@ router.delete("/api/log-rows/:id", requireAuth, async (req, res) => {
     }
     await storage.deleteLogRow(req.params.id as string);
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting log row");
-    res.status(500).json({ error: error.message || "Failed to delete log row" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete log row" });
   }
 });
 
@@ -304,9 +304,9 @@ router.delete("/api/daily-logs/:id", requireAuth, requirePermission("daily_repor
     }
     await storage.deleteDailyLog(req.params.id as string);
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting daily log");
-    res.status(500).json({ error: error.message || "Failed to delete daily log" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete daily log" });
   }
 });
 

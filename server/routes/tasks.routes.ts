@@ -72,9 +72,9 @@ router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (r
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const groups = await storage.getAllTaskGroups(companyId);
     res.json(groups);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task groups");
-    res.status(500).json({ error: error.message || "Failed to fetch task groups" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task groups" });
   }
 });
 
@@ -84,9 +84,9 @@ router.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), asyn
     const group = await storage.getTaskGroup(String(req.params.id));
     if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
     res.json(group);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task group");
-    res.status(500).json({ error: error.message || "Failed to fetch task group" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task group" });
   }
 });
 
@@ -100,9 +100,9 @@ router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AN
     }
     const group = await storage.createTaskGroup({ ...parsed.data, companyId });
     res.status(201).json(group);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task group");
-    res.status(500).json({ error: error.message || "Failed to create task group" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task group" });
   }
 });
 
@@ -129,9 +129,9 @@ router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VI
     const group = await storage.updateTaskGroup(String(req.params.id), parsed.data);
     if (!group) return res.status(404).json({ error: "Task group not found" });
     res.json(group);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating task group");
-    res.status(500).json({ error: error.message || "Failed to update task group" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update task group" });
   }
 });
 
@@ -142,9 +142,9 @@ router.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "V
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
     await storage.deleteTaskGroup(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task group");
-    res.status(500).json({ error: error.message || "Failed to delete task group" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete task group" });
   }
 });
 
@@ -164,9 +164,9 @@ router.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", 
     }
     await storage.reorderTaskGroups(groupIds);
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering task groups");
-    res.status(500).json({ error: error.message || "Failed to reorder task groups" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reorder task groups" });
   }
 });
 
@@ -180,9 +180,9 @@ router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
     res.json(task);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task");
-    res.status(500).json({ error: error.message || "Failed to fetch task" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task" });
   }
 });
 
@@ -218,9 +218,9 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
       createdById: userId,
     });
     res.status(201).json(task);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task");
-    res.status(500).json({ error: error.message || "Failed to create task" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task" });
   }
 });
 
@@ -249,9 +249,9 @@ router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND
     const task = await storage.updateTask(String(req.params.id), updateData);
     if (!task) return res.status(404).json({ error: "Task not found" });
     res.json(task);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating task");
-    res.status(500).json({ error: error.message || "Failed to update task" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update task" });
   }
 });
 
@@ -266,9 +266,9 @@ router.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AN
     }
     await storage.deleteTask(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task");
-    res.status(500).json({ error: error.message || "Failed to delete task" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete task" });
   }
 });
 
@@ -285,9 +285,9 @@ router.post("/api/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_
     }
     await storage.reorderTasks(groupId, taskIds);
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering tasks");
-    res.status(500).json({ error: error.message || "Failed to reorder tasks" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reorder tasks" });
   }
 });
 
@@ -313,9 +313,9 @@ router.post("/api/tasks/:id/move", requireAuth, requirePermission("tasks", "VIEW
       return res.status(404).json({ error: "Task not found" });
     }
     res.json(task);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error moving task");
-    res.status(500).json({ error: error.message || "Failed to move task" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to move task" });
   }
 });
 
@@ -330,9 +330,9 @@ router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), 
     }
     const assignees = await storage.getTaskAssignees(String(req.params.id));
     res.json(assignees);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task assignees");
-    res.status(500).json({ error: error.message || "Failed to fetch task assignees" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task assignees" });
   }
 });
 
@@ -351,9 +351,9 @@ router.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "
     }
     const assignees = await storage.setTaskAssignees(String(req.params.id), userIds);
     res.json(assignees);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error setting task assignees");
-    res.status(500).json({ error: error.message || "Failed to set task assignees" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to set task assignees" });
   }
 });
 
@@ -368,9 +368,9 @@ router.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), as
     }
     const updates = await storage.getTaskUpdates(String(req.params.id));
     res.json(updates);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task updates");
-    res.status(500).json({ error: error.message || "Failed to fetch task updates" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task updates" });
   }
 });
 
@@ -415,9 +415,9 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
     );
     
     res.status(201).json(update);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task update");
-    res.status(500).json({ error: error.message || "Failed to create task update" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task update" });
   }
 });
 
@@ -434,9 +434,9 @@ router.delete("/api/task-updates/:id", requireAuth, requirePermission("tasks", "
     }
     await storage.deleteTaskUpdate(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task update");
-    res.status(500).json({ error: error.message || "Failed to delete task update" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete task update" });
   }
 });
 
@@ -451,9 +451,9 @@ router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), asyn
     }
     const files = await storage.getTaskFiles(String(req.params.id));
     res.json(files);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task files");
-    res.status(500).json({ error: error.message || "Failed to fetch task files" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task files" });
   }
 });
 
@@ -487,9 +487,9 @@ router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIE
       uploadedById: userId,
     });
     res.status(201).json(taskFile);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading task file");
-    res.status(500).json({ error: error.message || "Failed to upload task file" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload task file" });
   }
 });
 
@@ -506,9 +506,9 @@ router.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VI
     }
     await storage.deleteTaskFile(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting task file");
-    res.status(500).json({ error: error.message || "Failed to delete task file" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete task file" });
   }
 });
 
@@ -517,9 +517,9 @@ router.get("/api/task-notifications", requireAuth, async (req, res) => {
     const userId = req.session.userId!;
     const notifications = await storage.getTaskNotifications(userId);
     res.json(notifications);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task notifications");
-    res.status(500).json({ error: error.message || "Failed to fetch task notifications" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task notifications" });
   }
 });
 
@@ -528,9 +528,9 @@ router.get("/api/task-notifications/unread-count", requireAuth, async (req, res)
     const userId = req.session.userId!;
     const count = await storage.getUnreadTaskNotificationCount(userId);
     res.json({ count });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching unread task notification count");
-    res.status(500).json({ error: error.message || "Failed to fetch count" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch count" });
   }
 });
 
@@ -546,9 +546,9 @@ router.post("/api/task-notifications/:id/read", requireAuth, async (req, res) =>
     }
     await storage.markTaskNotificationRead(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error marking notification read");
-    res.status(500).json({ error: error.message || "Failed to mark notification read" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to mark notification read" });
   }
 });
 
@@ -557,9 +557,9 @@ router.post("/api/task-notifications/read-all", requireAuth, async (req, res) =>
     const userId = req.session.userId!;
     await storage.markAllTaskNotificationsRead(userId);
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error marking all notifications read");
-    res.status(500).json({ error: error.message || "Failed to mark notifications read" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to mark notifications read" });
   }
 });
 
@@ -594,9 +594,9 @@ router.post("/api/tasks/send-email", requireAuth, async (req, res) => {
     }
 
     res.json({ success: true, messageId: result.messageId });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error sending tasks email");
-    res.status(500).json({ error: error.message || "Failed to send email" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
   }
 });
 

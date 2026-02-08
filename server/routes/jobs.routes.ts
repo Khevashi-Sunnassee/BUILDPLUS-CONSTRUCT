@@ -96,7 +96,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
     }));
 
     res.json(enriched);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching opportunities");
     res.status(500).json({ error: "Failed to fetch opportunities" });
   }
@@ -207,9 +207,9 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
     }
 
     res.json(serializeJobPhase(job));
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating opportunity");
-    res.status(400).json({ error: error.message || "Failed to create opportunity" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create opportunity" });
   }
 });
 
@@ -293,9 +293,9 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
     }
 
     res.json(serializeJobPhase(updated!));
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating opportunity");
-    res.status(400).json({ error: error.message || "Failed to update opportunity" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update opportunity" });
   }
 });
 
@@ -313,7 +313,7 @@ router.get("/api/jobs/opportunities/:id/history", requireAuth, async (req: Reque
       .orderBy(desc(salesStatusHistory.createdAt));
 
     res.json(history);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching sales status history");
     res.status(500).json({ error: "Failed to fetch history" });
   }
@@ -337,9 +337,9 @@ router.post("/api/customers/quick", requireAuth, async (req: Request, res: Respo
     }
     const customer = await storage.createCustomer({ ...parsed.data, companyId: req.companyId } as any);
     res.json(customer);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating quick customer");
-    res.status(500).json({ error: error.message || "Failed to create customer" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create customer" });
   }
 });
 
@@ -368,8 +368,8 @@ router.get("/api/jobs/:jobId", requireAuth, async (req: Request, res: Response) 
       return res.status(404).json({ error: "Job not found" });
     }
     res.json(serializeJobPhase(job));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to get job" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get job" });
   }
 });
 
@@ -386,7 +386,7 @@ router.get("/api/jobs/:jobId/audit-log", requireAuth, async (req: Request, res: 
       .orderBy(desc(jobAuditLogs.createdAt))
       .limit(100);
     res.json(logs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job audit log");
     res.status(500).json({ error: "Failed to fetch audit log" });
   }
@@ -434,8 +434,8 @@ router.get("/api/jobs/:jobId/totals", requireAuth, async (req: Request, res: Res
       validatedCount,
       panelCount: panels.length,
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to get job totals" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get job totals" });
   }
 });
 
@@ -458,8 +458,8 @@ router.put("/api/jobs/:jobId/panel-rates/:panelTypeId", requireRole("ADMIN"), as
     }
     const rate = await storage.upsertJobPanelRate(req.params.jobId as string, req.params.panelTypeId as string, req.body);
     res.json(rate);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to update job rate" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update job rate" });
   }
 });
 
@@ -596,8 +596,8 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     });
 
     res.json(serializeJobPhase(job));
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create job" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create job" });
   }
 });
 
@@ -716,14 +716,14 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
             .set({ requiredDeliveryStartDate: data.productionStartDate, updatedAt: new Date() })
             .where(eq(contracts.id, existingContract.id));
         }
-      } catch (syncError: any) {
+      } catch (syncError: unknown) {
         logger.warn({ err: syncError }, "Failed to sync Required Delivery Start to contract");
       }
     }
 
     res.json(serializeJobPhase(job));
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to update job" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update job" });
   }
 });
 
@@ -757,8 +757,8 @@ router.get("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async 
     }
     const cycleTimes = await storage.getJobLevelCycleTimes(req.params.id as string);
     res.json(cycleTimes);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to get level cycle times" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get level cycle times" });
   }
 });
 
@@ -787,8 +787,8 @@ router.post("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async
     
     await storage.saveJobLevelCycleTimes(req.params.id as string, parseResult.data.cycleTimes);
     res.json({ ok: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to save level cycle times" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to save level cycle times" });
   }
 });
 
@@ -814,8 +814,8 @@ router.get("/api/admin/jobs/:id/production-slot-status", requireRole("ADMIN"), a
       totalSlots: slots.length,
       nonStartedCount: nonStartedSlots.length,
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to get production slot status" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get production slot status" });
   }
 });
 
@@ -935,7 +935,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
     }
 
     return res.json(serializeJobPhase(job));
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating job phase/status");
     res.status(500).json({ error: "Failed to update job phase/status" });
   }
@@ -956,7 +956,7 @@ router.get("/api/admin/jobs/:id/audit-log", requireAuth, async (req: Request, re
       .limit(100);
 
     res.json(logs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job audit log");
     res.status(500).json({ error: "Failed to fetch audit log" });
   }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -469,7 +470,8 @@ export default function ManualEntryPage() {
     },
   });
 
-  // Check if timer is for the currently selected panel (must be after form definition)
+  useUnsavedChanges(form.formState.isDirty);
+
   const selectedPanelId = form.watch("panelRegisterId");
   const isTimerForSelectedPanel = activeTimer && activeTimer.panelRegisterId === selectedPanelId;
 

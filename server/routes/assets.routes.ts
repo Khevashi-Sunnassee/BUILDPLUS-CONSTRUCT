@@ -344,7 +344,7 @@ async function aiCategorizeBatch(items: { index: number; name: string; descripti
     }
 
     return results;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.warn({ err: error }, "AI categorization failed, falling back to manual mapping");
     return {};
   }
@@ -423,7 +423,7 @@ router.get("/api/admin/assets/template", requireAuth, async (_req: Request, res:
     res.setHeader("Content-Disposition", "attachment; filename=Asset_Register_Template.xlsx");
     await workbook.xlsx.write(res);
     res.end();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to generate asset template");
     res.status(500).json({ error: "Failed to generate template" });
   }
@@ -606,8 +606,8 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
           insertData.supplier = supplierName;
           try {
             insertData.supplierId = await findOrCreateSupplier(supplierName);
-          } catch (err: any) {
-            logger.warn(`Failed to create supplier "${supplierName}": ${err.message}`);
+          } catch (err: unknown) {
+            logger.warn(`Failed to create supplier "${supplierName}": ${err instanceof Error ? err.message : String(err)}`);
           }
         }
         if (rowData.description) insertData.description = String(rowData.description).trim();
@@ -689,8 +689,8 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
 
         const [created] = await db.insert(assets).values(insertData).returning();
         imported.push({ id: created.id, name: created.name, assetTag: created.assetTag });
-      } catch (rowError: any) {
-        errors.push(`Row ${parsedRow.rowNum} (${name}): ${rowError.message}`);
+      } catch (rowError: unknown) {
+        errors.push(`Row ${parsedRow.rowNum} (${name}): ${rowError instanceof Error ? rowError.message : String(rowError)}`);
       }
     }
 
@@ -701,9 +701,9 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
       errorDetails: errors.slice(0, 50),
       assets: imported.slice(0, 20),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to import assets");
-    res.status(500).json({ error: error.message || "Failed to import assets" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import assets" });
   }
 });
 
@@ -746,7 +746,7 @@ router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response)
       .orderBy(desc(assets.createdAt))
       .limit(safeLimit);
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch assets");
     res.status(500).json({ error: "Failed to fetch assets" });
   }
@@ -760,7 +760,7 @@ router.get("/api/admin/assets/:id", requireAuth, async (req: Request, res: Respo
       .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!asset) return res.status(404).json({ error: "Asset not found" });
     res.json(asset);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch asset");
     res.status(500).json({ error: "Failed to fetch asset" });
   }
@@ -783,9 +783,9 @@ router.post("/api/admin/assets", requireRole("ADMIN"), async (req: Request, res:
     };
     const [created] = await db.insert(assets).values(data).returning();
     res.status(201).json(created);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create asset");
-    res.status(500).json({ error: error.message || "Failed to create asset" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create asset" });
   }
 });
 
@@ -807,9 +807,9 @@ router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request,
       .where(eq(assets.id, String(req.params.id)))
       .returning();
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update asset");
-    res.status(500).json({ error: error.message || "Failed to update asset" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update asset" });
   }
 });
 
@@ -822,7 +822,7 @@ router.delete("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request
     if (!existing) return res.status(404).json({ error: "Asset not found" });
     await db.delete(assets).where(eq(assets.id, String(req.params.id)));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to delete asset");
     res.status(500).json({ error: "Failed to delete asset" });
   }
@@ -884,7 +884,7 @@ Format as clean HTML with headings and bullet points.`;
       .where(eq(assets.id, asset.id))
       .returning();
     res.json({ aiSummary: summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to generate AI summary");
     res.status(500).json({ error: "Failed to generate AI summary" });
   }
@@ -900,7 +900,7 @@ router.get("/api/admin/assets/:id/maintenance", requireAuth, async (req: Request
       .orderBy(desc(assetMaintenanceRecords.maintenanceDate))
       .limit(safeLimit);
     res.json(records);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch maintenance records" });
   }
 });
@@ -924,8 +924,8 @@ router.post("/api/admin/assets/:id/maintenance", requireRole("ADMIN"), async (re
       createdBy: req.session?.userId || null,
     }).returning();
     res.status(201).json(record);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to create maintenance record" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create maintenance record" });
   }
 });
 
@@ -936,7 +936,7 @@ router.delete("/api/admin/assets/:assetId/maintenance/:id", requireRole("ADMIN")
     await db.delete(assetMaintenanceRecords)
       .where(and(eq(assetMaintenanceRecords.id, String(req.params.id)), eq(assetMaintenanceRecords.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to delete maintenance record" });
   }
 });
@@ -951,7 +951,7 @@ router.get("/api/admin/assets/:id/transfers", requireAuth, async (req: Request, 
       .orderBy(desc(assetTransfers.transferDate))
       .limit(safeLimit);
     res.json(records);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch transfer records" });
   }
 });
@@ -985,8 +985,8 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
     }
 
     res.status(201).json(record);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to create transfer record" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create transfer record" });
   }
 });
 
@@ -997,7 +997,7 @@ router.delete("/api/admin/assets/:assetId/transfers/:id", requireRole("ADMIN"), 
     await db.delete(assetTransfers)
       .where(and(eq(assetTransfers.id, String(req.params.id)), eq(assetTransfers.companyId, companyId)));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to delete transfer record" });
   }
 });

@@ -53,7 +53,7 @@ router.get("/api/panels/ready-for-loading", requireAuth, async (req: Request, re
     const panels = await storage.getPanelsReadyForLoading();
     const filtered = panels.filter((p: any) => p.job?.companyId === companyId);
     res.json(filtered);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panels ready for loading");
     res.status(500).json({ error: "Failed to fetch panels ready for loading" });
   }
@@ -73,7 +73,7 @@ router.get("/api/panels/approved-for-production", requireAuth, async (req: Reque
     const panels = await storage.getPanelsApprovedForProduction(jobId as string | undefined);
     const filtered = panels.filter((p: any) => p.job?.companyId === companyId);
     res.json(filtered);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching approved panels");
     res.status(500).json({ error: "Failed to fetch approved panels" });
   }
@@ -124,8 +124,8 @@ router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, 
     }
     
     res.json(updatedPanel);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to update document status" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document status" });
   }
 });
 
@@ -167,8 +167,8 @@ router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: 
       pageSize,
       totalPages: Math.ceil(filtered.length / pageSize)
     });
-  } catch (error: any) {
-    logger.error({ error: error.message }, "Failed to get admin panels");
+  } catch (error: unknown) {
+    logger.error({ error: error instanceof Error ? error.message : String(error) }, "Failed to get admin panels");
     res.status(500).json({ error: "Failed to get panels" });
   }
 });
@@ -181,7 +181,7 @@ router.get("/api/panels/:id/details", requireAuth, async (req: Request, res: Res
     const job = await storage.getJob(panel.jobId);
     if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
     res.json(panel);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panel details");
     res.status(500).json({ error: "Failed to fetch panel details" });
   }
@@ -235,11 +235,11 @@ router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res:
     const panel = await storage.createPanelRegisterItem(result.data);
     logPanelChange(panel.id, "Panel created", req.session.userId, { changedFields: { panelMark: panel.panelMark, panelType: panel.panelType, jobId: panel.jobId }, newLifecycleStatus: 0 });
     res.json(panel);
-  } catch (error: any) {
-    if (error.message?.includes("duplicate")) {
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message?.includes("duplicate")) {
       return res.status(400).json({ error: "Panel with this mark already exists for this job" });
     }
-    res.status(400).json({ error: error.message || "Failed to create panel" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create panel" });
   }
 });
 
@@ -284,8 +284,8 @@ router.post("/api/panels/admin/:id/validate", requireRole("ADMIN", "MANAGER"), a
     });
     logPanelChange(updatedPanel!.id, "Panel validated", req.session.userId);
     res.json(updatedPanel);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to validate panel" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to validate panel" });
   }
 });
 
@@ -321,8 +321,8 @@ router.delete("/api/panels/admin/by-source/:source", requireRole("ADMIN"), async
     
     const deletedCount = await storage.deletePanelsBySource(source);
     res.json({ deleted: deletedCount });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete panels" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete panels" });
   }
 });
 
@@ -353,7 +353,7 @@ router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: 
       .offset(offset);
     
     res.json(logs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panel audit logs");
     res.status(500).json({ error: "Failed to get audit logs" });
   }
@@ -413,9 +413,9 @@ router.post("/api/panels/consolidation-check", requireAuth, requireRole("ADMIN",
     }
 
     res.json(results);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error checking panel consolidation records");
-    res.status(500).json({ error: error.message || "Failed to check panel records" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check panel records" });
   }
 });
 
@@ -555,9 +555,9 @@ router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGE
 
     const updatedPanel = await storage.getPanelRegisterItem(primaryPanelId);
     res.json({ panel: updatedPanel, consumedPanelIds });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Panel consolidation error");
-    res.status(500).json({ error: error.message || "Failed to consolidate panels" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to consolidate panels" });
   }
 });
 
@@ -611,7 +611,7 @@ router.post("/api/panels/:id/lifecycle", requireAuth, async (req: Request, res: 
 
     const updated = await storage.getPanelRegisterItem(panelId);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Panel lifecycle update error");
     res.status(500).json({ error: "Failed to update panel lifecycle" });
   }

@@ -40,6 +40,14 @@ app.use(helmet({
 
 app.set("trust proxy", 1);
 
+const sessionKeyGenerator = (req: Request): string => {
+  const sessionId = (req as any).session?.id;
+  if (sessionId) return `session:${sessionId}`;
+  const forwarded = req.headers["x-forwarded-for"];
+  const ip = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.ip;
+  return `ip:${ip || "unknown"}`;
+};
+
 const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 300,
@@ -47,6 +55,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
   validate: { xForwardedForHeader: false },
+  keyGenerator: sessionKeyGenerator,
 });
 
 const authLimiter = rateLimit({
@@ -186,29 +195,31 @@ app.get("/api/admin/error-summary", (req, res) => {
   res.json(errorMonitor.getSummary());
 });
 
-app.get("/api/health", (_req, res) => {
-  const poolStatus = {
-    totalCount: pool.totalCount,
-    idleCount: pool.idleCount,
-    waitingCount: pool.waitingCount,
-  };
-  
+app.get("/api/health", (req, res) => {
+  const isAdmin = (req as any).session?.role === "ADMIN";
+
   pool.query("SELECT 1")
     .then(() => {
-      res.json({ 
+      const response: Record<string, unknown> = {
         status: "healthy",
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        pool: poolStatus,
         timestamp: new Date().toISOString(),
-      });
+      };
+      if (isAdmin) {
+        response.uptime = process.uptime();
+        response.memory = process.memoryUsage();
+        response.pool = {
+          totalCount: pool.totalCount,
+          idleCount: pool.idleCount,
+          waitingCount: pool.waitingCount,
+        };
+      }
+      res.json(response);
     })
     .catch((err) => {
       logger.error({ err }, "Health check failed — database unreachable");
-      res.status(503).json({ 
+      res.status(503).json({
         status: "unhealthy",
         error: "Database connection failed",
-        pool: poolStatus,
         timestamp: new Date().toISOString(),
       });
     });

@@ -58,9 +58,9 @@ router.get("/api/purchase-orders", requireAuth, async (req, res) => {
       orders = await storage.getAllPurchaseOrders(companyId);
     }
     res.json(orders);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase orders");
-    res.status(500).json({ error: error.message || "Failed to fetch purchase orders" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
   }
 });
 
@@ -70,9 +70,9 @@ router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
     const orders = await storage.getPurchaseOrdersByUser(userId);
     res.json(orders);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching my purchase orders");
-    res.status(500).json({ error: error.message || "Failed to fetch purchase orders" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
   }
 });
 
@@ -82,9 +82,9 @@ router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => 
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const poNumber = await storage.getNextPONumber(companyId);
     res.json({ poNumber });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next PO number");
-    res.status(500).json({ error: error.message || "Failed to get next PO number" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next PO number" });
   }
 });
 
@@ -94,9 +94,9 @@ router.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     res.json(order);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase order");
-    res.status(500).json({ error: error.message || "Failed to fetch purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase order" });
   }
 });
 
@@ -122,9 +122,9 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
       lineItems || []
     );
     res.json(order);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating purchase order");
-    res.status(500).json({ error: error.message || "Failed to create purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create purchase order" });
   }
 });
 
@@ -156,9 +156,9 @@ router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     }
     const updated = await storage.updatePurchaseOrder(String(req.params.id), poData, lineItems);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating purchase order");
-    res.status(500).json({ error: error.message || "Failed to update purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update purchase order" });
   }
 });
 
@@ -179,9 +179,9 @@ router.post("/api/purchase-orders/:id/submit", requireAuth, async (req, res) => 
 
     const submitted = await storage.submitPurchaseOrder(String(req.params.id));
     res.json(submitted);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error submitting purchase order");
-    res.status(500).json({ error: error.message || "Failed to submit purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to submit purchase order" });
   }
 });
 
@@ -239,9 +239,9 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
     }
 
     res.json(approved);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error approving purchase order");
-    res.status(500).json({ error: error.message || "Failed to approve purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to approve purchase order" });
   }
 });
 
@@ -274,9 +274,9 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
 
     const rejected = await storage.rejectPurchaseOrder(String(req.params.id), userId!, reason);
     res.json(rejected);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error rejecting purchase order");
-    res.status(500).json({ error: error.message || "Failed to reject purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reject purchase order" });
   }
 });
 
@@ -339,9 +339,9 @@ router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) =>
 
     const updated = await storage.getPurchaseOrder(String(req.params.id));
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error receiving purchase order items");
-    res.status(500).json({ error: error.message || "Failed to receive items" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to receive items" });
   }
 });
 
@@ -368,9 +368,9 @@ router.delete("/api/purchase-orders/:id", requireAuth, async (req, res) => {
 
     await storage.deletePurchaseOrder(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting purchase order");
-    res.status(500).json({ error: error.message || "Failed to delete purchase order" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete purchase order" });
   }
 });
 
@@ -378,9 +378,9 @@ router.get("/api/purchase-orders/:id/attachments", requireAuth, async (req, res)
   try {
     const attachments = await storage.getPurchaseOrderAttachments(String(req.params.id));
     res.json(attachments);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching PO attachments");
-    res.status(500).json({ error: error.message || "Failed to fetch attachments" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch attachments" });
   }
 });
 
@@ -423,9 +423,9 @@ router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("f
     }
 
     res.status(201).json(attachments);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading PO attachments");
-    res.status(500).json({ error: error.message || "Failed to upload attachments" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload attachments" });
   }
 });
 
@@ -442,9 +442,9 @@ router.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => 
     res.setHeader("Content-Disposition", `attachment; filename="${attachment.originalName}"`);
     res.setHeader("Content-Type", attachment.mimeType);
     fs.createReadStream(attachment.filePath).pipe(res);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error downloading attachment");
-    res.status(500).json({ error: error.message || "Failed to download attachment" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download attachment" });
   }
 });
 
@@ -471,9 +471,9 @@ router.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
 
     await storage.deletePurchaseOrderAttachment(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting attachment");
-    res.status(500).json({ error: error.message || "Failed to delete attachment" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete attachment" });
   }
 });
 

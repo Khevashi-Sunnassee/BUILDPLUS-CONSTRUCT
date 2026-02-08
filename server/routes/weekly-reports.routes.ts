@@ -13,7 +13,7 @@ router.get("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_wa
     const endDate = req.query.endDate as string | undefined;
     const reports = await storage.getWeeklyWageReports(startDate, endDate);
     res.json(reports);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching weekly wage reports");
     res.status(500).json({ error: "Failed to fetch weekly wage reports" });
   }
@@ -26,7 +26,7 @@ router.get("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekl
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching weekly wage report");
     res.status(500).json({ error: "Failed to fetch weekly wage report" });
   }
@@ -51,7 +51,7 @@ router.post("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_w
       createdById: req.session.userId!,
     });
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating weekly wage report");
     res.status(500).json({ error: "Failed to create weekly wage report" });
   }
@@ -69,7 +69,7 @@ router.put("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekl
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating weekly wage report");
     res.status(500).json({ error: "Failed to update weekly wage report" });
   }
@@ -79,7 +79,7 @@ router.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), r
   try {
     await storage.deleteWeeklyWageReport(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting weekly wage report");
     res.status(500).json({ error: "Failed to delete weekly wage report" });
   }
@@ -170,7 +170,7 @@ router.get("/api/weekly-wage-reports/:id/analysis", requireAuth, async (req, res
         },
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error generating wage analysis");
     res.status(500).json({ error: "Failed to generate wage analysis" });
   }
@@ -181,7 +181,7 @@ router.get("/api/weekly-job-reports", requireAuth, requirePermission("weekly_job
     const projectManagerId = req.query.projectManagerId as string | undefined;
     const reports = await storage.getWeeklyJobReports(projectManagerId);
     res.json(reports);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching weekly job reports");
     res.status(500).json({ error: "Failed to fetch weekly job reports" });
   }
@@ -192,7 +192,7 @@ router.get("/api/weekly-job-reports/my-reports", requireAuth, async (req, res) =
     const userId = req.session.userId!;
     const reports = await storage.getWeeklyJobReports(userId);
     res.json(reports);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching my weekly job reports");
     res.status(500).json({ error: "Failed to fetch weekly job reports" });
   }
@@ -202,7 +202,7 @@ router.get("/api/weekly-job-reports/pending-approval", requireRole("ADMIN", "MAN
   try {
     const reports = await storage.getWeeklyJobReportsByStatus("SUBMITTED");
     res.json(reports);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching pending approval reports");
     res.status(500).json({ error: "Failed to fetch pending reports" });
   }
@@ -212,7 +212,7 @@ router.get("/api/weekly-job-reports/approved", requireAuth, async (req, res) => 
   try {
     const reports = await storage.getApprovedWeeklyJobReports();
     res.json(reports);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching approved reports");
     res.status(500).json({ error: "Failed to fetch approved reports" });
   }
@@ -225,7 +225,7 @@ router.get("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching weekly job report");
     res.status(500).json({ error: "Failed to fetch report" });
   }
@@ -241,7 +241,7 @@ router.post("/api/weekly-job-reports", requireAuth, async (req, res) => {
       schedules || []
     );
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating weekly job report");
     res.status(500).json({ error: "Failed to create report" });
   }
@@ -255,7 +255,7 @@ router.put("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating weekly job report");
     res.status(500).json({ error: "Failed to update report" });
   }
@@ -268,7 +268,7 @@ router.post("/api/weekly-job-reports/:id/submit", requireAuth, async (req, res) 
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error submitting weekly job report");
     res.status(500).json({ error: "Failed to submit report" });
   }
@@ -282,7 +282,7 @@ router.post("/api/weekly-job-reports/:id/approve", requireRole("ADMIN", "MANAGER
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error approving weekly job report");
     res.status(500).json({ error: "Failed to approve report" });
   }
@@ -297,7 +297,7 @@ router.post("/api/weekly-job-reports/:id/reject", requireRole("ADMIN", "MANAGER"
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error rejecting weekly job report");
     res.status(500).json({ error: "Failed to reject report" });
   }
@@ -307,7 +307,7 @@ router.delete("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
   try {
     await storage.deleteWeeklyJobReport(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting weekly job report");
     res.status(500).json({ error: "Failed to delete report" });
   }

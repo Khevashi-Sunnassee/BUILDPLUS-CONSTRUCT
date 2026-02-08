@@ -116,9 +116,9 @@ router.get("/api/procurement/suppliers", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const suppliersData = await storage.getAllSuppliers(companyId);
     res.json(suppliersData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching suppliers");
-    res.status(500).json({ error: error.message || "Failed to fetch suppliers" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
   }
 });
 
@@ -128,9 +128,9 @@ router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) =>
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const suppliersData = await storage.getActiveSuppliers(companyId);
     res.json(suppliersData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active suppliers");
-    res.status(500).json({ error: error.message || "Failed to fetch suppliers" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
   }
 });
 
@@ -148,7 +148,7 @@ router.get("/api/procurement/suppliers/template", requireAuth, async (_req, res)
     res.setHeader("Content-Disposition", "attachment; filename=Supplier_Import_Template.xlsx");
     await workbook.xlsx.write(res);
     res.end();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to generate supplier template");
     res.status(500).json({ error: "Failed to generate template" });
   }
@@ -191,7 +191,7 @@ router.get("/api/procurement/suppliers/export", requireAuth, async (req, res) =>
     res.setHeader("Content-Disposition", "attachment; filename=Suppliers_Export.xlsx");
     await workbook.xlsx.write(res);
     res.end();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to export suppliers");
     res.status(500).json({ error: "Failed to export suppliers" });
   }
@@ -314,8 +314,8 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
           supplierByName[key] = newSupplier;
           created.push(name);
         }
-      } catch (rowError: any) {
-        errors.push(`Row ${r} (${name}): ${rowError.message}`);
+      } catch (rowError: unknown) {
+        errors.push(`Row ${r} (${name}): ${rowError instanceof Error ? rowError.message : String(rowError)}`);
       }
     }
 
@@ -332,9 +332,9 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
         errors: errors.slice(0, 50),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error importing suppliers");
-    res.status(500).json({ error: error.message || "Failed to import suppliers" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import suppliers" });
   }
 });
 
@@ -344,9 +344,9 @@ router.get("/api/procurement/suppliers/:id", requireAuth, async (req, res) => {
     const supplier = await storage.getSupplier(String(req.params.id));
     if (!supplier || supplier.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
     res.json(supplier);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching supplier");
-    res.status(500).json({ error: error.message || "Failed to fetch supplier" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch supplier" });
   }
 });
 
@@ -360,9 +360,9 @@ router.post("/api/procurement/suppliers", requireRole("ADMIN", "MANAGER"), async
     }
     const supplier = await storage.createSupplier({ ...parsed.data, companyId });
     res.json(supplier);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating supplier");
-    res.status(500).json({ error: error.message || "Failed to create supplier" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create supplier" });
   }
 });
 
@@ -377,9 +377,9 @@ router.patch("/api/procurement/suppliers/:id", requireRole("ADMIN", "MANAGER"), 
     }
     const supplier = await storage.updateSupplier(String(req.params.id), parsed.data);
     res.json(supplier);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating supplier");
-    res.status(500).json({ error: error.message || "Failed to update supplier" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update supplier" });
   }
 });
 
@@ -390,9 +390,9 @@ router.delete("/api/procurement/suppliers/:id", requireRole("ADMIN"), async (req
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Supplier not found" });
     await storage.deleteSupplier(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting supplier");
-    res.status(500).json({ error: error.message || "Failed to delete supplier" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete supplier" });
   }
 });
 
@@ -402,9 +402,9 @@ router.get("/api/procurement/item-categories", requireAuth, async (req, res) => 
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const categories = await storage.getAllItemCategories(companyId);
     res.json(categories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching item categories");
-    res.status(500).json({ error: error.message || "Failed to fetch categories" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch categories" });
   }
 });
 
@@ -414,9 +414,9 @@ router.get("/api/procurement/item-categories/active", requireAuth, async (req, r
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const categories = await storage.getActiveItemCategories(companyId);
     res.json(categories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active item categories");
-    res.status(500).json({ error: error.message || "Failed to fetch categories" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch categories" });
   }
 });
 
@@ -426,9 +426,9 @@ router.get("/api/procurement/item-categories/:id", requireAuth, async (req, res)
     const category = await storage.getItemCategory(String(req.params.id));
     if (!category || category.companyId !== companyId) return res.status(404).json({ error: "Category not found" });
     res.json(category);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching category");
-    res.status(500).json({ error: error.message || "Failed to fetch category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch category" });
   }
 });
 
@@ -442,9 +442,9 @@ router.post("/api/procurement/item-categories", requireRole("ADMIN", "MANAGER"),
     }
     const category = await storage.createItemCategory({ ...parsed.data, companyId });
     res.json(category);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating category");
-    res.status(500).json({ error: error.message || "Failed to create category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create category" });
   }
 });
 
@@ -459,9 +459,9 @@ router.patch("/api/procurement/item-categories/:id", requireRole("ADMIN", "MANAG
     }
     const category = await storage.updateItemCategory(String(req.params.id), parsed.data);
     res.json(category);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating category");
-    res.status(500).json({ error: error.message || "Failed to update category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update category" });
   }
 });
 
@@ -472,9 +472,9 @@ router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), asyn
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Category not found" });
     await storage.deleteItemCategory(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting category");
-    res.status(500).json({ error: error.message || "Failed to delete category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete category" });
   }
 });
 
@@ -484,9 +484,9 @@ router.get("/api/procurement/items", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const itemsData = await storage.getAllItems(companyId);
     res.json(itemsData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching items");
-    res.status(500).json({ error: error.message || "Failed to fetch items" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });
   }
 });
 
@@ -496,9 +496,9 @@ router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const itemsData = await storage.getActiveItems(companyId);
     res.json(itemsData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active items");
-    res.status(500).json({ error: error.message || "Failed to fetch items" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch items" });
   }
 });
 
@@ -508,9 +508,9 @@ router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
     const item = await storage.getItem(String(req.params.id));
     if (!item || item.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
     res.json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching item");
-    res.status(500).json({ error: error.message || "Failed to fetch item" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch item" });
   }
 });
 
@@ -524,9 +524,9 @@ router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (re
     }
     const item = await storage.createItem({ ...parsed.data, companyId, name: parsed.data.description } as any);
     res.json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating item");
-    res.status(500).json({ error: error.message || "Failed to create item" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create item" });
   }
 });
 
@@ -542,9 +542,9 @@ router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), asyn
     const item = await storage.updateItem(String(req.params.id), parsed.data);
     if (!item) return res.status(404).json({ error: "Item not found" });
     res.json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating item");
-    res.status(500).json({ error: error.message || "Failed to update item" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update item" });
   }
 });
 
@@ -555,9 +555,9 @@ router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, re
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
     await storage.deleteItem(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting item");
-    res.status(500).json({ error: error.message || "Failed to delete item" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete item" });
   }
 });
 
@@ -662,9 +662,9 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
       categoriesCreated: categoriesToCreate.length,
       errors: result.errors,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error importing items");
-    res.status(500).json({ error: error.message || "Failed to import items" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import items" });
   }
 });
 
@@ -684,9 +684,9 @@ router.get("/purchase-orders/:id/pdf", requireAuth, async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${po.poNumber || "PurchaseOrder"}.pdf"`);
     res.send(pdfBuffer);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error generating PO PDF");
-    res.status(500).json({ error: error.message || "Failed to generate PDF" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate PDF" });
   }
 });
 
@@ -746,9 +746,9 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
       logger.error({ poId: id, error: result.error }, "Failed to send PO email");
       res.status(500).json({ error: result.error || "Failed to send email" });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error sending PO email with PDF");
-    res.status(500).json({ error: error.message || "Failed to send email" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
   }
 });
 
@@ -826,9 +826,9 @@ router.post("/purchase-orders/:id/send-email", requireAuth, async (req, res) => 
       logger.error({ poId: id, error: result.error }, "Failed to send PO email");
       res.status(500).json({ error: result.error || "Failed to send email" });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error sending PO email");
-    res.status(500).json({ error: error.message || "Failed to send email" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
   }
 });
 

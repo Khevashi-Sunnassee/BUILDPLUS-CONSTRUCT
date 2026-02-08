@@ -1,6 +1,7 @@
 import { useLocation } from "wouter";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useOnlineStatus } from "@/hooks/use-online-status";
 
 interface MobileLayoutProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface MobileLayoutProps {
 
 export function MobileLayout({ children, title, showBackButton = true }: MobileLayoutProps) {
   const [location, setLocation] = useLocation();
+  const isOnline = useOnlineStatus();
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -39,6 +41,12 @@ export function MobileLayout({ children, title, showBackButton = true }: MobileL
         <h1 className="text-white text-lg font-semibold flex-1">
           {title || "BuildPlus"}
         </h1>
+        {!isOnline && (
+          <div className="flex items-center gap-1 text-red-400 text-xs" data-testid="status-offline">
+            <WifiOff className="h-4 w-4" />
+            <span>Offline</span>
+          </div>
+        )}
       </header>
       
       <main 

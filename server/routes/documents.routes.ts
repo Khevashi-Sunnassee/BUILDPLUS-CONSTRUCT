@@ -78,9 +78,9 @@ router.get("/api/document-types", requireAuth, async (req, res) => {
   try {
     const types = await storage.getAllDocumentTypes();
     res.json(types);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document types");
-    res.status(500).json({ error: error.message || "Failed to fetch document types" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document types" });
   }
 });
 
@@ -88,9 +88,9 @@ router.get("/api/document-types/active", requireAuth, async (req, res) => {
   try {
     const types = await storage.getActiveDocumentTypes();
     res.json(types);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document types");
-    res.status(500).json({ error: error.message || "Failed to fetch document types" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document types" });
   }
 });
 
@@ -99,9 +99,9 @@ router.get("/api/document-types/:id", requireAuth, async (req, res) => {
     const type = await storage.getDocumentType(String(req.params.id));
     if (!type) return res.status(404).json({ error: "Document type not found" });
     res.json(type);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document type");
-    res.status(500).json({ error: error.message || "Failed to fetch document type" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document type" });
   }
 });
 
@@ -133,9 +133,9 @@ router.post("/api/document-types", requireRole("ADMIN"), async (req, res) => {
     });
     
     res.json(type);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document type");
-    res.status(500).json({ error: error.message || "Failed to create document type" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document type" });
   }
 });
 
@@ -148,9 +148,9 @@ router.patch("/api/document-types/:id", requireRole("ADMIN"), async (req, res) =
     const type = await storage.updateDocumentType(String(req.params.id), parsed.data);
     if (!type) return res.status(404).json({ error: "Document type not found" });
     res.json(type);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document type");
-    res.status(500).json({ error: error.message || "Failed to update document type" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document type" });
   }
 });
 
@@ -158,9 +158,9 @@ router.delete("/api/document-types/:id", requireRole("ADMIN"), async (req, res) 
   try {
     await storage.deleteDocumentType(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document type");
-    res.status(500).json({ error: error.message || "Failed to delete document type" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document type" });
   }
 });
 
@@ -170,9 +170,9 @@ router.get("/api/document-types/:typeId/statuses", requireAuth, async (req, res)
   try {
     const statuses = await storage.getDocumentTypeStatuses(String(req.params.typeId));
     res.json(statuses);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document type statuses");
-    res.status(500).json({ error: error.message || "Failed to fetch statuses" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch statuses" });
   }
 });
 
@@ -188,9 +188,9 @@ router.post("/api/document-types/:typeId/statuses", requireRole("ADMIN"), async 
     }
     const status = await storage.createDocumentTypeStatus(parsed.data);
     res.json(status);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document type status");
-    res.status(500).json({ error: error.message || "Failed to create status" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create status" });
   }
 });
 
@@ -203,9 +203,9 @@ router.patch("/api/document-types/:typeId/statuses/:statusId", requireRole("ADMI
     const status = await storage.updateDocumentTypeStatus(String(req.params.statusId), parsed.data);
     if (!status) return res.status(404).json({ error: "Status not found" });
     res.json(status);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document type status");
-    res.status(500).json({ error: error.message || "Failed to update status" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update status" });
   }
 });
 
@@ -213,9 +213,9 @@ router.delete("/api/document-types/:typeId/statuses/:statusId", requireRole("ADM
   try {
     await storage.deleteDocumentTypeStatus(String(req.params.statusId));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document type status");
-    res.status(500).json({ error: error.message || "Failed to delete status" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete status" });
   }
 });
 
@@ -225,9 +225,9 @@ router.get("/api/document-disciplines", requireAuth, async (req, res) => {
   try {
     const disciplines = await storage.getAllDocumentDisciplines();
     res.json(disciplines);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document disciplines");
-    res.status(500).json({ error: error.message || "Failed to fetch document disciplines" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document disciplines" });
   }
 });
 
@@ -235,9 +235,9 @@ router.get("/api/document-disciplines/active", requireAuth, async (req, res) => 
   try {
     const disciplines = await storage.getActiveDocumentDisciplines();
     res.json(disciplines);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document disciplines");
-    res.status(500).json({ error: error.message || "Failed to fetch document disciplines" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document disciplines" });
   }
 });
 
@@ -246,9 +246,9 @@ router.get("/api/document-disciplines/:id", requireAuth, async (req, res) => {
     const discipline = await storage.getDocumentDiscipline(String(req.params.id));
     if (!discipline) return res.status(404).json({ error: "Document discipline not found" });
     res.json(discipline);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document discipline");
-    res.status(500).json({ error: error.message || "Failed to fetch document discipline" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document discipline" });
   }
 });
 
@@ -260,9 +260,9 @@ router.post("/api/document-disciplines", requireRole("ADMIN"), async (req, res) 
     }
     const discipline = await storage.createDocumentDiscipline(parsed.data);
     res.json(discipline);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document discipline");
-    res.status(500).json({ error: error.message || "Failed to create document discipline" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document discipline" });
   }
 });
 
@@ -275,9 +275,9 @@ router.patch("/api/document-disciplines/:id", requireRole("ADMIN"), async (req, 
     const discipline = await storage.updateDocumentDiscipline(String(req.params.id), parsed.data);
     if (!discipline) return res.status(404).json({ error: "Document discipline not found" });
     res.json(discipline);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document discipline");
-    res.status(500).json({ error: error.message || "Failed to update document discipline" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document discipline" });
   }
 });
 
@@ -285,9 +285,9 @@ router.delete("/api/document-disciplines/:id", requireRole("ADMIN"), async (req,
   try {
     await storage.deleteDocumentDiscipline(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document discipline");
-    res.status(500).json({ error: error.message || "Failed to delete document discipline" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document discipline" });
   }
 });
 
@@ -297,9 +297,9 @@ router.get("/api/document-categories", requireAuth, async (req, res) => {
   try {
     const categories = await storage.getAllDocumentCategories();
     res.json(categories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document categories");
-    res.status(500).json({ error: error.message || "Failed to fetch document categories" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document categories" });
   }
 });
 
@@ -307,9 +307,9 @@ router.get("/api/document-categories/active", requireAuth, async (req, res) => {
   try {
     const categories = await storage.getActiveDocumentCategories();
     res.json(categories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document categories");
-    res.status(500).json({ error: error.message || "Failed to fetch document categories" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document categories" });
   }
 });
 
@@ -318,9 +318,9 @@ router.get("/api/document-categories/:id", requireAuth, async (req, res) => {
     const category = await storage.getDocumentCategory(String(req.params.id));
     if (!category) return res.status(404).json({ error: "Document category not found" });
     res.json(category);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document category");
-    res.status(500).json({ error: error.message || "Failed to fetch document category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document category" });
   }
 });
 
@@ -332,9 +332,9 @@ router.post("/api/document-categories", requireRole("ADMIN"), async (req, res) =
     }
     const category = await storage.createDocumentCategory(parsed.data);
     res.json(category);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document category");
-    res.status(500).json({ error: error.message || "Failed to create document category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document category" });
   }
 });
 
@@ -347,9 +347,9 @@ router.patch("/api/document-categories/:id", requireRole("ADMIN"), async (req, r
     const category = await storage.updateDocumentCategory(String(req.params.id), parsed.data);
     if (!category) return res.status(404).json({ error: "Document category not found" });
     res.json(category);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document category");
-    res.status(500).json({ error: error.message || "Failed to update document category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document category" });
   }
 });
 
@@ -357,9 +357,9 @@ router.delete("/api/document-categories/:id", requireRole("ADMIN"), async (req, 
   try {
     await storage.deleteDocumentCategory(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document category");
-    res.status(500).json({ error: error.message || "Failed to delete document category" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document category" });
   }
 });
 
@@ -388,9 +388,9 @@ router.get("/api/documents", requireAuth, async (req, res) => {
     });
     
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching documents");
-    res.status(500).json({ error: error.message || "Failed to fetch documents" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch documents" });
   }
 });
 
@@ -402,9 +402,9 @@ router.get("/api/documents/next-number", requireAuth, async (req, res) => {
     }
     const nextNumber = await storage.getNextDocumentNumber(String(typeId));
     res.json({ documentNumber: nextNumber });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error getting next document number");
-    res.status(500).json({ error: error.message || "Failed to get next document number" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get next document number" });
   }
 });
 
@@ -413,9 +413,9 @@ router.get("/api/documents/:id", requireAuth, async (req, res) => {
     const document = await storage.getDocument(String(req.params.id));
     if (!document) return res.status(404).json({ error: "Document not found" });
     res.json(document);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document");
-    res.status(500).json({ error: error.message || "Failed to fetch document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document" });
   }
 });
 
@@ -423,9 +423,9 @@ router.get("/api/documents/:id/versions", requireAuth, async (req, res) => {
   try {
     const versions = await storage.getDocumentVersionHistory(String(req.params.id));
     res.json(versions);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document versions");
-    res.status(500).json({ error: error.message || "Failed to fetch document versions" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document versions" });
   }
 });
 
@@ -503,9 +503,9 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
     });
 
     res.json(document);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading document");
-    res.status(500).json({ error: error.message || "Failed to upload document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload document" });
   }
 });
 
@@ -585,9 +585,9 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
     });
 
     res.json(newDocument);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating new document version");
-    res.status(500).json({ error: error.message || "Failed to create new version" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create new version" });
   }
 });
 
@@ -600,12 +600,12 @@ router.get("/api/documents/:id/view", requireAuth, async (req: Request, res: Res
 
     const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
     await objectStorageService.downloadObject(objectFile, res);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error viewing document");
-    res.status(500).json({ error: error.message || "Failed to view document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to view document" });
   }
 });
 
@@ -672,13 +672,13 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
         }
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error generating thumbnail");
     if (!res.headersSent) {
-      res.status(500).json({ error: error.message || "Failed to generate thumbnail" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate thumbnail" });
     }
   }
 });
@@ -700,12 +700,12 @@ router.get("/api/documents/:id/download", requireAuth, async (req: Request, res:
 
     const stream = objectFile.createReadStream();
     stream.pipe(res);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error downloading document");
-    res.status(500).json({ error: error.message || "Failed to download document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
   }
 });
 
@@ -748,9 +748,9 @@ router.post("/api/documents/visual-diff", requireAuth, async (req: Request, res:
     }
 
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Visual diff endpoint error");
-    res.status(500).json({ error: error.message || "Failed to generate visual diff" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate visual diff" });
   }
 });
 
@@ -840,9 +840,9 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
       logger.error({ error: result.error }, "Failed to send documents email");
       res.status(500).json({ error: result.error || "Failed to send email" });
     }
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error sending documents email");
-    res.status(500).json({ error: error.message || "Failed to send email" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
   }
 });
 
@@ -855,9 +855,9 @@ router.patch("/api/documents/:id", requireAuth, async (req, res) => {
     const document = await storage.updateDocument(String(req.params.id), parsed.data);
     if (!document) return res.status(404).json({ error: "Document not found" });
     res.json(document);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document");
-    res.status(500).json({ error: error.message || "Failed to update document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document" });
   }
 });
 
@@ -874,9 +874,9 @@ router.patch("/api/documents/:id/status", requireRole("ADMIN", "MANAGER"), async
     const document = await storage.updateDocument(String(req.params.id), updateData);
     if (!document) return res.status(404).json({ error: "Document not found" });
     res.json(document);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document status");
-    res.status(500).json({ error: error.message || "Failed to update document status" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document status" });
   }
 });
 
@@ -884,9 +884,9 @@ router.delete("/api/documents/:id", requireRole("ADMIN", "MANAGER"), async (req,
   try {
     await storage.deleteDocument(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document");
-    res.status(500).json({ error: error.message || "Failed to delete document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document" });
   }
 });
 
@@ -896,9 +896,9 @@ router.get("/api/document-bundles", requireAuth, async (req, res) => {
   try {
     const bundles = await storage.getAllDocumentBundles();
     res.json(bundles);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundles");
-    res.status(500).json({ error: error.message || "Failed to fetch document bundles" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document bundles" });
   }
 });
 
@@ -907,9 +907,9 @@ router.get("/api/document-bundles/:id", requireAuth, async (req, res) => {
     const bundle = await storage.getDocumentBundle(String(req.params.id));
     if (!bundle) return res.status(404).json({ error: "Document bundle not found" });
     res.json(bundle);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundle");
-    res.status(500).json({ error: error.message || "Failed to fetch document bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document bundle" });
   }
 });
 
@@ -918,9 +918,9 @@ router.get("/api/document-bundles/qr/:qrCodeId", requireAuth, async (req, res) =
     const bundle = await storage.getDocumentBundleByQr(String(req.params.qrCodeId));
     if (!bundle) return res.status(404).json({ error: "Document bundle not found" });
     res.json(bundle);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundle by QR");
-    res.status(500).json({ error: error.message || "Failed to fetch document bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch document bundle" });
   }
 });
 
@@ -993,9 +993,9 @@ router.post("/api/document-bundles", requireAuth, async (req, res) => {
 
     const fullBundle = await storage.getDocumentBundle(bundle.id);
     res.json(fullBundle);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating document bundle");
-    res.status(500).json({ error: error.message || "Failed to create document bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create document bundle" });
   }
 });
 
@@ -1011,9 +1011,9 @@ router.patch("/api/document-bundles/:id", requireAuth, async (req, res) => {
     });
     if (!bundle) return res.status(404).json({ error: "Document bundle not found" });
     res.json(bundle);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating document bundle");
-    res.status(500).json({ error: error.message || "Failed to update document bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update document bundle" });
   }
 });
 
@@ -1026,9 +1026,9 @@ router.post("/api/document-bundles/:id/documents", requireAuth, async (req, res)
 
     const items = await storage.addDocumentsToBundle(String(req.params.id), documentIds, req.session.userId!);
     res.json(items);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error adding documents to bundle");
-    res.status(500).json({ error: error.message || "Failed to add documents to bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add documents to bundle" });
   }
 });
 
@@ -1036,9 +1036,9 @@ router.delete("/api/document-bundles/:bundleId/documents/:documentId", requireAu
   try {
     await storage.removeDocumentFromBundle(String(req.params.bundleId), String(req.params.documentId));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error removing document from bundle");
-    res.status(500).json({ error: error.message || "Failed to remove document from bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to remove document from bundle" });
   }
 });
 
@@ -1050,9 +1050,9 @@ router.delete("/api/document-bundles/:id", requireRole("ADMIN", "MANAGER"), asyn
     }
     await storage.deleteDocumentBundle(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting document bundle");
-    res.status(500).json({ error: error.message || "Failed to delete document bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete document bundle" });
   }
 });
 
@@ -1126,9 +1126,9 @@ router.get("/api/public/bundles/:qrCodeId", async (req, res) => {
         fileSize: item.document.fileSize,
       })),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching public bundle");
-    res.status(500).json({ error: error.message || "Failed to fetch bundle" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch bundle" });
   }
 });
 
@@ -1172,12 +1172,12 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/view", async (re
 
     const stream = objectFile.createReadStream();
     stream.pipe(res);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error viewing public bundle document");
-    res.status(500).json({ error: error.message || "Failed to view document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to view document" });
   }
 });
 
@@ -1221,12 +1221,12 @@ router.get("/api/public/bundles/:qrCodeId/documents/:documentId/download", async
 
     const stream = objectFile.createReadStream();
     stream.pipe(res);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof ObjectNotFoundError) {
       return res.status(404).json({ error: "File not found in storage" });
     }
     logger.error({ err: error }, "Error downloading public bundle document");
-    res.status(500).json({ error: error.message || "Failed to download document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
   }
 });
 
@@ -1235,9 +1235,9 @@ router.get("/api/document-bundles/:id/access-logs", requireRole("ADMIN", "MANAGE
   try {
     const logs = await storage.getBundleAccessLogs(String(req.params.id));
     res.json(logs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching bundle access logs");
-    res.status(500).json({ error: error.message || "Failed to fetch access logs" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch access logs" });
   }
 });
 
@@ -1306,7 +1306,7 @@ Based on the file information and typical document workflows, provide a concise 
 
     logger.info({ originalDocumentId, newFileName }, "AI version analysis completed");
     res.json({ summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error analyzing document version with AI");
     res.status(500).json({ error: "Failed to analyze document", summary: "" });
   }
@@ -1343,9 +1343,9 @@ router.get("/api/panels/:panelId/documents", requireAuth, async (req, res) => {
     });
 
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panel documents");
-    res.status(500).json({ error: error.message || "Failed to fetch panel documents" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel documents" });
   }
 });
 
@@ -1485,9 +1485,9 @@ router.post("/api/panels/:panelId/documents/upload", requireAuth, upload.single(
 
     logger.info({ documentId: document.id, panelId, status }, "Panel document uploaded");
     res.json(document);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error uploading panel document");
-    res.status(500).json({ error: error.message || "Failed to upload panel document" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to upload panel document" });
   }
 });
 
@@ -1542,9 +1542,9 @@ router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, a
 
     const updated = await storage.updateDocument(documentId, { status });
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating panel document status");
-    res.status(500).json({ error: error.message || "Failed to update status" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update status" });
   }
 });
 
