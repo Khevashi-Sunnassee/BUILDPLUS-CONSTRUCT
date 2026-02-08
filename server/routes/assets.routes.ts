@@ -334,6 +334,8 @@ router.get("/api/admin/assets/template", requireAuth, async (_req: Request, res:
 });
 
 router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("file"), async (req: Request, res: Response) => {
+  req.setTimeout(300000);
+  res.setTimeout(300000);
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });

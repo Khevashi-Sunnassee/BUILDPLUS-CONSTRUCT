@@ -555,13 +555,23 @@ export default function AssetRegisterPage() {
       const formData = new FormData();
       formData.append("file", file);
       const csrfToken = getCsrfToken();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
       const res = await fetch(ASSET_ROUTES.IMPORT, {
         method: "POST",
         body: formData,
         credentials: "include",
         headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
+        signal: controller.signal,
       });
-      const result = await res.json();
+      clearTimeout(timeoutId);
+      const text = await res.text();
+      let result: any;
+      try {
+        result = JSON.parse(text);
+      } catch {
+        throw new Error("Server returned an invalid response. The file may be too large or took too long to process. Please try again.");
+      }
       if (!res.ok) {
         setImportResult({ errors: [result.error || result.message || "Import failed"] });
       } else {
