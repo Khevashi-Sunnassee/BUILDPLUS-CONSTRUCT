@@ -713,3 +713,19 @@ export const ASSET_ROUTES = {
 export type AssetRoutes = typeof ASSET_ROUTES;
 export type HelpRoutes = typeof HELP_ROUTES;
 export type UploadRoutes = typeof UPLOAD_ROUTES;
+
+// ============================================================================
+// EMPLOYEE MANAGEMENT
+// ============================================================================
+export const EMPLOYEE_ROUTES = {
+  LIST: '/api/employees',
+  ACTIVE: '/api/employees/active',
+  BY_ID: (id: string | number) => `/api/employees/${id}`,
+  EMPLOYMENTS: (employeeId: string | number) => `/api/employees/${employeeId}/employments`,
+  EMPLOYMENT_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/employments/${id}`,
+  DOCUMENTS: (employeeId: string | number) => `/api/employees/${employeeId}/documents`,
+  DOCUMENT_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/documents/${id}`,
+  LICENCES: (employeeId: string | number) => `/api/employees/${employeeId}/licences`,
+  LICENCE_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/licences/${id}`,
+} as const;
+export type EmployeeRoutes = typeof EMPLOYEE_ROUTES;

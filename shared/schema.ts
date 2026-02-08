@@ -3045,3 +3045,168 @@ export const helpFeedback = pgTable("help_feedback", {
   pageUrl: text("page_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ============== Employee Management Tables ==============
+
+export const employmentStatusEnum = pgEnum("employment_status", [
+  "prospect", "offer_sent", "offer_accepted", "pre_start",
+  "active", "on_leave", "inactive", "terminated", "archived",
+]);
+
+export const employmentTypeEnum = pgEnum("employment_type_enum", [
+  "full_time", "part_time", "casual", "contract",
+]);
+
+export const rateBasisEnum = pgEnum("rate_basis", ["hourly", "salary"]);
+
+export const payFrequencyEnum = pgEnum("pay_frequency", ["weekly", "fortnightly", "monthly"]);
+
+export const employeeDocCategoryEnum = pgEnum("employee_doc_category", [
+  "contract", "variation", "id", "licence", "induction",
+  "policy_acknowledgement", "performance", "termination", "other",
+]);
+
+export const employees = pgTable("employees", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  userId: varchar("user_id", { length: 36 }).references(() => users.id),
+  employeeNumber: text("employee_number").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  middleName: text("middle_name"),
+  preferredName: text("preferred_name"),
+  dateOfBirth: text("date_of_birth"),
+  phone: text("phone"),
+  email: text("email"),
+  addressLine1: text("address_line1"),
+  addressLine2: text("address_line2"),
+  suburb: text("suburb"),
+  state: text("state"),
+  postcode: text("postcode"),
+  emergencyContactName: text("emergency_contact_name"),
+  emergencyContactPhone: text("emergency_contact_phone"),
+  emergencyContactRelationship: text("emergency_contact_relationship"),
+  isDraftingResource: boolean("is_drafting_resource").default(false).notNull(),
+  isProductionResource: boolean("is_production_resource").default(false).notNull(),
+  isSiteResource: boolean("is_site_resource").default(false).notNull(),
+  receiveEscalatedWorkOrders: boolean("receive_escalated_work_orders").default(false).notNull(),
+  workRights: boolean("work_rights").default(true).notNull(),
+  notes: text("notes"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("employees_company_idx").on(table.companyId),
+  userIdx: index("employees_user_idx").on(table.userId),
+  empNumberCompanyIdx: uniqueIndex("employees_emp_number_company_idx").on(table.employeeNumber, table.companyId),
+  lastNameIdx: index("employees_last_name_idx").on(table.lastName),
+  activeIdx: index("employees_active_idx").on(table.isActive),
+}));
+
+export const insertEmployeeSchema = createInsertSchema(employees).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmployee = z.infer<typeof insertEmployeeSchema>;
+export type Employee = typeof employees.$inferSelect;
+
+export const employeeEmployments = pgTable("employee_employments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
+  employmentType: employmentTypeEnum("employment_type").notNull().default("full_time"),
+  positionTitle: text("position_title"),
+  jobTitle: text("job_title"),
+  department: text("department"),
+  reportingManagerId: varchar("reporting_manager_id", { length: 36 }).references(() => users.id),
+  workLocation: text("work_location"),
+  workState: text("work_state"),
+  startDate: text("start_date").notNull(),
+  expectedStartDate: text("expected_start_date"),
+  endDate: text("end_date"),
+  probationEndDate: text("probation_end_date"),
+  classificationLevel: text("classification_level"),
+  status: employmentStatusEnum("status").notNull().default("prospect"),
+  baseRate: decimal("base_rate", { precision: 14, scale: 2 }),
+  rateBasis: rateBasisEnum("rate_basis").default("hourly"),
+  payFrequency: payFrequencyEnum("pay_frequency").default("weekly"),
+  ordinaryRate: decimal("ordinary_rate", { precision: 14, scale: 2 }),
+  overtime1_5: decimal("overtime_1_5", { precision: 14, scale: 2 }),
+  overtime2: decimal("overtime_2", { precision: 14, scale: 2 }),
+  saturdayRate: decimal("saturday_rate", { precision: 14, scale: 2 }),
+  sundayRate: decimal("sunday_rate", { precision: 14, scale: 2 }),
+  publicHolidayRate: decimal("public_holiday_rate", { precision: 14, scale: 2 }),
+  nightShiftRate: decimal("night_shift_rate", { precision: 14, scale: 2 }),
+  travelAllowance: decimal("travel_allowance", { precision: 14, scale: 2 }),
+  mealAllowance: decimal("meal_allowance", { precision: 14, scale: 2 }),
+  toolAllowance: decimal("tool_allowance", { precision: 14, scale: 2 }),
+  uniformAllowance: decimal("uniform_allowance", { precision: 14, scale: 2 }),
+  phoneAllowance: decimal("phone_allowance", { precision: 14, scale: 2 }),
+  carAllowance: decimal("car_allowance", { precision: 14, scale: 2 }),
+  shiftAllowance: decimal("shift_allowance", { precision: 14, scale: 2 }),
+  annualLeaveHoursPerWeek: decimal("annual_leave_hours_per_week", { precision: 6, scale: 2 }),
+  sickLeaveHoursPerWeek: decimal("sick_leave_hours_per_week", { precision: 6, scale: 2 }),
+  longServiceLeaveHours: decimal("long_service_leave_hours", { precision: 8, scale: 2 }),
+  rdoCount: integer("rdo_count"),
+  rdoAccrual: decimal("rdo_accrual", { precision: 6, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("emp_employments_company_idx").on(table.companyId),
+  employeeIdx: index("emp_employments_employee_idx").on(table.employeeId),
+  statusIdx: index("emp_employments_status_idx").on(table.status),
+  startDateIdx: index("emp_employments_start_date_idx").on(table.startDate),
+}));
+
+export const insertEmployeeEmploymentSchema = createInsertSchema(employeeEmployments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmployeeEmployment = z.infer<typeof insertEmployeeEmploymentSchema>;
+export type EmployeeEmployment = typeof employeeEmployments.$inferSelect;
+
+export const employeeDocuments = pgTable("employee_documents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  category: employeeDocCategoryEnum("category").notNull().default("other"),
+  fileUrl: text("file_url"),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  issuedDate: text("issued_date"),
+  expiryDate: text("expiry_date"),
+  notes: text("notes"),
+  version: integer("version").default(1).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("emp_documents_company_idx").on(table.companyId),
+  employeeIdx: index("emp_documents_employee_idx").on(table.employeeId),
+  categoryIdx: index("emp_documents_category_idx").on(table.category),
+  expiryIdx: index("emp_documents_expiry_idx").on(table.expiryDate),
+}));
+
+export const insertEmployeeDocumentSchema = createInsertSchema(employeeDocuments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmployeeDocument = z.infer<typeof insertEmployeeDocumentSchema>;
+export type EmployeeDocument = typeof employeeDocuments.$inferSelect;
+
+export const employeeLicences = pgTable("employee_licences", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
+  licenceType: text("licence_type").notNull(),
+  licenceNumber: text("licence_number"),
+  issuingAuthority: text("issuing_authority"),
+  issueDate: text("issue_date"),
+  expiryDate: text("expiry_date"),
+  documentUrl: text("document_url"),
+  status: text("status").default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("emp_licences_company_idx").on(table.companyId),
+  employeeIdx: index("emp_licences_employee_idx").on(table.employeeId),
+  expiryIdx: index("emp_licences_expiry_idx").on(table.expiryDate),
+  typeIdx: index("emp_licences_type_idx").on(table.licenceType),
+}));
+
+export const insertEmployeeLicenceSchema = createInsertSchema(employeeLicences).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertEmployeeLicence = z.infer<typeof insertEmployeeLicenceSchema>;
+export type EmployeeLicence = typeof employeeLicences.$inferSelect;

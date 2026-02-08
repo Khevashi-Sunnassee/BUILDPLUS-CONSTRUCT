@@ -14,6 +14,7 @@ import { taskMethods } from "./tasks";
 import { documentMethods } from "./documents";
 import { schedulingMethods } from "./scheduling";
 import { broadcastMethods } from "./broadcast";
+import { employeeMethods } from "./employees";
 
 export type { IStorage } from "./types";
 export type {
@@ -400,6 +401,28 @@ export class DatabaseStorage implements IStorage {
   getBroadcastMessages = broadcastMethods.getBroadcastMessages;
   getBroadcastMessage = broadcastMethods.getBroadcastMessage;
   getBroadcastDeliveries = broadcastMethods.getBroadcastDeliveries;
+
+  getAllEmployees = employeeMethods.getAllEmployees;
+  getActiveEmployees = employeeMethods.getActiveEmployees;
+  getEmployee = employeeMethods.getEmployee;
+  createEmployee = employeeMethods.createEmployee;
+  updateEmployee = employeeMethods.updateEmployee;
+  deleteEmployee = employeeMethods.deleteEmployee;
+  getEmployeeEmployments = employeeMethods.getEmployeeEmployments;
+  getEmployeeEmployment = employeeMethods.getEmployeeEmployment;
+  createEmployeeEmployment = employeeMethods.createEmployeeEmployment;
+  updateEmployeeEmployment = employeeMethods.updateEmployeeEmployment;
+  deleteEmployeeEmployment = employeeMethods.deleteEmployeeEmployment;
+  getEmployeeDocuments = employeeMethods.getEmployeeDocuments;
+  getEmployeeDocument = employeeMethods.getEmployeeDocument;
+  createEmployeeDocument = employeeMethods.createEmployeeDocument;
+  updateEmployeeDocument = employeeMethods.updateEmployeeDocument;
+  deleteEmployeeDocument = employeeMethods.deleteEmployeeDocument;
+  getEmployeeLicences = employeeMethods.getEmployeeLicences;
+  getEmployeeLicence = employeeMethods.getEmployeeLicence;
+  createEmployeeLicence = employeeMethods.createEmployeeLicence;
+  updateEmployeeLicence = employeeMethods.updateEmployeeLicence;
+  deleteEmployeeLicence = employeeMethods.deleteEmployeeLicence;
 }
 
 export const storage = new DatabaseStorage();

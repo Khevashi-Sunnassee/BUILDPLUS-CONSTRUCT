@@ -41,6 +41,10 @@ import type {
   BroadcastMessage, InsertBroadcastMessage, BroadcastMessageWithDetails,
   BroadcastDelivery,
   EotClaim, InsertEotClaim,
+  Employee, InsertEmployee,
+  EmployeeEmployment, InsertEmployeeEmployment,
+  EmployeeDocument, InsertEmployeeDocument,
+  EmployeeLicence, InsertEmployeeLicence,
 } from "@shared/schema";
 
 export interface WorkingDaysConfig {
@@ -516,4 +520,29 @@ export interface IStorage {
   getBroadcastMessages(companyId: string): Promise<BroadcastMessageWithDetails[]>;
   getBroadcastMessage(id: string): Promise<BroadcastMessageWithDetails | undefined>;
   getBroadcastDeliveries(broadcastMessageId: string): Promise<BroadcastDelivery[]>;
+
+  getAllEmployees(companyId: string): Promise<Employee[]>;
+  getActiveEmployees(companyId: string): Promise<Employee[]>;
+  getEmployee(id: string): Promise<Employee | undefined>;
+  createEmployee(data: InsertEmployee): Promise<Employee>;
+  updateEmployee(id: string, data: Partial<InsertEmployee>): Promise<Employee | undefined>;
+  deleteEmployee(id: string): Promise<void>;
+
+  getEmployeeEmployments(employeeId: string): Promise<EmployeeEmployment[]>;
+  getEmployeeEmployment(id: string): Promise<EmployeeEmployment | undefined>;
+  createEmployeeEmployment(data: InsertEmployeeEmployment): Promise<EmployeeEmployment>;
+  updateEmployeeEmployment(id: string, data: Partial<InsertEmployeeEmployment>): Promise<EmployeeEmployment | undefined>;
+  deleteEmployeeEmployment(id: string): Promise<void>;
+
+  getEmployeeDocuments(employeeId: string): Promise<EmployeeDocument[]>;
+  getEmployeeDocument(id: string): Promise<EmployeeDocument | undefined>;
+  createEmployeeDocument(data: InsertEmployeeDocument): Promise<EmployeeDocument>;
+  updateEmployeeDocument(id: string, data: Partial<InsertEmployeeDocument>): Promise<EmployeeDocument | undefined>;
+  deleteEmployeeDocument(id: string): Promise<void>;
+
+  getEmployeeLicences(employeeId: string): Promise<EmployeeLicence[]>;
+  getEmployeeLicence(id: string): Promise<EmployeeLicence | undefined>;
+  createEmployeeLicence(data: InsertEmployeeLicence): Promise<EmployeeLicence>;
+  updateEmployeeLicence(id: string, data: Partial<InsertEmployeeLicence>): Promise<EmployeeLicence | undefined>;
+  deleteEmployeeLicence(id: string): Promise<void>;
 }
