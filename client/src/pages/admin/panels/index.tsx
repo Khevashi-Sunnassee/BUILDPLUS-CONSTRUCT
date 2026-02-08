@@ -54,7 +54,6 @@ import { useLocation, useSearch } from "wouter";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
-import defaultLogo from "@/assets/lte-logo.png";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
 import {
@@ -261,8 +260,8 @@ export default function AdminPanelsPage() {
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const deleteBySourceMutation = useMutation({
     mutationFn: async (source: number) => {

@@ -40,7 +40,6 @@ import {
   BookOpen,
   ImageIcon,
 } from "lucide-react";
-import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
 import {
   Sidebar,
@@ -181,7 +180,7 @@ export function AppSidebar() {
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const logoSrc = logoData?.logoBase64 || defaultLogo;
+  const logoSrc = logoData?.logoBase64 || null;
 
   const isItemHidden = (url: string): boolean => {
     const functionKey = urlToFunctionKey[url];
@@ -206,12 +205,21 @@ export function AppSidebar() {
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="p-4">
         <div className="flex items-center justify-start">
-          <img 
-            src={logoSrc} 
-            alt="LTE Precast Concrete Structures" 
-            className="h-[60px] w-auto max-w-full object-contain"
-            data-testid="img-sidebar-logo"
-          />
+          {logoSrc ? (
+            <img 
+              src={logoSrc} 
+              alt="BuildPlusAI" 
+              className="h-[60px] w-auto max-w-full object-contain"
+              data-testid="img-sidebar-logo"
+            />
+          ) : (
+            <div className="flex items-center gap-2" data-testid="img-sidebar-logo">
+              <Building2 className="h-8 w-8 text-primary" />
+              <span className="text-lg font-bold text-foreground">
+                BuildPlus<span className="text-primary">AI</span>
+              </span>
+            </div>
+          )}
         </div>
       </SidebarHeader>
 

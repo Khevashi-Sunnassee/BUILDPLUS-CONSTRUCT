@@ -5,7 +5,6 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import defaultLogo from "@/assets/lte-logo.png";
 import {
   ArrowLeft,
   Calendar,
@@ -92,8 +91,8 @@ export default function DailyReportDetailPage() {
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const updateRowMutation = useMutation({
     mutationFn: async ({ rowId, updates }: { rowId: string; updates: any }) => {
@@ -310,7 +309,7 @@ export default function DailyReportDetailPage() {
       
       pdf.setFontSize(8);
       pdf.setTextColor(100, 100, 100);
-      pdf.text("LTE Precast Concrete - Confidential", margin, pdfHeight - 4);
+      pdf.text("BuildPlusAI - Confidential", margin, pdfHeight - 4);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 4, { align: "right" });
       
       pdf.save(`LTE-Daily-Report-${log.logDay}.pdf`);

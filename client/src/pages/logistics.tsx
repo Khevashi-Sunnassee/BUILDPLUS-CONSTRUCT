@@ -6,7 +6,6 @@ import { z } from "zod";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import defaultLogo from "@/assets/lte-logo.png";
 import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Truck,
@@ -341,8 +340,8 @@ export default function LogisticsPage() {
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const loadListForm = useForm<LoadListFormData>({
     resolver: zodResolver(loadListSchema),

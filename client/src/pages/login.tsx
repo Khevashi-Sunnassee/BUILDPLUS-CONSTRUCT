@@ -6,8 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema } from "@shared/schema";
 import { z } from "zod";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
-import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
+import { Eye, EyeOff, Loader2, Building2 } from "lucide-react";
 import { SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +29,7 @@ export default function LoginPage() {
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const logoSrc = logoData?.logoBase64 || defaultLogo;
+  const logoSrc = logoData?.logoBase64 || null;
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -64,12 +63,21 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <img 
-            src={logoSrc} 
-            alt="LTE Precast Concrete Structures" 
-            className="h-16 mb-4"
-            data-testid="img-lte-logo"
-          />
+          {logoSrc ? (
+            <img 
+              src={logoSrc} 
+              alt="BuildPlusAI" 
+              className="h-16 mb-4"
+              data-testid="img-login-logo"
+            />
+          ) : (
+            <div className="flex items-center gap-2 mb-4" data-testid="img-login-logo">
+              <Building2 className="h-10 w-10 text-primary" />
+              <span className="text-2xl font-bold text-foreground">
+                BuildPlus<span className="text-primary">AI</span>
+              </span>
+            </div>
+          )}
           <h1 className="text-2xl font-bold text-foreground">Performance Management</h1>
           <p className="text-muted-foreground mt-1">KPI Tracking & Drafting Management</p>
         </div>

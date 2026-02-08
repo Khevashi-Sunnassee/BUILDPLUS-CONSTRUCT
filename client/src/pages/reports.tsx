@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import defaultLogo from "@/assets/lte-logo.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -143,8 +142,8 @@ export default function ReportsPage() {
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   // Calculate date range for logistics based on period
   const getDateRange = () => {

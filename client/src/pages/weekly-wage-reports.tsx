@@ -6,7 +6,6 @@ import { z } from "zod";
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import defaultLogo from "@/assets/lte-logo.png";
 import { WEEKLY_REPORTS_ROUTES, SETTINGS_ROUTES, USER_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import {
   DollarSign,
@@ -250,8 +249,8 @@ export default function WeeklyWageReportsPage() {
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const { data: analysisData, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery<WageAnalysis>({
     queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS, selectedReport?.id, "analysis"],

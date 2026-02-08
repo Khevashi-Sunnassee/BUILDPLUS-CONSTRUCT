@@ -4,7 +4,6 @@ import { Link } from "wouter";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
-import defaultLogo from "@/assets/lte-logo.png";
 import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Calendar,
@@ -225,8 +224,8 @@ export default function ProductionReportPage() {
   const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const filteredReports = reports?.filter((report) => {
     // Filter by factory (supports both factoryId and legacy factory text)

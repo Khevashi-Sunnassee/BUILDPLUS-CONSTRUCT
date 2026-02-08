@@ -4,7 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users } from "lucide-react";
-import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -645,12 +644,19 @@ export default function AdminSettingsPage() {
             <div className="flex items-center gap-6">
               <div className="flex-shrink-0">
                 <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
-                  <img 
-                    src={logoPreview || settings?.logoBase64 || defaultLogo} 
-                    alt="Company Logo" 
-                    className="max-w-full max-h-full object-contain"
-                    data-testid="img-logo-preview"
-                  />
+                  {(logoPreview || settings?.logoBase64) ? (
+                    <img 
+                      src={logoPreview || settings?.logoBase64 || ""} 
+                      alt="Company Logo" 
+                      className="max-w-full max-h-full object-contain"
+                      data-testid="img-logo-preview"
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-1" data-testid="img-logo-preview">
+                      <Building2 className="h-8 w-8 text-primary" />
+                      <span className="text-xs font-semibold text-gray-600">BuildPlusAI</span>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">

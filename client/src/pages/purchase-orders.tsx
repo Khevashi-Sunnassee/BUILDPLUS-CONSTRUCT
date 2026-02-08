@@ -196,7 +196,7 @@ function generatePoPdf(
   pdf.setTextColor(31, 41, 55);
   pdf.setFontSize(16);
   pdf.setFont("helvetica", "bold");
-  pdf.text(settings?.companyName || "LTE Precast Concrete Structures", headerTextX, 12);
+  pdf.text(settings?.companyName || "BuildPlusAI", headerTextX, 12);
 
   pdf.setFontSize(20);
   pdf.setTextColor(107, 114, 128);
@@ -532,7 +532,7 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
       const supplierEmail = po.supplierEmail || po.supplier?.email || "";
       setToEmail(supplierEmail);
       setCcEmail("");
-      const companyName = settings?.companyName || "LTE Precast Concrete Structures";
+      const companyName = settings?.companyName || "BuildPlusAI";
       setSubject(`Purchase Order ${po.poNumber} from ${companyName}`);
       const totalFormatted = formatCurrency(po.total);
       setMessage(
@@ -749,7 +749,7 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
                   <CardContent className="p-6 space-y-4">
                     <div className="text-center space-y-1">
                       <p className="text-lg font-semibold">
-                        {settings?.companyName || "LTE Precast Concrete Structures"}
+                        {settings?.companyName || "BuildPlusAI"}
                       </p>
                       <p className="text-2xl font-bold">{formatCurrency(po.total)}</p>
                       <p className="text-sm text-muted-foreground">

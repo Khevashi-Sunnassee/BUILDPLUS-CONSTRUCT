@@ -10,7 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import jsPDF from "jspdf";
-import defaultLogo from "@/assets/lte-logo.png";
 import {
   DndContext,
   DragEndEvent,
@@ -119,8 +118,8 @@ export default function TasksPage() {
   }, [groups, toast]);
 
   const [isExporting, setIsExporting] = useState(false);
-  const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
-  const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const filteredGroups = groups.map((group) => ({
     ...group,
@@ -246,7 +245,7 @@ export default function TasksPage() {
       pdf.setTextColor(31, 41, 55);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text(companyName || "LTE Precast Concrete Structures", headerTextX, margin + 2);
+      pdf.text(companyName || "BuildPlusAI", headerTextX, margin + 2);
 
       pdf.setFontSize(20);
       pdf.setTextColor(107, 114, 128);

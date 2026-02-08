@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -72,6 +74,10 @@ const stats = [
 export default function LandingPage() {
   const [, setLocation] = useLocation();
 
+  const { data: logoData } = useQuery<{ logoBase64: string | null }>({
+    queryKey: [SETTINGS_ROUTES.LOGO],
+  });
+
   useEffect(() => {
     document.title = "BuildPlusAI - Construction Performance Management";
     let metaDesc = document.querySelector('meta[name="description"]');
@@ -119,7 +125,11 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4 h-16">
             <div className="flex items-center gap-3" data-testid="text-brand-logo">
-              <Building2 className="h-7 w-7 text-primary" />
+              {logoData?.logoBase64 ? (
+                <img src={logoData.logoBase64} alt="BuildPlusAI" className="h-8 w-auto object-contain" data-testid="img-brand-logo" />
+              ) : (
+                <Building2 className="h-7 w-7 text-primary" />
+              )}
               <span className="text-lg font-bold text-foreground tracking-tight">
                 BuildPlus<span className="text-primary">AI</span>
               </span>
@@ -261,7 +271,11 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2" data-testid="text-footer-brand">
-              <Building2 className="h-5 w-5 text-primary" />
+              {logoData?.logoBase64 ? (
+                <img src={logoData.logoBase64} alt="BuildPlusAI" className="h-6 w-auto object-contain" />
+              ) : (
+                <Building2 className="h-5 w-5 text-primary" />
+              )}
               <span className="text-sm font-semibold text-foreground">
                 BuildPlus<span className="text-primary">AI</span>
               </span>
