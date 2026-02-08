@@ -538,7 +538,7 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     data.jobPhase = deserializePhase(jobPhaseStr);
     const job = await storage.createJob(data);
 
-    logJobChange(job.id, "JOB_CREATED", req.user?.id || null, req.user?.name || null, {
+    logJobChange(job.id, "JOB_CREATED", req.session?.userId || null, req.session?.name || null, {
       newPhase: jobPhaseStr,
       newStatus: data.status,
     });
@@ -644,7 +644,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
     const job = await storage.updateJob(req.params.id as string, data);
 
     if (Object.keys(changedFields).length > 0) {
-      logJobChange(req.params.id as string, "JOB_UPDATED", req.user?.id || null, req.user?.name || null, {
+      logJobChange(req.params.id as string, "JOB_UPDATED", req.session?.userId || null, req.session?.name || null, {
         changedFields,
         previousPhase: existingPhaseStr,
         newPhase: existingPhaseStr,
@@ -847,8 +847,8 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         targetPhase,
         currentStatus,
         targetStatus,
-        req.user?.id || null,
-        req.user?.name || null
+        req.session?.userId || null,
+        req.session?.name || null
       );
 
       const updatedJob = await storage.getJob(job.id);
@@ -871,8 +871,8 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         currentPhase,
         currentStatus,
         newStatus,
-        req.user?.id || null,
-        req.user?.name || null
+        req.session?.userId || null,
+        req.session?.name || null
       );
 
       const updatedJob = await storage.getJob(job.id);
