@@ -99,6 +99,11 @@ export default function AdminSettingsPage() {
     { key: "tasks", label: "Tasks", description: "Task groups and tasks" },
     { key: "suppliers", label: "Suppliers", description: "Suppliers and item catalog" },
     { key: "jobs", label: "Jobs", description: "All job records" },
+    { key: "assets", label: "Assets", description: "Asset register entries, maintenance records and transfers" },
+    { key: "documents", label: "Documents", description: "Document register entries and bundle links" },
+    { key: "contracts", label: "Contracts", description: "All contract records" },
+    { key: "progress_claims", label: "Progress Claims", description: "Progress claims and line items" },
+    { key: "broadcast_templates", label: "Broadcast Templates", description: "Broadcast templates and messages" },
   ];
 
   const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

@@ -11,7 +11,12 @@ import {
   chatMessageMentions, chatNotifications, userChatSettings,
   tasks, taskGroups, taskAssignees, taskUpdates, taskFiles, taskNotifications,
   productionSlotAdjustments, mappingRules, approvalEvents, productionDays, jobPanelRates,
-  deliveryRecords, jobLevelCycleTimes
+  deliveryRecords, jobLevelCycleTimes,
+  assets, assetMaintenanceRecords, assetTransfers,
+  documents, documentBundleItems,
+  contracts,
+  progressClaims, progressClaimItems,
+  broadcastTemplates, broadcastMessages,
 } from "@shared/schema";
 import { sql, isNotNull } from "drizzle-orm";
 import logger from "../lib/logger";
@@ -134,7 +139,12 @@ const dataDeletionCategories = [
   "chats",
   "tasks",
   "suppliers",
-  "jobs"
+  "jobs",
+  "assets",
+  "documents",
+  "contracts",
+  "progress_claims",
+  "broadcast_templates",
 ] as const;
 
 type DeletionCategory = typeof dataDeletionCategories[number];
@@ -175,6 +185,21 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     
     const [jobCount] = await db.select({ count: sql<number>`count(*)` }).from(jobs);
     counts.jobs = Number(jobCount.count);
+    
+    const [assetCount] = await db.select({ count: sql<number>`count(*)` }).from(assets);
+    counts.assets = Number(assetCount.count);
+    
+    const [documentCount] = await db.select({ count: sql<number>`count(*)` }).from(documents);
+    counts.documents = Number(documentCount.count);
+    
+    const [contractCount] = await db.select({ count: sql<number>`count(*)` }).from(contracts);
+    counts.contracts = Number(contractCount.count);
+    
+    const [progressClaimCount] = await db.select({ count: sql<number>`count(*)` }).from(progressClaims);
+    counts.progress_claims = Number(progressClaimCount.count);
+    
+    const [broadcastTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastTemplates);
+    counts.broadcast_templates = Number(broadcastTemplateCount.count);
     
     res.json(counts);
   } catch (error: any) {
@@ -274,6 +299,44 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       const [taskGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(taskGroups);
       if (Number(taskGroupCount.count) > 0) {
         warnings.push("Task Groups will also be deleted along with Tasks.");
+      }
+    }
+    
+    if (selected.has("assets")) {
+      const [maintenanceCount] = await db.select({ count: sql<number>`count(*)` }).from(assetMaintenanceRecords);
+      const [transferCount] = await db.select({ count: sql<number>`count(*)` }).from(assetTransfers);
+      const totalRelated = Number(maintenanceCount.count) + Number(transferCount.count);
+      if (totalRelated > 0) {
+        warnings.push(`${totalRelated} asset maintenance records and transfers will also be deleted.`);
+      }
+    }
+    
+    if (selected.has("documents")) {
+      const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(isNotNull(contracts.aiSourceDocumentId));
+      if (Number(contractDocRef.count) > 0 && !selected.has("contracts")) {
+        errors.push("Cannot delete Documents while Contracts reference them. Select Contracts for deletion first, or unlink them.");
+      }
+      const [bundleItemCount] = await db.select({ count: sql<number>`count(*)` }).from(documentBundleItems);
+      if (Number(bundleItemCount.count) > 0) {
+        warnings.push(`${bundleItemCount.count} document bundle link(s) will also be deleted.`);
+      }
+    }
+    
+    if (selected.has("contracts")) {
+      warnings.push("All contract records will be permanently deleted.");
+    }
+    
+    if (selected.has("progress_claims")) {
+      const [claimItemCount] = await db.select({ count: sql<number>`count(*)` }).from(progressClaimItems);
+      if (Number(claimItemCount.count) > 0) {
+        warnings.push(`${claimItemCount.count} progress claim line item(s) will also be deleted.`);
+      }
+    }
+    
+    if (selected.has("broadcast_templates")) {
+      const [msgCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastMessages);
+      if (Number(msgCount.count) > 0) {
+        warnings.push(`${msgCount.count} broadcast message(s) will also be deleted with templates.`);
       }
     }
     
@@ -385,6 +448,42 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       await db.delete(jobLevelCycleTimes);
       const result = await db.delete(jobs);
       deletedCounts.jobs = result.rowCount || 0;
+    }
+    
+    if (selected.has("assets")) {
+      await db.delete(assetMaintenanceRecords);
+      await db.delete(assetTransfers);
+      const result = await db.delete(assets);
+      deletedCounts.assets = result.rowCount || 0;
+    }
+    
+    if (selected.has("contracts")) {
+      const result = await db.delete(contracts);
+      deletedCounts.contracts = result.rowCount || 0;
+    }
+    
+    if (selected.has("documents")) {
+      if (!selected.has("contracts")) {
+        const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(isNotNull(contracts.aiSourceDocumentId));
+        if (Number(contractDocRef.count) > 0) {
+          return res.status(400).json({ error: "Cannot delete Documents while Contracts reference them. Select Contracts for deletion first." });
+        }
+      }
+      await db.delete(documentBundleItems);
+      const result = await db.delete(documents);
+      deletedCounts.documents = result.rowCount || 0;
+    }
+    
+    if (selected.has("progress_claims")) {
+      await db.delete(progressClaimItems);
+      const result = await db.delete(progressClaims);
+      deletedCounts.progress_claims = result.rowCount || 0;
+    }
+    
+    if (selected.has("broadcast_templates")) {
+      await db.delete(broadcastMessages);
+      const result = await db.delete(broadcastTemplates);
+      deletedCounts.broadcast_templates = result.rowCount || 0;
     }
     
     res.json({ 
