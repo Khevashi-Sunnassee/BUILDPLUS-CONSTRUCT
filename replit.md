@@ -1,7 +1,7 @@
 # LTE Performance Management System
 
 ## Overview
-The LTE Performance Management System is a comprehensive platform designed to optimize panel production and delivery processes in the construction and manufacturing sectors. It streamlines operational efficiency in CAD and Revit time management, provides insights into production and financial performance, and manages the lifecycle of panel production and delivery. Key capabilities include daily log management, manager approval workflows, reporting, analytics, KPI dashboards, and a logistics system for load lists and delivery tracking, offering robust tools for decision-making and operational control.
+The LTE Performance Management System optimizes panel production and delivery in construction and manufacturing. It enhances CAD and Revit time management, provides insights into production and financial performance, and manages the complete lifecycle of panel production and delivery. The system includes daily log management, manager approval workflows, reporting, analytics, KPI dashboards, and a logistics system for load lists and delivery tracking, supporting robust decision-making and operational control.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -11,106 +11,23 @@ Do not make changes to the folder `node_modules/`.
 Do not make changes to the file `package-lock.json`.
 
 ## System Architecture
-The system utilizes a client-server architecture. The frontend is built with React + Vite, while the backend uses Express.js. PostgreSQL is the primary database, managed by Drizzle ORM. User authentication is handled via email/password with bcrypt and `express-session`, featuring Role-Based Access Control (RBAC) with granular per-user permissions.
+The system employs a client-server architecture. The frontend is built with React + Vite, utilizing TanStack Query for data fetching, Wouter for routing, `shadcn/ui` components, and Tailwind CSS for styling. The backend uses Express.js with PostgreSQL as the primary database, managed by Drizzle ORM. User authentication is handled via email/password with bcrypt and `express-session`, featuring Role-Based Access Control (RBAC) with granular permissions.
 
 **UI/UX Decisions:**
-The frontend employs TanStack Query for data fetching, Wouter for routing, `shadcn/ui` for components, and Tailwind CSS for styling. It includes a KPI Dashboard with data visualization and PDF export, and interactive maps for factory management. Mobile pages follow strict design tokens and layout patterns, ensuring a consistent user experience with specific navigation and interaction guidelines.
+The frontend features a KPI Dashboard with data visualization and PDF export, and interactive maps for factory management. Mobile pages adhere to strict design tokens and layout patterns, ensuring a consistent user experience with specific navigation and interaction guidelines.
 
 **Technical Implementations & Features:**
-- **Core Management:** Time & approval management, comprehensive reporting & analytics, and centralized admin provisioning for users, jobs, customers, and global settings.
-- **Job & Panel Lifecycle:** Full CRUD for customer and job management, panel registration, production approval workflows, estimate import, and detailed panel field management. Panels are tracked through a 14-stage lifecycle with audit logging. Jobs have a 5-phase lifecycle (OPPORTUNITY → QUOTING → WON_AWAITING_CONTRACT → CONTRACTED, or LOST at any time) with 6 statuses (ACTIVE, ON_HOLD, PENDING_START, STARTED, COMPLETED, ARCHIVED). Phase progression is enforced sequentially, and each phase restricts which statuses and capabilities are available. Phase/status changes are audit-logged via `job_audit_logs` table with fire-and-forget pattern. LOST jobs are hidden from all selection dropdowns but remain visible in the admin job list. Backend capability gating prevents production, delivery, and claims actions for jobs not yet in the CONTRACTED phase. Key files: `shared/job-phases.ts`, `server/services/job-audit.service.ts`, `server/routes/middleware/job-capability.middleware.ts`.
+- **Core Management:** Time and approval management, comprehensive reporting and analytics, and centralized admin provisioning for users, jobs, customers, and global settings.
+- **Job & Panel Lifecycle:** Full CRUD operations for customer and job management, panel registration, production approval workflows, estimate import, and detailed panel field management. Panels are tracked through a 14-stage lifecycle with audit logging. Jobs follow a 5-phase lifecycle (OPPORTUNITY → QUOTING → WON_AWAITING_CONTRACT → CONTRACTED, or LOST) with 6 statuses. Phase progression is sequential, restricting available actions and capabilities.
 - **AI Integration:** OpenAI is used for PDF analysis to extract panel specifications and AI-powered visual comparison summaries for documents.
 - **Financial & Logistics:** Configurable rates and cost analysis, production tracking, and a logistics system for load list creation and delivery recording.
-- **Scheduling:** Drafting and procurement scheduling linked to production slots, considering multi-factory support and CFMEU calendars.
-- **Communication:** A Teams-style chat system with direct messages, groups, channels, @mentions, notifications, and file attachments.
+- **Scheduling:** Drafting and procurement scheduling linked to production slots, with support for multi-factory operations and CFMEU calendars.
+- **Communication:** A Teams-style chat system including direct messages, groups, channels, @mentions, notifications, and file attachments.
 - **Sales & Document Management:** A mobile-first pre-sales opportunity management system with a detailed sales pipeline, and a comprehensive document management system with version control, bundles, and entity linking.
-- **Photo Gallery:** Visual gallery for browsing image files from the document register as thumbnails. Features include search, filtering (job, type, discipline, status), grouping, chat photo toggle, full-screen viewer with navigation, multi-select with email, and download. Available on both web (`/photo-gallery`) and mobile (`/mobile/photo-gallery`). Key files: `client/src/pages/photo-gallery.tsx`, `client/src/pages/mobile/photo-gallery.tsx`. Backend uses existing `/api/documents` endpoint with `mimeTypePrefix=image/` and `excludeChat=true` query parameters.
-- **Mobile Functionality:** Dedicated QR scanner for panels and document bundles, and mobile panel checklists (e.g., Pre-Pour, Post-Pour Quality Inspections) with conditional fields and system-locked templates.
-- **Advanced Features:** Panel consolidation (merging multiple panels), contract retention tracking with automated deductions and caps, and visual document comparison with pixel-level overlay and AI summarization.
-- **Asset Register:** Comprehensive asset lifecycle management with 50+ fields across 8 tabs (Basic Info, Photos, Financial, Technical, Insurance, Maintenance Records, Transfer History, AI Summary). Supports 40+ asset categories, auto-generated asset tags (AST-YYMM-NNNN), depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis via OpenAI. Database tables: `assets`, `asset_maintenance_records`, `asset_transfers`. Admin-only access with company isolation.
-
-## Security: CSRF Protection Rules
-This project has CSRF (Cross-Site Request Forgery) protection enabled globally. All new features MUST follow these rules:
-
-**How it works:**
-- A CSRF token is stored in a browser cookie (`csrf_token`) and automatically generated by `server/middleware/csrf.ts` via `csrfTokenGenerator`.
-- The `csrfProtection` middleware validates that every mutating request (POST, PUT, PATCH, DELETE) includes a matching `x-csrf-token` header.
-- Safe methods (GET, HEAD, OPTIONS) are exempt. Login/register paths are also exempt.
-
-**Frontend rules for all new features:**
-1. **Always use `apiRequest()` from `@/lib/queryClient`** for all API calls (POST, PUT, PATCH, DELETE). It automatically reads the CSRF cookie and attaches the `x-csrf-token` header. Never use raw `fetch()` for mutating requests.
-2. **Always use `apiUpload()` from `@/lib/queryClient`** for file uploads via FormData. It also attaches the CSRF token automatically.
-3. **Never use raw `fetch()` or `XMLHttpRequest` for mutating API calls** — they will fail with 403 "CSRF token missing".
-4. **GET requests** can use the default TanStack Query `queryFn` (which uses raw fetch) since CSRF is not required for safe methods.
-
-**Backend rules for all new features:**
-1. **All new routes are automatically protected** by the global `csrfProtection` middleware registered in `server/routes/index.ts`. No per-route CSRF setup is needed.
-2. **If a route must be exempt** (e.g., webhooks from external services), add its path to the `EXEMPT_PATHS` set in `server/middleware/csrf.ts`.
-3. **Never disable or bypass CSRF** protection for authenticated user-facing endpoints.
-
-**Key files:**
-- `server/middleware/csrf.ts` — Token generation and validation middleware
-- `client/src/lib/queryClient.ts` — `getCsrfToken()`, `apiRequest()`, `apiUpload()` with automatic CSRF header injection
-- `server/routes/index.ts` — Global middleware registration (csrf is applied before all routes)
-
-## In-App Help System
-
-The system includes a database-driven help system providing contextual help throughout the application.
-
-**Architecture:**
-- Database tables: `help_entries`, `help_entry_versions`, `help_feedback` (Drizzle ORM)
-- Backend: `server/routes/help.routes.ts` — CRUD, search, feedback endpoints
-- Frontend components: `client/src/components/help/` — HelpProvider, HelpIcon, PageHelpButton, HelpDrawer, HelpHeader
-- Help Center page: `/help` — Search, browse by category, recently updated articles
-- Admin page: `/admin/help` — CRUD management with version history
-- Seed data: `server/seed-help.ts` — Initial page-level help entries
-
-**Help Entry Scopes:** PAGE, FIELD, ACTION, COLUMN, ERROR, GENERAL
-
-**Help Key Conventions:**
-- Page-level: `page.<routeName>` (e.g., `page.dashboard`, `page.admin.users`)
-- Field-level: `field.<page>.<fieldName>` (e.g., `field.jobs.status`)
-- Action-level: `action.<page>.<actionName>` (e.g., `action.jobs.create`)
-- Column-level: `column.<page>.<columnName>` (e.g., `column.panels.thicknessMm`)
-
-**Standards for New Pages/Features:**
-1. Every page MUST include `<PageHelpButton pageHelpKey="page.<routeName>" />` next to its `<h1>` title
-2. Import from `@/components/help/page-help-button`
-3. Major form fields, actions, and table columns SHOULD include `<HelpIcon helpKey="..." />` from `@/components/help/help-icon`
-4. Add corresponding help entries in the database via the Admin Help page (`/admin/help`) or the seed file
-5. Help content is stored in the database, NOT hardcoded — pages only reference help keys
-
-**Key Files:**
-- `shared/schema.ts` — helpEntries, helpEntryVersions, helpFeedback table definitions
-- `server/routes/help.routes.ts` — API endpoints for help system
-- `server/seed-help.ts` — Seed data for initial help entries
-- `client/src/components/help/help-provider.tsx` — Context provider and hooks
-- `client/src/components/help/help-icon.tsx` — Micro-help "?" icon component
-- `client/src/components/help/page-help-button.tsx` — Page-level "i" button
-- `client/src/components/help/help-drawer.tsx` — Slide-over help content drawer
-- `client/src/components/help/help-header.tsx` — Convenience header with built-in help button
-- `client/src/pages/help-center.tsx` — Help Center page
-- `client/src/pages/admin/help.tsx` — Admin help management page
-
-## Panel Register Page Architecture (Feb 2026)
-The admin panels page (`client/src/pages/admin/panels.tsx`, originally 4743 lines) has been decomposed into a modular directory structure at `client/src/pages/admin/panels/`:
-
-- **panels.tsx** — Re-export shim (`export { default } from "./panels/index"`) preserving existing import paths
-- **panels/index.tsx** (~2000 lines) — Main orchestrator with all state management, queries, mutations, filters, and table composition
-- **panels/types.ts** (~163 lines) — Shared types, interfaces, schemas (panelSchema, PanelFormData, PanelWithJob, etc.), constants, and utility functions
-- **panels/PanelEditDialog.tsx** (~635 lines) — Tabbed dialog for creating/editing panels with dimension auto-calculation
-- **panels/PanelBuildDialog.tsx** (~340 lines) — Production approval dialog with PDF drag-and-drop upload and AI analysis
-- **panels/PanelDialogs.tsx** (~622 lines) — Six smaller dialogs: Import, Delete, DeleteSource, TemplateDownload, QrCode, Consolidation
-- **panels/PanelTableRow.tsx** (~214 lines) — Reusable table row component with configurable columns for 4 view modes
-- **panels/PanelChatTab.tsx** (~385 lines) — Self-contained chat tab with own queries/mutations
-- **panels/PanelDocumentsTab.tsx** (~346 lines) — Self-contained documents tab with own queries/mutations
-- **panels/PanelAuditLogTab.tsx** (~76 lines) — Self-contained audit log tab
-
-Design decisions:
-- Centralized orchestrator pattern (index.tsx) for 30+ interconnected state variables
-- Tab components (Chat, Documents, AuditLog) are fully self-contained with own data fetching
-- Dialog components receive state and callbacks via props
-- PanelTableRow accepts configuration props for 4 different grouping modes (flat, by job, by type, by level)
+- **Photo Gallery:** A visual gallery for image files from the document register, offering search, filtering, grouping, full-screen viewing, multi-select with email, and download functionalities on both web and mobile.
+- **Mobile Functionality:** Dedicated QR scanner for panels and document bundles, and mobile panel checklists (e.g., Quality Inspections) with conditional fields and system-locked templates.
+- **Advanced Features:** Panel consolidation, contract retention tracking with automated deductions, and visual document comparison with pixel-level overlay and AI summarization.
+- **Asset Register:** Comprehensive asset lifecycle management with 50+ fields across 8 tabs, supporting 40+ asset categories, auto-generated asset tags, depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis via OpenAI.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
@@ -127,32 +44,4 @@ Design decisions:
 - **express-session**: Middleware for session management.
 - **connect-pg-simple**: PostgreSQL-backed session store for `express-session`.
 - **Vitest**: Testing framework for unit and integration tests.
-- **ExcelJS**: Excel file generation library (replaced vulnerable xlsx package).
-
-## Testing Infrastructure
-The project uses Vitest for automated testing. Tests are located in `tests/` directory.
-
-**Test Files:**
-- `tests/job-phases.test.ts` — 33 tests for job phase lifecycle logic (capabilities, status validation, phase advancement, labels, migration)
-- `tests/sales-pipeline.test.ts` — 7 tests for sales pipeline constants and stage validation
-- `tests/api-routes.test.ts` — 9 tests for centralized API route constant structure
-- `tests/api-endpoints.test.ts` — 23 tests for live API endpoint integration (auth, CRUD, help system, security)
-
-**Configuration:** `vitest.config.ts` — Uses Node environment with `@shared` alias support.
-
-**Running Tests:** `npx vitest run` (72 total tests, all passing)
-
-## Backend Storage Architecture (Feb 2026)
-The server storage layer (`server/storage.ts` was 4,847 lines) has been decomposed into 19 domain-specific modules at `server/storage/`:
-- `index.ts` — DatabaseStorage class composing all domain modules, barrel exports
-- `types.ts` — IStorage interface and shared types
-- `companies.ts`, `users.ts`, `jobs.ts`, `panels.ts`, `production.ts`, `tasks.ts`, `documents.ts`, `procurement.ts`, `reports.ts`, `scheduling.ts`, `logistics.ts`, `checklist.ts`, `chat.ts`, `daily-logs.ts`, `settings.ts`, `factories.ts`, `help.ts`, `sales.ts`
-
-The original `server/storage.ts` is now a one-line barrel re-export: `export * from "./storage/index";`
-
-## Code Quality Audit (Feb 2026)
-Composite score: **9.4/10 (A grade)** across 10 categories:
-- 0 npm vulnerabilities, 0 TypeScript errors, 0 console.logs in routes
-- 36 remaining `as any` casts (legitimate: Drizzle insert mismatches, library hacks)
-- 72/72 tests passing
-- All API endpoints verified functional
+- **ExcelJS**: Excel file generation library.
