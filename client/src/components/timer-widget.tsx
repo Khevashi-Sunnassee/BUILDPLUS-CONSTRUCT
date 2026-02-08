@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { TIMER_ROUTES, JOBS_ROUTES, DRAFTING_ROUTES, SETTINGS_ROUTES, DAILY_LOGS_ROUTES } from "@shared/api-routes";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 
 interface TimerSession {
   id: string;
@@ -426,7 +427,7 @@ export function TimerWidget() {
                   <SelectValue placeholder="Select a job" />
                 </SelectTrigger>
                 <SelectContent>
-                  {jobs?.map((job) => (
+                  {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                     <SelectItem key={job.id} value={job.id}>
                       {job.jobNumber} - {job.name}
                     </SelectItem>

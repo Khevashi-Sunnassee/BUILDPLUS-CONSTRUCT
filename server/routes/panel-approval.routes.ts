@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireRole } from "./middleware/auth.middleware";
+import { requireJobCapability } from "./middleware/job-capability.middleware";
 import logger from "../lib/logger";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import { documentRegisterService } from "../services/document-register.service";
@@ -209,6 +210,17 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
     const panel = await storage.getPanelById(id as string);
     if (!panel) {
       return res.status(404).json({ error: "Panel not found" });
+    }
+
+    if (panel.jobId) {
+      const { jobHasCapability } = await import("@shared/job-phases");
+      const job = await storage.getJob(panel.jobId);
+      if (job) {
+        const phase = ((job as any).jobPhase || "CONTRACTED") as string;
+        if (!jobHasCapability(phase as any, "PRODUCE_PANELS")) {
+          return res.status(403).json({ error: `Cannot approve panels for production while job is in "${phase}" phase` });
+        }
+      }
     }
     
     const updated = await storage.approvePanelForProduction(id as string, userId, {

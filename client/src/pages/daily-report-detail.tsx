@@ -57,6 +57,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { DailyLog, LogRow, Job, WorkType } from "@shared/schema";
 import { DAILY_LOGS_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, MANUAL_ENTRY_ROUTES } from "@shared/api-routes";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 
 interface DailyLogDetail extends DailyLog {
   rows: (LogRow & { job?: Job })[];
@@ -573,7 +574,7 @@ export default function DailyReportDetailPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {jobs?.map((j) => (
+                            {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((j) => (
                               <SelectItem key={j.id} value={j.id}>
                                 {j.code || j.name}
                               </SelectItem>

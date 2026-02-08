@@ -327,6 +327,8 @@ export const ADMIN_ROUTES = {
   JOB_LEVEL_CYCLE_TIMES: (id: string | number) => `/api/admin/jobs/${id}/level-cycle-times`,
   JOB_PRODUCTION_SLOT_STATUS: (id: string | number) => `/api/admin/jobs/${id}/production-slot-status`,
   JOB_UPDATE_PRODUCTION_SLOTS: (id: string | number) => `/api/admin/jobs/${id}/update-production-slots`,
+  JOB_PHASE_STATUS: (id: string | number) => `/api/admin/jobs/${id}/phase-status`,
+  JOB_AUDIT_LOG: (id: string | number) => `/api/admin/jobs/${id}/audit-log`,
   
   // Panels (admin management routes - uses /api/panels/admin pattern)
   PANELS: '/api/panels/admin',

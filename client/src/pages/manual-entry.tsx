@@ -70,6 +70,7 @@ import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Badge } from "@/components/ui/badge";
 import type { Job, PanelRegister, WorkType } from "@shared/schema";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 
 interface LogRowWithTimes {
   id: string;
@@ -1084,7 +1085,7 @@ export default function ManualEntryPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No job selected</SelectItem>
-                            {jobs?.filter(j => j.status === "ACTIVE").map((job) => (
+                            {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                               <SelectItem key={job.id} value={job.id}>
                                 {job.jobNumber} - {job.name}
                               </SelectItem>

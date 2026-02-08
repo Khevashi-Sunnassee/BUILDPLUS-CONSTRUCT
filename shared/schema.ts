@@ -7,7 +7,7 @@ export const roleEnum = pgEnum("role", ["USER", "MANAGER", "ADMIN"]);
 export const userTypeEnum = pgEnum("user_type", ["EMPLOYEE", "EXTERNAL"]);
 export const logStatusEnum = pgEnum("log_status", ["PENDING", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const disciplineEnum = pgEnum("discipline", ["DRAFTING"]);
-export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"]);
+export const jobStatusEnum = pgEnum("job_status", ["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED", "OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS", "PENDING_START", "STARTED"]);
 export const opportunityStatusEnum = pgEnum("opportunity_status", ["NEW", "CONTACTED", "PROPOSAL_SENT", "NEGOTIATING", "WON", "LOST", "ON_HOLD"]);
 export const salesStageEnum = pgEnum("sales_stage", ["OPPORTUNITY", "PRE_QUALIFICATION", "ESTIMATING", "SUBMITTED", "AWARDED", "LOST"]);
 export const opportunityTypeEnum = pgEnum("opportunity_type", ["BUILDER_SELECTED", "OPEN_TENDER", "NEGOTIATED_CONTRACT", "GENERAL_PRICING"]);
@@ -295,6 +295,7 @@ export const jobs = pgTable("jobs", {
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   productionSlotColor: text("production_slot_color"),
+  jobPhase: text("job_phase").default("OPPORTUNITY").notNull(),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   referrer: text("referrer"),
   engineerOnJob: text("engineer_on_job"),
@@ -313,6 +314,7 @@ export const jobs = pgTable("jobs", {
 }, (table) => ({
   jobNumberCompanyIdx: uniqueIndex("jobs_job_number_company_idx").on(table.jobNumber, table.companyId),
   statusIdx: index("jobs_status_idx").on(table.status),
+  jobPhaseIdx: index("jobs_job_phase_idx").on(table.jobPhase),
   codeIdx: index("jobs_code_idx").on(table.code),
   projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
   factoryIdx: index("jobs_factory_idx").on(table.factoryId),
@@ -612,6 +614,27 @@ export const panelAuditLogs = pgTable("panel_audit_logs", {
 export const insertPanelAuditLogSchema = createInsertSchema(panelAuditLogs).omit({ id: true, createdAt: true });
 export type InsertPanelAuditLog = z.infer<typeof insertPanelAuditLogSchema>;
 export type PanelAuditLog = typeof panelAuditLogs.$inferSelect;
+
+export const jobAuditLogs = pgTable("job_audit_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  action: text("action").notNull(),
+  changedFields: jsonb("changed_fields"),
+  previousPhase: text("previous_phase"),
+  newPhase: text("new_phase"),
+  previousStatus: text("previous_status"),
+  newStatus: text("new_status"),
+  changedById: varchar("changed_by_id", { length: 36 }).references(() => users.id),
+  changedByName: text("changed_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("job_audit_logs_job_id_idx").on(table.jobId),
+  createdAtIdx: index("job_audit_logs_created_at_idx").on(table.createdAt),
+}));
+
+export const insertJobAuditLogSchema = createInsertSchema(jobAuditLogs).omit({ id: true, createdAt: true });
+export type InsertJobAuditLog = z.infer<typeof insertJobAuditLogSchema>;
+export type JobAuditLog = typeof jobAuditLogs.$inferSelect;
 
 export const PANEL_LIFECYCLE_STATUS = {
   REGISTERED: 0,

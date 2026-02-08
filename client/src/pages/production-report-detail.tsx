@@ -78,6 +78,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Job, PanelRegister, ProductionEntry, User } from "@shared/schema";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 
 const productionEntrySchema = z.object({
   panelId: z.string().min(1, "Panel is required"),
@@ -164,7 +165,7 @@ export default function ProductionReportDetailPage() {
   const reportLogo = brandingSettings?.logoBase64 || defaultLogo;
   const companyName = brandingSettings?.companyName || "LTE Precast Concrete Structures";
 
-  const activeJobs = jobs?.filter(j => j.status === "ACTIVE") || [];
+  const activeJobs = jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")) || [];
 
   const selectedJobPanels = useMemo(() => {
     if (!selectedJobId || !jobs) return [];

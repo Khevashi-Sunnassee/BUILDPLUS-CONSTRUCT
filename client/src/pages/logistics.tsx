@@ -88,6 +88,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import type { Job, PanelRegister, TrailerType, PanelTypeConfig } from "@shared/schema";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 
 interface LoadListWithDetails {
   id: string;
@@ -1215,7 +1216,7 @@ export default function LogisticsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {jobs?.filter(j => j.status === "ACTIVE").map((job) => (
+                          {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                             <SelectItem key={job.id} value={job.id}>
                               {job.jobNumber} - {job.name}
                             </SelectItem>

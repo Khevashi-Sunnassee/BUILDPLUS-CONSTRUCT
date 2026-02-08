@@ -2,10 +2,13 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory } from "@shared/schema";
+import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
+import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceToPhase, getDefaultStatusForPhase } from "@shared/job-phases";
+import type { JobPhase, JobStatus } from "@shared/job-phases";
+import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
 
 const router = Router();
 
@@ -509,7 +512,20 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
       }
       data.procurementTimeDays = val;
     }
+    if (!data.jobPhase) {
+      data.jobPhase = "OPPORTUNITY";
+    }
+    if (!data.status || data.status === "ACTIVE") {
+      const defaultSt = getDefaultStatusForPhase(data.jobPhase as JobPhase);
+      if (defaultSt) data.status = defaultSt;
+    }
     const job = await storage.createJob(data);
+
+    logJobChange(job.id, "JOB_CREATED", req.user?.id || null, req.user?.name || null, {
+      newPhase: data.jobPhase,
+      newStatus: data.status,
+    });
+
     res.json(job);
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to create job" });
@@ -581,7 +597,39 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       }
       data.procurementTimeDays = val;
     }
+    if (data.jobPhase || data.status) {
+      const targetPhase = (data.jobPhase || (existingJob as any).jobPhase || "CONTRACTED") as JobPhase;
+      const targetStatus = (data.status || existingJob.status) as JobStatus;
+      
+      if (data.jobPhase && data.jobPhase !== (existingJob as any).jobPhase) {
+        if (!canAdvanceToPhase((existingJob as any).jobPhase || "CONTRACTED", targetPhase)) {
+          return res.status(400).json({ error: `Cannot move from ${(existingJob as any).jobPhase} to ${targetPhase}` });
+        }
+      }
+
+      if (targetPhase !== "LOST" && !isValidStatusForPhase(targetPhase, targetStatus)) {
+        return res.status(400).json({ error: `Status '${targetStatus}' is not valid for phase '${targetPhase}'` });
+      }
+    }
+
+    const changedFields: Record<string, any> = {};
+    for (const [key, val] of Object.entries(data)) {
+      if ((existingJob as any)[key] !== val) {
+        changedFields[key] = { from: (existingJob as any)[key], to: val };
+      }
+    }
+
     const job = await storage.updateJob(req.params.id as string, data);
+
+    if (Object.keys(changedFields).length > 0) {
+      logJobChange(req.params.id as string, "JOB_UPDATED", req.user?.id || null, req.user?.name || null, {
+        changedFields,
+        previousPhase: (existingJob as any).jobPhase,
+        newPhase: (existingJob as any).jobPhase,
+        previousStatus: existingJob.status,
+        newStatus: existingJob.status,
+      });
+    }
 
     if (data.productionStartDate !== undefined) {
       try {
@@ -722,6 +770,119 @@ router.delete("/api/admin/mapping-rules/:id", requireRole("ADMIN"), async (req: 
   }
   await storage.deleteMappingRule(req.params.id as string);
   res.json({ ok: true });
+});
+
+// PUT /api/admin/jobs/:id/phase-status - Update job phase and/or status with audit logging
+router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.id as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const schema = z.object({
+      jobPhase: z.enum(JOB_PHASES as any).optional(),
+      status: z.string().optional(),
+    });
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid input", details: parsed.error.flatten() });
+    }
+
+    const { jobPhase: newPhase, status: newStatus } = parsed.data;
+    const currentPhase = (job as any).jobPhase as JobPhase;
+    const currentStatus = job.status;
+
+    if (newPhase && newPhase !== currentPhase) {
+      if (!canAdvanceToPhase(currentPhase, newPhase as JobPhase)) {
+        return res.status(400).json({ 
+          error: `Cannot move from ${currentPhase} to ${newPhase}. Jobs must progress through phases sequentially.` 
+        });
+      }
+
+      const targetPhase = newPhase as JobPhase;
+      let targetStatus = newStatus || getDefaultStatusForPhase(targetPhase);
+
+      if (targetPhase === "LOST") {
+        targetStatus = "ARCHIVED";
+      } else if (targetStatus && !isValidStatusForPhase(targetPhase, targetStatus as JobStatus)) {
+        return res.status(400).json({
+          error: `Status '${targetStatus}' is not valid for phase '${newPhase}'`,
+        });
+      }
+
+      const updateData: any = { jobPhase: targetPhase, updatedAt: new Date() };
+      if (targetStatus) {
+        updateData.status = targetStatus;
+      }
+
+      await db.update(jobs).set(updateData).where(eq(jobs.id, job.id));
+
+      logJobPhaseChange(
+        job.id,
+        currentPhase,
+        targetPhase,
+        currentStatus,
+        targetStatus,
+        req.user?.id || null,
+        req.user?.name || null
+      );
+
+      const updatedJob = await storage.getJob(job.id);
+      return res.json(updatedJob);
+    }
+
+    if (newStatus && newStatus !== currentStatus) {
+      if (!isValidStatusForPhase(currentPhase, newStatus as JobStatus)) {
+        return res.status(400).json({
+          error: `Status '${newStatus}' is not valid for phase '${currentPhase}'`,
+        });
+      }
+
+      await db.update(jobs)
+        .set({ status: newStatus as any, updatedAt: new Date() })
+        .where(eq(jobs.id, job.id));
+
+      logJobStatusChange(
+        job.id,
+        currentPhase,
+        currentStatus,
+        newStatus,
+        req.user?.id || null,
+        req.user?.name || null
+      );
+
+      const updatedJob = await storage.getJob(job.id);
+      return res.json(updatedJob);
+    }
+
+    return res.json(job);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error updating job phase/status");
+    res.status(500).json({ error: "Failed to update job phase/status" });
+  }
+});
+
+// GET /api/admin/jobs/:id/audit-log - Get job audit trail
+router.get("/api/admin/jobs/:id/audit-log", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.id as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const logs = await db.select()
+      .from(jobAuditLogs)
+      .where(eq(jobAuditLogs.jobId, job.id))
+      .orderBy(desc(jobAuditLogs.createdAt))
+      .limit(100);
+
+    res.json(logs);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching job audit log");
+    res.status(500).json({ error: "Failed to fetch audit log" });
+  }
 });
 
 export const jobsRouter = router;

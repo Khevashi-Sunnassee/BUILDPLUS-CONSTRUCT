@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
+import { requireJobCapability } from "./middleware/job-capability.middleware";
 import { insertEotClaimSchema, jobs } from "@shared/schema";
 import { db } from "../db";
 import { eq } from "drizzle-orm";
@@ -61,7 +62,7 @@ router.get("/api/eot-claims/:id", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/api/eot-claims", requireAuth, async (req, res) => {
+router.post("/api/eot-claims", requireAuth, requireJobCapability("CLAIMS"), async (req, res) => {
   try {
     const userId = req.session.userId!;
     const { jobId } = req.body;

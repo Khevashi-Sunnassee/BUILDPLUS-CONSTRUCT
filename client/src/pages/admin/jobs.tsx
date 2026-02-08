@@ -83,8 +83,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, PanelRegister, User as UserType, GlobalSettings, Factory, Customer } from "@shared/schema";
+import type { Job, PanelRegister, User as UserType, GlobalSettings, Factory, Customer, JobAuditLog } from "@shared/schema";
 import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
+import {
+  JOB_PHASES, JOB_STATUSES,
+  PHASE_LABELS, STATUS_LABELS,
+  PHASE_COLORS, STATUS_COLORS,
+  PHASE_ALLOWED_STATUSES,
+  isValidStatusForPhase,
+  canAdvanceToPhase,
+  getDefaultStatusForPhase,
+  getPhaseLabel, getStatusLabel,
+} from "@shared/job-phases";
+import type { JobPhase, JobStatus } from "@shared/job-phases";
 
 const AUSTRALIAN_STATES = ["VIC", "NSW", "QLD", "SA", "WA", "TAS", "NT", "ACT"] as const;
 
@@ -127,7 +138,8 @@ const jobSchema = z.object({
   procurementTimeDays: z.number().int().min(1).optional().nullable(),
   siteContact: z.string().optional(),
   siteContactPhone: z.string().optional(),
-  status: z.enum(["ACTIVE", "ON_HOLD", "COMPLETED", "ARCHIVED"]),
+  jobPhase: z.enum(JOB_PHASES as any).optional(),
+  status: z.string(),
   projectManagerId: z.string().optional().nullable(),
   factoryId: z.string().optional().nullable(),
   productionSlotColor: z.string().optional().nullable(),
@@ -186,6 +198,7 @@ export default function AdminJobsPage() {
   
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState("");
+  const [phaseFilter, setPhaseFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [stateFilter, setStateFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("jobNumber");
@@ -252,6 +265,9 @@ export default function AdminJobsPage() {
   // Filter and sort jobs
   const filteredAndSortedJobs = (jobs || [])
     .filter((job) => {
+      // Phase filter
+      if (phaseFilter !== "all" && (job as any).jobPhase !== phaseFilter) return false;
+      
       // Status filter
       if (statusFilter !== "all" && job.status !== statusFilter) return false;
       
@@ -349,6 +365,7 @@ export default function AdminJobsPage() {
       procurementTimeDays: null,
       siteContact: "",
       siteContactPhone: "",
+      jobPhase: "OPPORTUNITY",
       status: "ACTIVE",
       projectManagerId: null,
       factoryId: null,
@@ -728,6 +745,7 @@ export default function AdminJobsPage() {
       procurementTimeDays: globalSettings?.procurementTimeDays ?? 14,
       siteContact: "",
       siteContactPhone: "",
+      jobPhase: "OPPORTUNITY",
       status: "ACTIVE",
       projectManagerId: null,
       factoryId: null,
@@ -763,6 +781,7 @@ export default function AdminJobsPage() {
       procurementTimeDays: job.procurementTimeDays ?? globalSettings?.procurementTimeDays ?? 14,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
+      jobPhase: (job as any).jobPhase || "CONTRACTED",
       status: job.status,
       projectManagerId: job.projectManagerId || null,
       factoryId: job.factoryId || null,
@@ -830,16 +849,6 @@ export default function AdminJobsPage() {
       .map(([field, err]: [string, any]) => `${field}: ${err?.message || "invalid"}`)
       .join(", ");
     toast({ title: "Please fix form errors", description: errorMessages, variant: "destructive" });
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      ACTIVE: "default",
-      ON_HOLD: "secondary",
-      COMPLETED: "outline",
-      ARCHIVED: "destructive",
-    };
-    return <Badge variant={variants[status] || "default"}>{status}</Badge>;
   };
 
   // Level cycle times functions
@@ -1062,16 +1071,26 @@ export default function AdminJobsPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={phaseFilter} onValueChange={setPhaseFilter}>
+              <SelectTrigger className="w-[160px]" data-testid="select-phase-filter">
+                <SelectValue placeholder="Filter by phase" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Phases</SelectItem>
+                {JOB_PHASES.map((phase) => (
+                  <SelectItem key={phase} value={phase}>{getPhaseLabel(phase)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
+              <SelectTrigger className="w-[150px]" data-testid="select-status-filter">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="ACTIVE">Active</SelectItem>
-                <SelectItem value="ON_HOLD">On Hold</SelectItem>
-                <SelectItem value="COMPLETED">Completed</SelectItem>
-                <SelectItem value="ARCHIVED">Archived</SelectItem>
+                {JOB_STATUSES.map((status) => (
+                  <SelectItem key={status} value={status}>{getStatusLabel(status)}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Button
@@ -1083,11 +1102,11 @@ export default function AdminJobsPage() {
               <MapPin className="h-4 w-4 mr-1" />
               Group by State
             </Button>
-            {(searchQuery || statusFilter !== "all" || stateFilter !== "all") && (
+            {(searchQuery || phaseFilter !== "all" || statusFilter !== "all" || stateFilter !== "all") && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setSearchQuery(""); setStatusFilter("all"); setStateFilter("all"); }}
+                onClick={() => { setSearchQuery(""); setPhaseFilter("all"); setStatusFilter("all"); setStateFilter("all"); }}
                 data-testid="button-clear-filters"
               >
                 Clear Filters
@@ -1123,6 +1142,7 @@ export default function AdminJobsPage() {
                   </Button>
                 </TableHead>
                 <TableHead>Location</TableHead>
+                <TableHead>Phase</TableHead>
                 <TableHead>
                   <Button
                     variant="ghost"
@@ -1143,7 +1163,7 @@ export default function AdminJobsPage() {
                 <Fragment key={stateGroup}>
                   {groupByState && stateGroup !== "All Jobs" && (
                     <TableRow className="bg-muted/50">
-                      <TableCell colSpan={8} className="py-2">
+                      <TableCell colSpan={9} className="py-2">
                         <div className="flex items-center gap-2 font-semibold">
                           <MapPin className="h-4 w-4" />
                           {stateGroup}
@@ -1191,7 +1211,35 @@ export default function AdminJobsPage() {
                           {!job.city && !job.state && <span className="text-muted-foreground">-</span>}
                         </div>
                       </TableCell>
-                      <TableCell>{getStatusBadge(job.status)}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          const phase = ((job as any).jobPhase || "CONTRACTED") as JobPhase;
+                          const colors = PHASE_COLORS[phase] || PHASE_COLORS.CONTRACTED;
+                          return (
+                            <Badge variant="outline" className={`${colors} text-xs`} data-testid={`badge-phase-${job.id}`}>
+                              {getPhaseLabel(phase)}
+                            </Badge>
+                          );
+                        })()}
+                      </TableCell>
+                      <TableCell>
+                        {(() => {
+                          const status = (job.status || "STARTED") as JobStatus;
+                          const colors = STATUS_COLORS[status as keyof typeof STATUS_COLORS];
+                          if (!colors) {
+                            return (
+                              <Badge variant="outline" className="text-xs" data-testid={`badge-status-${job.id}`}>
+                                {getStatusLabel(status)}
+                              </Badge>
+                            );
+                          }
+                          return (
+                            <Badge variant="outline" className={`${colors} text-xs`} data-testid={`badge-status-${job.id}`}>
+                              {getStatusLabel(status)}
+                            </Badge>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <Button
                           variant="ghost"
@@ -1254,7 +1302,7 @@ export default function AdminJobsPage() {
               ))}
               {filteredAndSortedJobs.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     {jobs?.length ? "No jobs match your filters." : "No jobs found. Add a job or import from Excel."}
                   </TableCell>
                 </TableRow>
@@ -1365,26 +1413,61 @@ export default function AdminJobsPage() {
                     />
                     <FormField
                       control={jobForm.control}
-                      name="status"
+                      name="jobPhase"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <FormLabel>Phase</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              const phase = val as JobPhase;
+                              const currentStatus = jobForm.getValues("status") as JobStatus;
+                              if (!isValidStatusForPhase(phase, currentStatus)) {
+                                jobForm.setValue("status", getDefaultStatusForPhase(phase));
+                              }
+                            }}
+                            value={field.value || "OPPORTUNITY"}
+                          >
                             <FormControl>
-                              <SelectTrigger data-testid="select-job-status">
+                              <SelectTrigger data-testid="select-job-phase">
                                 <SelectValue />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="ACTIVE">Active</SelectItem>
-                              <SelectItem value="ON_HOLD">On Hold</SelectItem>
-                              <SelectItem value="COMPLETED">Completed</SelectItem>
-                              <SelectItem value="ARCHIVED">Archived</SelectItem>
+                              {JOB_PHASES.map((phase) => (
+                                <SelectItem key={phase} value={phase}>{getPhaseLabel(phase)}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
                         </FormItem>
                       )}
+                    />
+                    <FormField
+                      control={jobForm.control}
+                      name="status"
+                      render={({ field }) => {
+                        const currentPhase = (jobForm.watch("jobPhase") || "CONTRACTED") as JobPhase;
+                        const allowedStatuses = PHASE_ALLOWED_STATUSES[currentPhase] || JOB_STATUSES;
+                        return (
+                          <FormItem>
+                            <FormLabel>Status</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-job-status">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {allowedStatuses.map((status) => (
+                                  <SelectItem key={status} value={status}>{getStatusLabel(status)}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   </div>
                   <FormField

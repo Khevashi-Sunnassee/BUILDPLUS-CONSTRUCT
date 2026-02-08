@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import { requireJobCapability } from "./middleware/job-capability.middleware";
 import { logPanelChange, advancePanelLifecycleIfLower } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 
@@ -24,7 +25,7 @@ router.get("/api/production-entries/:id", requireAuth, requirePermission("produc
   res.json(entry);
 });
 
-router.post("/api/production-entries", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+router.post("/api/production-entries", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), requireJobCapability("PRODUCE_PANELS"), async (req: Request, res: Response) => {
   try {
     const { panelId, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, ...entryFields } = req.body;
     if (panelId) {

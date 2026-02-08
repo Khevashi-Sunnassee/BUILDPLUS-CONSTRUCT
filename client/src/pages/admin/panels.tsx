@@ -101,6 +101,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Job, PanelRegister, PanelTypeConfig, Factory } from "@shared/schema";
 import { PANEL_LIFECYCLE_LABELS, PANEL_LIFECYCLE_COLORS } from "@shared/schema";
 import { ADMIN_ROUTES, CHAT_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, USER_ROUTES, SETTINGS_ROUTES, DOCUMENT_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import defaultLogo from "@/assets/lte-logo.png";
 
 const panelSchema = z.object({
@@ -2466,7 +2467,7 @@ export default function AdminPanelsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Jobs</SelectItem>
-                      {jobs?.filter(j => j.status === "ACTIVE").map(job => (
+                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map(job => (
                         <SelectItem key={job.id} value={job.id}>
                           {job.jobNumber} - {job.name}
                         </SelectItem>
@@ -3473,7 +3474,7 @@ export default function AdminPanelsPage() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {jobs?.map((job) => (
+                            {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                               <SelectItem key={job.id} value={job.id}>
                                 {job.jobNumber} - {job.name}
                               </SelectItem>
@@ -3976,7 +3977,7 @@ export default function AdminPanelsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">No fallback - require job in Excel</SelectItem>
-                  {jobs?.map((job) => (
+                  {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                     <SelectItem key={job.id} value={job.id}>
                       {job.jobNumber} - {job.name}
                     </SelectItem>

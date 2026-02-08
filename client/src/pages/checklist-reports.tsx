@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 
 interface ReportSummary {
   total: number;
@@ -238,7 +239,7 @@ export default function ChecklistReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" data-testid="option-job-all">All Jobs</SelectItem>
-                {jobs?.map((job) => (
+                {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                   <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                     {job.name}
                   </SelectItem>

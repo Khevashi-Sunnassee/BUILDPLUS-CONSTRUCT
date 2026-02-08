@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { ChecklistInstance, ChecklistTemplate, Job } from "@shared/schema";
 import { CHECKLIST_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import { format } from "date-fns";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
@@ -476,7 +477,7 @@ export default function ChecklistsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__" data-testid="option-job-none">None</SelectItem>
-                  {jobs?.map((job) => (
+                  {jobs?.filter(j => isJobVisibleInDropdowns((j as any).jobPhase || "CONTRACTED")).map((job) => (
                     <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                       {job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name}
                     </SelectItem>
