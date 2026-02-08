@@ -6,6 +6,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sheet,
   SheetContent,
@@ -24,7 +25,7 @@ interface VersionHistorySheetProps {
 }
 
 export function VersionHistorySheet({ open, onOpenChange, document: versionHistoryDoc }: VersionHistorySheetProps) {
-  const { data: versionHistory = [] } = useQuery<Document[]>({
+  const { data: versionHistory = [], isLoading } = useQuery<Document[]>({
     queryKey: [DOCUMENT_ROUTES.VERSIONS(versionHistoryDoc?.id || "")],
     enabled: !!versionHistoryDoc?.id && open,
   });
@@ -39,7 +40,30 @@ export function VersionHistorySheet({ open, onOpenChange, document: versionHisto
           </SheetDescription>
         </SheetHeader>
         <div className="mt-6 space-y-4">
-          {versionHistory.length === 0 ? (
+          {isLoading ? (
+            <div className="space-y-4" data-testid="skeleton-version-history">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="pt-4">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-2 flex-1">
+                        <div className="flex items-center gap-2">
+                          <Skeleton className="h-5 w-12" />
+                          <Skeleton className="h-5 w-16" />
+                        </div>
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-4 w-48" />
+                      </div>
+                      <div className="flex gap-1">
+                        <Skeleton className="h-9 w-9 rounded-md" />
+                        <Skeleton className="h-9 w-9 rounded-md" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : versionHistory.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No version history available</p>
           ) : (
             versionHistory.map((version, index) => {

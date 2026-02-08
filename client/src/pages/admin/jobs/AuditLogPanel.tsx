@@ -3,12 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPhaseLabel, getStatusLabel } from "@shared/job-phases";
 import type { JobAuditLog } from "@shared/schema";
+import { ADMIN_ROUTES } from "@shared/api-routes";
 
 export function AuditLogPanel({ jobId }: { jobId: string }) {
   const { data: logs, isLoading } = useQuery<JobAuditLog[]>({
-    queryKey: ["/api/admin/jobs", jobId, "audit-log"],
+    queryKey: [ADMIN_ROUTES.JOBS, jobId, "audit-log"],
     queryFn: async () => {
-      const res = await fetch(`/api/admin/jobs/${jobId}/audit-log`);
+      const res = await fetch(ADMIN_ROUTES.JOB_AUDIT_LOG(jobId));
       if (!res.ok) throw new Error("Failed to fetch audit log");
       return res.json();
     },
@@ -94,7 +95,7 @@ export function AuditLogPanel({ jobId }: { jobId: string }) {
               )}
             </div>
           )}
-          {log.changedFields && renderChangedFields(log.changedFields as Record<string, { from: any; to: any }>)}
+          {log.changedFields ? renderChangedFields(log.changedFields as Record<string, { from: any; to: any }>) : null}
           {log.changedByName && (
             <div className="text-xs text-muted-foreground">
               by {log.changedByName}

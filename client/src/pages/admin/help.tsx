@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Separator } from "@/components/ui/separator";
 import { Plus, Pencil, Archive, History, Search, BookOpen, X } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { HELP_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import type { HelpEntry, HelpEntryVersion } from "@shared/schema";
 
@@ -46,14 +47,14 @@ export default function AdminHelpPage() {
   const { toast } = useToast();
 
   const { data: entries = [], isLoading } = useQuery<HelpEntry[]>({
-    queryKey: ["/api/help/admin/list"],
+    queryKey: [HELP_ROUTES.ADMIN_LIST],
   });
 
   const { data: versions = [] } = useQuery<HelpEntryVersion[]>({
-    queryKey: ["/api/help/admin", historyEntry?.id, "versions"],
+    queryKey: [HELP_ROUTES.ADMIN_LIST, historyEntry?.id, "versions"],
     queryFn: async () => {
       if (!historyEntry?.id) return [];
-      const res = await fetch(`/api/help/admin/${historyEntry.id}/versions`, { credentials: "include" });
+      const res = await fetch(HELP_ROUTES.ADMIN_VERSIONS(historyEntry.id), { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -62,7 +63,7 @@ export default function AdminHelpPage() {
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      await apiRequest("POST", "/api/help/admin", {
+      await apiRequest("POST", HELP_ROUTES.ADMIN_LIST, {
         ...data,
         keywords: data.keywords ? data.keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
         category: data.category || null,
@@ -71,7 +72,7 @@ export default function AdminHelpPage() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/help/admin/list"] });
+      queryClient.invalidateQueries({ queryKey: [HELP_ROUTES.ADMIN_LIST] });
       setDialogOpen(false);
       setFormData(emptyForm);
       toast({ title: "Help entry created" });
@@ -83,7 +84,7 @@ export default function AdminHelpPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: FormData }) => {
-      await apiRequest("PUT", `/api/help/admin/${id}`, {
+      await apiRequest("PUT", HELP_ROUTES.ADMIN_BY_ID(id), {
         ...data,
         keywords: data.keywords ? data.keywords.split(",").map((k) => k.trim()).filter(Boolean) : [],
         category: data.category || null,
@@ -92,7 +93,7 @@ export default function AdminHelpPage() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/help/admin/list"] });
+      queryClient.invalidateQueries({ queryKey: [HELP_ROUTES.ADMIN_LIST] });
       setDialogOpen(false);
       setEditEntry(null);
       setFormData(emptyForm);
@@ -105,10 +106,10 @@ export default function AdminHelpPage() {
 
   const archiveMutation = useMutation({
     mutationFn: async (id: string) => {
-      await apiRequest("DELETE", `/api/help/admin/${id}`);
+      await apiRequest("DELETE", HELP_ROUTES.ADMIN_BY_ID(id));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/help/admin/list"] });
+      queryClient.invalidateQueries({ queryKey: [HELP_ROUTES.ADMIN_LIST] });
       toast({ title: "Help entry archived" });
     },
   });

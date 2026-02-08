@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
   ImageIcon,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 interface ChatConversation {
@@ -130,19 +131,19 @@ function NavRow({
 export default function MobileDashboard() {
   const { user } = useAuth();
 
-  const { data: conversations = [] } = useQuery<ChatConversation[]>({
+  const { data: conversations = [], isLoading: loadingConversations } = useQuery<ChatConversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
   });
 
-  const { data: taskNotifications = [] } = useQuery<TaskNotification[]>({
+  const { data: taskNotifications = [], isLoading: loadingTasks } = useQuery<TaskNotification[]>({
     queryKey: [TASKS_ROUTES.NOTIFICATIONS],
   });
 
-  const { data: jobs = [] } = useQuery<Job[]>({
+  const { data: jobs = [], isLoading: loadingJobs } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
 
-  const { data: panels = [] } = useQuery<Panel[]>({
+  const { data: panels = [], isLoading: loadingPanels } = useQuery<Panel[]>({
     queryKey: [PANELS_ROUTES.LIST],
   });
 
@@ -157,6 +158,8 @@ export default function MobileDashboard() {
   const { data: globalSettings } = useQuery<GlobalSettings>({
     queryKey: [ADMIN_ROUTES.SETTINGS],
   });
+
+  const isLoading = loadingConversations || loadingTasks || loadingJobs || loadingPanels;
 
   const unreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   const openTasks = taskNotifications.filter(n => !n.readAt).length;
@@ -206,12 +209,24 @@ export default function MobileDashboard() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
-        <div className="grid grid-cols-4 gap-2">
-          <StatCard value={totalTasks} title="Tasks" subtitle={`${openTasks} open`} accent="blue" />
-          <StatCard value={activeJobs} title="Jobs" subtitle="In Progress" accent="green" />
-          <StatCard value={inProgressPanels} title="Panels" subtitle="In Progress" accent="yellow" />
-          <StatCard value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />
-        </div>
+        {isLoading ? (
+          <div className="grid grid-cols-4 gap-2" data-testid="skeleton-stats">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <Skeleton className="h-8 w-12 bg-white/10" />
+                <Skeleton className="mt-2 h-4 w-16 bg-white/10" />
+                <Skeleton className="mt-1 h-3 w-12 bg-white/10" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
+            <StatCard value={totalTasks} title="Tasks" subtitle={`${openTasks} open`} accent="blue" />
+            <StatCard value={activeJobs} title="Jobs" subtitle="In Progress" accent="green" />
+            <StatCard value={inProgressPanels} title="Panels" subtitle="In Progress" accent="yellow" />
+            <StatCard value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />
+          </div>
+        )}
 
         <div className="mt-6 space-y-3">
           <NavRow

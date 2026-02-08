@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, BookOpen, Clock, Tag } from "lucide-react";
 import { useHelpContext } from "@/components/help/help-provider";
 import type { HelpEntry } from "@shared/schema";
+import { HELP_ROUTES } from "@shared/api-routes";
 
 export default function HelpCenterPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,16 +24,16 @@ export default function HelpCenterPage() {
   };
 
   const { data: categories = [] } = useQuery<string[]>({
-    queryKey: ["/api/help/categories"],
+    queryKey: [HELP_ROUTES.CATEGORIES],
   });
 
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<HelpEntry[]>({
-    queryKey: ["/api/help/search", debouncedQuery, selectedCategory],
+    queryKey: [HELP_ROUTES.SEARCH, debouncedQuery, selectedCategory],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (debouncedQuery) params.set("query", debouncedQuery);
       if (selectedCategory) params.set("category", selectedCategory);
-      const res = await fetch(`/api/help/search?${params.toString()}`, { credentials: "include" });
+      const res = await fetch(`${HELP_ROUTES.SEARCH}?${params.toString()}`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -40,7 +41,7 @@ export default function HelpCenterPage() {
   });
 
   const { data: recentEntries = [], isLoading: recentLoading } = useQuery<HelpEntry[]>({
-    queryKey: ["/api/help/recent"],
+    queryKey: [HELP_ROUTES.RECENT],
   });
 
   const showRecent = !debouncedQuery && !selectedCategory;

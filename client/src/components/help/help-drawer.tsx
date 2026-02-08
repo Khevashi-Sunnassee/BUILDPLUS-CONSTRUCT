@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import type { HelpEntry } from "@shared/schema";
+import { HELP_ROUTES } from "@shared/api-routes";
 
 function MarkdownContent({ content }: { content: string }) {
   const lines = content.split("\n");
@@ -62,11 +63,11 @@ export function HelpDrawer() {
   const { toast } = useToast();
 
   const { data: related } = useQuery<HelpEntry[]>({
-    queryKey: ["/api/help/search", "related", entry?.category],
+    queryKey: [HELP_ROUTES.SEARCH, "related", entry?.category],
     queryFn: async () => {
       if (!entry?.category) return [];
       const params = new URLSearchParams({ category: entry.category, limit: "5" });
-      const res = await fetch(`/api/help/search?${params.toString()}`, { credentials: "include" });
+      const res = await fetch(`${HELP_ROUTES.SEARCH}?${params.toString()}`, { credentials: "include" });
       if (!res.ok) return [];
       const data = await res.json();
       return data.filter((r: HelpEntry) => r.key !== drawerKey);
@@ -77,7 +78,7 @@ export function HelpDrawer() {
 
   const handleFeedbackSubmit = async () => {
     try {
-      await apiRequest("POST", "/api/help/feedback", {
+      await apiRequest("POST", HELP_ROUTES.FEEDBACK, {
         helpEntryId: entry?.id,
         helpKey: drawerKey,
         comment: feedbackText,

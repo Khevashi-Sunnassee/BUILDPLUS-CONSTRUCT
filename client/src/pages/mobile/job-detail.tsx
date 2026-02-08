@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { PANELS_ROUTES } from "@shared/api-routes";
+import { PANELS_ROUTES, JOBS_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import { PANEL_LIFECYCLE_LABELS } from "@shared/schema";
 import { getPhaseLabel, getStatusLabel, PHASE_COLORS, STATUS_COLORS } from "@shared/job-phases";
 import type { JobAuditLog } from "@shared/schema";
@@ -104,9 +104,9 @@ export default function MobileJobDetailPage() {
   const jobId = params?.id;
 
   const { data: job, isLoading } = useQuery<JobDetail>({
-    queryKey: ["/api/jobs", jobId],
+    queryKey: [JOBS_ROUTES.LIST, jobId],
     queryFn: async () => {
-      const res = await fetch(`/api/jobs/${jobId}`);
+      const res = await fetch(JOBS_ROUTES.BY_ID(jobId!));
       if (!res.ok) throw new Error("Failed to fetch job");
       return res.json();
     },
@@ -298,9 +298,9 @@ function InfoBox({ label, value }: { label: string; value: string }) {
 
 function JobPanelsTab({ jobId, onPanelClick }: { jobId: string; onPanelClick: (id: string) => void }) {
   const { data: panels = [], isLoading } = useQuery<Panel[]>({
-    queryKey: ["/api/panels/by-job", jobId],
+    queryKey: [PANELS_ROUTES.BY_JOB(jobId), jobId],
     queryFn: async () => {
-      const res = await fetch(`/api/panels/by-job/${jobId}`);
+      const res = await fetch(PANELS_ROUTES.BY_JOB(jobId));
       if (!res.ok) throw new Error("Failed to fetch panels");
       return res.json();
     },
@@ -390,9 +390,9 @@ function JobPanelsTab({ jobId, onPanelClick }: { jobId: string; onPanelClick: (i
 
 function JobAuditLogTab({ jobId }: { jobId: string }) {
   const { data: logs = [], isLoading } = useQuery<JobAuditLog[]>({
-    queryKey: ["/api/jobs", jobId, "audit-log"],
+    queryKey: [ADMIN_ROUTES.JOBS, jobId, "audit-log"],
     queryFn: async () => {
-      const res = await fetch(`/api/jobs/${jobId}/audit-log`);
+      const res = await fetch(ADMIN_ROUTES.JOB_AUDIT_LOG(jobId));
       if (!res.ok) throw new Error("Failed to fetch audit log");
       return res.json();
     },

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { HelpEntry } from "@shared/schema";
+import { HELP_ROUTES } from "@shared/api-routes";
 
 interface HelpContextValue {
   drawerOpen: boolean;
@@ -40,10 +41,10 @@ export function useHelpContext() {
 
 export function useHelp(key: string | null) {
   return useQuery<HelpEntry>({
-    queryKey: ["/api/help", key],
+    queryKey: [HELP_ROUTES.SEARCH, key],
     queryFn: async () => {
       if (!key) return null;
-      const res = await fetch(`/api/help?key=${encodeURIComponent(key)}`, { credentials: "include" });
+      const res = await fetch(HELP_ROUTES.BY_KEY(key), { credentials: "include" });
       if (!res.ok) return null;
       return res.json();
     },

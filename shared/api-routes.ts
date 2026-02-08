@@ -649,6 +649,27 @@ export type BroadcastRoutes = typeof BROADCAST_ROUTES;
 export type ProgressClaimsRoutes = typeof PROGRESS_CLAIMS_ROUTES;
 export type ContractRoutes = typeof CONTRACT_ROUTES;
 
+// ============================================================================
+// HELP SYSTEM
+// ============================================================================
+export const HELP_ROUTES = {
+  SEARCH: '/api/help/search',
+  RECENT: '/api/help/recent',
+  CATEGORIES: '/api/help/categories',
+  BY_KEY: (key: string) => `/api/help?key=${encodeURIComponent(key)}`,
+  FEEDBACK: '/api/help/feedback',
+  ADMIN_LIST: '/api/help/admin',
+  ADMIN_BY_ID: (id: string | number) => `/api/help/admin/${id}`,
+  ADMIN_VERSIONS: (id: string | number) => `/api/help/admin/${id}/versions`,
+} as const;
+
+// ============================================================================
+// UPLOADS (Object Storage)
+// ============================================================================
+export const UPLOAD_ROUTES = {
+  REQUEST_URL: '/api/uploads/request-url',
+} as const;
+
 export const ASSET_ROUTES = {
   LIST: '/api/admin/assets',
   BY_ID: (id: string) => `/api/admin/assets/${id}`,
@@ -660,3 +681,5 @@ export const ASSET_ROUTES = {
   TRANSFER_BY_ID: (assetId: string, id: string) => `/api/admin/assets/${assetId}/transfers/${id}`,
 } as const;
 export type AssetRoutes = typeof ASSET_ROUTES;
+export type HelpRoutes = typeof HELP_ROUTES;
+export type UploadRoutes = typeof UPLOAD_ROUTES;
