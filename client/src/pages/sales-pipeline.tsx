@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { JOBS_ROUTES } from "@shared/api-routes";
+import { JOBS_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -18,6 +19,8 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -32,6 +35,7 @@ import {
   UserCircle,
   History,
   Loader2,
+  Plus,
 } from "lucide-react";
 import {
   SALES_STAGES,
@@ -44,6 +48,13 @@ import {
   type SalesStage,
 } from "@shared/sales-pipeline";
 import { PageHelpButton } from "@/components/help/page-help-button";
+
+interface Customer {
+  id: string;
+  name: string;
+}
+
+const STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"];
 
 interface Opportunity {
   id: string;
@@ -131,6 +142,18 @@ export default function SalesPipelinePage() {
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [statusNote, setStatusNote] = useState("");
   const [detailTab, setDetailTab] = useState<"details" | "history">("details");
+  const [showNewOpp, setShowNewOpp] = useState(false);
+  const [newOpp, setNewOpp] = useState({
+    name: "",
+    customerId: "",
+    address: "",
+    city: "",
+    state: "",
+    estimatedValue: "",
+    opportunityType: "",
+    probability: "",
+    comments: "",
+  });
 
   const { data: opportunities = [], isLoading } = useQuery<Opportunity[]>({
     queryKey: [JOBS_ROUTES.OPPORTUNITIES],
@@ -145,6 +168,44 @@ export default function SalesPipelinePage() {
       return res.json();
     },
     enabled: !!selectedOpp && detailTab === "history",
+  });
+
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_ACTIVE],
+  });
+
+  const resetNewOppForm = () => {
+    setNewOpp({ name: "", customerId: "", address: "", city: "", state: "", estimatedValue: "", opportunityType: "", probability: "", comments: "" });
+  };
+
+  const createOpportunity = useMutation({
+    mutationFn: async () => {
+      const body: any = {
+        name: newOpp.name,
+        address: newOpp.address,
+        city: newOpp.city,
+        salesStage: "OPPORTUNITY" as const,
+        salesStatus: getDefaultStatus("OPPORTUNITY"),
+        opportunityStatus: "NEW",
+      };
+      if (newOpp.customerId) body.customerId = newOpp.customerId;
+      if (newOpp.state) body.state = newOpp.state;
+      if (newOpp.estimatedValue) body.estimatedValue = newOpp.estimatedValue;
+      if (newOpp.opportunityType) body.opportunityType = newOpp.opportunityType;
+      if (newOpp.probability) body.probability = parseInt(newOpp.probability);
+      if (newOpp.comments) body.comments = newOpp.comments;
+      const res = await apiRequest("POST", JOBS_ROUTES.OPPORTUNITIES, body);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [JOBS_ROUTES.OPPORTUNITIES] });
+      toast({ title: "Opportunity created" });
+      setShowNewOpp(false);
+      resetNewOppForm();
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create opportunity", description: error.message, variant: "destructive" });
+    },
   });
 
   const updateOpportunity = useMutation({
@@ -305,6 +366,10 @@ export default function SalesPipelinePage() {
             data-testid="input-search-pipeline"
           />
         </div>
+        <Button onClick={() => setShowNewOpp(true)} data-testid="button-new-opportunity">
+          <Plus className="h-4 w-4 mr-2" />
+          New Opportunity
+        </Button>
       </div>
 
       {/* Table */}
@@ -662,6 +727,142 @@ export default function SalesPipelinePage() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* New Opportunity Dialog */}
+      <Dialog open={showNewOpp} onOpenChange={(open) => { if (!open) { setShowNewOpp(false); resetNewOppForm(); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Opportunity</DialogTitle>
+            <DialogDescription>Create a new sales opportunity to track in your pipeline.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-opp-name">Project Name *</Label>
+              <Input
+                id="new-opp-name"
+                placeholder="Enter project name"
+                value={newOpp.name}
+                onChange={(e) => setNewOpp((p) => ({ ...p, name: e.target.value }))}
+                data-testid="input-new-opp-name"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-opp-customer">Customer</Label>
+              <Select value={newOpp.customerId} onValueChange={(v) => setNewOpp((p) => ({ ...p, customerId: v }))}>
+                <SelectTrigger id="new-opp-customer" data-testid="select-new-opp-customer">
+                  <SelectValue placeholder="Select customer..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="new-opp-address">Address *</Label>
+                <Input
+                  id="new-opp-address"
+                  placeholder="Street address"
+                  value={newOpp.address}
+                  onChange={(e) => setNewOpp((p) => ({ ...p, address: e.target.value }))}
+                  data-testid="input-new-opp-address"
+                />
+              </div>
+              <div>
+                <Label htmlFor="new-opp-city">City *</Label>
+                <Input
+                  id="new-opp-city"
+                  placeholder="City"
+                  value={newOpp.city}
+                  onChange={(e) => setNewOpp((p) => ({ ...p, city: e.target.value }))}
+                  data-testid="input-new-opp-city"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="new-opp-state">State</Label>
+                <Select value={newOpp.state} onValueChange={(v) => setNewOpp((p) => ({ ...p, state: v }))}>
+                  <SelectTrigger id="new-opp-state" data-testid="select-new-opp-state">
+                    <SelectValue placeholder="Select state..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="new-opp-value">Estimated Value ($)</Label>
+                <Input
+                  id="new-opp-value"
+                  placeholder="e.g. 500000"
+                  value={newOpp.estimatedValue}
+                  onChange={(e) => setNewOpp((p) => ({ ...p, estimatedValue: e.target.value }))}
+                  data-testid="input-new-opp-value"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="new-opp-type">Opportunity Type</Label>
+                <Select value={newOpp.opportunityType} onValueChange={(v) => setNewOpp((p) => ({ ...p, opportunityType: v }))}>
+                  <SelectTrigger id="new-opp-type" data-testid="select-new-opp-type">
+                    <SelectValue placeholder="Select type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BUILDER_SELECTED">Builder Selected</SelectItem>
+                    <SelectItem value="OPEN_TENDER">Open Tender</SelectItem>
+                    <SelectItem value="NEGOTIATED_CONTRACT">Negotiated Contract</SelectItem>
+                    <SelectItem value="GENERAL_PRICING">General Pricing</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="new-opp-probability">Probability (%)</Label>
+                <Input
+                  id="new-opp-probability"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="0-100"
+                  value={newOpp.probability}
+                  onChange={(e) => setNewOpp((p) => ({ ...p, probability: e.target.value }))}
+                  data-testid="input-new-opp-probability"
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="new-opp-comments">Comments</Label>
+              <Textarea
+                id="new-opp-comments"
+                placeholder="Additional notes..."
+                value={newOpp.comments}
+                onChange={(e) => setNewOpp((p) => ({ ...p, comments: e.target.value }))}
+                rows={3}
+                className="resize-none"
+                data-testid="input-new-opp-comments"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setShowNewOpp(false); resetNewOppForm(); }} data-testid="button-cancel-new-opp">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createOpportunity.mutate()}
+              disabled={!newOpp.name.trim() || !newOpp.address.trim() || !newOpp.city.trim() || createOpportunity.isPending}
+              data-testid="button-submit-new-opp"
+            >
+              {createOpportunity.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Create Opportunity
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

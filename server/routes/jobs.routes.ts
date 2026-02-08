@@ -38,7 +38,7 @@ function deserializePhase(phaseStr: string): number {
 
 const router = Router();
 
-const OPPORTUNITY_STATUSES = ["OPPORTUNITY", "QUOTING", "WON", "LOST", "CANCELLED", "CONTRACTED", "IN_PROGRESS"] as const;
+const OPPORTUNITY_PHASES = [0, 1, 4] as const;
 
 // GET /api/jobs/opportunities - List all opportunity-phase jobs
 router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Response) => {
@@ -75,7 +75,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       updatedAt: jobs.updatedAt,
     })
     .from(jobs)
-    .where(sql`${inArray(jobs.status, [...OPPORTUNITY_STATUSES])} AND ${eq(jobs.companyId, req.companyId)}`)
+    .where(sql`${inArray(jobs.jobPhase, [...OPPORTUNITY_PHASES])} AND ${eq(jobs.companyId, req.companyId)}`)
     .orderBy(desc(jobs.createdAt));
 
     const customerIds = [...new Set(result.filter(j => j.customerId).map(j => j.customerId!))];
@@ -169,7 +169,8 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       companyId: req.companyId,
       jobNumber: nextNum,
       name: parsed.data.name,
-      status: "OPPORTUNITY" as const,
+      jobPhase: 0,
+      status: "ACTIVE",
       customerId: parsed.data.customerId || null,
       address: parsed.data.address,
       city: parsed.data.city,
