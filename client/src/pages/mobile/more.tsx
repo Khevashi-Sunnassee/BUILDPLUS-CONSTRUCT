@@ -13,6 +13,7 @@ import {
   ScanLine,
   ListTodo,
   Target,
+  Camera,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -84,6 +85,22 @@ export default function MobileMore() {
               <div className="text-xs text-white/50">Quick entry for field sales</div>
             </div>
             <ChevronRight className="h-5 w-5 text-green-400/60" />
+          </button>
+        </Link>
+
+        <Link href="/mobile/photo-capture">
+          <button
+            className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 text-left active:scale-[0.99] mb-2"
+            data-testid="menu-add-photo"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20">
+              <Camera className="h-6 w-6 text-amber-400" />
+            </div>
+            <div className="flex-1">
+              <div className="text-base font-semibold text-white">Add Photo</div>
+              <div className="text-xs text-white/50">Capture and register site photos</div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-amber-400/60" />
           </button>
         </Link>
 

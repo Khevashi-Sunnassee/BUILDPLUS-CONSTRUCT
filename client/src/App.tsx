@@ -87,6 +87,7 @@ import MobileBroadcastPage from "@/pages/mobile/broadcast";
 import MobileQrScanner from "@/pages/mobile/qr-scanner";
 import MobileNewOpportunity from "@/pages/mobile/new-opportunity";
 import MobilePhotoGalleryPage from "@/pages/mobile/photo-gallery";
+import MobilePhotoCapturePage from "@/pages/mobile/photo-capture";
 import MobileJobDetailPage from "@/pages/mobile/job-detail";
 import PhotoGalleryPage from "@/pages/photo-gallery";
 import SalesPipelinePage from "@/pages/sales-pipeline";
@@ -744,6 +745,11 @@ function Router() {
       <Route path="/mobile/photo-gallery">
         <ProtectedRoute>
           <MobilePhotoGalleryPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/photo-capture">
+        <ProtectedRoute>
+          <MobilePhotoCapturePage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/checklists/:id">
