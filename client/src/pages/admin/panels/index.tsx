@@ -1985,19 +1985,12 @@ export default function AdminPanelsPage() {
         consolidationData={consolidationData}
         setConsolidationData={setConsolidationData}
         consolidationWarnings={consolidationWarnings}
+        setConsolidationWarnings={setConsolidationWarnings}
         consolidationCheckLoading={consolidationCheckLoading}
-        onProcess={() => {
-          if (!consolidationData) return;
-          consolidateMutation.mutate({
-            panelIds: consolidationData.panels.map(p => p.id),
-            primaryPanelId: consolidationData.primaryPanelId,
-            newPanelMark: consolidationData.newPanelMark,
-            newLoadWidth: consolidationData.newWidth,
-            newLoadHeight: consolidationData.newHeight,
-          });
+        onConsolidate={(data) => {
+          consolidateMutation.mutate(data);
         }}
-        processPending={consolidateMutation.isPending}
-        onCancel={() => { setConsolidationDialogOpen(false); setConsolidationData(null); }}
+        consolidatePending={consolidateMutation.isPending}
       />
     </div>
   );

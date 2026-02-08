@@ -174,7 +174,7 @@ export function JobFormDialog({
                               field.onChange(phase);
                               const currentStatus = (jobForm.getValues("status") ?? '') as JobStatus;
                               if (!isValidStatusForPhase(phase as JobPhase, currentStatus)) {
-                                jobForm.setValue("status", getDefaultStatusForPhase(phase as JobPhase));
+                                jobForm.setValue("status", getDefaultStatusForPhase(phase as JobPhase) ?? "");
                               }
                             }}
                           >
