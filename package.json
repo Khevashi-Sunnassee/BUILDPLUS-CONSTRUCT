@@ -120,6 +120,7 @@
     "recharts": "^2.15.4",
     "sanitize-html": "^2.17.0",
     "serve-index": "^1.9.2",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "supertest": "^7.2.2",
     "tailwind-merge": "^2.6.0",
