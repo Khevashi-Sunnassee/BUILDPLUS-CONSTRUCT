@@ -295,7 +295,7 @@ export const jobs = pgTable("jobs", {
   projectManagerId: varchar("project_manager_id", { length: 36 }).references(() => users.id),
   factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
   productionSlotColor: text("production_slot_color"),
-  jobPhase: text("job_phase").default("OPPORTUNITY").notNull(),
+  jobPhase: integer("job_phase").default(0).notNull(),
   status: jobStatusEnum("status").default("ACTIVE").notNull(),
   referrer: text("referrer"),
   engineerOnJob: text("engineer_on_job"),

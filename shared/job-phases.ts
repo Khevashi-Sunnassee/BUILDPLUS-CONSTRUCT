@@ -69,6 +69,30 @@ export const PHASE_ORDER: Record<JobPhase, number> = {
   LOST: -1,
 };
 
+export const PHASE_TO_INT: Record<JobPhase, number> = {
+  OPPORTUNITY: 0,
+  QUOTING: 1,
+  WON_AWAITING_CONTRACT: 2,
+  CONTRACTED: 3,
+  LOST: 4,
+};
+
+export const INT_TO_PHASE: Record<number, JobPhase> = {
+  0: "OPPORTUNITY",
+  1: "QUOTING",
+  2: "WON_AWAITING_CONTRACT",
+  3: "CONTRACTED",
+  4: "LOST",
+};
+
+export function phaseToInt(phase: JobPhase): number {
+  return PHASE_TO_INT[phase] ?? 0;
+}
+
+export function intToPhase(val: number): JobPhase {
+  return INT_TO_PHASE[val] ?? "OPPORTUNITY";
+}
+
 export type JobCapability =
   | "DOCUMENTS_TASKS"
   | "PRODUCTION_SLOTS"
