@@ -230,7 +230,6 @@ const SPREADSHEET_ALIASES: Record<string, string> = {
   "serial no": "serialNumber",
   "serial": "serialNumber",
   "s/n": "serialNumber",
-  "description": "category",
   "type": "category",
   "asset type": "category",
   "asset category": "category",
@@ -268,12 +267,33 @@ const SPREADSHEET_ALIASES: Record<string, string> = {
 function mapCategoryFromSpreadsheet(desc: string | null): string {
   if (!desc) return "Other";
   const lower = desc.toLowerCase().trim();
-  if (lower === "tools") return "Hand Tools & Power Tools";
-  if (lower === "machinery") return "General Machinery";
-  if (lower === "computer equipment") return "IT Equipment";
-  if (lower === "buildings") return "Infrastructure";
-  if (lower === "yard equipment") return "Workshop Equipment";
-  if (lower.includes("magnet") || lower.includes("formwork") || lower.includes("klipform")) return "Molds";
+  if (lower === "tools" || lower === "power tools" || lower === "hand tools") return "Hand Tools & Power Tools";
+  if (lower === "machinery" || lower === "plant" || lower === "plant & machinery" || lower === "plant and machinery") return "General Machinery";
+  if (lower === "computer equipment" || lower === "computers" || lower === "it" || lower === "it equipment") return "IT Equipment";
+  if (lower === "buildings" || lower === "building" || lower === "structure" || lower === "structures") return "Infrastructure";
+  if (lower === "yard equipment" || lower === "workshop" || lower === "workshop equipment") return "Workshop Equipment";
+  if (lower === "vehicle" || lower === "vehicles" || lower === "motor vehicle" || lower === "motor vehicles" || lower === "truck" || lower === "trucks" || lower === "car" || lower === "cars" || lower === "ute" || lower === "utes") return "Vehicles & Fleet";
+  if (lower === "furniture" || lower === "office furniture" || lower === "fittings" || lower === "furniture & fittings") return "Furniture";
+  if (lower === "crane" || lower === "cranes" || lower === "forklift" || lower === "forklifts" || lower === "excavator" || lower === "loader" || lower === "bulldozer" || lower === "dozer" || lower === "bobcat" || lower === "backhoe") return "Heavy Equipment";
+  if (lower === "scaffolding" || lower === "scaffold" || lower === "access equipment" || lower === "ladders" || lower === "ewp" || lower === "boom lift" || lower === "scissor lift") return "Scaffolding & Access";
+  if (lower === "safety" || lower === "safety equipment" || lower === "ppe") return "Safety Equipment";
+  if (lower === "generator" || lower === "generators" || lower === "power" || lower === "genset") return "Generators & Power Systems";
+  if (lower === "trailer" || lower === "trailers") return "Vehicles & Fleet";
+  if (lower === "office equipment" || lower === "office") return "IT Equipment";
+  if (lower === "survey" || lower === "survey equipment" || lower === "surveying") return "Survey & Measurement";
+  if (lower === "welding" || lower === "welder" || lower === "welders" || lower === "welding equipment") return "Welding Equipment";
+  if (lower === "concrete" || lower === "concrete equipment") return "Concrete & Pumping";
+  if (lower === "electrical" || lower === "electrical equipment") return "Electrical Equipment";
+  if (lower === "plumbing" || lower === "plumbing equipment") return "Plumbing Equipment";
+  if (lower === "communication" || lower === "communications" || lower === "radio" || lower === "radios") return "Communication Equipment";
+  if (lower === "testing" || lower === "testing equipment" || lower === "test equipment") return "Testing & Calibration";
+  if (lower.includes("magnet") || lower.includes("formwork") || lower.includes("klipform") || lower.includes("mold") || lower.includes("mould")) return "Molds";
+  if (lower.includes("scaffold")) return "Scaffolding & Access";
+  if (lower.includes("vehicle") || lower.includes("truck") || lower.includes("ute")) return "Vehicles & Fleet";
+  if (lower.includes("crane") || lower.includes("excavat") || lower.includes("dozer") || lower.includes("loader")) return "Heavy Equipment";
+  if (lower.includes("generator") || lower.includes("genset")) return "Generators & Power Systems";
+  if (lower.includes("computer") || lower.includes("laptop") || lower.includes("printer")) return "IT Equipment";
+  if (lower.includes("weld")) return "Welding Equipment";
   const match = ASSET_CATEGORIES.find(c => c.toLowerCase() === lower);
   if (match) return match;
   return "Other";
@@ -457,8 +477,21 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
     }
 
     if (!headerRowIndex) {
-      return res.status(400).json({ error: "Could not find header row. Please ensure the spreadsheet has recognizable column headers." });
+      const allHeaders: string[] = [];
+      const row1 = sheet.getRow(1);
+      for (let c = 1; c <= sheet.columnCount; c++) {
+        const cell = row1.getCell(c);
+        let val = cell.value;
+        if (val && typeof val === "object" && "richText" in val) {
+          val = (val as any).richText.map((t: any) => t.text).join("");
+        }
+        if (val) allHeaders.push(String(val).trim());
+      }
+      logger.warn("Could not find header row", { allHeaders, sheetName: sheet.name, rowCount: sheet.rowCount });
+      return res.status(400).json({ error: `Could not find header row. Found columns: ${allHeaders.join(", ")}. Please ensure the spreadsheet has recognizable column headers.` });
     }
+
+    logger.info("Asset import column mapping", { headerRowIndex, columnMap, sheetName: sheet.name });
 
     const imported: any[] = [];
     const errors: string[] = [];
@@ -500,9 +533,25 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         const mapped = mapCategoryFromSpreadsheet(rawCat);
         if (mapped !== "Other") manualCategory = mapped;
       }
+      if (!manualCategory && rowData.description) {
+        const descVal = String(rowData.description).trim();
+        if (descVal.length < 40) {
+          const mapped = mapCategoryFromSpreadsheet(descVal);
+          if (mapped !== "Other") {
+            manualCategory = mapped;
+          } else if (ASSET_CATEGORIES.includes(descVal as any)) {
+            manualCategory = descVal;
+          }
+        }
+      }
 
       parsedRows.push({ rowNum, name, rowData, manualCategory, rawCategory: rawCat });
     }
+
+    if (parsedRows.length > 0) {
+      logger.info("Asset import first row sample", { rowData: parsedRows[0].rowData, name: parsedRows[0].name, manualCategory: parsedRows[0].manualCategory, rawCategory: parsedRows[0].rawCategory });
+    }
+    logger.info(`Asset import parsed ${parsedRows.length} rows from ${rowNum} total`);
 
     const needsAI = parsedRows.filter(r => !r.manualCategory);
     let aiResults: Record<number, string> = {};
@@ -561,6 +610,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
             logger.warn(`Failed to create supplier "${supplierName}": ${err.message}`);
           }
         }
+        if (rowData.description) insertData.description = String(rowData.description).trim();
         if (rowData.serialNumber) insertData.serialNumber = String(rowData.serialNumber).trim();
         if (rowData.registrationNumber) insertData.registrationNumber = String(rowData.registrationNumber).trim();
         if (rowData.remarks) insertData.remarks = String(rowData.remarks).trim();

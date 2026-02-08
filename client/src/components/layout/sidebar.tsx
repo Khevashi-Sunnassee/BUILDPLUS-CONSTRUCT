@@ -39,7 +39,6 @@ import {
   Boxes,
   BookOpen,
   ImageIcon,
-  Trash2,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -117,7 +116,6 @@ const adminNavItems = [
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
   { title: "Help Management", url: "/admin/help", icon: BookOpen },
-  { title: "Data Management", url: "/admin/data-management", icon: Trash2 },
 ];
 
 const contactsNavItems = [
@@ -158,7 +156,6 @@ const urlToFunctionKey: Record<string, string> = {
   "/checklists": "checklists",
   "/checklist-reports": "checklists",
   "/manager/review": "daily_reports",
-  "/admin/data-management": "admin_settings",
   "/contracts": "contract_hub",
   "/progress-claims": "progress_claims",
   "/sales-pipeline": "sales_pipeline",

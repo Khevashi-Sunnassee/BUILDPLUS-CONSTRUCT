@@ -94,7 +94,6 @@ import PhotoGalleryPage from "@/pages/photo-gallery";
 import SalesPipelinePage from "@/pages/sales-pipeline";
 import HelpCenterPage from "@/pages/help-center";
 import AdminHelpPage from "@/pages/admin/help";
-import DataManagementPage from "@/pages/admin/data-management";
 import { HelpProvider } from "@/components/help/help-provider";
 import { HelpDrawer } from "@/components/help/help-drawer";
 
@@ -649,14 +648,6 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminHelpPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
-      </Route>
-
-      <Route path="/admin/data-management">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
-          <AuthenticatedLayout>
-            <DataManagementPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
