@@ -2886,6 +2886,7 @@ export const assets = pgTable("assets", {
   usefulLifeYears: integer("useful_life_years"),
   purchaseDate: text("purchase_date"),
   supplier: text("supplier"),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
   warrantyExpiry: text("warranty_expiry"),
   leaseStartDate: text("lease_start_date"),
   leaseEndDate: text("lease_end_date"),
