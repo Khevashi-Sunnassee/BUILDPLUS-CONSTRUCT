@@ -3,7 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLocation } from "wouter";
 import {
   Package,
   Search,
@@ -310,7 +309,6 @@ function SortableHeader({ label, field, currentSort, currentDir, onSort }: {
 
 export default function AssetRegisterPage() {
   const { toast } = useToast();
-  const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -592,7 +590,7 @@ export default function AssetRegisterPage() {
     <TableRow
       key={asset.id}
       className="cursor-pointer hover-elevate"
-      onClick={() => setLocation(`/admin/assets/${asset.id}`)}
+      onClick={() => openEditDialog(asset)}
       data-testid={`row-asset-${asset.id}`}
     >
       <TableCell className="font-mono text-xs" data-testid={`text-asset-tag-${asset.id}`}>
