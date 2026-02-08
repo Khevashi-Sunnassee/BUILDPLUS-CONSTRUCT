@@ -1,13 +1,11 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { JOBS_ROUTES } from "@shared/api-routes";
+import { getPhaseLabel, getStatusLabel } from "@shared/job-phases";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Briefcase, MapPin, User, ChevronRight, Phone } from "lucide-react";
+import { Briefcase, MapPin, User, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 interface Job {
@@ -19,6 +17,7 @@ interface Job {
   city: string | null;
   state: string | null;
   status: string;
+  jobPhase: string;
   siteContact: string | null;
   siteContactPhone: string | null;
   productionStartDate: string | null;
@@ -26,22 +25,32 @@ interface Job {
   levels: string | null;
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  ACTIVE: { label: "Active", color: "bg-green-500/20 text-green-400 border-green-500/30" },
-  ON_HOLD: { label: "On Hold", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30" },
-  COMPLETED: { label: "Completed", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" },
-  CANCELLED: { label: "Cancelled", color: "bg-red-500/20 text-red-400 border-red-500/30" },
+const phaseColors: Record<string, string> = {
+  OPPORTUNITY: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+  QUOTING: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+  WON_AWAITING_CONTRACT: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+  CONTRACTED: "bg-green-500/20 text-green-300 border-green-500/30",
+  LOST: "bg-red-500/20 text-red-300 border-red-500/30",
+};
+
+const statusColors: Record<string, string> = {
+  ACTIVE: "bg-green-500/20 text-green-300 border-green-500/30",
+  ON_HOLD: "bg-orange-500/20 text-orange-300 border-orange-500/30",
+  PENDING_START: "bg-violet-500/20 text-violet-300 border-violet-500/30",
+  STARTED: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+  COMPLETED: "bg-slate-500/20 text-slate-300 border-slate-500/30",
+  ARCHIVED: "bg-gray-500/20 text-gray-300 border-gray-500/30",
 };
 
 export default function MobileJobsPage() {
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [, setLocation] = useLocation();
 
   const { data: jobs = [], isLoading } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
 
-  const activeJobs = jobs.filter(j => j.status === "ACTIVE");
-  const otherJobs = jobs.filter(j => j.status !== "ACTIVE");
+  const activeJobs = jobs.filter(j => j.status === "ACTIVE" || j.status === "STARTED" || j.status === "PENDING_START");
+  const otherJobs = jobs.filter(j => !["ACTIVE", "STARTED", "PENDING_START"].includes(j.status));
 
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
@@ -76,7 +85,7 @@ export default function MobileJobsPage() {
                 </h2>
                 <div className="space-y-3">
                   {activeJobs.map((job) => (
-                    <JobCard key={job.id} job={job} onSelect={() => setSelectedJob(job)} />
+                    <JobCard key={job.id} job={job} onSelect={() => setLocation(`/mobile/jobs/${job.id}`)} />
                   ))}
                 </div>
               </div>
@@ -89,7 +98,7 @@ export default function MobileJobsPage() {
                 </h2>
                 <div className="space-y-3">
                   {otherJobs.map((job) => (
-                    <JobCard key={job.id} job={job} onSelect={() => setSelectedJob(job)} muted />
+                    <JobCard key={job.id} job={job} onSelect={() => setLocation(`/mobile/jobs/${job.id}`)} muted />
                   ))}
                 </div>
               </div>
@@ -98,30 +107,20 @@ export default function MobileJobsPage() {
         )}
       </div>
 
-      <Sheet open={!!selectedJob} onOpenChange={(open) => !open && setSelectedJob(null)}>
-        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl bg-[#0D1117] border-white/10">
-          {selectedJob && (
-            <JobDetailSheet job={selectedJob} onClose={() => setSelectedJob(null)} />
-          )}
-        </SheetContent>
-      </Sheet>
-
       <MobileBottomNav />
     </div>
   );
 }
 
-function JobCard({ 
-  job, 
+function JobCard({
+  job,
   onSelect,
-  muted = false 
-}: { 
-  job: Job; 
+  muted = false
+}: {
+  job: Job;
   onSelect: () => void;
   muted?: boolean;
 }) {
-  const status = statusConfig[job.status] || statusConfig.ACTIVE;
-
   return (
     <button
       onClick={onSelect}
@@ -129,7 +128,7 @@ function JobCard({
         "w-full p-4 rounded-2xl border border-white/10 text-left active:scale-[0.99]",
         muted ? "bg-white/[0.03]" : "bg-white/5"
       )}
-      data-testid={`job-${job.id}`}
+      data-testid={`job-card-${job.id}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
@@ -137,14 +136,14 @@ function JobCard({
             {job.jobNumber} - {job.name}
           </h3>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <Badge variant="outline" className={cn("text-xs border", status.color)}>
-            {status.label}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <Badge variant="outline" className={cn("text-xs border", phaseColors[job.jobPhase] || "")}>
+            {getPhaseLabel(job.jobPhase)}
           </Badge>
           <ChevronRight className="h-4 w-4 text-white/40" />
         </div>
       </div>
-      
+
       <div className="flex items-center gap-4 text-xs text-white/50">
         {job.client && (
           <span className="flex items-center gap-1">
@@ -160,95 +159,5 @@ function JobCard({
         )}
       </div>
     </button>
-  );
-}
-
-function JobDetailSheet({ job, onClose }: { job: Job; onClose: () => void }) {
-  const status = statusConfig[job.status] || statusConfig.ACTIVE;
-
-  return (
-    <div className="flex flex-col h-full text-white">
-      <SheetHeader className="pb-4">
-        <div className="flex items-center gap-2">
-          <SheetTitle className="text-left flex-1 text-white">{job.jobNumber} - {job.name}</SheetTitle>
-          <Badge variant="outline" className={cn("text-xs border", status.color)}>
-            {status.label}
-          </Badge>
-        </div>
-      </SheetHeader>
-
-      <div className="flex-1 overflow-auto space-y-4">
-        {job.client && (
-          <div>
-            <label className="text-sm font-medium text-white/60 mb-1 block">Client</label>
-            <p className="text-sm text-white">{job.client}</p>
-          </div>
-        )}
-
-        {job.address && (
-          <div>
-            <label className="text-sm font-medium text-white/60 mb-1 block">Address</label>
-            <p className="text-sm text-white">
-              {job.address}
-              {(job.city || job.state) && (
-                <><br />{[job.city, job.state].filter(Boolean).join(", ")}</>
-              )}
-            </p>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 gap-4">
-          {job.siteContact && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Site Contact</label>
-              <p className="text-sm text-white">{job.siteContact}</p>
-            </div>
-          )}
-          {job.siteContactPhone && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Phone</label>
-              <a href={`tel:${job.siteContactPhone}`} className="text-sm text-blue-400 underline">
-                {job.siteContactPhone}
-              </a>
-            </div>
-          )}
-          {job.productionStartDate && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Production Start</label>
-              <p className="text-sm text-white">{format(new Date(job.productionStartDate), "dd MMM yyyy")}</p>
-            </div>
-          )}
-          {job.numberOfBuildings && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Buildings</label>
-              <p className="text-sm text-white">{job.numberOfBuildings}</p>
-            </div>
-          )}
-          {job.levels && (
-            <div>
-              <label className="text-sm font-medium text-white/60 mb-1 block">Levels</label>
-              <p className="text-sm text-white">{job.levels}</p>
-            </div>
-          )}
-        </div>
-
-        {job.siteContactPhone && (
-          <Button 
-            variant="outline" 
-            className="w-full mt-4 border-white/20 text-white"
-            onClick={() => window.location.href = `tel:${job.siteContactPhone}`}
-          >
-            <Phone className="h-4 w-4 mr-2" />
-            Call Site Contact
-          </Button>
-        )}
-      </div>
-
-      <div className="pt-4 border-t border-white/10 mt-4">
-        <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose}>
-          Close
-        </Button>
-      </div>
-    </div>
   );
 }

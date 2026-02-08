@@ -350,7 +350,44 @@ router.get("/api/projects", requireAuth, async (req: Request, res: Response) => 
 // GET /api/jobs - Get all jobs (active only, for general use)
 router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
   const allJobs = await storage.getAllJobs(req.companyId);
-  res.json(allJobs.filter(j => j.status === "ACTIVE"));
+  const serialized = serializeJobsPhase(allJobs);
+  if (req.query.status === "ACTIVE") {
+    res.json(serialized.filter((j: any) => j.status === "ACTIVE"));
+  } else {
+    res.json(serialized);
+  }
+});
+
+// GET /api/jobs/:jobId - Get single job for authenticated users
+router.get("/api/jobs/:jobId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.jobId as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    res.json(serializeJobPhase(job));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || "Failed to get job" });
+  }
+});
+
+// GET /api/jobs/:jobId/audit-log - Get job audit trail for authenticated users
+router.get("/api/jobs/:jobId/audit-log", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.jobId as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const logs = await db.select()
+      .from(jobAuditLogs)
+      .where(eq(jobAuditLogs.jobId, job.id))
+      .orderBy(desc(jobAuditLogs.createdAt))
+      .limit(100);
+    res.json(logs);
+  } catch (error: any) {
+    logger.error({ err: error }, "Error fetching job audit log");
+    res.status(500).json({ error: "Failed to fetch audit log" });
+  }
 });
 
 // GET /api/jobs/:jobId/totals - Get job totals (m2, m3, elements)

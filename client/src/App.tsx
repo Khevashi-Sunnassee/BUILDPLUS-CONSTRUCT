@@ -86,6 +86,7 @@ import MobileChecklistFillPage from "@/pages/mobile/checklist-fill";
 import MobileBroadcastPage from "@/pages/mobile/broadcast";
 import MobileQrScanner from "@/pages/mobile/qr-scanner";
 import MobileNewOpportunity from "@/pages/mobile/new-opportunity";
+import MobileJobDetailPage from "@/pages/mobile/job-detail";
 import SalesPipelinePage from "@/pages/sales-pipeline";
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
@@ -634,6 +635,11 @@ function Router() {
       <Route path="/mobile/chat">
         <ProtectedRoute>
           <MobileChatPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/jobs/:id">
+        <ProtectedRoute>
+          <MobileJobDetailPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/jobs">
