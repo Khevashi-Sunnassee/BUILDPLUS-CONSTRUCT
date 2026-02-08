@@ -609,6 +609,7 @@ export const panelAuditLogs = pgTable("panel_audit_logs", {
 }, (table) => ({
   panelIdIdx: index("panel_audit_logs_panel_id_idx").on(table.panelId),
   createdAtIdx: index("panel_audit_logs_created_at_idx").on(table.createdAt),
+  panelCreatedAtIdx: index("panel_audit_logs_panel_created_at_idx").on(table.panelId, table.createdAt),
 }));
 
 export const insertPanelAuditLogSchema = createInsertSchema(panelAuditLogs).omit({ id: true, createdAt: true });
@@ -805,6 +806,7 @@ export const timerSessions = pgTable("timer_sessions", {
   dailyLogIdIdx: index("timer_sessions_daily_log_id_idx").on(table.dailyLogId),
   statusIdx: index("timer_sessions_status_idx").on(table.status),
   startedAtIdx: index("timer_sessions_started_at_idx").on(table.startedAt),
+  userStartedAtIdx: index("timer_sessions_user_started_at_idx").on(table.userId, table.startedAt),
 }));
 
 // Timer events for tracking history of all timer actions
@@ -2773,6 +2775,7 @@ export const progressClaims = pgTable("progress_claims", {
   jobIdIdx: index("progress_claims_job_id_idx").on(table.jobId),
   companyIdIdx: index("progress_claims_company_id_idx").on(table.companyId),
   createdByIdx: index("progress_claims_created_by_idx").on(table.createdById),
+  jobStatusIdx: index("progress_claims_job_status_idx").on(table.jobId, table.status),
 }));
 
 export const progressClaimItems = pgTable("progress_claim_items", {

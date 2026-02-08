@@ -349,6 +349,7 @@ export class DatabaseStorage implements IStorage {
   deleteDocumentCategory = documentMethods.deleteDocumentCategory;
   getDocuments = documentMethods.getDocuments;
   getDocument = documentMethods.getDocument;
+  getDocumentsByIds = documentMethods.getDocumentsByIds;
   createDocument = documentMethods.createDocument;
   updateDocument = documentMethods.updateDocument;
   deleteDocument = documentMethods.deleteDocument;

@@ -778,9 +778,12 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
 
     const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
 
+    const docs = await storage.getDocumentsByIds(documentIds);
+    const docsMap = new Map(docs.map(d => [d.id, d]));
+
     for (const docId of documentIds) {
       try {
-        const doc = await storage.getDocument(docId);
+        const doc = docsMap.get(docId);
         if (!doc) {
           logger.warn({ docId }, "Document not found for email attachment, skipping");
           continue;
@@ -938,15 +941,13 @@ router.post("/api/document-bundles", requireAuth, async (req, res) => {
 
     if (!finalDescription && documentIds && Array.isArray(documentIds) && documentIds.length > 0) {
       try {
+        const bundleDocs = await storage.getDocumentsByIds(documentIds);
         const docDetails: string[] = [];
-        for (const docId of documentIds) {
-          const doc = await storage.getDocument(docId);
-          if (doc) {
-            const parts = [doc.title];
-            if (doc.type?.typeName) parts.push(`(${doc.type.typeName})`);
-            if (doc.discipline?.disciplineName) parts.push(`[${doc.discipline.disciplineName}]`);
-            docDetails.push(parts.join(" "));
-          }
+        for (const doc of bundleDocs) {
+          const parts = [doc.title];
+          if (doc.type?.typeName) parts.push(`(${doc.type.typeName})`);
+          if (doc.discipline?.disciplineName) parts.push(`[${doc.discipline.disciplineName}]`);
+          docDetails.push(parts.join(" "));
         }
 
         if (docDetails.length > 0) {

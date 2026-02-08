@@ -11,6 +11,7 @@ import { createServer } from "http";
 import { seedDatabase, ensureSystemChecklistModules } from "./seed";
 import { seedHelpEntries } from "./seed-help";
 import logger from "./lib/logger";
+import { errorMonitor } from "./lib/error-monitor";
 import { pool } from "./db";
 
 const app = express();
@@ -178,6 +179,13 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/api/admin/error-summary", (req, res) => {
+  if (!req.session?.userId || (req.session as any).role !== "ADMIN") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  res.json(errorMonitor.getSummary());
+});
+
 app.get("/api/health", (_req, res) => {
   const poolStatus = {
     totalCount: pool.totalCount,
@@ -207,6 +215,8 @@ app.get("/api/health", (_req, res) => {
 });
 
 process.on("unhandledRejection", (reason, promise) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  errorMonitor.track(err, { route: "unhandledRejection" });
   logger.error({ reason, promise: String(promise) }, "Unhandled promise rejection");
 });
 
@@ -250,11 +260,17 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   await seedHelpEntries();
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    logger.error({ err }, "Internal Server Error");
+    errorMonitor.track(err instanceof Error ? err : new Error(String(err)), {
+      route: req.path,
+      method: req.method,
+      statusCode: status,
+    });
+
+    logger.error({ err, route: req.path, method: req.method, statusCode: status }, "Internal Server Error");
 
     if (res.headersSent) {
       return next(err);

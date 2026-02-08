@@ -1,4 +1,4 @@
-import { eq, and, desc, sql, asc } from "drizzle-orm";
+import { eq, and, desc, sql, asc, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   documentTypesConfig, documentTypeStatuses, documentDisciplines, documentCategories,
@@ -267,6 +267,53 @@ export const documentMethods = {
       supplier,
       uploadedByUser,
     };
+  },
+
+  async getDocumentsByIds(ids: string[]): Promise<DocumentWithDetails[]> {
+    if (ids.length === 0) return [];
+    const docs = await db.select().from(documents).where(inArray(documents.id, ids));
+    if (docs.length === 0) return [];
+
+    const typeIds = [...new Set(docs.map(d => d.typeId).filter(Boolean))] as string[];
+    const disciplineIds = [...new Set(docs.map(d => d.disciplineId).filter(Boolean))] as string[];
+    const categoryIds = [...new Set(docs.map(d => d.categoryId).filter(Boolean))] as string[];
+    const statusIds = [...new Set(docs.map(d => d.documentTypeStatusId).filter(Boolean))] as string[];
+    const jobIds = [...new Set(docs.map(d => d.jobId).filter(Boolean))] as string[];
+    const panelIds = [...new Set(docs.map(d => d.panelId).filter(Boolean))] as string[];
+    const supplierIds = [...new Set(docs.map(d => d.supplierId).filter(Boolean))] as string[];
+    const userIds = [...new Set(docs.map(d => d.uploadedBy).filter(Boolean))] as string[];
+
+    const [typesArr, disciplinesArr, categoriesArr, statusesArr, jobsArr, panelsArr, suppliersArr, usersArr] = await Promise.all([
+      typeIds.length > 0 ? db.select().from(documentTypesConfig).where(inArray(documentTypesConfig.id, typeIds)) : [],
+      disciplineIds.length > 0 ? db.select().from(documentDisciplines).where(inArray(documentDisciplines.id, disciplineIds)) : [],
+      categoryIds.length > 0 ? db.select().from(documentCategories).where(inArray(documentCategories.id, categoryIds)) : [],
+      statusIds.length > 0 ? db.select().from(documentTypeStatuses).where(inArray(documentTypeStatuses.id, statusIds)) : [],
+      jobIds.length > 0 ? db.select().from(jobs).where(inArray(jobs.id, jobIds)) : [],
+      panelIds.length > 0 ? db.select().from(panelRegister).where(inArray(panelRegister.id, panelIds)) : [],
+      supplierIds.length > 0 ? db.select().from(suppliers).where(inArray(suppliers.id, supplierIds)) : [],
+      userIds.length > 0 ? db.select().from(users).where(inArray(users.id, userIds)) : [],
+    ]);
+
+    const typesMap = new Map(typesArr.map(t => [t.id, t]));
+    const disciplinesMap = new Map(disciplinesArr.map(d => [d.id, d]));
+    const categoriesMap = new Map(categoriesArr.map(c => [c.id, c]));
+    const statusesMap = new Map(statusesArr.map(s => [s.id, s]));
+    const jobsMap = new Map(jobsArr.map(j => [j.id, j]));
+    const panelsMap = new Map(panelsArr.map(p => [p.id, p]));
+    const suppliersMap = new Map(suppliersArr.map(s => [s.id, s]));
+    const usersMap = new Map(usersArr.map(u => [u.id, { id: u.id, email: u.email, name: u.name, role: u.role }]));
+
+    return docs.map(doc => ({
+      ...doc,
+      type: doc.typeId ? typesMap.get(doc.typeId) || null : null,
+      discipline: doc.disciplineId ? disciplinesMap.get(doc.disciplineId) || null : null,
+      category: doc.categoryId ? categoriesMap.get(doc.categoryId) || null : null,
+      documentTypeStatus: doc.documentTypeStatusId ? statusesMap.get(doc.documentTypeStatusId) || null : null,
+      job: doc.jobId ? jobsMap.get(doc.jobId) || null : null,
+      panel: doc.panelId ? panelsMap.get(doc.panelId) || null : null,
+      supplier: doc.supplierId ? suppliersMap.get(doc.supplierId) || null : null,
+      uploadedByUser: doc.uploadedBy ? usersMap.get(doc.uploadedBy) || null : null,
+    }));
   },
 
   async createDocument(data: InsertDocument): Promise<Document> {

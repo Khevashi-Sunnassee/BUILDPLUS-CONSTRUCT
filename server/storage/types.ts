@@ -487,6 +487,7 @@ export interface IStorage {
     showLatestOnly?: boolean;
   }): Promise<{ documents: DocumentWithDetails[]; total: number; page: number; limit: number; totalPages: number }>;
   getDocument(id: string): Promise<DocumentWithDetails | undefined>;
+  getDocumentsByIds(ids: string[]): Promise<DocumentWithDetails[]>;
   createDocument(data: InsertDocument): Promise<Document>;
   updateDocument(id: string, data: Partial<InsertDocument>): Promise<Document | undefined>;
   deleteDocument(id: string): Promise<void>;
