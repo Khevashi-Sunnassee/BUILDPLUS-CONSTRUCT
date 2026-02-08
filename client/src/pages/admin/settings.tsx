@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText } from "lucide-react";
+import { Settings, Clock, Save, Loader2, Globe, Upload, Image, Trash2, Building2, Calendar, Factory, AlertTriangle, Database, RefreshCw, CheckCircle, FileText, Plus, Pencil, Users } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,9 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import type { GlobalSettings } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import type { GlobalSettings, Department } from "@shared/schema";
 import { ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
@@ -75,6 +77,15 @@ export default function AdminSettingsPage() {
     errors: string[];
     warnings: string[];
   } | null>(null);
+
+  const [showDeptDialog, setShowDeptDialog] = useState(false);
+  const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [deptName, setDeptName] = useState("");
+  const [deptCode, setDeptCode] = useState("");
+  const [deptDescription, setDeptDescription] = useState("");
+  const [deptActive, setDeptActive] = useState(true);
+  const [showDeleteDeptDialog, setShowDeleteDeptDialog] = useState(false);
+  const [deletingDept, setDeletingDept] = useState<Department | null>(null);
 
   const deletionCategories = [
     { key: "panels", label: "Panels", description: "Panel register entries" },
@@ -135,6 +146,69 @@ export default function AdminSettingsPage() {
       setIncludePOTerms(settings.includePOTerms);
     }
   }, [settings?.companyName, settings?.weekStartDay, settings?.productionWindowDays, settings?.ifcDaysInAdvance, settings?.daysToAchieveIfc, settings?.productionDaysInAdvance, settings?.procurementDaysInAdvance, settings?.procurementTimeDays, settings?.productionWorkDays, settings?.draftingWorkDays, settings?.cfmeuCalendar, settings?.includePOTerms]);
+
+  const { data: departments = [], isLoading: deptsLoading } = useQuery<Department[]>({
+    queryKey: [ADMIN_ROUTES.DEPARTMENTS],
+  });
+
+  const openDeptDialog = (dept?: Department) => {
+    if (dept) {
+      setEditingDept(dept);
+      setDeptName(dept.name);
+      setDeptCode(dept.code);
+      setDeptDescription(dept.description || "");
+      setDeptActive(dept.isActive ?? true);
+    } else {
+      setEditingDept(null);
+      setDeptName("");
+      setDeptCode("");
+      setDeptDescription("");
+      setDeptActive(true);
+    }
+    setShowDeptDialog(true);
+  };
+
+  const closeDeptDialog = () => {
+    setShowDeptDialog(false);
+    setEditingDept(null);
+    setDeptName("");
+    setDeptCode("");
+    setDeptDescription("");
+    setDeptActive(true);
+  };
+
+  const saveDeptMutation = useMutation({
+    mutationFn: async () => {
+      const body = { name: deptName, code: deptCode, description: deptDescription || null, isActive: deptActive };
+      if (editingDept) {
+        return apiRequest("PUT", ADMIN_ROUTES.DEPARTMENT_BY_ID(editingDept.id), body);
+      }
+      return apiRequest("POST", ADMIN_ROUTES.DEPARTMENTS, body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEPARTMENTS] });
+      toast({ title: editingDept ? "Department updated" : "Department created" });
+      closeDeptDialog();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to save department", variant: "destructive" });
+    },
+  });
+
+  const deleteDeptMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", ADMIN_ROUTES.DEPARTMENT_BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.DEPARTMENTS] });
+      toast({ title: "Department deleted" });
+      setShowDeleteDeptDialog(false);
+      setDeletingDept(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to delete department", variant: "destructive" });
+    },
+  });
 
   const saveCompanyNameMutation = useMutation({
     mutationFn: async (name: string) => {
@@ -621,8 +695,183 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* Departments */}
+          <div className="border-t pt-6 space-y-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Departments
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Manage departments that users can be assigned to
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openDeptDialog()}
+                data-testid="button-add-department"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Department
+              </Button>
+            </div>
+
+            {deptsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ) : departments.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No departments created yet. Add one to get started.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {departments.map((dept) => (
+                  <div
+                    key={dept.id}
+                    className="flex items-center justify-between gap-4 p-3 rounded-md border flex-wrap"
+                    data-testid={`dept-row-${dept.id}`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium text-sm" data-testid={`text-dept-name-${dept.id}`}>
+                            {dept.name}
+                          </span>
+                          <Badge variant="outline" className="text-xs">{dept.code}</Badge>
+                          {!dept.isActive && (
+                            <Badge variant="secondary" className="text-xs">Inactive</Badge>
+                          )}
+                        </div>
+                        {dept.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                            {dept.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openDeptDialog(dept)}
+                        data-testid={`button-edit-dept-${dept.id}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => { setDeletingDept(dept); setShowDeleteDeptDialog(true); }}
+                        data-testid={`button-delete-dept-${dept.id}`}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
+
+      {/* Department Create/Edit Dialog */}
+      <Dialog open={showDeptDialog} onOpenChange={(o) => !o && closeDeptDialog()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingDept ? "Edit Department" : "Add Department"}</DialogTitle>
+            <DialogDescription>
+              {editingDept ? "Update the department details below." : "Create a new department for your organisation."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="deptName">Name</Label>
+              <Input
+                id="deptName"
+                value={deptName}
+                onChange={(e) => setDeptName(e.target.value)}
+                placeholder="e.g. Engineering"
+                data-testid="input-dept-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deptCode">Code</Label>
+              <Input
+                id="deptCode"
+                value={deptCode}
+                onChange={(e) => setDeptCode(e.target.value)}
+                placeholder="e.g. ENG"
+                data-testid="input-dept-code"
+              />
+              <p className="text-xs text-muted-foreground">A short unique code for this department</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="deptDesc">Description (optional)</Label>
+              <Textarea
+                id="deptDesc"
+                value={deptDescription}
+                onChange={(e) => setDeptDescription(e.target.value)}
+                placeholder="Brief description of this department"
+                rows={2}
+                data-testid="input-dept-description"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch
+                checked={deptActive}
+                onCheckedChange={setDeptActive}
+                data-testid="switch-dept-active"
+              />
+              <Label>Active</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closeDeptDialog} data-testid="button-dept-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => saveDeptMutation.mutate()}
+              disabled={!deptName.trim() || !deptCode.trim() || saveDeptMutation.isPending}
+              data-testid="button-dept-save"
+            >
+              {saveDeptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {editingDept ? "Update" : "Create"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Department Delete Confirmation */}
+      <Dialog open={showDeleteDeptDialog} onOpenChange={(o) => !o && setShowDeleteDeptDialog(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Department</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deletingDept?.name}"? Users currently assigned to this department will become unassigned.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteDeptDialog(false)} data-testid="button-delete-dept-cancel">
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => deletingDept && deleteDeptMutation.mutate(deletingDept.id)}
+              disabled={deleteDeptMutation.isPending}
+              data-testid="button-delete-dept-confirm"
+            >
+              {deleteDeptMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Week Configuration Section */}
       <Card>
