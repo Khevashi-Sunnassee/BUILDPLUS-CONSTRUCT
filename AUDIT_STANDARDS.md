@@ -134,6 +134,11 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-017 | Connection pool: max 50 with statement timeout | Pool config in `server/db.ts` | 2026-02-08 |
 | VF-018 | Express v5 params: String(req.params.id) pattern | Confirmed by 0 TypeScript errors | 2026-02-08 |
 | VF-019 | Pino structured logging | Pino configured in `server/index.ts` | 2026-02-08 |
+| VF-020 | JSON body limit reduced to 5MB (50MB only for upload routes) | `grep "limit" server/index.ts` shows 5mb default, 50mb on upload routes only | 2026-02-08 |
+| VF-021 | Request-ID middleware for tracing | `grep "requestId\|X-Request-Id" server/index.ts` shows UUID generation per request | 2026-02-08 |
+| VF-022 | Zod validation on ALL route files (39/39 with safeParse) | `grep -c safeParse server/routes/*.ts` shows all route files have validation | 2026-02-08 |
+| VF-023 | Route-level code splitting with React.lazy() | `grep "lazy(" client/src/App.tsx` shows ~80 lazy-loaded pages with Suspense fallback | 2026-02-08 |
+| VF-024 | Test coverage: 7 test files, 219 tests passing | `npx vitest run` shows 7 files, 219 tests, 0 failures | 2026-02-08 |
 
 ---
 
@@ -144,15 +149,15 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 
 | ID | Issue | Priority | Status | Category | Notes | Date |
 |---|---|---|---|---|---|---|
-| KI-001 | 50MB JSON body limit in `server/index.ts` | P1 | OPEN | Security | Reduce to 5MB for API; larger only on upload routes | 2026-02-07 |
-| KI-002 | No request-id / correlation-id tracing | P2 | OPEN | Observability | Add middleware for UUID per request | 2026-02-07 |
+| KI-001 | 50MB JSON body limit in `server/index.ts` | P1 | FIXED | Security | Reduced to 5MB default; 50MB only on upload routes. See VF-020 | 2026-02-08 |
+| KI-002 | No request-id / correlation-id tracing | P2 | FIXED | Observability | Request-ID middleware added with X-Request-Id header. See VF-021 | 2026-02-08 |
 | KI-003 | No ESLint or Prettier configuration | P2 | OPEN | Build/Quality | Add configs for consistent code style | 2026-02-08 |
-| KI-004 | Zero application test files | P1 | OPEN | Testing | Tests for financial calcs, lifecycle transitions | 2026-02-07 |
-| KI-005 | 5.3MB main JS bundle — no code splitting | P1 | OPEN | Performance | React.lazy() for route-level code splitting | 2026-02-07 |
+| KI-004 | Insufficient test coverage | P1 | FIXED | Testing | 7 test files, 219 tests (financial calcs, lifecycle, validation, API). See VF-024 | 2026-02-08 |
+| KI-005 | 5.3MB main JS bundle — no code splitting | P1 | FIXED | Performance | React.lazy() with Suspense on ~80 page routes. See VF-023 | 2026-02-08 |
 | KI-006 | Excessive `any` usages (~818 baseline) | P2 | OPEN | TypeScript | Target: trending down. Focus on server routes first | 2026-02-07 |
 | KI-007 | Panel rate columns use `text` not `decimal` | P2 | MITIGATED | Database | safeParseFinancial guards at app layer. DO NOT change types without migration plan + backup + approval | 2026-02-07 |
 | KI-008 | No CHECK constraints on financial values | P2 | OPEN | Database | Non-negative values, percentage ranges 0-100 | 2026-02-07 |
-| KI-009 | Settings route lacks Zod validation | P1 | OPEN | Backend | `settings.routes.ts` uses raw req.body | 2026-02-07 |
+| KI-009 | Settings route lacks Zod validation | P1 | FIXED | Backend | All 4 mutating endpoints now have Zod safeParse. See VF-022 | 2026-02-08 |
 | KI-010 | N+1 query patterns in documents/bundles/drafting | P2 | OPEN | Performance | Refactor to JOINs or batch queries | 2026-02-07 |
 | KI-011 | No offline handling for mobile pages | P2 | OPEN | Frontend | Retry logic and offline detection | 2026-02-07 |
 | KI-012 | Health endpoint exposes memory/pool info | P3 | OPEN | Security | Restrict to authenticated admins | 2026-02-07 |
@@ -175,3 +180,4 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | 2026-02-07 | 87/100 (8.7/10) | B+ | Enterprise hardening (ENTERPRISE_AUDIT_REPORT.md). Added transactions, CSRF, Zod, company scope, optimistic locking, safeParseFinancial. Score used different rubric — not directly comparable. |
 | 2026-02-08 | 75.5/100 | C+ | Latest audit (in-chat). 0 TS errors, verified fixes in place. Score used yet another rubric — not comparable. |
 | 2026-02-08 | — | — | Standardized rubric established. All future audits use this fixed rubric for comparable scoring. |
+| 2026-02-08 | — | — | Fixed P1 items: JSON limit (KI-001), request-id (KI-002), Zod on all routes (KI-009), code splitting (KI-005), test coverage (KI-004). Added VF-020 through VF-024. |

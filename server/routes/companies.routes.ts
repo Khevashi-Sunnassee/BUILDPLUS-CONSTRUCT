@@ -35,7 +35,11 @@ router.get("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request
 
 router.post("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
   try {
-    const data = companySchema.parse(req.body);
+    const result = companySchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const data = result.data;
     const existing = await storage.getCompanyByCode(data.code.toUpperCase());
     if (existing) {
       return res.status(400).json({ error: "Company code already exists" });
@@ -57,7 +61,11 @@ router.post("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
 router.put("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.params.id as string;
-    const data = companySchema.partial().parse(req.body);
+    const result = companySchema.partial().safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const data = result.data;
     const updateData: any = { ...data };
     if (data.code) {
       updateData.code = data.code.toUpperCase();

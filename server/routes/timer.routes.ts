@@ -6,6 +6,33 @@ import { eq, and, desc, or } from "drizzle-orm";
 import { format } from "date-fns";
 import logger from "../lib/logger";
 import { logPanelChange } from "../services/panel-audit.service";
+import { z } from "zod";
+
+const timerStartSchema = z.object({
+  jobId: z.string().nullable().optional(),
+  panelRegisterId: z.string().nullable().optional(),
+  workTypeId: z.string().nullable().optional(),
+  app: z.string().nullable().optional(),
+  dailyLogId: z.string().nullable().optional(),
+});
+
+const timerStopSchema = z.object({
+  jobId: z.string().nullable().optional(),
+  panelRegisterId: z.string().nullable().optional(),
+  workTypeId: z.string().nullable().optional(),
+  app: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  panelMark: z.string().nullable().optional(),
+  drawingCode: z.string().nullable().optional(),
+});
+
+const timerUpdateSchema = z.object({
+  jobId: z.string().nullable().optional(),
+  panelRegisterId: z.string().nullable().optional(),
+  workTypeId: z.string().nullable().optional(),
+  app: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
 
 // Helper function to record timer events
 async function recordTimerEvent(
@@ -159,7 +186,11 @@ router.get("/api/timer-sessions/active", requireAuth, async (req, res) => {
 router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const { jobId, panelRegisterId, workTypeId, app, dailyLogId } = req.body;
+    const result = timerStartSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { jobId, panelRegisterId, workTypeId, app, dailyLogId } = result.data as any;
 
     // Check if there's already an active or paused session
     const [existingSession] = await db
@@ -332,7 +363,11 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const sessionId = req.params.id as string;
-    const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = req.body;
+    const result = timerStopSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = result.data as any;
 
     const [session] = await db
       .select()
@@ -596,7 +631,11 @@ router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
     const sessionId = req.params.id as string;
-    const { jobId, panelRegisterId, workTypeId, app, notes } = req.body;
+    const result = timerUpdateSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { jobId, panelRegisterId, workTypeId, app, notes } = result.data as any;
 
     const [session] = await db
       .select()

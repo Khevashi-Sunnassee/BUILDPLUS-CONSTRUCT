@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -11,91 +12,93 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { UserSettingsPopover } from "@/components/user-settings-popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Loader2 } from "lucide-react";
 import NotFound from "@/pages/not-found";
 import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
-import DashboardPage from "@/pages/dashboard";
-import DailyReportsPage from "@/pages/daily-reports";
-import DailyReportDetailPage from "@/pages/daily-report-detail";
-import ManagerReviewPage from "@/pages/manager-review";
-import ReportsPage from "@/pages/reports";
-import AdminSettingsPage from "@/pages/admin/settings";
-import AdminDevicesPage from "@/pages/admin/devices";
-import AdminUsersPage from "@/pages/admin/users";
-import AdminJobsPage from "@/pages/admin/jobs";
-import AdminPanelsPage from "@/pages/admin/panels";
-import AdminPanelTypesPage from "@/pages/admin/panel-types";
-import AdminUserPermissionsPage from "@/pages/admin/user-permissions";
-import AdminZonesPage from "@/pages/admin/zones";
-import AdminFactoriesPage from "@/pages/admin/factories";
-import AdminCustomersPage from "@/pages/admin/customers";
-import AdminSuppliersPage from "@/pages/admin/suppliers";
-import AdminItemsPage from "@/pages/admin/items";
-import DownloadsPage from "@/pages/downloads";
-import ManualEntryPage from "@/pages/manual-entry";
-import ProductionReportPage from "@/pages/production-report";
-import ProductionReportDetailPage from "@/pages/production-report-detail";
-import KPIDashboardPage from "@/pages/kpi-dashboard";
-import LogisticsPage from "@/pages/logistics";
-import WeeklyWageReportsPage from "@/pages/weekly-wage-reports";
-import WeeklyJobLogsPage from "@/pages/weekly-job-logs";
-import ProductionSlotsPage from "@/pages/production-slots";
-import DraftingProgramPage from "@/pages/drafting-program";
-import PurchaseOrdersPage from "@/pages/purchase-orders";
-import PurchaseOrderFormPage from "@/pages/purchase-order-form";
-import TasksPage from "@/pages/tasks";
-import PanelDetailsPage from "@/pages/panel-details";
-import ChatPage from "@/pages/chat";
-import ProductionSchedulePage from "@/pages/production-schedule";
-import DocumentRegisterPage from "@/pages/document-register";
-import PublicBundlePage from "@/pages/public-bundle";
-import AdminDocumentConfigPage from "@/pages/admin/document-config";
-import AdminCompaniesPage from "@/pages/admin/companies";
-import AdminChecklistTemplatesPage from "@/pages/admin/checklist-templates";
-import AssetRegisterPage from "@/pages/admin/asset-register";
-import AssetDetailPage from "@/pages/admin/asset-detail";
-import TemplateEditorPage from "@/pages/admin/template-editor";
-import ChecklistsPage from "@/pages/checklists";
-import ChecklistFillPage from "@/pages/checklist-fill";
-import ChecklistReportsPage from "@/pages/checklist-reports";
-import ProcurementReoSchedulingPage from "@/pages/procurement-reo-scheduling";
-import BroadcastPage from "@/pages/broadcast";
-import ContractHubPage from "@/pages/contract-hub";
-import ContractDetailPage from "@/pages/contract-detail";
-import ProgressClaimsPage from "@/pages/progress-claims";
-import ProgressClaimFormPage from "@/pages/progress-claim-form";
-import RetentionReportPage from "@/pages/retention-report";
-
-import MobileLoginPage from "@/pages/mobile/login";
-import MobileDashboard from "@/pages/mobile/dashboard";
-import MobileTasksPage from "@/pages/mobile/tasks";
-import MobileChatPage from "@/pages/mobile/chat";
-import MobileJobsPage from "@/pages/mobile/jobs";
-import MobilePanelsPage from "@/pages/mobile/panels";
-import MobilePanelDetailPage from "@/pages/mobile/panel-detail";
-import MobileLogisticsPage from "@/pages/mobile/logistics";
-import MobileCreateLoadListPage from "@/pages/mobile/create-load-list";
-import MobileRecordDeliveryPage from "@/pages/mobile/record-delivery";
-import MobileReturnLoadPage from "@/pages/mobile/return-load";
-import MobilePurchaseOrdersPage from "@/pages/mobile/purchase-orders";
-import MobileMore from "@/pages/mobile/more";
-import MobileProfilePage from "@/pages/mobile/profile";
-import MobileWeeklyJobReportPage from "@/pages/mobile/weekly-job-report";
-import MobileDocumentsPage from "@/pages/mobile/documents";
-import MobileChecklistsPage from "@/pages/mobile/checklists";
-import MobileChecklistFillPage from "@/pages/mobile/checklist-fill";
-import MobileBroadcastPage from "@/pages/mobile/broadcast";
-import MobileQrScanner from "@/pages/mobile/qr-scanner";
-import MobileNewOpportunity from "@/pages/mobile/new-opportunity";
-import MobilePhotoGalleryPage from "@/pages/mobile/photo-gallery";
-import MobilePhotoCapturePage from "@/pages/mobile/photo-capture";
-import MobileJobDetailPage from "@/pages/mobile/job-detail";
-import PhotoGalleryPage from "@/pages/photo-gallery";
-import SalesPipelinePage from "@/pages/sales-pipeline";
-import HelpCenterPage from "@/pages/help-center";
-import AdminHelpPage from "@/pages/admin/help";
 import { HelpProvider } from "@/components/help/help-provider";
 import { HelpDrawer } from "@/components/help/help-drawer";
+
+const DashboardPage = lazy(() => import("@/pages/dashboard"));
+const DailyReportsPage = lazy(() => import("@/pages/daily-reports"));
+const DailyReportDetailPage = lazy(() => import("@/pages/daily-report-detail"));
+const ManagerReviewPage = lazy(() => import("@/pages/manager-review"));
+const ReportsPage = lazy(() => import("@/pages/reports"));
+const AdminSettingsPage = lazy(() => import("@/pages/admin/settings"));
+const AdminDevicesPage = lazy(() => import("@/pages/admin/devices"));
+const AdminUsersPage = lazy(() => import("@/pages/admin/users"));
+const AdminJobsPage = lazy(() => import("@/pages/admin/jobs"));
+const AdminPanelsPage = lazy(() => import("@/pages/admin/panels"));
+const AdminPanelTypesPage = lazy(() => import("@/pages/admin/panel-types"));
+const AdminUserPermissionsPage = lazy(() => import("@/pages/admin/user-permissions"));
+const AdminZonesPage = lazy(() => import("@/pages/admin/zones"));
+const AdminFactoriesPage = lazy(() => import("@/pages/admin/factories"));
+const AdminCustomersPage = lazy(() => import("@/pages/admin/customers"));
+const AdminSuppliersPage = lazy(() => import("@/pages/admin/suppliers"));
+const AdminItemsPage = lazy(() => import("@/pages/admin/items"));
+const DownloadsPage = lazy(() => import("@/pages/downloads"));
+const ManualEntryPage = lazy(() => import("@/pages/manual-entry"));
+const ProductionReportPage = lazy(() => import("@/pages/production-report"));
+const ProductionReportDetailPage = lazy(() => import("@/pages/production-report-detail"));
+const KPIDashboardPage = lazy(() => import("@/pages/kpi-dashboard"));
+const LogisticsPage = lazy(() => import("@/pages/logistics"));
+const WeeklyWageReportsPage = lazy(() => import("@/pages/weekly-wage-reports"));
+const WeeklyJobLogsPage = lazy(() => import("@/pages/weekly-job-logs"));
+const ProductionSlotsPage = lazy(() => import("@/pages/production-slots"));
+const DraftingProgramPage = lazy(() => import("@/pages/drafting-program"));
+const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
+const PurchaseOrderFormPage = lazy(() => import("@/pages/purchase-order-form"));
+const TasksPage = lazy(() => import("@/pages/tasks"));
+const PanelDetailsPage = lazy(() => import("@/pages/panel-details"));
+const ChatPage = lazy(() => import("@/pages/chat"));
+const ProductionSchedulePage = lazy(() => import("@/pages/production-schedule"));
+const DocumentRegisterPage = lazy(() => import("@/pages/document-register"));
+const PublicBundlePage = lazy(() => import("@/pages/public-bundle"));
+const AdminDocumentConfigPage = lazy(() => import("@/pages/admin/document-config"));
+const AdminCompaniesPage = lazy(() => import("@/pages/admin/companies"));
+const AdminChecklistTemplatesPage = lazy(() => import("@/pages/admin/checklist-templates"));
+const AssetRegisterPage = lazy(() => import("@/pages/admin/asset-register"));
+const AssetDetailPage = lazy(() => import("@/pages/admin/asset-detail"));
+const TemplateEditorPage = lazy(() => import("@/pages/admin/template-editor"));
+const ChecklistsPage = lazy(() => import("@/pages/checklists"));
+const ChecklistFillPage = lazy(() => import("@/pages/checklist-fill"));
+const ChecklistReportsPage = lazy(() => import("@/pages/checklist-reports"));
+const ProcurementReoSchedulingPage = lazy(() => import("@/pages/procurement-reo-scheduling"));
+const BroadcastPage = lazy(() => import("@/pages/broadcast"));
+const ContractHubPage = lazy(() => import("@/pages/contract-hub"));
+const ContractDetailPage = lazy(() => import("@/pages/contract-detail"));
+const ProgressClaimsPage = lazy(() => import("@/pages/progress-claims"));
+const ProgressClaimFormPage = lazy(() => import("@/pages/progress-claim-form"));
+const RetentionReportPage = lazy(() => import("@/pages/retention-report"));
+
+const MobileLoginPage = lazy(() => import("@/pages/mobile/login"));
+const MobileDashboard = lazy(() => import("@/pages/mobile/dashboard"));
+const MobileTasksPage = lazy(() => import("@/pages/mobile/tasks"));
+const MobileChatPage = lazy(() => import("@/pages/mobile/chat"));
+const MobileJobsPage = lazy(() => import("@/pages/mobile/jobs"));
+const MobilePanelsPage = lazy(() => import("@/pages/mobile/panels"));
+const MobilePanelDetailPage = lazy(() => import("@/pages/mobile/panel-detail"));
+const MobileLogisticsPage = lazy(() => import("@/pages/mobile/logistics"));
+const MobileCreateLoadListPage = lazy(() => import("@/pages/mobile/create-load-list"));
+const MobileRecordDeliveryPage = lazy(() => import("@/pages/mobile/record-delivery"));
+const MobileReturnLoadPage = lazy(() => import("@/pages/mobile/return-load"));
+const MobilePurchaseOrdersPage = lazy(() => import("@/pages/mobile/purchase-orders"));
+const MobileMore = lazy(() => import("@/pages/mobile/more"));
+const MobileProfilePage = lazy(() => import("@/pages/mobile/profile"));
+const MobileWeeklyJobReportPage = lazy(() => import("@/pages/mobile/weekly-job-report"));
+const MobileDocumentsPage = lazy(() => import("@/pages/mobile/documents"));
+const MobileChecklistsPage = lazy(() => import("@/pages/mobile/checklists"));
+const MobileChecklistFillPage = lazy(() => import("@/pages/mobile/checklist-fill"));
+const MobileBroadcastPage = lazy(() => import("@/pages/mobile/broadcast"));
+const MobileQrScanner = lazy(() => import("@/pages/mobile/qr-scanner"));
+const MobileNewOpportunity = lazy(() => import("@/pages/mobile/new-opportunity"));
+const MobilePhotoGalleryPage = lazy(() => import("@/pages/mobile/photo-gallery"));
+const MobilePhotoCapturePage = lazy(() => import("@/pages/mobile/photo-capture"));
+const MobileJobDetailPage = lazy(() => import("@/pages/mobile/job-detail"));
+const PhotoGalleryPage = lazy(() => import("@/pages/photo-gallery"));
+const SalesPipelinePage = lazy(() => import("@/pages/sales-pipeline"));
+const HelpCenterPage = lazy(() => import("@/pages/help-center"));
+const AdminHelpPage = lazy(() => import("@/pages/admin/help"));
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -179,7 +182,8 @@ function Router() {
   }
 
   return (
-    <Switch>
+    <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+      <Switch>
       <Route path="/login">
         {user ? <Redirect to={isMobile ? "/mobile/dashboard" : "/dashboard"} /> : (isMobile ? <MobileLoginPage /> : <LoginPage />)}
       </Route>
@@ -774,8 +778,9 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
-      <Route component={NotFound} />
-    </Switch>
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 

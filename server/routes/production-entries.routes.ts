@@ -5,6 +5,39 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import { requireJobCapability } from "./middleware/job-capability.middleware";
 import { logPanelChange, advancePanelLifecycleIfLower } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { z } from "zod";
+
+const createProductionEntrySchema = z.object({
+  panelId: z.string().optional(),
+  loadWidth: z.string().optional(),
+  loadHeight: z.string().optional(),
+  panelThickness: z.string().optional(),
+  panelVolume: z.string().optional(),
+  panelMass: z.string().optional(),
+}).passthrough();
+
+const updateProductionEntrySchema = z.object({
+  loadWidth: z.string().optional(),
+  loadHeight: z.string().optional(),
+  panelThickness: z.string().optional(),
+  panelVolume: z.string().optional(),
+  panelMass: z.string().optional(),
+  panelId: z.string().optional(),
+  status: z.string().optional(),
+}).passthrough();
+
+const batchStatusSchema = z.object({
+  entryIds: z.array(z.string()),
+  status: z.string(),
+});
+
+const assignPanelsSchema = z.object({
+  panelAssignments: z.array(z.object({
+    panelId: z.string(),
+    productionDate: z.string(),
+  })),
+  factory: z.string().optional(),
+});
 
 const router = Router();
 
@@ -27,7 +60,11 @@ router.get("/api/production-entries/:id", requireAuth, requirePermission("produc
 
 router.post("/api/production-entries", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), requireJobCapability("PRODUCE_PANELS"), async (req: Request, res: Response) => {
   try {
-    const { panelId, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, ...entryFields } = req.body;
+    const result = createProductionEntrySchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { panelId, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, ...entryFields } = result.data as any;
     if (panelId) {
       const panel = await storage.getPanelById(panelId);
       if (!panel) {
@@ -66,7 +103,11 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
 
 router.put("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
-    const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, status, ...entryFields } = req.body;
+    const result = updateProductionEntrySchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, status, ...entryFields } = result.data as any;
     
     if (panelId) {
       const panelUpdates: any = {};
@@ -126,7 +167,11 @@ router.delete("/api/production-entries/:id", requireAuth, requirePermission("pro
 });
 
 router.put("/api/production-entries/batch-status", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
-  const { entryIds, status } = req.body;
+  const batchResult = batchStatusSchema.safeParse(req.body);
+  if (!batchResult.success) {
+    return res.status(400).json({ error: batchResult.error.format() });
+  }
+  const { entryIds, status } = batchResult.data;
   if (!entryIds || !Array.isArray(entryIds) || entryIds.length === 0 || !status) {
     return res.status(400).json({ error: "entryIds array and status required" });
   }
@@ -207,10 +252,11 @@ router.get("/api/production-slots/:slotId/panel-entries", requireAuth, requirePe
 router.post("/api/production-slots/:slotId/assign-panels", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const slotId = String(req.params.slotId);
-    const { panelAssignments, factory } = req.body as {
-      panelAssignments: { panelId: string; productionDate: string }[];
-      factory?: string;
-    };
+    const assignResult = assignPanelsSchema.safeParse(req.body);
+    if (!assignResult.success) {
+      return res.status(400).json({ error: assignResult.error.format() });
+    }
+    const { panelAssignments, factory } = assignResult.data;
 
     if (!panelAssignments || !Array.isArray(panelAssignments) || panelAssignments.length === 0) {
       return res.status(400).json({ error: "Panel assignments are required" });

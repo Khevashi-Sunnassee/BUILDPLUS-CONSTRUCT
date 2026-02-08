@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import multer from "multer";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
@@ -29,6 +30,20 @@ const upload = multer({
       cb(new Error(`File type ${file.mimetype} not allowed`));
     }
   },
+});
+
+const createPurchaseOrderSchema = z.object({
+  items: z.array(z.object({}).passthrough()).optional(),
+  supplierId: z.string().nullable().optional(),
+  requiredByDate: z.string().nullable().optional(),
+}).passthrough();
+
+const rejectPurchaseOrderSchema = z.object({
+  reason: z.string(),
+});
+
+const receivePurchaseOrderSchema = z.object({
+  receivedItemIds: z.array(z.string()),
 });
 
 router.get("/api/purchase-orders", requireAuth, async (req, res) => {
@@ -90,7 +105,11 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
     const companyId = req.companyId;
     const userId = req.session.userId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const { items: lineItems, ...poData } = req.body;
+    const result = createPurchaseOrderSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { items: lineItems, ...poData } = result.data as any;
     const poNumber = await storage.getNextPONumber(companyId);
     if (poData.supplierId === "") {
       poData.supplierId = null;
@@ -124,7 +143,11 @@ router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Only draft or rejected purchase orders can be edited" });
     }
     
-    const { items: lineItems, ...poData } = req.body;
+    const result = createPurchaseOrderSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { items: lineItems, ...poData } = result.data as any;
     if (poData.requiredByDate && typeof poData.requiredByDate === "string") {
       poData.requiredByDate = new Date(poData.requiredByDate);
     }
@@ -240,7 +263,11 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
       return res.status(403).json({ error: "You are not authorized to reject purchase orders" });
     }
 
-    const { reason } = req.body;
+    const rejectResult = rejectPurchaseOrderSchema.safeParse(req.body);
+    if (!rejectResult.success) {
+      return res.status(400).json({ error: rejectResult.error.format() });
+    }
+    const { reason } = rejectResult.data;
     if (!reason) {
       return res.status(400).json({ error: "Rejection reason is required" });
     }
@@ -263,7 +290,11 @@ router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) =>
       return res.status(400).json({ error: "Only approved or partially received POs can have items received" });
     }
 
-    const { receivedItemIds } = req.body;
+    const receiveResult = receivePurchaseOrderSchema.safeParse(req.body);
+    if (!receiveResult.success) {
+      return res.status(400).json({ error: receiveResult.error.format() });
+    }
+    const { receivedItemIds } = receiveResult.data;
     if (!Array.isArray(receivedItemIds)) {
       return res.status(400).json({ error: "receivedItemIds must be an array" });
     }

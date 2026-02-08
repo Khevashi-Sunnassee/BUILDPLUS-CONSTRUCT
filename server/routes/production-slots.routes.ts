@@ -2,6 +2,18 @@ import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { z } from "zod";
+
+const generateSlotsSchema = z.object({
+  skipEmptyLevels: z.boolean().optional(),
+});
+
+const adjustSlotSchema = z.object({
+  newDate: z.string(),
+  reason: z.string().optional(),
+  clientConfirmed: z.boolean().optional(),
+  cascadeToLater: z.boolean().optional(),
+});
 
 const router = Router();
 
@@ -77,7 +89,11 @@ router.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MA
 
 router.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
-    const { skipEmptyLevels } = req.body || {};
+    const result = generateSlotsSchema.safeParse(req.body || {});
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { skipEmptyLevels } = result.data;
     const slots = await storage.generateProductionSlotsForJob(String(req.params.jobId), skipEmptyLevels);
     res.json(slots);
   } catch (error: any) {
@@ -88,7 +104,11 @@ router.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAG
 
 router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
-    const { newDate, reason, clientConfirmed, cascadeToLater } = req.body;
+    const result = adjustSlotSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { newDate, reason, clientConfirmed, cascadeToLater } = result.data as any;
     const changedById = req.session.userId!;
     
     const slot = await storage.adjustProductionSlot(String(req.params.id), {

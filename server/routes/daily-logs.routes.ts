@@ -5,6 +5,57 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { logPanelChange, advancePanelLifecycleIfLower } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { z } from "zod";
+
+const createDailyLogSchema = z.object({
+  logDay: z.string(),
+});
+
+const approveDailyLogSchema = z.object({
+  approve: z.boolean(),
+  comment: z.string().optional(),
+});
+
+const updateLogRowSchema = z.object({
+  panelMark: z.string().optional(),
+  drawingCode: z.string().optional(),
+  notes: z.string().optional(),
+  jobId: z.string().optional(),
+  workTypeId: z.any().optional(),
+});
+
+const manualEntrySchema = z.object({
+  logDay: z.string(),
+  jobId: z.string().nullable().optional(),
+  panelRegisterId: z.string().nullable().optional(),
+  workTypeId: z.any().optional(),
+  app: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  fileName: z.string().optional(),
+  filePath: z.string().optional(),
+  revitViewName: z.string().optional(),
+  revitSheetNumber: z.string().optional(),
+  revitSheetName: z.string().optional(),
+  acadLayoutName: z.string().optional(),
+  panelMark: z.string().nullable().optional(),
+  drawingCode: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  createNewPanel: z.boolean().optional(),
+  newPanelMark: z.string().optional(),
+  panelDetails: z.object({
+    loadWidth: z.string().optional(),
+    loadHeight: z.string().optional(),
+    panelThickness: z.string().optional(),
+    panelVolume: z.string().optional(),
+    panelMass: z.string().optional(),
+    panelArea: z.string().optional(),
+    day28Fc: z.string().optional(),
+    liftFcm: z.string().optional(),
+    rotationalLifters: z.string().optional(),
+    primaryLifters: z.string().optional(),
+  }).optional(),
+});
 
 const router = Router();
 
@@ -83,7 +134,11 @@ router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "
     const user = await storage.getUser(req.session.userId!);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
     
-    const { logDay } = req.body;
+    const result = createDailyLogSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { logDay } = result.data;
     if (!logDay) {
       return res.status(400).json({ error: "logDay is required" });
     }
@@ -147,7 +202,11 @@ router.post("/api/daily-logs/:id/submit", requireAuth, async (req, res) => {
 });
 
 router.post("/api/daily-logs/:id/approve", requireRole("MANAGER", "ADMIN"), async (req, res) => {
-  const { approve, comment } = req.body;
+  const result = approveDailyLogSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error.format() });
+  }
+  const { approve, comment } = result.data;
   const status = approve ? "APPROVED" : "REJECTED";
   const log = await storage.updateDailyLogStatus(req.params.id as string, {
     status,
@@ -187,7 +246,11 @@ router.patch("/api/log-rows/:id", requireAuth, async (req, res) => {
   if (log.status !== "PENDING" && log.status !== "REJECTED") {
     return res.status(400).json({ error: "Cannot edit rows in submitted/approved logs" });
   }
-  const { panelMark, drawingCode, notes, jobId, workTypeId } = req.body;
+  const result = updateLogRowSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: result.error.format() });
+  }
+  const { panelMark, drawingCode, notes, jobId, workTypeId } = result.data;
   const updatedRow = await storage.updateLogRow(req.params.id as string, {
     panelMark,
     drawingCode,
@@ -252,9 +315,13 @@ router.post("/api/manual-entry", requireAuth, async (req, res) => {
     const user = await storage.getUser(req.session.userId!);
     if (!user) return res.status(401).json({ error: "Unauthorized" });
 
+    const result = manualEntrySchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
     const { logDay, jobId, panelRegisterId, workTypeId, app, startTime, endTime, fileName, filePath,
             revitViewName, revitSheetNumber, revitSheetName, acadLayoutName,
-            panelMark, drawingCode, notes, createNewPanel, newPanelMark, panelDetails } = req.body;
+            panelMark, drawingCode, notes, createNewPanel, newPanelMark, panelDetails } = result.data;
 
     if (!logDay || !app || !startTime || !endTime) {
       return res.status(400).json({ error: "Missing required fields" });

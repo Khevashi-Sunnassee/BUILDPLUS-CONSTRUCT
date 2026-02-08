@@ -3,6 +3,13 @@ import { storage } from "../storage";
 import { format, subDays } from "date-fns";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { z } from "zod";
+
+const createProductionDaySchema = z.object({
+  productionDate: z.string(),
+  factory: z.string(),
+  notes: z.string().nullable().optional(),
+});
 
 const router = Router();
 
@@ -204,7 +211,11 @@ router.get("/api/production-days", requireAuth, async (req: Request, res: Respon
 
 router.post("/api/production-days", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { productionDate, factory, notes } = req.body;
+    const result = createProductionDaySchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { productionDate, factory, notes } = result.data;
     
     if (!productionDate || !factory) {
       return res.status(400).json({ error: "Date and factory are required" });

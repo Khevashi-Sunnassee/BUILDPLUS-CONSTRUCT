@@ -5,6 +5,30 @@ import { helpEntries, helpEntryVersions, helpFeedback } from "@shared/schema";
 import { eq, and, or, ilike, sql, desc, asc } from "drizzle-orm";
 import { z } from "zod";
 
+const helpFeedbackSchema = z.object({
+  helpEntryId: z.string().nullable().optional(),
+  helpKey: z.string().nullable().optional(),
+  rating: z.coerce.number().nullable().optional(),
+  comment: z.string().nullable().optional(),
+  pageUrl: z.string().nullable().optional(),
+});
+
+const helpAdminSchema = z.object({
+  key: z.string(),
+  scope: z.string().optional(),
+  title: z.string(),
+  shortText: z.string().nullable().optional(),
+  bodyMd: z.string().nullable().optional(),
+  keywords: z.array(z.string()).optional(),
+  category: z.string().nullable().optional(),
+  pageRoute: z.string().nullable().optional(),
+  roleVisibility: z.array(z.string()).optional(),
+  status: z.string().optional(),
+  rank: z.coerce.number().optional(),
+});
+
+const helpAdminUpdateSchema = helpAdminSchema.partial();
+
 const router = Router();
 
 router.get("/api/help", requireAuth, async (req: Request, res: Response) => {
@@ -99,7 +123,11 @@ router.get("/api/help/recent", requireAuth, async (_req: Request, res: Response)
 
 router.post("/api/help/feedback", requireAuth, async (req: Request, res: Response) => {
   try {
-    const { helpEntryId, helpKey, rating, comment, pageUrl } = req.body;
+    const result = helpFeedbackSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { helpEntryId, helpKey, rating, comment, pageUrl } = result.data;
     const [feedback] = await db
       .insert(helpFeedback)
       .values({
@@ -132,7 +160,11 @@ router.get("/api/help/admin/list", requireAuth, requireRole("ADMIN"), async (_re
 
 router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { key, scope, title, shortText, bodyMd, keywords, category, pageRoute, roleVisibility, status, rank } = req.body;
+    const result = helpAdminSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
+    }
+    const { key, scope, title, shortText, bodyMd, keywords, category, pageRoute, roleVisibility, status, rank } = result.data;
     if (!key || !title) {
       return res.status(400).json({ error: "key and title are required" });
     }
@@ -181,7 +213,11 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
       createdBy: req.session.userId || null,
     });
 
-    const { key, scope, title, shortText, bodyMd, keywords, category, pageRoute, roleVisibility, status, rank } = req.body;
+    const updateResult = helpAdminUpdateSchema.safeParse(req.body);
+    if (!updateResult.success) {
+      return res.status(400).json({ error: updateResult.error.format() });
+    }
+    const { key, scope, title, shortText, bodyMd, keywords, category, pageRoute, roleVisibility, status, rank } = updateResult.data;
     const [updated] = await db
       .update(helpEntries)
       .set({

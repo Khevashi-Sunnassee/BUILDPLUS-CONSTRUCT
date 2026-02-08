@@ -217,7 +217,7 @@ const createPanelSchema = z.object({
   panelMass: z.string().nullish(),
   concreteStrengthMpa: z.string().nullish(),
   estimatedHours: z.number().nullish(),
-  status: z.string().optional(),
+  status: z.enum(["PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "NOT_STARTED"]).optional(),
 }).passthrough();
 
 const updatePanelSchema = createPanelSchema.partial().passthrough();
