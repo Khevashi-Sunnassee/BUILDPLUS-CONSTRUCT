@@ -45,3 +45,54 @@ The frontend features a KPI Dashboard with data visualization and PDF export, an
 - **connect-pg-simple**: PostgreSQL-backed session store for `express-session`.
 - **Vitest**: Testing framework for unit and integration tests.
 - **ExcelJS**: Excel file generation library.
+
+## Comprehensive Debugging & QA Audit Procedure
+When the user requests a "comprehensive debugging", "full audit", "QA pass", or "code quality check", follow this structured procedure:
+
+### 1. Frontend
+- Validate React/TypeScript correctness
+- Check for invalid React element types, broken imports, hooks misuse, state leaks
+- Enforce strict TypeScript rules (no implicit any, unsafe casts, unused exports)
+- Run ESLint and flag all violations
+- Detect performance issues (unnecessary re-renders, large bundles, blocking renders)
+
+### 2. Backend
+- Validate all API endpoints exist, are reachable, and return consistent schemas
+- Ensure every protected endpoint enforces authentication and permissions
+- Validate request/response schema validation on all endpoints
+- Detect missing or inconsistent error handling
+- Check database access patterns for N+1 queries, missing indexes, unsafe transactions
+
+### 3. Security
+- Verify CSRF protection for all cookie-based write operations
+- Validate secure cookie flags, SameSite policy, and session handling
+- Check for XSS, injection risks, unsafe eval or dynamic execution
+- Scan dependencies for known vulnerabilities
+- Ensure secrets are not hard-coded and only loaded from environment variables
+- Validate security headers (CSP, HSTS, X-Frame-Options, etc.)
+
+### 4. TypeScript & Build Integrity
+- Run a full TypeScript typecheck with noEmit
+- Ensure the application builds cleanly with no warnings
+- Detect circular dependencies and invalid imports
+
+### 5. Performance & Scalability
+- Simulate load assumptions of 200+ concurrent users
+- Identify latency bottlenecks (API p95, slow pages, blocking I/O)
+- Check database connection pooling and resource limits
+- Identify operations that should be queued or backgrounded
+
+### 6. Rules Compliance
+- Verify the codebase follows its own architectural and coding rules
+- Flag any deviation from established patterns or conventions
+
+### 7. Output
+- Produce a single structured report summarizing:
+  - Critical issues
+  - Warnings
+  - Recommended fixes (with file references)
+- Assign an overall Application Health Score (0–100)
+- Assign a letter grade (A–F)
+- Clearly state whether the application is SAFE TO DEPLOY or BLOCKED
+
+**Audit Principles:** Be strict, assume production risk, do not ignore issues. If something is unclear, surface it as a risk instead of guessing.
