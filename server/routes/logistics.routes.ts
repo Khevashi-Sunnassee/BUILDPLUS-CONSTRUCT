@@ -167,7 +167,8 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
       const { jobHasCapability } = await import("@shared/job-phases");
       const job = await storage.getJob(loadListForPhaseCheck.jobId);
       if (job) {
-        const phase = ((job as any).jobPhase || "CONTRACTED") as string;
+        const { intToPhase } = await import("@shared/job-phases");
+        const phase = (typeof (job as any).jobPhase === 'number' ? intToPhase((job as any).jobPhase) : ((job as any).jobPhase || "CONTRACTED")) as string;
         if (!jobHasCapability(phase as any, "DELIVER_PANELS")) {
           return res.status(403).json({ error: `Cannot record deliveries while job is in "${phase}" phase` });
         }

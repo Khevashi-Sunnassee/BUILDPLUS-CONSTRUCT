@@ -6,9 +6,22 @@ import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHist
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
-import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceToPhase, getDefaultStatusForPhase } from "@shared/job-phases";
+import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceToPhase, getDefaultStatusForPhase, intToPhase, phaseToInt } from "@shared/job-phases";
 import type { JobPhase, JobStatus } from "@shared/job-phases";
 import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
+
+function serializeJobPhase(job: any): any {
+  if (!job) return job;
+  return { ...job, jobPhase: intToPhase(job.jobPhase ?? 0) };
+}
+
+function serializeJobsPhase(jobsList: any[]): any[] {
+  return jobsList.map(serializeJobPhase);
+}
+
+function deserializePhase(phaseStr: string): number {
+  return phaseToInt(phaseStr as JobPhase);
+}
 
 const router = Router();
 
@@ -177,7 +190,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       logger.warn({ err: e }, "Failed to log sales status history on create");
     }
 
-    res.json(job);
+    res.json(serializeJobPhase(job));
   } catch (error: any) {
     logger.error({ err: error }, "Error creating opportunity");
     res.status(400).json({ error: error.message || "Failed to create opportunity" });
@@ -263,7 +276,7 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       }
     }
 
-    res.json(updated);
+    res.json(serializeJobPhase(updated));
   } catch (error: any) {
     logger.error({ err: error }, "Error updating opportunity");
     res.status(400).json({ error: error.message || "Failed to update opportunity" });
@@ -412,7 +425,7 @@ router.delete("/api/jobs/:jobId/panel-rates/:rateId", requireRole("ADMIN"), asyn
 // GET /api/admin/jobs - Get all jobs (for admin)
 router.get("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const allJobs = await storage.getAllJobs(req.companyId);
-  res.json(allJobs);
+  res.json(serializeJobsPhase(allJobs));
 });
 
 // GET /api/admin/jobs/:id - Get single job
@@ -421,7 +434,7 @@ router.get("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
   if (!job || job.companyId !== req.companyId) {
     return res.status(404).json({ error: "Job not found" });
   }
-  res.json(job);
+  res.json(serializeJobPhase(job));
 });
 
 // POST /api/admin/jobs - Create job
@@ -515,18 +528,20 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     if (!data.jobPhase) {
       data.jobPhase = "OPPORTUNITY";
     }
+    const jobPhaseStr = data.jobPhase as JobPhase;
     if (!data.status || data.status === "ACTIVE") {
-      const defaultSt = getDefaultStatusForPhase(data.jobPhase as JobPhase);
+      const defaultSt = getDefaultStatusForPhase(jobPhaseStr);
       if (defaultSt) data.status = defaultSt;
     }
+    data.jobPhase = deserializePhase(jobPhaseStr);
     const job = await storage.createJob(data);
 
     logJobChange(job.id, "JOB_CREATED", req.user?.id || null, req.user?.name || null, {
-      newPhase: data.jobPhase,
+      newPhase: jobPhaseStr,
       newStatus: data.status,
     });
 
-    res.json(job);
+    res.json(serializeJobPhase(job));
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to create job" });
   }
@@ -597,19 +612,24 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       }
       data.procurementTimeDays = val;
     }
+    const existingPhaseStr = intToPhase((existingJob as any).jobPhase ?? 0);
     if (data.jobPhase || data.status) {
-      const targetPhase = (data.jobPhase || (existingJob as any).jobPhase || "CONTRACTED") as JobPhase;
+      const targetPhase = (data.jobPhase || existingPhaseStr || "CONTRACTED") as JobPhase;
       const targetStatus = (data.status || existingJob.status) as JobStatus;
       
-      if (data.jobPhase && data.jobPhase !== (existingJob as any).jobPhase) {
-        if (!canAdvanceToPhase((existingJob as any).jobPhase || "CONTRACTED", targetPhase)) {
-          return res.status(400).json({ error: `Cannot move from ${(existingJob as any).jobPhase} to ${targetPhase}` });
+      if (data.jobPhase && data.jobPhase !== existingPhaseStr) {
+        if (!canAdvanceToPhase(existingPhaseStr || "CONTRACTED", targetPhase)) {
+          return res.status(400).json({ error: `Cannot move from ${existingPhaseStr} to ${targetPhase}` });
         }
       }
 
       if (targetPhase !== "LOST" && !isValidStatusForPhase(targetPhase, targetStatus)) {
         return res.status(400).json({ error: `Status '${targetStatus}' is not valid for phase '${targetPhase}'` });
       }
+    }
+
+    if (data.jobPhase) {
+      data.jobPhase = deserializePhase(data.jobPhase);
     }
 
     const changedFields: Record<string, any> = {};
@@ -624,8 +644,8 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
     if (Object.keys(changedFields).length > 0) {
       logJobChange(req.params.id as string, "JOB_UPDATED", req.user?.id || null, req.user?.name || null, {
         changedFields,
-        previousPhase: (existingJob as any).jobPhase,
-        newPhase: (existingJob as any).jobPhase,
+        previousPhase: existingPhaseStr,
+        newPhase: existingPhaseStr,
         previousStatus: existingJob.status,
         newStatus: existingJob.status,
       });
@@ -646,7 +666,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       }
     }
 
-    res.json(job);
+    res.json(serializeJobPhase(job));
   } catch (error: any) {
     res.status(400).json({ error: error.message || "Failed to update job" });
   }
@@ -791,7 +811,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
     }
 
     const { jobPhase: newPhase, status: newStatus } = parsed.data;
-    const currentPhase = (job as any).jobPhase as JobPhase;
+    const currentPhase = intToPhase((job as any).jobPhase ?? 0);
     const currentStatus = job.status;
 
     if (newPhase && newPhase !== currentPhase) {
@@ -812,7 +832,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         });
       }
 
-      const updateData: any = { jobPhase: targetPhase, updatedAt: new Date() };
+      const updateData: any = { jobPhase: deserializePhase(targetPhase), updatedAt: new Date() };
       if (targetStatus) {
         updateData.status = targetStatus;
       }
@@ -830,7 +850,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
       );
 
       const updatedJob = await storage.getJob(job.id);
-      return res.json(updatedJob);
+      return res.json(serializeJobPhase(updatedJob));
     }
 
     if (newStatus && newStatus !== currentStatus) {
@@ -854,10 +874,10 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
       );
 
       const updatedJob = await storage.getJob(job.id);
-      return res.json(updatedJob);
+      return res.json(serializeJobPhase(updatedJob));
     }
 
-    return res.json(job);
+    return res.json(serializeJobPhase(job));
   } catch (error: any) {
     logger.error({ err: error }, "Error updating job phase/status");
     res.status(500).json({ error: "Failed to update job phase/status" });

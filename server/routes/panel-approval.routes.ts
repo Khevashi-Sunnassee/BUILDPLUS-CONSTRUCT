@@ -216,7 +216,8 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
       const { jobHasCapability } = await import("@shared/job-phases");
       const job = await storage.getJob(panel.jobId);
       if (job) {
-        const phase = ((job as any).jobPhase || "CONTRACTED") as string;
+        const { intToPhase } = await import("@shared/job-phases");
+        const phase = (typeof (job as any).jobPhase === 'number' ? intToPhase((job as any).jobPhase) : ((job as any).jobPhase || "CONTRACTED")) as string;
         if (!jobHasCapability(phase as any, "PRODUCE_PANELS")) {
           return res.status(403).json({ error: `Cannot approve panels for production while job is in "${phase}" phase` });
         }

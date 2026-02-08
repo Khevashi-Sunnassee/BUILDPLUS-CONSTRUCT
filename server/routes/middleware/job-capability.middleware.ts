@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { storage } from "../../storage";
-import { jobHasCapability } from "@shared/job-phases";
+import { jobHasCapability, intToPhase } from "@shared/job-phases";
 import type { JobPhase, JobCapability } from "@shared/job-phases";
 
 export function requireJobCapability(capability: JobCapability, jobIdExtractor?: (req: Request) => string | null) {
@@ -23,7 +23,7 @@ export function requireJobCapability(capability: JobCapability, jobIdExtractor?:
         return res.status(404).json({ error: "Job not found" });
       }
 
-      const phase = ((job as any).jobPhase || "CONTRACTED") as JobPhase;
+      const phase = (typeof (job as any).jobPhase === 'number' ? intToPhase((job as any).jobPhase) : ((job as any).jobPhase || "CONTRACTED")) as JobPhase;
 
       if (!jobHasCapability(phase, capability)) {
         return res.status(403).json({
