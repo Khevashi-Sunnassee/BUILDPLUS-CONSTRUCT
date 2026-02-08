@@ -6,6 +6,7 @@ import { eq, and, sql, max } from "drizzle-orm";
 import { z } from "zod";
 import OpenAI from "openai";
 import multer from "multer";
+import mammoth from "mammoth";
 import { ObjectStorageService } from "../replit_integrations/object_storage";
 import crypto from "crypto";
 import logger from "../lib/logger";
@@ -221,120 +222,217 @@ router.post("/api/contracts/ai-analyze", requireAuth, upload.single("file"), asy
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const fileContent = file.buffer.toString("base64");
+    const fileBase64 = file.buffer.toString("base64");
     const mimeType = file.mimetype;
+    const isImage = mimeType.startsWith("image/");
+    const isPdf = mimeType === "application/pdf";
+    const isWord = mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      || mimeType === "application/msword";
 
-    const contractFields = `
-CONTRACT FIELDS TO EXTRACT:
-1. Core Contract Identification:
-   - contractNumber, projectName, projectAddress, ownerClientName, generalContractor, architectEngineer
-   - contractType (one of: LUMP_SUM, UNIT_PRICE, TIME_AND_MATERIALS, GMP)
-   - originalContractDate, noticeToProceedDate (ISO date format)
+    const contractFieldsPrompt = `
+You MUST extract values for the following contract fields. For each field, return its exact key name with the extracted value, or null if not found in the document.
 
-2. Financial & Commercial Terms:
-   - originalContractValue, revisedContractValue (numbers only)
-   - unitPrices, retentionPercentage, retentionCap
-   - paymentTerms, billingMethod, taxResponsibility
-   - escalationClause (true/false), escalationClauseDetails
-   - liquidatedDamagesRate, liquidatedDamagesStartDate
+SECTION 1 - Core Contract Identification:
+  contractNumber (string) - The contract or subcontract reference number
+  projectName (string) - Name of the project
+  projectAddress (string) - Street address / location of the project
+  ownerClientName (string) - Name of the property owner or principal client
+  generalContractor (string) - Name of the head/general contractor
+  architectEngineer (string) - Name of the architect or engineer of record
+  contractType (string, one of: "LUMP_SUM", "UNIT_PRICE", "TIME_AND_MATERIALS", "GMP") - Type of contract pricing
+  originalContractDate (ISO date string, e.g. "2025-03-15") - Date the contract was originally executed
+  noticeToProceedDate (ISO date string) - Date notice to proceed was issued
 
-3. Scope of Work (Precast-Specific):
-   - precastScopeDescription
-   - precastElementsIncluded (object with boolean: panels, beams, columns, doubleTees, hollowCore, stairs)
-   - estimatedPieceCount, estimatedTotalWeight, estimatedTotalVolume
-   - finishRequirements, connectionTypeResponsibility
+SECTION 2 - Financial & Commercial Terms:
+  originalContractValue (number) - Original total contract value in dollars, no currency symbols
+  revisedContractValue (number) - Revised contract value if amended, no currency symbols
+  unitPrices (string) - Description of any unit pricing arrangements
+  retentionPercentage (number) - Retention percentage held, e.g. 10
+  retentionCap (number) - Maximum retention cap percentage, e.g. 5
+  paymentTerms (string) - Payment period terms, e.g. "Net 30"
+  billingMethod (string) - How billing is structured, e.g. "Progress claims"
+  taxResponsibility (string) - Who is responsible for applicable taxes
+  escalationClause (boolean) - Whether the contract has an escalation/rise-and-fall clause
+  escalationClauseDetails (string) - Details of any escalation provisions
+  liquidatedDamagesRate (string) - Rate of liquidated damages, e.g. "$5,000 per day"
+  liquidatedDamagesStartDate (ISO date string) - Date from which LDs apply
 
-4. Schedule & Milestones:
-   - requiredDeliveryStartDate, requiredDeliveryEndDate
-   - productionStartDate, productionFinishDate
-   - erectionStartDate, erectionFinishDate
-   - criticalMilestones, weekendNightWorkAllowed (true/false), weatherAllowances
+SECTION 3 - Scope of Work (Precast-Specific):
+  precastScopeDescription (string) - Description of precast concrete scope of works
+  precastElementsIncluded (object with boolean values: { panels, beams, columns, doubleTees, hollowCore, stairs }) - Which precast element types are included
+  estimatedPieceCount (integer) - Total estimated number of precast pieces
+  estimatedTotalWeight (string) - Total estimated weight, e.g. "2,500 tonnes"
+  estimatedTotalVolume (string) - Total estimated concrete volume, e.g. "1,200 m3"
+  finishRequirements (string) - Surface finish requirements for precast elements
+  connectionTypeResponsibility (string) - Who designs/supplies connections
 
-5. Engineering & Submittals:
-   - designResponsibility, shopDrawingRequired (true/false)
-   - submittalDueDate, submittalApprovalDate
-   - revisionCount, connectionDesignIncluded (true/false), stampedCalculationsRequired (true/false)
+SECTION 4 - Schedule & Milestones:
+  requiredDeliveryStartDate (ISO date string) - When deliveries to site must commence
+  requiredDeliveryEndDate (ISO date string) - When all deliveries must be completed
+  productionStartDate (ISO date string) - When production/casting must begin
+  productionFinishDate (ISO date string) - When production must be finished
+  erectionStartDate (ISO date string) - When erection/installation begins
+  erectionFinishDate (ISO date string) - When erection must be completed
+  criticalMilestones (string) - Key milestones and deadlines noted in the contract
+  weekendNightWorkAllowed (boolean) - Whether weekend or night work is permitted
+  weatherAllowances (string) - Any weather-related allowances or provisions
 
-6. Logistics & Site Constraints:
-   - deliveryRestrictions, siteAccessConstraints, craneTypeCapacity
-   - unloadingResponsibility, laydownAreaAvailable (true/false), returnLoadsAllowed (true/false)
+SECTION 5 - Engineering & Submittals:
+  designResponsibility (string) - Who is responsible for design, e.g. "Design & Construct" or "Construct Only"
+  shopDrawingRequired (boolean) - Whether shop drawings are required
+  submittalDueDate (ISO date string) - When submittals are due
+  submittalApprovalDate (ISO date string) - Expected approval date for submittals
+  revisionCount (integer) - Number of revisions allowed or mentioned
+  connectionDesignIncluded (boolean) - Whether connection design is included in scope
+  stampedCalculationsRequired (boolean) - Whether stamped engineering calculations are needed
 
-7. Change Management:
-   - approvedChangeOrderValue, pendingChangeOrderValue
-   - changeOrderCount, changeOrderReferenceNumbers, changeReasonCodes, timeImpactDays
+SECTION 6 - Logistics & Site Constraints:
+  deliveryRestrictions (string) - Any restrictions on delivery times, routes, vehicle sizes
+  siteAccessConstraints (string) - Site access limitations
+  craneTypeCapacity (string) - Crane requirements and capacity
+  unloadingResponsibility (string) - Who is responsible for unloading at site
+  laydownAreaAvailable (boolean) - Whether a laydown/staging area is available on site
+  returnLoadsAllowed (boolean) - Whether return/back-loading is permitted
 
-8. Risk, Legal & Compliance:
-   - performanceBondRequired (true/false), paymentBondRequired (true/false)
-   - insuranceRequirements, warrantyPeriod
-   - indemnificationClauseNotes, disputeResolutionMethod, governingLaw
-   - forceMajeureClause (true/false)
+SECTION 7 - Change Management:
+  approvedChangeOrderValue (number) - Total value of approved change orders
+  pendingChangeOrderValue (number) - Total value of pending change orders
+  changeOrderCount (integer) - Number of change orders
+  changeOrderReferenceNumbers (string) - Reference numbers for change orders
+  changeReasonCodes (string) - Codes or descriptions for change order reasons
+  timeImpactDays (integer) - Total days of time impact from changes
 
-9. Quality & Acceptance:
-   - qualityStandardReference, mockupsRequired (true/false)
-   - acceptanceCriteria, punchListResponsibility, finalAcceptanceDate
+SECTION 8 - Risk, Legal & Compliance:
+  performanceBondRequired (boolean) - Whether a performance bond is required
+  paymentBondRequired (boolean) - Whether a payment bond is required
+  insuranceRequirements (string) - Insurance requirements and minimum coverage
+  warrantyPeriod (string) - Warranty/defects liability period, e.g. "12 months"
+  indemnificationClauseNotes (string) - Key notes about indemnification obligations
+  disputeResolutionMethod (string) - How disputes are resolved, e.g. "Arbitration", "Litigation"
+  governingLaw (string) - Governing law jurisdiction, e.g. "Victoria, Australia"
+  forceMajeureClause (boolean) - Whether there is a force majeure clause
 
-10. Closeout & Completion:
-   - substantialCompletionDate, finalCompletionDate, finalRetentionReleaseDate
-   - asBuiltsRequired (true/false), omManualsRequired (true/false)
-   - warrantyStartDate, warrantyEndDate
+SECTION 9 - Quality & Acceptance:
+  qualityStandardReference (string) - Referenced quality standards, e.g. "AS 3610"
+  mockupsRequired (boolean) - Whether mockup panels or samples are required
+  acceptanceCriteria (string) - Criteria for accepting completed work
+  punchListResponsibility (string) - Who handles defect/punch list items
+  finalAcceptanceDate (ISO date string) - Date of final acceptance
+
+SECTION 10 - Closeout & Completion:
+  substantialCompletionDate (ISO date string) - Substantial/practical completion date
+  finalCompletionDate (ISO date string) - Final completion date
+  finalRetentionReleaseDate (ISO date string) - When retention monies are released
+  asBuiltsRequired (boolean) - Whether as-built drawings are required
+  omManualsRequired (boolean) - Whether O&M manuals are required
+  warrantyStartDate (ISO date string) - When warranty period starts
+  warrantyEndDate (ISO date string) - When warranty period ends
 `;
 
-    const systemPrompt = `You are an expert construction contract legal adviser specializing in precast concrete contracts. Analyze the uploaded contract document and:
+    const systemPrompt = `You are a senior construction contract legal adviser specialising in precast concrete subcontracts.
+You are advising a SUBCONTRACTOR (the precast manufacturer/supplier/installer) reviewing a contract they have been given by a head contractor or principal.
 
-1. Extract all possible contract field values from the document.
-2. Provide a risk assessment with a rating from 1-10 (1 = very low risk, 10 = extreme risk).
-3. Identify and highlight major risks, unfavorable terms, and areas of concern.
-4. Provide a comprehensive risk overview summary.
+Your job is to:
+1. EXTRACT all contract field values from the document and map them to the required fields below.
+2. ASSESS RISKS from the subcontractor's perspective — flag anything that exposes the subcontractor to financial loss, unfair liability, unreasonable timelines, onerous terms, or missing protections.
+3. Provide a RISK RATING from 1 to 10 (1 = minimal risk, 10 = extremely high risk for the subcontractor).
+4. Write a clear RISK OVERVIEW summary paragraph that a non-lawyer can understand, highlighting the most important concerns.
 
-${contractFields}
+${contractFieldsPrompt}
 
-IMPORTANT: Return ONLY valid JSON with this exact structure:
+Return ONLY valid JSON with this exact structure (no markdown, no code fences, no explanation outside the JSON):
 {
-  "extractedFields": { <field names from above with their values, use null for fields not found> },
-  "riskRating": <number 1-10>,
-  "riskOverview": "<comprehensive risk assessment summary paragraph>",
+  "extractedFields": {
+    "contractNumber": "value or null",
+    "projectName": "value or null",
+    ... (include ALL field keys listed above, using null for fields not found)
+  },
+  "riskRating": 7,
+  "riskOverview": "A plain-English paragraph summarising the key risks this contract poses to the subcontractor, what to watch out for, and any recommended actions before signing.",
   "riskHighlights": [
-    { "category": "<Risk Category>", "severity": "HIGH|MEDIUM|LOW", "description": "<description of the risk>" }
+    {
+      "category": "Payment Terms",
+      "severity": "HIGH",
+      "description": "Specific description of the risk and why it matters to the subcontractor"
+    }
   ]
 }
 
-For date fields, use ISO 8601 format (YYYY-MM-DDTHH:mm:ss.sssZ).
-For boolean fields, use true/false.
-For numeric fields, use numbers without currency symbols.
-Be thorough in your risk analysis - this serves as legal advisory for the precast company.`;
+RULES:
+- Date values must be ISO 8601 format: "YYYY-MM-DD" (e.g. "2025-06-15"). Do NOT include time components.
+- Boolean values must be true or false (not strings).
+- Numeric values must be plain numbers without currency symbols, commas, or units.
+- For precastElementsIncluded, return an object like { "panels": true, "beams": false, "columns": false, "doubleTees": false, "hollowCore": false, "stairs": false }.
+- If a field cannot be determined from the document, use null.
+- Risk highlights should have severity "HIGH", "MEDIUM", or "LOW".
+- Focus risk analysis on: payment security, retention terms, liquidated damages exposure, design risk transfer, insurance burden, indemnification, time constraints, and unfair termination clauses.`;
 
-    const response = await openai.responses.create({
-      model: "gpt-4o",
-      instructions: systemPrompt,
-      input: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_file",
-              file_data: `data:${mimeType};base64,${fileContent}`,
-              filename: file.originalname,
-            },
-            {
-              type: "input_text",
-              text: "Please analyze this contract document, extract all relevant fields, and provide a comprehensive risk assessment.",
-            },
-          ],
+    const userContent: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
+
+    if (isWord) {
+      let extractedText = "";
+      try {
+        const result = await mammoth.extractRawText({ buffer: file.buffer });
+        extractedText = result.value;
+      } catch (extractErr) {
+        logger.warn({ err: extractErr }, "Failed to extract text from Word document, sending as-is");
+        extractedText = file.buffer.toString("utf-8");
+      }
+
+      if (!extractedText || extractedText.trim().length < 50) {
+        return res.status(400).json({ error: "Could not extract sufficient text from the Word document. Please try uploading a PDF version instead." });
+      }
+
+      userContent.push({
+        type: "text",
+        text: `Here is the full text of the contract document (extracted from "${file.originalname}"):\n\n---\n${extractedText}\n---\n\nPlease analyze this contract, extract all field values, and provide a risk assessment from the subcontractor's perspective.`,
+      });
+    } else if (isPdf || isImage) {
+      const dataUri = `data:${mimeType};base64,${fileBase64}`;
+
+      userContent.push({
+        type: "image_url",
+        image_url: {
+          url: dataUri,
+          detail: "high",
         },
+      });
+      userContent.push({
+        type: "text",
+        text: `This is a contract document ("${file.originalname}"). Please carefully read every page, extract all field values, and provide a thorough risk assessment from the subcontractor's perspective.`,
+      });
+    } else {
+      return res.status(400).json({ error: "Unsupported file type. Please upload a PDF, Word document, or image file." });
+    }
+
+    logger.info({ fileName: file.originalname, mimeType, fileSize: file.size }, "Starting AI contract analysis");
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userContent },
       ],
-      text: {
-        format: { type: "json_object" },
-      },
+      response_format: { type: "json_object" },
       temperature: 0.1,
+      max_completion_tokens: 4096,
     });
 
-    const responseText = response.output_text || "{}";
+    const responseText = completion.choices[0]?.message?.content || "{}";
+    logger.info({ responseLength: responseText.length }, "AI contract analysis response received");
+
     let parsed;
     try {
       parsed = JSON.parse(responseText);
-    } catch {
-      parsed = { extractedFields: {}, riskRating: 5, riskOverview: "Unable to parse AI response", riskHighlights: [] };
+    } catch (parseErr) {
+      logger.error({ err: parseErr, responseText: responseText.substring(0, 500) }, "Failed to parse AI response as JSON");
+      parsed = { extractedFields: {}, riskRating: 5, riskOverview: "The AI returned an invalid response. Please try again.", riskHighlights: [] };
     }
+
+    if (!parsed.extractedFields) parsed.extractedFields = {};
+    if (!parsed.riskHighlights) parsed.riskHighlights = [];
+    if (!parsed.riskRating) parsed.riskRating = 5;
+    if (!parsed.riskOverview) parsed.riskOverview = "No risk overview available.";
 
     const storageKey = `.private/contracts/${companyId}/${crypto.randomUUID()}_${file.originalname}`;
     await objectStorageService.uploadFile(storageKey, file.buffer, file.mimetype);
@@ -353,7 +451,7 @@ Be thorough in your risk analysis - this serves as legal advisory for the precas
       },
     });
   } catch (error: any) {
-    logger.error({ err: error }, "Error analyzing contract with AI");
+    logger.error({ err: error, stack: error.stack }, "Error analyzing contract with AI");
     res.status(500).json({ error: error.message || "Failed to analyze contract" });
   }
 });

@@ -856,7 +856,7 @@ export default function ContractDetailPage() {
                   <div className="flex flex-col items-center gap-3">
                     <Loader2 className="h-10 w-10 animate-spin text-primary" />
                     <p className="font-medium">Analyzing contract...</p>
-                    <p className="text-sm text-muted-foreground">Our AI legal adviser is reviewing your contract document</p>
+                    <p className="text-sm text-muted-foreground">Reading document, extracting field values, and assessing risks from a subcontractor perspective. This may take up to 60 seconds.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col items-center gap-3">
