@@ -130,6 +130,15 @@ export class ObjectStorageService {
     }
   }
 
+  async uploadFile(storageKey: string, buffer: Buffer, mimeType: string): Promise<void> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const fullPath = `${privateObjectDir}/${storageKey}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    await file.save(buffer, { contentType: mimeType });
+  }
+
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();

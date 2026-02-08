@@ -31,6 +31,7 @@ export class UserRepository {
   async createUser(data: InsertUser & { password?: string }): Promise<User> {
     const passwordHash = data.password ? await bcrypt.hash(data.password, 10) : null;
     const [user] = await db.insert(users).values({
+      companyId: data.companyId,
       email: data.email.toLowerCase(),
       name: data.name,
       passwordHash,
@@ -93,6 +94,7 @@ export class UserRepository {
     const deviceKey = randomKey();
     const apiKeyHash = sha256Hex(deviceKey);
     const [device] = await db.insert(devices).values({
+      companyId: (data as any).companyId,
       userId: data.userId,
       deviceName: data.deviceName,
       os: data.os || "Windows",

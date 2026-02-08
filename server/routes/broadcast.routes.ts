@@ -67,11 +67,11 @@ router.patch("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
 router.delete("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.session.companyId;
-    const existing = await storage.getBroadcastTemplate(req.params.id);
+    const existing = await storage.getBroadcastTemplate(String(req.params.id));
     if (!existing || existing.companyId !== companyId) {
       return res.status(404).json({ error: "Template not found" });
     }
-    await storage.deleteBroadcastTemplate(req.params.id);
+    await storage.deleteBroadcastTemplate(String(req.params.id));
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -100,7 +100,7 @@ router.get("/api/broadcasts/channels-status", requireAuth, async (_req, res) => 
 
 router.get("/api/broadcasts/:id", requireAuth, async (req, res) => {
   try {
-    const message = await storage.getBroadcastMessage(req.params.id);
+    const message = await storage.getBroadcastMessage(String(req.params.id));
     if (!message) return res.status(404).json({ error: "Broadcast not found" });
     res.json(message);
   } catch (error: any) {
@@ -110,7 +110,7 @@ router.get("/api/broadcasts/:id", requireAuth, async (req, res) => {
 
 router.get("/api/broadcasts/:id/deliveries", requireAuth, async (req, res) => {
   try {
-    const deliveries = await storage.getBroadcastDeliveries(req.params.id);
+    const deliveries = await storage.getBroadcastDeliveries(String(req.params.id));
     res.json(deliveries);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

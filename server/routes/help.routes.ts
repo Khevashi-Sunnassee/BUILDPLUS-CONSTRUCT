@@ -36,7 +36,7 @@ router.get("/api/help/search", requireAuth, async (req: Request, res: Response) 
       conditions.push(eq(helpEntries.category, category));
     }
     if (scope) {
-      conditions.push(eq(helpEntries.scope, scope));
+      conditions.push(eq(helpEntries.scope, scope as any));
     }
     if (route) {
       conditions.push(eq(helpEntries.pageRoute, route));
@@ -156,7 +156,7 @@ router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Re
         rank: rank || 0,
         createdBy: req.session.userId || null,
         updatedBy: req.session.userId || null,
-      })
+      } as any)
       .returning();
     res.json(entry);
   } catch (error: any) {
@@ -167,7 +167,7 @@ router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Re
 
 router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const [existing] = await db.select().from(helpEntries).where(eq(helpEntries.id, id));
     if (!existing) {
       return res.status(404).json({ error: "Help entry not found" });
@@ -177,7 +177,7 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
       helpEntryId: existing.id,
       key: existing.key,
       version: existing.version,
-      snapshot: existing as Record<string, unknown>,
+      snapshot: existing as any,
       createdBy: req.session.userId || null,
     });
 
@@ -199,7 +199,7 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
         version: existing.version + 1,
         updatedBy: req.session.userId || null,
         updatedAt: new Date(),
-      })
+      } as any)
       .where(eq(helpEntries.id, id))
       .returning();
     res.json(updated);
@@ -211,10 +211,10 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
 
 router.delete("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const [updated] = await db
       .update(helpEntries)
-      .set({ status: "ARCHIVED", updatedBy: req.session.userId || null, updatedAt: new Date() })
+      .set({ status: "ARCHIVED", updatedBy: req.session.userId || null, updatedAt: new Date() } as any)
       .where(eq(helpEntries.id, id))
       .returning();
     if (!updated) {
@@ -228,7 +228,7 @@ router.delete("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (r
 
 router.get("/api/help/admin/:id/versions", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = String(req.params.id);
     const versions = await db
       .select()
       .from(helpEntryVersions)

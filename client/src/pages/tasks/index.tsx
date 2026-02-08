@@ -228,7 +228,7 @@ export default function TasksPage() {
 
       try {
         const img = document.createElement("img");
-        img.src = reportLogo;
+        img.src = reportLogo!;
         await new Promise<void>((resolve) => {
           img.onload = () => resolve();
           img.onerror = () => resolve();
@@ -237,7 +237,7 @@ export default function TasksPage() {
           const aspectRatio = img.naturalWidth / img.naturalHeight;
           const lw = Math.min(25, logoHeight * aspectRatio);
           const lh = lw / aspectRatio;
-          pdf.addImage(reportLogo, "PNG", margin, margin - 5, lw, lh, undefined, "FAST");
+          pdf.addImage(reportLogo!, "PNG", margin, margin - 5, lw, lh, undefined, "FAST");
           headerTextX = margin + 30;
         }
       } catch (_e) {}

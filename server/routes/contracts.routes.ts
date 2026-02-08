@@ -96,12 +96,12 @@ router.get("/api/contracts/hub", requireAuth, async (req: Request, res: Response
 router.get("/api/contracts/job/:jobId", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { jobId } = req.params;
+    const jobId = String(req.params.jobId);
 
     const [contract] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId)));
+      .where(and(eq(contracts.jobId, jobId), eq(contracts.companyId, companyId))!);
 
     if (!contract) {
       return res.json(null);
@@ -117,12 +117,12 @@ router.get("/api/contracts/job/:jobId", requireAuth, async (req: Request, res: R
 router.get("/api/contracts/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const [contract] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)));
+      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId))!);
 
     if (!contract) {
       return res.status(404).json({ error: "Contract not found" });
@@ -143,13 +143,13 @@ router.post("/api/contracts", requireAuth, async (req: Request, res: Response) =
     const [existing] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.jobId, data.jobId), eq(contracts.companyId, companyId)));
+      .where(and(eq(contracts.jobId, data.jobId), eq(contracts.companyId, companyId))!);
 
     if (existing) {
       return res.status(409).json({ error: "Contract already exists for this job" });
     }
 
-    const [contract] = await db.insert(contracts).values(data).returning();
+    const [contract] = await db.insert(contracts).values(data as any).returning();
     res.status(201).json(contract);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating contract");
@@ -160,12 +160,12 @@ router.post("/api/contracts", requireAuth, async (req: Request, res: Response) =
 router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { id } = req.params;
+    const id = String(req.params.id);
 
     const [existing] = await db
       .select()
       .from(contracts)
-      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId)));
+      .where(and(eq(contracts.id, id), eq(contracts.companyId, companyId))!);
 
     if (!existing) {
       return res.status(404).json({ error: "Contract not found" });
@@ -176,17 +176,17 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
     const { version: clientVersion, ...rest } = parsed.data as Record<string, unknown>;
-    const updateData = { ...rest, updatedAt: new Date(), version: sql`${contracts.version} + 1` };
+    const updateData: Record<string, unknown> = { ...rest, updatedAt: new Date(), version: sql`${contracts.version} + 1` };
 
     const updated = await db.transaction(async (tx) => {
       const whereClause = clientVersion !== undefined
-        ? and(eq(contracts.id, id), eq(contracts.companyId, companyId), eq(contracts.version, clientVersion))
+        ? and(eq(contracts.id, id), eq(contracts.companyId, companyId), eq(contracts.version, clientVersion as number))
         : and(eq(contracts.id, id), eq(contracts.companyId, companyId));
 
       const [contractResult] = await tx
         .update(contracts)
-        .set(updateData)
-        .where(whereClause)
+        .set(updateData as any)
+        .where(whereClause!)
         .returning();
 
       if (!contractResult) {
@@ -194,10 +194,10 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
       }
 
       if (updateData.requiredDeliveryStartDate !== undefined) {
-        const newDate = updateData.requiredDeliveryStartDate ? new Date(updateData.requiredDeliveryStartDate) : null;
+        const newDate = updateData.requiredDeliveryStartDate ? new Date(updateData.requiredDeliveryStartDate as string) : null;
         await tx.update(jobs)
           .set({ productionStartDate: newDate })
-          .where(and(eq(jobs.id, existing.jobId), eq(jobs.companyId, companyId)));
+          .where(and(eq(jobs.id, existing.jobId), eq(jobs.companyId, companyId))!);
       }
 
       return contractResult;

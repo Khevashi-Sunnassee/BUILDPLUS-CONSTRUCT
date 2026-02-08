@@ -295,7 +295,7 @@ export default function DataManagementPage() {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold" data-testid="text-page-title">Data Management</h1>
-            <PageHelpButton pageKey="data_management" />
+            <PageHelpButton pageHelpKey="data_management" />
           </div>
           <p className="text-sm text-muted-foreground mt-1" data-testid="text-page-description">
             Delete individual records across the system. Records with dependencies will be blocked from deletion.

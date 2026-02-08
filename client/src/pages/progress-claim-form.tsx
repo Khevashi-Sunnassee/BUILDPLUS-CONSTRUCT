@@ -523,7 +523,7 @@ export default function ProgressClaimFormPage() {
                 <p className="text-sm text-muted-foreground">Contract Value</p>
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-1" data-testid="text-contract-value">{formatCurrency(jobSummary.contractValue)}</p>
+              <p className="text-2xl font-bold mt-1" data-testid="text-contract-value">{formatCurrency(parseFloat(jobSummary.contractValue as any) || 0)}</p>
               <p className="text-xs text-muted-foreground mt-1">Total job value</p>
             </CardContent>
           </Card>
@@ -533,7 +533,7 @@ export default function ProgressClaimFormPage() {
                 <p className="text-sm text-muted-foreground">Claimed to Date</p>
                 <CheckCircle className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-1" data-testid="text-claimed-to-date">{formatCurrency(jobSummary.claimedToDate)}</p>
+              <p className="text-2xl font-bold mt-1" data-testid="text-claimed-to-date">{formatCurrency(parseFloat(jobSummary.claimedToDate as any) || 0)}</p>
               {parseFloat(jobSummary.contractValue) > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {((parseFloat(jobSummary.claimedToDate) / parseFloat(jobSummary.contractValue)) * 100).toFixed(1)}% of contract
@@ -547,7 +547,7 @@ export default function ProgressClaimFormPage() {
                 <p className="text-sm text-muted-foreground">Remaining</p>
                 <TrendingDown className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-2xl font-bold mt-1" data-testid="text-remaining-value">{formatCurrency(jobSummary.remainingValue)}</p>
+              <p className="text-2xl font-bold mt-1" data-testid="text-remaining-value">{formatCurrency(parseFloat(jobSummary.remainingValue as any) || 0)}</p>
               {parseFloat(jobSummary.contractValue) > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
                   {((parseFloat(jobSummary.remainingValue) / parseFloat(jobSummary.contractValue)) * 100).toFixed(1)}% remaining
@@ -774,7 +774,7 @@ export default function ProgressClaimFormPage() {
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Retention cap ({retentionSummary.retentionCapPct}% of contract)</span>
-                          <span className="font-mono">{formatCurrency(retentionSummary.retentionCapAmount)}</span>
+                          <span className="font-mono">{formatCurrency(parseFloat(retentionSummary.retentionCapAmount as any) || 0)}</span>
                         </div>
                       </div>
                     )}

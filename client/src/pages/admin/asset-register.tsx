@@ -331,6 +331,7 @@ export default function AssetRegisterPage() {
   const [groupByMode, setGroupByMode] = useState<"category" | "month" | "none">("category");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [showGraph, setShowGraph] = useState(false);
+  const [chartMonthFilter, setChartMonthFilter] = useState<string | null>(null);
 
   const toggleGroup = (category: string) => {
     setCollapsedGroups(prev => ({ ...prev, [category]: !prev[category] }));
@@ -377,6 +378,7 @@ export default function AssetRegisterPage() {
 
   const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
+    const monthNames3 = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     let result = assets.filter((asset) => {
       const query = searchQuery.toLowerCase();
       if (query) {
@@ -391,6 +393,13 @@ export default function AssetRegisterPage() {
       if (categoryFilter !== "all" && asset.category !== categoryFilter) return false;
       if (statusFilter !== "all" && asset.status !== statusFilter) return false;
       if (fundingFilter !== "all" && asset.fundingMethod !== fundingFilter) return false;
+      if (chartMonthFilter) {
+        if (!asset.purchaseDate) return false;
+        const d = new Date(asset.purchaseDate);
+        if (isNaN(d.getTime())) return false;
+        const label = `${monthNames3[d.getMonth()]} ${d.getFullYear()}`;
+        if (label !== chartMonthFilter) return false;
+      }
       return true;
     });
 
@@ -419,7 +428,7 @@ export default function AssetRegisterPage() {
     }
 
     return result;
-  }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter, sortField, sortDir]);
+  }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter, chartMonthFilter, sortField, sortDir]);
 
   const groupedAssets = useMemo(() => {
     if (groupByMode === "none") return null;
@@ -491,15 +500,14 @@ export default function AssetRegisterPage() {
       const price = asset.purchasePrice ? parseFloat(String(asset.purchasePrice)) : 0;
       monthMap[label].total += isNaN(price) ? 0 : price;
     }
-    return Object.entries(monthMap)
-      .sort(([, a], [, b]) => a.sortKey - b.sortKey)
-      .map(([month, data]) => ({ month, count: data.count, total: data.total }));
+    const sorted = Object.entries(monthMap)
+      .sort(([, a], [, b]) => a.sortKey - b.sortKey);
+    let cumulative = 0;
+    return sorted.map(([month, data]) => {
+      cumulative += data.total;
+      return { month, count: data.count, total: data.total, cumulativeValue: cumulative };
+    });
   }, [assets]);
-
-  const CHART_COLORS = [
-    "hsl(215, 70%, 55%)", "hsl(150, 60%, 45%)", "hsl(35, 85%, 55%)",
-    "hsl(270, 60%, 55%)", "hsl(350, 70%, 55%)", "hsl(185, 60%, 45%)",
-  ];
 
   const createMutation = useMutation({
     mutationFn: async (data: AssetFormData) => {
@@ -916,15 +924,141 @@ export default function AssetRegisterPage() {
           </SelectContent>
         </Select>
         <Button
-          variant="outline"
-          onClick={() => setShowGraph(true)}
+          variant={showGraph ? "default" : "outline"}
+          onClick={() => { setShowGraph(!showGraph); if (showGraph) setChartMonthFilter(null); }}
           data-testid="button-view-graph"
           className="whitespace-nowrap"
         >
           <BarChart3 className="h-4 w-4 mr-2" />
-          View Graph
+          {showGraph ? "Hide Graph" : "View Graph"}
         </Button>
       </div>
+
+      {showGraph && (
+        <div className="space-y-4">
+          {chartMonthFilter && (
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">
+                Filtered: {chartMonthFilter}
+              </Badge>
+              <Button variant="ghost" size="sm" onClick={() => setChartMonthFilter(null)} data-testid="button-clear-chart-filter">
+                Clear filter
+              </Button>
+            </div>
+          )}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend per Month</CardTitle>
+              <span className="text-xs text-muted-foreground">Click a bar to filter assets below</span>
+            </CardHeader>
+            <CardContent>
+              {chartData.length === 0 ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  No purchase date data available to display
+                </div>
+              ) : (
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid hsl(var(--border))",
+                          backgroundColor: "hsl(var(--popover))",
+                          color: "hsl(var(--popover-foreground))",
+                          fontSize: "13px",
+                        }}
+                        formatter={(value: number) => [formatCurrency(value), "Total Spend"]}
+                        labelFormatter={(label) => label}
+                        cursor={{ fill: "hsl(var(--muted))", fillOpacity: 0.5 }}
+                      />
+                      <Bar
+                        dataKey="total"
+                        name="total"
+                        radius={[4, 4, 0, 0]}
+                        maxBarSize={40}
+                        cursor="pointer"
+                        onClick={(data: { month: string }) => {
+                          if (chartMonthFilter === data.month) {
+                            setChartMonthFilter(null);
+                          } else {
+                            setChartMonthFilter(data.month);
+                          }
+                        }}
+                      >
+                        {chartData.map((entry, index) => (
+                          <Cell
+                            key={`cell-spend-${index}`}
+                            fill={chartMonthFilter === entry.month ? "hsl(215, 80%, 45%)" : "hsl(215, 70%, 55%)"}
+                            stroke={chartMonthFilter === entry.month ? "hsl(215, 90%, 35%)" : "none"}
+                            strokeWidth={chartMonthFilter === entry.month ? 2 : 0}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {chartData.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Asset Value Over Time</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid hsl(var(--border))",
+                          backgroundColor: "hsl(var(--popover))",
+                          color: "hsl(var(--popover-foreground))",
+                          fontSize: "13px",
+                        }}
+                        formatter={(value: number) => [formatCurrency(value), "Cumulative Value"]}
+                        labelFormatter={(label) => label}
+                      />
+                      <Bar dataKey="cumulativeValue" name="cumulativeValue" radius={[4, 4, 0, 0]} maxBarSize={40} fill="hsl(215, 70%, 55%)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {groupByMode !== "none" && groupedAssets ? (
         <div className="space-y-3">
@@ -989,106 +1123,6 @@ export default function AssetRegisterPage() {
           </CardContent>
         </Card>
       )}
-
-      <Dialog open={showGraph} onOpenChange={setShowGraph}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Asset Purchases Over Time</DialogTitle>
-            <DialogDescription>
-              Number of assets purchased and total spend per month
-            </DialogDescription>
-          </DialogHeader>
-          {chartData.length === 0 ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              No purchase date data available to display
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-3">Assets Purchased per Month</p>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 11 }}
-                        className="fill-muted-foreground"
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        className="fill-muted-foreground"
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "1px solid hsl(var(--border))",
-                          backgroundColor: "hsl(var(--popover))",
-                          color: "hsl(var(--popover-foreground))",
-                          fontSize: "13px",
-                        }}
-                        formatter={(value: number, name: string) => {
-                          if (name === "total") return [formatCurrency(value), "Total Spend"];
-                          return [value, "Assets Purchased"];
-                        }}
-                        labelFormatter={(label) => label}
-                      />
-                      <Bar dataKey="count" name="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                        {chartData.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground mb-3">Total Spend per Month</p>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis
-                        dataKey="month"
-                        tick={{ fontSize: 11 }}
-                        className="fill-muted-foreground"
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 11 }}
-                        className="fill-muted-foreground"
-                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          borderRadius: "8px",
-                          border: "1px solid hsl(var(--border))",
-                          backgroundColor: "hsl(var(--popover))",
-                          color: "hsl(var(--popover-foreground))",
-                          fontSize: "13px",
-                        }}
-                        formatter={(value: number) => [formatCurrency(value), "Total Spend"]}
-                        labelFormatter={(label) => label}
-                      />
-                      <Bar dataKey="total" name="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
-                        {chartData.map((_, index) => (
-                          <Cell key={`cell-spend-${index}`} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">

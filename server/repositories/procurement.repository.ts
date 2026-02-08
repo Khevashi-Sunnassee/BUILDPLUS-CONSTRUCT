@@ -2,14 +2,14 @@ import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   suppliers, itemCategories, items, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
-  jobs, users,
+  users,
   type InsertSupplier, type Supplier,
   type InsertItemCategory, type ItemCategory,
   type InsertItem, type Item,
   type InsertPurchaseOrder, type PurchaseOrder,
   type InsertPurchaseOrderItem, type PurchaseOrderItem,
   type InsertPurchaseOrderAttachment, type PurchaseOrderAttachment,
-  type Job, type User
+  type User
 } from "@shared/schema";
 
 export interface ItemWithDetails extends Item {
@@ -19,8 +19,7 @@ export interface ItemWithDetails extends Item {
 
 export interface PurchaseOrderWithDetails extends PurchaseOrder {
   supplier?: Supplier;
-  job?: Job;
-  createdBy?: User;
+  requestedBy?: User;
   approvedBy?: User;
   items?: PurchaseOrderItem[];
 }
@@ -142,7 +141,7 @@ export class ProcurementRepository {
   }
 
   async getPurchaseOrdersByUser(userId: string): Promise<PurchaseOrderWithDetails[]> {
-    const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.createdById, userId)).orderBy(desc(purchaseOrders.createdAt));
+    const orders = await db.select().from(purchaseOrders).where(eq(purchaseOrders.requestedById, userId)).orderBy(desc(purchaseOrders.createdAt));
     return this.enrichPurchaseOrders(orders);
   }
 
@@ -150,15 +149,13 @@ export class ProcurementRepository {
     const result: PurchaseOrderWithDetails[] = [];
     for (const order of orders) {
       const [supplier] = order.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, order.supplierId)) : [];
-      const [job] = order.jobId ? await db.select().from(jobs).where(eq(jobs.id, order.jobId)) : [];
-      const [createdBy] = order.createdById ? await db.select().from(users).where(eq(users.id, order.createdById)) : [];
+      const [requestedBy] = order.requestedById ? await db.select().from(users).where(eq(users.id, order.requestedById)) : [];
       const [approvedBy] = order.approvedById ? await db.select().from(users).where(eq(users.id, order.approvedById)) : [];
       const lineItems = await db.select().from(purchaseOrderItems).where(eq(purchaseOrderItems.purchaseOrderId, order.id));
       result.push({
         ...order,
         supplier: supplier || undefined,
-        job: job || undefined,
-        createdBy: createdBy || undefined,
+        requestedBy: requestedBy || undefined,
         approvedBy: approvedBy || undefined,
         items: lineItems
       });

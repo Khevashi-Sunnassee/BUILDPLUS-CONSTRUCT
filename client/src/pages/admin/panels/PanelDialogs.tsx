@@ -93,7 +93,7 @@ export function ImportDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No fallback - require job in Excel</SelectItem>
-                {jobs?.filter(j => isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((job) => (
+                {jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((job) => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.jobNumber} - {job.name}
                   </SelectItem>

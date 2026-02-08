@@ -19,7 +19,7 @@ router.post("/login", async (req, res) => {
     }
     req.session.userId = user.id;
     req.session.companyId = user.companyId;
-    req.session.name = user.name;
+    req.session.name = user.name ?? undefined;
     res.json({ user: { ...user, passwordHash: undefined } });
   } catch (error) {
     if (error instanceof z.ZodError) {

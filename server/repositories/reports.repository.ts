@@ -106,7 +106,7 @@ export class ReportsRepository {
   }
 
   async updateDailyLogStatus(id: string, data: { status: string; submittedAt?: Date; approvedAt?: Date; approvedBy?: string; managerComment?: string }): Promise<DailyLog | undefined> {
-    const [log] = await db.update(dailyLogs).set({ ...data, updatedAt: new Date() }).where(eq(dailyLogs.id, id)).returning();
+    const [log] = await db.update(dailyLogs).set({ ...data, updatedAt: new Date() } as any).where(eq(dailyLogs.id, id)).returning();
     return log;
   }
 
@@ -121,7 +121,7 @@ export class ReportsRepository {
       const [updated] = await db.update(logRows).set({ ...data, updatedAt: new Date() }).where(eq(logRows.id, existing.id)).returning();
       return updated;
     }
-    const [created] = await db.insert(logRows).values({ ...data, sourceEventId }).returning();
+    const [created] = await db.insert(logRows).values({ ...data, sourceEventId } as any).returning();
     return created;
   }
 
@@ -209,7 +209,7 @@ export class ReportsRepository {
   private async enrichWeeklyJobReports(reports: WeeklyJobReport[]): Promise<WeeklyJobReportWithDetails[]> {
     const result: WeeklyJobReportWithDetails[] = [];
     for (const report of reports) {
-      const [job] = await db.select().from(jobs).where(eq(jobs.id, report.jobId));
+      const [job] = await db.select().from(jobs).where(eq(jobs.id, (report as any).jobId));
       const [pm] = await db.select().from(users).where(eq(users.id, report.projectManagerId));
       const schedules = await db.select().from(weeklyJobReportSchedules).where(eq(weeklyJobReportSchedules.reportId, report.id));
       result.push({ ...report, job: job || undefined, projectManager: pm || undefined, schedules });

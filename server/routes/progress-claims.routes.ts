@@ -173,7 +173,7 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
               panelVolume: panelRegister.panelVolume,
             })
             .from(panelRegister)
-            .where(and(eq(panelRegister.jobId, jId), eq(panelRegister.companyId, companyId))),
+            .where(eq(panelRegister.jobId, jId)),
           db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jId)),
         ]);
 
@@ -355,7 +355,7 @@ router.get("/api/progress-claims/:id", requireAuth, async (req: Request, res: Re
       })
       .from(progressClaims)
       .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
 
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     res.json(claim);
@@ -371,7 +371,7 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
     const [claim] = await db
       .select()
       .from(progressClaims)
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
 
     const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
@@ -389,7 +389,7 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
       })
       .from(progressClaimItems)
       .leftJoin(panelRegister, eq(progressClaimItems.panelId, panelRegister.id))
-      .where(eq(progressClaimItems.progressClaimId, req.params.id))
+      .where(eq(progressClaimItems.progressClaimId, String(req.params.id)))
       .limit(safeLimit);
 
     res.json(items);
@@ -402,7 +402,7 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
 router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = String(req.params.jobId);
 
     const [contract] = await db
       .select()
@@ -424,10 +424,7 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
         description: panelRegister.description,
       })
       .from(panelRegister)
-      .where(and(
-        eq(panelRegister.jobId, jobId),
-        eq(panelRegister.companyId, companyId),
-      ));
+      .where(eq(panelRegister.jobId, jobId));
 
     const allPanelTypes = await db
       .select()
@@ -495,7 +492,7 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
 router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = String(req.params.jobId);
 
     const approvedTotals = await db
       .select({
@@ -517,7 +514,7 @@ router.get("/api/progress-claims/job/:jobId/summary", requireAuth, async (req: R
         panelVolume: panelRegister.panelVolume,
       })
       .from(panelRegister)
-      .where(and(eq(panelRegister.jobId, jobId), eq(panelRegister.companyId, companyId)));
+      .where(eq(panelRegister.jobId, jobId));
 
     const allPT = await db.select().from(panelTypes).where(eq(panelTypes.companyId, companyId));
     const allJR = await db.select().from(jobPanelRates).where(eq(jobPanelRates.jobId, jobId));
@@ -640,7 +637,7 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
   try {
     const companyId = req.session.companyId!;
     const [claim] = await db.select().from(progressClaims)
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "DRAFT") return res.status(400).json({ error: "Only draft claims can be edited" });
 
@@ -736,7 +733,7 @@ router.post("/api/progress-claims/:id/submit", requireAuth, async (req: Request,
   try {
     const companyId = req.session.companyId!;
     const [claim] = await db.select().from(progressClaims)
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "DRAFT") return res.status(400).json({ error: "Only draft claims can be submitted" });
 
@@ -757,7 +754,7 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
     const [claim] = await db.select().from(progressClaims)
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted claims can be approved" });
 
@@ -800,7 +797,7 @@ router.post("/api/progress-claims/:id/reject", requireAuth, async (req: Request,
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
     const [claim] = await db.select().from(progressClaims)
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted claims can be rejected" });
 
@@ -826,7 +823,7 @@ router.post("/api/progress-claims/:id/reject", requireAuth, async (req: Request,
 router.get("/api/progress-claims/job/:jobId/retention-summary", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const jobId = req.params.jobId;
+    const jobId = String(req.params.jobId);
 
     const [contract] = await db
       .select({
@@ -895,7 +892,7 @@ router.delete("/api/progress-claims/:id", requireAuth, async (req: Request, res:
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
     const [claim] = await db.select().from(progressClaims)
-      .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
+      .where(and(eq(progressClaims.id, String(req.params.id)), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
 
     if (claim.status === "APPROVED") {

@@ -243,7 +243,7 @@ export default function ChecklistReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" data-testid="option-job-all">All Jobs</SelectItem>
-                {jobs?.filter(j => isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((job) => (
+                {jobs?.filter(j => isJobVisibleInDropdowns(String((j as any).jobPhase ?? "CONTRACTED") as any)).map((job) => (
                   <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                     {job.name}
                   </SelectItem>

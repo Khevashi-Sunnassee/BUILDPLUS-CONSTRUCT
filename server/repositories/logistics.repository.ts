@@ -188,7 +188,7 @@ export class LogisticsRepository {
 
   async createDeliveryRecord(data: InsertDeliveryRecord): Promise<DeliveryRecord> {
     const [record] = await db.insert(deliveryRecords).values(data).returning();
-    await db.update(loadLists).set({ status: "DELIVERED", updatedAt: new Date() }).where(eq(loadLists.id, data.loadListId));
+    await db.update(loadLists).set({ status: "COMPLETE", updatedAt: new Date() }).where(eq(loadLists.id, data.loadListId));
     return record;
   }
 

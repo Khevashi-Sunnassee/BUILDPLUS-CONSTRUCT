@@ -47,6 +47,51 @@ const itemSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const SUPPLIER_TEMPLATE_COLUMNS = [
+  { header: "Name", key: "name", width: 30 },
+  { header: "Key Contact", key: "keyContact", width: 25 },
+  { header: "Email", key: "email", width: 30 },
+  { header: "Phone", key: "phone", width: 20 },
+  { header: "ABN", key: "abn", width: 20 },
+  { header: "ACN", key: "acn", width: 20 },
+  { header: "Address Line 1", key: "addressLine1", width: 30 },
+  { header: "Address Line 2", key: "addressLine2", width: 30 },
+  { header: "City", key: "city", width: 20 },
+  { header: "State", key: "state", width: 15 },
+  { header: "Postcode", key: "postcode", width: 15 },
+  { header: "Country", key: "country", width: 20 },
+  { header: "Payment Terms", key: "paymentTerms", width: 25 },
+  { header: "Notes", key: "notes", width: 40 },
+];
+
+const SUPPLIER_HEADER_MAP: Record<string, string> = {
+  "name": "name",
+  "supplier name": "name",
+  "company": "name",
+  "key contact": "keyContact",
+  "contact": "keyContact",
+  "contact name": "keyContact",
+  "email": "email",
+  "email address": "email",
+  "phone": "phone",
+  "phone number": "phone",
+  "abn": "abn",
+  "acn": "acn",
+  "address line 1": "addressLine1",
+  "address": "addressLine1",
+  "street": "addressLine1",
+  "address line 2": "addressLine2",
+  "city": "city",
+  "suburb": "city",
+  "state": "state",
+  "postcode": "postcode",
+  "zip": "postcode",
+  "country": "country",
+  "payment terms": "paymentTerms",
+  "terms": "paymentTerms",
+  "notes": "notes",
+};
+
 const ALLOWED_IMPORT_TYPES = [
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -104,7 +149,7 @@ router.get("/api/procurement/suppliers/template", requireAuth, async (_req, res)
     await workbook.xlsx.write(res);
     res.end();
   } catch (error: any) {
-    logger.error("Failed to generate supplier template", { error: error.message });
+    logger.error({ err: error }, "Failed to generate supplier template");
     res.status(500).json({ error: "Failed to generate template" });
   }
 });
@@ -147,7 +192,7 @@ router.get("/api/procurement/suppliers/export", requireAuth, async (req, res) =>
     await workbook.xlsx.write(res);
     res.end();
   } catch (error: any) {
-    logger.error("Failed to export suppliers", { error: error.message });
+    logger.error({ err: error }, "Failed to export suppliers");
     res.status(500).json({ error: "Failed to export suppliers" });
   }
 });
@@ -477,7 +522,7 @@ router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (re
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const item = await storage.createItem({ ...parsed.data, companyId });
+    const item = await storage.createItem({ ...parsed.data, companyId, name: parsed.data.description } as any);
     res.json(item);
   } catch (error: any) {
     logger.error({ err: error }, "Error creating item");

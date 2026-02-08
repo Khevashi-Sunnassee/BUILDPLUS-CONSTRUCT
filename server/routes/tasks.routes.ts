@@ -514,7 +514,7 @@ router.delete("/api/task-files/:id", requireAuth, requirePermission("tasks", "VI
 
 router.get("/api/task-notifications", requireAuth, async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
     const notifications = await storage.getTaskNotifications(userId);
     res.json(notifications);
   } catch (error: any) {
@@ -525,7 +525,7 @@ router.get("/api/task-notifications", requireAuth, async (req, res) => {
 
 router.get("/api/task-notifications/unread-count", requireAuth, async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
     const count = await storage.getUnreadTaskNotificationCount(userId);
     res.json({ count });
   } catch (error: any) {
@@ -554,7 +554,7 @@ router.post("/api/task-notifications/:id/read", requireAuth, async (req, res) =>
 
 router.post("/api/task-notifications/read-all", requireAuth, async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
     await storage.markAllTaskNotificationsRead(userId);
     res.json({ success: true });
   } catch (error: any) {
@@ -574,7 +574,7 @@ router.post("/api/tasks/send-email", requireAuth, async (req, res) => {
     });
 
     const data = schema.parse(req.body);
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
 
     if (!emailService.isConfigured()) {
       return res.status(500).json({ error: "Email service is not configured" });

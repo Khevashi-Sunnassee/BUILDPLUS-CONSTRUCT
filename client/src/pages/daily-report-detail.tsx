@@ -264,7 +264,7 @@ export default function DailyReportDetailPage() {
       const logoHeight = 12;
       const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
+        if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
       } catch (e) {}
       
       // Company name and report type on separate line
@@ -575,7 +575,7 @@ export default function DailyReportDetailPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {jobs?.filter(j => isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((j) => (
+                            {jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((j) => (
                               <SelectItem key={j.id} value={j.id}>
                                 {j.code || j.name}
                               </SelectItem>

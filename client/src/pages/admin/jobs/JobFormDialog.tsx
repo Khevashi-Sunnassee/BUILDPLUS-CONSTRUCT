@@ -172,7 +172,7 @@ export function JobFormDialog({
                             }`}
                             onClick={() => {
                               field.onChange(phase);
-                              const currentStatus = jobForm.getValues("status") as JobStatus;
+                              const currentStatus = (jobForm.getValues("status") ?? '') as JobStatus;
                               if (!isValidStatusForPhase(phase as JobPhase, currentStatus)) {
                                 jobForm.setValue("status", getDefaultStatusForPhase(phase as JobPhase));
                               }

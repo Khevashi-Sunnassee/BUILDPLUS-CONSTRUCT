@@ -186,7 +186,7 @@ export default function AdminJobsPage() {
 
   const filteredAndSortedJobs = (jobs || [])
     .filter((job) => {
-      if (phaseFilter !== "all" && job.jobPhase !== phaseFilter) return false;
+      if (phaseFilter !== "all" && String(job.jobPhase) !== phaseFilter) return false;
       if (statusFilter !== "all" && job.status !== statusFilter) return false;
       if (stateFilter !== "all") {
         if (stateFilter === "none" && job.state) return false;
@@ -708,7 +708,7 @@ export default function AdminJobsPage() {
       procurementTimeDays: job.procurementTimeDays ?? globalSettings?.procurementTimeDays ?? 14,
       siteContact: job.siteContact || "",
       siteContactPhone: job.siteContactPhone || "",
-      jobPhase: job.jobPhase || "CONTRACTED",
+      jobPhase: String(job.jobPhase || "CONTRACTED"),
       status: job.status,
       projectManagerId: job.projectManagerId || null,
       factoryId: job.factoryId || null,

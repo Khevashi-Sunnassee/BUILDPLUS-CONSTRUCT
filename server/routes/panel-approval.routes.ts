@@ -61,7 +61,7 @@ router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"),
       productionPdfUrl: registeredDoc.storageKey,
     });
 
-    logPanelChange(id, "Production PDF uploaded", req.session.userId, { changedFields: { productionPdfUrl: pdfFileName } });
+    logPanelChange(id as string, "Production PDF uploaded", req.session.userId, { changedFields: { productionPdfUrl: pdfFileName } });
     
     res.json({
       success: true,
@@ -240,7 +240,7 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
       productionPdfUrl,
     });
     
-    updatePanelLifecycleStatus(id, PANEL_LIFECYCLE_STATUS.PRODUCTION_APPROVED, "Approved for production", userId, { loadWidth, loadHeight, panelThickness, panelVolume, panelMass });
+    updatePanelLifecycleStatus(id as string, PANEL_LIFECYCLE_STATUS.PRODUCTION_APPROVED, "Approved for production", userId, { loadWidth, loadHeight, panelThickness, panelVolume, panelMass });
     
     res.json({ success: true, panel: updated });
   } catch (error: any) {
@@ -260,7 +260,7 @@ router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MAN
     
     const updated = await storage.revokePanelProductionApproval(id as string);
     
-    updatePanelLifecycleStatus(id, PANEL_LIFECYCLE_STATUS.REGISTERED, "Production approval revoked", req.session.userId);
+    updatePanelLifecycleStatus(id as string, PANEL_LIFECYCLE_STATUS.REGISTERED, "Production approval revoked", req.session.userId);
     
     res.json({ success: true, panel: updated });
   } catch (error: any) {

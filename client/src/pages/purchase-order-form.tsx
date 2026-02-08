@@ -599,7 +599,7 @@ export default function PurchaseOrderFormPage() {
       });
     } else {
       await updateMutation.mutateAsync({ po: formData, items: lineItems });
-      submitMutation.mutate();
+      submitMutation.mutate(poId!);
     }
   };
 

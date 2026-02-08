@@ -225,9 +225,9 @@ router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, r
       diff[key] = req.body[key];
     }
   }
-  logPanelChange(panel.id, "Panel updated", req.session.userId, { changedFields: diff });
+  logPanelChange(panel!.id, "Panel updated", req.session.userId, { changedFields: diff });
   if (diff.loadWidth !== undefined || diff.loadHeight !== undefined || diff.panelThickness !== undefined) {
-    advancePanelLifecycleIfLower(panel.id, PANEL_LIFECYCLE_STATUS.DIMENSIONS_CONFIRMED, "Dimensions confirmed", req.session.userId);
+    advancePanelLifecycleIfLower(panel!.id, PANEL_LIFECYCLE_STATUS.DIMENSIONS_CONFIRMED, "Dimensions confirmed", req.session.userId);
   }
   res.json(panel);
 });
@@ -249,7 +249,7 @@ router.post("/api/panels/admin/:id/validate", requireRole("ADMIN", "MANAGER"), a
     const updatedPanel = await storage.updatePanelRegisterItem(req.params.id as string, { 
       status: "NOT_STARTED" 
     });
-    logPanelChange(updatedPanel.id, "Panel validated", req.session.userId);
+    logPanelChange(updatedPanel!.id, "Panel validated", req.session.userId);
     res.json(updatedPanel);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to validate panel" });

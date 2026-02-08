@@ -42,7 +42,7 @@ export function HelpIcon({ helpKey, variant = "question", className = "" }: Help
         <p className="text-xs text-muted-foreground">{tooltip}</p>
         {hasBody && (
           <Button
-            variant="link"
+            variant="ghost"
             size="sm"
             className="mt-1 h-auto p-0 text-xs"
             onClick={() => openDrawer(helpKey)}

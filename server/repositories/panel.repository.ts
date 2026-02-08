@@ -181,10 +181,10 @@ export class PanelRepository {
   async updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void> {
     const panel = await this.getPanelById(panelId);
     if (!panel) return;
-    const currentMinutes = parseFloat(panel.actualHours || "0") * 60;
-    const newHours = ((currentMinutes + additionalMinutes) / 60).toFixed(2);
+    const currentMinutes = parseFloat(String(panel.actualHours ?? 0)) * 60;
+    const newHours = (currentMinutes + additionalMinutes) / 60;
     await db.update(panelRegister)
-      .set({ actualHours: newHours, updatedAt: new Date() })
+      .set({ actualHours: newHours, updatedAt: new Date() } as any)
       .where(eq(panelRegister.id, panelId));
   }
 
@@ -259,7 +259,7 @@ export class PanelRepository {
       .set({
         ...data,
         approvedForProduction: true,
-        approvedForProductionAt: new Date(),
+        approvedAt: new Date(),
         approvedById,
         updatedAt: new Date()
       })
@@ -272,7 +272,7 @@ export class PanelRepository {
     const [panel] = await db.update(panelRegister)
       .set({
         approvedForProduction: false,
-        approvedForProductionAt: null,
+        approvedAt: null,
         approvedById: null,
         updatedAt: new Date()
       })

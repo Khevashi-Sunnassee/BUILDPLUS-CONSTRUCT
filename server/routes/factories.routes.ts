@@ -18,6 +18,7 @@ const CFMEU_CALENDAR_URLS: Record<CfmeuCalendarType, { url: string; years: numbe
     { url: "https://vic.cfmeu.org/wp-content/uploads/2024/11/rdo-offsite-2025.ics", years: [2025] },
     { url: "https://vic.cfmeu.org/wp-content/uploads/2025/11/38hr-offsite-rdo-calendar.ics", years: [2026] },
   ],
+  QLD: [],
 };
 
 async function parseIcsAndSaveHolidays(
@@ -374,7 +375,7 @@ router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req,
   }
 
   try {
-    const urls = CFMEU_CALENDAR_URLS[calendarType];
+    const urls = CFMEU_CALENDAR_URLS[calendarType as CfmeuCalendarType];
     let totalImported = 0;
     let totalSkipped = 0;
 
@@ -406,7 +407,7 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
   try {
     const results: Record<string, { imported: number; skipped: number }> = {};
 
-    for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS)) {
+    for (const calendarType of Object.keys(CFMEU_CALENDAR_URLS) as CfmeuCalendarType[]) {
       const urls = CFMEU_CALENDAR_URLS[calendarType];
       let totalImported = 0;
       let totalSkipped = 0;

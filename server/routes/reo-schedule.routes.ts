@@ -414,7 +414,7 @@ router.post("/api/reo-schedules/:scheduleId/create-po", requireAuth, async (req:
       companyId,
       poNumber,
       supplierId,
-      requestedById: userId,
+      requestedById: userId!,
       status: "DRAFT",
       notes: notes || `Reo schedule for panel ${schedule.panel?.panelMark || schedule.panelId}`,
     }, poLineItems);

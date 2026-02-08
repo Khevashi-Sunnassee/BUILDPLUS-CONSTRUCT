@@ -681,7 +681,7 @@ export default function LogisticsPage() {
       const logoHeight = 12;
       const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
+        if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
       } catch (e) {}
       
       // Report title
@@ -1219,7 +1219,7 @@ export default function LogisticsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((job) => (
+                          {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((job) => (
                             <SelectItem key={job.id} value={job.id}>
                               {job.jobNumber} - {job.name}
                             </SelectItem>

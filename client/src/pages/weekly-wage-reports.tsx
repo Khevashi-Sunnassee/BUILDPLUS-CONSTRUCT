@@ -407,7 +407,7 @@ export default function WeeklyWageReportsPage() {
       const logoHeight = 12;
       const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
+        if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
       } catch (e) {}
       
       // Report title
@@ -530,7 +530,7 @@ export default function WeeklyWageReportsPage() {
 
       <div ref={reportRef} className="bg-white dark:bg-card rounded-lg">
         <div className="p-4 border-b flex items-center gap-4">
-          <img src={reportLogo} alt="Company Logo" className="h-10 w-auto" />
+          <img src={reportLogo || ""} alt="Company Logo" className="h-10 w-auto" />
           <div>
             <h2 className="text-lg font-semibold">Weekly Wage Report Summary</h2>
             <p className="text-sm text-muted-foreground">

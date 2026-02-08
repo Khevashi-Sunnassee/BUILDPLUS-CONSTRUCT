@@ -1530,7 +1530,7 @@ export default function AdminPanelsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Jobs</SelectItem>
-                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map(job => (
+                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map(job => (
                         <SelectItem key={job.id} value={job.id}>
                           {job.jobNumber} - {job.name}
                         </SelectItem>
@@ -1926,14 +1926,13 @@ export default function AdminPanelsPage() {
         isDragging={isDragging}
         setIsDragging={setIsDragging}
         isAnalyzing={isAnalyzing}
-        pdfInputRef={pdfInputRef}
         onPdfDrop={handlePdfDrop}
         onPdfSelect={handlePdfSelect}
         onAnalyzePdf={analyzePdf}
-        onApproveProduction={handleApproveProduction}
-        approveProductionPending={approveProductionMutation.isPending}
-        onRevokeApproval={(id) => revokeApprovalMutation.mutate(id)}
-        revokeApprovalPending={revokeApprovalMutation.isPending}
+        onApprove={handleApproveProduction}
+        approvePending={approveProductionMutation.isPending}
+        onRevoke={(id: string) => revokeApprovalMutation.mutate(id)}
+        revokePending={revokeApprovalMutation.isPending}
       />
 
       <ImportDialog
@@ -1944,14 +1943,15 @@ export default function AdminPanelsPage() {
         selectedJobForImport={selectedJobForImport}
         setSelectedJobForImport={setSelectedJobForImport}
         jobs={jobs}
-        onImport={(data, jobId) => importPanelsMutation.mutate({ data, jobId })}
+        onImport={(data: { data: any[]; jobId?: string }) => importPanelsMutation.mutate(data)}
         importPending={importPanelsMutation.isPending}
       />
 
       <DeleteDialog
         open={deleteDialogOpen}
         onOpenChange={setDeleteDialogOpen}
-        onConfirm={() => deletingPanelId && deletePanelMutation.mutate(deletingPanelId)}
+        deletingPanelId={deletingPanelId}
+        onDelete={(id: string) => deletePanelMutation.mutate(id)}
         deletePending={deletePanelMutation.isPending}
       />
 
@@ -1959,10 +1959,10 @@ export default function AdminPanelsPage() {
         open={deleteSourceDialogOpen}
         onOpenChange={setDeleteSourceDialogOpen}
         sourceToDelete={sourceToDelete}
+        setSourceToDelete={setSourceToDelete}
         sourceCounts={sourceCounts}
-        onConfirm={(source) => deleteBySourceMutation.mutate(source)}
+        onDelete={(source: number) => deleteBySourceMutation.mutate(source)}
         deletePending={deleteBySourceMutation.isPending}
-        onCancel={() => setSourceToDelete(null)}
       />
 
       <TemplateDialog

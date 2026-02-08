@@ -7,11 +7,24 @@ import logger from "./lib/logger";
 export async function seedDatabase() {
   logger.info("Checking if seed data exists...");
 
-  // Always seed work types (idempotent)
+  let existingCompanies = await db.select().from(companies);
+  let seedCompanyId: string;
+  if (existingCompanies.length === 0) {
+    const [company] = await db.insert(companies).values({
+      name: "LTE Precast",
+      code: "LTE",
+    }).returning();
+    seedCompanyId = company.id;
+    logger.info("Seed company created");
+  } else {
+    seedCompanyId = existingCompanies[0].id;
+  }
+
   const existingWorkTypes = await db.select().from(workTypes);
   if (existingWorkTypes.length === 0) {
     await db.insert(workTypes).values([
       {
+        companyId: seedCompanyId,
         code: "GENERAL",
         name: "General Drafting",
         description: "Standard drafting work",
@@ -19,6 +32,7 @@ export async function seedDatabase() {
         isActive: true,
       },
       {
+        companyId: seedCompanyId,
         code: "CLIENT_CHANGE",
         name: "Client Changes",
         description: "Modifications requested by client",
@@ -26,6 +40,7 @@ export async function seedDatabase() {
         isActive: true,
       },
       {
+        companyId: seedCompanyId,
         code: "ERROR_REWORK",
         name: "Errors/Redrafting",
         description: "Corrections and redrafting of previous work",
@@ -36,17 +51,18 @@ export async function seedDatabase() {
     logger.info("Work types seeded");
   }
 
-  // Always seed trailer types (idempotent)
   const existingTrailerTypes = await db.select().from(trailerTypes);
   if (existingTrailerTypes.length === 0) {
     await db.insert(trailerTypes).values([
       {
+        companyId: seedCompanyId,
         name: "Layover",
         description: "Flat deck trailer with panels laying flat",
         sortOrder: 1,
         isActive: true,
       },
       {
+        companyId: seedCompanyId,
         name: "A-Frame",
         description: "A-frame trailer with panels standing upright",
         sortOrder: 2,
@@ -69,6 +85,7 @@ export async function seedDatabase() {
   const userPasswordHash = await bcrypt.hash("user123", 10);
 
   const [adminUser] = await db.insert(users).values({
+    companyId: seedCompanyId,
     email: "admin@lte.com.au",
     name: "Admin User",
     passwordHash: adminPasswordHash,
@@ -77,6 +94,7 @@ export async function seedDatabase() {
   }).returning();
 
   const [managerUser] = await db.insert(users).values({
+    companyId: seedCompanyId,
     email: "manager@lte.com.au",
     name: "Sarah Chen",
     passwordHash: managerPasswordHash,
@@ -85,6 +103,7 @@ export async function seedDatabase() {
   }).returning();
 
   const [drafterUser] = await db.insert(users).values({
+    companyId: seedCompanyId,
     email: "drafter@lte.com.au",
     name: "Michael Torres",
     passwordHash: userPasswordHash,
@@ -93,6 +112,7 @@ export async function seedDatabase() {
   }).returning();
 
   const [drafter2User] = await db.insert(users).values({
+    companyId: seedCompanyId,
     email: "james@lte.com.au",
     name: "James Wilson",
     passwordHash: userPasswordHash,
@@ -101,6 +121,7 @@ export async function seedDatabase() {
   }).returning();
 
   const [job1] = await db.insert(jobs).values({
+    companyId: seedCompanyId,
     jobNumber: "MCT-2026",
     code: "MCT-2026",
     name: "Melbourne Central Tower Renovation",
@@ -110,6 +131,7 @@ export async function seedDatabase() {
   }).returning();
 
   const [job2] = await db.insert(jobs).values({
+    companyId: seedCompanyId,
     jobNumber: "SRC-2026",
     code: "SRC-2026",
     name: "Southbank Residential Complex",
@@ -119,6 +141,7 @@ export async function seedDatabase() {
   }).returning();
 
   const [job3] = await db.insert(jobs).values({
+    companyId: seedCompanyId,
     jobNumber: "DOF-2026",
     code: "DOF-2026",
     name: "Docklands Office Fitout",
@@ -128,6 +151,7 @@ export async function seedDatabase() {
   }).returning();
 
   await db.insert(globalSettings).values({
+    companyId: seedCompanyId,
     tz: "Australia/Melbourne",
     captureIntervalS: 300,
     idleThresholdS: 300,

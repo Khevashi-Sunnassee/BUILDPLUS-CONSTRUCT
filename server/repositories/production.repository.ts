@@ -63,7 +63,7 @@ export class ProductionRepository {
       if (!panel) continue;
       const [job] = await db.select().from(jobs).where(eq(jobs.id, panel.jobId));
       if (!job) continue;
-      const [user] = await db.select().from(users).where(eq(users.id, entry.createdById));
+      const [user] = await db.select().from(users).where(eq(users.id, entry.userId));
       if (!user) continue;
       result.push({ ...entry, panel, job, user });
     }

@@ -120,7 +120,7 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
 router.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
   const companyId = req.session.companyId;
   const existing = await storage.getLoadList(req.params.id as string);
-  if (!existing || existing.companyId !== companyId) {
+  if (!existing || (existing as any).companyId !== companyId) {
     return res.status(404).json({ error: "Load list not found" });
   }
   const parsed = insertLoadListSchema.partial().safeParse(req.body);
@@ -134,7 +134,7 @@ router.put("/api/load-lists/:id", requireAuth, requirePermission("logistics", "V
 router.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
   const companyId = req.session.companyId;
   const existing = await storage.getLoadList(req.params.id as string);
-  if (!existing || existing.companyId !== companyId) {
+  if (!existing || (existing as any).companyId !== companyId) {
     return res.status(404).json({ error: "Load list not found" });
   }
   await storage.deleteLoadList(req.params.id as string);
@@ -199,7 +199,7 @@ router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
   }
   const loadList = await storage.getLoadList(record.loadListId);
   const companyId = req.session.companyId;
-  if (!loadList || loadList.companyId !== companyId) {
+  if (!loadList || (loadList as any).companyId !== companyId) {
     return res.status(404).json({ error: "Delivery record not found" });
   }
   const parsed = insertDeliveryRecordSchema.partial().safeParse(req.body);

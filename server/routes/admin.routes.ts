@@ -50,7 +50,7 @@ router.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) =>
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
   }
-  const device = await storage.updateDevice(req.params.id as string, parsed.data);
+  const device = await storage.updateDevice(req.params.id as string, parsed.data as any);
   res.json(device);
 });
 

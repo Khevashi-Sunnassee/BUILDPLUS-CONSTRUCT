@@ -29,9 +29,10 @@ export const chatStorage: IChatStorage = {
   async createConversation(title: string) {
     const [conversation] = await db.insert(conversations).values({ 
       id: generateId(),
+      companyId: "system",
       type: "DM",
       name: title 
-    }).returning();
+    } as any).returning();
     return conversation;
   },
 

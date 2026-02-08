@@ -361,7 +361,7 @@ export default function ProductionReportPage() {
       const logoHeight = 12;
       const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
+        if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
       } catch (e) {}
       
       // Report title

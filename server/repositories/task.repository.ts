@@ -1,4 +1,4 @@
-import { eq, and, desc, asc, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import {
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
@@ -25,13 +25,13 @@ export interface TaskGroupWithTasks extends TaskGroup {
 
 export class TaskRepository {
   async getAllTaskGroups(): Promise<TaskGroupWithTasks[]> {
-    const groups = await db.select().from(taskGroups).orderBy(asc((taskGroups as any).displayOrder));
+    const groups = await db.select().from(taskGroups).orderBy(asc(taskGroups.sortOrder));
     const groupIds = groups.map(g => g.id);
     if (!groupIds.length) return groups.map(g => ({ ...g, tasks: [] }));
 
     const allTasks = await db.select().from(tasks)
       .where(inArray(tasks.groupId, groupIds))
-      .orderBy(asc((tasks as any).displayOrder));
+      .orderBy(asc(tasks.sortOrder));
 
     const enrichedTasks = await this.enrichTasksBatch(allTasks);
 
@@ -46,7 +46,7 @@ export class TaskRepository {
   }
 
   private async getTasksByGroupId(groupId: string): Promise<TaskWithDetails[]> {
-    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, groupId)).orderBy(asc((tasks as any).displayOrder));
+    const groupTasks = await db.select().from(tasks).where(eq(tasks.groupId, groupId)).orderBy(asc(tasks.sortOrder));
     return this.enrichTasksBatch(groupTasks);
   }
 
@@ -124,7 +124,7 @@ export class TaskRepository {
 
   async reorderTaskGroups(groupIds: string[]): Promise<void> {
     for (let i = 0; i < groupIds.length; i++) {
-      await db.update(taskGroups).set({ displayOrder: i, updatedAt: new Date() }).where(eq(taskGroups.id, groupIds[i]));
+      await db.update(taskGroups).set({ sortOrder: i, updatedAt: new Date() }).where(eq(taskGroups.id, groupIds[i]));
     }
   }
 
@@ -155,7 +155,7 @@ export class TaskRepository {
 
   async reorderTasks(groupId: string, taskIds: string[]): Promise<void> {
     for (let i = 0; i < taskIds.length; i++) {
-      await db.update(tasks).set({ displayOrder: i, updatedAt: new Date() }).where(eq(tasks.id, taskIds[i]));
+      await db.update(tasks).set({ sortOrder: i, updatedAt: new Date() }).where(eq(tasks.id, taskIds[i]));
     }
   }
 
@@ -240,16 +240,16 @@ export class TaskRepository {
 
   async getUnreadTaskNotificationCount(userId: string): Promise<number> {
     const notifications = await db.select().from(taskNotifications)
-      .where(and(eq(taskNotifications.userId, userId), eq(taskNotifications.isRead, false)));
+      .where(and(eq(taskNotifications.userId, userId), isNull(taskNotifications.readAt)));
     return notifications.length;
   }
 
   async markTaskNotificationRead(id: string): Promise<void> {
-    await db.update(taskNotifications).set({ isRead: true, readAt: new Date() }).where(eq(taskNotifications.id, id));
+    await db.update(taskNotifications).set({ readAt: new Date() }).where(eq(taskNotifications.id, id));
   }
 
   async markAllTaskNotificationsRead(userId: string): Promise<void> {
-    await db.update(taskNotifications).set({ isRead: true, readAt: new Date() }).where(eq(taskNotifications.userId, userId));
+    await db.update(taskNotifications).set({ readAt: new Date() }).where(eq(taskNotifications.userId, userId));
   }
 
   async createTaskNotificationsForAssignees(taskId: string, excludeUserId: string, type: string, title: string, body: string | null, updateId: string | null): Promise<void> {
@@ -262,7 +262,7 @@ export class TaskRepository {
           type: type as typeof taskNotifications.type.enumValues[number],
           title,
           body,
-          taskUpdateId: updateId
+          updateId
         });
       }
     }

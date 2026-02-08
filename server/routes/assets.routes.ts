@@ -339,13 +339,13 @@ async function aiCategorizeBatch(items: { index: number; name: string; descripti
           }
         }
       } catch {
-        logger.warn("Failed to parse AI categorization response", { content: cleaned });
+        logger.warn({ content: cleaned }, "Failed to parse AI categorization response");
       }
     }
 
     return results;
   } catch (error: any) {
-    logger.warn("AI categorization failed, falling back to manual mapping", { error: error.message });
+    logger.warn({ err: error }, "AI categorization failed, falling back to manual mapping");
     return {};
   }
 }
@@ -424,7 +424,7 @@ router.get("/api/admin/assets/template", requireAuth, async (_req: Request, res:
     await workbook.xlsx.write(res);
     res.end();
   } catch (error: any) {
-    logger.error("Failed to generate asset template", { error: error.message });
+    logger.error({ err: error }, "Failed to generate asset template");
     res.status(500).json({ error: "Failed to generate template" });
   }
 });
@@ -487,11 +487,11 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         }
         if (val) allHeaders.push(String(val).trim());
       }
-      logger.warn("Could not find header row", { allHeaders, sheetName: sheet.name, rowCount: sheet.rowCount });
+      logger.warn({ allHeaders, sheetName: sheet.name, rowCount: sheet.rowCount }, "Could not find header row");
       return res.status(400).json({ error: `Could not find header row. Found columns: ${allHeaders.join(", ")}. Please ensure the spreadsheet has recognizable column headers.` });
     }
 
-    logger.info("Asset import column mapping", { headerRowIndex, columnMap, sheetName: sheet.name });
+    logger.info({ headerRowIndex, columnMap, sheetName: sheet.name }, "Asset import column mapping");
 
     const imported: any[] = [];
     const errors: string[] = [];
@@ -549,7 +549,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
     }
 
     if (parsedRows.length > 0) {
-      logger.info("Asset import first row sample", { rowData: parsedRows[0].rowData, name: parsedRows[0].name, manualCategory: parsedRows[0].manualCategory, rawCategory: parsedRows[0].rawCategory });
+      logger.info({ rowData: parsedRows[0].rowData, name: parsedRows[0].name, manualCategory: parsedRows[0].manualCategory, rawCategory: parsedRows[0].rawCategory }, "Asset import first row sample");
     }
     logger.info(`Asset import parsed ${parsedRows.length} rows from ${rowNum} total`);
 
@@ -575,7 +575,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
       const key = supplierName.toLowerCase().trim();
       if (supplierCache[key]) return supplierCache[key];
       const [newSupplier] = await db.insert(suppliers).values({
-        companyId,
+        companyId: companyId!,
         name: supplierName.trim(),
         isActive: true,
       }).returning({ id: suppliers.id });
@@ -702,7 +702,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
       assets: imported.slice(0, 20),
     });
   } catch (error: any) {
-    logger.error("Failed to import assets", { error: error.message });
+    logger.error({ err: error }, "Failed to import assets");
     res.status(500).json({ error: error.message || "Failed to import assets" });
   }
 });
@@ -747,7 +747,7 @@ router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response)
       .limit(safeLimit);
     res.json(result);
   } catch (error: any) {
-    logger.error("Failed to fetch assets", { error: error.message });
+    logger.error({ err: error }, "Failed to fetch assets");
     res.status(500).json({ error: "Failed to fetch assets" });
   }
 });
@@ -757,11 +757,11 @@ router.get("/api/admin/assets/:id", requireAuth, async (req: Request, res: Respo
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const [asset] = await db.select().from(assets)
-      .where(and(eq(assets.id, req.params.id), eq(assets.companyId, companyId)));
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!asset) return res.status(404).json({ error: "Asset not found" });
     res.json(asset);
   } catch (error: any) {
-    logger.error("Failed to fetch asset", { error: error.message });
+    logger.error({ err: error }, "Failed to fetch asset");
     res.status(500).json({ error: "Failed to fetch asset" });
   }
 });
@@ -784,7 +784,7 @@ router.post("/api/admin/assets", requireRole("ADMIN"), async (req: Request, res:
     const [created] = await db.insert(assets).values(data).returning();
     res.status(201).json(created);
   } catch (error: any) {
-    logger.error("Failed to create asset", { error: error.message });
+    logger.error({ err: error }, "Failed to create asset");
     res.status(500).json({ error: error.message || "Failed to create asset" });
   }
 });
@@ -794,7 +794,7 @@ router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request,
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const [existing] = await db.select().from(assets)
-      .where(and(eq(assets.id, req.params.id), eq(assets.companyId, companyId)));
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!existing) return res.status(404).json({ error: "Asset not found" });
 
     const parsed = createAssetSchema.partial().safeParse(req.body);
@@ -804,11 +804,11 @@ router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request,
     const { id: _id, companyId: _cid, assetTag: _tag, createdAt: _ca, ...safeData } = parsed.data as Record<string, unknown>;
     const [updated] = await db.update(assets)
       .set({ ...safeData, updatedAt: new Date() })
-      .where(eq(assets.id, req.params.id))
+      .where(eq(assets.id, String(req.params.id)))
       .returning();
     res.json(updated);
   } catch (error: any) {
-    logger.error("Failed to update asset", { error: error.message });
+    logger.error({ err: error }, "Failed to update asset");
     res.status(500).json({ error: error.message || "Failed to update asset" });
   }
 });
@@ -818,12 +818,12 @@ router.delete("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const [existing] = await db.select().from(assets)
-      .where(and(eq(assets.id, req.params.id), eq(assets.companyId, companyId)));
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!existing) return res.status(404).json({ error: "Asset not found" });
-    await db.delete(assets).where(eq(assets.id, req.params.id));
+    await db.delete(assets).where(eq(assets.id, String(req.params.id)));
     res.json({ success: true });
   } catch (error: any) {
-    logger.error("Failed to delete asset", { error: error.message });
+    logger.error({ err: error }, "Failed to delete asset");
     res.status(500).json({ error: "Failed to delete asset" });
   }
 });
@@ -833,7 +833,7 @@ router.post("/api/admin/assets/:id/ai-summary", requireRole("ADMIN"), async (req
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const [asset] = await db.select().from(assets)
-      .where(and(eq(assets.id, req.params.id), eq(assets.companyId, companyId)));
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!asset) return res.status(404).json({ error: "Asset not found" });
     if (!asset.manufacturer && !asset.model) {
       return res.status(400).json({ error: "Manufacturer and model are required for AI analysis" });
@@ -885,7 +885,7 @@ Format as clean HTML with headings and bullet points.`;
       .returning();
     res.json({ aiSummary: summary });
   } catch (error: any) {
-    logger.error("Failed to generate AI summary", { error: error.message });
+    logger.error({ err: error }, "Failed to generate AI summary");
     res.status(500).json({ error: "Failed to generate AI summary" });
   }
 });
@@ -896,7 +896,7 @@ router.get("/api/admin/assets/:id/maintenance", requireAuth, async (req: Request
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const records = await db.select().from(assetMaintenanceRecords)
-      .where(and(eq(assetMaintenanceRecords.assetId, req.params.id), eq(assetMaintenanceRecords.companyId, companyId)))
+      .where(and(eq(assetMaintenanceRecords.assetId, String(req.params.id)), eq(assetMaintenanceRecords.companyId, companyId)))
       .orderBy(desc(assetMaintenanceRecords.maintenanceDate))
       .limit(safeLimit);
     res.json(records);
@@ -910,7 +910,7 @@ router.post("/api/admin/assets/:id/maintenance", requireRole("ADMIN"), async (re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const [asset] = await db.select({ id: assets.id }).from(assets)
-      .where(and(eq(assets.id, req.params.id), eq(assets.companyId, companyId)));
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!asset) return res.status(404).json({ error: "Asset not found" });
 
     const parsed = createMaintenanceSchema.safeParse(req.body);
@@ -919,7 +919,7 @@ router.post("/api/admin/assets/:id/maintenance", requireRole("ADMIN"), async (re
     }
     const [record] = await db.insert(assetMaintenanceRecords).values({
       ...parsed.data,
-      assetId: req.params.id,
+      assetId: String(req.params.id),
       companyId,
       createdBy: req.session?.userId || null,
     }).returning();
@@ -934,7 +934,7 @@ router.delete("/api/admin/assets/:assetId/maintenance/:id", requireRole("ADMIN")
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     await db.delete(assetMaintenanceRecords)
-      .where(and(eq(assetMaintenanceRecords.id, req.params.id), eq(assetMaintenanceRecords.companyId, companyId)));
+      .where(and(eq(assetMaintenanceRecords.id, String(req.params.id)), eq(assetMaintenanceRecords.companyId, companyId)));
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: "Failed to delete maintenance record" });
@@ -947,7 +947,7 @@ router.get("/api/admin/assets/:id/transfers", requireAuth, async (req: Request, 
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const records = await db.select().from(assetTransfers)
-      .where(and(eq(assetTransfers.assetId, req.params.id), eq(assetTransfers.companyId, companyId)))
+      .where(and(eq(assetTransfers.assetId, String(req.params.id)), eq(assetTransfers.companyId, companyId)))
       .orderBy(desc(assetTransfers.transferDate))
       .limit(safeLimit);
     res.json(records);
@@ -961,7 +961,7 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const [asset] = await db.select().from(assets)
-      .where(and(eq(assets.id, req.params.id), eq(assets.companyId, companyId)));
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!asset) return res.status(404).json({ error: "Asset not found" });
 
     const parsed = createTransferSchema.safeParse(req.body);
@@ -970,7 +970,7 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
     }
     const [record] = await db.insert(assetTransfers).values({
       ...parsed.data,
-      assetId: req.params.id,
+      assetId: String(req.params.id),
       companyId,
       transferredBy: req.session?.userId || null,
     }).returning();
@@ -981,7 +981,7 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
     if (parsed.data.toAssignee) updateFields.assignedTo = parsed.data.toAssignee;
     if (Object.keys(updateFields).length > 0) {
       updateFields.updatedAt = new Date();
-      await db.update(assets).set(updateFields).where(eq(assets.id, req.params.id));
+      await db.update(assets).set(updateFields).where(eq(assets.id, String(req.params.id)));
     }
 
     res.status(201).json(record);
@@ -995,7 +995,7 @@ router.delete("/api/admin/assets/:assetId/transfers/:id", requireRole("ADMIN"), 
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     await db.delete(assetTransfers)
-      .where(and(eq(assetTransfers.id, req.params.id), eq(assetTransfers.companyId, companyId)));
+      .where(and(eq(assetTransfers.id, String(req.params.id)), eq(assetTransfers.companyId, companyId)));
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: "Failed to delete transfer record" });

@@ -564,8 +564,10 @@ chatRouter.post("/conversations", requireAuth, requireChatPermission, async (req
     const { type, name, memberIds, jobId, panelId } = schema.parse(req.body);
 
     const convId = createId();
+    const companyId = req.session.companyId!;
     await db.insert(conversations).values({
       id: convId,
+      companyId,
       type,
       name: name || null,
       jobId: jobId || null,
@@ -656,6 +658,7 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
     const convId = createId();
     await db.insert(conversations).values({
       id: convId,
+      companyId: req.session.companyId!,
       type: "GROUP",
       name: `Panel: ${panel[0].panelMark}`,
       panelId,

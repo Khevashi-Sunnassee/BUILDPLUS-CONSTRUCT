@@ -190,7 +190,7 @@ router.post("/api/purchase-orders/:id/approve", requireAuth, async (req, res) =>
       }
     }
 
-    const approved = await storage.approvePurchaseOrder(String(req.params.id), userId);
+    const approved = await storage.approvePurchaseOrder(String(req.params.id), userId!);
 
     try {
       const requestor = await storage.getUser(order.requestedById);
@@ -245,7 +245,7 @@ router.post("/api/purchase-orders/:id/reject", requireAuth, async (req, res) => 
       return res.status(400).json({ error: "Rejection reason is required" });
     }
 
-    const rejected = await storage.rejectPurchaseOrder(String(req.params.id), userId, reason);
+    const rejected = await storage.rejectPurchaseOrder(String(req.params.id), userId!, reason);
     res.json(rejected);
   } catch (error: any) {
     logger.error({ err: error }, "Error rejecting purchase order");
@@ -386,7 +386,7 @@ router.post("/api/purchase-orders/:id/attachments", requireAuth, upload.array("f
         mimeType: file.mimetype,
         fileSize: file.size,
         filePath,
-        uploadedById: userId,
+        uploadedById: userId!,
       });
       attachments.push(attachment);
     }
@@ -419,7 +419,7 @@ router.get("/api/po-attachments/:id/download", requireAuth, async (req, res) => 
 
 router.delete("/api/po-attachments/:id", requireAuth, async (req, res) => {
   try {
-    const userId = req.session.userId;
+    const userId = req.session.userId!;
     const user = await storage.getUser(userId);
     const attachment = await storage.getPurchaseOrderAttachment(String(req.params.id));
     if (!attachment) return res.status(404).json({ error: "Attachment not found" });

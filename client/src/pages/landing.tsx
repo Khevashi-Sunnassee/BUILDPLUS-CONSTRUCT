@@ -128,11 +128,13 @@ export default function LandingPage() {
               {logoData?.logoBase64 ? (
                 <img src={logoData.logoBase64} alt="BuildPlusAI" className="h-8 w-auto object-contain" data-testid="img-brand-logo" />
               ) : (
-                <Building2 className="h-7 w-7 text-primary" />
+                <>
+                  <Building2 className="h-7 w-7 text-primary" />
+                  <span className="text-lg font-bold text-foreground tracking-tight">
+                    BuildPlus<span className="text-primary">AI</span>
+                  </span>
+                </>
               )}
-              <span className="text-lg font-bold text-foreground tracking-tight">
-                BuildPlus<span className="text-primary">AI</span>
-              </span>
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
@@ -274,11 +276,13 @@ export default function LandingPage() {
               {logoData?.logoBase64 ? (
                 <img src={logoData.logoBase64} alt="BuildPlusAI" className="h-6 w-auto object-contain" />
               ) : (
-                <Building2 className="h-5 w-5 text-primary" />
+                <>
+                  <Building2 className="h-5 w-5 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">
+                    BuildPlus<span className="text-primary">AI</span>
+                  </span>
+                </>
               )}
-              <span className="text-sm font-semibold text-foreground">
-                BuildPlus<span className="text-primary">AI</span>
-              </span>
             </div>
             <p className="text-sm text-muted-foreground" data-testid="text-footer-url">
               www.buildplusai.com

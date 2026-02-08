@@ -156,12 +156,12 @@ interface DocumentItem {
   mimeType: string;
 }
 
-function formatDate(date: string | null): string {
+function formatDate(date: string | null | undefined): string {
   if (!date) return "";
   return new Date(date).toISOString().split("T")[0];
 }
 
-function BooleanField({ label, value, onChange, testId }: { label: string; value: boolean | null; onChange: (v: boolean) => void; testId: string }) {
+function BooleanField({ label, value, onChange, testId }: { label: string; value: boolean | null | undefined; onChange: (v: boolean) => void; testId: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <Label className="text-sm">{label}</Label>

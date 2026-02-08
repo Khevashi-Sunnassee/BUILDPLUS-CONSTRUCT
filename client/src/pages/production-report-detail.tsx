@@ -165,7 +165,7 @@ export default function ProductionReportDetailPage() {
   const reportLogo = brandingSettings?.logoBase64 || null;
   const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
-  const activeJobs = jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")) || [];
+  const activeJobs = jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)) || [];
 
   const selectedJobPanels = useMemo(() => {
     if (!selectedJobId || !jobs) return [];
@@ -492,7 +492,7 @@ export default function ProductionReportDetailPage() {
       const logoHeight = 12;
       const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
-        pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
+        if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
       } catch (e) {}
       
       // Report title

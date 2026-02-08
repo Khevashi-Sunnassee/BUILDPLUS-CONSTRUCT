@@ -216,7 +216,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
 // PATCH /api/jobs/opportunities/:id - Update opportunity status/details
 router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, res: Response) => {
   try {
-    const job = await storage.getJob(req.params.id);
+    const job = await storage.getJob(String(req.params.id));
     if (!job || job.companyId !== req.companyId) {
       return res.status(404).json({ error: "Opportunity not found" });
     }
@@ -272,11 +272,11 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       return res.status(400).json({ error: `Status "${effectiveStatus}" is not valid for stage "${effectiveStage}"` });
     }
 
-    const updated = await storage.updateJob(req.params.id, updateData);
+    const updated = await storage.updateJob(String(req.params.id), updateData);
 
     if (parsed.data.salesStage || parsed.data.salesStatus) {
-      const newStage = updated.salesStage || job.salesStage || "OPPORTUNITY";
-      const newStatus = updated.salesStatus || job.salesStatus || "";
+      const newStage = updated!.salesStage || job.salesStage || "OPPORTUNITY";
+      const newStatus = updated!.salesStatus || job.salesStatus || "";
       try {
         await db.insert(salesStatusHistory).values({
           jobId: job.id,
@@ -292,7 +292,7 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       }
     }
 
-    res.json(serializeJobPhase(updated));
+    res.json(serializeJobPhase(updated!));
   } catch (error: any) {
     logger.error({ err: error }, "Error updating opportunity");
     res.status(400).json({ error: error.message || "Failed to update opportunity" });
@@ -302,14 +302,14 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
 // GET /api/jobs/opportunities/:id/history - Get sales status history for an opportunity
 router.get("/api/jobs/opportunities/:id/history", requireAuth, async (req: Request, res: Response) => {
   try {
-    const job = await storage.getJob(req.params.id);
+    const job = await storage.getJob(String(req.params.id));
     if (!job || job.companyId !== req.companyId) {
       return res.status(404).json({ error: "Opportunity not found" });
     }
 
     const history = await db.select()
       .from(salesStatusHistory)
-      .where(eq(salesStatusHistory.jobId, req.params.id))
+      .where(eq(salesStatusHistory.jobId, String(req.params.id)))
       .orderBy(desc(salesStatusHistory.createdAt));
 
     res.json(history);

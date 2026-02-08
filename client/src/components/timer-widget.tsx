@@ -53,6 +53,7 @@ interface Job {
   id: string;
   jobNumber: string;
   name: string;
+  jobPhase?: number | null;
 }
 
 interface WorkType {
@@ -427,7 +428,7 @@ export function TimerWidget() {
                   <SelectValue placeholder="Select a job" />
                 </SelectTrigger>
                 <SelectContent>
-                  {jobs?.filter(j => isJobVisibleInDropdowns(j.jobPhase || "CONTRACTED")).map((job) => (
+                  {jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as import("@shared/job-phases").JobPhase)).map((job) => (
                     <SelectItem key={job.id} value={job.id}>
                       {job.jobNumber} - {job.name}
                     </SelectItem>
