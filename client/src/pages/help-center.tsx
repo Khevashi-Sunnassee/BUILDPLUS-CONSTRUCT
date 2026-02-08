@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ export default function HelpCenterPage() {
       <div className="flex items-center gap-3">
         <BookOpen className="h-7 w-7 text-muted-foreground" />
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-help-center-title">Help Center</h1>
+        <PageHelpButton pageHelpKey="page.help-center" />
       </div>
 
       <div className="relative">

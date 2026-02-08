@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -356,6 +357,7 @@ export default function DailyReportDetailPage() {
               <h1 className="text-2xl font-bold tracking-tight" data-testid="text-log-date">
                 {format(new Date(log.logDay), "EEEE, dd/MM/yyyy")}
               </h1>
+              <PageHelpButton pageHelpKey="page.daily-report-detail" />
               {getStatusBadge(log.status)}
             </div>
             <p className="text-muted-foreground text-sm mt-1">

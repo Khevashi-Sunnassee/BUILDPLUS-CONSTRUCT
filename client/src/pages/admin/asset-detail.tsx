@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import DOMPurify from "dompurify";
 import { ASSET_ROUTES } from "@shared/api-routes";
 import type { Asset, AssetMaintenance, AssetTransfer } from "@shared/schema";
@@ -365,9 +366,12 @@ export default function AssetDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold truncate" data-testid="text-asset-name">
-            {asset.name}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold truncate" data-testid="text-asset-name">
+              {asset.name}
+            </h1>
+            <PageHelpButton pageHelpKey="page.admin.asset-detail" />
+          </div>
           <Badge variant="outline" data-testid="badge-asset-tag" className="mt-1">
             {asset.assetTag}
           </Badge>

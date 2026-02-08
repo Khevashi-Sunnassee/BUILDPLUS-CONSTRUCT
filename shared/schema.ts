@@ -3008,6 +3008,8 @@ export const helpEntries = pgTable("help_entries", {
   scopeIdx: index("help_scope_idx").on(table.scope),
   categoryIdx: index("help_category_idx").on(table.category),
   routeIdx: index("help_route_idx").on(table.pageRoute),
+  statusIdx: index("help_status_idx").on(table.status),
+  statusUpdatedIdx: index("help_status_updated_idx").on(table.status, table.updatedAt),
 }));
 
 export const insertHelpEntrySchema = createInsertSchema(helpEntries).omit({ id: true, createdAt: true, updatedAt: true });

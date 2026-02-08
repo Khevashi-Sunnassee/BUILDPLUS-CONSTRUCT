@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -70,7 +71,10 @@ export default function RetentionReportPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold" data-testid="heading-retention-report">Retention Report</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" data-testid="heading-retention-report">Retention Report</h1>
+            <PageHelpButton pageHelpKey="page.retention-report" />
+          </div>
           <p className="text-muted-foreground text-sm">Cumulative retention tracking across all jobs</p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -997,9 +998,12 @@ export default function PurchaseOrderFormPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-semibold" data-testid="text-page-title">
-            {isNew ? "New Purchase Order" : `Purchase Order: ${existingPO?.poNumber}`}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold" data-testid="text-page-title">
+              {isNew ? "New Purchase Order" : `Purchase Order: ${existingPO?.poNumber}`}
+            </h1>
+            <PageHelpButton pageHelpKey="page.purchase-order-form" />
+          </div>
           {existingPO && (
             <div className="flex items-center gap-2 mt-1">
               {getStatusBadge(existingPO.status)}

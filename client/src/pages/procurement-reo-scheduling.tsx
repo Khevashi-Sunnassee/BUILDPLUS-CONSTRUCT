@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { useAuth } from "@/lib/auth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { REO_SCHEDULE_ROUTES, JOBS_ROUTES, PROCUREMENT_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
@@ -811,6 +812,7 @@ export default function ProcurementReoSchedulingPage() {
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="w-5 h-5" />
             Procurement Manager - Reo Scheduling
+            <PageHelpButton pageHelpKey="page.procurement-reo-scheduling" />
           </CardTitle>
           <CardDescription>
             View IFC-approved panels, extract reinforcement schedules using AI, and create purchase orders

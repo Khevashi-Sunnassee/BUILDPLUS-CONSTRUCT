@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -358,9 +359,12 @@ export default function ContractDetailPage() {
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-contract-title">
-              {job?.jobNumber} - {job?.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-contract-title">
+                {job?.jobNumber} - {job?.name}
+              </h1>
+              <PageHelpButton pageHelpKey="page.contract-detail" />
+            </div>
             <p className="text-muted-foreground">{job?.client}</p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -536,7 +537,10 @@ export default function TemplateEditorPage() {
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">{template.name}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold">{template.name}</h1>
+              <PageHelpButton pageHelpKey="page.admin.template-editor" />
+            </div>
             <p className="text-muted-foreground">{template.description || "No description"}</p>
           </div>
         </div>

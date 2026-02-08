@@ -1,5 +1,6 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
 import { PANELS_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +94,7 @@ export default function PanelDetailsPage() {
           <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-panel-mark">
             <Package className="h-8 w-8" />
             {panel.panelMark}
+            <PageHelpButton pageHelpKey="page.panel-details" />
           </h1>
           <p className="text-muted-foreground mt-1" data-testid="text-job-info">
             {panel.jobNumber} - {panel.jobName}

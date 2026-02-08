@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -452,9 +453,12 @@ export default function ProgressClaimFormPage() {
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold" data-testid="text-page-title">
-            {isNew ? "New Progress Claim" : existingClaim?.claimNumber || "Progress Claim"}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" data-testid="text-page-title">
+              {isNew ? "New Progress Claim" : existingClaim?.claimNumber || "Progress Claim"}
+            </h1>
+            <PageHelpButton pageHelpKey="page.progress-claim-form" />
+          </div>
           {existingClaim && (
             <div className="flex items-center gap-2 mt-1">
               <Badge variant={statusBadgeVariant[existingClaim.status]} data-testid="badge-claim-status">

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -571,6 +572,7 @@ export default function ProductionReportDetailPage() {
               <Badge variant={factory === "QLD" ? "default" : "secondary"} className="text-sm">
                 {factory}
               </Badge>
+              <PageHelpButton pageHelpKey="page.production-report-detail" />
             </h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <Calendar className="h-4 w-4" />

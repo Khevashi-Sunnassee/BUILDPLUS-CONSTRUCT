@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -165,6 +166,7 @@ export default function AdminHelpPage() {
         <div className="flex items-center gap-2">
           <BookOpen className="h-6 w-6 text-muted-foreground" />
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-admin-help-title">Help Management</h1>
+          <PageHelpButton pageHelpKey="page.admin.help" />
         </div>
         <Button onClick={openCreate} data-testid="button-create-help">
           <Plus className="h-4 w-4 mr-1.5" />

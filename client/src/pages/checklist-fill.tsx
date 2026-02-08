@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Link } from "wouter";
 import {
   ArrowLeft,
@@ -170,6 +171,7 @@ export default function ChecklistFillPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold">{template.name}</h1>
+              <PageHelpButton pageHelpKey="page.checklist-fill" />
               {statusConfig && (
                 <Badge variant={statusConfig.variant}>
                   <statusConfig.icon className="h-3 w-3 mr-1" />

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -432,6 +433,7 @@ export default function ChatPage() {
         <div className="p-4 border-b">
           <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="text-lg font-semibold">Messages</h2>
+            <PageHelpButton pageHelpKey="page.chat" />
             <Dialog open={showNewConversationDialog} onOpenChange={setShowNewConversationDialog}>
               <DialogTrigger asChild>
                 <Button size="icon" variant="ghost" data-testid="button-new-conversation">

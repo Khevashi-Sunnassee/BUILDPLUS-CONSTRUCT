@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
@@ -172,7 +173,10 @@ export default function AdminItemCategoriesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-item-categories-title">Item Categories</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-item-categories-title">Item Categories</h1>
+            <PageHelpButton pageHelpKey="page.admin.item-categories" />
+          </div>
           <p className="text-muted-foreground">Manage categories for inventory items</p>
         </div>
         <Button onClick={openCreateDialog} data-testid="button-create-category">
