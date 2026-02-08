@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   ImageIcon,
   Search,
@@ -16,6 +16,7 @@ import {
   Loader2,
   CheckSquare,
   Square,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,11 +36,15 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   statusConfig,
   formatDate,
@@ -57,11 +62,13 @@ function ThumbnailCard({
   isSelected,
   onToggleSelect,
   onViewFullscreen,
+  onDelete,
 }: {
   doc: DocumentWithDetails;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
   onViewFullscreen: (doc: DocumentWithDetails) => void;
+  onDelete: (doc: DocumentWithDetails) => void;
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -150,6 +157,14 @@ function ThumbnailCard({
               <Download className="h-4 w-4" />
             </a>
           </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => { e.stopPropagation(); onDelete(doc); }}
+            data-testid={`button-delete-photo-${doc.id}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -164,6 +179,7 @@ function FullscreenViewer({
   onNext,
   hasPrev,
   hasNext,
+  onDelete,
 }: {
   doc: DocumentWithDetails | null;
   open: boolean;
@@ -172,6 +188,7 @@ function FullscreenViewer({
   onNext: () => void;
   hasPrev: boolean;
   hasNext: boolean;
+  onDelete: (doc: DocumentWithDetails) => void;
 }) {
   if (!doc) return null;
   const viewUrl = DOCUMENT_ROUTES.VIEW(doc.id);
@@ -216,6 +233,14 @@ function FullscreenViewer({
                   <Download className="h-4 w-4" />
                 </a>
               </Button>
+              <Button
+                size="icon"
+                variant="outline"
+                onClick={() => onDelete(doc)}
+                data-testid="button-viewer-delete"
+              >
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center bg-muted/50 overflow-auto p-4">
@@ -249,6 +274,8 @@ export default function PhotoGallery() {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [viewerDoc, setViewerDoc] = useState<DocumentWithDetails | null>(null);
   const [isViewerOpen, setIsViewerOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DocumentWithDetails | null>(null);
+  const { toast } = useToast();
 
   const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
@@ -400,6 +427,31 @@ export default function PhotoGallery() {
     [viewerIndex, photos]
   );
 
+  const deleteMutation = useMutation({
+    mutationFn: async (docId: string) => {
+      await apiRequest("DELETE", DOCUMENT_ROUTES.BY_ID(docId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.LIST] });
+      setDeleteTarget(null);
+      setIsViewerOpen(false);
+      toast({ title: "Photo deleted", description: "The image has been removed." });
+    },
+    onError: () => {
+      toast({ title: "Delete failed", description: "Could not delete the photo. Please try again.", variant: "destructive" });
+    },
+  });
+
+  const handleDeleteRequest = useCallback((doc: DocumentWithDetails) => {
+    setDeleteTarget(doc);
+  }, []);
+
+  const confirmDelete = useCallback(() => {
+    if (deleteTarget) {
+      deleteMutation.mutate(deleteTarget.id);
+    }
+  }, [deleteTarget, deleteMutation]);
+
   const renderGrid = (docs: DocumentWithDetails[]) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
       {docs.map((doc) => (
@@ -409,6 +461,7 @@ export default function PhotoGallery() {
           isSelected={selectedDocIds.has(doc.id)}
           onToggleSelect={toggleDocSelection}
           onViewFullscreen={openViewer}
+          onDelete={handleDeleteRequest}
         />
       ))}
     </div>
@@ -679,6 +732,7 @@ export default function PhotoGallery() {
         onNext={() => navigateViewer(1)}
         hasPrev={viewerIndex > 0}
         hasNext={viewerIndex < photos.length - 1}
+        onDelete={handleDeleteRequest}
       />
 
       <SendDocumentsEmailDialog
@@ -687,6 +741,42 @@ export default function PhotoGallery() {
         selectedDocuments={selectedDocuments}
         onSuccess={() => setSelectedDocIds(new Set())}
       />
+
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Photo</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteTarget?.title}"? This will permanently remove the image. If this photo was shared in chat, it will show as "Image removed".
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-cancel-delete"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

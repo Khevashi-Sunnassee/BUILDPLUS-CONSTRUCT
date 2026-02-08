@@ -17,11 +17,40 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
-import { MessageCircle, FileIcon, Send, UserPlus, Image, X, Smile } from "lucide-react";
+import { MessageCircle, FileIcon, Send, UserPlus, Image, X, Smile, ImageOff } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CHAT_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import type { User, PanelConversation, ChatMessage } from "./types";
 import { COMMON_EMOJIS } from "./types";
+
+function PanelChatImage({ att }: { att: { id: string; fileName: string; url: string; mimeType: string } }) {
+  const [removed, setRemoved] = useState(false);
+
+  if (removed) {
+    return (
+      <div className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-dashed border-muted-foreground/30 text-muted-foreground max-w-[200px]">
+        <ImageOff className="h-4 w-4 shrink-0" />
+        <span className="text-sm">Image removed</span>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={att.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block"
+    >
+      <img
+        src={att.url}
+        alt={att.fileName}
+        className="max-w-[200px] max-h-[150px] rounded border object-cover"
+        onError={() => setRemoved(true)}
+      />
+    </a>
+  );
+}
 
 export function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMark: string }) {
   const { toast } = useToast();
@@ -204,19 +233,7 @@ export function PanelChatTab({ panelId, panelMark }: { panelId: string; panelMar
                     <div className="flex flex-wrap gap-2 mt-2">
                       {msg.attachments.map((att) => (
                         att.mimeType?.startsWith("image/") ? (
-                          <a
-                            key={att.id}
-                            href={att.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block"
-                          >
-                            <img
-                              src={att.url}
-                              alt={att.fileName}
-                              className="max-w-[200px] max-h-[150px] rounded border object-cover"
-                            />
-                          </a>
+                          <PanelChatImage key={att.id} att={att} />
                         ) : (
                           <a
                             key={att.id}

@@ -37,6 +37,7 @@ import {
   Trash2,
   UserPlus,
   Smile,
+  ImageOff,
 } from "lucide-react";
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import {
@@ -101,6 +102,39 @@ interface Message {
   sender?: User;
   attachments?: MessageAttachment[];
   mentions?: MessageMention[];
+}
+
+function ChatImageAttachment({ att, fileUrl }: { att: MessageAttachment; fileUrl: string }) {
+  const [removed, setRemoved] = useState(false);
+
+  if (removed) {
+    return (
+      <div
+        className="flex items-center gap-2 p-3 rounded-md bg-muted/50 border border-dashed border-muted-foreground/30 text-muted-foreground max-w-xs"
+        data-testid={`attachment-removed-${att.id}`}
+      >
+        <ImageOff className="h-4 w-4 shrink-0" />
+        <span className="text-sm">Image removed</span>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="block"
+      data-testid={`attachment-${att.id}`}
+    >
+      <img
+        src={fileUrl}
+        alt={att.fileName}
+        className="max-w-xs max-h-64 rounded-md border cursor-pointer hover:opacity-90"
+        onError={() => setRemoved(true)}
+      />
+    </a>
+  );
 }
 
 export default function ChatPage() {
@@ -723,20 +757,7 @@ export default function ChatPage() {
                               const fileSize = att.sizeBytes || att.fileSize || 0;
                               
                               return isImage ? (
-                                <a
-                                  key={att.id}
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="block"
-                                  data-testid={`attachment-${att.id}`}
-                                >
-                                  <img
-                                    src={fileUrl}
-                                    alt={att.fileName}
-                                    className="max-w-xs max-h-64 rounded-md border cursor-pointer hover:opacity-90"
-                                  />
-                                </a>
+                                <ChatImageAttachment key={att.id} att={att} fileUrl={fileUrl || ""} />
                               ) : (
                                 <a
                                   key={att.id}

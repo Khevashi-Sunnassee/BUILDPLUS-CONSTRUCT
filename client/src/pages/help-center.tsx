@@ -47,7 +47,7 @@ export default function HelpCenterPage() {
   const showRecent = !debouncedQuery && !selectedCategory;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-3">
         <BookOpen className="h-7 w-7 text-muted-foreground" />
         <h1 className="text-2xl font-bold tracking-tight" data-testid="text-help-center-title">Help Center</h1>
