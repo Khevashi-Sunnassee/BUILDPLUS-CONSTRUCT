@@ -16,6 +16,7 @@ import {
   Upload,
   Download,
   ChevronDown,
+  ChevronRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -326,6 +327,26 @@ export default function AssetRegisterPage() {
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [groupByCategory, setGroupByCategory] = useState(true);
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+
+  const toggleGroup = (category: string) => {
+    setCollapsedGroups(prev => ({ ...prev, [category]: !prev[category] }));
+  };
+
+  const GROUP_COLORS = [
+    { bg: "bg-blue-50 dark:bg-blue-950/30", border: "border-l-blue-500", text: "text-blue-700 dark:text-blue-300" },
+    { bg: "bg-emerald-50 dark:bg-emerald-950/30", border: "border-l-emerald-500", text: "text-emerald-700 dark:text-emerald-300" },
+    { bg: "bg-amber-50 dark:bg-amber-950/30", border: "border-l-amber-500", text: "text-amber-700 dark:text-amber-300" },
+    { bg: "bg-purple-50 dark:bg-purple-950/30", border: "border-l-purple-500", text: "text-purple-700 dark:text-purple-300" },
+    { bg: "bg-rose-50 dark:bg-rose-950/30", border: "border-l-rose-500", text: "text-rose-700 dark:text-rose-300" },
+    { bg: "bg-cyan-50 dark:bg-cyan-950/30", border: "border-l-cyan-500", text: "text-cyan-700 dark:text-cyan-300" },
+    { bg: "bg-orange-50 dark:bg-orange-950/30", border: "border-l-orange-500", text: "text-orange-700 dark:text-orange-300" },
+    { bg: "bg-indigo-50 dark:bg-indigo-950/30", border: "border-l-indigo-500", text: "text-indigo-700 dark:text-indigo-300" },
+    { bg: "bg-teal-50 dark:bg-teal-950/30", border: "border-l-teal-500", text: "text-teal-700 dark:text-teal-300" },
+    { bg: "bg-pink-50 dark:bg-pink-950/30", border: "border-l-pink-500", text: "text-pink-700 dark:text-pink-300" },
+    { bg: "bg-lime-50 dark:bg-lime-950/30", border: "border-l-lime-500", text: "text-lime-700 dark:text-lime-300" },
+    { bg: "bg-sky-50 dark:bg-sky-950/30", border: "border-l-sky-500", text: "text-sky-700 dark:text-sky-300" },
+  ];
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
@@ -840,28 +861,45 @@ export default function AssetRegisterPage() {
       </div>
 
       {groupByCategory && groupedAssets ? (
-        <div className="space-y-4">
-          {groupedAssets.map(([category, categoryAssets]) => (
-            <Card key={category}>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 py-3 px-4">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-sm font-semibold">{category}</CardTitle>
-                  <Badge variant="secondary">{categoryAssets.length}</Badge>
+        <div className="space-y-3">
+          {groupedAssets.map(([category, categoryAssets], groupIndex) => {
+            const colorSet = GROUP_COLORS[groupIndex % GROUP_COLORS.length];
+            const isCollapsed = !!collapsedGroups[category];
+            return (
+              <div key={category} className={`border-l-4 ${colorSet.border} rounded-none overflow-hidden`}>
+                <div
+                  className={`flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer select-none ${colorSet.bg}`}
+                  onClick={() => toggleGroup(category)}
+                  data-testid={`button-toggle-group-${category}`}
+                >
+                  <div className="flex items-center gap-2">
+                    {isCollapsed ? (
+                      <ChevronRight className={`h-4 w-4 ${colorSet.text}`} />
+                    ) : (
+                      <ChevronDown className={`h-4 w-4 ${colorSet.text}`} />
+                    )}
+                    <span className={`text-sm font-semibold ${colorSet.text}`}>{category}</span>
+                    <Badge variant="secondary">{categoryAssets.length}</Badge>
+                  </div>
+                  <span className="text-xs text-muted-foreground font-mono">
+                    {formatCurrency(categoryAssets.reduce((sum, a) => sum + (a.purchasePrice ? parseFloat(String(a.purchasePrice)) : 0), 0))}
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground font-mono">
-                  {formatCurrency(categoryAssets.reduce((sum, a) => sum + (a.purchasePrice ? parseFloat(String(a.purchasePrice)) : 0), 0))}
-                </span>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>{tableHeaders}</TableHeader>
-                  <TableBody>
-                    {categoryAssets.map(renderAssetRow)}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          ))}
+                {!isCollapsed && (
+                  <Card className="rounded-none border-0 border-t">
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>{tableHeaders}</TableHeader>
+                        <TableBody>
+                          {categoryAssets.map(renderAssetRow)}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <Card>
