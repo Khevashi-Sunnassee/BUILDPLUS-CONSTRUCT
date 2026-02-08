@@ -48,52 +48,122 @@ The frontend features a KPI Dashboard with data visualization and PDF export, an
 - **ExcelJS**: Excel file generation library.
 
 ## Comprehensive Debugging & QA Audit Procedure
-When the user requests a "comprehensive debugging", "full audit", "QA pass", or "code quality check", follow this structured procedure:
+When the user requests a "comprehensive debugging", "full audit", "QA pass", or "code quality check", act as a senior full-stack engineer, performance engineer, and security auditor. Run a comprehensive debugging + quality-assurance pass across the ENTIRE application (frontend, backend, database, auth, build pipeline, and deployment configuration).
 
-### 1. Frontend
-- Validate React/TypeScript correctness
-- Check for invalid React element types, broken imports, hooks misuse, state leaks
-- Enforce strict TypeScript rules (no implicit any, unsafe casts, unused exports)
-- Run ESLint and flag all violations
-- Detect performance issues (unnecessary re-renders, large bundles, blocking renders)
+### 0. Baseline & Inventory (Do This First)
+- Identify the tech stack: framework (React/Vite), backend runtime (Node/Express), DB (PostgreSQL), ORM (Drizzle), auth method (cookie session with bcrypt), hosting/runtime assumptions (Replit).
+- Enumerate key directories (client/src/, server/, shared/, public/) and identify entry points.
+- List all API routes/endpoints and all page routes.
+- Identify coding rules/conventions in the repo (eslint, prettier, tsconfig, folder conventions, naming conventions).
+- If config files are missing, flag as a risk.
 
-### 2. Backend
-- Validate all API endpoints exist, are reachable, and return consistent schemas
-- Ensure every protected endpoint enforces authentication and permissions
-- Validate request/response schema validation on all endpoints
-- Detect missing or inconsistent error handling
-- Check database access patterns for N+1 queries, missing indexes, unsafe transactions
+### 1. Frontend (Deep)
+- Validate React/TypeScript correctness end-to-end.
+- Check for invalid React element types, broken imports/exports, incorrect default/named imports, circular component imports.
+- Hooks rules audit: invalid hook usage, dependency arrays, stale closures, excessive rerenders, missing memoization where needed.
+- State management audit (local state vs global state): state leaks, orphan listeners, unmounted setState calls, event handler leaks.
+- Routing & UI flow audit: broken routes, missing loaders, incorrect redirects, auth gating, and error boundaries.
+- Form & data handling: validation gaps, unsafe parsing, missing empty/loading/error states, optimistic update mistakes.
+- Accessibility & UX risks: missing aria labels, focus traps, keyboard navigation, modal scroll-lock issues.
+- Client security: XSS risks from dangerouslySetInnerHTML, unsafe rendering of API content, unsafe HTML/markdown rendering.
+- Bundle/performance: identify large bundles, duplicated deps, blocking renders, excessive hydration, large images, unnecessary rerenders.
+- Ensure no secrets or server-only env vars are referenced in the client bundle.
 
-### 3. Security
-- Verify CSRF protection for all cookie-based write operations
-- Validate secure cookie flags, SameSite policy, and session handling
-- Check for XSS, injection risks, unsafe eval or dynamic execution
-- Scan dependencies for known vulnerabilities
-- Ensure secrets are not hard-coded and only loaded from environment variables
-- Validate security headers (CSP, HSTS, X-Frame-Options, etc.)
+### 2. Backend (Deep)
+- Validate ALL API endpoints exist, are reachable, and consistently implemented.
+- For each endpoint:
+  - Confirm method + path + request schema + response schema
+  - Confirm consistent error format and status codes
+  - Confirm idempotency for safe retries where relevant
+  - Confirm input validation + output validation (schema guard) exists
+- Authentication + Authorization:
+  - Ensure every protected endpoint enforces auth AND permissions/role checks
+  - Verify public endpoints are explicitly marked public
+  - Confirm no endpoints accidentally bypass auth checks
+- Error handling:
+  - Ensure centralized error handler exists and prevents stack trace leakage in prod
+  - Confirm logging includes request-id and relevant context
+- Database & transactions:
+  - Detect N+1 query patterns, missing indexes on frequent filters/joins
+  - Ensure writes use transactions where needed; detect unsafe partial writes
+  - Confirm connection pooling settings and timeout handling
+  - Confirm migrations exist and schema drift is controlled
+- Data integrity:
+  - Verify critical tables have constraints (unique keys, foreign keys if applicable)
+  - Detect race conditions for concurrent writes (double insert, oversell, etc.)
+- File upload / import pipelines (if present):
+  - Validate file type checking, size limits, virus-risk controls, storage safety, and path traversal protections.
 
-### 4. TypeScript & Build Integrity
-- Run a full TypeScript typecheck with noEmit
-- Ensure the application builds cleanly with no warnings
-- Detect circular dependencies and invalid imports
+### 3. Security (Comprehensive)
+- CSRF:
+  - Verify CSRF protection for all cookie-based write operations (POST/PUT/PATCH/DELETE).
+  - Confirm SameSite policy aligns with CSRF approach.
+- Cookies & sessions:
+  - Ensure cookies are HttpOnly, Secure, SameSite configured correctly.
+  - Confirm session fixation protections and rotation on login.
+- Injection risks:
+  - SQL injection risk review (raw queries, string concatenation)
+  - NoSQL injection patterns if applicable
+  - Command injection risks in server utilities
+- XSS:
+  - Validate output encoding, safe HTML/markdown rendering, sanitization for user-generated content.
+- SSRF / Open redirect:
+  - Detect any user-controlled URL fetching; ensure allowlists and DNS/IP protections.
+- Secrets:
+  - Ensure secrets are not hard-coded; verify only environment variables are used.
+  - Detect leaked secrets or keys in repo history if possible.
+- Dependencies:
+  - Scan dependencies for known vulnerabilities and provide patch guidance.
+- Security headers:
+  - Validate CSP, HSTS, X-Frame-Options/frame-ancestors, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
+- Rate limiting & abuse:
+  - Confirm rate limiting on auth + write-heavy endpoints.
+  - Confirm request body limits and upload limits.
+- Auth hardening:
+  - Verify password policy (if applicable), hashing algorithm, login throttling, lockout protections, and MFA readiness.
 
-### 5. Performance & Scalability
-- Simulate load assumptions of 200+ concurrent users
-- Identify latency bottlenecks (API p95, slow pages, blocking I/O)
-- Check database connection pooling and resource limits
-- Identify operations that should be queued or backgrounded
+### 4. TypeScript, Build, and Codebase Integrity (Deep)
+- Run full TypeScript typecheck with `--noEmit` and strict settings; surface unsafe `any` usage.
+- Run ESLint and report all violations; ensure React hooks lint is enabled.
+- Ensure Prettier/format rules are consistent (flag if missing).
+- Detect circular dependencies, unreachable modules, dead code, duplicated utilities.
+- Confirm the app builds cleanly in production mode with no warnings.
+- Validate environment config: required env vars, safe defaults, and missing config failures.
+- Verify CI/CD scripts (if present) are correct and enforce the same checks.
 
-### 6. Rules Compliance
-- Verify the codebase follows its own architectural and coding rules
-- Flag any deviation from established patterns or conventions
+### 5. Performance, Latency & Scalability (200+ Users + High Transactions)
+- Identify slow paths in API (p95 and p99) and sources of latency (DB, I/O, external calls).
+- Confirm caching strategy where appropriate (server caching, CDN caching, query caching).
+- Confirm server is stateless or uses shared storage (Redis/db) for sessions to scale horizontally.
+- Confirm DB pool sizing, timeouts, and backpressure for bursts.
+- Identify bottlenecks: heavy endpoints, inefficient queries, chat/message polling, large payloads.
+- Detect blocking Node operations (sync fs, heavy CPU) and recommend background jobs/queues.
+- Simulate/estimate load under 200 concurrent users:
+  - API p95, error rate, DB saturation risk, and memory usage risks.
+- Flag any design that will fail under concurrency (race conditions, per-request expensive work).
 
-### 7. Output
+### 6. Rules Compliance (Strict)
+- Verify the codebase follows its own architectural and coding rules:
+  - folder conventions, route conventions, naming conventions, patterns for auth + validation.
+- Flag deviations and provide a "fix pattern" with example edits.
+
+### 7. Observability & Operations (Production Readiness)
+- Confirm structured logging exists and is consistent (no leaking secrets).
+- Confirm request tracing / correlation IDs for API calls.
+- Confirm health checks (readiness/liveness) exist.
+- Confirm error monitoring hooks exist (or flag missing: Sentry-like).
+- Confirm backups/migration safety practices (or flag as risk).
+
+### 8. Output Requirements (Non-negotiable)
 - Produce a single structured report summarizing:
-  - Critical issues
+  - Critical issues (must-fix)
+  - High risks (security/perf)
   - Warnings
-  - Recommended fixes (with file references)
-- Assign an overall Application Health Score (0–100)
+  - Recommended fixes with exact file paths and line references
+- Assign an overall Application Health Score (0–100) with a clear scoring breakdown per category:
+  - Frontend, Backend, Security, Build/TS, Performance/Scale, Rules Compliance, Observability
 - Assign a letter grade (A–F)
 - Clearly state whether the application is SAFE TO DEPLOY or BLOCKED
+- Provide a prioritized "Top 10 Fix List" with expected impact (security/perf/stability).
 
-**Audit Principles:** Be strict, assume production risk, do not ignore issues. If something is unclear, surface it as a risk instead of guessing.
+**Audit Principles:** Be strict. Assume production risk. Do not ignore issues. If something is unclear, surface it as an explicit risk instead of guessing.
