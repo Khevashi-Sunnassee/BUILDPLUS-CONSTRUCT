@@ -10,6 +10,18 @@ import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceTo
 import type { JobPhase, JobStatus } from "@shared/job-phases";
 import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
 
+async function resolveUserName(req: Request): Promise<string | null> {
+  if (req.session?.name) return req.session.name;
+  if (req.session?.userId) {
+    const user = await storage.getUser(req.session.userId);
+    if (user?.name) {
+      req.session.name = user.name;
+      return user.name;
+    }
+  }
+  return null;
+}
+
 function serializeJobPhase(job: any): any {
   if (!job) return job;
   return { ...job, jobPhase: intToPhase(job.jobPhase ?? 0) };
@@ -538,7 +550,8 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     data.jobPhase = deserializePhase(jobPhaseStr);
     const job = await storage.createJob(data);
 
-    logJobChange(job.id, "JOB_CREATED", req.session?.userId || null, req.session?.name || null, {
+    const userName = await resolveUserName(req);
+    logJobChange(job.id, "JOB_CREATED", req.session?.userId || null, userName, {
       newPhase: jobPhaseStr,
       newStatus: data.status,
     });
@@ -644,7 +657,8 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
     const job = await storage.updateJob(req.params.id as string, data);
 
     if (Object.keys(changedFields).length > 0) {
-      logJobChange(req.params.id as string, "JOB_UPDATED", req.session?.userId || null, req.session?.name || null, {
+      const userName = await resolveUserName(req);
+      logJobChange(req.params.id as string, "JOB_UPDATED", req.session?.userId || null, userName, {
         changedFields,
         previousPhase: existingPhaseStr,
         newPhase: existingPhaseStr,
@@ -841,6 +855,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
 
       await db.update(jobs).set(updateData).where(eq(jobs.id, job.id));
 
+      const phaseUserName = await resolveUserName(req);
       logJobPhaseChange(
         job.id,
         currentPhase,
@@ -848,7 +863,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         currentStatus,
         targetStatus,
         req.session?.userId || null,
-        req.session?.name || null
+        phaseUserName
       );
 
       const updatedJob = await storage.getJob(job.id);
@@ -866,13 +881,14 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         .set({ status: newStatus as any, updatedAt: new Date() })
         .where(eq(jobs.id, job.id));
 
+      const statusUserName = await resolveUserName(req);
       logJobStatusChange(
         job.id,
         currentPhase,
         currentStatus,
         newStatus,
         req.session?.userId || null,
-        req.session?.name || null
+        statusUserName
       );
 
       const updatedJob = await storage.getJob(job.id);
