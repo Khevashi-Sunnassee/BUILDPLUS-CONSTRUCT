@@ -57,6 +57,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       probability: jobs.probability,
       estimatedStartDate: jobs.estimatedStartDate,
       comments: jobs.comments,
+      jobPhase: jobs.jobPhase,
       createdAt: jobs.createdAt,
       updatedAt: jobs.updatedAt,
     })
@@ -77,6 +78,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
 
     const enriched = result.map(j => ({
       ...j,
+      jobPhase: intToPhase(j.jobPhase ?? 0),
       customerName: j.customerId ? customerMap.get(j.customerId)?.name || null : null,
     }));
 

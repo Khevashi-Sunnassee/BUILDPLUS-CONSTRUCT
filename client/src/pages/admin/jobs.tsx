@@ -1334,7 +1334,70 @@ export default function AdminJobsPage() {
             
             <TabsContent value="details" className="mt-4">
               <div className="space-y-4">
-                <h3 className="font-medium text-sm text-muted-foreground">Basic Information</h3>
+                <FormField
+                  control={jobForm.control}
+                  name="jobPhase"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs text-muted-foreground">Phase</FormLabel>
+                      <div className="flex flex-wrap gap-2">
+                        {JOB_PHASES.map((phase) => {
+                          const isSelected = (field.value || "OPPORTUNITY") === phase;
+                          const colorClasses = PHASE_COLORS[phase];
+                          return (
+                            <Badge
+                              key={phase}
+                              data-testid={`badge-phase-${phase.toLowerCase()}`}
+                              className={`cursor-pointer text-xs px-3 transition-all border ${
+                                isSelected
+                                  ? `${colorClasses} ring-2 ring-offset-1 ring-current font-semibold`
+                                  : "bg-muted/50 text-muted-foreground border-transparent opacity-60"
+                              }`}
+                              onClick={() => {
+                                field.onChange(phase);
+                                const currentStatus = jobForm.getValues("status") as JobStatus;
+                                if (!isValidStatusForPhase(phase as JobPhase, currentStatus)) {
+                                  jobForm.setValue("status", getDefaultStatusForPhase(phase as JobPhase));
+                                }
+                              }}
+                            >
+                              {getPhaseLabel(phase)}
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={jobForm.control}
+                  name="status"
+                  render={({ field }) => {
+                    const currentPhase = (jobForm.watch("jobPhase") || "CONTRACTED") as JobPhase;
+                    const allowedStatuses = PHASE_ALLOWED_STATUSES[currentPhase] || JOB_STATUSES;
+                    return (
+                      <FormItem>
+                        <FormLabel className="text-xs text-muted-foreground">Status</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-job-status" className="w-48">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {allowedStatuses.map((status) => (
+                              <SelectItem key={status} value={status}>{getStatusLabel(status)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    );
+                  }}
+                />
+
+                <h3 className="font-medium text-sm text-muted-foreground pt-2 border-t">Basic Information</h3>
                   <FormField
                     control={jobForm.control}
                     name="jobNumber"
@@ -1410,64 +1473,6 @@ export default function AdminJobsPage() {
                           <FormMessage />
                         </FormItem>
                       )}
-                    />
-                    <FormField
-                      control={jobForm.control}
-                      name="jobPhase"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Phase</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              field.onChange(val);
-                              const phase = val as JobPhase;
-                              const currentStatus = jobForm.getValues("status") as JobStatus;
-                              if (!isValidStatusForPhase(phase, currentStatus)) {
-                                jobForm.setValue("status", getDefaultStatusForPhase(phase));
-                              }
-                            }}
-                            value={field.value || "OPPORTUNITY"}
-                          >
-                            <FormControl>
-                              <SelectTrigger data-testid="select-job-phase">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {JOB_PHASES.map((phase) => (
-                                <SelectItem key={phase} value={phase}>{getPhaseLabel(phase)}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={jobForm.control}
-                      name="status"
-                      render={({ field }) => {
-                        const currentPhase = (jobForm.watch("jobPhase") || "CONTRACTED") as JobPhase;
-                        const allowedStatuses = PHASE_ALLOWED_STATUSES[currentPhase] || JOB_STATUSES;
-                        return (
-                          <FormItem>
-                            <FormLabel>Status</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
-                                <SelectTrigger data-testid="select-job-status">
-                                  <SelectValue />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                {allowedStatuses.map((status) => (
-                                  <SelectItem key={status} value={status}>{getStatusLabel(status)}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        );
-                      }}
                     />
                   </div>
                   <FormField
