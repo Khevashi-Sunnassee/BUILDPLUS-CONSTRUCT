@@ -73,18 +73,19 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 
 const supplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
-  keyContact: z.string().optional(),
+  keyContact: z.string().optional().or(z.literal("")),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
-  phone: z.string().optional(),
-  abn: z.string().optional(),
-  acn: z.string().optional(),
-  addressLine1: z.string().optional(),
-  addressLine2: z.string().optional(),
-  city: z.string().optional(),
-  state: z.string().optional(),
-  postcode: z.string().optional(),
-  paymentTerms: z.string().optional(),
-  notes: z.string().optional(),
+  phone: z.string().optional().or(z.literal("")),
+  abn: z.string().optional().or(z.literal("")),
+  acn: z.string().optional().or(z.literal("")),
+  addressLine1: z.string().optional().or(z.literal("")),
+  addressLine2: z.string().optional().or(z.literal("")),
+  city: z.string().optional().or(z.literal("")),
+  state: z.string().optional().or(z.literal("")),
+  postcode: z.string().optional().or(z.literal("")),
+  country: z.string().optional().or(z.literal("")),
+  paymentTerms: z.string().optional().or(z.literal("")),
+  notes: z.string().optional().or(z.literal("")),
   isActive: z.boolean().default(true),
 });
 
@@ -188,6 +189,7 @@ export default function AdminSuppliersPage() {
       city: "",
       state: "",
       postcode: "",
+      country: "Australia",
       paymentTerms: "",
       notes: "",
       isActive: true,
@@ -254,6 +256,7 @@ export default function AdminSuppliersPage() {
       city: "",
       state: "",
       postcode: "",
+      country: "Australia",
       paymentTerms: "",
       notes: "",
       isActive: true,
@@ -275,6 +278,7 @@ export default function AdminSuppliersPage() {
       city: supplier.city || "",
       state: supplier.state || "",
       postcode: supplier.postcode || "",
+      country: supplier.country || "Australia",
       paymentTerms: supplier.paymentTerms || "",
       notes: supplier.notes || "",
       isActive: supplier.isActive,
@@ -594,6 +598,19 @@ export default function AdminSuppliersPage() {
                       <FormLabel>Postcode</FormLabel>
                       <FormControl>
                         <Input placeholder="0000" {...field} data-testid="input-supplier-postcode" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Country</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Australia" {...field} data-testid="input-supplier-country" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
