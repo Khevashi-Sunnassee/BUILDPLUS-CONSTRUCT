@@ -23,7 +23,9 @@ import {
   Calendar,
   Clock,
   TrendingDown,
+  BarChart3,
 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ASSET_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import type { Asset } from "@shared/schema";
 import {
@@ -326,8 +328,9 @@ export default function AssetRegisterPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [groupByCategory, setGroupByCategory] = useState(true);
+  const [groupByMode, setGroupByMode] = useState<"category" | "month" | "none">("category");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [showGraph, setShowGraph] = useState(false);
 
   const toggleGroup = (category: string) => {
     setCollapsedGroups(prev => ({ ...prev, [category]: !prev[category] }));
@@ -419,15 +422,42 @@ export default function AssetRegisterPage() {
   }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter, sortField, sortDir]);
 
   const groupedAssets = useMemo(() => {
-    if (!groupByCategory) return null;
+    if (groupByMode === "none") return null;
     const groups: Record<string, Asset[]> = {};
     for (const asset of filteredAndSortedAssets) {
-      const cat = asset.category || "Other";
-      if (!groups[cat]) groups[cat] = [];
-      groups[cat].push(asset);
+      let key: string;
+      if (groupByMode === "month") {
+        if (asset.purchaseDate) {
+          const d = new Date(asset.purchaseDate);
+          if (!isNaN(d.getTime())) {
+            const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            key = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+          } else {
+            key = "No Purchase Date";
+          }
+        } else {
+          key = "No Purchase Date";
+        }
+      } else {
+        key = asset.category || "Other";
+      }
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(asset);
+    }
+    if (groupByMode === "month") {
+      return Object.entries(groups).sort(([a], [b]) => {
+        if (a === "No Purchase Date") return 1;
+        if (b === "No Purchase Date") return -1;
+        const parseMonth = (s: string) => {
+          const parts = s.split(" ");
+          const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+          return new Date(parseInt(parts[1]), monthNames.indexOf(parts[0])).getTime();
+        };
+        return parseMonth(b) - parseMonth(a);
+      });
     }
     return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
-  }, [filteredAndSortedAssets, groupByCategory]);
+  }, [filteredAndSortedAssets, groupByMode]);
 
   const stats = useMemo(() => {
     if (!assets) return { total: 0, totalPurchasePrice: 0, totalCurrentValue: 0, active: 0, leased: 0 };
@@ -445,6 +475,31 @@ export default function AssetRegisterPage() {
       leased: assets.filter((a) => a.fundingMethod === "leased").length,
     };
   }, [assets]);
+
+  const chartData = useMemo(() => {
+    if (!assets) return [];
+    const monthMap: Record<string, { count: number; total: number; sortKey: number }> = {};
+    for (const asset of assets) {
+      if (!asset.purchaseDate) continue;
+      const d = new Date(asset.purchaseDate);
+      if (isNaN(d.getTime())) continue;
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const label = `${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+      const sortKey = d.getFullYear() * 100 + d.getMonth();
+      if (!monthMap[label]) monthMap[label] = { count: 0, total: 0, sortKey };
+      monthMap[label].count += 1;
+      const price = asset.purchasePrice ? parseFloat(String(asset.purchasePrice)) : 0;
+      monthMap[label].total += isNaN(price) ? 0 : price;
+    }
+    return Object.entries(monthMap)
+      .sort(([, a], [, b]) => a.sortKey - b.sortKey)
+      .map(([month, data]) => ({ month, count: data.count, total: data.total }));
+  }, [assets]);
+
+  const CHART_COLORS = [
+    "hsl(215, 70%, 55%)", "hsl(150, 60%, 45%)", "hsl(35, 85%, 55%)",
+    "hsl(270, 60%, 55%)", "hsl(350, 70%, 55%)", "hsl(185, 60%, 45%)",
+  ];
 
   const createMutation = useMutation({
     mutationFn: async (data: AssetFormData) => {
@@ -850,17 +905,28 @@ export default function AssetRegisterPage() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={groupByMode} onValueChange={(v) => { setGroupByMode(v as "category" | "month" | "none"); setCollapsedGroups({}); }}>
+          <SelectTrigger className="w-[160px]" data-testid="select-group-by">
+            <SelectValue placeholder="Group By" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="category">Group by Category</SelectItem>
+            <SelectItem value="month">Group by Month</SelectItem>
+            <SelectItem value="none">No Grouping</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
-          variant={groupByCategory ? "default" : "outline"}
-          onClick={() => setGroupByCategory(!groupByCategory)}
-          data-testid="button-group-category"
+          variant="outline"
+          onClick={() => setShowGraph(true)}
+          data-testid="button-view-graph"
           className="whitespace-nowrap"
         >
-          Group by Category
+          <BarChart3 className="h-4 w-4 mr-2" />
+          View Graph
         </Button>
       </div>
 
-      {groupByCategory && groupedAssets ? (
+      {groupByMode !== "none" && groupedAssets ? (
         <div className="space-y-3">
           {groupedAssets.map(([category, categoryAssets], groupIndex) => {
             const colorSet = GROUP_COLORS[groupIndex % GROUP_COLORS.length];
@@ -923,6 +989,106 @@ export default function AssetRegisterPage() {
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={showGraph} onOpenChange={setShowGraph}>
+        <DialogContent className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Asset Purchases Over Time</DialogTitle>
+            <DialogDescription>
+              Number of assets purchased and total spend per month
+            </DialogDescription>
+          </DialogHeader>
+          {chartData.length === 0 ? (
+            <div className="flex items-center justify-center py-12 text-muted-foreground">
+              No purchase date data available to display
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-3">Assets Purchased per Month</p>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid hsl(var(--border))",
+                          backgroundColor: "hsl(var(--popover))",
+                          color: "hsl(var(--popover-foreground))",
+                          fontSize: "13px",
+                        }}
+                        formatter={(value: number, name: string) => {
+                          if (name === "total") return [formatCurrency(value), "Total Spend"];
+                          return [value, "Assets Purchased"];
+                        }}
+                        labelFormatter={(label) => label}
+                      />
+                      <Bar dataKey="count" name="count" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        {chartData.map((_, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-3">Total Spend per Month</p>
+                <div className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis
+                        dataKey="month"
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        className="fill-muted-foreground"
+                        tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: "8px",
+                          border: "1px solid hsl(var(--border))",
+                          backgroundColor: "hsl(var(--popover))",
+                          color: "hsl(var(--popover-foreground))",
+                          fontSize: "13px",
+                        }}
+                        formatter={(value: number) => [formatCurrency(value), "Total Spend"]}
+                        labelFormatter={(label) => label}
+                      />
+                      <Bar dataKey="total" name="total" radius={[4, 4, 0, 0]} maxBarSize={40}>
+                        {chartData.map((_, index) => (
+                          <Cell key={`cell-spend-${index}`} fill={CHART_COLORS[(index + 2) % CHART_COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
