@@ -112,14 +112,17 @@ const adminNavItems = [
   { title: "Panel Types", url: "/admin/panel-types", icon: Layers },
   { title: "Document Config", url: "/admin/document-config", icon: FileText },
   { title: "Checklist Templates", url: "/admin/checklist-templates", icon: ClipboardList },
-  { title: "Customers", url: "/admin/customers", icon: Handshake },
-  { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
   { title: "Items", url: "/admin/items", icon: Package },
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
   { title: "Help Management", url: "/admin/help", icon: BookOpen },
   { title: "Data Management", url: "/admin/data-management", icon: Trash2 },
+];
+
+const contactsNavItems = [
+  { title: "Customers", url: "/admin/customers", icon: Handshake },
+  { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
 ];
 
 const urlToFunctionKey: Record<string, string> = {
@@ -169,6 +172,7 @@ export function AppSidebar() {
   const [productionExpanded, setProductionExpanded] = useState(true);
   const [adminFinanceExpanded, setAdminFinanceExpanded] = useState(true);
   const [managementExpanded, setManagementExpanded] = useState(true);
+  const [contactsExpanded, setContactsExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(false);
 
   const { data: myPermissions = [] } = useQuery<UserPermission[]>({
@@ -321,6 +325,39 @@ export function AppSidebar() {
                 <SidebarGroupContent>
                   <SidebarMenu>
                     {managerNavItems.map((item) => (
+                      <SidebarMenuItem key={item.title}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(item.url)}
+                          className="transition-colors"
+                        >
+                          <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    ))}
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </CollapsibleContent>
+            </SidebarGroup>
+          </Collapsible>
+        )}
+
+        {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
+          <Collapsible open={contactsExpanded} onOpenChange={setContactsExpanded}>
+            <SidebarGroup>
+              <CollapsibleTrigger className="w-full">
+                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+                  <span>Contacts</span>
+                  {contactsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                </SidebarGroupLabel>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    {contactsNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
                       <SidebarMenuItem key={item.title}>
                         <SidebarMenuButton
                           asChild
