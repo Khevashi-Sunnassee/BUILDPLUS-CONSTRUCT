@@ -17,6 +17,12 @@ import {
   Upload,
   Download,
   ChevronDown,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Calendar,
+  Clock,
+  TrendingDown,
 } from "lucide-react";
 import { ASSET_ROUTES } from "@shared/api-routes";
 import type { Asset } from "@shared/schema";
@@ -85,6 +91,31 @@ const formatCurrency = (value: string | number | null | undefined) => {
     style: "currency",
     currency: "AUD",
   }).format(num);
+};
+
+const formatDate = (value: string | null | undefined) => {
+  if (!value) return "-";
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "-";
+    return d.toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return "-";
+  }
+};
+
+const daysSinceDate = (value: string | null | undefined): string => {
+  if (!value) return "-";
+  try {
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return "-";
+    const diff = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diff < 0) return "Future";
+    if (diff === 0) return "Today";
+    return `${diff.toLocaleString()}d`;
+  } catch {
+    return "-";
+  }
 };
 
 const assetFormSchema = z.object({
@@ -204,7 +235,7 @@ const defaultFormValues: AssetFormData = {
 };
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return <span>-</span>;
+  if (!status) return <span className="text-muted-foreground">-</span>;
   const variant =
     status === "active"
       ? "default"
@@ -212,14 +243,14 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
         ? "secondary"
         : "destructive";
   return (
-    <Badge variant={variant} className="capitalize">
+    <Badge variant={variant} className="capitalize" data-testid="badge-status">
       {status}
     </Badge>
   );
 }
 
 function ConditionBadge({ condition }: { condition: string | null | undefined }) {
-  if (!condition) return <span>-</span>;
+  if (!condition) return <span className="text-muted-foreground">-</span>;
   return (
     <Badge variant="outline" className="capitalize">
       {condition}
@@ -249,6 +280,34 @@ function FormSection({ title, defaultOpen, children }: { title: string; defaultO
   );
 }
 
+type SortField = "purchasePrice" | "name" | "purchaseDate" | "daysSincePurchase" | null;
+type SortDir = "asc" | "desc";
+
+function SortableHeader({ label, field, currentSort, currentDir, onSort }: {
+  label: string;
+  field: SortField;
+  currentSort: SortField;
+  currentDir: SortDir;
+  onSort: (f: SortField) => void;
+}) {
+  const active = currentSort === field;
+  return (
+    <button
+      type="button"
+      className="flex items-center gap-1 cursor-pointer text-left whitespace-nowrap"
+      onClick={() => onSort(field)}
+      data-testid={`button-sort-${field}`}
+    >
+      {label}
+      {active ? (
+        currentDir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+      ) : (
+        <ArrowUpDown className="h-3 w-3 opacity-40" />
+      )}
+    </button>
+  );
+}
+
 export default function AssetRegisterPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -264,6 +323,9 @@ export default function AssetRegisterPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ imported?: number; errors?: string[] } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [groupByCategory, setGroupByCategory] = useState(false);
 
   const { data: assets, isLoading } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
@@ -276,9 +338,18 @@ export default function AssetRegisterPage() {
 
   const watchedFundingMethod = form.watch("fundingMethod");
 
-  const filteredAssets = useMemo(() => {
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir("desc");
+    }
+  };
+
+  const filteredAndSortedAssets = useMemo(() => {
     if (!assets) return [];
-    return assets.filter((asset) => {
+    let result = assets.filter((asset) => {
       const query = searchQuery.toLowerCase();
       if (query) {
         const matchesSearch =
@@ -294,13 +365,54 @@ export default function AssetRegisterPage() {
       if (fundingFilter !== "all" && asset.fundingMethod !== fundingFilter) return false;
       return true;
     });
-  }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter]);
+
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        let valA: number, valB: number;
+        if (sortField === "purchasePrice") {
+          valA = a.purchasePrice ? parseFloat(String(a.purchasePrice)) : 0;
+          valB = b.purchasePrice ? parseFloat(String(b.purchasePrice)) : 0;
+        } else if (sortField === "name") {
+          const cmp = (a.name || "").localeCompare(b.name || "");
+          return sortDir === "asc" ? cmp : -cmp;
+        } else if (sortField === "purchaseDate") {
+          valA = a.purchaseDate ? new Date(a.purchaseDate).getTime() : 0;
+          valB = b.purchaseDate ? new Date(b.purchaseDate).getTime() : 0;
+        } else if (sortField === "daysSincePurchase") {
+          valA = a.purchaseDate ? Math.floor((Date.now() - new Date(a.purchaseDate).getTime()) / 86400000) : -1;
+          valB = b.purchaseDate ? Math.floor((Date.now() - new Date(b.purchaseDate).getTime()) / 86400000) : -1;
+        } else {
+          return 0;
+        }
+        if (isNaN(valA)) valA = 0;
+        if (isNaN(valB)) valB = 0;
+        return sortDir === "asc" ? valA - valB : valB - valA;
+      });
+    }
+
+    return result;
+  }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter, sortField, sortDir]);
+
+  const groupedAssets = useMemo(() => {
+    if (!groupByCategory) return null;
+    const groups: Record<string, Asset[]> = {};
+    for (const asset of filteredAndSortedAssets) {
+      const cat = asset.category || "Other";
+      if (!groups[cat]) groups[cat] = [];
+      groups[cat].push(asset);
+    }
+    return Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+  }, [filteredAndSortedAssets, groupByCategory]);
 
   const stats = useMemo(() => {
-    if (!assets) return { total: 0, totalValue: 0, active: 0, leased: 0 };
+    if (!assets) return { total: 0, totalPurchasePrice: 0, totalCurrentValue: 0, active: 0, leased: 0 };
     return {
       total: assets.length,
-      totalValue: assets.reduce((sum, a) => {
+      totalPurchasePrice: assets.reduce((sum, a) => {
+        const val = a.purchasePrice ? parseFloat(String(a.purchasePrice)) : 0;
+        return sum + (isNaN(val) ? 0 : val);
+      }, 0),
+      totalCurrentValue: assets.reduce((sum, a) => {
         const val = a.currentValue ? parseFloat(String(a.currentValue)) : 0;
         return sum + (isNaN(val) ? 0 : val);
       }, 0),
@@ -317,32 +429,33 @@ export default function AssetRegisterPage() {
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
       toast({ title: "Asset created successfully" });
       setDialogOpen(false);
-      form.reset();
+      form.reset(defaultFormValues);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to create asset", description: error.message, variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to create asset", description: err.message, variant: "destructive" });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: AssetFormData }) => {
-      return apiRequest("PATCH", ASSET_ROUTES.BY_ID(id), data);
+    mutationFn: async (data: AssetFormData & { id: string }) => {
+      const { id, ...rest } = data;
+      return apiRequest("PATCH", ASSET_ROUTES.UPDATE(id), rest);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
       toast({ title: "Asset updated successfully" });
       setDialogOpen(false);
       setEditingAsset(null);
-      form.reset();
+      form.reset(defaultFormValues);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to update asset", description: error.message, variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to update asset", description: err.message, variant: "destructive" });
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", ASSET_ROUTES.BY_ID(id), {});
+      return apiRequest("DELETE", ASSET_ROUTES.DELETE(id));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
@@ -350,30 +463,30 @@ export default function AssetRegisterPage() {
       setDeleteDialogOpen(false);
       setDeletingAssetId(null);
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to delete asset", description: error.message, variant: "destructive" });
+    onError: (err: any) => {
+      toast({ title: "Failed to delete asset", description: err.message, variant: "destructive" });
     },
   });
 
   const openCreateDialog = () => {
     setEditingAsset(null);
-    form.reset({ ...defaultFormValues });
+    form.reset(defaultFormValues);
     setDialogOpen(true);
   };
 
   const openEditDialog = (asset: Asset) => {
     setEditingAsset(asset);
     form.reset({
-      name: asset.name,
-      category: asset.category,
+      name: asset.name || "",
+      category: asset.category || "",
       description: asset.description || "",
       quantity: asset.quantity ?? null,
       status: asset.status || "active",
-      condition: asset.condition || "",
+      condition: asset.condition || "good",
       location: asset.location || "",
       department: asset.department || "",
       assignedTo: asset.assignedTo || "",
-      fundingMethod: asset.fundingMethod || "",
+      fundingMethod: asset.fundingMethod || "purchased",
       remarks: asset.remarks || "",
       supplier: asset.supplier || "",
       purchaseDate: asset.purchaseDate || "",
@@ -396,7 +509,7 @@ export default function AssetRegisterPage() {
       yearOfManufacture: asset.yearOfManufacture || "",
       countryOfOrigin: asset.countryOfOrigin || "",
       specifications: asset.specifications || "",
-      operatingHours: asset.operatingHours ?? null,
+      operatingHours: asset.operatingHours ? Number(asset.operatingHours) : null,
       barcode: asset.barcode || "",
       leaseStartDate: asset.leaseStartDate || "",
       leaseEndDate: asset.leaseEndDate || "",
@@ -424,7 +537,7 @@ export default function AssetRegisterPage() {
 
   const onSubmit = (data: AssetFormData) => {
     if (editingAsset) {
-      updateMutation.mutate({ id: editingAsset.id, data });
+      updateMutation.mutate({ ...data, id: editingAsset.id });
     } else {
       createMutation.mutate(data);
     }
@@ -460,14 +573,14 @@ export default function AssetRegisterPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6" style={{ fontFamily: "helvetica, sans-serif" }}>
+      <div className="p-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-9 w-32" />
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-28" />
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Skeleton key={i} className="h-20" />
           ))}
         </div>
         <Skeleton className="h-96" />
@@ -475,15 +588,102 @@ export default function AssetRegisterPage() {
     );
   }
 
+  const renderAssetRow = (asset: Asset) => (
+    <TableRow
+      key={asset.id}
+      className="cursor-pointer hover-elevate"
+      onClick={() => setLocation(`/admin/assets/${asset.id}`)}
+      data-testid={`row-asset-${asset.id}`}
+    >
+      <TableCell className="font-mono text-xs" data-testid={`text-asset-tag-${asset.id}`}>
+        {asset.assetTag}
+      </TableCell>
+      <TableCell className="font-medium max-w-[240px] truncate" data-testid={`text-asset-name-${asset.id}`}>
+        {asset.name}
+      </TableCell>
+      <TableCell className="text-sm" data-testid={`text-asset-category-${asset.id}`}>
+        {asset.category || "-"}
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={asset.status} />
+      </TableCell>
+      <TableCell className="text-sm" data-testid={`text-asset-purchase-date-${asset.id}`}>
+        {formatDate(asset.purchaseDate)}
+      </TableCell>
+      <TableCell className="text-sm text-center" data-testid={`text-asset-useful-life-${asset.id}`}>
+        {asset.usefulLifeYears ? `${asset.usefulLifeYears}y` : "-"}
+      </TableCell>
+      <TableCell className="text-sm text-center" data-testid={`text-asset-days-since-${asset.id}`}>
+        {daysSinceDate(asset.purchaseDate)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm" data-testid={`text-asset-purchase-price-${asset.id}`}>
+        {formatCurrency(asset.purchasePrice)}
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm" data-testid={`text-asset-current-value-${asset.id}`}>
+        {formatCurrency(asset.currentValue)}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              openEditDialog(asset);
+            }}
+            data-testid={`button-edit-asset-${asset.id}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeletingAssetId(asset.id);
+              setDeleteDialogOpen(true);
+            }}
+            data-testid={`button-delete-asset-${asset.id}`}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+
+  const tableHeaders = (
+    <TableRow>
+      <TableHead className="w-[90px]">Tag</TableHead>
+      <TableHead>
+        <SortableHeader label="Name" field="name" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
+      </TableHead>
+      <TableHead>Category</TableHead>
+      <TableHead>Status</TableHead>
+      <TableHead>
+        <SortableHeader label="Purchase Date" field="purchaseDate" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
+      </TableHead>
+      <TableHead className="text-center">Useful Life</TableHead>
+      <TableHead className="text-center">
+        <SortableHeader label="Days Since" field="daysSincePurchase" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
+      </TableHead>
+      <TableHead className="text-right">
+        <SortableHeader label="Purchase Price" field="purchasePrice" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
+      </TableHead>
+      <TableHead className="text-right">Current Value</TableHead>
+      <TableHead className="text-right w-[80px]">Actions</TableHead>
+    </TableRow>
+  );
+
   return (
-    <div className="p-6 space-y-6" style={{ fontFamily: "helvetica, sans-serif" }}>
+    <div className="p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <Package className="h-6 w-6 text-muted-foreground" />
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold" data-testid="text-page-title">
-            Asset Register
-          </h1>
+              Asset Register
+            </h1>
             <PageHelpButton pageHelpKey="page.admin.asset-register" />
           </div>
         </div>
@@ -491,7 +691,7 @@ export default function AssetRegisterPage() {
           <a href={ASSET_ROUTES.TEMPLATE} download>
             <Button variant="outline" data-testid="button-download-template">
               <Download className="h-4 w-4 mr-2" />
-              Download Template
+              Template
             </Button>
           </a>
           <Button variant="outline" onClick={() => { setImportResult(null); setImportDialogOpen(true); }} data-testid="button-import-assets">
@@ -505,47 +705,58 @@ export default function AssetRegisterPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Assets</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-assets">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Total Assets</span>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="text-xl font-bold mt-1" data-testid="stat-total-assets">
               {stats.total}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-total-value">
-              {formatCurrency(stats.totalValue)}
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Total Purchase Price</span>
+              <DollarSign className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="text-xl font-bold mt-1" data-testid="stat-total-purchase-price">
+              {formatCurrency(stats.totalPurchasePrice)}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Assets</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-active-assets">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Current Value</span>
+              <TrendingDown className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="text-xl font-bold mt-1" data-testid="stat-total-current-value">
+              {formatCurrency(stats.totalCurrentValue)}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Active Assets</span>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="text-xl font-bold mt-1" data-testid="stat-active-assets">
               {stats.active}
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leased Assets</CardTitle>
-            <Truck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="stat-leased-assets">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Leased</span>
+              <Truck className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="text-xl font-bold mt-1" data-testid="stat-leased-assets">
               {stats.leased}
             </div>
           </CardContent>
@@ -564,7 +775,7 @@ export default function AssetRegisterPage() {
           />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]" data-testid="select-category-filter">
+          <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
@@ -577,7 +788,7 @@ export default function AssetRegisterPage() {
           </SelectContent>
         </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="select-status-filter">
+          <SelectTrigger className="w-[140px]" data-testid="select-status-filter">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -590,8 +801,8 @@ export default function AssetRegisterPage() {
           </SelectContent>
         </Select>
         <Select value={fundingFilter} onValueChange={setFundingFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-funding-filter">
-            <SelectValue placeholder="Funding Method" />
+          <SelectTrigger className="w-[140px]" data-testid="select-funding-filter">
+            <SelectValue placeholder="Funding" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Funding</SelectItem>
@@ -602,99 +813,62 @@ export default function AssetRegisterPage() {
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant={groupByCategory ? "default" : "outline"}
+          onClick={() => setGroupByCategory(!groupByCategory)}
+          data-testid="button-group-category"
+          className="whitespace-nowrap"
+        >
+          Group by Category
+        </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Asset Tag</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Condition</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead className="text-right">Purchase Price</TableHead>
-                <TableHead className="text-right">Current Value</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAssets.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                    {assets && assets.length > 0
-                      ? "No assets match the current filters"
-                      : "No assets found"}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredAssets.map((asset) => (
-                  <TableRow
-                    key={asset.id}
-                    className="cursor-pointer hover-elevate"
-                    onClick={() => setLocation(`/admin/assets/${asset.id}`)}
-                    data-testid={`row-asset-${asset.id}`}
-                  >
-                    <TableCell className="font-mono text-sm" data-testid={`text-asset-tag-${asset.id}`}>
-                      {asset.assetTag}
-                    </TableCell>
-                    <TableCell className="font-medium" data-testid={`text-asset-name-${asset.id}`}>
-                      {asset.name}
-                    </TableCell>
-                    <TableCell data-testid={`text-asset-category-${asset.id}`}>
-                      {asset.category}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={asset.status} />
-                    </TableCell>
-                    <TableCell>
-                      <ConditionBadge condition={asset.condition} />
-                    </TableCell>
-                    <TableCell data-testid={`text-asset-location-${asset.id}`}>
-                      {asset.location || "-"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-asset-purchase-price-${asset.id}`}>
-                      {formatCurrency(asset.purchasePrice)}
-                    </TableCell>
-                    <TableCell className="text-right font-mono" data-testid={`text-asset-current-value-${asset.id}`}>
-                      {formatCurrency(asset.currentValue)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex flex-wrap items-center justify-end gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditDialog(asset);
-                          }}
-                          data-testid={`button-edit-asset-${asset.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingAssetId(asset.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          data-testid={`button-delete-asset-${asset.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+      {groupByCategory && groupedAssets ? (
+        <div className="space-y-4">
+          {groupedAssets.map(([category, categoryAssets]) => (
+            <Card key={category}>
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 py-3 px-4">
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-sm font-semibold">{category}</CardTitle>
+                  <Badge variant="secondary">{categoryAssets.length}</Badge>
+                </div>
+                <span className="text-xs text-muted-foreground font-mono">
+                  {formatCurrency(categoryAssets.reduce((sum, a) => sum + (a.purchasePrice ? parseFloat(String(a.purchasePrice)) : 0), 0))}
+                </span>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>{tableHeaders}</TableHeader>
+                  <TableBody>
+                    {categoryAssets.map(renderAssetRow)}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>{tableHeaders}</TableHeader>
+              <TableBody>
+                {filteredAndSortedAssets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      {assets && assets.length > 0
+                        ? "No assets match the current filters"
+                        : "No assets found"}
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                ) : (
+                  filteredAndSortedAssets.map(renderAssetRow)
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -1085,7 +1259,7 @@ export default function AssetRegisterPage() {
                 </div>
               </FormSection>
 
-              <FormSection title="Technical / Identification">
+              <FormSection title="Identification & Specifications">
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -1133,7 +1307,7 @@ export default function AssetRegisterPage() {
                     name="registrationNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Asset No.</FormLabel>
+                        <FormLabel>Registration Number</FormLabel>
                         <FormControl>
                           <Input {...field} data-testid="input-asset-registration-number" />
                         </FormControl>
@@ -1219,7 +1393,7 @@ export default function AssetRegisterPage() {
                       <FormItem>
                         <FormLabel>Operating Hours</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-operating-hours" />
+                          <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-operating-hours" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -1242,234 +1416,50 @@ export default function AssetRegisterPage() {
               </FormSection>
 
               {(watchedFundingMethod === "leased" || watchedFundingMethod === "financed") && (
-                <FormSection title="Lease / Finance">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="leaseStartDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lease Start Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} data-testid="input-asset-lease-start-date" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="leaseEndDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lease End Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} data-testid="input-asset-lease-end-date" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="leaseMonthlyPayment"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Monthly Payment</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} data-testid="input-asset-lease-monthly-payment" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="balloonPayment"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Balloon Payment</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} data-testid="input-asset-balloon-payment" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="leaseTerm"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lease Term (Months)</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-lease-term" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lessor"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lessor</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-asset-lessor" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="loanAmount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Loan Amount</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} data-testid="input-asset-loan-amount" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="interestRate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Interest Rate</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" {...field} data-testid="input-asset-interest-rate" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="loanTerm"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Loan Term (Months)</FormLabel>
-                          <FormControl>
-                            <Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-loan-term" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="lender"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lender</FormLabel>
-                          <FormControl>
-                            <Input {...field} data-testid="input-asset-lender" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
+                <FormSection title={watchedFundingMethod === "leased" ? "Lease Details" : "Finance Details"}>
+                  {watchedFundingMethod === "leased" && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="lessor" render={({ field }) => (<FormItem><FormLabel>Lessor</FormLabel><FormControl><Input {...field} data-testid="input-asset-lessor" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="leaseTerm" render={({ field }) => (<FormItem><FormLabel>Lease Term (Months)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-lease-term" /></FormControl><FormMessage /></FormItem>)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="leaseStartDate" render={({ field }) => (<FormItem><FormLabel>Lease Start</FormLabel><FormControl><Input type="date" {...field} data-testid="input-asset-lease-start" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="leaseEndDate" render={({ field }) => (<FormItem><FormLabel>Lease End</FormLabel><FormControl><Input type="date" {...field} data-testid="input-asset-lease-end" /></FormControl><FormMessage /></FormItem>)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="leaseMonthlyPayment" render={({ field }) => (<FormItem><FormLabel>Monthly Payment</FormLabel><FormControl><Input type="number" step="0.01" {...field} data-testid="input-asset-lease-payment" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="balloonPayment" render={({ field }) => (<FormItem><FormLabel>Balloon Payment</FormLabel><FormControl><Input type="number" step="0.01" {...field} data-testid="input-asset-balloon-payment" /></FormControl><FormMessage /></FormItem>)} />
+                      </div>
+                    </>
+                  )}
+                  {watchedFundingMethod === "financed" && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="lender" render={({ field }) => (<FormItem><FormLabel>Lender</FormLabel><FormControl><Input {...field} data-testid="input-asset-lender" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="loanTerm" render={({ field }) => (<FormItem><FormLabel>Loan Term (Months)</FormLabel><FormControl><Input type="number" {...field} value={field.value ?? ""} onChange={(e) => field.onChange(e.target.value === "" ? null : Number(e.target.value))} data-testid="input-asset-loan-term" /></FormControl><FormMessage /></FormItem>)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField control={form.control} name="loanAmount" render={({ field }) => (<FormItem><FormLabel>Loan Amount</FormLabel><FormControl><Input type="number" step="0.01" {...field} data-testid="input-asset-loan-amount" /></FormControl><FormMessage /></FormItem>)} />
+                        <FormField control={form.control} name="interestRate" render={({ field }) => (<FormItem><FormLabel>Interest Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} data-testid="input-asset-interest-rate" /></FormControl><FormMessage /></FormItem>)} />
+                      </div>
+                    </>
+                  )}
                 </FormSection>
               )}
 
               <FormSection title="Insurance">
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="insuranceProvider"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Insurance Provider</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-asset-insurance-provider" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="insurancePolicyNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Policy Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-asset-insurance-policy-number" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormField control={form.control} name="insuranceProvider" render={({ field }) => (<FormItem><FormLabel>Provider</FormLabel><FormControl><Input {...field} data-testid="input-asset-insurance-provider" /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="insurancePolicyNumber" render={({ field }) => (<FormItem><FormLabel>Policy Number</FormLabel><FormControl><Input {...field} data-testid="input-asset-insurance-policy-number" /></FormControl><FormMessage /></FormItem>)} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="insurancePremium"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Premium</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} data-testid="input-asset-insurance-premium" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="insuranceExcess"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Excess</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" {...field} data-testid="input-asset-insurance-excess" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormField control={form.control} name="insurancePremium" render={({ field }) => (<FormItem><FormLabel>Premium</FormLabel><FormControl><Input type="number" step="0.01" {...field} data-testid="input-asset-insurance-premium" /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="insuranceExcess" render={({ field }) => (<FormItem><FormLabel>Excess</FormLabel><FormControl><Input type="number" step="0.01" {...field} data-testid="input-asset-insurance-excess" /></FormControl><FormMessage /></FormItem>)} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="insuranceStartDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-asset-insurance-start-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="insuranceExpiryDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Expiry Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-asset-insurance-expiry-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormField control={form.control} name="insuranceStartDate" render={({ field }) => (<FormItem><FormLabel>Start Date</FormLabel><FormControl><Input type="date" {...field} data-testid="input-asset-insurance-start-date" /></FormControl><FormMessage /></FormItem>)} />
+                  <FormField control={form.control} name="insuranceExpiryDate" render={({ field }) => (<FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input type="date" {...field} data-testid="input-asset-insurance-expiry-date" /></FormControl><FormMessage /></FormItem>)} />
                 </div>
                 <FormField
                   control={form.control}
@@ -1493,50 +1483,14 @@ export default function AssetRegisterPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="insuranceNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Insurance Notes</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} data-testid="input-asset-insurance-notes" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="insuranceNotes" render={({ field }) => (<FormItem><FormLabel>Insurance Notes</FormLabel><FormControl><Textarea {...field} data-testid="input-asset-insurance-notes" /></FormControl><FormMessage /></FormItem>)} />
               </FormSection>
 
               <FormSection title="CAPEX">
                 <div className="grid grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="capexRequestId"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CAPEX Request ID</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-asset-capex-request-id" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <FormField control={form.control} name="capexRequestId" render={({ field }) => (<FormItem><FormLabel>CAPEX Request ID</FormLabel><FormControl><Input {...field} data-testid="input-asset-capex-request-id" /></FormControl><FormMessage /></FormItem>)} />
                 </div>
-                <FormField
-                  control={form.control}
-                  name="capexDescription"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>CAPEX Description</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} data-testid="input-asset-capex-description" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="capexDescription" render={({ field }) => (<FormItem><FormLabel>CAPEX Description</FormLabel><FormControl><Textarea {...field} data-testid="input-asset-capex-description" /></FormControl><FormMessage /></FormItem>)} />
               </FormSection>
 
               <DialogFooter>
@@ -1569,7 +1523,7 @@ export default function AssetRegisterPage() {
           <DialogHeader>
             <DialogTitle>Import Assets</DialogTitle>
             <DialogDescription>
-              Upload an Excel file (.xlsx/.xls) to import assets. Use the Download Template button for the correct format.
+              Upload an Excel file (.xlsx/.xls) to import assets. AI will automatically categorize assets based on their name and description.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1588,7 +1542,7 @@ export default function AssetRegisterPage() {
             {importing && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Importing...
+                Importing and categorizing with AI...
               </div>
             )}
             {importResult && (

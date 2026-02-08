@@ -213,6 +213,57 @@ function mapCategoryFromSpreadsheet(desc: string | null): string {
   return "Other";
 }
 
+async function aiCategorizeBatch(items: { index: number; name: string; description?: string }[]): Promise<Record<number, string>> {
+  if (items.length === 0) return {};
+  try {
+    const openai = getOpenAI();
+    const categoriesList = ASSET_CATEGORIES.join(", ");
+
+    const batchSize = 80;
+    const results: Record<number, string> = {};
+
+    for (let start = 0; start < items.length; start += batchSize) {
+      const batch = items.slice(start, start + batchSize);
+      const batchList = batch.map(i => `${i.index}: ${i.name}${i.description ? " - " + i.description : ""}`).join("\n");
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0,
+        messages: [
+          {
+            role: "system",
+            content: `You are an asset categorization assistant for a construction/manufacturing company. Given asset names and optional descriptions, assign the most appropriate category from this list: ${categoriesList}. Respond ONLY with a JSON object mapping item index to category. Example: {"1":"Heavy Equipment","2":"Hand Tools & Power Tools"}`
+          },
+          {
+            role: "user",
+            content: `Categorize these assets:\n${batchList}`
+          }
+        ],
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      const cleaned = content.replace(/```json\n?|\n?```/g, "").trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        for (const [key, val] of Object.entries(parsed)) {
+          const idx = parseInt(key);
+          const cat = String(val);
+          if (ASSET_CATEGORIES.includes(cat as any)) {
+            results[idx] = cat;
+          }
+        }
+      } catch {
+        logger.warn("Failed to parse AI categorization response", { content: cleaned });
+      }
+    }
+
+    return results;
+  } catch (error: any) {
+    logger.warn("AI categorization failed, falling back to manual mapping", { error: error.message });
+    return {};
+  }
+}
+
 function parseExcelDate(value: any): string | null {
   if (!value) return null;
   if (value instanceof Date) {
@@ -334,6 +385,8 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
     const errors: string[] = [];
     let rowNum = 0;
 
+    const parsedRows: { rowNum: number; name: string; rowData: Record<string, any>; manualCategory: string | null; rawCategory: string | null }[] = [];
+
     for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
       const rowData: Record<string, any> = {};
@@ -360,11 +413,36 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         continue;
       }
 
-      let category = rowData.category ? String(rowData.category).trim() : null;
-      if (category && !ASSET_CATEGORIES.includes(category as any)) {
-        category = mapCategoryFromSpreadsheet(category);
+      let manualCategory: string | null = null;
+      const rawCat = rowData.category ? String(rowData.category).trim() : null;
+      if (rawCat && ASSET_CATEGORIES.includes(rawCat as any)) {
+        manualCategory = rawCat;
+      } else if (rawCat) {
+        const mapped = mapCategoryFromSpreadsheet(rawCat);
+        if (mapped !== "Other") manualCategory = mapped;
       }
-      if (!category) category = "Other";
+
+      parsedRows.push({ rowNum, name, rowData, manualCategory, rawCategory: rawCat });
+    }
+
+    const needsAI = parsedRows.filter(r => !r.manualCategory);
+    let aiResults: Record<number, string> = {};
+    if (needsAI.length > 0) {
+      const aiItems = needsAI.map(r => ({
+        index: r.rowNum,
+        name: r.name,
+        description: r.rowData.description ? String(r.rowData.description).trim() : undefined,
+      }));
+      aiResults = await aiCategorizeBatch(aiItems);
+      logger.info(`AI categorized ${Object.keys(aiResults).length}/${needsAI.length} assets`);
+    }
+
+    for (const parsedRow of parsedRows) {
+      const { name, rowData } = parsedRow;
+      let category = parsedRow.manualCategory
+        || aiResults[parsedRow.rowNum]
+        || (parsedRow.rawCategory ? mapCategoryFromSpreadsheet(parsedRow.rawCategory) : null)
+        || "Other";
 
       try {
         const assetTag = await generateAssetTag(companyId);
@@ -458,7 +536,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         const [created] = await db.insert(assets).values(insertData).returning();
         imported.push({ id: created.id, name: created.name, assetTag: created.assetTag });
       } catch (rowError: any) {
-        errors.push(`Row ${rowNum} (${name}): ${rowError.message}`);
+        errors.push(`Row ${parsedRow.rowNum} (${name}): ${rowError.message}`);
       }
     }
 
