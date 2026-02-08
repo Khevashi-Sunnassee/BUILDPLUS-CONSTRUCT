@@ -32,7 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -436,10 +436,12 @@ export default function AssetRegisterPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      const csrfToken = getCsrfToken();
       const res = await fetch(ASSET_ROUTES.IMPORT, {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
       });
       const result = await res.json();
       if (!res.ok) {
