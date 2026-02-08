@@ -95,6 +95,9 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
     if (poData.supplierId === "") {
       poData.supplierId = null;
     }
+    if (poData.requiredByDate && typeof poData.requiredByDate === "string") {
+      poData.requiredByDate = new Date(poData.requiredByDate);
+    }
     const order = await storage.createPurchaseOrder(
       { ...poData, poNumber, companyId, requestedById: userId },
       lineItems || []
@@ -113,19 +116,22 @@ router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
     if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
     const userId = req.session.userId;
-    if (order.requestedById !== userId && order.status !== "DRAFT") {
-      return res.status(403).json({ error: "Cannot edit this purchase order" });
+    if (order.requestedById !== userId) {
+      return res.status(403).json({ error: "Only the requester can edit this purchase order" });
+    }
+    
+    if (order.status !== "DRAFT" && order.status !== "REJECTED") {
+      return res.status(400).json({ error: "Only draft or rejected purchase orders can be edited" });
     }
     
     const { items: lineItems, ...poData } = req.body;
-    const parsed = insertPurchaseOrderSchema.partial().safeParse(poData);
-    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-
-    const validatedData = { ...parsed.data };
-    if (validatedData.supplierId === "") {
-      validatedData.supplierId = null;
+    if (poData.requiredByDate && typeof poData.requiredByDate === "string") {
+      poData.requiredByDate = new Date(poData.requiredByDate);
     }
-    const updated = await storage.updatePurchaseOrder(String(req.params.id), validatedData, lineItems);
+    if (poData.supplierId === "") {
+      poData.supplierId = null;
+    }
+    const updated = await storage.updatePurchaseOrder(String(req.params.id), poData, lineItems);
     res.json(updated);
   } catch (error: any) {
     logger.error({ err: error }, "Error updating purchase order");

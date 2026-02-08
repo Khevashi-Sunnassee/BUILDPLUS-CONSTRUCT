@@ -142,6 +142,10 @@ export default function PurchaseOrderFormPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
 
+  const { data: poTermsSettings } = useQuery<{ poTermsHtml: string; includePOTerms: boolean }>({
+    queryKey: [SETTINGS_ROUTES.PO_TERMS],
+  });
+
   const { data: existingPO, isLoading: loadingPO } = useQuery<PurchaseOrderWithDetails>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId],
     enabled: !!poId,
@@ -953,6 +957,64 @@ export default function PurchaseOrderFormPage() {
       }
     }
     
+    // Terms and Conditions section
+    if (poTermsSettings?.includePOTerms && poTermsSettings?.poTermsHtml) {
+      checkPageBreak(20);
+      
+      currentY += 5;
+      pdf.setDrawColor(229, 231, 235);
+      pdf.line(margin, currentY, pageWidth - margin, currentY);
+      currentY += 8;
+      
+      pdf.setTextColor(31, 41, 55);
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.text("TERMS AND CONDITIONS", margin, currentY);
+      currentY += 7;
+      
+      const termsText = poTermsSettings.poTermsHtml
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n")
+        .replace(/<\/li>/gi, "\n")
+        .replace(/<li>/gi, "  - ")
+        .replace(/<\/h[1-6]>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+      
+      pdf.setTextColor(75, 85, 99);
+      pdf.setFontSize(8);
+      pdf.setFont("helvetica", "normal");
+      
+      const termsLines = pdf.splitTextToSize(termsText, contentWidth);
+      const lineHeight = 3.5;
+      
+      for (let i = 0; i < termsLines.length; i++) {
+        if (currentY + lineHeight > pageHeight - margin - 15) {
+          pdf.addPage();
+          currentY = margin + 10;
+          
+          pdf.setTextColor(107, 114, 128);
+          pdf.setFontSize(9);
+          pdf.setFont("helvetica", "italic");
+          pdf.text(`${existingPO.poNumber} - Terms and Conditions (continued)`, margin, currentY);
+          currentY += 8;
+          
+          pdf.setTextColor(75, 85, 99);
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "normal");
+        }
+        pdf.text(termsLines[i], margin, currentY);
+        currentY += lineHeight;
+      }
+    }
+    
     // Add footers to all pages
     const totalPages = pdf.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
@@ -965,7 +1027,7 @@ export default function PurchaseOrderFormPage() {
     }
     
     pdf.save(`${existingPO.poNumber || "PurchaseOrder"}.pdf`);
-  }, [existingPO, lineItems, settings]);
+  }, [existingPO, lineItems, settings, poTermsSettings]);
 
   const canEdit = isNew || existingPO?.status === "DRAFT" || existingPO?.status === "REJECTED";
   const canApprove = existingPO?.status === "SUBMITTED" && (user?.poApprover || user?.role === "ADMIN");
