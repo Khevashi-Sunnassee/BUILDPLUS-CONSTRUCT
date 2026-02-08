@@ -21,12 +21,18 @@ import {
   Trash2,
   ChevronsDownUp,
   ChevronsUpDown,
+  Palette,
+  Check,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -47,6 +53,16 @@ import {
   MAX_ITEM_COL_WIDTH,
   ITEM_COL_STORAGE_KEY,
 } from "./types";
+
+const GROUP_COLOR_PALETTE = [
+  "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+  "#f43f5e", "#ef4444", "#f97316", "#f59e0b", "#eab308",
+  "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4",
+  "#0ea5e9", "#3b82f6", "#2563eb", "#7c3aed", "#c026d3",
+  "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#0891b2",
+  "#4f46e5", "#9333ea", "#db2777", "#dc2626", "#d97706",
+  "#65a30d", "#059669", "#0d9488", "#0284c7", "#1d4ed8",
+];
 
 export function TaskGroupComponent({
   group,
@@ -341,6 +357,42 @@ export function TaskGroupComponent({
             <DropdownMenuItem onClick={() => setIsEditingName(true)} data-testid={`menu-rename-group-${group.id}`}>
               Rename group
             </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger data-testid={`menu-color-group-${group.id}`}>
+                <Palette className="h-4 w-4 mr-2" />
+                Change color
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="p-2">
+                <div className="grid grid-cols-7 gap-1.5" data-testid={`color-picker-${group.id}`}>
+                  {GROUP_COLOR_PALETTE.map((color) => {
+                    const isUsed = allGroups.some(g => g.id !== group.id && g.color?.toLowerCase() === color.toLowerCase());
+                    const isSelected = group.color?.toLowerCase() === color.toLowerCase();
+                    return (
+                      <button
+                        key={color}
+                        className={cn(
+                          "w-6 h-6 rounded-md flex items-center justify-center transition-all",
+                          isUsed ? "opacity-25 cursor-not-allowed" : "cursor-pointer hover:scale-110",
+                          isSelected && "ring-2 ring-offset-1 ring-foreground"
+                        )}
+                        style={{ backgroundColor: color }}
+                        onClick={() => {
+                          if (!isUsed) {
+                            updateGroupMutation.mutate({ color });
+                          }
+                        }}
+                        disabled={isUsed}
+                        title={isUsed ? "Already used by another group" : isSelected ? "Current color" : ""}
+                        data-testid={`color-swatch-${group.id}-${color.replace("#", "")}`}
+                      >
+                        {isSelected && <Check className="h-3.5 w-3.5 text-white drop-shadow-sm" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive"
               onClick={() => setShowDeleteConfirm(true)}

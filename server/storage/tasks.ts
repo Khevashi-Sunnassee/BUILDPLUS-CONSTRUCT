@@ -157,8 +157,27 @@ export const taskMethods = {
 
   async createTaskGroup(data: InsertTaskGroup): Promise<TaskGroup> {
     const [maxOrder] = await db.select({ maxOrder: sql<number>`COALESCE(MAX(sort_order), 0)` }).from(taskGroups);
+
+    let color = data.color;
+    if (!color) {
+      const GROUP_COLOR_PALETTE = [
+        "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+        "#f43f5e", "#ef4444", "#f97316", "#f59e0b", "#eab308",
+        "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4",
+        "#0ea5e9", "#3b82f6", "#2563eb", "#7c3aed", "#c026d3",
+        "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#0891b2",
+        "#4f46e5", "#9333ea", "#db2777", "#dc2626", "#d97706",
+        "#65a30d", "#059669", "#0d9488", "#0284c7", "#1d4ed8",
+      ];
+      const existingGroups = await db.select({ color: taskGroups.color }).from(taskGroups)
+        .where(data.companyId ? eq(taskGroups.companyId, data.companyId) : undefined);
+      const usedColors = new Set(existingGroups.map(g => g.color?.toLowerCase()));
+      color = GROUP_COLOR_PALETTE.find(c => !usedColors.has(c.toLowerCase())) || GROUP_COLOR_PALETTE[existingGroups.length % GROUP_COLOR_PALETTE.length];
+    }
+
     const [group] = await db.insert(taskGroups).values({
       ...data,
+      color,
       sortOrder: (maxOrder?.maxOrder || 0) + 1,
     }).returning();
     return group;

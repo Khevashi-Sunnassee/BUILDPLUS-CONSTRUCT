@@ -115,6 +115,17 @@ router.patch("/api/task-groups/:id", requireAuth, requirePermission("tasks", "VI
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
+
+    if (parsed.data.color) {
+      const allGroups = await storage.getAllTaskGroups(companyId);
+      const colorInUse = allGroups.some(
+        g => g.id !== String(req.params.id) && g.color?.toLowerCase() === parsed.data.color!.toLowerCase()
+      );
+      if (colorInUse) {
+        return res.status(400).json({ error: "This color is already used by another group" });
+      }
+    }
+
     const group = await storage.updateTaskGroup(String(req.params.id), parsed.data);
     if (!group) return res.status(404).json({ error: "Task group not found" });
     res.json(group);
