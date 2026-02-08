@@ -123,6 +123,9 @@ export const PROCUREMENT_ROUTES = {
   // Suppliers
   SUPPLIERS: '/api/procurement/suppliers',
   SUPPLIERS_ACTIVE: '/api/procurement/suppliers/active',
+  SUPPLIERS_TEMPLATE: '/api/procurement/suppliers/template',
+  SUPPLIERS_IMPORT: '/api/procurement/suppliers/import',
+  SUPPLIERS_EXPORT: '/api/procurement/suppliers/export',
   SUPPLIER_BY_ID: (id: string | number) => `/api/procurement/suppliers/${id}`,
   
   // Purchase Orders
