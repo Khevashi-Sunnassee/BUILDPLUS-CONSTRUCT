@@ -8,9 +8,34 @@ import { documentRegisterService } from "../services/document-register.service";
 import { logPanelChange, advancePanelLifecycleIfLower, updatePanelLifecycleStatus } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 import type { JobPhase } from "@shared/job-phases";
+import { z } from "zod";
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
+
+const uploadPdfSchema = z.object({
+  pdfBase64: z.string(),
+  fileName: z.string().optional(),
+});
+
+const analyzePdfSchema = z.object({
+  pdfBase64: z.string(),
+});
+
+const approveProductionSchema = z.object({
+  loadWidth: z.string().nullish(),
+  loadHeight: z.string().nullish(),
+  panelThickness: z.string().nullish(),
+  panelVolume: z.string().nullish(),
+  panelMass: z.string().nullish(),
+  panelArea: z.string().nullish(),
+  day28Fc: z.string().nullish(),
+  liftFcm: z.string().nullish(),
+  concreteStrengthMpa: z.string().nullish(),
+  rotationalLifters: z.string().nullish(),
+  primaryLifters: z.string().nullish(),
+  productionPdfUrl: z.string().nullish(),
+}).passthrough();
 
 let ifcDocumentTypeId: string | null = null;
 async function getIfcDocumentTypeId(): Promise<string> {
@@ -25,12 +50,10 @@ async function getIfcDocumentTypeId(): Promise<string> {
 
 router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
+    const result = uploadPdfSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const { id } = req.params;
-    const { pdfBase64, fileName } = req.body;
-
-    if (!pdfBase64) {
-      return res.status(400).json({ error: "PDF data is required" });
-    }
+    const { pdfBase64, fileName } = result.data;
 
     const panel = await storage.getPanelById(id as string);
     if (!panel) {
@@ -108,12 +131,10 @@ router.get("/api/panels/admin/:id/download-pdf", requireRole("ADMIN", "MANAGER")
 
 router.post("/api/panels/admin/:id/analyze-pdf", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
+    const result = analyzePdfSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const { id } = req.params;
-    const { pdfBase64 } = req.body;
-    
-    if (!pdfBase64) {
-      return res.status(400).json({ error: "PDF data is required" });
-    }
+    const { pdfBase64 } = result.data;
     
     const panel = await storage.getPanelById(id as string);
     if (!panel) {
@@ -191,6 +212,8 @@ Return ONLY valid JSON, no explanation text.`
 
 router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
+    const result = approveProductionSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const { id } = req.params;
     const userId = req.session.userId!;
     const { 
@@ -206,7 +229,7 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
       rotationalLifters,
       primaryLifters,
       productionPdfUrl 
-    } = req.body;
+    } = result.data;
     
     const panel = await storage.getPanelById(id as string);
     if (!panel) {

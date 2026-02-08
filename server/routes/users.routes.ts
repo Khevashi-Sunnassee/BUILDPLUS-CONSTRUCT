@@ -25,15 +25,18 @@ router.get("/api/user/settings", requireAuth, async (req, res) => {
   });
 });
 
+const userSettingsSchema = z.object({
+  selectedFactoryIds: z.array(z.string()).optional(),
+  defaultFactoryId: z.string().nullable().optional(),
+});
+
 // Update user settings
 router.put("/api/user/settings", requireAuth, async (req, res) => {
-  const { selectedFactoryIds, defaultFactoryId } = req.body;
-  if (selectedFactoryIds !== undefined && !Array.isArray(selectedFactoryIds)) {
-    return res.status(400).json({ error: "selectedFactoryIds must be an array" });
+  const result = userSettingsSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: "Validation failed", details: result.error.errors });
   }
-  if (defaultFactoryId !== undefined && defaultFactoryId !== null && typeof defaultFactoryId !== "string") {
-    return res.status(400).json({ error: "defaultFactoryId must be a string or null" });
-  }
+  const { selectedFactoryIds, defaultFactoryId } = result.data;
   const finalSelectedFactoryIds = selectedFactoryIds !== undefined ? (selectedFactoryIds || null) : undefined;
   if (defaultFactoryId && finalSelectedFactoryIds && finalSelectedFactoryIds.length > 0 && !finalSelectedFactoryIds.includes(defaultFactoryId)) {
     finalSelectedFactoryIds.push(defaultFactoryId);
@@ -98,7 +101,11 @@ router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
     if (!req.companyId) {
       return res.status(403).json({ error: "Company context required" });
     }
-    const validated = createUserSchema.parse(req.body);
+    const parseResult = createUserSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Validation failed", details: parseResult.error.errors });
+    }
+    const validated = parseResult.data;
     if (validated.poApprovalLimit === "") {
       validated.poApprovalLimit = undefined;
     }
@@ -133,7 +140,11 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     if (!existingUser || existingUser.companyId !== req.companyId) {
       return res.status(404).json({ error: "User not found" });
     }
-    const validated = updateUserSchema.parse(req.body);
+    const parseResult = updateUserSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Validation failed", details: parseResult.error.errors });
+    }
+    const validated = parseResult.data;
     const updateData: Record<string, any> = { ...validated };
     delete updateData.companyId;
     if (updateData.password === "") {
@@ -191,7 +202,11 @@ router.put("/api/admin/users/:id/work-hours", requireRole("ADMIN"), async (req, 
     if (!existingUser || existingUser.companyId !== req.companyId) {
       return res.status(404).json({ error: "User not found" });
     }
-    const validatedData = workHoursSchema.parse(req.body);
+    const parseResult = workHoursSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid work hours data", details: parseResult.error.errors });
+    }
+    const validatedData = parseResult.data;
     const user = await storage.updateUser(req.params.id as string, validatedData);
     res.json({ ...user, passwordHash: undefined });
   } catch (error) {
@@ -238,16 +253,21 @@ router.post("/api/admin/user-permissions/:userId/initialize", requireRole("ADMIN
   res.json(permissions);
 });
 
+const updatePermissionSchema = z.object({
+  permissionLevel: z.enum(["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]),
+});
+
 // Admin: Update user permission
 router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMIN"), async (req, res) => {
   const user = await storage.getUser(String(req.params.userId));
   if (!user || user.companyId !== req.companyId) {
     return res.status(404).json({ error: "User not found" });
   }
-  const { permissionLevel } = req.body;
-  if (!permissionLevel || !["HIDDEN", "VIEW", "VIEW_AND_UPDATE"].includes(permissionLevel)) {
-    return res.status(400).json({ error: "Invalid permission level" });
+  const result = updatePermissionSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({ error: "Validation failed", details: result.error.errors });
   }
+  const { permissionLevel } = result.data;
   const permission = await storage.setUserPermission(
     String(req.params.userId),
     req.params.functionKey as FunctionKey,
@@ -288,7 +308,11 @@ router.post("/api/admin/departments", requireRole("ADMIN"), async (req, res) => 
     if (!req.companyId) {
       return res.status(403).json({ error: "Company context required" });
     }
-    const validated = createDepartmentSchema.parse(req.body);
+    const parseResult = createDepartmentSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Validation failed", details: parseResult.error.errors });
+    }
+    const validated = parseResult.data;
     const department = await storage.createDepartment({ ...validated, companyId: req.companyId });
     res.json(department);
   } catch (error: any) {
@@ -306,7 +330,11 @@ router.put("/api/admin/departments/:id", requireRole("ADMIN"), async (req, res) 
     if (!existing || existing.companyId !== req.companyId) {
       return res.status(404).json({ error: "Department not found" });
     }
-    const validated = updateDepartmentSchema.parse(req.body);
+    const parseResult = updateDepartmentSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Validation failed", details: parseResult.error.errors });
+    }
+    const validated = parseResult.data;
     const department = await storage.updateDepartment(id, validated);
     res.json(department);
   } catch (error: any) {

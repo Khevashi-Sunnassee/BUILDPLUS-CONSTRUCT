@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import serveIndex from "serve-index";
@@ -85,9 +86,26 @@ declare module "http" {
   }
 }
 
+// Larger body limit for specific upload/import routes
+const largeBodyRoutes = [
+  "/api/documents/upload",
+  "/api/documents/:id/new-version",
+  "/api/panels/:panelId/documents/upload",
+  "/api/tasks/:id/files",
+  "/api/purchase-orders/:id/attachments",
+  "/api/chat/:conversationId/files",
+  "/api/procurement/items/import",
+  "/api/jobs/:jobId/import-estimate",
+  "/api/admin/settings/logo",
+  "/api/assets/import"
+];
+for (const route of largeBodyRoutes) {
+  app.use(route, express.json({ limit: "50mb" }));
+}
+
 app.use(
   express.json({
-    limit: "50mb",
+    limit: "5mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -95,6 +113,14 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
+
+// Request-ID middleware for tracing
+app.use((req, res, next) => {
+  const requestId = crypto.randomUUID();
+  (req as any).requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  next();
+});
 
 app.use("/api/auth/login", authLimiter);
 app.use("/api/documents/upload", uploadLimiter);

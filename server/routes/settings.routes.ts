@@ -1,9 +1,38 @@
 import { Router } from "express";
+import { z } from "zod";
 import sanitizeHtml from "sanitize-html";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 
 const router = Router();
+
+// Validation schemas
+const updateSettingsSchema = z.object({
+  tz: z.string().optional(),
+  captureIntervalS: z.number().int().min(60).max(3600).optional(),
+  idleThresholdS: z.number().int().min(60).max(3600).optional(),
+  trackedApps: z.string().optional(),
+  requireAddins: z.boolean().optional(),
+  weekStartDay: z.number().int().min(0).max(6).optional(),
+  productionWindowDays: z.number().int().min(1).max(60).optional(),
+  ifcDaysInAdvance: z.number().int().min(1).max(60).optional(),
+  daysToAchieveIfc: z.number().int().min(1).max(90).optional(),
+  productionDaysInAdvance: z.number().int().min(1).max(60).optional(),
+  procurementDaysInAdvance: z.number().int().min(1).max(60).optional(),
+  procurementTimeDays: z.number().int().min(1).max(90).optional(),
+}).strict();
+
+const logoSchema = z.object({
+  logoBase64: z.string(),
+});
+
+const companyNameSchema = z.object({
+  companyName: z.string().min(1).max(200),
+});
+
+const poTermsSchema = z.object({
+  poTermsHtml: z.string(),
+});
 
 router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   try {
@@ -25,67 +54,27 @@ router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
 
 router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   try {
-  if (req.body.weekStartDay !== undefined) {
-    const weekStartDay = parseInt(req.body.weekStartDay, 10);
-    if (isNaN(weekStartDay) || weekStartDay < 0 || weekStartDay > 6) {
-      return res.status(400).json({ error: "weekStartDay must be a number between 0 (Sunday) and 6 (Saturday)" });
+    const result = updateSettingsSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
     }
-    req.body.weekStartDay = weekStartDay;
-  }
-  if (req.body.productionWindowDays !== undefined) {
-    const productionWindowDays = parseInt(req.body.productionWindowDays, 10);
-    if (isNaN(productionWindowDays) || productionWindowDays < 1 || productionWindowDays > 60) {
-      return res.status(400).json({ error: "productionWindowDays must be a number between 1 and 60" });
+    const body = result.data;
+    if (body.ifcDaysInAdvance !== undefined) {
+      const currentSettings = await storage.getGlobalSettings();
+      const effectiveProcurementDays = body.procurementDaysInAdvance ?? currentSettings?.procurementDaysInAdvance ?? 7;
+      if (body.ifcDaysInAdvance <= effectiveProcurementDays) {
+        return res.status(400).json({ error: `ifcDaysInAdvance must be greater than procurementDaysInAdvance (${effectiveProcurementDays})` });
+      }
     }
-    req.body.productionWindowDays = productionWindowDays;
-  }
-  if (req.body.ifcDaysInAdvance !== undefined) {
-    const ifcDaysInAdvance = parseInt(req.body.ifcDaysInAdvance, 10);
-    if (isNaN(ifcDaysInAdvance) || ifcDaysInAdvance < 1 || ifcDaysInAdvance > 60) {
-      return res.status(400).json({ error: "ifcDaysInAdvance must be a number between 1 and 60" });
+    if (body.procurementDaysInAdvance !== undefined) {
+      const currentSettings = await storage.getGlobalSettings();
+      const effectiveIfcDays = body.ifcDaysInAdvance ?? currentSettings?.ifcDaysInAdvance ?? 14;
+      if (body.procurementDaysInAdvance >= effectiveIfcDays) {
+        return res.status(400).json({ error: `procurementDaysInAdvance must be less than ifcDaysInAdvance (${effectiveIfcDays})` });
+      }
     }
-    const currentSettings = await storage.getGlobalSettings();
-    const effectiveProcurementDays = req.body.procurementDaysInAdvance ?? currentSettings?.procurementDaysInAdvance ?? 7;
-    if (ifcDaysInAdvance <= effectiveProcurementDays) {
-      return res.status(400).json({ error: `ifcDaysInAdvance must be greater than procurementDaysInAdvance (${effectiveProcurementDays})` });
-    }
-    req.body.ifcDaysInAdvance = ifcDaysInAdvance;
-  }
-  if (req.body.daysToAchieveIfc !== undefined) {
-    const daysToAchieveIfc = parseInt(req.body.daysToAchieveIfc, 10);
-    if (isNaN(daysToAchieveIfc) || daysToAchieveIfc < 1 || daysToAchieveIfc > 90) {
-      return res.status(400).json({ error: "daysToAchieveIfc must be a number between 1 and 90" });
-    }
-    req.body.daysToAchieveIfc = daysToAchieveIfc;
-  }
-  if (req.body.productionDaysInAdvance !== undefined) {
-    const productionDaysInAdvance = parseInt(req.body.productionDaysInAdvance, 10);
-    if (isNaN(productionDaysInAdvance) || productionDaysInAdvance < 1 || productionDaysInAdvance > 60) {
-      return res.status(400).json({ error: "productionDaysInAdvance must be a number between 1 and 60" });
-    }
-    req.body.productionDaysInAdvance = productionDaysInAdvance;
-  }
-  if (req.body.procurementDaysInAdvance !== undefined) {
-    const procurementDaysInAdvance = parseInt(req.body.procurementDaysInAdvance, 10);
-    if (isNaN(procurementDaysInAdvance) || procurementDaysInAdvance < 1 || procurementDaysInAdvance > 60) {
-      return res.status(400).json({ error: "procurementDaysInAdvance must be a number between 1 and 60" });
-    }
-    const currentSettings = await storage.getGlobalSettings();
-    const effectiveIfcDays = req.body.ifcDaysInAdvance ?? currentSettings?.ifcDaysInAdvance ?? 14;
-    if (procurementDaysInAdvance >= effectiveIfcDays) {
-      return res.status(400).json({ error: `procurementDaysInAdvance must be less than ifcDaysInAdvance (${effectiveIfcDays})` });
-    }
-    req.body.procurementDaysInAdvance = procurementDaysInAdvance;
-  }
-  if (req.body.procurementTimeDays !== undefined) {
-    const procurementTimeDays = parseInt(req.body.procurementTimeDays, 10);
-    if (isNaN(procurementTimeDays) || procurementTimeDays < 1 || procurementTimeDays > 90) {
-      return res.status(400).json({ error: "procurementTimeDays must be a number between 1 and 90" });
-    }
-    req.body.procurementTimeDays = procurementTimeDays;
-  }
-  const settings = await storage.updateGlobalSettings(req.body);
-  res.json(settings);
+    const settings = await storage.updateGlobalSettings(body);
+    res.json(settings);
   } catch (error: any) {
     res.status(500).json({ error: error.message || "Failed to update settings" });
   }
@@ -93,10 +82,11 @@ router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
 
 router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) => {
   try {
-    const { logoBase64 } = req.body;
-    if (typeof logoBase64 !== "string") {
-      return res.status(400).json({ error: "Logo data is required" });
+    const result = logoSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
     }
+    const { logoBase64 } = result.data;
     if (logoBase64 !== "" && !logoBase64.startsWith("data:image/")) {
       return res.status(400).json({ error: "Invalid image format" });
     }
@@ -109,10 +99,11 @@ router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) =
 
 router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req, res) => {
   try {
-    const { companyName } = req.body;
-    if (!companyName || typeof companyName !== "string") {
-      return res.status(400).json({ error: "Company name is required" });
+    const result = companyNameSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
     }
+    const { companyName } = result.data;
     const settings = await storage.updateGlobalSettings({ companyName });
     res.json({ success: true, companyName: settings.companyName });
   } catch (error: any) {
@@ -146,10 +137,11 @@ router.get("/api/settings/po-terms", requireAuth, async (req, res) => {
 
 router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
   try {
-    const { poTermsHtml } = req.body;
-    if (typeof poTermsHtml !== "string") {
-      return res.status(400).json({ error: "PO terms content is required" });
+    const result = poTermsSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.format() });
     }
+    const { poTermsHtml } = result.data;
     const cleanHtml = sanitizeHtml(poTermsHtml, {
       allowedTags: sanitizeHtml.defaults.allowedTags.concat(["h1", "h2", "u", "s", "span", "div"]),
       allowedAttributes: {

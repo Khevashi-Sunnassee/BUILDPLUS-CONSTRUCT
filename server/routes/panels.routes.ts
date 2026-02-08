@@ -79,13 +79,16 @@ router.get("/api/panels/approved-for-production", requireAuth, async (req: Reque
   }
 });
 
+const documentStatusSchema = z.object({
+  documentStatus: z.enum(["DRAFT", "IFA", "IFC", "APPROVED"]),
+});
+
 router.put("/api/panels/:id/document-status", requireAuth, async (req: Request, res: Response) => {
   try {
+    const result = documentStatusSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const companyId = req.companyId;
-    const { documentStatus } = req.body;
-    if (!documentStatus || !["DRAFT", "IFA", "IFC", "APPROVED"].includes(documentStatus)) {
-      return res.status(400).json({ error: "Invalid document status. Must be DRAFT, IFA, IFC, or APPROVED" });
-    }
+    const { documentStatus } = result.data;
     
     const panel = await storage.getPanelRegisterItem(req.params.id as string);
     if (!panel) {
@@ -193,15 +196,43 @@ router.get("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, r
   res.json(panel);
 });
 
+const createPanelSchema = z.object({
+  jobId: z.string(),
+  panelMark: z.string(),
+  panelType: z.string(),
+  description: z.string().nullish(),
+  drawingCode: z.string().nullish(),
+  sheetNumber: z.string().nullish(),
+  building: z.string().nullish(),
+  zone: z.string().nullish(),
+  level: z.string().nullish(),
+  structuralElevation: z.string().nullish(),
+  reckliDetail: z.string().nullish(),
+  qty: z.number().optional(),
+  loadWidth: z.string().nullish(),
+  loadHeight: z.string().nullish(),
+  panelThickness: z.string().nullish(),
+  panelArea: z.string().nullish(),
+  panelVolume: z.string().nullish(),
+  panelMass: z.string().nullish(),
+  concreteStrengthMpa: z.string().nullish(),
+  estimatedHours: z.number().nullish(),
+  status: z.string().optional(),
+}).passthrough();
+
+const updatePanelSchema = createPanelSchema.partial().passthrough();
+
 router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const result = createPanelSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const job = await storage.getJob(req.body.jobId);
+    const job = await storage.getJob(result.data.jobId);
     if (!job || job.companyId !== companyId) {
       return res.status(400).json({ error: "Invalid job" });
     }
-    const panel = await storage.createPanelRegisterItem(req.body);
+    const panel = await storage.createPanelRegisterItem(result.data);
     logPanelChange(panel.id, "Panel created", req.session.userId, { changedFields: { panelMark: panel.panelMark, panelType: panel.panelType, jobId: panel.jobId }, newLifecycleStatus: 0 });
     res.json(panel);
   } catch (error: any) {
@@ -213,16 +244,18 @@ router.post("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res:
 });
 
 router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  const validationResult = updatePanelSchema.safeParse(req.body);
+  if (!validationResult.success) return res.status(400).json({ error: "Validation failed", details: validationResult.error.format() });
   const companyId = req.companyId;
   const existing = await storage.getPanelRegisterItem(req.params.id as string);
   if (!existing) return res.status(404).json({ error: "Panel not found" });
   const job = await storage.getJob(existing.jobId);
   if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
-  const panel = await storage.updatePanelRegisterItem(req.params.id as string, req.body);
+  const panel = await storage.updatePanelRegisterItem(req.params.id as string, validationResult.data);
   const diff: Record<string, any> = {};
-  for (const key of Object.keys(req.body)) {
-    if (req.body[key] !== (existing as Record<string, unknown>)[key]) {
-      diff[key] = req.body[key];
+  for (const key of Object.keys(validationResult.data)) {
+    if ((validationResult.data as any)[key] !== (existing as Record<string, unknown>)[key]) {
+      diff[key] = (validationResult.data as any)[key];
     }
   }
   logPanelChange(panel!.id, "Panel updated", req.session.userId, { changedFields: diff });
@@ -326,15 +359,18 @@ router.get("/api/panels/:id/audit-logs", requireAuth, async (req: Request, res: 
   }
 });
 
+const consolidationCheckSchema = z.object({
+  panelIds: z.array(z.string()).min(2, "Must provide at least 2 panel IDs"),
+});
+
 router.post("/api/panels/consolidation-check", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
+    const result = consolidationCheckSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
-    const { panelIds } = req.body as { panelIds: string[] };
-    if (!panelIds || !Array.isArray(panelIds) || panelIds.length < 2) {
-      return res.status(400).json({ error: "Must provide at least 2 panel IDs" });
-    }
+    const { panelIds } = result.data;
 
     const panels = await db.select({ panel: panelRegister, job: jobs })
       .from(panelRegister)
@@ -393,8 +429,9 @@ const consolidateSchema = z.object({
 
 router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
-    const body = consolidateSchema.parse(req.body);
-    const { panelIds, primaryPanelId, newPanelMark, newLoadWidth, newLoadHeight } = body;
+    const consolidateResult = consolidateSchema.safeParse(req.body);
+    if (!consolidateResult.success) return res.status(400).json({ error: "Validation failed", details: consolidateResult.error.format() });
+    const { panelIds, primaryPanelId, newPanelMark, newLoadWidth, newLoadHeight } = consolidateResult.data;
 
     if (!panelIds.includes(primaryPanelId)) {
       return res.status(400).json({ error: "Primary panel must be one of the selected panels" });
@@ -519,9 +556,6 @@ router.post("/api/panels/consolidate", requireAuth, requireRole("ADMIN", "MANAGE
     const updatedPanel = await storage.getPanelRegisterItem(primaryPanelId);
     res.json({ panel: updatedPanel, consumedPanelIds });
   } catch (error: any) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors[0].message });
-    }
     logger.error({ err: error }, "Panel consolidation error");
     res.status(500).json({ error: error.message || "Failed to consolidate panels" });
   }
@@ -532,15 +566,21 @@ const ALLOWED_MOBILE_TRANSITIONS: Record<number, { action: string }> = {
   [PANEL_LIFECYCLE_STATUS.RETURNED]: { action: "Panel returned (mobile)" },
 };
 
+const lifecycleSchema = z.object({
+  targetStatus: z.number(),
+});
+
 router.post("/api/panels/:id/lifecycle", requireAuth, async (req: Request, res: Response) => {
   try {
+    const result = lifecycleSchema.safeParse(req.body);
+    if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
     const panelId = req.params.id as string;
-    const { targetStatus } = req.body;
+    const { targetStatus } = result.data;
 
-    if (typeof targetStatus !== "number" || !ALLOWED_MOBILE_TRANSITIONS[targetStatus]) {
+    if (!ALLOWED_MOBILE_TRANSITIONS[targetStatus]) {
       return res.status(400).json({ error: "Invalid lifecycle transition" });
     }
 

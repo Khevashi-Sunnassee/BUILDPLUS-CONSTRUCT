@@ -6,8 +6,18 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { logPanelChange } from "../services/panel-audit.service";
 import { PANEL_LIFECYCLE_STATUS } from "@shared/schema";
+import { z } from "zod";
 
 const router = Router();
+
+const panelImportSchema = z.object({
+  data: z.array(z.record(z.any())),
+  jobId: z.string().optional(),
+});
+
+const estimateImportBodySchema = z.object({
+  replace: z.string().optional(),
+});
 
 const ALLOWED_IMPORT_TYPES = [
   "application/vnd.ms-excel",
@@ -29,10 +39,9 @@ const upload = multer({
 
 router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const { data, jobId } = req.body;
-    if (!data || !Array.isArray(data)) {
-      return res.status(400).json({ error: "Invalid import data" });
-    }
+    const validationResult = panelImportSchema.safeParse(req.body);
+    if (!validationResult.success) return res.status(400).json({ error: "Validation failed", details: validationResult.error.format() });
+    const { data, jobId } = validationResult.data;
     
     const allJobs = await storage.getAllJobs();
     const jobsByNumber: Record<string, typeof allJobs[0]> = {};
@@ -280,8 +289,10 @@ router.post("/api/jobs/:jobId/import-estimate",
   upload.single("file"),
   async (req: Request, res: Response) => {
     try {
+      const bodyResult = estimateImportBodySchema.safeParse(req.body);
+      if (!bodyResult.success) return res.status(400).json({ error: "Validation failed", details: bodyResult.error.format() });
       const { jobId } = req.params;
-      const replace = req.body.replace === "true";
+      const replace = bodyResult.data.replace === "true";
       
       const job = await storage.getJob(String(jobId));
       if (!job) {
