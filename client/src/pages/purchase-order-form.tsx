@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2 } from "lucide-react";
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
+import { ItemPickerDialog } from "@/components/ItemPickerDialog";
 
 function compressLogoForPdf(logoBase64: string, maxWidth = 200, quality = 0.75): Promise<string> {
   return new Promise((resolve) => {
@@ -112,6 +113,8 @@ export default function PurchaseOrderFormPage() {
   const [uploadingFiles, setUploadingFiles] = useState(false);
   const [receivingMode, setReceivingMode] = useState(false);
   const [receivedItemIds, setReceivedItemIds] = useState<Set<string>>(new Set());
+  const [itemPickerOpen, setItemPickerOpen] = useState(false);
+  const [itemPickerLineId, setItemPickerLineId] = useState<string | null>(null);
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
@@ -541,6 +544,18 @@ export default function PurchaseOrderFormPage() {
       };
     }));
   }, [items]);
+
+  const openItemPicker = useCallback((lineId: string) => {
+    setItemPickerLineId(lineId);
+    setItemPickerOpen(true);
+  }, []);
+
+  const handleItemPickerSelect = useCallback((itemId: string) => {
+    if (itemPickerLineId) {
+      handleItemSelect(itemPickerLineId, itemId);
+    }
+    setItemPickerLineId(null);
+  }, [itemPickerLineId, handleItemSelect]);
 
   const { subtotal, tax, total } = useMemo(() => {
     const sub = lineItems.reduce((sum, item) => sum + (parseFloat(item.lineTotal) || 0), 0);
@@ -1339,27 +1354,24 @@ export default function PurchaseOrderFormPage() {
                         )}
                         <TableCell className="p-1">
                           {canEdit ? (
-                            <Select
-                              value={line.itemId || ""}
-                              onValueChange={(value) => handleItemSelect(line.id, value)}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-9 w-full justify-start text-left font-normal"
+                              onClick={() => openItemPicker(line.id)}
+                              data-testid={`select-item-${index}`}
                             >
-                              <SelectTrigger 
-                                className="h-9"
-                                data-testid={`select-item-${index}`}
-                              >
-                                <SelectValue placeholder="Select item" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value={MANUAL_ENTRY_ID}>
-                                  -- Manual Entry --
-                                </SelectItem>
-                                {items.map((item) => (
-                                  <SelectItem key={item.id} value={item.id}>
-                                    {item.code ? `${item.code} - ` : ""}{item.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                              {line.itemId && line.itemId !== MANUAL_ENTRY_ID ? (
+                                <span className="truncate">
+                                  {line.itemCode ? `${line.itemCode} - ` : ""}
+                                  {items.find(i => i.id === line.itemId)?.name || line.description || "Selected"}
+                                </span>
+                              ) : line.itemId === MANUAL_ENTRY_ID ? (
+                                <span className="truncate text-muted-foreground">Manual Entry</span>
+                              ) : (
+                                <span className="text-muted-foreground">Select item...</span>
+                              )}
+                            </Button>
                           ) : (
                             <span className="text-sm">{line.itemCode || "-"}</span>
                           )}
@@ -1822,6 +1834,15 @@ export default function PurchaseOrderFormPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ItemPickerDialog
+        open={itemPickerOpen}
+        onOpenChange={setItemPickerOpen}
+        onSelect={handleItemPickerSelect}
+        items={items}
+        selectedItemId={itemPickerLineId ? lineItems.find(l => l.id === itemPickerLineId)?.itemId : null}
+        manualEntryId={MANUAL_ENTRY_ID}
+      />
     </div>
   );
 }
