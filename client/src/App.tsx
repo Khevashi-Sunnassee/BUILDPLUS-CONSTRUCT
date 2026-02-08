@@ -12,6 +12,7 @@ import { UserSettingsPopover } from "@/components/user-settings-popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
 import NotFound from "@/pages/not-found";
+import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import DashboardPage from "@/pages/dashboard";
 import DailyReportsPage from "@/pages/daily-reports";
@@ -193,11 +194,15 @@ function Router() {
       </Route>
 
       <Route path="/">
-        <ProtectedRoute>
-          <AuthenticatedLayout>
-            <DashboardPage />
-          </AuthenticatedLayout>
-        </ProtectedRoute>
+        {user ? (
+          <ProtectedRoute>
+            <AuthenticatedLayout>
+              <DashboardPage />
+            </AuthenticatedLayout>
+          </ProtectedRoute>
+        ) : (
+          <LandingPage />
+        )}
       </Route>
 
       <Route path="/dashboard">

@@ -27,6 +27,7 @@ The frontend features a KPI Dashboard with data visualization and PDF export, an
 - **Photo Gallery:** A visual gallery for image files from the document register, offering search, filtering, grouping, full-screen viewing, multi-select with email, and download functionalities on both web and mobile.
 - **Mobile Functionality:** Dedicated QR scanner for panels and document bundles, and mobile panel checklists (e.g., Quality Inspections) with conditional fields and system-locked templates.
 - **Advanced Features:** Panel consolidation, contract retention tracking with automated deductions, and visual document comparison with pixel-level overlay and AI summarization.
+- **Landing Page:** BuildPlusAI branded landing page at `/` for unauthenticated users (www.buildplusai.com), with hero section, feature showcase, stats, and login CTA. Authenticated users are routed directly to the dashboard.
 - **Asset Register:** Comprehensive asset lifecycle management with 50+ fields across 8 tabs, supporting 40+ asset categories, auto-generated asset tags, depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis via OpenAI.
 
 ## External Dependencies
