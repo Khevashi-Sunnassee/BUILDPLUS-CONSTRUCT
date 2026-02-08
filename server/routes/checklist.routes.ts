@@ -514,10 +514,12 @@ router.get("/api/checklist/instances", requireAuth, async (req: Request, res: Re
       conditions.push(eq(checklistInstances.panelId, panelId as string));
     }
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(...conditions))
-      .orderBy(desc(checklistInstances.createdAt));
+      .orderBy(desc(checklistInstances.createdAt))
+      .limit(safeLimit);
 
     res.json(instances);
   } catch (error) {
@@ -562,13 +564,15 @@ router.get("/api/checklist/templates/:templateId/instances", requireAuth, async 
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(
         eq(checklistInstances.companyId, companyId!),
         eq(checklistInstances.templateId, templateId)
       ))
-      .orderBy(desc(checklistInstances.createdAt));
+      .orderBy(desc(checklistInstances.createdAt))
+      .limit(safeLimit);
 
     res.json(instances);
   } catch (error) {
@@ -586,13 +590,15 @@ router.get("/api/checklist/jobs/:jobId/instances", requireAuth, async (req: Requ
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(
         eq(checklistInstances.companyId, companyId!),
         eq(checklistInstances.jobId, jobId)
       ))
-      .orderBy(desc(checklistInstances.createdAt));
+      .orderBy(desc(checklistInstances.createdAt))
+      .limit(safeLimit);
 
     res.json(instances);
   } catch (error) {
@@ -610,13 +616,15 @@ router.get("/api/checklist/panels/:panelId/instances", requireAuth, async (req: 
       return res.status(400).json({ error: "Company ID required" });
     }
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const instances = await db.select()
       .from(checklistInstances)
       .where(and(
         eq(checklistInstances.companyId, companyId!),
         eq(checklistInstances.panelId, panelId)
       ))
-      .orderBy(desc(checklistInstances.createdAt));
+      .orderBy(desc(checklistInstances.createdAt))
+      .limit(safeLimit);
 
     res.json(instances);
   } catch (error) {

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
@@ -320,10 +320,25 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
       return res.status(400).json({ error: "No file uploaded" });
     }
 
-    const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
-    const sheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(sheet) as any[];
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const sheet = workbook.worksheets[0];
+    const rows: any[] = [];
+    const headerRow = sheet.getRow(1);
+    const headers: string[] = [];
+    headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      headers[colNumber] = String(cell.value || "");
+    });
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return;
+      const rowObj: any = {};
+      row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        if (headers[colNumber]) {
+          rowObj[headers[colNumber]] = cell.value;
+        }
+      });
+      if (Object.keys(rowObj).length > 0) rows.push(rowObj);
+    });
 
     if (rows.length === 0) {
       return res.status(400).json({ error: "No data found in Excel file" });

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import multer from "multer";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { storage, sha256Hex } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
@@ -296,12 +296,15 @@ router.post("/api/jobs/:jobId/import-estimate",
       const fileBuffer = req.file.buffer;
       const fileHash = sha256Hex(fileBuffer);
       
-      const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(fileBuffer);
       
-      const takeoffSheets = workbook.SheetNames.filter(name => {
-        const normalized = name.toLowerCase().replace(/[\s\-]/g, "");
-        return normalized.includes("takeoff");
-      });
+      const takeoffSheets = workbook.worksheets
+        .map(ws => ws.name)
+        .filter(name => {
+          const normalized = name.toLowerCase().replace(/[\s\-]/g, "");
+          return normalized.includes("takeoff");
+        });
       
       if (takeoffSheets.length === 0) {
         return res.status(400).json({ error: "No TakeOff sheets found in the workbook" });
@@ -492,8 +495,12 @@ router.post("/api/jobs/:jobId/import-estimate",
         if (!category) category = "Uncategorised";
         sheetResult.takeoffCategory = category;
         
-        const sheet = workbook.Sheets[sheetName];
-        const data: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 0 });
+        const sheet = workbook.getWorksheet(sheetName)!;
+        const data: any[][] = [];
+        sheet.eachRow({ includeEmpty: true }, (row, _rowNumber) => {
+          const rowValues = row.values as any[];
+          data.push(rowValues.slice(1));
+        });
         
         let headerRow = -1;
         let headers: string[] = [];

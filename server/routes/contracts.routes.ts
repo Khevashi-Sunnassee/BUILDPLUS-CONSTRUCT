@@ -61,7 +61,8 @@ router.get("/api/contracts/hub", requireAuth, async (req: Request, res: Response
       .from(jobs)
       .leftJoin(contracts, and(eq(contracts.jobId, jobs.id), eq(contracts.companyId, companyId)))
       .where(eq(jobs.companyId, companyId))
-      .orderBy(jobs.jobNumber);
+      .orderBy(jobs.jobNumber)
+      .limit(Math.min(parseInt(req.query.limit as string) || 500, 1000));
 
     const result = jobsWithStatus.map(row => ({
       jobId: row.jobId,

@@ -91,6 +91,26 @@ The system includes a database-driven help system providing contextual help thro
 - `client/src/pages/help-center.tsx` — Help Center page
 - `client/src/pages/admin/help.tsx` — Admin help management page
 
+## Panel Register Page Architecture (Feb 2026)
+The admin panels page (`client/src/pages/admin/panels.tsx`, originally 4743 lines) has been decomposed into a modular directory structure at `client/src/pages/admin/panels/`:
+
+- **panels.tsx** — Re-export shim (`export { default } from "./panels/index"`) preserving existing import paths
+- **panels/index.tsx** (~2000 lines) — Main orchestrator with all state management, queries, mutations, filters, and table composition
+- **panels/types.ts** (~163 lines) — Shared types, interfaces, schemas (panelSchema, PanelFormData, PanelWithJob, etc.), constants, and utility functions
+- **panels/PanelEditDialog.tsx** (~635 lines) — Tabbed dialog for creating/editing panels with dimension auto-calculation
+- **panels/PanelBuildDialog.tsx** (~340 lines) — Production approval dialog with PDF drag-and-drop upload and AI analysis
+- **panels/PanelDialogs.tsx** (~622 lines) — Six smaller dialogs: Import, Delete, DeleteSource, TemplateDownload, QrCode, Consolidation
+- **panels/PanelTableRow.tsx** (~214 lines) — Reusable table row component with configurable columns for 4 view modes
+- **panels/PanelChatTab.tsx** (~385 lines) — Self-contained chat tab with own queries/mutations
+- **panels/PanelDocumentsTab.tsx** (~346 lines) — Self-contained documents tab with own queries/mutations
+- **panels/PanelAuditLogTab.tsx** (~76 lines) — Self-contained audit log tab
+
+Design decisions:
+- Centralized orchestrator pattern (index.tsx) for 30+ interconnected state variables
+- Tab components (Chat, Documents, AuditLog) are fully self-contained with own data fetching
+- Dialog components receive state and callbacks via props
+- PanelTableRow accepts configuration props for 4 different grouping modes (flat, by job, by type, by level)
+
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
 - **OpenAI**: AI services for PDF analysis and visual comparison summaries.

@@ -133,7 +133,8 @@ router.get("/api/progress-claims", requireAuth, async (req: Request, res: Respon
       .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
       .leftJoin(users, eq(progressClaims.createdById, users.id))
       .where(and(...conditions))
-      .orderBy(desc(progressClaims.createdAt));
+      .orderBy(desc(progressClaims.createdAt))
+      .limit(Math.min(parseInt(req.query.limit as string) || 500, 1000));
 
     const uniqueJobIds = [...new Set(claims.map(c => c.jobId))];
 
@@ -250,7 +251,8 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
       .from(progressClaims)
       .leftJoin(jobs, eq(progressClaims.jobId, jobs.id))
       .where(eq(progressClaims.companyId, companyId))
-      .orderBy(jobs.jobNumber, progressClaims.claimDate);
+      .orderBy(jobs.jobNumber, progressClaims.claimDate)
+      .limit(Math.min(parseInt(req.query.limit as string) || 500, 1000));
 
     const jobIds = [...new Set(allClaims.map(c => c.jobId))];
     const contractMap: Record<string, { retentionRate: number; retentionCapPct: number; contractValue: number; retentionCapAmount: number }> = {};
@@ -372,6 +374,7 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
       .where(and(eq(progressClaims.id, req.params.id), eq(progressClaims.companyId, companyId)));
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
 
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const items = await db
       .select({
         id: progressClaimItems.id,
@@ -386,7 +389,8 @@ router.get("/api/progress-claims/:id/items", requireAuth, async (req: Request, r
       })
       .from(progressClaimItems)
       .leftJoin(panelRegister, eq(progressClaimItems.panelId, panelRegister.id))
-      .where(eq(progressClaimItems.progressClaimId, req.params.id));
+      .where(eq(progressClaimItems.progressClaimId, req.params.id))
+      .limit(safeLimit);
 
     res.json(items);
   } catch (error: any) {

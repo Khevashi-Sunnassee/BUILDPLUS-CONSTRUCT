@@ -115,9 +115,11 @@ router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response)
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const result = await db.select().from(assets)
       .where(eq(assets.companyId, companyId))
-      .orderBy(desc(assets.createdAt));
+      .orderBy(desc(assets.createdAt))
+      .limit(safeLimit);
     res.json(result);
   } catch (error: any) {
     logger.error("Failed to fetch assets", { error: error.message });
@@ -267,9 +269,11 @@ router.get("/api/admin/assets/:id/maintenance", requireAuth, async (req: Request
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const records = await db.select().from(assetMaintenanceRecords)
       .where(and(eq(assetMaintenanceRecords.assetId, req.params.id), eq(assetMaintenanceRecords.companyId, companyId)))
-      .orderBy(desc(assetMaintenanceRecords.maintenanceDate));
+      .orderBy(desc(assetMaintenanceRecords.maintenanceDate))
+      .limit(safeLimit);
     res.json(records);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch maintenance records" });
@@ -316,9 +320,11 @@ router.get("/api/admin/assets/:id/transfers", requireAuth, async (req: Request, 
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const records = await db.select().from(assetTransfers)
       .where(and(eq(assetTransfers.assetId, req.params.id), eq(assetTransfers.companyId, companyId)))
-      .orderBy(desc(assetTransfers.transferDate));
+      .orderBy(desc(assetTransfers.transferDate))
+      .limit(safeLimit);
     res.json(records);
   } catch (error: any) {
     res.status(500).json({ error: "Failed to fetch transfer records" });

@@ -322,6 +322,7 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid calendar type" });
     }
     
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
     const holidays = await db.select()
       .from(cfmeuHolidays)
       .where(
@@ -331,7 +332,8 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
           lte(cfmeuHolidays.date, new Date(endDate as string))
         )
       )
-      .orderBy(cfmeuHolidays.date);
+      .orderBy(cfmeuHolidays.date)
+      .limit(safeLimit);
     
     res.json(holidays);
   } catch (error: any) {
@@ -342,7 +344,8 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
 
 router.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) => {
   try {
-    const holidays = await db.select().from(cfmeuHolidays).orderBy(cfmeuHolidays.date);
+    const safeLimit = Math.min(parseInt(req.query.limit as string) || 500, 1000);
+    const holidays = await db.select().from(cfmeuHolidays).orderBy(cfmeuHolidays.date).limit(safeLimit);
     
     const summary: Record<string, { count: number; years: number[] }> = {};
     for (const h of holidays) {
