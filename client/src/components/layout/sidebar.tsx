@@ -38,6 +38,7 @@ import {
   Target,
   Boxes,
   BookOpen,
+  ImageIcon,
 } from "lucide-react";
 import defaultLogo from "@assets/LTE_STRUCTURE_LOGO_1769926222936.png";
 import type { UserPermission } from "@shared/schema";
@@ -70,6 +71,7 @@ const mainNavItems = [
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
   { title: "Document Register", url: "/documents", icon: FolderOpen },
+  { title: "Photo Gallery", url: "/photo-gallery", icon: ImageIcon },
   { title: "Checklists", url: "/checklists", icon: CheckSquare },
   { title: "Weekly Job Logs", url: "/weekly-job-logs", icon: ClipboardList },
   { title: "Broadcast", url: "/broadcast", icon: Radio },
@@ -133,6 +135,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/tasks": "tasks",
   "/chat": "chat",
   "/documents": "document_register",
+  "/photo-gallery": "document_register",
   "/reports": "daily_reports",
   "/admin/jobs": "admin_jobs",
   "/admin/panels": "panel_register",

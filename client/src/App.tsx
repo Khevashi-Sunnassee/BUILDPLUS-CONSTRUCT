@@ -86,7 +86,9 @@ import MobileChecklistFillPage from "@/pages/mobile/checklist-fill";
 import MobileBroadcastPage from "@/pages/mobile/broadcast";
 import MobileQrScanner from "@/pages/mobile/qr-scanner";
 import MobileNewOpportunity from "@/pages/mobile/new-opportunity";
+import MobilePhotoGalleryPage from "@/pages/mobile/photo-gallery";
 import MobileJobDetailPage from "@/pages/mobile/job-detail";
+import PhotoGalleryPage from "@/pages/photo-gallery";
 import SalesPipelinePage from "@/pages/sales-pipeline";
 import HelpCenterPage from "@/pages/help-center";
 import AdminHelpPage from "@/pages/admin/help";
@@ -360,6 +362,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <DocumentRegisterPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/photo-gallery">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PhotoGalleryPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
@@ -720,6 +730,11 @@ function Router() {
       <Route path="/mobile/documents">
         <ProtectedRoute>
           <MobileDocumentsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/photo-gallery">
+        <ProtectedRoute>
+          <MobilePhotoGalleryPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/checklists/:id">

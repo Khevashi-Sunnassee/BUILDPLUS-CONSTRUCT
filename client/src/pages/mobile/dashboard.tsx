@@ -15,6 +15,7 @@ import {
   Home,
   FolderOpen,
   ClipboardCheck,
+  ImageIcon,
 } from "lucide-react";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -260,6 +261,12 @@ export default function MobileDashboard() {
             iconBg="bg-cyan-500/20"
             label="Documents"
             href="/mobile/documents"
+          />
+          <NavRow
+            icon={<ImageIcon className="h-5 w-5 text-pink-400" />}
+            iconBg="bg-pink-500/20"
+            label="Photo Gallery"
+            href="/mobile/photo-gallery"
           />
           <NavRow
             icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}

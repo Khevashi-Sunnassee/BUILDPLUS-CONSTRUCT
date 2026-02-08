@@ -75,6 +75,16 @@ const pageHelp: HelpSeed[] = [
     pageRoute: "/documents",
   },
   {
+    key: "page.photo-gallery",
+    scope: "PAGE",
+    title: "Photo Gallery",
+    shortText: "Browse and manage project photos with filtering and grouping.",
+    bodyMd: `## Photo Gallery\n\nVisual gallery for all image files stored in the document register.\n\n### Features\n- **Thumbnail Grid** - Browse photos as visual thumbnails\n- **Search & Filter** - Search by title, filter by job, type, discipline, or status\n- **Grouping** - Group photos by job, discipline, type, or status\n- **Chat Toggle** - Include or exclude chat-attached photos\n- **Full-Screen Viewer** - Click any photo to view full-size with navigation\n- **Multi-Select & Email** - Select multiple photos and send via email\n- **Download** - Download individual photos directly`,
+    keywords: ["photos", "images", "gallery", "thumbnails", "pictures"],
+    category: "Documents",
+    pageRoute: "/photo-gallery",
+  },
+  {
     key: "page.checklists",
     scope: "PAGE",
     title: "Checklists",

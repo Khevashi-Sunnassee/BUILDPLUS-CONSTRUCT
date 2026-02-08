@@ -149,6 +149,8 @@ export const documentMethods = {
     conversationId?: string;
     messageId?: string;
     showLatestOnly?: boolean;
+    mimeTypePrefix?: string;
+    excludeChat?: boolean;
   }): Promise<{ documents: DocumentWithDetails[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = filters.page || 1;
     const limit = filters.limit || 50;
@@ -172,6 +174,14 @@ export const documentMethods = {
     if (filters.conversationId) conditions.push(eq(documents.conversationId, filters.conversationId));
     if (filters.messageId) conditions.push(eq(documents.messageId, filters.messageId));
     if (filters.showLatestOnly) conditions.push(eq(documents.isLatestVersion, true));
+    if (filters.mimeTypePrefix) {
+      const prefix = `${filters.mimeTypePrefix}%`;
+      conditions.push(sql`${documents.mimeType} LIKE ${prefix}`);
+    }
+    if (filters.excludeChat) {
+      conditions.push(sql`${documents.conversationId} IS NULL`);
+      conditions.push(sql`${documents.messageId} IS NULL`);
+    }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 

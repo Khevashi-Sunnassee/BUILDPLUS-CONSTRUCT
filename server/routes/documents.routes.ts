@@ -353,7 +353,7 @@ router.delete("/api/document-categories/:id", requireRole("ADMIN"), async (req, 
 
 router.get("/api/documents", requireAuth, async (req, res) => {
   try {
-    const { page, limit, search, status, typeId, disciplineId, categoryId, jobId, panelId, supplierId, purchaseOrderId, taskId, showLatestOnly } = req.query;
+    const { page, limit, search, status, typeId, disciplineId, categoryId, jobId, panelId, supplierId, purchaseOrderId, taskId, showLatestOnly, mimeTypePrefix, excludeChat } = req.query;
     
     const result = await storage.getDocuments({
       page: page ? parseInt(String(page)) : 1,
@@ -369,6 +369,8 @@ router.get("/api/documents", requireAuth, async (req, res) => {
       purchaseOrderId: purchaseOrderId ? String(purchaseOrderId) : undefined,
       taskId: taskId ? String(taskId) : undefined,
       showLatestOnly: showLatestOnly === "true",
+      mimeTypePrefix: mimeTypePrefix ? String(mimeTypePrefix) : undefined,
+      excludeChat: excludeChat === "true",
     });
     
     res.json(result);
