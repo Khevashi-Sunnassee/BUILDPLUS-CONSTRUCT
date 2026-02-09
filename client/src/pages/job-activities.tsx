@@ -30,10 +30,12 @@ import {
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
   Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
   ListChecks, BarChart3, TableProperties, Eye, EyeOff, CheckCircle,
-  RefreshCw, Link2,
+  RefreshCw, Link2, Printer,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
+import { PROJECT_ACTIVITIES_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, JobActivity } from "@shared/schema";
 import { format, isAfter, isBefore, startOfDay } from "date-fns";
 
@@ -93,11 +95,20 @@ export default function JobActivitiesPage() {
   const [selectedJobTypeId, setSelectedJobTypeId] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+  const [printIncludeTasks, setPrintIncludeTasks] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
 
   const { data: job } = useQuery<any>({
     queryKey: [`/api/admin/jobs/${jobId}`],
     enabled: !!jobId,
   });
+
+  const { data: brandingSettings } = useQuery<{ logoBase64: string | null; companyName: string }>({
+    queryKey: [SETTINGS_ROUTES.LOGO],
+  });
+  const reportLogo = brandingSettings?.logoBase64 || null;
+  const companyName = brandingSettings?.companyName || "BuildPlusAI";
 
   const { data: activities, isLoading: loadingActivities } = useQuery<ActivityWithAssignees[]>({
     queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)],
@@ -307,6 +318,348 @@ export default function JobActivitiesPage() {
   const overdueCount = allParentActivities.filter(a => isOverdue(a)).length;
   const progressPct = totalActivities > 0 ? Math.round((doneCount / totalActivities) * 100) : 0;
 
+  const exportActivitiesToPDF = async () => {
+    setIsExporting(true);
+    try {
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: "a4",
+        compress: true,
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 15;
+      const contentWidth = pageWidth - margin * 2;
+      let currentY = margin;
+
+      const logoHeight = 20;
+      let headerTextX = margin;
+
+      try {
+        if (reportLogo) {
+          const img = document.createElement("img");
+          img.src = reportLogo;
+          await new Promise<void>((resolve) => {
+            img.onload = () => resolve();
+            img.onerror = () => resolve();
+          });
+          if (img.naturalWidth && img.naturalHeight) {
+            const aspectRatio = img.naturalWidth / img.naturalHeight;
+            const lw = Math.min(25, logoHeight * aspectRatio);
+            const lh = lw / aspectRatio;
+            pdf.addImage(reportLogo, "PNG", margin, margin - 5, lw, lh, undefined, "FAST");
+            headerTextX = margin + 30;
+          }
+        }
+      } catch (_e) {}
+
+      pdf.setTextColor(31, 41, 55);
+      pdf.setFontSize(16);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(companyName || "BuildPlusAI", headerTextX, margin + 2);
+
+      pdf.setFontSize(20);
+      pdf.setTextColor(107, 114, 128);
+      pdf.text("PROJECT ACTIVITIES", headerTextX, margin + 12);
+
+      const jobTitle = job ? `${job.jobNumber || ""} - ${job.name || ""}`.trim() : "";
+      if (jobTitle) {
+        pdf.setFontSize(11);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(31, 41, 55);
+        pdf.text(jobTitle, headerTextX, margin + 18);
+      }
+
+      pdf.setFillColor(249, 250, 251);
+      pdf.setDrawColor(229, 231, 235);
+      pdf.roundedRect(pageWidth - margin - 55, margin - 5, 55, 22, 2, 2, "FD");
+      pdf.setTextColor(107, 114, 128);
+      pdf.setFontSize(9);
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Generated", pageWidth - margin - 50, margin + 2);
+      pdf.setFontSize(11);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(31, 41, 55);
+      pdf.text(format(new Date(), "dd/MM/yyyy"), pageWidth - margin - 50, margin + 10);
+
+      pdf.setDrawColor(229, 231, 235);
+      pdf.line(margin, margin + 24, pageWidth - margin, margin + 24);
+      currentY = margin + 32;
+
+      const formatStatus = (status: string) => {
+        switch (status) {
+          case "NOT_STARTED": return "Not Started";
+          case "IN_PROGRESS": return "In Progress";
+          case "STUCK": return "Stuck";
+          case "DONE": return "Done";
+          case "ON_HOLD": return "On Hold";
+          case "SKIPPED": return "Skipped";
+          default: return status.replace(/_/g, " ");
+        }
+      };
+
+      const checkPageBreak = (requiredHeight: number) => {
+        if (currentY + requiredHeight > pageHeight - margin - 5) {
+          pdf.addPage();
+          currentY = margin;
+          return true;
+        }
+        return false;
+      };
+
+      const drawCheckbox = (x: number, y: number, size: number = 3.5) => {
+        pdf.setDrawColor(150, 150, 150);
+        pdf.setLineWidth(0.3);
+        pdf.rect(x, y, size, size, "S");
+        pdf.setLineWidth(0.2);
+      };
+
+      const sortCol = 12;
+      const activityCol = 70;
+      const statusCol = 24;
+      const daysCol = 14;
+      const predCol = 12;
+      const relCol = 12;
+      const startCol = 24;
+      const endCol = 24;
+      const remainingCol = contentWidth - sortCol - activityCol - statusCol - daysCol - predCol - relCol - startCol - endCol;
+      const assigneeCol = remainingCol;
+
+      const colWidths = [sortCol, activityCol, statusCol, daysCol, predCol, relCol, startCol, endCol, assigneeCol];
+      const colHeaders = ["#", "Activity", "Status", "Days", "Pred", "Rel", "Start", "End", "Assignees"];
+
+      const drawTableHeaders = () => {
+        pdf.setFillColor(75, 85, 99);
+        pdf.rect(margin, currentY, contentWidth, 8, "F");
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(7);
+        pdf.setFont("helvetica", "bold");
+        let hx = margin;
+        colHeaders.forEach((header, i) => {
+          pdf.text(header, hx + 2, currentY + 5.5);
+          hx += colWidths[i];
+        });
+        currentY += 8;
+      };
+
+      const taskColWidths = [8, 80, 24, 24, 30];
+      const taskHeaders = ["", "Task", "Status", "Due Date", "Assignee"];
+
+      const drawTaskHeaders = () => {
+        pdf.setFillColor(107, 114, 128);
+        const taskTotalWidth = taskColWidths.reduce((a, b) => a + b, 0);
+        const taskStartX = margin + sortCol + 8;
+        pdf.rect(taskStartX, currentY, taskTotalWidth, 6, "F");
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(6.5);
+        pdf.setFont("helvetica", "bold");
+        let hx = taskStartX;
+        taskHeaders.forEach((header, i) => {
+          if (i === 0) { hx += taskColWidths[i]; return; }
+          pdf.text(header, hx + 2, currentY + 4);
+          hx += taskColWidths[i];
+        });
+        currentY += 6;
+      };
+
+      const printedActivityIds = new Set<string>();
+      for (const stageId of orderedStageIds) {
+        const stageActs = activitiesByStage.get(stageId) || [];
+        stageActs.forEach(a => printedActivityIds.add(a.id));
+      }
+
+      let taskDataCache: Map<string, any[]> | null = null;
+      if (printIncludeTasks) {
+        taskDataCache = new Map();
+        const fetchPromises = Array.from(printedActivityIds).map(async (actId) => {
+          try {
+            const res = await fetch(PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(actId), { credentials: "include" });
+            if (res.ok) {
+              const tasks = await res.json();
+              taskDataCache!.set(actId, tasks);
+            }
+          } catch (_e) {}
+        });
+        await Promise.all(fetchPromises);
+      }
+
+      for (const stageId of orderedStageIds) {
+        const stage = stageMap.get(stageId);
+        const stageActivities = (activitiesByStage.get(stageId) || []).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+        if (stageActivities.length === 0) continue;
+
+        checkPageBreak(25);
+
+        pdf.setFillColor(249, 250, 251);
+        pdf.setDrawColor(229, 231, 235);
+        pdf.roundedRect(margin, currentY, contentWidth, 9, 2, 2, "FD");
+        pdf.setTextColor(31, 41, 55);
+        pdf.setFontSize(11);
+        pdf.setFont("helvetica", "bold");
+        const stageName = (stage?.name || "Ungrouped").toUpperCase();
+        pdf.text(stageName, margin + 5, currentY + 6.5);
+        const stageNameWidth = pdf.getTextWidth(stageName);
+        const stageDone = stageActivities.filter(a => a.status === "DONE").length;
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(107, 114, 128);
+        pdf.text(`(${stageDone}/${stageActivities.length} done)`, margin + 5 + stageNameWidth + 4, currentY + 6.5);
+        currentY += 13;
+
+        drawTableHeaders();
+
+        let rowIndex = 0;
+        for (const activity of stageActivities) {
+          const titleLines: string[] = pdf.splitTextToSize(activity.name, activityCol - 4);
+          const lineHeight = 4;
+          const rowHeight = Math.max(7, titleLines.length * lineHeight + 3);
+
+          checkPageBreak(rowHeight);
+
+          if (rowIndex % 2 === 0) {
+            pdf.setFillColor(249, 250, 251);
+            pdf.rect(margin, currentY, contentWidth, rowHeight, "F");
+          }
+
+          if (activity.status === "DONE") {
+            pdf.setFillColor(220, 252, 231);
+            pdf.rect(margin, currentY, contentWidth, rowHeight, "F");
+          } else if (isOverdue(activity)) {
+            pdf.setFillColor(254, 226, 226);
+            pdf.rect(margin, currentY, contentWidth, rowHeight, "F");
+          }
+
+          let rx = margin;
+
+          pdf.setTextColor(107, 114, 128);
+          pdf.setFontSize(7);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(String(activity.sortOrder ?? ""), rx + 2, currentY + 4.5);
+          rx += sortCol;
+
+          pdf.setTextColor(31, 41, 55);
+          pdf.setFontSize(8);
+          pdf.setFont("helvetica", "normal");
+          pdf.text(titleLines, rx + 2, currentY + 4.5);
+          rx += activityCol;
+
+          pdf.setFontSize(7);
+          pdf.text(formatStatus(activity.status), rx + 2, currentY + 4.5);
+          rx += statusCol;
+
+          pdf.setTextColor(107, 114, 128);
+          pdf.text(activity.days != null ? String(activity.days) : "-", rx + 2, currentY + 4.5);
+          rx += daysCol;
+
+          pdf.text(activity.predecessorSortOrder != null ? String(activity.predecessorSortOrder) : "-", rx + 2, currentY + 4.5);
+          rx += predCol;
+
+          pdf.text(activity.relationship || "-", rx + 2, currentY + 4.5);
+          rx += relCol;
+
+          pdf.setTextColor(31, 41, 55);
+          pdf.text(activity.startDate ? format(new Date(activity.startDate), "dd/MM/yyyy") : "-", rx + 2, currentY + 4.5);
+          rx += startCol;
+
+          pdf.text(activity.endDate ? format(new Date(activity.endDate), "dd/MM/yyyy") : "-", rx + 2, currentY + 4.5);
+          rx += endCol;
+
+          const assigneeNames = activity.assignees?.map(a => {
+            const u = users?.find((u: any) => u.id === a.userId);
+            return u?.name?.split(" ")[0] || "";
+          }).filter(Boolean).join(", ") || "-";
+          pdf.setTextColor(107, 114, 128);
+          pdf.setFontSize(7);
+          const maxAssLen = Math.floor((assigneeCol - 4) / 1.8);
+          const assigneeText = assigneeNames.length > maxAssLen ? assigneeNames.substring(0, maxAssLen - 2) + "..." : assigneeNames;
+          pdf.text(assigneeText, rx + 2, currentY + 4.5);
+
+          pdf.setDrawColor(229, 231, 235);
+          pdf.line(margin, currentY + rowHeight, margin + contentWidth, currentY + rowHeight);
+
+          currentY += rowHeight;
+          rowIndex++;
+
+          if (printIncludeTasks && taskDataCache) {
+            const actTasks = taskDataCache.get(activity.id) || [];
+            if (actTasks.length > 0) {
+              checkPageBreak(12);
+              drawTaskHeaders();
+
+              for (let ti = 0; ti < actTasks.length; ti++) {
+                const task = actTasks[ti];
+                const taskRowHeight = 6;
+                checkPageBreak(taskRowHeight);
+
+                const taskStartX = margin + sortCol + 8;
+                if (ti % 2 === 0) {
+                  pdf.setFillColor(245, 245, 245);
+                  pdf.rect(taskStartX, currentY, taskColWidths.reduce((a: number, b: number) => a + b, 0), taskRowHeight, "F");
+                }
+
+                let tx = taskStartX;
+                drawCheckbox(tx + 2, currentY + 1.5, 3);
+                if (task.status === "DONE") {
+                  pdf.setDrawColor(100, 100, 100);
+                  pdf.setLineWidth(0.3);
+                  const cbx = tx + 2, cby = currentY + 1.5, cbs = 3;
+                  pdf.line(cbx, cby, cbx + cbs, cby + cbs);
+                  pdf.line(cbx + cbs, cby, cbx, cby + cbs);
+                  pdf.setLineWidth(0.2);
+                }
+                tx += taskColWidths[0];
+
+                pdf.setTextColor(task.status === "DONE" ? 156 : 55, task.status === "DONE" ? 163 : 65, task.status === "DONE" ? 175 : 81);
+                pdf.setFontSize(7);
+                pdf.setFont("helvetica", "normal");
+                const taskTitle = task.title.length > 45 ? task.title.substring(0, 42) + "..." : task.title;
+                pdf.text(taskTitle, tx + 2, currentY + 4);
+                tx += taskColWidths[1];
+
+                pdf.setFontSize(6.5);
+                pdf.text(formatStatus(task.status), tx + 2, currentY + 4);
+                tx += taskColWidths[2];
+
+                pdf.text(task.dueDate ? format(new Date(task.dueDate), "dd/MM/yy") : "-", tx + 2, currentY + 4);
+                tx += taskColWidths[3];
+
+                const taskAssignees = task.assignees?.map((a: any) => a.user?.name?.split(" ")[0] || "").filter(Boolean).join(", ") || "-";
+                const taskAssText = taskAssignees.length > 18 ? taskAssignees.substring(0, 15) + "..." : taskAssignees;
+                pdf.text(taskAssText, tx + 2, currentY + 4);
+
+                currentY += taskRowHeight;
+              }
+              currentY += 2;
+            }
+          }
+        }
+        currentY += 6;
+      }
+
+      const totalPages = pdf.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setTextColor(156, 163, 175);
+        pdf.setFontSize(8);
+        pdf.setFont("helvetica", "normal");
+        pdf.text(`${companyName} - Confidential`, margin, pageHeight - 8);
+        pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
+      }
+
+      const filename = `Activities-${job?.jobNumber || jobId}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      pdf.save(filename);
+      toast({ title: "PDF exported successfully" });
+      setShowPrintDialog(false);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to generate PDF" });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (loadingActivities) {
     return (
       <div className="p-4 md:p-6 space-y-4 h-full overflow-auto">
@@ -459,6 +812,17 @@ export default function JobActivitiesPage() {
               Show Done
             </Button>
 
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPrintDialog(true)}
+              disabled={!hasActivities}
+              data-testid="button-print-activities"
+            >
+              <Printer className="h-4 w-4 mr-1" />
+              Print
+            </Button>
+
             <div className="flex items-center border rounded-md overflow-visible">
               <Button
                 variant={viewMode === "table" ? "default" : "ghost"}
@@ -588,6 +952,42 @@ export default function JobActivitiesPage() {
           )}
         </>
       )}
+
+      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Print Project Activities</DialogTitle>
+            <DialogDescription>
+              Export activities for {job?.jobNumber} - {job?.name} as PDF
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="include-tasks"
+                checked={printIncludeTasks}
+                onCheckedChange={(checked) => setPrintIncludeTasks(checked === true)}
+                data-testid="checkbox-include-tasks"
+              />
+              <label htmlFor="include-tasks" className="text-sm cursor-pointer">
+                Include tasks with activities
+              </label>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 ml-7">
+              When enabled, tasks assigned to each activity will be printed below their parent activity
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPrintDialog(false)} data-testid="button-cancel-print">
+              Cancel
+            </Button>
+            <Button onClick={exportActivitiesToPDF} disabled={isExporting} data-testid="button-confirm-print">
+              {isExporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Printer className="h-4 w-4 mr-1" />}
+              {isExporting ? "Generating..." : "Print PDF"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <InstantiateDialog
         open={showInstantiateDialog}
