@@ -773,7 +773,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
     const { to, cc, subject, message, documentIds, sendCopy } = parsed.data;
 
     if (!emailService.isConfigured()) {
-      return res.status(503).json({ error: "Email service is not configured. Please configure Mailgun settings (MAILGUN_API_KEY, MAILGUN_DOMAIN)." });
+      return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
     }
 
     const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];

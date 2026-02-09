@@ -724,7 +724,7 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
     }
 
     if (!emailService.isConfigured()) {
-      return res.status(503).json({ error: "Email service is not configured. Please configure Mailgun settings." });
+      return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
     }
 
     const settings = await storage.getGlobalSettings();
@@ -804,7 +804,7 @@ router.post("/purchase-orders/:id/send-email", requireAuth, async (req, res) => 
     }
 
     if (!emailService.isConfigured()) {
-      return res.status(503).json({ error: "Email service is not configured. Please configure Mailgun settings (MAILGUN_API_KEY, MAILGUN_DOMAIN)." });
+      return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
     }
 
     const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];

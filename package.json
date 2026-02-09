@@ -121,6 +121,7 @@
     "react-leaflet": "^4.2.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "^2.15.4",
+    "resend": "^4.0.0",
     "sanitize-html": "^2.17.0",
     "serve-index": "^1.9.2",
     "sharp": "^0.34.5",

@@ -19,6 +19,8 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Search,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,6 +132,7 @@ export default function AdminSuppliersPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sortColumn, setSortColumn] = useState<string>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const toggleSort = useCallback((column: string) => {
     if (sortColumn === column) {
@@ -151,7 +154,19 @@ export default function AdminSuppliersPage() {
 
   const suppliers = useMemo(() => {
     if (!suppliersRaw) return undefined;
-    return [...suppliersRaw].sort((a, b) => {
+    let filtered = suppliersRaw;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = suppliersRaw.filter(s =>
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.keyContact || "").toLowerCase().includes(q) ||
+        (s.email || "").toLowerCase().includes(q) ||
+        (s.phone || "").toLowerCase().includes(q) ||
+        (s.abn || "").toLowerCase().includes(q) ||
+        (s.city || "").toLowerCase().includes(q)
+      );
+    }
+    return [...filtered].sort((a, b) => {
       let aVal = "";
       let bVal = "";
       switch (sortColumn) {
@@ -166,7 +181,7 @@ export default function AdminSuppliersPage() {
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [suppliersRaw, sortColumn, sortDirection]);
+  }, [suppliersRaw, sortColumn, sortDirection, searchQuery]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -369,6 +384,28 @@ export default function AdminSuppliersPage() {
         </div>
       </div>
 
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search suppliers..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9 pr-9"
+          data-testid="input-search-suppliers"
+        />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+            onClick={() => setSearchQuery("")}
+            data-testid="button-clear-search-suppliers"
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -376,7 +413,7 @@ export default function AdminSuppliersPage() {
             Suppliers
           </CardTitle>
           <CardDescription>
-            {suppliers?.length || 0} supplier{suppliers?.length !== 1 ? "s" : ""} configured
+            {suppliers?.length || 0} supplier{suppliers?.length !== 1 ? "s" : ""}{searchQuery ? " found" : " configured"}
           </CardDescription>
         </CardHeader>
         <CardContent>
