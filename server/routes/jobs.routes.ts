@@ -748,6 +748,129 @@ router.delete("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, 
   res.json({ ok: true });
 });
 
+// GET /api/admin/jobs/:id/generate-levels - Generate level cycle times from job settings
+router.get("/api/admin/jobs/:id/generate-levels", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    if (!job.lowestLevel || !job.highestLevel) {
+      return res.status(400).json({ error: "Job must have lowest and highest level configured to generate levels" });
+    }
+
+    const numberOfBuildings = job.numberOfBuildings || 1;
+    const defaultCycleDays = job.expectedCycleTimePerFloor || 5;
+
+    const lowMatch = job.lowestLevel.match(/^L?(\d+)$/i);
+    const highMatch = job.highestLevel.match(/^L?(\d+)$/i);
+
+    const levelOrder: Record<string, number> = {
+      "Basement 2": -2, "B2": -2,
+      "Basement 1": -1, "B1": -1, "Basement": -1,
+      "Ground": 0, "G": 0, "GF": 0,
+      "Mezzanine": 0.5, "Mezz": 0.5,
+    };
+
+    let levels: string[] = [];
+    if (lowMatch && highMatch) {
+      const lowNum = parseInt(lowMatch[1], 10);
+      const highNum = parseInt(highMatch[1], 10);
+      const useLPrefix = job.lowestLevel.toLowerCase().startsWith('l') || job.highestLevel.toLowerCase().startsWith('l');
+      for (let i = lowNum; i <= highNum; i++) {
+        levels.push(useLPrefix ? `L${i}` : String(i));
+      }
+    } else {
+      const specialLevels = ["Basement 2", "B2", "Basement 1", "B1", "Basement", "Ground", "G", "GF", "Mezzanine", "Mezz"];
+      const lowIdx = specialLevels.findIndex(l => l.toLowerCase() === job.lowestLevel!.toLowerCase());
+      const highIdx = specialLevels.findIndex(l => l.toLowerCase() === job.highestLevel!.toLowerCase());
+      if (lowIdx !== -1 && highIdx !== -1 && lowIdx <= highIdx) {
+        levels = specialLevels.slice(lowIdx, highIdx + 1);
+      } else if (job.lowestLevel === job.highestLevel) {
+        levels = [job.lowestLevel];
+      } else {
+        levels = [job.lowestLevel, job.highestLevel];
+      }
+    }
+
+    const result: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[] = [];
+    for (let b = 1; b <= numberOfBuildings; b++) {
+      levels.forEach((level, idx) => {
+        const order = levelOrder[level] !== undefined ? levelOrder[level] : (lowMatch ? parseInt(level.replace(/^L/i, ''), 10) : idx);
+        result.push({
+          buildingNumber: b,
+          level,
+          levelOrder: order,
+          cycleDays: defaultCycleDays,
+        });
+      });
+    }
+
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error generating levels from settings");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate levels" });
+  }
+});
+
+// GET /api/admin/jobs/:id/build-levels - Build level cycle times from registered panels
+router.get("/api/admin/jobs/:id/build-levels", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const panels = await storage.getPanelsByJob(String(req.params.id));
+    const defaultCycleDays = job.expectedCycleTimePerFloor || 5;
+
+    const levelOrder: Record<string, number> = {
+      "Basement 2": -2, "B2": -2,
+      "Basement 1": -1, "B1": -1, "Basement": -1,
+      "Ground": 0, "G": 0, "GF": 0,
+      "Mezzanine": 0.5, "Mezz": 0.5,
+    };
+
+    const parseLevelNumber = (level: string): number => {
+      if (levelOrder[level] !== undefined) return levelOrder[level];
+      const match = level.match(/^L?(\d+)$/i);
+      if (match) return parseInt(match[1], 10);
+      if (level.toLowerCase() === "roof") return 999;
+      return 500;
+    };
+
+    const existingCycleTimes = await storage.getJobLevelCycleTimes(String(req.params.id));
+    const existingMap = new Map(existingCycleTimes.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays]));
+
+    const uniqueLevels = new Map<string, { buildingNumber: number; level: string }>();
+    for (const panel of panels) {
+      const level = panel.level || "Unknown";
+      const building = parseInt(panel.building || "1", 10) || 1;
+      const key = `${building}-${level}`;
+      if (!uniqueLevels.has(key)) {
+        uniqueLevels.set(key, { buildingNumber: building, level });
+      }
+    }
+
+    const result = Array.from(uniqueLevels.values())
+      .sort((a, b) => {
+        if (a.buildingNumber !== b.buildingNumber) return a.buildingNumber - b.buildingNumber;
+        return parseLevelNumber(a.level) - parseLevelNumber(b.level);
+      })
+      .map(item => ({
+        buildingNumber: item.buildingNumber,
+        level: item.level,
+        levelOrder: parseLevelNumber(item.level),
+        cycleDays: existingMap.get(`${item.buildingNumber}-${item.level}`) || defaultCycleDays,
+      }));
+
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error building levels from panels");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to build levels from panels" });
+  }
+});
+
 // GET /api/admin/jobs/:id/level-cycle-times - Get level cycle times
 router.get("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
