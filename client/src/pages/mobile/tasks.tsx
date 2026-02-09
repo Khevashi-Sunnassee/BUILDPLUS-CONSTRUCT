@@ -27,6 +27,7 @@ import {
   Eye,
   EyeOff,
   FolderPlus,
+  Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -88,6 +89,7 @@ export default function MobileTasksPage() {
   const [newTaskGroupId, setNewTaskGroupId] = useState<string | null>(null);
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [hideDone, setHideDone] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState(GROUP_COLORS[0]);
@@ -197,6 +199,25 @@ export default function MobileTasksPage() {
               </Button>
             </div>
           </div>
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks..."
+              className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl"
+              data-testid="input-search-tasks"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40"
+                data-testid="button-clear-search"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -221,8 +242,20 @@ export default function MobileTasksPage() {
             {groups.map((group) => {
               const isCollapsed = collapsedGroups.has(group.id);
               const allGroupTasks = group.tasks || [];
-              const groupTasks = hideDone ? allGroupTasks.filter(t => t.status !== "DONE") : allGroupTasks;
+              const q = searchQuery.toLowerCase().trim();
+              const searchFiltered = q
+                ? allGroupTasks.filter(t =>
+                    t.title.toLowerCase().includes(q) ||
+                    (t.priority && t.priority.toLowerCase().includes(q)) ||
+                    (t.consultant && t.consultant.toLowerCase().includes(q)) ||
+                    (t.projectStage && t.projectStage.toLowerCase().includes(q)) ||
+                    (t.assignees?.some(a => a.user?.name?.toLowerCase().includes(q)))
+                  )
+                : allGroupTasks;
+              const groupTasks = hideDone ? searchFiltered.filter(t => t.status !== "DONE") : searchFiltered;
               const activeCount = allGroupTasks.filter(t => t.status !== "DONE").length;
+
+              if (q && groupTasks.length === 0 && !group.name.toLowerCase().includes(q)) return null;
 
               return (
                 <div key={group.id} className="space-y-2">
