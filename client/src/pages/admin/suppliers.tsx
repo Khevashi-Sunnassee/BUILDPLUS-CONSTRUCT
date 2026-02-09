@@ -396,9 +396,6 @@ export default function AdminSuppliersPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-supplier-phone">
                     <span className="flex items-center">Phone<SortIcon column="phone" /></span>
                   </TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("abn")} data-testid="sort-supplier-abn">
-                    <span className="flex items-center">ABN<SortIcon column="abn" /></span>
-                  </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-supplier-status">
                     <span className="flex items-center">Status<SortIcon column="status" /></span>
                   </TableHead>
@@ -419,9 +416,6 @@ export default function AdminSuppliersPage() {
                     </TableCell>
                     <TableCell data-testid={`text-supplier-phone-${supplier.id}`}>
                       {supplier.phone || "-"}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm" data-testid={`text-supplier-abn-${supplier.id}`}>
-                      {supplier.abn || "-"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={supplier.isActive ? "default" : "secondary"} data-testid={`badge-supplier-status-${supplier.id}`}>
