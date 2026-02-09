@@ -33,6 +33,7 @@ import {
   ListTodo,
   MessageSquare,
   Handshake,
+  UserCheck,
   Radio,
   Scale,
   Target,
@@ -120,6 +121,7 @@ const adminNavItems = [
 const contactsNavItems = [
   { title: "Customers", url: "/admin/customers", icon: Handshake },
   { title: "Suppliers", url: "/admin/suppliers", icon: Building2 },
+  { title: "Employees", url: "/admin/employees", icon: UserCheck },
 ];
 
 const urlToFunctionKey: Record<string, string> = {
@@ -144,6 +146,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/panel-types": "admin_panel_types",
   "/admin/customers": "admin_customers",
   "/admin/suppliers": "admin_suppliers",
+  "/admin/employees": "admin_employees",
   "/admin/items": "admin_item_catalog",
   "/admin/asset-register": "admin_assets",
   "/admin/devices": "admin_devices",

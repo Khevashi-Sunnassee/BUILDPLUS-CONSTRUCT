@@ -35,6 +35,8 @@ const AdminZonesPage = lazy(() => import("@/pages/admin/zones"));
 const AdminFactoriesPage = lazy(() => import("@/pages/admin/factories"));
 const AdminCustomersPage = lazy(() => import("@/pages/admin/customers"));
 const AdminSuppliersPage = lazy(() => import("@/pages/admin/suppliers"));
+const AdminEmployeesPage = lazy(() => import("@/pages/admin/employees"));
+const EmployeeDetailPage = lazy(() => import("@/pages/admin/employee-detail"));
 const AdminItemsPage = lazy(() => import("@/pages/admin/items"));
 const DownloadsPage = lazy(() => import("@/pages/downloads"));
 const ManualEntryPage = lazy(() => import("@/pages/manual-entry"));
@@ -500,6 +502,22 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminSuppliersPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/employees/:id">
+        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+          <AuthenticatedLayout>
+            <EmployeeDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/employees">
+        <ProtectedRoute requiredRole={["ADMIN", "MANAGER"]}>
+          <AuthenticatedLayout>
+            <AdminEmployeesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
