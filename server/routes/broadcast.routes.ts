@@ -2,7 +2,9 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { broadcastService } from "../services/broadcast.service";
-import { insertBroadcastTemplateSchema, insertBroadcastMessageSchema } from "@shared/schema";
+import { insertBroadcastTemplateSchema, insertBroadcastMessageSchema, customers, suppliers, employees } from "@shared/schema";
+import { db } from "../db";
+import { eq, and, or, isNotNull, ne } from "drizzle-orm";
 import logger from "../lib/logger";
 
 const router = Router();
@@ -128,6 +130,97 @@ router.post("/api/broadcasts/deliveries/:deliveryId/resend", requireAuth, async 
     }
     res.json({ success: true });
   } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.session.companyId;
+    if (!companyId) return res.status(400).json({ error: "No company context" });
+
+    const [customerList, supplierList, employeeList] = await Promise.all([
+      db.select({
+        id: customers.id,
+        name: customers.name,
+        keyContact: customers.keyContact,
+        email: customers.email,
+        phone: customers.phone,
+      })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.companyId, companyId),
+            eq(customers.isActive, true),
+            or(
+              and(isNotNull(customers.email), ne(customers.email, "")),
+              and(isNotNull(customers.phone), ne(customers.phone, ""))
+            )
+          )
+        ),
+      db.select({
+        id: suppliers.id,
+        name: suppliers.name,
+        keyContact: suppliers.keyContact,
+        email: suppliers.email,
+        phone: suppliers.phone,
+      })
+        .from(suppliers)
+        .where(
+          and(
+            eq(suppliers.companyId, companyId),
+            eq(suppliers.isActive, true),
+            or(
+              and(isNotNull(suppliers.email), ne(suppliers.email, "")),
+              and(isNotNull(suppliers.phone), ne(suppliers.phone, ""))
+            )
+          )
+        ),
+      db.select({
+        id: employees.id,
+        firstName: employees.firstName,
+        lastName: employees.lastName,
+        email: employees.email,
+        phone: employees.phone,
+      })
+        .from(employees)
+        .where(
+          and(
+            eq(employees.companyId, companyId),
+            eq(employees.isActive, true),
+            or(
+              and(isNotNull(employees.email), ne(employees.email, "")),
+              and(isNotNull(employees.phone), ne(employees.phone, ""))
+            )
+          )
+        ),
+    ]);
+
+    res.json({
+      customers: customerList.map(c => ({
+        id: c.id,
+        name: c.keyContact ? `${c.name} (${c.keyContact})` : c.name,
+        email: c.email || null,
+        phone: c.phone || null,
+        type: "customer" as const,
+      })),
+      suppliers: supplierList.map(s => ({
+        id: s.id,
+        name: s.keyContact ? `${s.name} (${s.keyContact})` : s.name,
+        email: s.email || null,
+        phone: s.phone || null,
+        type: "supplier" as const,
+      })),
+      employees: employeeList.map(e => ({
+        id: e.id,
+        name: `${e.firstName} ${e.lastName}`,
+        email: e.email || null,
+        phone: e.phone || null,
+        type: "employee" as const,
+      })),
+    });
+  } catch (error: any) {
+    logger.error({ error }, "Failed to fetch broadcast recipients");
     res.status(500).json({ error: error.message });
   }
 });

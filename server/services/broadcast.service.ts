@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { eq, and, inArray } from "drizzle-orm";
-import { users, broadcastMessages, broadcastDeliveries } from "@shared/schema";
+import { users, broadcastMessages, broadcastDeliveries, customers, suppliers, employees } from "@shared/schema";
 import { twilioService } from "./twilio.service";
 import { emailService } from "./email.service";
 import logger from "../lib/logger";
@@ -174,6 +174,45 @@ class BroadcastService {
           name: c.name || null,
           phone: c.phone || null,
           email: c.email || null,
+        }));
+      }
+
+      case "SPECIFIC_CUSTOMERS": {
+        if (!message.recipientIds || message.recipientIds.length === 0) return [];
+        const result = await db
+          .select()
+          .from(customers)
+          .where(inArray(customers.id, message.recipientIds));
+        return result.map((c) => ({
+          name: c.keyContact ? `${c.name} (${c.keyContact})` : c.name,
+          phone: c.phone || null,
+          email: c.email || null,
+        }));
+      }
+
+      case "SPECIFIC_SUPPLIERS": {
+        if (!message.recipientIds || message.recipientIds.length === 0) return [];
+        const result = await db
+          .select()
+          .from(suppliers)
+          .where(inArray(suppliers.id, message.recipientIds));
+        return result.map((s) => ({
+          name: s.keyContact ? `${s.name} (${s.keyContact})` : s.name,
+          phone: s.phone || null,
+          email: s.email || null,
+        }));
+      }
+
+      case "SPECIFIC_EMPLOYEES": {
+        if (!message.recipientIds || message.recipientIds.length === 0) return [];
+        const result = await db
+          .select()
+          .from(employees)
+          .where(inArray(employees.id, message.recipientIds));
+        return result.map((e) => ({
+          name: `${e.firstName} ${e.lastName}`,
+          phone: e.phone || null,
+          email: e.email || null,
         }));
       }
 

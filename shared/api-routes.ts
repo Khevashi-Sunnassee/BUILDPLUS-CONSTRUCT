@@ -655,6 +655,7 @@ export const BROADCAST_ROUTES = {
   DELIVERIES: (id: string) => `/api/broadcasts/${id}/deliveries`,
   RESEND_DELIVERY: (deliveryId: string) => `/api/broadcasts/deliveries/${deliveryId}/resend`,
   CHANNELS_STATUS: '/api/broadcasts/channels-status',
+  RECIPIENTS: '/api/broadcasts/recipients',
 } as const;
 
 // ============================================================================

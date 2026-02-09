@@ -2581,7 +2581,7 @@ export type BroadcastTemplate = typeof broadcastTemplates.$inferSelect;
 export const broadcastStatusEnum = pgEnum("broadcast_status", ["PENDING", "SENDING", "COMPLETED", "FAILED"]);
 export const broadcastChannelEnum = pgEnum("broadcast_channel", ["SMS", "WHATSAPP", "EMAIL"]);
 export const deliveryStatusEnum = pgEnum("delivery_status", ["PENDING", "SENT", "FAILED"]);
-export const recipientTypeEnum = pgEnum("recipient_type", ["ALL_USERS", "SPECIFIC_USERS", "CUSTOM_CONTACTS"]);
+export const recipientTypeEnum = pgEnum("recipient_type", ["ALL_USERS", "SPECIFIC_USERS", "CUSTOM_CONTACTS", "SPECIFIC_CUSTOMERS", "SPECIFIC_SUPPLIERS", "SPECIFIC_EMPLOYEES"]);
 
 export const broadcastMessages = pgTable("broadcast_messages", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),

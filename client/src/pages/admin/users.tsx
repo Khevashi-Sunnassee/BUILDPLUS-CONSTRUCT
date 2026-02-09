@@ -22,7 +22,7 @@ import {
   PowerOff,
   Clock,
 } from "lucide-react";
-import { ADMIN_ROUTES } from "@shared/api-routes";
+import { ADMIN_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import { Factory as FactoryIcon } from "lucide-react";
 import type { Factory } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -213,6 +213,7 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
+      queryClient.invalidateQueries({ queryKey: [USER_ROUTES.LIST] });
       toast({ title: "User created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -228,6 +229,7 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
+      queryClient.invalidateQueries({ queryKey: [USER_ROUTES.LIST] });
       toast({ title: "User updated successfully" });
       setDialogOpen(false);
       setEditingUser(null);
@@ -244,6 +246,7 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
+      queryClient.invalidateQueries({ queryKey: [USER_ROUTES.LIST] });
       toast({ title: "User status updated" });
     },
     onError: () => {
@@ -257,6 +260,7 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
+      queryClient.invalidateQueries({ queryKey: [USER_ROUTES.LIST] });
       toast({ title: "User deleted" });
       setDeleteDialogOpen(false);
       setDeletingUserId(null);

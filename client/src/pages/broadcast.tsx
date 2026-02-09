@@ -15,6 +15,9 @@ import {
   Loader2,
   X,
   Eye,
+  Building2,
+  Truck,
+  HardHat,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +79,8 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 
 type ChannelStatus = { sms: boolean; whatsapp: boolean; email: boolean };
 type CustomContact = { name: string; phone: string; email: string };
+type BroadcastRecipient = { id: string; name: string; email: string | null; phone: string | null; type: string };
+type BroadcastRecipientsData = { customers: BroadcastRecipient[]; suppliers: BroadcastRecipient[]; employees: BroadcastRecipient[] };
 
 function getStatusBadgeVariant(status: string) {
   switch (status) {
@@ -128,6 +133,12 @@ function formatRecipientType(type: string) {
       return "All Users";
     case "SPECIFIC_USERS":
       return "Specific Users";
+    case "SPECIFIC_CUSTOMERS":
+      return "Customers";
+    case "SPECIFIC_SUPPLIERS":
+      return "Suppliers";
+    case "SPECIFIC_EMPLOYEES":
+      return "Employees";
     case "CUSTOM_CONTACTS":
       return "Custom Contacts";
     default:
@@ -150,6 +161,9 @@ function SendMessageTab({
   const [customContacts, setCustomContacts] = useState<CustomContact[]>([
     { name: "", phone: "", email: "" },
   ]);
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
+  const [selectedSupplierIds, setSelectedSupplierIds] = useState<string[]>([]);
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
 
   const { data: channelStatus } = useQuery<ChannelStatus>({
@@ -162,6 +176,10 @@ function SendMessageTab({
 
   const { data: users = [] } = useQuery<User[]>({
     queryKey: [USER_ROUTES.LIST],
+  });
+
+  const { data: recipientsData } = useQuery<BroadcastRecipientsData>({
+    queryKey: [BROADCAST_ROUTES.RECIPIENTS],
   });
 
   const activeTemplates = templates.filter((t) => t.isActive);
@@ -180,6 +198,15 @@ function SendMessageTab({
       }
       if (recipientType === "SPECIFIC_USERS") {
         payload.recipientIds = selectedUserIds;
+      }
+      if (recipientType === "SPECIFIC_CUSTOMERS") {
+        payload.recipientIds = selectedCustomerIds;
+      }
+      if (recipientType === "SPECIFIC_SUPPLIERS") {
+        payload.recipientIds = selectedSupplierIds;
+      }
+      if (recipientType === "SPECIFIC_EMPLOYEES") {
+        payload.recipientIds = selectedEmployeeIds;
       }
       if (recipientType === "CUSTOM_CONTACTS") {
         payload.customRecipients = customContacts.filter(
@@ -200,6 +227,9 @@ function SendMessageTab({
       setSelectedChannels([]);
       setRecipientType("ALL_USERS");
       setSelectedUserIds([]);
+      setSelectedCustomerIds([]);
+      setSelectedSupplierIds([]);
+      setSelectedEmployeeIds([]);
       setCustomContacts([{ name: "", phone: "", email: "" }]);
       onSent();
     },
@@ -267,6 +297,9 @@ function SendMessageTab({
     selectedChannels.length > 0 &&
     (recipientType === "ALL_USERS" ||
       (recipientType === "SPECIFIC_USERS" && selectedUserIds.length > 0) ||
+      (recipientType === "SPECIFIC_CUSTOMERS" && selectedCustomerIds.length > 0) ||
+      (recipientType === "SPECIFIC_SUPPLIERS" && selectedSupplierIds.length > 0) ||
+      (recipientType === "SPECIFIC_EMPLOYEES" && selectedEmployeeIds.length > 0) ||
       (recipientType === "CUSTOM_CONTACTS" &&
         customContacts.some((c) => c.name || c.phone || c.email)));
 
@@ -366,7 +399,13 @@ function SendMessageTab({
             <Label>Recipients</Label>
             <RadioGroup
               value={recipientType}
-              onValueChange={setRecipientType}
+              onValueChange={(val) => {
+                setRecipientType(val);
+                setSelectedUserIds([]);
+                setSelectedCustomerIds([]);
+                setSelectedSupplierIds([]);
+                setSelectedEmployeeIds([]);
+              }}
               className="flex flex-wrap gap-4"
             >
               <div className="flex items-center gap-2">
@@ -388,6 +427,39 @@ function SendMessageTab({
                 />
                 <Label htmlFor="recipient-specific" className="cursor-pointer">
                   Specific Users
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="SPECIFIC_CUSTOMERS"
+                  id="recipient-customers"
+                  data-testid="radio-recipient-customers"
+                />
+                <Label htmlFor="recipient-customers" className="cursor-pointer flex items-center gap-1.5">
+                  <Building2 className="h-4 w-4" />
+                  Customers
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="SPECIFIC_SUPPLIERS"
+                  id="recipient-suppliers"
+                  data-testid="radio-recipient-suppliers"
+                />
+                <Label htmlFor="recipient-suppliers" className="cursor-pointer flex items-center gap-1.5">
+                  <Truck className="h-4 w-4" />
+                  Suppliers
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <RadioGroupItem
+                  value="SPECIFIC_EMPLOYEES"
+                  id="recipient-employees"
+                  data-testid="radio-recipient-employees"
+                />
+                <Label htmlFor="recipient-employees" className="cursor-pointer flex items-center gap-1.5">
+                  <HardHat className="h-4 w-4" />
+                  Employees
                 </Label>
               </div>
               <div className="flex items-center gap-2">
@@ -437,6 +509,117 @@ function SendMessageTab({
                   {selectedUserIds.length > 0 && (
                     <p className="text-sm text-muted-foreground mt-2">
                       {selectedUserIds.length} user(s) selected
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {recipientType === "SPECIFIC_CUSTOMERS" && (
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {(!recipientsData?.customers || recipientsData.customers.length === 0) && (
+                      <p className="text-muted-foreground text-sm">No customers with contact details found.</p>
+                    )}
+                    {recipientsData?.customers?.map((c) => (
+                      <div key={c.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`customer-${c.id}`}
+                          data-testid={`checkbox-customer-${c.id}`}
+                          checked={selectedCustomerIds.includes(c.id)}
+                          onCheckedChange={() =>
+                            setSelectedCustomerIds((prev) =>
+                              prev.includes(c.id) ? prev.filter((id) => id !== c.id) : [...prev, c.id]
+                            )
+                          }
+                        />
+                        <Label htmlFor={`customer-${c.id}`} className="cursor-pointer text-sm">
+                          {c.name}
+                          <span className="text-muted-foreground ml-1">
+                            {c.email && c.phone ? `(${c.email}, ${c.phone})` : c.email ? `(${c.email})` : `(${c.phone})`}
+                          </span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedCustomerIds.length > 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {selectedCustomerIds.length} customer(s) selected
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {recipientType === "SPECIFIC_SUPPLIERS" && (
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {(!recipientsData?.suppliers || recipientsData.suppliers.length === 0) && (
+                      <p className="text-muted-foreground text-sm">No suppliers with contact details found.</p>
+                    )}
+                    {recipientsData?.suppliers?.map((s) => (
+                      <div key={s.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`supplier-${s.id}`}
+                          data-testid={`checkbox-supplier-${s.id}`}
+                          checked={selectedSupplierIds.includes(s.id)}
+                          onCheckedChange={() =>
+                            setSelectedSupplierIds((prev) =>
+                              prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id]
+                            )
+                          }
+                        />
+                        <Label htmlFor={`supplier-${s.id}`} className="cursor-pointer text-sm">
+                          {s.name}
+                          <span className="text-muted-foreground ml-1">
+                            {s.email && s.phone ? `(${s.email}, ${s.phone})` : s.email ? `(${s.email})` : `(${s.phone})`}
+                          </span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedSupplierIds.length > 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {selectedSupplierIds.length} supplier(s) selected
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {recipientType === "SPECIFIC_EMPLOYEES" && (
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                    {(!recipientsData?.employees || recipientsData.employees.length === 0) && (
+                      <p className="text-muted-foreground text-sm">No employees with contact details found.</p>
+                    )}
+                    {recipientsData?.employees?.map((e) => (
+                      <div key={e.id} className="flex items-center gap-2">
+                        <Checkbox
+                          id={`employee-${e.id}`}
+                          data-testid={`checkbox-employee-${e.id}`}
+                          checked={selectedEmployeeIds.includes(e.id)}
+                          onCheckedChange={() =>
+                            setSelectedEmployeeIds((prev) =>
+                              prev.includes(e.id) ? prev.filter((id) => id !== e.id) : [...prev, e.id]
+                            )
+                          }
+                        />
+                        <Label htmlFor={`employee-${e.id}`} className="cursor-pointer text-sm">
+                          {e.name}
+                          <span className="text-muted-foreground ml-1">
+                            {e.email && e.phone ? `(${e.email}, ${e.phone})` : e.email ? `(${e.email})` : `(${e.phone})`}
+                          </span>
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {selectedEmployeeIds.length > 0 && (
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {selectedEmployeeIds.length} employee(s) selected
                     </p>
                   )}
                 </CardContent>
@@ -538,6 +721,12 @@ function SendMessageTab({
                 ? "all users"
                 : recipientType === "SPECIFIC_USERS"
                 ? `${selectedUserIds.length} selected user(s)`
+                : recipientType === "SPECIFIC_CUSTOMERS"
+                ? `${selectedCustomerIds.length} selected customer(s)`
+                : recipientType === "SPECIFIC_SUPPLIERS"
+                ? `${selectedSupplierIds.length} selected supplier(s)`
+                : recipientType === "SPECIFIC_EMPLOYEES"
+                ? `${selectedEmployeeIds.length} selected employee(s)`
                 : `${customContacts.filter((c) => c.name || c.phone || c.email).length} custom contact(s)`}
               .
             </AlertDialogDescription>
