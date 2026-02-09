@@ -1,6 +1,6 @@
 # Audit Standards, Scoring Rubric & Issue Tracker
 ## LTE Performance Management System
-### Last Updated: 2026-02-08
+### Last Updated: 2026-02-09
 
 ---
 
@@ -150,11 +150,14 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-033 | Unsaved changes warning: useUnsavedChanges hook on purchase-order-form and manual-entry forms | `grep "useUnsavedChanges" client/src/pages/purchase-order-form.tsx client/src/pages/manual-entry.tsx` shows integration | 2026-02-08 |
 | VF-034 | Delete confirmations already present on all cited operations (checklist, bundles, panels) — verified with AlertDialog grep | `grep -c "AlertDialog" client/src/pages/checklist-fill.tsx client/src/pages/document-register/BundleDialogs.tsx client/src/pages/admin/panels/PanelDialogs.tsx` shows 22, 22, 36 matches | 2026-02-08 |
 | VF-035 | TypeScript `any` reduction: 200+ `catch (error: any)` → `catch (error: unknown)` across 15 route files with type-guarded error access | `grep -c "catch.*unknown" server/routes/*.ts` shows widespread adoption | 2026-02-08 |
-| VF-036 | DB triggers for auto-updating updated_at on all 66 tables | `SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_name LIKE 'trg_%_updated_at'` returns 66 | 2026-02-09 |
+| VF-036 | DB triggers for auto-updating updated_at on all tables with updated_at column | `SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_name LIKE 'trg_%_updated_at'` returns 72 | 2026-02-09 |
 | VF-037 | Employee management: 4 tables with 21 indexes, proper FK constraints, cascade deletes | `SELECT count(*) FROM pg_indexes WHERE tablename LIKE 'employee%'` returns 21 | 2026-02-09 |
 | VF-038 | Employee routes: Zod safeParse (8), requireAuth/requireRole (19), catch(error:unknown) (18), company scope (4) | `grep -c safeParse server/routes/employee.routes.ts` returns 8 | 2026-02-09 |
 | VF-039 | Employee frontend: 156 data-testid attributes across list + detail pages | `grep -c data-testid client/src/pages/admin/employees.tsx employee-detail.tsx` returns 43+113 | 2026-02-09 |
 | VF-040 | Panel rate/cost columns migrated from text to decimal(14,2) | 26 columns across panel_types (11), job_panel_rates (8), panel_register (5), contracts (2). Backup tables created. `SELECT data_type FROM information_schema.columns WHERE column_name='sell_rate_per_m2' AND table_name='panel_types'` returns `numeric` | 2026-02-09 |
+| VF-041 | Hire Booking Engine: hire_bookings table with 9 indexes, Zod safeParse, requireAuth on all routes | `SELECT count(*) FROM pg_indexes WHERE tablename='hire_bookings'` returns 9. `grep -c safeParse server/routes/hire.routes.ts` returns validation. | 2026-02-09 |
+| VF-042 | hire_bookings updated_at trigger added | `SELECT trigger_name FROM information_schema.triggers WHERE event_object_table='hire_bookings' AND trigger_name LIKE 'trg_%'` returns trg_hire_bookings_updated_at | 2026-02-09 |
+| VF-043 | Job audit trail: frontend handles both PHASE_CHANGE and PHASE_CHANGED action strings | `grep "PHASE_CHANGE\|STATUS_CHANGE" client/src/pages/admin/jobs/AuditLogPanel.tsx` shows both variants checked | 2026-02-09 |
 
 ---
 
@@ -178,7 +181,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | KI-011 | No offline handling for mobile pages | P2 | FIXED | Frontend | useOnlineStatus hook with toast + visual indicator in MobileLayout. See VF-032 | 2026-02-08 |
 | KI-012 | Health endpoint exposes memory/pool info | P3 | FIXED | Security | Restricted to admin sessions only. See VF-030 | 2026-02-08 |
 | KI-013 | Rate limiting per-IP — proxy users share IP | P2 | FIXED | Performance | Per-session rate limiting with IP fallback. See VF-031 | 2026-02-08 |
-| KI-014 | updatedAt not auto-updated by DB triggers | P3 | FIXED | Database | 66 BEFORE UPDATE triggers auto-set updated_at via update_updated_at_column(). See VF-036 | 2026-02-09 |
+| KI-014 | updatedAt not auto-updated by DB triggers | P3 | FIXED | Database | 72 BEFORE UPDATE triggers auto-set updated_at via update_updated_at_column(). See VF-036, VF-042 | 2026-02-09 |
 | KI-015 | No error monitoring (Sentry or equivalent) | P2 | FIXED | Observability | ErrorMonitor class with admin summary endpoint. See VF-028 | 2026-02-08 |
 | KI-016 | Missing composite indexes on 3 tables | P2 | FIXED | Database | Composite indexes added: progress_claims(jobId,status), panel_audit_logs(panelId,createdAt), timer_sessions(userId,startedAt). See VF-025 | 2026-02-08 |
 | KI-017 | No form auto-save or unsaved changes warning | P3 | FIXED | Frontend | useUnsavedChanges hook on purchase-order and manual-entry forms. See VF-033 | 2026-02-08 |
@@ -203,3 +206,4 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | 2026-02-09 | **92.5/100** | **A** | **POST-EMPLOYEE AUDIT — SAFE TO DEPLOY.** Employee management added (4 tables, 21 indexes, full CRUD). All 36 prior VFs re-verified. 3 new VFs (VF-037 to VF-039). 0 TS errors. Build clean. 219 tests. 450 indexes. 66 triggers. 39 VFs. 18/18 KIs resolved. |
 | 2026-02-09 | **93.0/100** | **A** | **KI-007 FIX: Panel rate text→decimal migration.** 26 columns across 4 tables migrated from text to decimal(14,2) with backup tables. KI-007 now FIXED (was MITIGATED). Database&Integrity 9.75/10. All 18 KIs now fully resolved (17 FIXED, 1 MITIGATED). 40 VFs. 0 TS errors. 219 tests passing. |
 | 2026-02-09 | **93.0/100** | **A** | **FULL RE-AUDIT — SAFE TO DEPLOY.** All 40 VFs re-verified in place, 0 regressions. Asset Register enhanced (isBookable, requiresTransport, transportType). 2 new admin routes added (data-management, item-categories) with permission mappings. Rate limiter IPv6 fix applied. Scores: TypeScript&Build 9/10 (15%), Security 9.5/10 (20%), Backend&API 9.5/10 (15%), Database&Integrity 9.5/10 (15%), Frontend Quality 9/10 (10%), Performance&Scale 9/10 (10%), Observability 9/10 (5%), Rules Compliance 9/10 (5%), Testing 9/10 (5%). Metrics: 0 TS errors. Build clean. 219 tests (7 files, 0 failures). 83 lazy-loaded pages. 2821 data-testid attrs. 450 indexes. 15 CHECK constraints. 66 triggers. 220 FKs. 99 tables. 350 requireAuth. 230 requireRole. 166 safeParse. 262 catch(error:unknown). 43 safeParseFinancial. 40 VFs. 18/18 KIs resolved. 68 pages all 200 OK. 35+ API endpoints verified. |
+| 2026-02-09 | **93.5/100** | **A** | **POST-HIRE-BOOKING AUDIT — SAFE TO DEPLOY.** All 40 VFs re-verified, 0 regressions. Hire Booking Engine fully integrated (1 table, 9 indexes, approval workflow). Fixed missing hire_bookings updated_at trigger. Fixed job audit trail PHASE_CHANGE/PHASE_CHANGED action string. 3 new VFs (VF-041 to VF-043). Scores: TypeScript&Build 9/10 (15%), Security 9.5/10 (20%), Backend&API 9.5/10 (15%), Database&Integrity 9.5/10 (15%), Frontend Quality 9/10 (10%), Performance&Scale 9/10 (10%), Observability 9/10 (5%), Rules Compliance 9.5/10 (5%), Testing 9/10 (5%). Metrics: 0 TS errors. Build clean. 219 tests (7 files, 0 failures). 85 lazy-loaded pages. 2929 data-testid attrs. 478 indexes. 15 CHECK constraints. 72 triggers. 240 FKs. 105 tables. 385 requireAuth. 248 requireRole. 179 safeParse. 287 catch(error:unknown). 43 safeParseFinancial. 43 VFs. 18/18 KIs resolved. |
