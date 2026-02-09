@@ -1,5 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
+import ExcelJS from "exceljs";
 import { z } from "zod";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { db } from "../db";
@@ -1006,7 +1007,6 @@ router.get("/api/job-types/:jobTypeId/templates/download-template", requireAuth,
       .where(eq(activityConsultants.companyId, companyId!))
       .orderBy(asc(activityConsultants.sortOrder));
 
-    const ExcelJS = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
 
     const mainSheet = workbook.addWorksheet("Activities");
@@ -1107,7 +1107,6 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
       .where(eq(activityConsultants.companyId, companyId!));
     const consultantByName = new Map(allConsultants.map(c => [c.name.toLowerCase().trim(), c]));
 
-    const ExcelJS = await import("exceljs");
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
 
