@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import ExcelJS from "exceljs";
 import { z } from "zod";
-import { eq, and, asc, desc, count, sql } from "drizzle-orm";
+import { eq, and, asc, desc, count, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import {
   jobTypes, activityStages, activityConsultants,
@@ -730,8 +730,8 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
           deliverable: template.deliverable,
           jobPhase: template.jobPhase,
           sortOrder: template.sortOrder,
-          predecessorSortOrder: template.predecessorSortOrder || null,
-          relationship: template.relationship || null,
+          predecessorSortOrder: template.predecessorSortOrder ?? null,
+          relationship: template.predecessorSortOrder != null ? (template.relationship || "FS") : null,
           startDate: dates.start,
           endDate: dates.end,
           createdById: req.session.userId,
@@ -767,6 +767,63 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
   } catch (error: unknown) {
     logger.error({ err: error }, "Error instantiating activities");
     res.status(500).json({ error: "Failed to instantiate activities" });
+  }
+});
+
+router.post("/api/jobs/:jobId/activities/sync-predecessors", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const jobId = String(req.params.jobId);
+
+    const activities = await db.select().from(jobActivities)
+      .where(and(
+        eq(jobActivities.jobId, jobId),
+        eq(jobActivities.companyId, companyId!),
+        isNull(jobActivities.parentId)
+      ))
+      .orderBy(asc(jobActivities.sortOrder));
+
+    if (activities.length === 0) {
+      return res.status(404).json({ error: "No activities found for this job" });
+    }
+
+    const templateIds = activities.map(a => a.templateId).filter(Boolean) as string[];
+    if (templateIds.length === 0) {
+      return res.status(400).json({ error: "Activities have no linked templates" });
+    }
+
+    const templates = await db.select().from(activityTemplates)
+      .where(inArray(activityTemplates.id, templateIds));
+
+    const templateMap = new Map(templates.map(t => [t.id, t]));
+
+    let synced = 0;
+    await db.transaction(async (tx) => {
+      for (const activity of activities) {
+        if (!activity.templateId) continue;
+        const template = templateMap.get(activity.templateId);
+        if (!template) continue;
+
+        const predSortOrder = template.predecessorSortOrder ?? null;
+        const rel = predSortOrder != null ? (template.relationship || "FS") : null;
+
+        if (activity.predecessorSortOrder !== predSortOrder || activity.relationship !== rel) {
+          await tx.update(jobActivities)
+            .set({
+              predecessorSortOrder: predSortOrder,
+              relationship: rel,
+              updatedAt: new Date(),
+            })
+            .where(eq(jobActivities.id, activity.id));
+          synced++;
+        }
+      }
+    });
+
+    res.json({ success: true, synced, total: activities.length });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error syncing predecessors from templates");
+    res.status(500).json({ error: "Failed to sync predecessors" });
   }
 });
 

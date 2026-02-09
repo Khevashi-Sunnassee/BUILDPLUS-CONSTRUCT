@@ -210,6 +210,21 @@ export default function JobActivitiesPage() {
     },
   });
 
+  const syncPredecessorsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_SYNC_PREDECESSORS(jobId), {});
+    },
+    onSuccess: async (res: any) => {
+      const data = await res.json();
+      await queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+      toast({ title: "Predecessors synced", description: `${data.synced} of ${data.total} activities updated from template` });
+      recalculateMutation.mutate();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const updateActivityMutation = useMutation({
     mutationFn: async ({ id, _recalculate, ...data }: any) => {
       const res = await apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
@@ -411,6 +426,17 @@ export default function JobActivitiesPage() {
                 </Button>
               </>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncPredecessorsMutation.mutate()}
+              disabled={syncPredecessorsMutation.isPending}
+              data-testid="button-sync-predecessors"
+            >
+              {syncPredecessorsMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Link2 className="h-4 w-4 mr-1" />}
+              Sync Predecessors
+            </Button>
 
             <Button
               variant="outline"
@@ -697,7 +723,7 @@ function ActivityRow({
                 .filter(a => a.sortOrder < activity.sortOrder)
                 .map(a => (
                   <SelectItem key={a.id} value={String(a.sortOrder)}>
-                    {a.sortOrder + 1}
+                    {a.sortOrder}
                   </SelectItem>
                 ))}
             </SelectContent>
@@ -1134,7 +1160,7 @@ function ActivitySidebar({
                           .filter(a => a.sortOrder < activity.sortOrder)
                           .map(a => (
                             <SelectItem key={a.id} value={String(a.sortOrder)}>
-                              {a.sortOrder + 1}. {a.name}
+                              {a.sortOrder}. {a.name}
                             </SelectItem>
                           ))}
                       </SelectContent>
