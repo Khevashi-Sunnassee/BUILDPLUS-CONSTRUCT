@@ -1556,6 +1556,7 @@ export const items = pgTable("items", {
   complianceNotes: text("compliance_notes"),
   supplierShortlist: text("supplier_shortlist"),
   sources: text("sources"),
+  itemType: text("item_type").default("local").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1565,6 +1566,7 @@ export const items = pgTable("items", {
   categoryIdx: index("items_category_idx").on(table.categoryId),
   supplierIdx: index("items_supplier_idx").on(table.supplierId),
   companyIdx: index("items_company_idx").on(table.companyId),
+  itemTypeIdx: index("items_item_type_idx").on(table.itemType),
 }));
 
 export const purchaseOrders = pgTable("purchase_orders", {

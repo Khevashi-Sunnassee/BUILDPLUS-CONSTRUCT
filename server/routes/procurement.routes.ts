@@ -44,6 +44,7 @@ const itemSchema = z.object({
   unitPrice: z.string().optional(),
   preferredSupplierId: z.string().optional().nullable(),
   notes: z.string().max(5000).optional().nullable(),
+  itemType: z.enum(["local", "imported"]).optional(),
   isActive: z.boolean().optional(),
 });
 

@@ -93,6 +93,7 @@ const itemSchema = z.object({
   unitPrice: z.string().optional(),
   minOrderQty: z.string().optional(),
   leadTimeDays: z.string().optional(),
+  itemType: z.enum(["local", "imported"]).default("local"),
   isActive: z.boolean().default(true),
 });
 
@@ -179,6 +180,7 @@ function CategoryPanel({
                 <TableHead>Supplier</TableHead>
                 <TableHead className="text-right w-28">Unit Price</TableHead>
                 <TableHead className="text-right w-20">Min Qty</TableHead>
+                <TableHead className="w-24">Type</TableHead>
                 <TableHead className="w-24">Status</TableHead>
                 <TableHead className="text-right w-20">Actions</TableHead>
               </TableRow>
@@ -200,6 +202,11 @@ function CategoryPanel({
                   </TableCell>
                   <TableCell className="text-right" data-testid={`text-item-minqty-${item.id}`}>
                     {item.minOrderQty || 1}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={item.itemType === "imported" ? "outline" : "secondary"} data-testid={`badge-item-type-${item.id}`}>
+                      {item.itemType === "imported" ? "Imported" : "Local"}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={item.isActive ? "default" : "secondary"} data-testid={`badge-item-status-${item.id}`}>
@@ -246,6 +253,7 @@ export default function AdminItemsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterItemType, setFilterItemType] = useState<string>("all");
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -284,10 +292,13 @@ export default function AdminItemsPage() {
       
       const matchesStatus = filterStatus === "all" ||
         (filterStatus === "active" ? item.isActive : !item.isActive);
+
+      const matchesItemType = filterItemType === "all" ||
+        item.itemType === filterItemType;
       
-      return matchesSearch && matchesCategory && matchesStatus;
+      return matchesSearch && matchesCategory && matchesStatus && matchesItemType;
     });
-  }, [items, searchQuery, filterCategory, filterStatus]);
+  }, [items, searchQuery, filterCategory, filterStatus, filterItemType]);
 
   const groupedItems = useMemo(() => {
     const groups: CategoryGroup[] = [];
@@ -372,6 +383,7 @@ export default function AdminItemsPage() {
       unitPrice: "",
       minOrderQty: "1",
       leadTimeDays: "",
+      itemType: "local",
       isActive: true,
     },
   });
@@ -580,6 +592,7 @@ export default function AdminItemsPage() {
       unitPrice: "",
       minOrderQty: "1",
       leadTimeDays: "",
+      itemType: "local",
       isActive: true,
     });
     setDialogOpen(true);
@@ -597,6 +610,7 @@ export default function AdminItemsPage() {
       unitPrice: item.unitPrice ? String(item.unitPrice) : "",
       minOrderQty: item.minOrderQty ? String(item.minOrderQty) : "1",
       leadTimeDays: item.leadTimeDays ? String(item.leadTimeDays) : "",
+      itemType: (item.itemType as "local" | "imported") || "local",
       isActive: item.isActive,
     });
     setDialogOpen(true);
@@ -614,9 +628,10 @@ export default function AdminItemsPage() {
     setSearchQuery("");
     setFilterCategory("all");
     setFilterStatus("all");
+    setFilterItemType("all");
   };
 
-  const hasActiveFilters = searchQuery !== "" || filterCategory !== "all" || filterStatus !== "all";
+  const hasActiveFilters = searchQuery !== "" || filterCategory !== "all" || filterStatus !== "all" || filterItemType !== "all";
 
   if (isLoading) {
     return (
@@ -819,6 +834,17 @@ export default function AdminItemsPage() {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={filterItemType} onValueChange={setFilterItemType}>
+                <SelectTrigger className="w-[140px]" data-testid="select-filter-item-type">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="local">Local</SelectItem>
+                  <SelectItem value="imported">Imported</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -1170,6 +1196,28 @@ export default function AdminItemsPage() {
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="itemType"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Imported Item</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        Toggle on if this item is imported, off for local
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value === "imported"}
+                        onCheckedChange={(checked) => field.onChange(checked ? "imported" : "local")}
+                        data-testid="switch-item-type"
+                      />
+                    </FormControl>
                   </FormItem>
                 )}
               />
