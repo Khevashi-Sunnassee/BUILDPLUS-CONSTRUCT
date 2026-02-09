@@ -446,6 +446,11 @@ export default function AssetDetailPage() {
                 <FieldDisplay label="Barcode" value={displayValue(asset.barcode)} testId="text-barcode" />
                 <FieldDisplay label="QR Code" value={displayValue(asset.qrCode)} testId="text-qr-code" />
                 <FieldDisplay label="Remarks" value={displayValue(asset.remarks)} testId="text-remarks" />
+                <FieldDisplay label="Bookable" value={asset.isBookable ? "Yes" : "No"} testId="text-bookable" />
+                <FieldDisplay label="Requires Transport" value={asset.requiresTransport ? "Yes" : "No"} testId="text-requires-transport" />
+                {asset.requiresTransport && (
+                  <FieldDisplay label="Transport Type" value={displayValue(asset.transportType)} testId="text-transport-type" />
+                )}
               </div>
             </CardContent>
           </Card>

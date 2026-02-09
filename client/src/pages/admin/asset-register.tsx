@@ -33,6 +33,7 @@ import {
   ASSET_STATUSES,
   ASSET_CONDITIONS,
   ASSET_FUNDING_METHODS,
+  ASSET_TRANSPORT_TYPES,
 } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -83,6 +84,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
 const formatCurrency = (value: string | number | null | undefined) => {
@@ -176,6 +178,9 @@ const assetFormSchema = z.object({
   insuranceNotes: z.string().optional(),
   capexRequestId: z.string().optional(),
   capexDescription: z.string().optional(),
+  isBookable: z.boolean().optional(),
+  requiresTransport: z.boolean().optional(),
+  transportType: z.string().optional(),
 });
 
 type AssetFormData = z.infer<typeof assetFormSchema>;
@@ -236,6 +241,9 @@ const defaultFormValues: AssetFormData = {
   insuranceNotes: "",
   capexRequestId: "",
   capexDescription: "",
+  isBookable: false,
+  requiresTransport: false,
+  transportType: "",
 };
 
 function StatusBadge({ status }: { status: string | null | undefined }) {
@@ -318,6 +326,8 @@ export default function AssetRegisterPage() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [fundingFilter, setFundingFilter] = useState("all");
+  const [bookableFilter, setBookableFilter] = useState("all");
+  const [transportFilter, setTransportFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -393,6 +403,14 @@ export default function AssetRegisterPage() {
       if (categoryFilter !== "all" && asset.category !== categoryFilter) return false;
       if (statusFilter !== "all" && asset.status !== statusFilter) return false;
       if (fundingFilter !== "all" && asset.fundingMethod !== fundingFilter) return false;
+      if (bookableFilter !== "all") {
+        if (bookableFilter === "yes" && !asset.isBookable) return false;
+        if (bookableFilter === "no" && asset.isBookable) return false;
+      }
+      if (transportFilter !== "all") {
+        if (transportFilter === "yes" && !asset.requiresTransport) return false;
+        if (transportFilter === "no" && asset.requiresTransport) return false;
+      }
       if (chartMonthFilter) {
         if (!asset.purchaseDate) return false;
         const d = new Date(asset.purchaseDate);
@@ -428,7 +446,7 @@ export default function AssetRegisterPage() {
     }
 
     return result;
-  }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter, chartMonthFilter, sortField, sortDir]);
+  }, [assets, searchQuery, categoryFilter, statusFilter, fundingFilter, bookableFilter, transportFilter, chartMonthFilter, sortField, sortDir]);
 
   const groupedAssets = useMemo(() => {
     if (groupByMode === "none") return null;
@@ -620,6 +638,9 @@ export default function AssetRegisterPage() {
       insuranceNotes: asset.insuranceNotes || "",
       capexRequestId: asset.capexRequestId || "",
       capexDescription: asset.capexDescription || "",
+      isBookable: asset.isBookable ?? false,
+      requiresTransport: asset.requiresTransport ?? false,
+      transportType: asset.transportType || "",
     });
     setDialogOpen(true);
   };
@@ -911,6 +932,26 @@ export default function AssetRegisterPage() {
                 {f}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={bookableFilter} onValueChange={setBookableFilter}>
+          <SelectTrigger className="w-[140px]" data-testid="select-bookable-filter">
+            <SelectValue placeholder="Bookable" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Bookable</SelectItem>
+            <SelectItem value="yes">Bookable</SelectItem>
+            <SelectItem value="no">Not Bookable</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={transportFilter} onValueChange={setTransportFilter}>
+          <SelectTrigger className="w-[160px]" data-testid="select-transport-filter">
+            <SelectValue placeholder="Transport" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Transport</SelectItem>
+            <SelectItem value="yes">Requires Transport</SelectItem>
+            <SelectItem value="no">No Transport Needed</SelectItem>
           </SelectContent>
         </Select>
         <Select value={groupByMode} onValueChange={(v) => { setGroupByMode(v as "category" | "month" | "none"); setCollapsedGroups({}); }}>
@@ -1760,6 +1801,73 @@ export default function AssetRegisterPage() {
                   )}
                 />
                 <FormField control={form.control} name="insuranceNotes" render={({ field }) => (<FormItem><FormLabel>Insurance Notes</FormLabel><FormControl><Textarea {...field} data-testid="input-asset-insurance-notes" /></FormControl><FormMessage /></FormItem>)} />
+              </FormSection>
+
+              <FormSection title="Booking & Transport">
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="isBookable"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Bookable Asset</FormLabel>
+                          <p className="text-sm text-muted-foreground">This asset can be booked for use</p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-asset-bookable"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="requiresTransport"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel>Requires Transport</FormLabel>
+                          <p className="text-sm text-muted-foreground">Needs transport when moved</p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-asset-requires-transport"
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                {form.watch("requiresTransport") && (
+                  <FormField
+                    control={form.control}
+                    name="transportType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Transport Type</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-transport-type">
+                              <SelectValue placeholder="Select transport type" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {ASSET_TRANSPORT_TYPES.map((t) => (
+                              <SelectItem key={t} value={t}>{t}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </FormSection>
 
               <FormSection title="CAPEX">

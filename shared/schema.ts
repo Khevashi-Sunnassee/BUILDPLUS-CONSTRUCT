@@ -2864,6 +2864,20 @@ export type AssetCondition = typeof ASSET_CONDITIONS[number];
 export const ASSET_FUNDING_METHODS = ["purchased", "leased", "financed", "donated", "rented"] as const;
 export type AssetFundingMethod = typeof ASSET_FUNDING_METHODS[number];
 
+export const ASSET_TRANSPORT_TYPES = [
+  "Flatbed Truck",
+  "Low Loader",
+  "Tilt Tray",
+  "Semi-Trailer",
+  "Crane Truck",
+  "Container Transport",
+  "Hiab Truck",
+  "Float",
+  "Light Vehicle",
+  "Other",
+] as const;
+export type AssetTransportType = typeof ASSET_TRANSPORT_TYPES[number];
+
 export const assets = pgTable("assets", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -2925,6 +2939,9 @@ export const assets = pgTable("assets", {
   remarks: text("remarks"),
   capexRequestId: text("capex_request_id"),
   capexDescription: text("capex_description"),
+  isBookable: boolean("is_bookable").default(false),
+  requiresTransport: boolean("requires_transport").default(false),
+  transportType: text("transport_type"),
   aiSummary: text("ai_summary"),
   lastAudited: timestamp("last_audited"),
   auditNotes: text("audit_notes"),
