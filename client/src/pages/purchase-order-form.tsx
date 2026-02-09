@@ -90,6 +90,7 @@ const formSchema = z.object({
   deliveryAddress: z.string().optional(),
   requiredByDate: z.date().optional().nullable(),
   notes: z.string().optional(),
+  internalNotes: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -169,6 +170,7 @@ export default function PurchaseOrderFormPage() {
       deliveryAddress: "",
       requiredByDate: isNew ? addDays(new Date(), 7) : null,
       notes: "",
+      internalNotes: "",
     },
   });
 
@@ -186,6 +188,7 @@ export default function PurchaseOrderFormPage() {
         deliveryAddress: existingPO.deliveryAddress || "",
         requiredByDate: existingPO.requiredByDate ? new Date(existingPO.requiredByDate) : null,
         notes: existingPO.notes || "",
+        internalNotes: existingPO.internalNotes || "",
       });
       
       const mappedItems: LineItem[] = existingPO.items.map((item, index) => ({
@@ -1368,6 +1371,31 @@ export default function PurchaseOrderFormPage() {
               </div>
             </div>
           </Form>
+
+          <div className="mt-4">
+            <Card className="border-dashed border-amber-500/30 bg-amber-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  Internal Notes
+                  <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/30">Not visible on PO</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {canEdit ? (
+                  <Textarea
+                    value={form.watch("internalNotes") || ""}
+                    onChange={(e) => form.setValue("internalNotes", e.target.value, { shouldDirty: true })}
+                    placeholder="Add internal notes (not visible on printed purchase order or sent to supplier)"
+                    className="min-h-[80px]"
+                    data-testid="textarea-internal-notes"
+                  />
+                ) : (
+                  <p className="whitespace-pre-line text-sm text-muted-foreground">{existingPO?.internalNotes || "No internal notes"}</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
           <Separator />
 
