@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,6 +86,28 @@ export function CreateBundleDialog({
 }: CreateBundleDialogProps) {
   const { toast } = useToast();
   const [selectedDocsForBundle, setSelectedDocsForBundle] = useState<string[]>(initialSelectedDocs);
+  const [isTenderPackage, setIsTenderPackage] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedDocsForBundle(initialSelectedDocs);
+      setIsTenderPackage(false);
+      bundleForm.reset({
+        bundleName: "",
+        description: "",
+        allowGuestAccess: true,
+        expiresAt: "",
+      });
+    }
+  }, [open, initialSelectedDocs]);
+
+  const getTenderPackageName = () => {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, "0");
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const yyyy = now.getFullYear();
+    return `Tender Package_${dd}-${mm}-${yyyy}`;
+  };
 
   const bundleForm = useForm<BundleFormValues>({
     resolver: zodResolver(bundleFormSchema),
@@ -96,6 +118,15 @@ export function CreateBundleDialog({
       expiresAt: "",
     },
   });
+
+  const handleTenderToggle = (checked: boolean) => {
+    setIsTenderPackage(checked);
+    if (checked) {
+      bundleForm.setValue("bundleName", getTenderPackageName());
+    } else {
+      bundleForm.setValue("bundleName", "");
+    }
+  };
 
   const createBundleMutation = useMutation({
     mutationFn: async (data: BundleFormValues & { documentIds: string[] }) => {
@@ -108,11 +139,19 @@ export function CreateBundleDialog({
       onOpenChange(false);
       onBundleCreated(bundle);
       setSelectedDocsForBundle([]);
+      setIsTenderPackage(false);
       bundleForm.reset();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
+  });
+
+  const sortedDocuments = [...documents].sort((a, b) => {
+    const aSelected = selectedDocsForBundle.includes(a.id) ? 0 : 1;
+    const bSelected = selectedDocsForBundle.includes(b.id) ? 0 : 1;
+    if (aSelected !== bSelected) return aSelected - bSelected;
+    return (a.title || "").localeCompare(b.title || "");
   });
 
   return (
@@ -131,6 +170,16 @@ export function CreateBundleDialog({
               documentIds: selectedDocsForBundle,
             });
           })} className="space-y-4">
+
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={isTenderPackage}
+                onCheckedChange={handleTenderToggle}
+                data-testid="switch-tender-package"
+              />
+              <Label className="!mt-0">Submit as tender package</Label>
+            </div>
+
             <FormField
               control={bundleForm.control}
               name="bundleName"
@@ -138,7 +187,13 @@ export function CreateBundleDialog({
                 <FormItem>
                   <FormLabel>Bundle Name</FormLabel>
                   <FormControl>
-                    <Input {...field} placeholder="Enter bundle name" data-testid="input-bundle-name" />
+                    <Input
+                      {...field}
+                      placeholder="Enter bundle name"
+                      readOnly={isTenderPackage}
+                      className={isTenderPackage ? "bg-muted cursor-not-allowed" : ""}
+                      data-testid="input-bundle-name"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -190,16 +245,13 @@ export function CreateBundleDialog({
             <div className="space-y-2">
               <Label>Documents ({selectedDocsForBundle.length} selected)</Label>
               <div className="border rounded-lg max-h-48 overflow-y-auto p-2 space-y-1">
-                {(selectedDocIds.size > 0
-                  ? documents.filter(doc => selectedDocsForBundle.includes(doc.id))
-                  : documents
-                ).map((doc) => (
+                {sortedDocuments.map((doc) => (
                   <div
                     key={doc.id}
                     className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
                       selectedDocsForBundle.includes(doc.id)
                         ? "bg-primary/10 border border-primary"
-                        : "hover:bg-muted"
+                        : "hover-elevate"
                     }`}
                     onClick={() => {
                       setSelectedDocsForBundle(prev =>
