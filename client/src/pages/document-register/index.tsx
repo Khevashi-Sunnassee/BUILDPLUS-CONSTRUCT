@@ -225,6 +225,15 @@ export default function DocumentRegister() {
 
   const selectedDocuments = useMemo(() => documents.filter((d) => selectedDocIds.has(d.id)), [documents, selectedDocIds]);
 
+  const handleBundleCreated = useCallback((bundle: DocumentBundle) => {
+    setCreatedBundle(bundle);
+    setIsBundleViewOpen(true);
+  }, []);
+
+  const handleEmailSuccess = useCallback(() => {
+    setSelectedDocIds(new Set());
+  }, []);
+
   const renderPagination = () => {
     if (!pagination || pagination.totalPages <= 1) return null;
     return (
@@ -516,59 +525,72 @@ export default function DocumentRegister() {
         </CardContent>
       </Card>
 
-      <UploadDocumentDialog
-        open={isUploadOpen}
-        onOpenChange={setIsUploadOpen}
-      />
+      {isUploadOpen && (
+        <UploadDocumentDialog
+          open={isUploadOpen}
+          onOpenChange={setIsUploadOpen}
+        />
+      )}
 
-      <NewVersionDialog
-        open={isVersionDialogOpen}
-        onOpenChange={setIsVersionDialogOpen}
-        document={selectedDocumentForVersion}
-      />
+      {isVersionDialogOpen && (
+        <NewVersionDialog
+          open={isVersionDialogOpen}
+          onOpenChange={setIsVersionDialogOpen}
+          document={selectedDocumentForVersion}
+        />
+      )}
 
-      <VersionHistorySheet
-        open={isVersionHistoryOpen}
-        onOpenChange={setIsVersionHistoryOpen}
-        document={versionHistoryDoc}
-      />
+      {isVersionHistoryOpen && (
+        <VersionHistorySheet
+          open={isVersionHistoryOpen}
+          onOpenChange={setIsVersionHistoryOpen}
+          document={versionHistoryDoc}
+        />
+      )}
 
-      <CreateBundleDialog
-        open={isBundleDialogOpen}
-        onOpenChange={setIsBundleDialogOpen}
-        documents={documents}
-        selectedDocIds={selectedDocIds}
-        initialSelectedDocs={selectedDocsForBundle}
-        onBundleCreated={(bundle) => {
-          setCreatedBundle(bundle);
-          setIsBundleViewOpen(true);
-        }}
-      />
+      {isBundleDialogOpen && (
+        <CreateBundleDialog
+          open={isBundleDialogOpen}
+          onOpenChange={setIsBundleDialogOpen}
+          documents={documents}
+          selectedDocIds={selectedDocIds}
+          initialSelectedDocs={selectedDocsForBundle}
+          onBundleCreated={handleBundleCreated}
+        />
+      )}
 
-      <BundleViewDialog
-        open={isBundleViewOpen}
-        onOpenChange={setIsBundleViewOpen}
-        bundle={createdBundle}
-      />
+      {isBundleViewOpen && (
+        <BundleViewDialog
+          open={isBundleViewOpen}
+          onOpenChange={setIsBundleViewOpen}
+          bundle={createdBundle}
+        />
+      )}
 
-      <BundlesListDialog
-        open={isBundlesListOpen}
-        onOpenChange={setIsBundlesListOpen}
-      />
+      {isBundlesListOpen && (
+        <BundlesListDialog
+          open={isBundlesListOpen}
+          onOpenChange={setIsBundlesListOpen}
+        />
+      )}
 
-      <SendDocumentsEmailDialog
-        open={isEmailDialogOpen}
-        onOpenChange={setIsEmailDialogOpen}
-        selectedDocuments={selectedDocuments}
-        onSuccess={() => setSelectedDocIds(new Set())}
-      />
+      {isEmailDialogOpen && (
+        <SendDocumentsEmailDialog
+          open={isEmailDialogOpen}
+          onOpenChange={setIsEmailDialogOpen}
+          selectedDocuments={selectedDocuments}
+          onSuccess={handleEmailSuccess}
+        />
+      )}
 
-      <VisualComparisonDialog
-        open={isOverlayDialogOpen}
-        onOpenChange={setIsOverlayDialogOpen}
-        selectedDocIds={selectedDocIds}
-        documents={documents}
-      />
+      {isOverlayDialogOpen && (
+        <VisualComparisonDialog
+          open={isOverlayDialogOpen}
+          onOpenChange={setIsOverlayDialogOpen}
+          selectedDocIds={selectedDocIds}
+          documents={documents}
+        />
+      )}
     </div>
   );
 }
