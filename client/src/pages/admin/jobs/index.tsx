@@ -69,8 +69,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import type { Job, User as UserType, GlobalSettings, Factory, Customer } from "@shared/schema";
-import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
+import type { Job, User as UserType, GlobalSettings, Factory, Customer, JobType } from "@shared/schema";
+import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES, PROCUREMENT_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import {
   JOB_PHASES, JOB_STATUSES,
   PHASE_LABELS, STATUS_LABELS,
@@ -184,6 +184,10 @@ export default function AdminJobsPage() {
     queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
+  const { data: jobTypes } = useQuery<JobType[]>({
+    queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_TYPES],
+  });
+
   const filteredAndSortedJobs = useMemo(() => (jobs || [])
     .filter((job) => {
       if (phaseFilter !== "all" && String(job.jobPhase) !== phaseFilter) return false;
@@ -281,6 +285,7 @@ export default function AdminJobsPage() {
       projectManagerId: null,
       factoryId: null,
       productionSlotColor: null,
+      jobTypeId: null,
     },
   });
 
@@ -677,6 +682,7 @@ export default function AdminJobsPage() {
       projectManagerId: null,
       factoryId: null,
       productionSlotColor: getNextAvailableColor(),
+      jobTypeId: null,
     });
     setJobDialogOpen(true);
   };
@@ -713,6 +719,7 @@ export default function AdminJobsPage() {
       projectManagerId: job.projectManagerId || null,
       factoryId: job.factoryId || null,
       productionSlotColor: job.productionSlotColor || getNextAvailableColor(),
+      jobTypeId: job.jobTypeId || null,
     });
     setJobDialogOpen(true);
     
@@ -1250,6 +1257,7 @@ export default function AdminJobsPage() {
         setSchedulingSettingsChanged={setSchedulingSettingsChanged}
         setQuickAddCustomerName={setQuickAddCustomerName}
         setQuickAddCustomerOpen={setQuickAddCustomerOpen}
+        jobTypes={jobTypes}
       />
 
       <JobImportDialog

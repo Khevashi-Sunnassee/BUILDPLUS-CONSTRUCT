@@ -43,7 +43,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Job, User as UserType, GlobalSettings, Factory, Customer } from "@shared/schema";
+import type { Job, User as UserType, GlobalSettings, Factory, Customer, JobType } from "@shared/schema";
 import { ADMIN_ROUTES } from "@shared/api-routes";
 import type { UseFormReturn } from "react-hook-form";
 import type { UseMutationResult } from "@tanstack/react-query";
@@ -93,6 +93,7 @@ interface JobFormDialogProps {
   setSchedulingSettingsChanged: (changed: boolean) => void;
   setQuickAddCustomerName: (name: string) => void;
   setQuickAddCustomerOpen: (open: boolean) => void;
+  jobTypes?: JobType[];
 }
 
 export function JobFormDialog({
@@ -124,6 +125,7 @@ export function JobFormDialog({
   setSchedulingSettingsChanged,
   setQuickAddCustomerName,
   setQuickAddCustomerOpen,
+  jobTypes,
 }: JobFormDialogProps) {
   const { toast } = useToast();
 
@@ -214,6 +216,35 @@ export function JobFormDialog({
                     </FormItem>
                   );
                 }}
+              />
+
+              <FormField
+                control={jobForm.control}
+                name="jobTypeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Job Type</FormLabel>
+                    <Select
+                      onValueChange={(value) => field.onChange(value === "__none__" ? null : value)}
+                      value={field.value || "__none__"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-job-type">
+                          <SelectValue placeholder="Select job type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">No job type</SelectItem>
+                        {jobTypes?.filter(jt => jt.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map((jt) => (
+                          <SelectItem key={jt.id} value={jt.id}>
+                            {jt.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
 
               <h3 className="font-medium text-sm text-muted-foreground pt-2 border-t">Basic Information</h3>
