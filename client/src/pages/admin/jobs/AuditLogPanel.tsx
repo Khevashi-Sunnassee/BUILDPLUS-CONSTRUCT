@@ -38,8 +38,10 @@ export function AuditLogPanel({ jobId }: { jobId: string }) {
     switch (action) {
       case "JOB_CREATED": return "Job Created";
       case "JOB_UPDATED": return "Job Updated";
-      case "PHASE_CHANGED": return "Phase Changed";
-      case "STATUS_CHANGED": return "Status Changed";
+      case "PHASE_CHANGED":
+      case "PHASE_CHANGE": return "Phase Changed";
+      case "STATUS_CHANGED":
+      case "STATUS_CHANGE": return "Status Changed";
       default: return action.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
     }
   }
@@ -77,16 +79,16 @@ export function AuditLogPanel({ jobId }: { jobId: string }) {
               {new Date(log.createdAt).toLocaleString()}
             </span>
           </div>
-          {(log.previousPhase || log.newPhase) && (log.action === "PHASE_CHANGED" || log.action === "STATUS_CHANGED") && (
+          {(log.previousPhase || log.newPhase) && (["PHASE_CHANGED", "PHASE_CHANGE", "STATUS_CHANGED", "STATUS_CHANGE"].includes(log.action)) && (
             <div className="text-xs">
-              {log.action === "PHASE_CHANGED" && (
+              {(log.action === "PHASE_CHANGED" || log.action === "PHASE_CHANGE") && (
                 <span>
                   Phase: <span className="font-medium">{getPhaseLabel(log.previousPhase || "")}</span>
                   {" → "}
                   <span className="font-medium">{getPhaseLabel(log.newPhase || "")}</span>
                 </span>
               )}
-              {log.action === "STATUS_CHANGED" && log.previousStatus && log.newStatus && (
+              {(log.action === "STATUS_CHANGED" || log.action === "STATUS_CHANGE") && log.previousStatus && log.newStatus && (
                 <span>
                   Status: <span className="font-medium">{getStatusLabel(log.previousStatus)}</span>
                   {" → "}
