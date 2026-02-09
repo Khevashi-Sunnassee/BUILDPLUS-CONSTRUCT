@@ -788,7 +788,7 @@ const sendPoEmailSchema = z.object({
   pdfBase64: z.string().optional(),
 });
 
-router.post("/purchase-orders/:id/send-email", requireAuth, async (req, res) => {
+router.post("/api/purchase-orders/:id/send-email", requireAuth, async (req, res) => {
   try {
     const id = req.params.id as string;
     const parsed = sendPoEmailSchema.safeParse(req.body);
