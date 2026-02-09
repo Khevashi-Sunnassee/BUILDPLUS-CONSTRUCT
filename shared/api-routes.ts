@@ -453,6 +453,14 @@ export const ADMIN_ROUTES = {
   DATA_MGMT_CUSTOMER_DELETE: (id: string) => `/api/admin/data-management/customers/${id}`,
   DATA_MGMT_EMPLOYEES: '/api/admin/data-management/employees',
   DATA_MGMT_EMPLOYEE_DELETE: (id: string) => `/api/admin/data-management/employees/${id}`,
+  DATA_MGMT_ACTIVITY_TEMPLATES: '/api/admin/data-management/activity-templates',
+  DATA_MGMT_ACTIVITY_TEMPLATE_DELETE: (id: string) => `/api/admin/data-management/activity-templates/${id}`,
+  DATA_MGMT_JOB_ACTIVITIES: '/api/admin/data-management/job-activities',
+  DATA_MGMT_JOB_ACTIVITY_DELETE: (id: string) => `/api/admin/data-management/job-activities/${id}`,
+  DATA_MGMT_ACTIVITY_STAGES: '/api/admin/data-management/activity-stages',
+  DATA_MGMT_ACTIVITY_STAGE_DELETE: (id: string) => `/api/admin/data-management/activity-stages/${id}`,
+  DATA_MGMT_ACTIVITY_CONSULTANTS: '/api/admin/data-management/activity-consultants',
+  DATA_MGMT_ACTIVITY_CONSULTANT_DELETE: (id: string) => `/api/admin/data-management/activity-consultants/${id}`,
   DATA_MGMT_BULK_DELETE: (entityType: string) => `/api/admin/data-management/${entityType}/bulk-delete`,
 } as const;
 

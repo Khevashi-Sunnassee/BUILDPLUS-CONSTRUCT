@@ -26,6 +26,15 @@ import {
   employees,
   documentBundles,
   checklistInstances,
+  activityTemplates,
+  activityTemplateSubtasks,
+  jobActivities,
+  jobActivityAssignees,
+  jobActivityUpdates,
+  jobActivityFiles,
+  activityStages,
+  activityConsultants,
+  jobTypes,
 } from "@shared/schema";
 import { inArray, notInArray } from "drizzle-orm";
 
@@ -663,6 +672,191 @@ dataManagementRouter.delete("/api/admin/data-management/employees/:id", requireR
 });
 
 // ============================================================================
+// WORKFLOW ENTITIES - Activity Templates, Job Activities, Stages, Consultants
+// ============================================================================
+
+dataManagementRouter.get("/api/admin/data-management/activity-templates", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: activityTemplates.id,
+        name: activityTemplates.name,
+        description: activityTemplates.description,
+        category: activityTemplates.category,
+        estimatedDays: activityTemplates.estimatedDays,
+        consultantName: activityTemplates.consultantName,
+        deliverable: activityTemplates.deliverable,
+        jobPhase: activityTemplates.jobPhase,
+        jobTypeName: jobTypes.name,
+        stageName: activityStages.name,
+        createdAt: activityTemplates.createdAt,
+      })
+      .from(activityTemplates)
+      .leftJoin(jobTypes, eq(activityTemplates.jobTypeId, jobTypes.id))
+      .leftJoin(activityStages, eq(activityTemplates.stageId, activityStages.id))
+      .where(eq(activityTemplates.companyId, companyId))
+      .orderBy(asc(activityTemplates.sortOrder), asc(activityTemplates.name));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity templates" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/activity-templates/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = String(req.params.id);
+
+    const [template] = await db.select({ id: activityTemplates.id }).from(activityTemplates).where(and(eq(activityTemplates.id, id), eq(activityTemplates.companyId, companyId)));
+    if (!template) return res.status(404).json({ error: "Activity template not found or does not belong to your company" });
+
+    await db.delete(activityTemplateSubtasks).where(eq(activityTemplateSubtasks.templateId, id));
+    await db.delete(activityTemplates).where(and(eq(activityTemplates.id, id), eq(activityTemplates.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete activity template" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/job-activities", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: jobActivities.id,
+        name: jobActivities.name,
+        description: jobActivities.description,
+        category: jobActivities.category,
+        status: jobActivities.status,
+        consultantName: jobActivities.consultantName,
+        jobPhase: jobActivities.jobPhase,
+        startDate: jobActivities.startDate,
+        endDate: jobActivities.endDate,
+        jobName: jobs.name,
+        jobNumber: jobs.jobNumber,
+        stageName: activityStages.name,
+        createdAt: jobActivities.createdAt,
+      })
+      .from(jobActivities)
+      .leftJoin(jobs, eq(jobActivities.jobId, jobs.id))
+      .leftJoin(activityStages, eq(jobActivities.stageId, activityStages.id))
+      .where(eq(jobActivities.companyId, companyId))
+      .orderBy(desc(jobActivities.createdAt));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch job activities" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/job-activities/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = String(req.params.id);
+
+    const [activity] = await db.select({ id: jobActivities.id }).from(jobActivities).where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId)));
+    if (!activity) return res.status(404).json({ error: "Job activity not found or does not belong to your company" });
+
+    await db.delete(jobActivities).where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete job activity" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/activity-stages", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: activityStages.id,
+        name: activityStages.name,
+        stageNumber: activityStages.stageNumber,
+        sortOrder: activityStages.sortOrder,
+        createdAt: activityStages.createdAt,
+      })
+      .from(activityStages)
+      .where(eq(activityStages.companyId, companyId))
+      .orderBy(asc(activityStages.stageNumber));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity stages" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/activity-stages/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = String(req.params.id);
+
+    const [stage] = await db.select({ id: activityStages.id }).from(activityStages).where(and(eq(activityStages.id, id), eq(activityStages.companyId, companyId)));
+    if (!stage) return res.status(404).json({ error: "Activity stage not found or does not belong to your company" });
+
+    const [templateCount] = await db.select({ count: count() }).from(activityTemplates).where(and(eq(activityTemplates.stageId, id), eq(activityTemplates.companyId, companyId)));
+    if (templateCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this stage is used by ${templateCount.count} activity template(s). Remove those templates first.` });
+    }
+
+    const [activityCount] = await db.select({ count: count() }).from(jobActivities).where(and(eq(jobActivities.stageId, id), eq(jobActivities.companyId, companyId)));
+    if (activityCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this stage is used by ${activityCount.count} job activit(ies). Remove those activities first.` });
+    }
+
+    await db.delete(activityStages).where(and(eq(activityStages.id, id), eq(activityStages.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete activity stage" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/activity-consultants", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: activityConsultants.id,
+        name: activityConsultants.name,
+        sortOrder: activityConsultants.sortOrder,
+        createdAt: activityConsultants.createdAt,
+      })
+      .from(activityConsultants)
+      .where(eq(activityConsultants.companyId, companyId))
+      .orderBy(asc(activityConsultants.name));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity consultants" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/activity-consultants/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = String(req.params.id);
+
+    const [consultant] = await db.select({ id: activityConsultants.id }).from(activityConsultants).where(and(eq(activityConsultants.id, id), eq(activityConsultants.companyId, companyId)));
+    if (!consultant) return res.status(404).json({ error: "Activity consultant not found or does not belong to your company" });
+
+    const [templateCount] = await db.select({ count: count() }).from(activityTemplates).where(and(eq(activityTemplates.consultantId, id), eq(activityTemplates.companyId, companyId)));
+    if (templateCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this consultant is assigned to ${templateCount.count} activity template(s). Remove those assignments first.` });
+    }
+
+    await db.delete(activityConsultants).where(and(eq(activityConsultants.id, id), eq(activityConsultants.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete activity consultant" });
+  }
+});
+
+// ============================================================================
 // BULK DELETE - delete all records that are safe to remove (no FK dependencies)
 // ============================================================================
 
@@ -888,6 +1082,67 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
           await db.delete(loadLists).where(inArray(loadLists.id, safeLLIds));
         }
         deletedCount = safeLLIds.length;
+        break;
+      }
+      case "activity-templates": {
+        const [total] = await db.select({ count: count() }).from(activityTemplates).where(eq(activityTemplates.companyId, companyId));
+        totalCount = total.count;
+        protectedCount = 0;
+        const allTemplates = await db.select({ id: activityTemplates.id }).from(activityTemplates).where(eq(activityTemplates.companyId, companyId));
+        if (allTemplates.length > 0) {
+          await db.delete(activityTemplateSubtasks).where(inArray(activityTemplateSubtasks.templateId, allTemplates.map(t => t.id)));
+          await db.delete(activityTemplates).where(eq(activityTemplates.companyId, companyId));
+        }
+        deletedCount = totalCount;
+        break;
+      }
+      case "job-activities": {
+        const [total] = await db.select({ count: count() }).from(jobActivities).where(eq(jobActivities.companyId, companyId));
+        totalCount = total.count;
+        protectedCount = 0;
+        await db.delete(jobActivities).where(eq(jobActivities.companyId, companyId));
+        deletedCount = totalCount;
+        break;
+      }
+      case "activity-stages": {
+        const [total] = await db.select({ count: count() }).from(activityStages).where(eq(activityStages.companyId, companyId));
+        totalCount = total.count;
+        const protectedStageIds: string[] = [];
+        const allStages = await db.select({ id: activityStages.id }).from(activityStages).where(eq(activityStages.companyId, companyId));
+        for (const stage of allStages) {
+          const [tCount] = await db.select({ count: count() }).from(activityTemplates).where(eq(activityTemplates.stageId, stage.id));
+          const [aCount] = await db.select({ count: count() }).from(jobActivities).where(eq(jobActivities.stageId, stage.id));
+          if (tCount.count > 0 || aCount.count > 0) {
+            protectedStageIds.push(stage.id);
+          }
+        }
+        protectedCount = protectedStageIds.length;
+        protectedReason = "used by activity templates or job activities";
+        const safeIds = allStages.filter(s => !protectedStageIds.includes(s.id)).map(s => s.id);
+        if (safeIds.length > 0) {
+          await db.delete(activityStages).where(inArray(activityStages.id, safeIds));
+        }
+        deletedCount = safeIds.length;
+        break;
+      }
+      case "activity-consultants": {
+        const [total] = await db.select({ count: count() }).from(activityConsultants).where(eq(activityConsultants.companyId, companyId));
+        totalCount = total.count;
+        const protectedConsultantIds: string[] = [];
+        const allConsultants = await db.select({ id: activityConsultants.id }).from(activityConsultants).where(eq(activityConsultants.companyId, companyId));
+        for (const c of allConsultants) {
+          const [tCount] = await db.select({ count: count() }).from(activityTemplates).where(eq(activityTemplates.consultantId, c.id));
+          if (tCount.count > 0) {
+            protectedConsultantIds.push(c.id);
+          }
+        }
+        protectedCount = protectedConsultantIds.length;
+        protectedReason = "assigned to activity templates";
+        const safeIds = allConsultants.filter(c => !protectedConsultantIds.includes(c.id)).map(c => c.id);
+        if (safeIds.length > 0) {
+          await db.delete(activityConsultants).where(inArray(activityConsultants.id, safeIds));
+        }
+        deletedCount = safeIds.length;
         break;
       }
       default:
