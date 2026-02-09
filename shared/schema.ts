@@ -314,6 +314,7 @@ export const jobs = pgTable("jobs", {
   probability: integer("probability"),
   estimatedStartDate: timestamp("estimated_start_date"),
   comments: text("comments"),
+  jobTypeId: varchar("job_type_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -324,6 +325,7 @@ export const jobs = pgTable("jobs", {
   projectManagerIdx: index("jobs_project_manager_idx").on(table.projectManagerId),
   factoryIdx: index("jobs_factory_idx").on(table.factoryId),
   companyIdx: index("jobs_company_idx").on(table.companyId),
+  jobTypeIdx: index("jobs_job_type_idx").on(table.jobTypeId),
 }));
 
 export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
