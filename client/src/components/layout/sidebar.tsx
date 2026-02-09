@@ -43,6 +43,7 @@ import {
   Database,
   Tag,
   Wrench,
+  Workflow,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -120,6 +121,7 @@ const adminNavItems = [
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
   { title: "Item Categories", url: "/admin/item-categories", icon: Tag },
+  { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
   { title: "Data Management", url: "/admin/data-management", icon: Database },
   { title: "Help Management", url: "/admin/help", icon: BookOpen },
 ];
@@ -164,6 +166,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/checklist-templates": "admin_checklist_templates",
   "/admin/item-categories": "admin_item_catalog",
   "/admin/data-management": "admin_settings",
+  "/admin/job-types": "admin_settings",
   "/checklists": "checklists",
   "/checklist-reports": "checklists",
   "/manager/review": "daily_reports",

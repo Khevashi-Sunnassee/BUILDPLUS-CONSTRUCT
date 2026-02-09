@@ -32,7 +32,9 @@ import {
   Mail,
   ChevronsDownUp,
   ChevronsUpDown,
+  Workflow,
 } from "lucide-react";
+import { Link } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { TaskGroupComponent } from "./TaskGroupComponent";
 import { TaskSidebar } from "./TaskSidebar";
@@ -693,6 +695,18 @@ export default function TasksPage() {
             <ChevronsUpDown className="h-4 w-4 mr-2" />
             Expand All
           </Button>
+          {jobFilter && jobFilter !== "all" && jobFilter !== "none" && (
+            <Link href={`/jobs/${jobFilter}/activities`}>
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="btn-project-activities"
+              >
+                <Workflow className="h-4 w-4 mr-2" />
+                Project Activities
+              </Button>
+            </Link>
+          )}
           <Button
             onClick={() => setShowNewGroupInput(true)}
             data-testid="btn-new-group"

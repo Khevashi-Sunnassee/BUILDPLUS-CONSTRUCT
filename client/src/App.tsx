@@ -77,6 +77,9 @@ const ContractDetailPage = lazy(() => import("@/pages/contract-detail"));
 const ProgressClaimsPage = lazy(() => import("@/pages/progress-claims"));
 const ProgressClaimFormPage = lazy(() => import("@/pages/progress-claim-form"));
 const RetentionReportPage = lazy(() => import("@/pages/retention-report"));
+const AdminJobTypesPage = lazy(() => import("@/pages/admin/job-types"));
+const WorkflowBuilderPage = lazy(() => import("@/pages/admin/workflow-builder"));
+const JobActivitiesPage = lazy(() => import("@/pages/job-activities"));
 
 const MobileLoginPage = lazy(() => import("@/pages/mobile/login"));
 const MobileDashboard = lazy(() => import("@/pages/mobile/dashboard"));
@@ -391,6 +394,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/jobs/:jobId/activities">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <JobActivitiesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/chat">
         <ProtectedRoute>
           <AuthenticatedLayout>
@@ -571,6 +582,22 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AssetDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/job-types">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminJobTypesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/job-types/:id/workflow">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <WorkflowBuilderPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

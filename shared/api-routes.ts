@@ -769,6 +769,35 @@ export const EMPLOYEE_ROUTES = {
 } as const;
 export type EmployeeRoutes = typeof EMPLOYEE_ROUTES;
 
+// ============================================================================
+// PROJECT ACTIVITIES / WORKFLOW
+// ============================================================================
+export const PROJECT_ACTIVITIES_ROUTES = {
+  JOB_TYPES: '/api/job-types',
+  JOB_TYPE_BY_ID: (id: string | number) => `/api/job-types/${id}`,
+  STAGES: '/api/activity-stages',
+  STAGE_BY_ID: (id: string | number) => `/api/activity-stages/${id}`,
+  CONSULTANTS: '/api/activity-consultants',
+  CONSULTANT_BY_ID: (id: string | number) => `/api/activity-consultants/${id}`,
+  TEMPLATES: (jobTypeId: string | number) => `/api/job-types/${jobTypeId}/templates`,
+  TEMPLATE_BY_ID: (id: string | number) => `/api/activity-templates/${id}`,
+  TEMPLATE_SUBTASKS: (templateId: string | number) => `/api/activity-templates/${templateId}/subtasks`,
+  TEMPLATE_SUBTASK_BY_ID: (id: string | number) => `/api/activity-template-subtasks/${id}`,
+  TEMPLATES_REORDER: (jobTypeId: string | number) => `/api/job-types/${jobTypeId}/templates/reorder`,
+  JOB_ACTIVITIES: (jobId: string | number) => `/api/jobs/${jobId}/activities`,
+  JOB_ACTIVITIES_INSTANTIATE: (jobId: string | number) => `/api/jobs/${jobId}/activities/instantiate`,
+  ACTIVITY_BY_ID: (id: string | number) => `/api/job-activities/${id}`,
+  ACTIVITY_ASSIGNEES: (id: string | number) => `/api/job-activities/${id}/assignees`,
+  ACTIVITY_UPDATES: (id: string | number) => `/api/job-activities/${id}/updates`,
+  ACTIVITY_UPDATE_BY_ID: (id: string | number) => `/api/job-activity-updates/${id}`,
+  ACTIVITY_FILES: (id: string | number) => `/api/job-activities/${id}/files`,
+  ACTIVITY_FILE_BY_ID: (id: string | number) => `/api/job-activity-files/${id}`,
+  ACTIVITIES_REORDER: (jobId: string | number) => `/api/jobs/${jobId}/activities/reorder`,
+  ACTIVITY_MOVE: (id: string | number) => `/api/job-activities/${id}/move`,
+  SEED: '/api/activity-seed',
+} as const;
+export type ProjectActivitiesRoutes = typeof PROJECT_ACTIVITIES_ROUTES;
+
 export const ONBOARDING_ROUTES = {
   INSTRUMENTS: '/api/onboarding/instruments',
   INSTRUMENT_BY_ID: (id: string | number) => `/api/onboarding/instruments/${id}`,

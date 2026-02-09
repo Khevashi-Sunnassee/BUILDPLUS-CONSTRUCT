@@ -3423,3 +3423,190 @@ export const hireBookings = pgTable("hire_bookings", {
 export const insertHireBookingSchema = createInsertSchema(hireBookings).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertHireBooking = z.infer<typeof insertHireBookingSchema>;
 export type HireBooking = typeof hireBookings.$inferSelect;
+
+// ============================================================================
+// PROJECT ACTIVITIES / WORKFLOW SYSTEM
+// ============================================================================
+
+export const activityStatusEnum = pgEnum("activity_status", ["NOT_STARTED", "IN_PROGRESS", "STUCK", "DONE", "ON_HOLD", "SKIPPED"]);
+
+export const jobTypes = pgTable("job_types", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("job_types_company_idx").on(table.companyId),
+  nameCompanyIdx: uniqueIndex("job_types_name_company_idx").on(table.name, table.companyId),
+}));
+
+export const activityStages = pgTable("activity_stages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  stageNumber: integer("stage_number").notNull(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("activity_stages_company_idx").on(table.companyId),
+  sortOrderIdx: index("activity_stages_sort_order_idx").on(table.sortOrder),
+}));
+
+export const activityConsultants = pgTable("activity_consultants", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("activity_consultants_company_idx").on(table.companyId),
+}));
+
+export const activityTemplates = pgTable("activity_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobTypeId: varchar("job_type_id", { length: 36 }).notNull().references(() => jobTypes.id, { onDelete: "cascade" }),
+  stageId: varchar("stage_id", { length: 36 }).notNull().references(() => activityStages.id),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  category: text("category"),
+  name: text("name").notNull(),
+  description: text("description"),
+  estimatedDays: integer("estimated_days").default(14).notNull(),
+  consultantId: varchar("consultant_id", { length: 36 }).references(() => activityConsultants.id),
+  consultantName: text("consultant_name"),
+  deliverable: text("deliverable"),
+  jobPhase: text("job_phase"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobTypeIdx: index("activity_templates_job_type_idx").on(table.jobTypeId),
+  stageIdx: index("activity_templates_stage_idx").on(table.stageId),
+  companyIdx: index("activity_templates_company_idx").on(table.companyId),
+  sortOrderIdx: index("activity_templates_sort_order_idx").on(table.sortOrder),
+}));
+
+export const activityTemplateSubtasks = pgTable("activity_template_subtasks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id", { length: 36 }).notNull().references(() => activityTemplates.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  estimatedDays: integer("estimated_days"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  templateIdx: index("activity_template_subtasks_template_idx").on(table.templateId),
+}));
+
+export const jobActivities = pgTable("job_activities", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  templateId: varchar("template_id", { length: 36 }).references(() => activityTemplates.id, { onDelete: "set null" }),
+  stageId: varchar("stage_id", { length: 36 }).references(() => activityStages.id),
+  parentId: varchar("parent_id", { length: 36 }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  category: text("category"),
+  name: text("name").notNull(),
+  description: text("description"),
+  estimatedDays: integer("estimated_days").default(14),
+  consultantName: text("consultant_name"),
+  deliverable: text("deliverable"),
+  jobPhase: text("job_phase"),
+  status: activityStatusEnum("status").default("NOT_STARTED").notNull(),
+  startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
+  reminderDate: timestamp("reminder_date"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("job_activities_job_idx").on(table.jobId),
+  stageIdx: index("job_activities_stage_idx").on(table.stageId),
+  templateIdx: index("job_activities_template_idx").on(table.templateId),
+  parentIdx: index("job_activities_parent_idx").on(table.parentId),
+  companyIdx: index("job_activities_company_idx").on(table.companyId),
+  statusIdx: index("job_activities_status_idx").on(table.status),
+  sortOrderIdx: index("job_activities_sort_order_idx").on(table.sortOrder),
+  reminderIdx: index("job_activities_reminder_idx").on(table.reminderDate),
+  jobPhaseIdx: index("job_activities_job_phase_idx").on(table.jobPhase),
+}));
+
+export const jobActivityAssignees = pgTable("job_activity_assignees", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  activityId: varchar("activity_id", { length: 36 }).notNull().references(() => jobActivities.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  activityUserIdx: uniqueIndex("job_activity_assignees_activity_user_idx").on(table.activityId, table.userId),
+  activityIdx: index("job_activity_assignees_activity_idx").on(table.activityId),
+  userIdx: index("job_activity_assignees_user_idx").on(table.userId),
+}));
+
+export const jobActivityUpdates = pgTable("job_activity_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  activityId: varchar("activity_id", { length: 36 }).notNull().references(() => jobActivities.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  activityIdx: index("job_activity_updates_activity_idx").on(table.activityId),
+  createdAtIdx: index("job_activity_updates_created_at_idx").on(table.createdAt),
+}));
+
+export const jobActivityFiles = pgTable("job_activity_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  activityId: varchar("activity_id", { length: 36 }).notNull().references(() => jobActivities.id, { onDelete: "cascade" }),
+  updateId: varchar("update_id", { length: 36 }).references(() => jobActivityUpdates.id, { onDelete: "set null" }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  activityIdx: index("job_activity_files_activity_idx").on(table.activityId),
+  updateIdx: index("job_activity_files_update_idx").on(table.updateId),
+}));
+
+// Project Activities Insert Schemas and Types
+export const insertJobTypeSchema = createInsertSchema(jobTypes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJobType = z.infer<typeof insertJobTypeSchema>;
+export type JobType = typeof jobTypes.$inferSelect;
+
+export const insertActivityStageSchema = createInsertSchema(activityStages).omit({ id: true, createdAt: true });
+export type InsertActivityStage = z.infer<typeof insertActivityStageSchema>;
+export type ActivityStage = typeof activityStages.$inferSelect;
+
+export const insertActivityConsultantSchema = createInsertSchema(activityConsultants).omit({ id: true, createdAt: true });
+export type InsertActivityConsultant = z.infer<typeof insertActivityConsultantSchema>;
+export type ActivityConsultant = typeof activityConsultants.$inferSelect;
+
+export const insertActivityTemplateSchema = createInsertSchema(activityTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertActivityTemplate = z.infer<typeof insertActivityTemplateSchema>;
+export type ActivityTemplate = typeof activityTemplates.$inferSelect;
+
+export const insertActivityTemplateSubtaskSchema = createInsertSchema(activityTemplateSubtasks).omit({ id: true, createdAt: true });
+export type InsertActivityTemplateSubtask = z.infer<typeof insertActivityTemplateSubtaskSchema>;
+export type ActivityTemplateSubtask = typeof activityTemplateSubtasks.$inferSelect;
+
+export const insertJobActivitySchema = createInsertSchema(jobActivities).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJobActivity = z.infer<typeof insertJobActivitySchema>;
+export type JobActivity = typeof jobActivities.$inferSelect;
+
+export const insertJobActivityAssigneeSchema = createInsertSchema(jobActivityAssignees).omit({ id: true, createdAt: true });
+export type InsertJobActivityAssignee = z.infer<typeof insertJobActivityAssigneeSchema>;
+export type JobActivityAssignee = typeof jobActivityAssignees.$inferSelect;
+
+export const insertJobActivityUpdateSchema = createInsertSchema(jobActivityUpdates).omit({ id: true, createdAt: true });
+export type InsertJobActivityUpdate = z.infer<typeof insertJobActivityUpdateSchema>;
+export type JobActivityUpdate = typeof jobActivityUpdates.$inferSelect;
+
+export const insertJobActivityFileSchema = createInsertSchema(jobActivityFiles).omit({ id: true, createdAt: true });
+export type InsertJobActivityFile = z.infer<typeof insertJobActivityFileSchema>;
+export type JobActivityFile = typeof jobActivityFiles.$inferSelect;
+
+export type ActivityStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD" | "SKIPPED";
