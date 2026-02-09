@@ -290,7 +290,7 @@ export default function EmployeeDetailPage() {
   const [selectedEmploymentIdForOnboarding, setSelectedEmploymentIdForOnboarding] = useState<string>("");
 
   const { data: employee, isLoading: employeeLoading } = useQuery<Employee>({
-    queryKey: [EMPLOYEE_ROUTES.BY_ID(id), "detail"],
+    queryKey: [EMPLOYEE_ROUTES.BY_ID(id)],
     enabled: !!id,
   });
 
@@ -351,7 +351,7 @@ export default function EmployeeDetailPage() {
   });
 
   const invalidateEmployee = () => {
-    queryClient.invalidateQueries({ queryKey: [EMPLOYEE_ROUTES.BY_ID(id), "detail"] });
+    queryClient.invalidateQueries({ queryKey: [EMPLOYEE_ROUTES.BY_ID(id)] });
   };
 
   const updateEmployeeMutation = useMutation({
