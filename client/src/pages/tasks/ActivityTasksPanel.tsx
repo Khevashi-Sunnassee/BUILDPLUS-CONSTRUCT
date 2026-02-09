@@ -75,10 +75,11 @@ export function ActivityTasksPanel({
 
   const createTaskMutation = useMutation({
     mutationFn: async (title: string) => {
-      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activityId), {
-        title,
-        jobId,
-      });
+      const body: any = { title, jobId };
+      if (activityEndDate) {
+        body.dueDate = new Date(activityEndDate).toISOString();
+      }
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activityId), body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
