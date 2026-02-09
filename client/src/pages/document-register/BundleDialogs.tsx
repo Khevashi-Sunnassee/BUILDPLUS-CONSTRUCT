@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -148,12 +147,9 @@ export function CreateBundleDialog({
     },
   });
 
-  const sortedDocuments = [...documents].sort((a, b) => {
-    const aSelected = selectedDocsForBundle.includes(a.id) ? 0 : 1;
-    const bSelected = selectedDocsForBundle.includes(b.id) ? 0 : 1;
-    if (aSelected !== bSelected) return aSelected - bSelected;
-    return (a.title || "").localeCompare(b.title || "");
-  });
+  const sortedDocuments = documents
+    .filter((doc) => selectedDocsForBundle.includes(doc.id))
+    .sort((a, b) => (a.title || "").localeCompare(b.title || ""));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -246,28 +242,14 @@ export function CreateBundleDialog({
             <div className="space-y-2">
               <Label>Documents ({selectedDocsForBundle.length} selected)</Label>
               <div className="border rounded-lg max-h-48 overflow-y-auto p-2 space-y-1">
-                {sortedDocuments.map((doc) => (
+                {sortedDocuments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No documents selected</p>
+                ) : sortedDocuments.map((doc) => (
                   <div
                     key={doc.id}
-                    className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                      selectedDocsForBundle.includes(doc.id)
-                        ? "bg-primary/10 border border-primary"
-                        : "hover-elevate"
-                    }`}
-                    onClick={() => {
-                      setSelectedDocsForBundle(prev =>
-                        prev.includes(doc.id)
-                          ? prev.filter(id => id !== doc.id)
-                          : [...prev, doc.id]
-                      );
-                    }}
+                    className="flex items-center gap-2 p-2 rounded"
                     data-testid={`bundle-doc-${doc.id}`}
                   >
-                    <Checkbox
-                      checked={selectedDocsForBundle.includes(doc.id)}
-                      className="pointer-events-none"
-                      data-testid={`checkbox-bundle-doc-${doc.id}`}
-                    />
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span className="flex-1 text-sm truncate">{doc.title}</span>
                     <Badge variant="outline" className="text-xs">{doc.revision}</Badge>
