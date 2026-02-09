@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -74,6 +74,8 @@ export function TaskGroupComponent({
   selectedTaskIds,
   onToggleTaskSelected,
   isDropTarget,
+  collapseAllVersion,
+  expandAllVersion,
 }: {
   group: TaskGroup;
   users: User[];
@@ -84,6 +86,8 @@ export function TaskGroupComponent({
   selectedTaskIds: Set<string>;
   onToggleTaskSelected: (taskId: string) => void;
   isDropTarget?: boolean;
+  collapseAllVersion?: number;
+  expandAllVersion?: number;
 }) {
   const { toast } = useToast();
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -91,6 +95,19 @@ export function TaskGroupComponent({
     data: { type: "group", groupId: group.id },
   });
   const [isCollapsed, setIsCollapsed] = useState(group.isCollapsed);
+
+  useEffect(() => {
+    if (collapseAllVersion && collapseAllVersion > 0) {
+      setIsCollapsed(true);
+    }
+  }, [collapseAllVersion]);
+
+  useEffect(() => {
+    if (expandAllVersion && expandAllVersion > 0) {
+      setIsCollapsed(false);
+    }
+  }, [expandAllVersion]);
+
   const [isEditingName, setIsEditingName] = useState(false);
   const [groupName, setGroupName] = useState(group.name);
   const [newTaskTitle, setNewTaskTitle] = useState("");

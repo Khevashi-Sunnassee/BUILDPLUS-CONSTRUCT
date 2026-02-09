@@ -30,6 +30,8 @@ import {
   Eye,
   EyeOff,
   Mail,
+  ChevronsDownUp,
+  ChevronsUpDown,
 } from "lucide-react";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { TaskGroupComponent } from "./TaskGroupComponent";
@@ -51,6 +53,8 @@ export default function TasksPage() {
   const [overGroupId, setOverGroupId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [collapseAllVersion, setCollapseAllVersion] = useState(0);
+  const [expandAllVersion, setExpandAllVersion] = useState(0);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -672,6 +676,24 @@ export default function TasksPage() {
             {isExporting ? "Exporting..." : "Print"}
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCollapseAllVersion(v => v + 1)}
+            data-testid="btn-collapse-all-groups"
+          >
+            <ChevronsDownUp className="h-4 w-4 mr-2" />
+            Collapse All
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setExpandAllVersion(v => v + 1)}
+            data-testid="btn-expand-all-groups"
+          >
+            <ChevronsUpDown className="h-4 w-4 mr-2" />
+            Expand All
+          </Button>
+          <Button
             onClick={() => setShowNewGroupInput(true)}
             data-testid="btn-new-group"
           >
@@ -754,6 +776,8 @@ export default function TasksPage() {
                 selectedTaskIds={selectedTaskIds}
                 onToggleTaskSelected={toggleTaskSelected}
                 isDropTarget={overGroupId === group.id}
+                collapseAllVersion={collapseAllVersion}
+                expandAllVersion={expandAllVersion}
               />
             ))}
           </div>
