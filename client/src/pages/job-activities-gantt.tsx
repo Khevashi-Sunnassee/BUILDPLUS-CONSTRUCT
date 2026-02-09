@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, useCallback } from "react";
+import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { format, differenceInCalendarDays, addDays, startOfDay, isWeekend, endOfMonth, eachMonthOfInterval, eachWeekOfInterval } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,8 +28,8 @@ const ROW_HEIGHT = 32;
 const HEADER_HEIGHT = 48;
 const LABEL_WIDTH = 260;
 const DAY_WIDTH_DEFAULT = 28;
-const MIN_DAY_WIDTH = 14;
-const MAX_DAY_WIDTH = 60;
+const MIN_DAY_WIDTH = 8;
+const MAX_DAY_WIDTH = 80;
 
 interface GanttChartProps {
   activities: ActivityWithAssignees[];
@@ -45,6 +45,8 @@ export function GanttChart({
   onSelectActivity,
 }: GanttChartProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const labelScrollRef = useRef<HTMLDivElement>(null);
+  const chartWrapperRef = useRef<HTMLDivElement>(null);
   const [dayWidth, setDayWidth] = useState(DAY_WIDTH_DEFAULT);
 
   const parentActivities = useMemo(() =>
@@ -134,23 +136,74 @@ export function GanttChart({
   const today = startOfDay(new Date());
   const todayOffset = differenceInCalendarDays(today, timelineStart) * dayWidth;
 
-  const handleZoom = useCallback((direction: "in" | "out") => {
+  const handleZoom = useCallback((direction: "in" | "out", centerX?: number) => {
     setDayWidth(prev => {
-      if (direction === "in") return Math.min(prev + 4, MAX_DAY_WIDTH);
-      return Math.max(prev - 4, MIN_DAY_WIDTH);
+      const step = Math.max(2, Math.round(prev * 0.15));
+      let next: number;
+      if (direction === "in") next = Math.min(prev + step, MAX_DAY_WIDTH);
+      else next = Math.max(prev - step, MIN_DAY_WIDTH);
+
+      if (centerX != null && scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const scrollLeft = container.scrollLeft;
+        const dayAtCenter = (scrollLeft + centerX) / prev;
+        requestAnimationFrame(() => {
+          container.scrollLeft = dayAtCenter * next - centerX;
+        });
+      }
+
+      return next;
     });
   }, []);
 
   const scrollToToday = useCallback(() => {
     if (scrollContainerRef.current) {
       const containerWidth = scrollContainerRef.current.clientWidth;
-      scrollContainerRef.current.scrollLeft = todayOffset - containerWidth / 2 + LABEL_WIDTH;
+      scrollContainerRef.current.scrollLeft = todayOffset - containerWidth / 2;
     }
   }, [todayOffset]);
 
+  useEffect(() => {
+    const chartEl = scrollContainerRef.current;
+    if (!chartEl) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const rect = chartEl.getBoundingClientRect();
+        const centerX = e.clientX - rect.left;
+        if (e.deltaY < 0) handleZoom("in", centerX);
+        else handleZoom("out", centerX);
+      }
+    };
+
+    chartEl.addEventListener("wheel", handleWheel, { passive: false });
+    return () => chartEl.removeEventListener("wheel", handleWheel);
+  }, [handleZoom]);
+
+  useEffect(() => {
+    const chartEl = scrollContainerRef.current;
+    const labelEl = labelScrollRef.current;
+    if (!chartEl || !labelEl) return;
+
+    const syncFromChart = () => {
+      labelEl.scrollTop = chartEl.scrollTop;
+    };
+    const syncFromLabels = () => {
+      chartEl.scrollTop = labelEl.scrollTop;
+    };
+
+    chartEl.addEventListener("scroll", syncFromChart);
+    labelEl.addEventListener("scroll", syncFromLabels);
+    return () => {
+      chartEl.removeEventListener("scroll", syncFromChart);
+      labelEl.removeEventListener("scroll", syncFromLabels);
+    };
+  }, []);
+
   return (
-    <div className="border rounded-md bg-background overflow-hidden" data-testid="gantt-chart">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b">
+    <div className="border rounded-md bg-background overflow-hidden flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 400 }} data-testid="gantt-chart">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b flex-shrink-0">
         <span className="text-xs font-medium text-muted-foreground">
           {format(timelineStart, "MMM yyyy")} &ndash; {format(timelineEnd, "MMM yyyy")}
         </span>
@@ -179,47 +232,52 @@ export function GanttChart({
           >
             <Plus className="h-3 w-3" />
           </Button>
+          <span className="text-[10px] text-muted-foreground ml-1 hidden md:inline">
+            Ctrl+Scroll to zoom
+          </span>
         </div>
       </div>
 
-      <div className="flex overflow-hidden" style={{ height: HEADER_HEIGHT + chartHeight + 2 }}>
+      <div className="flex flex-1 overflow-hidden" ref={chartWrapperRef}>
         <div
-          className="flex-shrink-0 border-r bg-background z-10"
+          className="flex-shrink-0 border-r bg-background z-10 flex flex-col"
           style={{ width: LABEL_WIDTH }}
         >
           <div
-            className="flex items-end px-3 border-b bg-muted/30 text-[10px] font-medium text-muted-foreground"
+            className="flex items-end px-3 border-b bg-muted/30 text-[10px] font-medium text-muted-foreground flex-shrink-0"
             style={{ height: HEADER_HEIGHT }}
           >
             <span className="pb-1">Activity</span>
           </div>
-          <div className="overflow-hidden">
-            {orderedActivities.map(({ activity, stageIndex, stageName }, i) => {
-              const color = STAGE_HEX_COLORS[stageIndex % STAGE_HEX_COLORS.length];
-              return (
-                <div
-                  key={activity.id}
-                  className="flex items-center gap-1.5 px-2 border-b cursor-pointer hover-elevate"
-                  style={{ height: ROW_HEIGHT }}
-                  onClick={() => onSelectActivity(activity)}
-                  data-testid={`gantt-label-${activity.id}`}
-                >
-                  <span
-                    className="w-2 h-2 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: color }}
-                  />
-                  <span className="text-xs truncate flex-1" title={activity.name}>
-                    {activity.name}
-                  </span>
-                </div>
-              );
-            })}
+          <div ref={labelScrollRef} className="flex-1 overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: "none" }}>
+            <div style={{ height: chartHeight }}>
+              {orderedActivities.map(({ activity, stageIndex }) => {
+                const color = STAGE_HEX_COLORS[stageIndex % STAGE_HEX_COLORS.length];
+                return (
+                  <div
+                    key={activity.id}
+                    className="flex items-center gap-1.5 px-2 border-b cursor-pointer hover-elevate"
+                    style={{ height: ROW_HEIGHT }}
+                    onClick={() => onSelectActivity(activity)}
+                    data-testid={`gantt-label-${activity.id}`}
+                  >
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: color }}
+                    />
+                    <span className="text-xs truncate flex-1" title={activity.name}>
+                      {activity.name}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-x-auto overflow-y-hidden"
+          className="flex-1 overflow-auto"
         >
           <div style={{ width: chartWidth, minWidth: "100%" }}>
             <TimelineHeader
@@ -287,7 +345,7 @@ export function GanttChart({
                 );
               })}
 
-              {renderDependencyArrows(orderedActivities, timelineStart, dayWidth, ROW_HEIGHT)}
+              {renderDependencyArrows(orderedActivities, parentActivities, timelineStart, dayWidth, ROW_HEIGHT)}
 
               {orderedActivities.map(({ activity, stageIndex }, rowIdx) => {
                 if (!activity.startDate && !activity.endDate) return null;
@@ -401,7 +459,7 @@ export function GanttChart({
         </div>
       </div>
 
-      <div className="flex items-center gap-4 px-3 py-1.5 bg-muted/30 border-t text-[10px] text-muted-foreground flex-wrap">
+      <div className="flex items-center gap-4 px-3 py-1.5 bg-muted/30 border-t text-[10px] text-muted-foreground flex-wrap flex-shrink-0">
         <span className="flex items-center gap-1">
           <span className="w-3 h-1.5 rounded-sm bg-gray-400 opacity-40 inline-block" /> Not Started
         </span>
@@ -445,7 +503,7 @@ function TimelineHeader({
   const chartWidth = totalDays * dayWidth;
 
   return (
-    <div className="border-b bg-muted/30" style={{ height: headerHeight }}>
+    <div className="border-b bg-muted/30 sticky top-0 z-10" style={{ height: headerHeight }}>
       <div className="relative" style={{ width: chartWidth, height: headerHeight }}>
         <div className="absolute top-0 left-0 w-full" style={{ height: headerHeight / 2 }}>
           {months.map((monthDate, mi) => {
@@ -533,31 +591,43 @@ function TimelineHeader({
 
 function renderDependencyArrows(
   orderedActivities: { activity: ActivityWithAssignees; stageIndex: number; stageName: string }[],
+  allParentActivities: ActivityWithAssignees[],
   timelineStart: Date,
   dayWidth: number,
   rowHeight: number,
 ) {
   const arrows: JSX.Element[] = [];
 
-  for (let i = 0; i < orderedActivities.length - 1; i++) {
+  const sortOrderToRowIdx = new Map<number, number>();
+  orderedActivities.forEach(({ activity }, idx) => {
+    sortOrderToRowIdx.set(activity.sortOrder, idx);
+  });
+
+  for (let i = 0; i < orderedActivities.length; i++) {
     const curr = orderedActivities[i].activity;
-    const next = orderedActivities[i + 1].activity;
+    if (curr.predecessorSortOrder == null) continue;
 
-    if (!curr.endDate || !next.startDate) continue;
+    const predRowIdx = sortOrderToRowIdx.get(curr.predecessorSortOrder);
+    if (predRowIdx == null) continue;
 
-    const currEnd = startOfDay(new Date(curr.endDate));
-    const nextStart = startOfDay(new Date(next.startDate));
+    const pred = orderedActivities[predRowIdx]?.activity;
+    if (!pred) continue;
 
-    const x1 = (differenceInCalendarDays(currEnd, timelineStart) + 1) * dayWidth;
-    const y1 = i * rowHeight + rowHeight / 2;
-    const x2 = differenceInCalendarDays(nextStart, timelineStart) * dayWidth;
-    const y2 = (i + 1) * rowHeight + rowHeight / 2;
+    if (!pred.endDate || !curr.startDate) continue;
+
+    const predEnd = startOfDay(new Date(pred.endDate));
+    const currStart = startOfDay(new Date(curr.startDate));
+
+    const x1 = (differenceInCalendarDays(predEnd, timelineStart) + 1) * dayWidth;
+    const y1 = predRowIdx * rowHeight + rowHeight / 2;
+    const x2 = differenceInCalendarDays(currStart, timelineStart) * dayWidth;
+    const y2 = i * rowHeight + rowHeight / 2;
 
     const midX = x1 + 8;
     const pathD = `M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}`;
 
     arrows.push(
-      <g key={`arrow-${i}`}>
+      <g key={`arrow-${curr.id}`}>
         <path
           d={pathD}
           fill="none"
