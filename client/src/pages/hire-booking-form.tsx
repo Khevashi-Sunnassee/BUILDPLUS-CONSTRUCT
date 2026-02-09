@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Calendar } from "@/components/ui/calendar";
@@ -303,9 +304,12 @@ export default function HireBookingFormPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold" data-testid="text-hire-form-title">
-            {isNew ? "New Hire Booking" : `Hire Booking ${bookingNumber}`}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" data-testid="text-hire-form-title">
+              {isNew ? "New Hire Booking" : `Hire Booking ${bookingNumber}`}
+            </h1>
+            <PageHelpButton pageHelpKey="page.hire-booking-form" />
+          </div>
           <p className="text-sm text-muted-foreground">
             {isNew ? "Create a new equipment hire booking" : "View and manage this hire booking"}
           </p>

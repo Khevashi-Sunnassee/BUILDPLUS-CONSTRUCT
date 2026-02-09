@@ -2132,6 +2132,174 @@ Help articles are organised into categories including:
     category: "General",
     pageRoute: "/help",
   },
+  {
+    key: "page.hire-bookings",
+    scope: "PAGE",
+    title: "Hire Bookings",
+    shortText: "Manage equipment hire requests, approvals, and booking lifecycle.",
+    bodyMd: `## Hire Bookings
+
+Manage all equipment hire bookings from initial request through to return and closure. Track internal assets and external hire from suppliers.
+
+### Buttons & Actions
+
+- **New Hire Booking** - Opens a form to create a new hire booking for internal or external equipment
+- **Search** - Find bookings by booking number, equipment description, or job
+- **Status Filter** - Filter bookings by status (Draft, Requested, Approved, Booked, On Hire, Returned, Closed, Cancelled)
+- **Source Filter** - Filter by hire source (Internal or External)
+- **Clear Filters** - Remove all active filters
+- **View** (eye icon) - Open a booking to view its full details
+- **Edit** (pencil icon) - Modify a booking (only available for Draft or Requested bookings)
+- **Submit** - Submit a Draft booking for approval
+- **Approve** - Approve a submitted booking (Managers and Admins only)
+- **Reject** - Reject a submitted booking with feedback (Managers and Admins only)
+- **Book** - Confirm the booking after approval
+- **Pickup** - Record that equipment has been picked up
+- **On Hire** - Mark equipment as currently on hire
+- **Return** - Record that equipment has been returned
+- **Close** - Close a completed booking (Managers and Admins only)
+- **Cancel** - Cancel an active booking
+- **Delete** (trash icon) - Delete a Draft booking (Admins only)
+
+### Booking Workflow
+
+| Status | Description |
+|--------|-------------|
+| **Draft** | Initial booking created, not yet submitted |
+| **Requested** | Submitted for approval |
+| **Approved** | Approved by a manager |
+| **Booked** | Booking confirmed with supplier or asset reserved |
+| **On Hire** | Equipment is currently in use |
+| **Returned** | Equipment has been returned |
+| **Closed** | Booking finalised and archived |
+| **Cancelled** | Booking was cancelled |
+
+### Hire Sources
+
+| Source | Description |
+|--------|-------------|
+| **Internal** | Using company-owned assets from the Asset Register |
+| **External** | Hiring from an external supplier |
+
+### Tips
+- Internal bookings link to specific assets from the Asset Register
+- External bookings link to a supplier and may include a supplier reference number
+- Overdue return dates are highlighted in red
+- Each booking is assigned a unique booking number automatically
+- Bookings are linked to jobs for cost tracking`,
+    keywords: ["hire", "bookings", "equipment", "rental", "approval"],
+    category: "Finance",
+    pageRoute: "/hire-bookings",
+  },
+  {
+    key: "page.hire-booking-form",
+    scope: "PAGE",
+    title: "Hire Booking Form",
+    shortText: "Create or edit an equipment hire booking with full details.",
+    bodyMd: `## Hire Booking Form
+
+Create a new hire booking or edit an existing one. Specify the equipment, source, dates, rates, and delivery requirements.
+
+### Buttons & Actions
+
+- **Back** (arrow icon) - Return to the Hire Bookings list
+- **Save as Draft** - Save the booking without submitting for approval
+- **Submit for Approval** - Save and submit the booking for manager approval
+- **Save Changes** - Save modifications to an existing booking
+- **Cancel** - Discard changes and return to the list
+
+### Form Sections
+
+#### Equipment Details
+- **Hire Source** - Choose Internal (company asset) or External (from supplier)
+- **Asset Category** - Select the type of equipment from 40+ categories
+- **Asset** - (Internal only) Select a specific asset from the Asset Register
+- **Supplier** - (External only) Select the hire supplier
+- **Equipment Description** - Free-text description of the equipment being hired
+- **Quantity** - Number of items being hired
+
+#### Job & Assignment
+- **Job** - Which job the hire is for (required for cost tracking)
+- **Cost Code** - Optional cost code for financial tracking
+- **Requested By** - The employee who requested the hire
+- **Responsible Person** - The person responsible for the equipment
+- **Site Contact** - The on-site contact for deliveries
+
+#### Dates
+- **Hire Start Date** - When the hire period begins
+- **Hire End Date** - When the hire period ends
+- **Expected Return Date** - When the equipment is expected to be returned
+
+#### Rates & Costs
+- **Rate Type** - Daily, Weekly, or Monthly hire rate
+- **Rate Amount** - The cost per rate period
+- **Charge Rule** - How charges are calculated
+
+#### Delivery
+- **Delivery Required** - Whether delivery to site is needed
+- **Delivery Address** - Where to deliver the equipment
+- **Delivery Cost** - Cost of delivery
+- **Pickup Required** - Whether pickup from site is needed
+- **Pickup Cost** - Cost of pickup
+
+#### Additional
+- **Supplier Reference** - External supplier's reference number
+- **Notes** - Additional notes or special requirements
+
+### Tips
+- For internal hire, select the specific asset to automatically fill category details
+- For external hire, select the supplier first to link the booking
+- The booking number is auto-generated when saved
+- Draft bookings can be edited freely; once submitted, editing is restricted`,
+    keywords: ["hire", "booking", "form", "create", "edit", "equipment"],
+    category: "Finance",
+    pageRoute: "/hire-bookings/new",
+  },
+  {
+    key: "page.admin.employee-detail",
+    scope: "PAGE",
+    title: "Employee Detail",
+    shortText: "View and manage complete employee record with all personal, employment, and emergency details.",
+    bodyMd: `## Employee Detail
+
+Comprehensive view of an individual employee's record. View and edit all personal details, employment information, emergency contacts, and qualifications.
+
+### Buttons & Actions
+
+- **Back** (arrow icon) - Return to the Employee Management list
+- **Edit Employee** - Open the edit form to modify employee details
+- **Delete Employee** - Remove this employee record (requires confirmation)
+
+### Information Sections
+
+| Section | Details |
+|---------|---------|
+| **Personal** | Name, date of birth, preferred name, employee number |
+| **Contact** | Email, phone, full address |
+| **Emergency Contact** | Emergency contact name, phone, and relationship |
+| **Employment** | Start date, position, department, employment type (Full-time, Part-time, Casual, Contract) |
+| **Status** | Active or inactive status |
+| **Financial** | Tax file number, superannuation details, bank information |
+| **Notes** | Free-text notes and additional information |
+
+### Related Information
+
+| Tab | What It Shows |
+|-----|--------------|
+| **Qualifications** | Licenses, certifications, and training records with expiry tracking |
+| **Equipment** | Company equipment assigned to this employee |
+| **Hire Bookings** | Equipment hire bookings requested by this employee |
+| **Time Logs** | Summary of recent time entries and attendance |
+
+### Tips
+- Employee numbers are unique and cannot be changed after creation
+- Use qualifications to track license expiry dates for compliance
+- The employment type affects wage calculation rules
+- Inactive employees are retained for historical records but cannot log time`,
+    keywords: ["employee", "detail", "profile", "HR", "personnel"],
+    category: "Admin",
+    pageRoute: "/admin/employees/:id",
+  },
 ];
 
 export async function seedHelpEntries() {

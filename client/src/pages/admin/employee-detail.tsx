@@ -47,6 +47,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PageHelpButton } from "@/components/help/page-help-button";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -724,9 +725,12 @@ export default function EmployeeDetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-employee-detail-name">
-              {employee.firstName} {employee.lastName}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-employee-detail-name">
+                {employee.firstName} {employee.lastName}
+              </h1>
+              <PageHelpButton pageHelpKey="page.admin.employee-detail" />
+            </div>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
               <Badge variant="outline" data-testid="badge-employee-number">{employee.employeeNumber}</Badge>
               <Badge variant={employee.isActive ? "default" : "secondary"} data-testid="badge-employee-status">

@@ -18,6 +18,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { HireBooking, Employee, Job, Supplier, User } from "@shared/schema";
 import { ASSET_CATEGORIES } from "@shared/schema";
 import { HIRE_ROUTES } from "@shared/api-routes";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 interface HireBookingWithDetails extends HireBooking {
   assetCategoryName: string;
@@ -142,7 +143,10 @@ export default function HireBookingsPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold" data-testid="text-hire-bookings-title">Hire Bookings</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold" data-testid="text-hire-bookings-title">Hire Bookings</h1>
+            <PageHelpButton pageHelpKey="page.hire-bookings" />
+          </div>
           <p className="text-sm text-muted-foreground">Manage equipment hire requests and bookings</p>
         </div>
         <Button onClick={() => navigate("/hire-bookings/new")} data-testid="button-new-hire-booking">
