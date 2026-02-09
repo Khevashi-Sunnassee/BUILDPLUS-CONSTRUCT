@@ -16,6 +16,74 @@ import logger from "../lib/logger";
 
 const router = Router();
 
+function addWorkingDaysHelper(from: Date, days: number): Date {
+  const result = new Date(from);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) {
+      added++;
+    }
+  }
+  return result;
+}
+
+function nextWorkingDayHelper(from: Date): Date {
+  const result = new Date(from);
+  result.setDate(result.getDate() + 1);
+  while (result.getDay() === 0 || result.getDay() === 6) {
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
+
+function ensureWorkingDayHelper(d: Date): Date {
+  const result = new Date(d);
+  while (result.getDay() === 0 || result.getDay() === 6) {
+    result.setDate(result.getDate() + 1);
+  }
+  return result;
+}
+
+function subtractWorkingDaysHelper(from: Date, days: number): Date {
+  const result = new Date(from);
+  let subtracted = 0;
+  while (subtracted < days) {
+    result.setDate(result.getDate() - 1);
+    const dow = result.getDay();
+    if (dow !== 0 && dow !== 6) {
+      subtracted++;
+    }
+  }
+  return result;
+}
+
+function resolveActivityStart(
+  predDates: { start: Date; end: Date },
+  rel: string,
+  estimatedDays: number
+): Date {
+  let activityStart: Date;
+  switch (rel) {
+    case "FS":
+      activityStart = nextWorkingDayHelper(predDates.end);
+      break;
+    case "SS":
+      activityStart = new Date(predDates.start);
+      break;
+    case "FF":
+      activityStart = subtractWorkingDaysHelper(new Date(predDates.end), estimatedDays - 1);
+      break;
+    case "SF":
+      activityStart = subtractWorkingDaysHelper(new Date(predDates.start), estimatedDays - 1);
+      break;
+    default:
+      activityStart = nextWorkingDayHelper(predDates.end);
+  }
+  return ensureWorkingDayHelper(activityStart);
+}
+
 const ALLOWED_FILE_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
   "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
@@ -662,6 +730,8 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
           deliverable: template.deliverable,
           jobPhase: template.jobPhase,
           sortOrder: template.sortOrder,
+          predecessorSortOrder: template.predecessorSortOrder || null,
+          relationship: template.relationship || null,
           startDate: dates.start,
           endDate: dates.end,
           createdById: req.session.userId,
@@ -715,6 +785,8 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
       deliverable: z.string().optional().nullable(),
       notes: z.string().optional().nullable(),
       sortOrder: z.number().int().optional(),
+      predecessorSortOrder: z.number().int().optional().nullable(),
+      relationship: z.enum(["FS", "SS", "FF", "SF"]).optional().nullable(),
       category: z.string().optional().nullable(),
       jobPhase: z.string().optional().nullable(),
     });
@@ -727,6 +799,23 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
     if (!existing) return res.status(404).json({ error: "Activity not found" });
 
     const updateData: any = { ...parsed.data, updatedAt: new Date() };
+
+    if (updateData.predecessorSortOrder !== undefined) {
+      if (updateData.predecessorSortOrder === null) {
+        updateData.relationship = null;
+      } else if (updateData.predecessorSortOrder >= existing.sortOrder) {
+        return res.status(400).json({ error: "Predecessor must have a lower sort order than the current activity" });
+      }
+    }
+    if (updateData.relationship !== undefined && updateData.relationship !== null) {
+      const effectivePred = updateData.predecessorSortOrder !== undefined
+        ? updateData.predecessorSortOrder
+        : existing.predecessorSortOrder;
+      if (effectivePred == null) {
+        return res.status(400).json({ error: "Cannot set relationship without a predecessor" });
+      }
+    }
+
     if (updateData.startDate !== undefined) {
       updateData.startDate = updateData.startDate ? new Date(updateData.startDate) : null;
     }
@@ -782,6 +871,84 @@ router.post("/api/jobs/:jobId/activities/reorder", requireAuth, async (req, res)
   } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering activities");
     res.status(500).json({ error: "Failed to reorder activities" });
+  }
+});
+
+// ============================================================================
+// RECALCULATE ACTIVITY DATES BASED ON PREDECESSORS
+// ============================================================================
+
+router.post("/api/jobs/:jobId/activities/recalculate", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const jobId = String(req.params.jobId);
+
+    const activities = await db.select().from(jobActivities)
+      .where(and(
+        eq(jobActivities.jobId, jobId),
+        eq(jobActivities.companyId, companyId!),
+        sql`${jobActivities.parentId} IS NULL`
+      ))
+      .orderBy(asc(jobActivities.sortOrder));
+
+    if (activities.length === 0) {
+      return res.json({ success: true, updated: 0 });
+    }
+
+    const resolvedDates = new Map<number, { start: Date; end: Date }>();
+
+    const firstActivity = activities[0];
+    const projectStart = firstActivity.startDate
+      ? ensureWorkingDayHelper(new Date(firstActivity.startDate))
+      : ensureWorkingDayHelper(new Date());
+
+    const updates: Array<{ id: string; startDate: Date; endDate: Date }> = [];
+
+    for (const activity of activities) {
+      const estimatedDays = activity.estimatedDays || 1;
+      const predOrder = activity.predecessorSortOrder;
+      const rel = activity.relationship || "FS";
+      let activityStart: Date;
+
+      if (predOrder != null && resolvedDates.has(predOrder)) {
+        const predDates = resolvedDates.get(predOrder)!;
+        activityStart = resolveActivityStart(predDates, rel, estimatedDays);
+      } else if (predOrder != null && !resolvedDates.has(predOrder)) {
+        activityStart = activity.startDate
+          ? ensureWorkingDayHelper(new Date(activity.startDate))
+          : new Date(projectStart);
+        logger.warn({ activityId: activity.id, predOrder }, "Predecessor sortOrder not found in resolved dates, preserving existing start date");
+      } else if (activity.startDate) {
+        activityStart = ensureWorkingDayHelper(new Date(activity.startDate));
+      } else {
+        activityStart = new Date(projectStart);
+      }
+
+      const activityEnd = addWorkingDaysHelper(activityStart, estimatedDays - 1);
+      resolvedDates.set(activity.sortOrder, { start: activityStart, end: activityEnd });
+
+      const startChanged = !activity.startDate || new Date(activity.startDate).toDateString() !== activityStart.toDateString();
+      const endChanged = !activity.endDate || new Date(activity.endDate).toDateString() !== activityEnd.toDateString();
+
+      if (startChanged || endChanged) {
+        updates.push({ id: activity.id, startDate: activityStart, endDate: activityEnd });
+      }
+    }
+
+    if (updates.length > 0) {
+      await db.transaction(async (tx) => {
+        for (const upd of updates) {
+          await tx.update(jobActivities)
+            .set({ startDate: upd.startDate, endDate: upd.endDate, updatedAt: new Date() })
+            .where(eq(jobActivities.id, upd.id));
+        }
+      });
+    }
+
+    res.json({ success: true, updated: updates.length });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error recalculating activity dates");
+    res.status(500).json({ error: "Failed to recalculate dates" });
   }
 });
 

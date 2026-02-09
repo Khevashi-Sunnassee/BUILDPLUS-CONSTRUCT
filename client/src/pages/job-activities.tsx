@@ -30,6 +30,7 @@ import {
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
   Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
   ListChecks, BarChart3, TableProperties, Eye, EyeOff, CheckCircle,
+  RefreshCw, Link2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
@@ -201,6 +202,20 @@ export default function JobActivitiesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_RECALCULATE(jobId), {});
+    },
+    onSuccess: async (res: any) => {
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+      toast({ title: "Dates recalculated", description: `${data.updated} activities updated` });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -394,6 +409,17 @@ export default function JobActivitiesPage() {
             )}
 
             <Button
+              variant="outline"
+              size="sm"
+              onClick={() => recalculateMutation.mutate()}
+              disabled={recalculateMutation.isPending}
+              data-testid="button-recalculate-dates"
+            >
+              {recalculateMutation.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-1" />}
+              Recalculate Dates
+            </Button>
+
+            <Button
               variant={showCompleted ? "default" : "outline"}
               size="sm"
               onClick={() => setShowCompleted(!showCompleted)}
@@ -485,6 +511,8 @@ export default function JobActivitiesPage() {
                                 <th className="px-3 py-2 font-medium w-[100px]">Category</th>
                                 <th className="px-3 py-2 font-medium w-[120px]">Status</th>
                                 <th className="px-3 py-2 font-medium w-[80px]">Days</th>
+                                <th className="px-3 py-2 font-medium w-[80px]">Pred</th>
+                                <th className="px-3 py-2 font-medium w-[60px]">Rel</th>
                                 <th className="px-3 py-2 font-medium w-[140px]">Consultant</th>
                                 <th className="px-3 py-2 font-medium w-[120px]">Start Date</th>
                                 <th className="px-3 py-2 font-medium w-[120px]">End Date</th>
@@ -499,12 +527,16 @@ export default function JobActivitiesPage() {
                                     key={activity.id}
                                     activity={activity}
                                     children={children}
+                                    allParentActivities={allParentActivities}
                                     onSelect={setSelectedActivity}
                                     onStatusChange={(id, status) => {
                                       updateActivityMutation.mutate({ id, status });
                                     }}
                                     onDateChange={(id, field, value) => {
                                       updateActivityMutation.mutate({ id, [field]: value || null });
+                                    }}
+                                    onPredecessorChange={(id, predecessorSortOrder, relationship) => {
+                                      updateActivityMutation.mutate({ id, predecessorSortOrder, relationship });
                                     }}
                                     users={users || []}
                                     jobs={jobsList || []}
@@ -545,6 +577,7 @@ export default function JobActivitiesPage() {
         onClose={() => setSelectedActivity(null)}
         jobId={jobId}
         users={users || []}
+        allParentActivities={allParentActivities}
       />
     </div>
   );
@@ -553,9 +586,11 @@ export default function JobActivitiesPage() {
 function ActivityRow({
   activity,
   children,
+  allParentActivities,
   onSelect,
   onStatusChange,
   onDateChange,
+  onPredecessorChange,
   users,
   jobs,
   jobId,
@@ -566,9 +601,11 @@ function ActivityRow({
 }: {
   activity: ActivityWithAssignees;
   children: ActivityWithAssignees[];
+  allParentActivities: ActivityWithAssignees[];
   onSelect: (a: ActivityWithAssignees) => void;
   onStatusChange: (id: string, status: string) => void;
   onDateChange: (id: string, field: string, value: string) => void;
+  onPredecessorChange: (id: string, predecessorSortOrder: number | null, relationship: string | null) => void;
   users: any[];
   jobs: any[];
   jobId: string;
@@ -623,6 +660,17 @@ function ActivityRow({
           </span>
         </td>
         <td className="px-3 py-2 text-center">{activity.estimatedDays || "-"}</td>
+        <td className="px-3 py-2 text-center text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
+          {activity.predecessorSortOrder != null ? (
+            <span className="inline-flex items-center gap-0.5">
+              <Link2 className="h-3 w-3" />
+              {activity.predecessorSortOrder + 1}
+            </span>
+          ) : "-"}
+        </td>
+        <td className="px-3 py-2 text-center text-xs text-muted-foreground">
+          {activity.relationship || "-"}
+        </td>
         <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[140px]">{activity.consultantName || "-"}</td>
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
@@ -647,7 +695,7 @@ function ActivityRow({
 
       {tasksExpanded && (
         <tr data-testid={`activity-tasks-row-${activity.id}`}>
-          <td colSpan={8} className="px-4 py-2 bg-muted/30">
+          <td colSpan={10} className="px-4 py-2 bg-muted/30">
             <ActivityTasksPanel
               activityId={activity.id}
               jobId={jobId}
@@ -684,6 +732,8 @@ function ActivityRow({
               </span>
             </td>
             <td className="px-3 py-1.5 text-center text-xs">{child.estimatedDays || "-"}</td>
+            <td className="px-3 py-1.5 text-center text-xs text-muted-foreground">-</td>
+            <td className="px-3 py-1.5 text-center text-xs text-muted-foreground">-</td>
             <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.consultantName || "-"}</td>
             <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
               <Input
@@ -820,11 +870,13 @@ function ActivitySidebar({
   onClose,
   jobId,
   users,
+  allParentActivities,
 }: {
   activity: ActivityWithAssignees | null;
   onClose: () => void;
   jobId: string;
   users: any[];
+  allParentActivities: ActivityWithAssignees[];
 }) {
   const { toast } = useToast();
   const [commentText, setCommentText] = useState("");
@@ -977,6 +1029,56 @@ function ActivitySidebar({
                   {activity.estimatedDays || "-"} days
                 </div>
               </div>
+
+              {!activity.parentId && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Predecessor</Label>
+                    <Select
+                      value={activity.predecessorSortOrder != null ? String(activity.predecessorSortOrder) : "none"}
+                      onValueChange={(v) => {
+                        const predOrder = v === "none" ? null : parseInt(v);
+                        const rel = predOrder != null ? (activity.relationship || "FS") : null;
+                        updateActivityMutation.mutate({ id: activity.id, predecessorSortOrder: predOrder, relationship: rel });
+                      }}
+                    >
+                      <SelectTrigger data-testid="sidebar-select-predecessor">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {allParentActivities
+                          .filter(a => a.sortOrder < activity.sortOrder)
+                          .map(a => (
+                            <SelectItem key={a.id} value={String(a.sortOrder)}>
+                              {a.sortOrder + 1}. {a.name}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">Relationship</Label>
+                    <Select
+                      value={activity.relationship || "FS"}
+                      onValueChange={(v) => {
+                        updateActivityMutation.mutate({ id: activity.id, relationship: v });
+                      }}
+                      disabled={activity.predecessorSortOrder == null}
+                    >
+                      <SelectTrigger data-testid="sidebar-select-relationship">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FS">FS (Finish-to-Start)</SelectItem>
+                        <SelectItem value="SS">SS (Start-to-Start)</SelectItem>
+                        <SelectItem value="FF">FF (Finish-to-Finish)</SelectItem>
+                        <SelectItem value="SF">SF (Start-to-Finish)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <Label className="text-muted-foreground text-xs">Consultant</Label>

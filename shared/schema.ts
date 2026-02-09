@@ -3526,6 +3526,8 @@ export const jobActivities = pgTable("job_activities", {
   endDate: timestamp("end_date"),
   reminderDate: timestamp("reminder_date"),
   sortOrder: integer("sort_order").default(0).notNull(),
+  predecessorSortOrder: integer("predecessor_sort_order"),
+  relationship: text("relationship"),
   notes: text("notes"),
   createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),

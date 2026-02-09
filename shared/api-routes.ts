@@ -807,6 +807,7 @@ export const PROJECT_ACTIVITIES_ROUTES = {
   ACTIVITY_MOVE: (id: string | number) => `/api/job-activities/${id}/move`,
   ACTIVITY_TASKS: (activityId: string | number) => `/api/job-activities/${activityId}/tasks`,
   ACTIVITY_TASKS_REORDER: (activityId: string | number) => `/api/job-activities/${activityId}/tasks/reorder`,
+  JOB_ACTIVITIES_RECALCULATE: (jobId: string | number) => `/api/jobs/${jobId}/activities/recalculate`,
   SEED: '/api/activity-seed',
 } as const;
 export type ProjectActivitiesRoutes = typeof PROJECT_ACTIVITIES_ROUTES;
