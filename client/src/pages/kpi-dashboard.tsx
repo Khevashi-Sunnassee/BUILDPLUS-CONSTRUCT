@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek, endOfWeek, subWeeks } from "date-fns";
 import {
@@ -226,7 +226,7 @@ export default function KPIDashboardPage() {
   const [selectedComponent, setSelectedComponent] = useState<string>("all");
   const reportRef = useRef<HTMLDivElement>(null);
 
-  const getDateRange = () => {
+  const { startDate, endDate } = useMemo(() => {
     const today = new Date();
     let startDate: Date;
     let endDate: Date;
@@ -264,9 +264,7 @@ export default function KPIDashboardPage() {
       startDate: format(startDate, "yyyy-MM-dd"),
       endDate: format(endDate, "yyyy-MM-dd"),
     };
-  };
-
-  const { startDate, endDate } = getDateRange();
+  }, [periodType, customStartDate, customEndDate]);
 
   const { data: productionData, isLoading: productionLoading } = useQuery<ProductionReportResponse>({
     queryKey: [REPORTS_ROUTES.PRODUCTION_DAILY, { startDate, endDate }],
@@ -313,29 +311,29 @@ export default function KPIDashboardPage() {
     }
   }, [costDailyData?.componentNames, selectedComponent]);
 
-  const formatDate = (dateStr: string) => {
+  const formatDate = useCallback((dateStr: string) => {
     const [year, month, day] = dateStr.split("-");
     return `${day}/${month}`;
-  };
+  }, []);
 
-  const getPeriodLabel = () => {
+  const getPeriodLabel = useCallback(() => {
     if (startDate && endDate) {
       const start = formatDate(startDate);
       const end = formatDate(endDate);
       return `${start} - ${end}`;
     }
     return "";
-  };
+  }, [startDate, endDate, formatDate]);
 
-  const getMonthName = () => {
+  const getMonthName = useCallback(() => {
     if (startDate) {
       const date = new Date(startDate);
       return format(date, "MMMM yyyy");
     }
     return "";
-  };
+  }, [startDate]);
 
-  const panelsDailyChartData = productionData?.dailyData?.map((d) => {
+  const panelsDailyChartData = useMemo(() => productionData?.dailyData?.map((d) => {
     const entry: Record<string, any> = {
       date: formatDate(d.date),
       panelCount: d.panelCount,
@@ -348,9 +346,9 @@ export default function KPIDashboardPage() {
       });
     }
     return entry;
-  }) || [];
+  }) || [], [productionData, formatDate]);
 
-  const cubesDailyChartData = productionData?.dailyData?.map((d) => {
+  const cubesDailyChartData = useMemo(() => productionData?.dailyData?.map((d) => {
     const cubeTypes = ["CUBE_BASE", "CUBE_RING", "LANDING"];
     const entry: Record<string, any> = {
       date: formatDate(d.date),
@@ -372,23 +370,23 @@ export default function KPIDashboardPage() {
     
     entry.totalVolume = Math.round(entry.totalVolume * 100) / 100;
     return entry;
-  }) || [];
+  }) || [], [productionData, formatDate]);
 
-  const financialChartData = productionCostsData?.dailyData?.map((d) => ({
+  const financialChartData = useMemo(() => productionCostsData?.dailyData?.map((d) => ({
     date: formatDate(d.date),
     cost: d.totalCost,
     revenue: d.revenue,
     profit: d.profit,
-  })) || [];
+  })) || [], [productionCostsData, formatDate]);
 
-  const draftingChartData = draftingData?.dailyData?.map((d) => ({
+  const draftingChartData = useMemo(() => draftingData?.dailyData?.map((d) => ({
     date: formatDate(d.date),
     activeHours: d.activeHours,
     idleHours: Math.round((d.idleMinutes / 60) * 100) / 100,
     totalHours: d.totalHours,
-  })) || [];
+  })) || [], [draftingData, formatDate]);
 
-  const allPanelTypes = productionData?.panelTypes || [];
+  const allPanelTypes = useMemo(() => productionData?.panelTypes || [], [productionData]);
 
   const exportToPDF = async () => {
     if (!reportRef.current) return;

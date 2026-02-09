@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -86,7 +86,7 @@ export default function AdminSettingsPage() {
   const [showDeleteDeptDialog, setShowDeleteDeptDialog] = useState(false);
   const [deletingDept, setDeletingDept] = useState<Department | null>(null);
 
-  const deletionCategories = [
+  const deletionCategories = useMemo(() => [
     { key: "panels", label: "Panels", description: "Panel register entries" },
     { key: "production_slots", label: "Production Slots", description: "Scheduled production slots" },
     { key: "drafting_program", label: "Drafting Program", description: "Drafting program entries" },
@@ -103,9 +103,9 @@ export default function AdminSettingsPage() {
     { key: "contracts", label: "Contracts", description: "All contract records" },
     { key: "progress_claims", label: "Progress Claims", description: "Progress claims and line items" },
     { key: "broadcast_templates", label: "Broadcast Templates", description: "Broadcast templates and messages" },
-  ];
+  ], []);
 
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const dayNames = useMemo(() => ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], []);
 
   const { data: settings, isLoading } = useQuery<GlobalSettings>({
     queryKey: [ADMIN_ROUTES.SETTINGS],
@@ -155,7 +155,7 @@ export default function AdminSettingsPage() {
     queryKey: [ADMIN_ROUTES.DEPARTMENTS],
   });
 
-  const openDeptDialog = (dept?: Department) => {
+  const openDeptDialog = useCallback((dept?: Department) => {
     if (dept) {
       setEditingDept(dept);
       setDeptName(dept.name);
@@ -170,16 +170,16 @@ export default function AdminSettingsPage() {
       setDeptActive(true);
     }
     setShowDeptDialog(true);
-  };
+  }, []);
 
-  const closeDeptDialog = () => {
+  const closeDeptDialog = useCallback(() => {
     setShowDeptDialog(false);
     setEditingDept(null);
     setDeptName("");
     setDeptCode("");
     setDeptDescription("");
     setDeptActive(true);
-  };
+  }, []);
 
   const saveDeptMutation = useMutation({
     mutationFn: async () => {
@@ -460,28 +460,30 @@ export default function AdminSettingsPage() {
     },
   });
 
-  const handleCategoryToggle = (key: string, checked: boolean) => {
-    const newSet = new Set(selectedCategories);
-    if (checked) {
-      newSet.add(key);
-    } else {
-      newSet.delete(key);
-    }
-    setSelectedCategories(newSet);
+  const handleCategoryToggle = useCallback((key: string, checked: boolean) => {
+    setSelectedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(key);
+      } else {
+        newSet.delete(key);
+      }
+      return newSet;
+    });
     setValidationResult(null);
-  };
+  }, []);
 
-  const handleValidateAndDelete = () => {
+  const handleValidateAndDelete = useCallback(() => {
     if (selectedCategories.size === 0) {
       toast({ title: "Please select at least one category", variant: "destructive" });
       return;
     }
     validateDeletionMutation.mutate(Array.from(selectedCategories));
-  };
+  }, [selectedCategories, toast, validateDeletionMutation]);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = useCallback(() => {
     performDeletionMutation.mutate(Array.from(selectedCategories));
-  };
+  }, [selectedCategories, performDeletionMutation]);
 
   const uploadLogoMutation = useMutation({
     mutationFn: async (logoBase64: string) => {
@@ -512,7 +514,7 @@ export default function AdminSettingsPage() {
     },
   });
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -536,7 +538,7 @@ export default function AdminSettingsPage() {
     };
     reader.readAsDataURL(file);
     if (logoInputRef.current) logoInputRef.current.value = "";
-  };
+  }, [toast, uploadLogoMutation, logoInputRef]);
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(settingsSchema),
@@ -569,9 +571,9 @@ export default function AdminSettingsPage() {
     },
   });
 
-  const onSubmit = (data: SettingsFormData) => {
+  const onSubmit = useCallback((data: SettingsFormData) => {
     updateMutation.mutate(data);
-  };
+  }, [updateMutation]);
 
   if (isLoading) {
     return (

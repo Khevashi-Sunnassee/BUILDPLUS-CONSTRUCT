@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, Fragment, useCallback } from "react";
+import { useState, useRef, useEffect, Fragment, useCallback, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -285,19 +285,19 @@ export default function AdminPanelsPage() {
     },
   });
 
-  const getPanelTypeColor = (panelType: string | null | undefined): string | null => {
+  const getPanelTypeColor = useCallback((panelType: string | null | undefined): string | null => {
     if (!panelType || !panelTypes) return null;
     const pt = panelTypes.find(t => t.code === panelType || t.name === panelType || t.code.toUpperCase() === panelType.toUpperCase());
     return pt?.color || null;
-  };
+  }, [panelTypes]);
 
-  const getFactoryName = (factoryId: string | null | undefined): string => {
+  const getFactoryName = useCallback((factoryId: string | null | undefined): string => {
     if (!factoryId || !factories) return "-";
     const factory = factories.find(f => f.id === factoryId);
     return factory?.name || "-";
-  };
+  }, [factories]);
 
-  const filteredPanels = panels?.filter(panel => {
+  const filteredPanels = useMemo(() => panels?.filter(panel => {
     if (panel.consolidatedIntoPanelId) return false;
     if (filterJobId && panel.jobId !== filterJobId) return false;
     if (jobFilter !== "all" && panel.jobId !== jobFilter) return false;
@@ -316,39 +316,39 @@ export default function AdminPanelsPage() {
     const levelA = a.level || "";
     const levelB = b.level || "";
     return levelA.localeCompare(levelB, undefined, { numeric: true });
-  });
+  }), [panels, filterJobId, jobFilter, factoryFilter, statusFilter, panelTypeFilter, levelFilter, searchTerm]);
 
-  const panelsByJob = filteredPanels?.reduce((acc, panel) => {
+  const panelsByJob = useMemo(() => filteredPanels?.reduce((acc, panel) => {
     const jobId = panel.jobId;
     if (!acc[jobId]) {
       acc[jobId] = { job: panel.job, panels: [] };
     }
     acc[jobId].panels.push(panel);
     return acc;
-  }, {} as Record<string, { job: Job; panels: PanelWithJob[] }>) || {};
+  }, {} as Record<string, { job: Job; panels: PanelWithJob[] }>) || {}, [filteredPanels]);
 
-  const panelsByType = filteredPanels?.reduce((acc, panel) => {
+  const panelsByType = useMemo(() => filteredPanels?.reduce((acc, panel) => {
     const type = panel.panelType || "UNKNOWN";
     if (!acc[type]) {
       acc[type] = [];
     }
     acc[type].push(panel);
     return acc;
-  }, {} as Record<string, PanelWithJob[]>) || {};
+  }, {} as Record<string, PanelWithJob[]>) || {}, [filteredPanels]);
 
-  const panelsByLevel = filteredPanels?.reduce((acc, panel) => {
+  const panelsByLevel = useMemo(() => filteredPanels?.reduce((acc, panel) => {
     const level = panel.level || "No Level";
     if (!acc[level]) {
       acc[level] = [];
     }
     acc[level].push(panel);
     return acc;
-  }, {} as Record<string, PanelWithJob[]>) || {};
+  }, {} as Record<string, PanelWithJob[]>) || {}, [filteredPanels]);
 
-  const uniquePanelTypes = Array.from(new Set(panels?.map(p => p.panelType).filter(Boolean) || [])).sort();
-  const uniqueLevels = Array.from(new Set(panels?.map(p => p.level).filter(Boolean) || [])).sort((a, b) =>
+  const uniquePanelTypes = useMemo(() => Array.from(new Set(panels?.map(p => p.panelType).filter(Boolean) || [])).sort(), [panels]);
+  const uniqueLevels = useMemo(() => Array.from(new Set(panels?.map(p => p.level).filter(Boolean) || [])).sort((a, b) =>
     a!.localeCompare(b!, undefined, { numeric: true })
-  );
+  ), [panels]);
 
   const toggleJobCollapse = (jobId: string) => {
     setCollapsedJobs(prev => {
@@ -377,7 +377,7 @@ export default function AdminPanelsPage() {
     });
   };
 
-  const currentJob = jobs?.find(j => j.id === filterJobId);
+  const currentJob = useMemo(() => jobs?.find(j => j.id === filterJobId), [jobs, filterJobId]);
 
   const handlePrintPanelList = useCallback(() => {
     if (!filteredPanels || filteredPanels.length === 0) {

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, Fragment } from "react";
+import { useState, useRef, useEffect, Fragment, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -184,7 +184,7 @@ export default function AdminJobsPage() {
     queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
-  const filteredAndSortedJobs = (jobs || [])
+  const filteredAndSortedJobs = useMemo(() => (jobs || [])
     .filter((job) => {
       if (phaseFilter !== "all" && String(job.jobPhase) !== phaseFilter) return false;
       if (statusFilter !== "all" && job.status !== statusFilter) return false;
@@ -223,32 +223,32 @@ export default function AdminJobsPage() {
           break;
       }
       return sortDirection === "asc" ? comparison : -comparison;
-    });
+    }), [jobs, phaseFilter, statusFilter, stateFilter, searchQuery, groupByState, sortField, sortDirection]);
 
-  const groupedJobs = groupByState
+  const groupedJobs = useMemo(() => groupByState
     ? filteredAndSortedJobs.reduce((acc, job) => {
         const state = job.state || "No State";
         if (!acc[state]) acc[state] = [];
         acc[state].push(job);
         return acc;
       }, {} as Record<string, JobWithPanels[]>)
-    : { "All Jobs": filteredAndSortedJobs };
+    : { "All Jobs": filteredAndSortedJobs }, [groupByState, filteredAndSortedJobs]);
 
-  const handleSort = (field: SortField) => {
+  const handleSort = useCallback((field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
       setSortDirection("asc");
     }
-  };
+  }, [sortField, sortDirection]);
 
-  const getSortIcon = (field: SortField) => {
+  const getSortIcon = useCallback((field: SortField) => {
     if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1" />;
     return sortDirection === "asc" 
       ? <ArrowUp className="h-4 w-4 ml-1" /> 
       : <ArrowDown className="h-4 w-4 ml-1" />;
-  };
+  }, [sortField, sortDirection]);
 
   const jobForm = useForm<JobFormData>({
     resolver: zodResolver(jobSchema),

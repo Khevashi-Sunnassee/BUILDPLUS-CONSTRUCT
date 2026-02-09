@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -241,25 +241,25 @@ export default function LogisticsPage() {
     queryKey: [PANELS_ROUTES.READY_FOR_LOADING],
   });
 
-  const getPanelTypeColor = (panelType: string | null | undefined): string | null => {
+  const getPanelTypeColor = useCallback((panelType: string | null | undefined): string | null => {
     if (!panelType || !panelTypesData) return null;
     const pt = panelTypesData.find(t => t.code === panelType || t.name === panelType || t.code.toUpperCase() === panelType.toUpperCase());
     return pt?.color || null;
-  };
+  }, [panelTypesData]);
 
-  const getFactoryCode = (panel: PanelRegister & { job: Job }): string => {
+  const getFactoryCode = useCallback((panel: PanelRegister & { job: Job }): string => {
     if (!panel.job.factoryId || !factoriesList) return "QLD";
     const factory = factoriesList.find(f => f.id === panel.job.factoryId);
     return factory?.state || factory?.code || "QLD";
-  };
+  }, [factoriesList]);
 
-  const filteredReadyPanels = readyForLoadingPanels?.filter(p => {
+  const filteredReadyPanels = useMemo(() => readyForLoadingPanels?.filter(p => {
     if (factoryFilter === "all") return true;
     const factoryCode = getFactoryCode(p);
     return factoryCode === factoryFilter;
-  }) || [];
+  }) || [], [readyForLoadingPanels, factoryFilter, getFactoryCode]);
 
-  const toggleReadyPanel = (panelId: string) => {
+  const toggleReadyPanel = useCallback((panelId: string) => {
     setSelectedReadyPanels(prev => {
       const next = new Set(prev);
       if (next.has(panelId)) {
@@ -269,15 +269,15 @@ export default function LogisticsPage() {
       }
       return next;
     });
-  };
+  }, []);
 
-  const toggleAllReadyPanels = () => {
+  const toggleAllReadyPanels = useCallback(() => {
     if (selectedReadyPanels.size === filteredReadyPanels.length) {
       setSelectedReadyPanels(new Set());
     } else {
       setSelectedReadyPanels(new Set(filteredReadyPanels.map(p => p.id)));
     }
-  };
+  }, [selectedReadyPanels.size, filteredReadyPanels]);
 
   const createLoadListFromReady = useMutation({
     mutationFn: async (panelIds: string[]) => {
@@ -305,7 +305,7 @@ export default function LogisticsPage() {
     },
   });
 
-  const handleCreateFromReady = () => {
+  const handleCreateFromReady = useCallback(() => {
     const panelIds = Array.from(selectedReadyPanels);
     const panels = readyForLoadingPanels?.filter(p => panelIds.includes(p.id)) || [];
     
@@ -322,7 +322,7 @@ export default function LogisticsPage() {
     }
     
     createLoadListFromReady.mutate(panelIds);
-  };
+  }, [selectedReadyPanels, readyForLoadingPanels, factoriesList, toast, createLoadListFromReady]);
 
   const { data: approvedPanels } = useQuery<(PanelRegister & { job: Job })[]>({
     queryKey: [PANELS_ROUTES.APPROVED_FOR_PRODUCTION, selectedJobId],
