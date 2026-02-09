@@ -48,7 +48,7 @@ router.get("/api/production-slots", requireAuth, async (req: Request, res: Respo
     
     const slots = await storage.getProductionSlots(filters);
     res.json(slots);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production slots");
     res.status(500).json({ error: "Failed to fetch production slots" });
   }
@@ -58,7 +58,7 @@ router.get("/api/production-slots/jobs-without-slots", requireAuth, async (req: 
   try {
     const jobsWithoutSlots = await storage.getJobsWithoutProductionSlots();
     res.json(jobsWithoutSlots);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching jobs without slots");
     res.status(500).json({ error: "Failed to fetch jobs" });
   }
@@ -71,7 +71,7 @@ router.get("/api/production-slots/:id", requireAuth, async (req: Request, res: R
       return res.status(404).json({ error: "Production slot not found" });
     }
     res.json(slot);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production slot");
     res.status(500).json({ error: "Failed to fetch production slot" });
   }
@@ -81,7 +81,7 @@ router.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MA
   try {
     const result = await storage.checkPanelLevelCoverage(String(req.params.jobId));
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error checking panel level coverage");
     res.status(500).json({ error: "Failed to check level coverage" });
   }
@@ -96,7 +96,7 @@ router.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAG
     const { skipEmptyLevels } = result.data;
     const slots = await storage.generateProductionSlotsForJob(String(req.params.jobId), skipEmptyLevels);
     res.json(slots);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error generating production slots");
     res.status(500).json({ error: "Failed to generate production slots" });
   }
@@ -123,7 +123,7 @@ router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"),
       return res.status(404).json({ error: "Production slot not found" });
     }
     res.json(slot);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error adjusting production slot");
     res.status(500).json({ error: "Failed to adjust production slot" });
   }
@@ -136,7 +136,7 @@ router.post("/api/production-slots/:id/book", requireRole("ADMIN", "MANAGER"), a
       return res.status(404).json({ error: "Production slot not found" });
     }
     res.json(slot);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error booking production slot");
     res.status(500).json({ error: "Failed to book production slot" });
   }
@@ -149,7 +149,7 @@ router.post("/api/production-slots/:id/complete", requireRole("ADMIN", "MANAGER"
       return res.status(404).json({ error: "Production slot not found" });
     }
     res.json(slot);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error completing production slot");
     res.status(500).json({ error: "Failed to complete production slot" });
   }
@@ -159,7 +159,7 @@ router.get("/api/production-slots/:id/adjustments", requireAuth, async (req: Req
   try {
     const adjustments = await storage.getProductionSlotAdjustments(String(req.params.id));
     res.json(adjustments);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production slot adjustments");
     res.status(500).json({ error: "Failed to fetch adjustments" });
   }
@@ -169,7 +169,7 @@ router.delete("/api/production-slots/:id", requireRole("ADMIN"), async (req: Req
   try {
     await storage.deleteProductionSlot(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting production slot");
     res.status(500).json({ error: "Failed to delete production slot" });
   }

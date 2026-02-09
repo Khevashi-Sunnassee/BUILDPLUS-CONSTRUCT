@@ -1004,7 +1004,7 @@ router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MAN
         const actionType = (changedFields.manualStartDate || changedFields.manualEndDate) ? "PROGRAMME_DATES_CHANGED" :
           (changedFields.predecessorSequenceOrder || changedFields.relationship) ? "PROGRAMME_PREDECESSOR_CHANGED" :
           "PROGRAMME_ENTRY_UPDATED";
-        logJobChange(job.id, actionType, req.session?.userId || null, req.session?.userName || null, {
+        logJobChange(job.id, actionType, req.session?.userId || null, req.session?.name || null, {
           changedFields: { entryId: existing.id, entryLabel, ...changedFields },
         });
       }
@@ -1077,7 +1077,7 @@ router.post("/api/admin/jobs/:id/programme/split", requireRole("ADMIN", "MANAGER
     const { entryId } = z.object({ entryId: z.string() }).parse(req.body);
     const result = await storage.splitProgrammeEntry(String(req.params.id), entryId);
 
-    logJobChange(job.id, "PROGRAMME_LEVEL_SPLIT", req.session?.userId || null, req.session?.userName || null, {
+    logJobChange(job.id, "PROGRAMME_LEVEL_SPLIT", req.session?.userId || null, req.session?.name || null, {
       changedFields: { entryId, newEntryCount: result.length },
     });
 
@@ -1099,7 +1099,7 @@ router.post("/api/admin/jobs/:id/programme/reorder", requireRole("ADMIN", "MANAG
     const { orderedIds } = z.object({ orderedIds: z.array(z.string()) }).parse(req.body);
     const result = await storage.reorderProgramme(String(req.params.id), orderedIds);
 
-    logJobChange(job.id, "PROGRAMME_REORDERED", req.session?.userId || null, req.session?.userName || null, {
+    logJobChange(job.id, "PROGRAMME_REORDERED", req.session?.userId || null, req.session?.name || null, {
       changedFields: { entriesReordered: orderedIds.length },
     });
 
@@ -1222,7 +1222,7 @@ router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "M
 
     const result = await storage.saveJobProgramme(String(req.params.id), updatedEntries);
 
-    logJobChange(job.id, "PROGRAMME_DATES_RECALCULATED", req.session?.userId || null, req.session?.userName || null, {
+    logJobChange(job.id, "PROGRAMME_DATES_RECALCULATED", req.session?.userId || null, req.session?.name || null, {
       changedFields: { entriesRecalculated: updatedEntries.length },
     });
 
@@ -1243,7 +1243,7 @@ router.delete("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MA
     const entryId = String(req.params.entryId);
     const result = await storage.deleteProgrammeEntry(String(req.params.id), entryId);
 
-    logJobChange(job.id, "PROGRAMME_ENTRY_DELETED", req.session?.userId || null, req.session?.userName || null, {
+    logJobChange(job.id, "PROGRAMME_ENTRY_DELETED", req.session?.userId || null, req.session?.name || null, {
       changedFields: { entryId },
     });
 

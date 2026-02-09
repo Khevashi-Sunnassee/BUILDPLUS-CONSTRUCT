@@ -378,20 +378,13 @@ router.get("/api/job-types/:jobTypeId/templates", requireAuth, async (req, res) 
       .where(and(eq(activityTemplates.jobTypeId, jobTypeId), eq(activityTemplates.companyId, companyId!)))
       .orderBy(asc(activityTemplates.sortOrder));
 
-    const subtasks = await db.select().from(activityTemplateSubtasks)
-      .where(
-        templates.length > 0
-          ? eq(activityTemplateSubtasks.templateId, activityTemplateSubtasks.templateId)
-          : eq(activityTemplateSubtasks.templateId, "NEVER_MATCH")
-      );
+    const templateIds = templates.map(t => t.id);
 
-    const allSubtasks = templates.length > 0
+    const filteredSubtasks = templateIds.length > 0
       ? await db.select().from(activityTemplateSubtasks)
+          .where(inArray(activityTemplateSubtasks.templateId, templateIds))
           .orderBy(asc(activityTemplateSubtasks.sortOrder))
       : [];
-
-    const templateIds = new Set(templates.map(t => t.id));
-    const filteredSubtasks = allSubtasks.filter(s => templateIds.has(s.templateId));
 
     const result = templates.map(t => ({
       ...t,
@@ -587,8 +580,8 @@ router.get("/api/jobs/:jobId/activities", requireAuth, async (req, res) => {
 
     let assignees: any[] = [];
     if (activityIds.length > 0) {
-      assignees = await db.select().from(jobActivityAssignees);
-      assignees = assignees.filter(a => activityIds.includes(a.activityId));
+      assignees = await db.select().from(jobActivityAssignees)
+        .where(inArray(jobActivityAssignees.activityId, activityIds));
     }
 
     const result = activities.map(a => ({
@@ -624,10 +617,12 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       return res.status(400).json({ error: "No templates found for this job type. Build the workflow first." });
     }
 
-    const allSubtasks = await db.select().from(activityTemplateSubtasks)
-      .orderBy(asc(activityTemplateSubtasks.sortOrder));
-    const templateIds = new Set(templates.map(t => t.id));
-    const filteredSubtasks = allSubtasks.filter(s => templateIds.has(s.templateId));
+    const templateIds = templates.map(t => t.id);
+    const filteredSubtasks = templateIds.length > 0
+      ? await db.select().from(activityTemplateSubtasks)
+          .where(inArray(activityTemplateSubtasks.templateId, templateIds))
+          .orderBy(asc(activityTemplateSubtasks.sortOrder))
+      : [];
 
     function addWorkingDays(from: Date, days: number): Date {
       const result = new Date(from);
@@ -764,7 +759,7 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       }
     });
 
-    logJobChange(jobId, "ACTIVITIES_INSTANTIATED", req.session.userId || null, req.session.userName || null, {
+    logJobChange(jobId, "ACTIVITIES_INSTANTIATED", req.session.userId || null, req.session.name || null, {
       changedFields: {
         jobTypeId,
         jobTypeName: jt.name,
@@ -917,7 +912,7 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
         (changedFields.startDate || changedFields.endDate) ? "ACTIVITY_DATES_CHANGED" :
         (changedFields.predecessorSortOrder || changedFields.relationship) ? "ACTIVITY_PREDECESSOR_CHANGED" :
         "ACTIVITY_UPDATED";
-      logJobChange(existing.jobId, actionType, req.session?.userId || null, req.session?.userName || null, {
+      logJobChange(existing.jobId, actionType, req.session?.userId || null, req.session?.name || null, {
         changedFields: {
           activityId: existing.id,
           activityName: existing.name,
@@ -943,7 +938,7 @@ router.delete("/api/job-activities/:id", requireAuth, requireRole("ADMIN", "MANA
     await db.delete(jobActivities).where(eq(jobActivities.id, String(req.params.id)));
 
     if (existing.jobId) {
-      logJobChange(existing.jobId, "ACTIVITY_DELETED", req.session?.userId || null, req.session?.userName || null, {
+      logJobChange(existing.jobId, "ACTIVITY_DELETED", req.session?.userId || null, req.session?.name || null, {
         changedFields: {
           activityId: existing.id,
           activityName: existing.name,
@@ -1053,7 +1048,7 @@ router.post("/api/jobs/:jobId/activities/recalculate", requireAuth, async (req, 
     }
 
     if (updates.length > 0) {
-      logJobChange(jobId, "ACTIVITIES_DATES_RECALCULATED", req.session?.userId || null, req.session?.userName || null, {
+      logJobChange(jobId, "ACTIVITIES_DATES_RECALCULATED", req.session?.userId || null, req.session?.name || null, {
         changedFields: {
           activitiesUpdated: updates.length,
           updatedActivities: updates.map(u => u.id),
@@ -1187,9 +1182,11 @@ router.post("/api/job-activities/:id/files", requireAuth, upload.single("file"),
 
     let fileUrl: string;
     try {
-      const { uploadFile } = await import("../replit_integrations/object_storage");
-      const fileName = `activity-files/${activityId}/${Date.now()}-${req.file.originalname}`;
-      fileUrl = await uploadFile(fileName, req.file.buffer, req.file.mimetype);
+      const { ObjectStorageService } = await import("../replit_integrations/object_storage");
+      const storageService = new ObjectStorageService();
+      const storageKey = `.private/activity-files/${activityId}/${Date.now()}-${req.file.originalname}`;
+      await storageService.uploadFile(storageKey, req.file.buffer, req.file.mimetype);
+      fileUrl = storageKey;
     } catch {
       const base64 = req.file.buffer.toString("base64");
       fileUrl = `data:${req.file.mimetype};base64,${base64}`;
@@ -1744,9 +1741,13 @@ router.post("/api/job-activities/:activityId/tasks/reorder", requireAuth, requir
       }
     }
 
-    for (let i = 0; i < taskIds.length; i++) {
-      await storage.updateTask(taskIds[i], { sortOrder: i } as any);
-    }
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < taskIds.length; i++) {
+        await tx.update(tasks)
+          .set({ sortOrder: i, updatedAt: new Date() })
+          .where(eq(tasks.id, taskIds[i]));
+      }
+    });
 
     res.json({ success: true });
   } catch (error: unknown) {

@@ -396,7 +396,7 @@ export const productionMethods = {
           slotRelationship = "FS";
         }
 
-        const [slot] = await db.insert(productionSlots).values({
+        const [insertedSlot]: ProductionSlot[] = await db.insert(productionSlots).values({
           jobId,
           buildingNumber: entry.buildingNumber,
           level: entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level,
@@ -408,9 +408,9 @@ export const productionMethods = {
           predecessorSlotId,
           relationship: slotRelationship,
         }).returning();
-        createdSlots.push(slot);
-        seqOrderToSlotId.set(entry.sequenceOrder, slot.id);
-        previousSlotId = slot.id;
+        createdSlots.push(insertedSlot);
+        seqOrderToSlotId.set(entry.sequenceOrder, insertedSlot.id);
+        previousSlotId = insertedSlot.id;
       }
     } else {
       if (!job.expectedCycleTimePerFloor) {
@@ -441,7 +441,7 @@ export const productionMethods = {
         const onsiteDate = addWorkingDays(onsiteStartBaseDate, cumulativeWorkingDays, workDays, holidays);
         const panelProductionDue = subtractWorkingDays(onsiteDate, productionDaysInAdvance, workDays, holidays);
 
-        const [slot] = await db.insert(productionSlots).values({
+        const [insertedSlot2]: ProductionSlot[] = await db.insert(productionSlots).values({
           jobId,
           buildingNumber: 1,
           level,
@@ -453,8 +453,8 @@ export const productionMethods = {
           predecessorSlotId: prevSlotId,
           relationship: prevSlotId ? "FS" : null,
         }).returning();
-        createdSlots.push(slot);
-        prevSlotId = slot.id;
+        createdSlots.push(insertedSlot2);
+        prevSlotId = insertedSlot2.id;
         cumulativeWorkingDays += defaultCycleTime;
       }
     }
