@@ -16,12 +16,49 @@ import {
   RotateCcw,
   MessageSquare,
   Camera,
+  Upload,
+  CheckCircle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiUpload } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+
+const PHOTO_SUBJECTS = [
+  { value: "progress", label: "Progress" },
+  { value: "defect", label: "Defect" },
+  { value: "safety", label: "Safety Issue" },
+  { value: "quality", label: "Quality Inspection" },
+  { value: "delivery", label: "Delivery" },
+  { value: "site_conditions", label: "Site Conditions" },
+  { value: "rework", label: "Rework" },
+  { value: "damage", label: "Damage" },
+  { value: "installation", label: "Installation" },
+  { value: "completion", label: "Completion" },
+  { value: "variation", label: "Variation" },
+  { value: "hold_point", label: "Hold Point" },
+  { value: "weather", label: "Weather" },
+  { value: "equipment", label: "Equipment" },
+  { value: "general", label: "General" },
+] as const;
 
 interface Photo {
   id: string;
@@ -231,32 +268,75 @@ export default function MobilePhotoGallery() {
   const [isUploading, setIsUploading] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  const [capturedFile, setCapturedFile] = useState<File | null>(null);
+  const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
+  const [metadataDialogOpen, setMetadataDialogOpen] = useState(false);
+  const [photoJobId, setPhotoJobId] = useState<string>("");
+  const [photoSubject, setPhotoSubject] = useState<string>("");
+  const [photoDescription, setPhotoDescription] = useState<string>("");
+
   const handleTakePhoto = () => {
     cameraInputRef.current?.click();
   };
 
-  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCameraCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setCapturedFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setCapturedPreview(previewUrl);
+    setPhotoJobId("");
+    setPhotoSubject("");
+    setPhotoDescription("");
+    setMetadataDialogOpen(true);
+
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  };
+
+  const handleCancelMetadata = () => {
+    setMetadataDialogOpen(false);
+    if (capturedPreview) URL.revokeObjectURL(capturedPreview);
+    setCapturedFile(null);
+    setCapturedPreview(null);
+    setPhotoJobId("");
+    setPhotoSubject("");
+    setPhotoDescription("");
+  };
+
+  const handleConfirmUpload = async () => {
+    if (!capturedFile || !photoJobId || !photoSubject) return;
+
     setIsUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
+      const subjectLabel = PHOTO_SUBJECTS.find(s => s.value === photoSubject)?.label || photoSubject;
+      const selectedJob = jobs.find(j => String(j.id) === photoJobId);
+      const jobLabel = selectedJob ? `${selectedJob.jobNumber} - ${selectedJob.name}` : "";
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-      formData.append("title", `Photo ${timestamp}`);
+      const title = `${subjectLabel} - ${jobLabel} - ${timestamp}`;
+
+      const formData = new FormData();
+      formData.append("file", capturedFile);
+      formData.append("title", title);
+      formData.append("jobId", photoJobId);
+      formData.append("tags", photoSubject);
+      if (photoDescription) {
+        formData.append("description", photoDescription);
+      }
 
       await apiUpload("/api/documents/upload", formData);
 
       queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.LIST] });
       toast({ title: "Photo uploaded successfully" });
+      handleCancelMetadata();
     } catch (error: any) {
       toast({ title: "Failed to upload photo", description: error.message, variant: "destructive" });
     } finally {
       setIsUploading(false);
-      if (cameraInputRef.current) cameraInputRef.current.value = "";
     }
   };
+
+  const canSubmitPhoto = photoJobId !== "" && photoSubject !== "";
 
   const { data: photosResult, isLoading } = useQuery<{ documents: Photo[]; total: number }>({
     queryKey: [DOCUMENT_ROUTES.LIST, "mobile-photos", { search: searchQuery, jobId: selectedJobId, typeId: selectedTypeId, excludeChat }],
@@ -276,7 +356,7 @@ export default function MobilePhotoGallery() {
     queryKey: [DOCUMENT_ROUTES.TYPES_ACTIVE],
   });
 
-  const { data: jobs = [] } = useQuery<Job[]>({
+  const { data: jobs = [], isLoading: jobsLoading } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
 
@@ -537,6 +617,111 @@ export default function MobilePhotoGallery() {
         className="hidden"
         data-testid="input-camera-capture"
       />
+
+      <Dialog open={metadataDialogOpen} onOpenChange={() => {}}>
+        <DialogContent className="max-w-sm mx-auto max-h-[90vh] overflow-y-auto [&>button:last-child]:hidden" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>Photo Details</DialogTitle>
+            <DialogDescription>
+              Select a job and reason for this photo before uploading.
+            </DialogDescription>
+          </DialogHeader>
+
+          {capturedPreview && (
+            <div className="rounded-md overflow-hidden border bg-muted aspect-video flex items-center justify-center">
+              <img
+                src={capturedPreview}
+                alt="Captured preview"
+                className="w-full h-full object-cover"
+                data-testid="img-photo-preview"
+              />
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" data-testid="label-photo-job">
+                Job <span className="text-destructive">*</span>
+              </label>
+              <Select value={photoJobId} onValueChange={setPhotoJobId} disabled={jobsLoading}>
+                <SelectTrigger data-testid="select-photo-job">
+                  <SelectValue placeholder={jobsLoading ? "Loading jobs..." : "Select a job"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {jobs.map((job) => (
+                    <SelectItem key={job.id} value={String(job.id)} data-testid={`option-job-${job.id}`}>
+                      {job.jobNumber} - {job.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {photoJobId === "" && (
+                <p className="text-xs text-muted-foreground">Required - select which job this photo belongs to</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" data-testid="label-photo-subject">
+                Subject <span className="text-destructive">*</span>
+              </label>
+              <Select value={photoSubject} onValueChange={setPhotoSubject}>
+                <SelectTrigger data-testid="select-photo-subject">
+                  <SelectValue placeholder="Select a reason" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PHOTO_SUBJECTS.map((subject) => (
+                    <SelectItem key={subject.value} value={subject.value} data-testid={`option-subject-${subject.value}`}>
+                      {subject.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {photoSubject === "" && (
+                <p className="text-xs text-muted-foreground">Required - select the reason for this photo</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" data-testid="label-photo-description">
+                Description (optional)
+              </label>
+              <Input
+                placeholder="Add a brief description..."
+                value={photoDescription}
+                onChange={(e) => setPhotoDescription(e.target.value)}
+                data-testid="input-photo-description"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-row gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCancelMetadata}
+              disabled={isUploading}
+              className="flex-1"
+              data-testid="button-cancel-photo-upload"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmUpload}
+              disabled={!canSubmitPhoto || isUploading}
+              className="flex-1"
+              data-testid="button-confirm-photo-upload"
+            >
+              {isUploading ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Upload className="h-4 w-4 mr-2" />
+              )}
+              Upload
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="fixed bottom-20 right-4 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
         <button
