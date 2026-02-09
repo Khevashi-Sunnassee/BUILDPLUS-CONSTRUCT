@@ -55,6 +55,7 @@ import {
   ChevronRight,
   BarChart3,
   TableProperties,
+  Factory,
 } from "lucide-react";
 import type { Job, JobLevelCycleTime } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -348,6 +349,7 @@ export default function JobProgrammePage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
+  const [updateSlotsConfirmOpen, setUpdateSlotsConfirmOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -509,6 +511,21 @@ export default function JobProgrammePage() {
     },
   });
 
+  const updateProductionSlotsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/production-slots/generate/${jobId}`, { skipEmptyLevels: false });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      setUpdateSlotsConfirmOpen(false);
+      const count = Array.isArray(data) ? data.length : 0;
+      toast({ title: "Production slots updated", description: `${count} production slot${count !== 1 ? 's' : ''} generated from programme.` });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err?.message || "Failed to update production slots", variant: "destructive" });
+    },
+  });
+
   const handlePatchEntry = useCallback((id: string, field: string, value: any) => {
     patchEntryMutation.mutate({ entryId: id, data: { [field]: value } });
   }, [patchEntryMutation]);
@@ -548,7 +565,7 @@ export default function JobProgrammePage() {
     });
   }, []);
 
-  const isSaving = patchEntryMutation.isPending || splitMutation.isPending || reorderMutation.isPending || recalcMutation.isPending || deleteMutation.isPending || generateFromSettingsMutation.isPending || generateFromPanelsMutation.isPending;
+  const isSaving = patchEntryMutation.isPending || splitMutation.isPending || reorderMutation.isPending || recalcMutation.isPending || deleteMutation.isPending || generateFromSettingsMutation.isPending || generateFromPanelsMutation.isPending || updateProductionSlotsMutation.isPending;
   const isLoading = jobLoading || programmeLoading;
 
   if (isLoading) {
@@ -639,6 +656,17 @@ export default function JobProgrammePage() {
             {recalcMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Calculator className="h-4 w-4 mr-2" />}
             Recalculate Dates
           </Button>
+          {entries.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setUpdateSlotsConfirmOpen(true)}
+              disabled={isSaving}
+              data-testid="btn-update-production-slots"
+            >
+              {updateProductionSlotsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Factory className="h-4 w-4 mr-2" />}
+              Update Production Slots
+            </Button>
+          )}
         </div>
       </div>
 
@@ -775,6 +803,26 @@ export default function JobProgrammePage() {
             <AlertDialogAction onClick={confirmDelete}>
               {deleteMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={updateSlotsConfirmOpen} onOpenChange={setUpdateSlotsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update Production Slots</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will regenerate all production slots for this job based on the current programme.
+              Any existing production slots and their manual adjustments will be replaced.
+              Do you want to update the production slots and design program?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => updateProductionSlotsMutation.mutate()} data-testid="btn-confirm-update-slots">
+              {updateProductionSlotsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Update Production Slots
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

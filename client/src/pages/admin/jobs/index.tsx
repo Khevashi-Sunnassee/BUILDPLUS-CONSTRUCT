@@ -27,6 +27,7 @@ import {
   AlertCircle,
   FileUp,
   Clock,
+  CalendarRange,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1172,6 +1173,15 @@ export default function AdminJobsPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/admin/jobs/${job.id}/programme`)}
+                            title="Job Programme"
+                            data-testid={`button-programme-${job.id}`}
+                          >
+                            <CalendarRange className="h-4 w-4 text-purple-600" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="icon"
