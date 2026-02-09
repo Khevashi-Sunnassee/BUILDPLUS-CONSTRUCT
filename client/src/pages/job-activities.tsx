@@ -309,7 +309,7 @@ export default function JobActivitiesPage() {
 
   if (loadingActivities) {
     return (
-      <div className="container mx-auto p-4 md:p-6 max-w-7xl space-y-4">
+      <div className="p-4 md:p-6 space-y-4 h-full overflow-auto">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -318,7 +318,7 @@ export default function JobActivitiesPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-7xl space-y-4">
+    <div className="p-4 md:p-6 space-y-4 h-full overflow-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/tasks")} data-testid="button-back-to-tasks">
