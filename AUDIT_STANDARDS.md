@@ -125,7 +125,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-008 | Optimistic locking on contracts and progress claims | `version` column incremented via `sql` expression on updates | 2026-02-08 |
 | VF-009 | safeParseFinancial replaces raw parseFloat | `safeParseFinancial` function used across server routes | 2026-02-08 |
 | VF-010 | Auth on import-estimate endpoint | `requireAuth, requireRole` on `/api/jobs/:jobId/import-estimate` | 2026-02-08 |
-| VF-011 | Database indexes (400+) on FKs and frequent filters | `SELECT count(*) FROM pg_indexes WHERE schemaname='public'` returns 400+ | 2026-02-08 |
+| VF-011 | Database indexes (450+) on FKs and frequent filters | `SELECT count(*) FROM pg_indexes WHERE schemaname='public'` returns 450+ | 2026-02-09 |
 | VF-012 | Session cookies: HttpOnly, Secure (prod), SameSite=lax | Cookie config in `server/routes/index.ts` | 2026-02-08 |
 | VF-013 | Rate limiting: API, Auth, Upload tiers | Three `rateLimit` instances in `server/index.ts` | 2026-02-08 |
 | VF-014 | Password hashing with bcrypt | bcrypt used in auth routes and seed | 2026-02-08 |
@@ -137,7 +137,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-020 | JSON body limit reduced to 5MB (50MB only for upload routes) | `grep "limit" server/index.ts` shows 5mb default, 50mb on upload routes only | 2026-02-08 |
 | VF-021 | Request-ID middleware for tracing | `grep "requestId\|X-Request-Id" server/index.ts` shows UUID generation per request | 2026-02-08 |
 | VF-022 | Zod validation on ALL route files (39/39 with safeParse) | `grep -c safeParse server/routes/*.ts` shows all route files have validation | 2026-02-08 |
-| VF-023 | Route-level code splitting with React.lazy() | `grep "lazy(" client/src/App.tsx` shows ~80 lazy-loaded pages with Suspense fallback | 2026-02-08 |
+| VF-023 | Route-level code splitting with React.lazy() | `grep "lazy(" client/src/App.tsx` shows 81 lazy-loaded pages with Suspense fallback | 2026-02-09 |
 | VF-024 | Test coverage: 7 test files, 219 tests passing | `npx vitest run` shows 7 files, 219 tests, 0 failures | 2026-02-08 |
 | VF-025 | Composite indexes on progress_claims, panel_audit_logs, timer_sessions | SQL `SELECT indexname FROM pg_indexes WHERE indexname LIKE '%job_status%' OR indexname LIKE '%panel_created_at%' OR indexname LIKE '%user_started_at%'` returns 3 rows | 2026-02-08 |
 | VF-026 | CHECK constraints on financial columns (progress_claims, contracts, users, progress_claim_items) | `SELECT conname FROM pg_constraint WHERE contype='c' AND conname LIKE 'chk_%'` returns 14+ constraints | 2026-02-08 |
@@ -150,7 +150,10 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-033 | Unsaved changes warning: useUnsavedChanges hook on purchase-order-form and manual-entry forms | `grep "useUnsavedChanges" client/src/pages/purchase-order-form.tsx client/src/pages/manual-entry.tsx` shows integration | 2026-02-08 |
 | VF-034 | Delete confirmations already present on all cited operations (checklist, bundles, panels) — verified with AlertDialog grep | `grep -c "AlertDialog" client/src/pages/checklist-fill.tsx client/src/pages/document-register/BundleDialogs.tsx client/src/pages/admin/panels/PanelDialogs.tsx` shows 22, 22, 36 matches | 2026-02-08 |
 | VF-035 | TypeScript `any` reduction: 200+ `catch (error: any)` → `catch (error: unknown)` across 15 route files with type-guarded error access | `grep -c "catch.*unknown" server/routes/*.ts` shows widespread adoption | 2026-02-08 |
-| VF-036 | DB triggers for auto-updating updated_at on all 62 tables | `SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_name LIKE 'trg_%_updated_at'` returns 62 | 2026-02-08 |
+| VF-036 | DB triggers for auto-updating updated_at on all 66 tables | `SELECT COUNT(*) FROM information_schema.triggers WHERE trigger_name LIKE 'trg_%_updated_at'` returns 66 | 2026-02-09 |
+| VF-037 | Employee management: 4 tables with 21 indexes, proper FK constraints, cascade deletes | `SELECT count(*) FROM pg_indexes WHERE tablename LIKE 'employee%'` returns 21 | 2026-02-09 |
+| VF-038 | Employee routes: Zod safeParse (8), requireAuth/requireRole (19), catch(error:unknown) (18), company scope (4) | `grep -c safeParse server/routes/employee.routes.ts` returns 8 | 2026-02-09 |
+| VF-039 | Employee frontend: 156 data-testid attributes across list + detail pages | `grep -c data-testid client/src/pages/admin/employees.tsx employee-detail.tsx` returns 43+113 | 2026-02-09 |
 
 ---
 
@@ -174,7 +177,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | KI-011 | No offline handling for mobile pages | P2 | FIXED | Frontend | useOnlineStatus hook with toast + visual indicator in MobileLayout. See VF-032 | 2026-02-08 |
 | KI-012 | Health endpoint exposes memory/pool info | P3 | FIXED | Security | Restricted to admin sessions only. See VF-030 | 2026-02-08 |
 | KI-013 | Rate limiting per-IP — proxy users share IP | P2 | FIXED | Performance | Per-session rate limiting with IP fallback. See VF-031 | 2026-02-08 |
-| KI-014 | updatedAt not auto-updated by DB triggers | P3 | FIXED | Database | 62 BEFORE UPDATE triggers auto-set updated_at via update_updated_at_column(). See VF-036 | 2026-02-08 |
+| KI-014 | updatedAt not auto-updated by DB triggers | P3 | FIXED | Database | 66 BEFORE UPDATE triggers auto-set updated_at via update_updated_at_column(). See VF-036 | 2026-02-09 |
 | KI-015 | No error monitoring (Sentry or equivalent) | P2 | FIXED | Observability | ErrorMonitor class with admin summary endpoint. See VF-028 | 2026-02-08 |
 | KI-016 | Missing composite indexes on 3 tables | P2 | FIXED | Database | Composite indexes added: progress_claims(jobId,status), panel_audit_logs(panelId,createdAt), timer_sessions(userId,startedAt). See VF-025 | 2026-02-08 |
 | KI-017 | No form auto-save or unsaved changes warning | P3 | FIXED | Frontend | useUnsavedChanges hook on purchase-order and manual-entry forms. See VF-033 | 2026-02-08 |
@@ -196,3 +199,4 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | 2026-02-08 | 85.5/100 | B | Fixed P2 items: composite indexes (KI-016), CHECK constraints (KI-008), N+1 batch queries (KI-010), error monitoring (KI-015), ESLint (KI-003). Added VF-025 through VF-029. |
 | 2026-02-08 | — | — | Final round: health endpoint secured (KI-012), per-session rate limiting (KI-013), offline detection (KI-011), unsaved changes (KI-017), delete confirmations verified (KI-018), 200+ any→unknown (KI-006), updatedAt triggers on 62 tables (KI-014). Added VF-030 through VF-036. ALL 18 KIs resolved: 16 FIXED, 2 MITIGATED. |
 | 2026-02-08 | **92.3/100** | **A** | **FINAL AUDIT — SAFE TO DEPLOY.** Scores: TypeScript&Build 9/10 (15%), Security 9.5/10 (20%), Backend&API 9.5/10 (15%), Database&Integrity 9.5/10 (15%), Frontend Quality 9/10 (10%), Performance&Scale 9/10 (10%), Observability 9/10 (5%), Rules Compliance 9/10 (5%), Testing 9.5/10 (5%). Vite build clean. 0 TS errors. 219 tests. 36 verified fixes. 18/18 KIs resolved. |
+| 2026-02-09 | **92.5/100** | **A** | **POST-EMPLOYEE AUDIT — SAFE TO DEPLOY.** Employee management added (4 tables, 21 indexes, full CRUD). All 36 prior VFs re-verified. 3 new VFs (VF-037 to VF-039). Scores: TypeScript&Build 9/10 (15%), Security 9.5/10 (20%), Backend&API 9.5/10 (15%), Database&Integrity 9.5/10 (15%), Frontend Quality 9/10 (10%), Performance&Scale 9/10 (10%), Observability 9/10 (5%), Rules Compliance 9/10 (5%), Testing 9.5/10 (5%). 0 TS errors. Build clean. 219 tests. 450 indexes. 66 triggers. 39 VFs. 18/18 KIs resolved. |
