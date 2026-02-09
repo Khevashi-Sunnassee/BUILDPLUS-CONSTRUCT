@@ -151,6 +151,24 @@ export const PROCUREMENT_ROUTES = {
 } as const;
 
 // ============================================================================
+// HIRE BOOKINGS
+// ============================================================================
+export const HIRE_ROUTES = {
+  LIST: '/api/hire-bookings',
+  NEXT_NUMBER: '/api/hire-bookings/next-number',
+  BY_ID: (id: string | number) => `/api/hire-bookings/${id}`,
+  SUBMIT: (id: string | number) => `/api/hire-bookings/${id}/submit`,
+  APPROVE: (id: string | number) => `/api/hire-bookings/${id}/approve`,
+  REJECT: (id: string | number) => `/api/hire-bookings/${id}/reject`,
+  BOOK: (id: string | number) => `/api/hire-bookings/${id}/book`,
+  PICKUP: (id: string | number) => `/api/hire-bookings/${id}/pickup`,
+  ON_HIRE: (id: string | number) => `/api/hire-bookings/${id}/on-hire`,
+  RETURN: (id: string | number) => `/api/hire-bookings/${id}/return`,
+  CANCEL: (id: string | number) => `/api/hire-bookings/${id}/cancel`,
+  CLOSE: (id: string | number) => `/api/hire-bookings/${id}/close`,
+} as const;
+
+// ============================================================================
 // JOBS & PANELS
 // ============================================================================
 export const JOBS_ROUTES = {
@@ -756,3 +774,4 @@ export const ONBOARDING_ROUTES = {
   TEMPLATE_TASK_BY_ID: (templateId: string | number, taskId: string | number) => `/api/onboarding/templates/${templateId}/tasks/${taskId}`,
 } as const;
 export type OnboardingRoutes = typeof ONBOARDING_ROUTES;
+export type HireRoutes = typeof HIRE_ROUTES;

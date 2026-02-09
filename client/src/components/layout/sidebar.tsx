@@ -42,6 +42,7 @@ import {
   ImageIcon,
   Database,
   Tag,
+  Wrench,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -94,6 +95,7 @@ const adminFinanceNavItems = [
   { title: "Contract Hub", url: "/contracts", icon: Scale },
   { title: "Progress Claims", url: "/progress-claims", icon: FileText },
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
+  { title: "Hire Bookings", url: "/hire-bookings", icon: Wrench },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
 ];
@@ -139,6 +141,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/weekly-wages": "weekly_wages",
   "/weekly-job-logs": "weekly_job_logs",
   "/purchase-orders": "purchase_orders",
+  "/hire-bookings": "purchase_orders",
   "/procurement-reo": "purchase_orders",
   "/tasks": "tasks",
   "/chat": "chat",

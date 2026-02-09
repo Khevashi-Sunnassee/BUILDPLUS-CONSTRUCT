@@ -50,6 +50,8 @@ const ProductionSlotsPage = lazy(() => import("@/pages/production-slots"));
 const DraftingProgramPage = lazy(() => import("@/pages/drafting-program"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
 const PurchaseOrderFormPage = lazy(() => import("@/pages/purchase-order-form"));
+const HireBookingsPage = lazy(() => import("@/pages/hire-bookings"));
+const HireBookingFormPage = lazy(() => import("@/pages/hire-booking-form"));
 const TasksPage = lazy(() => import("@/pages/tasks"));
 const PanelDetailsPage = lazy(() => import("@/pages/panel-details"));
 const ChatPage = lazy(() => import("@/pages/chat"));
@@ -344,6 +346,22 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <PurchaseOrderFormPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/hire-bookings">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <HireBookingsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/hire-bookings/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <HireBookingFormPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

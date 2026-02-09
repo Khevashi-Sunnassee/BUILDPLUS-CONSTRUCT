@@ -29,6 +29,7 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 - **Advanced Features:** Panel consolidation, contract retention tracking with automated deductions, and visual document comparison with pixel-level overlay and AI summarization.
 - **Landing Page:** A branded landing page for unauthenticated users, routing authenticated users directly to the dashboard.
 - **Asset Register:** Comprehensive asset lifecycle management with over 50 fields, supporting more than 40 asset categories, auto-generated asset tags, depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis.
+- **Hire Booking Engine:** Equipment hire management with approval workflow (Draft → Requested → Approved → Booked → On Hire → Returned → Closed), supporting internal assets (own equipment with chargeout rates) and external hire companies (suppliers). Asset categories stored as integer index into ASSET_CATEGORIES array. Overdue return dates highlighted in red. Linked to jobs, employees, and suppliers.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.

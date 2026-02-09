@@ -23,6 +23,11 @@ export const contractStatusEnum = pgEnum("contract_status", ["AWAITING_CONTRACT"
 export const contractTypeEnum = pgEnum("contract_type", ["LUMP_SUM", "UNIT_PRICE", "TIME_AND_MATERIALS", "GMP"]);
 export const progressClaimStatusEnum = pgEnum("progress_claim_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 
+export const hireStatusEnum = pgEnum("hire_status", ["DRAFT", "REQUESTED", "APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CANCELLED", "CLOSED"]);
+export const hireRateTypeEnum = pgEnum("hire_rate_type", ["day", "week", "month", "custom"]);
+export const hireChargeRuleEnum = pgEnum("hire_charge_rule", ["calendar_days", "business_days", "minimum_days"]);
+export const hireSourceEnum = pgEnum("hire_source", ["internal", "external"]);
+
 export const companies = pgTable("companies", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
@@ -3359,3 +3364,54 @@ export const employeeOnboardingTasks = pgTable("employee_onboarding_tasks", {
 export const insertEmployeeOnboardingTaskSchema = createInsertSchema(employeeOnboardingTasks).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
 export type InsertEmployeeOnboardingTask = z.infer<typeof insertEmployeeOnboardingTaskSchema>;
 export type EmployeeOnboardingTask = typeof employeeOnboardingTasks.$inferSelect;
+
+// ============================================================================
+// HIRE BOOKINGS
+// ============================================================================
+export const hireBookings = pgTable("hire_bookings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  bookingNumber: text("booking_number").notNull(),
+  hireSource: hireSourceEnum("hire_source").notNull().default("external"),
+  equipmentDescription: text("equipment_description").notNull(),
+  assetCategoryIndex: integer("asset_category_index").notNull(),
+  assetId: varchar("asset_id", { length: 36 }).references(() => assets.id),
+  supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  costCode: text("cost_code"),
+  requestedByUserId: varchar("requested_by_user_id", { length: 36 }).notNull().references(() => employees.id),
+  responsiblePersonUserId: varchar("responsible_person_user_id", { length: 36 }).notNull().references(() => employees.id),
+  siteContactUserId: varchar("site_contact_user_id", { length: 36 }).references(() => employees.id),
+  hireStartDate: timestamp("hire_start_date").notNull(),
+  hireEndDate: timestamp("hire_end_date").notNull(),
+  expectedReturnDate: timestamp("expected_return_date"),
+  rateType: hireRateTypeEnum("rate_type").notNull().default("day"),
+  rateAmount: decimal("rate_amount", { precision: 14, scale: 2 }).notNull(),
+  chargeRule: hireChargeRuleEnum("charge_rule").notNull().default("calendar_days"),
+  quantity: integer("quantity").notNull().default(1),
+  deliveryRequired: boolean("delivery_required").default(false).notNull(),
+  deliveryAddress: text("delivery_address"),
+  deliveryCost: decimal("delivery_cost", { precision: 14, scale: 2 }),
+  pickupRequired: boolean("pickup_required").default(false).notNull(),
+  pickupCost: decimal("pickup_cost", { precision: 14, scale: 2 }),
+  status: hireStatusEnum("status").notNull().default("DRAFT"),
+  approvedByUserId: varchar("approved_by_user_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  supplierReference: text("supplier_reference"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  bookingNumberCompanyIdx: uniqueIndex("hire_bookings_booking_number_company_idx").on(table.bookingNumber, table.companyId),
+  statusIdx: index("hire_bookings_status_idx").on(table.status),
+  jobIdx: index("hire_bookings_job_idx").on(table.jobId),
+  supplierIdx: index("hire_bookings_supplier_idx").on(table.supplierId),
+  assetIdx: index("hire_bookings_asset_idx").on(table.assetId),
+  requestedByIdx: index("hire_bookings_requested_by_idx").on(table.requestedByUserId),
+  companyIdx: index("hire_bookings_company_idx").on(table.companyId),
+  hireSourceIdx: index("hire_bookings_hire_source_idx").on(table.hireSource),
+}));
+
+export const insertHireBookingSchema = createInsertSchema(hireBookings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertHireBooking = z.infer<typeof insertHireBookingSchema>;
+export type HireBooking = typeof hireBookings.$inferSelect;
