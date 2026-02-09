@@ -40,6 +40,8 @@ import {
   Boxes,
   BookOpen,
   ImageIcon,
+  Database,
+  Tag,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -115,6 +117,8 @@ const adminNavItems = [
   { title: "Devices", url: "/admin/devices", icon: Monitor },
   { title: "Users", url: "/admin/users", icon: Users },
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
+  { title: "Item Categories", url: "/admin/item-categories", icon: Tag },
+  { title: "Data Management", url: "/admin/data-management", icon: Database },
   { title: "Help Management", url: "/admin/help", icon: BookOpen },
 ];
 
@@ -155,6 +159,8 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/factories": "admin_factories",
   "/admin/companies": "admin_companies",
   "/admin/checklist-templates": "admin_checklist_templates",
+  "/admin/item-categories": "admin_item_catalog",
+  "/admin/data-management": "admin_settings",
   "/checklists": "checklists",
   "/checklist-reports": "checklists",
   "/manager/review": "daily_reports",

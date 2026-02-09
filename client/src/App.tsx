@@ -62,6 +62,8 @@ const AdminChecklistTemplatesPage = lazy(() => import("@/pages/admin/checklist-t
 const AssetRegisterPage = lazy(() => import("@/pages/admin/asset-register"));
 const AssetDetailPage = lazy(() => import("@/pages/admin/asset-detail"));
 const TemplateEditorPage = lazy(() => import("@/pages/admin/template-editor"));
+const DataManagementPage = lazy(() => import("@/pages/admin/data-management"));
+const AdminItemCategoriesPage = lazy(() => import("@/pages/admin/item-categories"));
 const ChecklistsPage = lazy(() => import("@/pages/checklists"));
 const ChecklistFillPage = lazy(() => import("@/pages/checklist-fill"));
 const ChecklistReportsPage = lazy(() => import("@/pages/checklist-reports"));
@@ -542,6 +544,22 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AssetDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/data-management">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <DataManagementPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/item-categories">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminItemCategoriesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
