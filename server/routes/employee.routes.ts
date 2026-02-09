@@ -50,6 +50,7 @@ const employmentSchema = z.object({
   endDate: z.string().optional().nullable(),
   probationEndDate: z.string().optional().nullable(),
   classificationLevel: z.string().max(100).optional().nullable(),
+  instrumentId: z.string().max(36).optional().nullable(),
   status: z.enum(["prospect", "offer_sent", "offer_accepted", "pre_start", "active", "on_leave", "inactive", "terminated", "archived"]).optional(),
   baseRate: z.string().optional().nullable(),
   rateBasis: z.enum(["hourly", "salary"]).optional().nullable(),

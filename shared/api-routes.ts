@@ -740,5 +740,19 @@ export const EMPLOYEE_ROUTES = {
   DOCUMENT_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/documents/${id}`,
   LICENCES: (employeeId: string | number) => `/api/employees/${employeeId}/licences`,
   LICENCE_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/licences/${id}`,
+  ONBOARDINGS: (employeeId: string | number) => `/api/employees/${employeeId}/onboardings`,
+  ONBOARDING_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/onboardings/${id}`,
+  ONBOARDING_TASKS: (employeeId: string | number, onboardingId: string | number) => `/api/employees/${employeeId}/onboardings/${onboardingId}/tasks`,
+  ONBOARDING_TASK_BY_ID: (employeeId: string | number, onboardingId: string | number, taskId: string | number) => `/api/employees/${employeeId}/onboardings/${onboardingId}/tasks/${taskId}`,
 } as const;
 export type EmployeeRoutes = typeof EMPLOYEE_ROUTES;
+
+export const ONBOARDING_ROUTES = {
+  INSTRUMENTS: '/api/onboarding/instruments',
+  INSTRUMENT_BY_ID: (id: string | number) => `/api/onboarding/instruments/${id}`,
+  TEMPLATES: '/api/onboarding/templates',
+  TEMPLATE_BY_ID: (id: string | number) => `/api/onboarding/templates/${id}`,
+  TEMPLATE_TASKS: (templateId: string | number) => `/api/onboarding/templates/${templateId}/tasks`,
+  TEMPLATE_TASK_BY_ID: (templateId: string | number, taskId: string | number) => `/api/onboarding/templates/${templateId}/tasks/${taskId}`,
+} as const;
+export type OnboardingRoutes = typeof ONBOARDING_ROUTES;

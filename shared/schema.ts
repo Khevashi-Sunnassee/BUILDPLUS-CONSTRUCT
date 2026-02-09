@@ -3140,6 +3140,7 @@ export const employeeEmployments = pgTable("employee_employments", {
   endDate: text("end_date"),
   probationEndDate: text("probation_end_date"),
   classificationLevel: text("classification_level"),
+  instrumentId: varchar("instrument_id", { length: 36 }),
   status: employmentStatusEnum("status").notNull().default("prospect"),
   baseRate: decimal("base_rate", { precision: 14, scale: 2 }),
   rateBasis: rateBasisEnum("rate_basis").default("hourly"),
@@ -3227,3 +3228,132 @@ export const employeeLicences = pgTable("employee_licences", {
 export const insertEmployeeLicenceSchema = createInsertSchema(employeeLicences).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertEmployeeLicence = z.infer<typeof insertEmployeeLicenceSchema>;
 export type EmployeeLicence = typeof employeeLicences.$inferSelect;
+
+// ============== Industrial Instruments (Award / EBA / Policy Pack) ==============
+
+export const industrialInstruments = pgTable("industrial_instruments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  code: text("code"),
+  instrumentType: text("instrument_type").default("award"),
+  state: text("state"),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("industrial_instruments_company_idx").on(table.companyId),
+  activeIdx: index("industrial_instruments_active_idx").on(table.isActive),
+}));
+
+export const insertIndustrialInstrumentSchema = createInsertSchema(industrialInstruments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertIndustrialInstrument = z.infer<typeof insertIndustrialInstrumentSchema>;
+export type IndustrialInstrument = typeof industrialInstruments.$inferSelect;
+
+// ============== Onboarding System ==============
+
+export const onboardingStatusEnum = pgEnum("onboarding_status", [
+  "not_started", "in_progress", "blocked", "ready_to_start", "started", "complete", "withdrawn",
+]);
+
+export const onboardingTaskOwnerEnum = pgEnum("onboarding_task_owner", [
+  "employee", "supervisor", "hr", "payroll",
+]);
+
+export const onboardingTaskStatusEnum = pgEnum("onboarding_task_status", [
+  "pending", "in_progress", "complete", "blocked", "skipped",
+]);
+
+export const onboardingTemplates = pgTable("onboarding_templates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  role: text("role"),
+  employmentType: text("employment_type"),
+  state: text("state"),
+  instrumentId: varchar("instrument_id", { length: 36 }).references(() => industrialInstruments.id),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("onboarding_templates_company_idx").on(table.companyId),
+  activeIdx: index("onboarding_templates_active_idx").on(table.isActive),
+}));
+
+export const insertOnboardingTemplateSchema = createInsertSchema(onboardingTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertOnboardingTemplate = z.infer<typeof insertOnboardingTemplateSchema>;
+export type OnboardingTemplate = typeof onboardingTemplates.$inferSelect;
+
+export const onboardingTemplateTasks = pgTable("onboarding_template_tasks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id", { length: 36 }).notNull().references(() => onboardingTemplates.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  owner: onboardingTaskOwnerEnum("owner").notNull().default("hr"),
+  dueDaysOffset: integer("due_days_offset").default(0),
+  requiresEvidence: boolean("requires_evidence").default(false).notNull(),
+  isBlocking: boolean("is_blocking").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  templateIdx: index("onboarding_template_tasks_template_idx").on(table.templateId),
+  sortIdx: index("onboarding_template_tasks_sort_idx").on(table.sortOrder),
+}));
+
+export const insertOnboardingTemplateTaskSchema = createInsertSchema(onboardingTemplateTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertOnboardingTemplateTask = z.infer<typeof insertOnboardingTemplateTaskSchema>;
+export type OnboardingTemplateTask = typeof onboardingTemplateTasks.$inferSelect;
+
+export const employeeOnboardings = pgTable("employee_onboardings", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  employeeId: varchar("employee_id", { length: 36 }).notNull().references(() => employees.id, { onDelete: "cascade" }),
+  employmentId: varchar("employment_id", { length: 36 }).notNull().references(() => employeeEmployments.id, { onDelete: "cascade" }),
+  templateId: varchar("template_id", { length: 36 }).references(() => onboardingTemplates.id),
+  status: onboardingStatusEnum("status").notNull().default("not_started"),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("employee_onboardings_company_idx").on(table.companyId),
+  employeeIdx: index("employee_onboardings_employee_idx").on(table.employeeId),
+  employmentIdx: index("employee_onboardings_employment_idx").on(table.employmentId),
+  statusIdx: index("employee_onboardings_status_idx").on(table.status),
+}));
+
+export const insertEmployeeOnboardingSchema = createInsertSchema(employeeOnboardings).omit({ id: true, createdAt: true, updatedAt: true, startedAt: true, completedAt: true });
+export type InsertEmployeeOnboarding = z.infer<typeof insertEmployeeOnboardingSchema>;
+export type EmployeeOnboarding = typeof employeeOnboardings.$inferSelect;
+
+export const employeeOnboardingTasks = pgTable("employee_onboarding_tasks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  onboardingId: varchar("onboarding_id", { length: 36 }).notNull().references(() => employeeOnboardings.id, { onDelete: "cascade" }),
+  templateTaskId: varchar("template_task_id", { length: 36 }).references(() => onboardingTemplateTasks.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  owner: onboardingTaskOwnerEnum("owner").notNull().default("hr"),
+  status: onboardingTaskStatusEnum("status").notNull().default("pending"),
+  dueDate: text("due_date"),
+  completedAt: timestamp("completed_at"),
+  completedBy: varchar("completed_by", { length: 36 }).references(() => users.id),
+  requiresEvidence: boolean("requires_evidence").default(false).notNull(),
+  evidenceDocumentId: varchar("evidence_document_id", { length: 36 }).references(() => employeeDocuments.id),
+  isBlocking: boolean("is_blocking").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  onboardingIdx: index("employee_onboarding_tasks_onboarding_idx").on(table.onboardingId),
+  statusIdx: index("employee_onboarding_tasks_status_idx").on(table.status),
+  ownerIdx: index("employee_onboarding_tasks_owner_idx").on(table.owner),
+}));
+
+export const insertEmployeeOnboardingTaskSchema = createInsertSchema(employeeOnboardingTasks).omit({ id: true, createdAt: true, updatedAt: true, completedAt: true });
+export type InsertEmployeeOnboardingTask = z.infer<typeof insertEmployeeOnboardingTaskSchema>;
+export type EmployeeOnboardingTask = typeof employeeOnboardingTasks.$inferSelect;

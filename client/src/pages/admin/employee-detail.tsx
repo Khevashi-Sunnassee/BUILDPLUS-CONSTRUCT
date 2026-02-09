@@ -15,6 +15,13 @@ import {
   FileText,
   Award,
   User,
+  ClipboardCheck,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  XCircle,
+  SkipForward,
+  Play,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -67,8 +74,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { Employee, EmployeeEmployment, EmployeeDocument, EmployeeLicence } from "@shared/schema";
-import { EMPLOYEE_ROUTES } from "@shared/api-routes";
+import { Progress } from "@/components/ui/progress";
+import type { Employee, EmployeeEmployment, EmployeeDocument, EmployeeLicence, EmployeeOnboarding, EmployeeOnboardingTask, OnboardingTemplate } from "@shared/schema";
+import { EMPLOYEE_ROUTES, ONBOARDING_ROUTES } from "@shared/api-routes";
 
 const AUSTRALIAN_STATES = [
   { value: "VIC", label: "Victoria" },
@@ -121,6 +129,7 @@ const employmentSchema = z.object({
   endDate: z.string().optional(),
   probationEndDate: z.string().optional(),
   classificationLevel: z.string().optional(),
+  instrumentId: z.string().optional(),
   status: z.string().default("prospect"),
   baseRate: z.string().optional(),
   rateBasis: z.string().optional(),
@@ -202,6 +211,7 @@ const defaultEmploymentValues: EmploymentFormData = {
   endDate: "",
   probationEndDate: "",
   classificationLevel: "",
+  instrumentId: "",
   status: "prospect",
   baseRate: "",
   rateBasis: "hourly",
@@ -274,6 +284,10 @@ export default function EmployeeDetailPage() {
   const [deleteLicenceOpen, setDeleteLicenceOpen] = useState(false);
   const [deletingLicenceId, setDeletingLicenceId] = useState<string | null>(null);
 
+  const [createOnboardingOpen, setCreateOnboardingOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [selectedEmploymentIdForOnboarding, setSelectedEmploymentIdForOnboarding] = useState<string>("");
+
   const { data: employee, isLoading: employeeLoading } = useQuery<Employee>({
     queryKey: [EMPLOYEE_ROUTES.BY_ID(id), "detail"],
     enabled: !!id,
@@ -291,6 +305,21 @@ export default function EmployeeDetailPage() {
 
   const { data: licences } = useQuery<EmployeeLicence[]>({
     queryKey: [EMPLOYEE_ROUTES.LICENCES(id)],
+    enabled: !!id,
+  });
+
+  const { data: onboardings, isLoading: onboardingsLoading } = useQuery({
+    queryKey: ['/api/employees', id, 'onboardings'],
+    enabled: !!id,
+  });
+
+  const { data: instruments } = useQuery({
+    queryKey: ["/api/onboarding/instruments"],
+    enabled: !!id,
+  });
+
+  const { data: templates } = useQuery({
+    queryKey: ['/api/onboarding/templates'],
     enabled: !!id,
   });
 
@@ -486,6 +515,35 @@ export default function EmployeeDetailPage() {
     },
   });
 
+  const createOnboardingMutation = useMutation({
+    mutationFn: async (data: { employmentId: string; templateId?: string; notes?: string }) => {
+      return apiRequest("POST", `/api/employees/${id}/onboardings`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees', id, 'onboardings'] });
+      setCreateOnboardingOpen(false);
+      setSelectedTemplateId("");
+      setSelectedEmploymentIdForOnboarding("");
+      toast({ title: "Onboarding created" });
+    },
+    onError: () => {
+      toast({ title: "Failed to create onboarding", variant: "destructive" });
+    },
+  });
+
+  const updateOnboardingTaskMutation = useMutation({
+    mutationFn: async ({ onboardingId, taskId, data }: { onboardingId: string; taskId: string; data: any }) => {
+      return apiRequest("PATCH", `/api/employees/${id}/onboardings/${onboardingId}/tasks/${taskId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/employees', id, 'onboardings'] });
+      toast({ title: "Task updated" });
+    },
+    onError: () => {
+      toast({ title: "Failed to update task", variant: "destructive" });
+    },
+  });
+
   const openEditEmployee = () => {
     if (!employee) return;
     editForm.reset({
@@ -536,6 +594,7 @@ export default function EmployeeDetailPage() {
       endDate: emp.endDate || "",
       probationEndDate: emp.probationEndDate || "",
       classificationLevel: emp.classificationLevel || "",
+      instrumentId: emp.instrumentId || "",
       status: emp.status || "prospect",
       baseRate: emp.baseRate || "",
       rateBasis: emp.rateBasis || "hourly",
@@ -565,10 +624,11 @@ export default function EmployeeDetailPage() {
   };
 
   const onSubmitEmployment = (data: EmploymentFormData) => {
+    const payload = { ...data, instrumentId: data.instrumentId === "none" || !data.instrumentId ? null : data.instrumentId };
     if (editingEmployment) {
-      updateEmploymentMutation.mutate({ eid: editingEmployment.id, data });
+      updateEmploymentMutation.mutate({ eid: editingEmployment.id, data: payload });
     } else {
-      createEmploymentMutation.mutate(data);
+      createEmploymentMutation.mutate(payload);
     }
   };
 
@@ -698,6 +758,10 @@ export default function EmployeeDetailPage() {
           <TabsTrigger value="licences" data-testid="tab-licences">
             <Award className="h-4 w-4 mr-2" />
             Licences
+          </TabsTrigger>
+          <TabsTrigger value="onboarding" data-testid="tab-onboarding">
+            <ClipboardCheck className="h-4 w-4 mr-2" />
+            Onboarding
           </TabsTrigger>
         </TabsList>
 
@@ -970,6 +1034,160 @@ export default function EmployeeDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="onboarding" className="space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <h2 className="text-lg font-semibold" data-testid="text-onboarding-title">Onboarding</h2>
+            <Button onClick={() => setCreateOnboardingOpen(true)} data-testid="button-start-onboarding">
+              <Play className="h-4 w-4 mr-2" />
+              Start Onboarding
+            </Button>
+          </div>
+          {onboardingsLoading ? (
+            <Skeleton className="h-32 w-full" />
+          ) : !onboardings || onboardings.length === 0 ? (
+            <Card>
+              <CardContent className="p-0">
+                <div className="text-center py-8 text-muted-foreground" data-testid="empty-onboarding">
+                  <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No onboarding records yet</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            onboardings.map((ob: any) => {
+              const totalTasks = ob.tasks?.length || 0;
+              const completedTasks = ob.tasks?.filter((t: any) => t.status === "complete").length || 0;
+              const progressValue = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+              const employment = employments?.find((e) => e.id === ob.employmentId);
+              return (
+                <Card key={ob.id} data-testid={`card-onboarding-${ob.id}`}>
+                  <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+                    <CardTitle className="text-base">
+                      {employment?.positionTitle || "Employment"}{" "}
+                      {employment?.startDate ? `(${employment.startDate})` : ""}
+                    </CardTitle>
+                    <Badge
+                      variant={
+                        ob.status === "not_started" ? "secondary"
+                        : ob.status === "blocked" ? "destructive"
+                        : ob.status === "ready_to_start" ? "outline"
+                        : ob.status === "complete" ? "default"
+                        : ob.status === "withdrawn" ? "secondary"
+                        : "default"
+                      }
+                      className={ob.status === "complete" ? "bg-green-600 text-white" : ""}
+                      data-testid={`badge-onboarding-status-${ob.id}`}
+                    >
+                      {statusLabel(ob.status || "not_started")}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-sm text-muted-foreground">
+                        <span>Progress</span>
+                        <span data-testid={`text-onboarding-progress-${ob.id}`}>{completedTasks} / {totalTasks} tasks</span>
+                      </div>
+                      <Progress value={progressValue} data-testid={`progress-onboarding-${ob.id}`} />
+                    </div>
+                    {totalTasks > 0 && (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Task</TableHead>
+                            <TableHead>Owner</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ob.tasks.map((task: any) => (
+                            <TableRow key={task.id} data-testid={`row-onboarding-task-${task.id}`}>
+                              <TableCell className="font-medium">{task.title}</TableCell>
+                              <TableCell>
+                                <Badge
+                                  variant={
+                                    task.owner === "employee" ? "secondary"
+                                    : task.owner === "supervisor" ? "outline"
+                                    : task.owner === "hr" ? "default"
+                                    : "secondary"
+                                  }
+                                  data-testid={`badge-task-owner-${task.id}`}
+                                >
+                                  {statusLabel(task.owner || "employee")}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{task.dueDate || "-"}</TableCell>
+                              <TableCell>
+                                {task.status === "complete" ? (
+                                  <div className="flex items-center gap-1">
+                                    <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    <Badge variant="default" className="bg-green-600 text-white" data-testid={`badge-task-status-${task.id}`}>
+                                      Complete
+                                    </Badge>
+                                    {task.completedAt && (
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        {new Date(task.completedAt).toLocaleDateString()}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <Badge
+                                    variant={
+                                      task.status === "pending" ? "secondary"
+                                      : task.status === "in_progress" ? "default"
+                                      : task.status === "blocked" ? "destructive"
+                                      : task.status === "skipped" ? "outline"
+                                      : "secondary"
+                                    }
+                                    data-testid={`badge-task-status-${task.id}`}
+                                  >
+                                    {statusLabel(task.status || "pending")}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {task.status !== "complete" && task.status !== "skipped" && (
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => updateOnboardingTaskMutation.mutate({ onboardingId: ob.id, taskId: task.id, data: { status: "complete" } })}
+                                      data-testid={`button-complete-task-${task.id}`}
+                                    >
+                                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => updateOnboardingTaskMutation.mutate({ onboardingId: ob.id, taskId: task.id, data: { status: "blocked" } })}
+                                      data-testid={`button-block-task-${task.id}`}
+                                    >
+                                      <AlertTriangle className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => updateOnboardingTaskMutation.mutate({ onboardingId: ob.id, taskId: task.id, data: { status: "skipped" } })}
+                                      data-testid={`button-skip-task-${task.id}`}
+                                    >
+                                      <SkipForward className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </TabsContent>
       </Tabs>
 
@@ -1252,6 +1470,25 @@ export default function EmployeeDetailPage() {
                   <FormItem>
                     <FormLabel>Classification Level</FormLabel>
                     <FormControl><Input {...field} data-testid="input-employment-classification" /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={employmentForm.control} name="instrumentId" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Industrial Instrument</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-employment-instrument">
+                          <SelectValue placeholder="Select instrument (Award/EBA)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {instruments?.filter((i: any) => i.isActive).map((inst: any) => (
+                          <SelectItem key={inst.id} value={inst.id}>{inst.name}{inst.code ? ` (${inst.code})` : ""}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -1711,6 +1948,64 @@ export default function EmployeeDetailPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={createOnboardingOpen} onOpenChange={setCreateOnboardingOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Start Onboarding</DialogTitle>
+            <DialogDescription>Create a new onboarding process for this employee.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Employment</label>
+              <Select value={selectedEmploymentIdForOnboarding} onValueChange={setSelectedEmploymentIdForOnboarding}>
+                <SelectTrigger data-testid="select-onboarding-employment">
+                  <SelectValue placeholder="Select employment" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employments?.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.id} data-testid={`select-onboarding-employment-${emp.id}`}>
+                      {emp.positionTitle || emp.jobTitle || "Employment"} - {emp.startDate || "No start date"}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Template (Optional)</label>
+              <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                <SelectTrigger data-testid="select-onboarding-template">
+                  <SelectValue placeholder="Select template" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No template</SelectItem>
+                  {templates?.map((tmpl: any) => (
+                    <SelectItem key={tmpl.id} value={tmpl.id} data-testid={`select-onboarding-template-${tmpl.id}`}>
+                      {tmpl.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              onClick={() => {
+                if (!selectedEmploymentIdForOnboarding) return;
+                createOnboardingMutation.mutate({
+                  employmentId: selectedEmploymentIdForOnboarding,
+                  templateId: selectedTemplateId && selectedTemplateId !== "none" ? selectedTemplateId : undefined,
+                });
+              }}
+              disabled={!selectedEmploymentIdForOnboarding || createOnboardingMutation.isPending}
+              data-testid="button-submit-onboarding"
+            >
+              {createOnboardingMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Play className="h-4 w-4 mr-2" />}
+              Start Onboarding
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
