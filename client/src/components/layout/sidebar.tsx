@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
@@ -289,30 +289,34 @@ export function AppSidebar() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   {mainNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={isActive(item.url)}
-                        className="transition-colors"
-                      >
-                        <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
+                    <Fragment key={item.title}>
+                      <SidebarMenuItem>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive(item.url)}
+                          className="transition-colors"
+                        >
+                          <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                            <item.icon className="h-4 w-4" />
+                            <span>{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                      {item.title === "Jobs" && (
+                        <SidebarMenuItem>
+                          <SidebarMenuButton
+                            isActive={location.includes("/activities")}
+                            className="transition-colors cursor-pointer"
+                            onClick={() => setProjectActivitiesOpen(true)}
+                            data-testid="nav-project-activities"
+                          >
+                            <Workflow className="h-4 w-4" />
+                            <span>Job Activities</span>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      )}
+                    </Fragment>
                   ))}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={location.includes("/activities")}
-                      className="transition-colors cursor-pointer"
-                      onClick={() => setProjectActivitiesOpen(true)}
-                      data-testid="nav-project-activities"
-                    >
-                      <Workflow className="h-4 w-4" />
-                      <span>Job Activities</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </CollapsibleContent>
