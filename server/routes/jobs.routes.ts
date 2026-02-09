@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
-import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays } from "../storage";
+import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays, addWorkingDays } from "../storage";
 import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
@@ -912,6 +912,164 @@ router.post("/api/admin/jobs/:id/level-cycle-times", requireRole("ADMIN"), async
     res.json({ ok: true });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to save level cycle times" });
+  }
+});
+
+// ===== Job Programme Routes =====
+
+// GET /api/admin/jobs/:id/programme - Get job programme entries
+router.get("/api/admin/jobs/:id/programme", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const programme = await storage.getJobProgramme(String(req.params.id));
+    res.json(programme);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error getting job programme");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get job programme" });
+  }
+});
+
+// POST /api/admin/jobs/:id/programme - Save job programme (bulk upsert)
+router.post("/api/admin/jobs/:id/programme", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const entrySchema = z.object({
+      id: z.string().optional(),
+      buildingNumber: z.number().int().min(1),
+      level: z.string().min(1),
+      levelOrder: z.number(),
+      pourLabel: z.string().nullable().optional(),
+      sequenceOrder: z.number().int().min(0),
+      cycleDays: z.number().int().min(1),
+      estimatedStartDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
+      estimatedEndDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
+      manualStartDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
+      manualEndDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
+      notes: z.string().nullable().optional(),
+    });
+
+    const bodySchema = z.object({ entries: z.array(entrySchema) });
+    const parseResult = bodySchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid programme data", details: parseResult.error.format() });
+    }
+
+    const entries = parseResult.data.entries.map(e => ({
+      ...e,
+      estimatedStartDate: e.estimatedStartDate ? new Date(e.estimatedStartDate) : null,
+      estimatedEndDate: e.estimatedEndDate ? new Date(e.estimatedEndDate) : null,
+      manualStartDate: e.manualStartDate ? new Date(e.manualStartDate) : null,
+      manualEndDate: e.manualEndDate ? new Date(e.manualEndDate) : null,
+    }));
+
+    const result = await storage.saveJobProgramme(String(req.params.id), entries);
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error saving job programme");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to save job programme" });
+  }
+});
+
+// POST /api/admin/jobs/:id/programme/split - Split a level into pours
+router.post("/api/admin/jobs/:id/programme/split", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const { entryId } = z.object({ entryId: z.string() }).parse(req.body);
+    const result = await storage.splitProgrammeEntry(String(req.params.id), entryId);
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error splitting programme entry");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to split level" });
+  }
+});
+
+// POST /api/admin/jobs/:id/programme/reorder - Reorder programme entries
+router.post("/api/admin/jobs/:id/programme/reorder", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const { orderedIds } = z.object({ orderedIds: z.array(z.string()) }).parse(req.body);
+    const result = await storage.reorderProgramme(String(req.params.id), orderedIds);
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error reordering programme");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reorder programme" });
+  }
+});
+
+// POST /api/admin/jobs/:id/programme/recalculate - Recalculate estimated dates
+router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    if (!job.productionStartDate) {
+      return res.status(400).json({ error: "Job must have a production start date configured to calculate programme dates" });
+    }
+
+    const entries = await storage.getJobProgramme(String(req.params.id));
+    if (entries.length === 0) {
+      return res.json([]);
+    }
+
+    const factoryWorkDays = job.factoryId ? await getFactoryWorkDays(job.factoryId) : null;
+    const startDate = new Date(job.productionStartDate);
+    const endDate = new Date(startDate);
+    endDate.setFullYear(endDate.getFullYear() + 5);
+    const holidays = await getCfmeuHolidaysInRange(startDate, endDate);
+
+    let currentDate = new Date(job.productionStartDate);
+    const updatedEntries = entries.map((entry, idx) => {
+      const effectiveStart = entry.manualStartDate || currentDate;
+      const effectiveEnd = addWorkingDays(new Date(effectiveStart), entry.cycleDays, factoryWorkDays, holidays);
+      
+      const updated = {
+        ...entry,
+        sequenceOrder: idx,
+        estimatedStartDate: new Date(effectiveStart),
+        estimatedEndDate: effectiveEnd,
+      };
+
+      currentDate = addWorkingDays(effectiveEnd, 1, factoryWorkDays, holidays);
+      return updated;
+    });
+
+    const result = await storage.saveJobProgramme(String(req.params.id), updatedEntries);
+    res.json(result.sort((a, b) => a.sequenceOrder - b.sequenceOrder));
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error recalculating programme dates");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to recalculate dates" });
+  }
+});
+
+// DELETE /api/admin/jobs/:id/programme/:entryId - Delete a programme entry
+router.delete("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const result = await storage.deleteProgrammeEntry(String(req.params.id), String(req.params.entryId));
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error deleting programme entry");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete programme entry" });
   }
 });
 

@@ -30,6 +30,7 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 - **Landing Page:** A branded landing page for unauthenticated users, routing authenticated users directly to the dashboard.
 - **Asset Register:** Comprehensive asset lifecycle management with over 50 fields, supporting more than 40 asset categories, auto-generated asset tags, depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis.
 - **Hire Booking Engine:** Equipment hire management with approval workflow (Draft → Requested → Approved → Booked → On Hire → Returned → Closed), supporting internal assets (own equipment with chargeout rates) and external hire companies (suppliers). Asset categories stored as integer index into ASSET_CATEGORIES array. Overdue return dates highlighted in red. Linked to jobs, employees, and suppliers.
+- **Job Programme:** Enhanced scheduling for job production levels. Extends `job_level_cycle_times` table with pour labels (level splitting into A/B/C pours), sequence ordering, estimated/manual start and end dates, and notes. Features drag-and-drop reorder via @dnd-kit, inline editing of cycle days and dates, split-level functionality, automatic date recalculation using working days (factory work days + CFMEU holidays), and manual date overrides. Accessible from the Job Form Dialog's "Level Cycle Times" tab via "Open Job Programme" button. Route: `/admin/jobs/:id/programme`.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.

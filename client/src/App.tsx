@@ -47,6 +47,7 @@ const LogisticsPage = lazy(() => import("@/pages/logistics"));
 const WeeklyWageReportsPage = lazy(() => import("@/pages/weekly-wage-reports"));
 const WeeklyJobLogsPage = lazy(() => import("@/pages/weekly-job-logs"));
 const ProductionSlotsPage = lazy(() => import("@/pages/production-slots"));
+const JobProgrammePage = lazy(() => import("@/pages/job-programme"));
 const DraftingProgramPage = lazy(() => import("@/pages/drafting-program"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
 const PurchaseOrderFormPage = lazy(() => import("@/pages/purchase-order-form"));
@@ -314,6 +315,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <ProductionSlotsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/jobs/:id/programme">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <JobProgrammePage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

@@ -3,7 +3,9 @@ import {
   Save,
   Loader2,
   AlertCircle,
+  ExternalLink,
 } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -856,7 +858,18 @@ export function JobFormDialog({
                     Configure different production cycle times for each building level
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Link href={editingJob ? `/admin/jobs/${editingJob.id}/programme` : "#"}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled={!editingJob}
+                      data-testid="button-open-job-programme"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Open Job Programme
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     size="sm"

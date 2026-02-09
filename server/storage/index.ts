@@ -155,6 +155,11 @@ export class DatabaseStorage implements IStorage {
   getJobLevelCycleTimes = productionMethods.getJobLevelCycleTimes;
   saveJobLevelCycleTimes = productionMethods.saveJobLevelCycleTimes;
   getJobLevelCycleTime = productionMethods.getJobLevelCycleTime;
+  getJobProgramme = productionMethods.getJobProgramme;
+  saveJobProgramme = productionMethods.saveJobProgramme;
+  splitProgrammeEntry = productionMethods.splitProgrammeEntry;
+  reorderProgramme = productionMethods.reorderProgramme;
+  deleteProgrammeEntry = productionMethods.deleteProgrammeEntry;
 
   getPanelType = panelTypeMethods.getPanelType;
   getPanelTypeByCode = panelTypeMethods.getPanelTypeByCode;

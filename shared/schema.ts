@@ -332,12 +332,20 @@ export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
   buildingNumber: integer("building_number").notNull().default(1),
   level: text("level").notNull(),
   levelOrder: real("level_order").notNull(),
+  pourLabel: text("pour_label"),
+  sequenceOrder: integer("sequence_order").notNull().default(0),
   cycleDays: integer("cycle_days").notNull(),
+  estimatedStartDate: timestamp("estimated_start_date"),
+  estimatedEndDate: timestamp("estimated_end_date"),
+  manualStartDate: timestamp("manual_start_date"),
+  manualEndDate: timestamp("manual_end_date"),
+  notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   jobIdIdx: index("job_level_cycle_times_job_id_idx").on(table.jobId),
   uniqueJobBuildingLevel: index("job_level_cycle_times_unique_idx").on(table.jobId, table.buildingNumber, table.level),
+  sequenceOrderIdx: index("job_level_cycle_times_seq_idx").on(table.jobId, table.sequenceOrder),
 }));
 
 export const productionSlots = pgTable("production_slots", {

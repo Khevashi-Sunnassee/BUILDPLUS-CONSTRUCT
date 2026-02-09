@@ -563,7 +563,7 @@ export const productionMethods = {
   async getJobLevelCycleTimes(jobId: string): Promise<JobLevelCycleTime[]> {
     return db.select().from(jobLevelCycleTimes)
       .where(eq(jobLevelCycleTimes.jobId, jobId))
-      .orderBy(asc(jobLevelCycleTimes.buildingNumber), asc(jobLevelCycleTimes.levelOrder));
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder), asc(jobLevelCycleTimes.buildingNumber), asc(jobLevelCycleTimes.levelOrder));
   },
 
   async saveJobLevelCycleTimes(jobId: string, cycleTimes: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[]): Promise<void> {
@@ -571,11 +571,12 @@ export const productionMethods = {
     
     if (cycleTimes.length > 0) {
       await db.insert(jobLevelCycleTimes).values(
-        cycleTimes.map(ct => ({
+        cycleTimes.map((ct, idx) => ({
           jobId,
           buildingNumber: ct.buildingNumber,
           level: ct.level,
           levelOrder: ct.levelOrder,
+          sequenceOrder: idx,
           cycleDays: ct.cycleDays,
         }))
       );
@@ -590,5 +591,159 @@ export const productionMethods = {
         eq(jobLevelCycleTimes.level, level)
       ));
     return result || null;
+  },
+
+  async getJobProgramme(jobId: string): Promise<JobLevelCycleTime[]> {
+    return db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
+  },
+
+  async saveJobProgramme(jobId: string, entries: {
+    id?: string;
+    buildingNumber: number;
+    level: string;
+    levelOrder: number;
+    pourLabel?: string | null;
+    sequenceOrder: number;
+    cycleDays: number;
+    estimatedStartDate?: Date | null;
+    estimatedEndDate?: Date | null;
+    manualStartDate?: Date | null;
+    manualEndDate?: Date | null;
+    notes?: string | null;
+  }[]): Promise<JobLevelCycleTime[]> {
+    await db.delete(jobLevelCycleTimes).where(eq(jobLevelCycleTimes.jobId, jobId));
+    
+    if (entries.length === 0) return [];
+
+    const result = await db.insert(jobLevelCycleTimes).values(
+      entries.map(entry => ({
+        jobId,
+        buildingNumber: entry.buildingNumber,
+        level: entry.level,
+        levelOrder: entry.levelOrder,
+        pourLabel: entry.pourLabel || null,
+        sequenceOrder: entry.sequenceOrder,
+        cycleDays: entry.cycleDays,
+        estimatedStartDate: entry.estimatedStartDate || null,
+        estimatedEndDate: entry.estimatedEndDate || null,
+        manualStartDate: entry.manualStartDate || null,
+        manualEndDate: entry.manualEndDate || null,
+        notes: entry.notes || null,
+      }))
+    ).returning();
+
+    return result;
+  },
+
+  async splitProgrammeEntry(jobId: string, entryId: string): Promise<JobLevelCycleTime[]> {
+    const entries = await db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
+
+    const entryIndex = entries.findIndex(e => e.id === entryId);
+    if (entryIndex === -1) throw new Error("Programme entry not found");
+
+    const entry = entries[entryIndex];
+
+    const existingSplits = entries.filter(e => e.level === entry.level && e.buildingNumber === entry.buildingNumber);
+    
+    let newPourLabelA: string;
+    let newPourLabelB: string;
+
+    if (entry.pourLabel) {
+      newPourLabelA = entry.pourLabel;
+      const lastChar = entry.pourLabel.charCodeAt(entry.pourLabel.length - 1);
+      newPourLabelB = entry.pourLabel.slice(0, -1) + String.fromCharCode(lastChar + 1);
+    } else if (existingSplits.length === 1) {
+      newPourLabelA = "A";
+      newPourLabelB = "B";
+    } else {
+      const usedLabels = existingSplits.map(e => e.pourLabel).filter(Boolean).sort();
+      const lastLabel = usedLabels.length > 0 ? usedLabels[usedLabels.length - 1]! : "A";
+      newPourLabelA = entry.pourLabel || lastLabel;
+      newPourLabelB = String.fromCharCode(lastLabel.charCodeAt(0) + 1);
+    }
+
+    const halfCycleDays = Math.max(1, Math.ceil(entry.cycleDays / 2));
+
+    const newEntries = [...entries];
+    newEntries[entryIndex] = { ...entry, pourLabel: newPourLabelA, cycleDays: halfCycleDays };
+    newEntries.splice(entryIndex + 1, 0, {
+      ...entry,
+      id: '',
+      pourLabel: newPourLabelB,
+      cycleDays: halfCycleDays,
+      estimatedStartDate: null,
+      estimatedEndDate: null,
+      manualStartDate: null,
+      manualEndDate: null,
+    });
+
+    const resequenced = newEntries.map((e, idx) => ({ ...e, sequenceOrder: idx }));
+
+    await db.delete(jobLevelCycleTimes).where(eq(jobLevelCycleTimes.jobId, jobId));
+    
+    const result = await db.insert(jobLevelCycleTimes).values(
+      resequenced.map(e => ({
+        jobId,
+        buildingNumber: e.buildingNumber,
+        level: e.level,
+        levelOrder: e.levelOrder,
+        pourLabel: e.pourLabel || null,
+        sequenceOrder: e.sequenceOrder,
+        cycleDays: e.cycleDays,
+        estimatedStartDate: e.estimatedStartDate || null,
+        estimatedEndDate: e.estimatedEndDate || null,
+        manualStartDate: e.manualStartDate || null,
+        manualEndDate: e.manualEndDate || null,
+        notes: e.notes || null,
+      }))
+    ).returning();
+
+    return result.sort((a, b) => a.sequenceOrder - b.sequenceOrder);
+  },
+
+  async reorderProgramme(jobId: string, orderedIds: string[]): Promise<JobLevelCycleTime[]> {
+    const entries = await db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId));
+
+    const entryMap = new Map(entries.map(e => [e.id, e]));
+
+    for (let i = 0; i < orderedIds.length; i++) {
+      const entry = entryMap.get(orderedIds[i]);
+      if (entry) {
+        await db.update(jobLevelCycleTimes)
+          .set({ sequenceOrder: i, updatedAt: new Date() })
+          .where(eq(jobLevelCycleTimes.id, orderedIds[i]));
+      }
+    }
+
+    return db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
+  },
+
+  async deleteProgrammeEntry(jobId: string, entryId: string): Promise<JobLevelCycleTime[]> {
+    await db.delete(jobLevelCycleTimes).where(
+      and(eq(jobLevelCycleTimes.id, entryId), eq(jobLevelCycleTimes.jobId, jobId))
+    );
+    
+    const remaining = await db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
+
+    for (let i = 0; i < remaining.length; i++) {
+      if (remaining[i].sequenceOrder !== i) {
+        await db.update(jobLevelCycleTimes)
+          .set({ sequenceOrder: i, updatedAt: new Date() })
+          .where(eq(jobLevelCycleTimes.id, remaining[i].id));
+      }
+    }
+
+    return db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
   },
 };
