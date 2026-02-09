@@ -54,7 +54,7 @@ const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
-  validate: { xForwardedForHeader: false },
+  validate: { xForwardedForHeader: false, ip: false, default: false },
   keyGenerator: sessionKeyGenerator,
 });
 
