@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,6 +18,9 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -163,6 +166,22 @@ export default function AdminEmployeesPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sortColumn, setSortColumn] = useState<string>("lastName");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }, [sortColumn]);
+
+  const SortIcon = useCallback(({ column }: { column: string }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+  }, [sortColumn, sortDirection]);
 
   const { data: employeesList, isLoading } = useQuery<Employee[]>({
     queryKey: [EMPLOYEE_ROUTES.LIST],
@@ -206,16 +225,32 @@ export default function AdminEmployeesPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const filteredEmployees = employeesList?.filter((e) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      e.employeeNumber.toLowerCase().includes(q) ||
-      e.firstName.toLowerCase().includes(q) ||
-      e.lastName.toLowerCase().includes(q) ||
-      (e.email && e.email.toLowerCase().includes(q))
-    );
-  });
+  const filteredEmployees = useMemo(() => {
+    let list = employeesList || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((e) =>
+        e.employeeNumber.toLowerCase().includes(q) ||
+        e.firstName.toLowerCase().includes(q) ||
+        e.lastName.toLowerCase().includes(q) ||
+        (e.email && e.email.toLowerCase().includes(q))
+      );
+    }
+    return [...list].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+      switch (sortColumn) {
+        case "employeeNumber": aVal = a.employeeNumber || ""; bVal = b.employeeNumber || ""; break;
+        case "lastName": aVal = `${a.lastName} ${a.firstName}`; bVal = `${b.lastName} ${b.firstName}`; break;
+        case "email": aVal = a.email || ""; bVal = b.email || ""; break;
+        case "phone": aVal = a.phone || ""; bVal = b.phone || ""; break;
+        case "status": aVal = a.isActive ? "Active" : "Inactive"; bVal = b.isActive ? "Active" : "Inactive"; break;
+        default: aVal = a.lastName || ""; bVal = b.lastName || "";
+      }
+      const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+  }, [employeesList, searchQuery, sortColumn, sortDirection]);
 
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
@@ -376,12 +411,22 @@ export default function AdminEmployeesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Employee Number</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("employeeNumber")} data-testid="sort-employee-number">
+                    <span className="flex items-center">Employee Number<SortIcon column="employeeNumber" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("lastName")} data-testid="sort-employee-name">
+                    <span className="flex items-center">Name<SortIcon column="lastName" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("email")} data-testid="sort-employee-email">
+                    <span className="flex items-center">Email<SortIcon column="email" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-employee-phone">
+                    <span className="flex items-center">Phone<SortIcon column="phone" /></span>
+                  </TableHead>
                   <TableHead>Role Tags</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-employee-status">
+                    <span className="flex items-center">Status<SortIcon column="status" /></span>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

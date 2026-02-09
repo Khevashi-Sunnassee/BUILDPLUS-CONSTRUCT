@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +16,9 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   AlertCircle,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -126,6 +129,22 @@ export default function AdminCustomersPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [sortColumn, setSortColumn] = useState<string>("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  const toggleSort = useCallback((column: string) => {
+    if (sortColumn === column) {
+      setSortDirection((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  }, [sortColumn]);
+
+  const SortIcon = useCallback(({ column }: { column: string }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+    return sortDirection === "asc" ? <ArrowUp className="h-3 w-3 ml-1" /> : <ArrowDown className="h-3 w-3 ml-1" />;
+  }, [sortColumn, sortDirection]);
 
   const { data: customersList, isLoading } = useQuery<Customer[]>({
     queryKey: [PROCUREMENT_ROUTES.CUSTOMERS],
@@ -170,16 +189,34 @@ export default function AdminCustomersPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const filteredCustomers = customersList?.filter((c) => {
-    if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
-    return (
-      c.name.toLowerCase().includes(q) ||
-      (c.keyContact && c.keyContact.toLowerCase().includes(q)) ||
-      (c.email && c.email.toLowerCase().includes(q)) ||
-      (c.abn && c.abn.includes(q))
-    );
-  });
+  const filteredCustomers = useMemo(() => {
+    let list = customersList || [];
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.keyContact && c.keyContact.toLowerCase().includes(q)) ||
+        (c.email && c.email.toLowerCase().includes(q)) ||
+        (c.abn && c.abn.includes(q))
+      );
+    }
+    return [...list].sort((a, b) => {
+      let aVal = "";
+      let bVal = "";
+      switch (sortColumn) {
+        case "name": aVal = a.name || ""; bVal = b.name || ""; break;
+        case "keyContact": aVal = a.keyContact || ""; bVal = b.keyContact || ""; break;
+        case "email": aVal = a.email || ""; bVal = b.email || ""; break;
+        case "phone": aVal = a.phone || ""; bVal = b.phone || ""; break;
+        case "abn": aVal = a.abn || ""; bVal = b.abn || ""; break;
+        case "location": aVal = [a.city, a.state].filter(Boolean).join(", "); bVal = [b.city, b.state].filter(Boolean).join(", "); break;
+        case "status": aVal = a.isActive ? "Active" : "Inactive"; bVal = b.isActive ? "Active" : "Inactive"; break;
+        default: aVal = a.name || ""; bVal = b.name || "";
+      }
+      const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
+      return sortDirection === "asc" ? cmp : -cmp;
+    });
+  }, [customersList, searchQuery, sortColumn, sortDirection]);
 
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -364,13 +401,27 @@ export default function AdminCustomersPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key Contact</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>ABN</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("name")} data-testid="sort-customer-name">
+                    <span className="flex items-center">Name<SortIcon column="name" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("keyContact")} data-testid="sort-customer-contact">
+                    <span className="flex items-center">Key Contact<SortIcon column="keyContact" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("email")} data-testid="sort-customer-email">
+                    <span className="flex items-center">Email<SortIcon column="email" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-customer-phone">
+                    <span className="flex items-center">Phone<SortIcon column="phone" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("abn")} data-testid="sort-customer-abn">
+                    <span className="flex items-center">ABN<SortIcon column="abn" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("location")} data-testid="sort-customer-location">
+                    <span className="flex items-center">Location<SortIcon column="location" /></span>
+                  </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-customer-status">
+                    <span className="flex items-center">Status<SortIcon column="status" /></span>
+                  </TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
