@@ -1,9 +1,24 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { USER_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
+import { USER_ROUTES, SETTINGS_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   LayoutDashboard,
   FileText,
@@ -176,7 +191,7 @@ const urlToFunctionKey: Record<string, string> = {
 };
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   
   const [mainExpanded, setMainExpanded] = useState(true);
@@ -185,11 +200,34 @@ export function AppSidebar() {
   const [managementExpanded, setManagementExpanded] = useState(true);
   const [contactsExpanded, setContactsExpanded] = useState(true);
   const [adminExpanded, setAdminExpanded] = useState(false);
+  const [projectActivitiesOpen, setProjectActivitiesOpen] = useState(false);
+  const [paSearch, setPaSearch] = useState("");
+  const [paJobTypeFilter, setPaJobTypeFilter] = useState("all");
 
   const { data: myPermissions = [] } = useQuery<UserPermission[]>({
     queryKey: [USER_ROUTES.MY_PERMISSIONS],
     enabled: !!user,
   });
+
+  const { data: paJobs = [] } = useQuery<any[]>({
+    queryKey: ['/api/admin/jobs'],
+    enabled: projectActivitiesOpen,
+  });
+
+  const { data: paJobTypes = [] } = useQuery<any[]>({
+    queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_TYPES],
+    enabled: projectActivitiesOpen,
+  });
+
+  const filteredPaJobs = useMemo(() => {
+    return paJobs.filter((job: any) => {
+      const matchesSearch = !paSearch || 
+        (job.name || "").toLowerCase().includes(paSearch.toLowerCase()) ||
+        (job.jobNumber || "").toLowerCase().includes(paSearch.toLowerCase());
+      const matchesType = paJobTypeFilter === "all" || job.jobTypeId === paJobTypeFilter;
+      return matchesSearch && matchesType;
+    });
+  }, [paJobs, paSearch, paJobTypeFilter]);
 
   // Fetch dynamic logo from settings
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
@@ -264,6 +302,17 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      isActive={location.includes("/activities")}
+                      className="transition-colors cursor-pointer"
+                      onClick={() => setProjectActivitiesOpen(true)}
+                      data-testid="nav-project-activities"
+                    >
+                      <Workflow className="h-4 w-4" />
+                      <span>Project Activities</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </CollapsibleContent>
@@ -462,6 +511,73 @@ export function AppSidebar() {
       </SidebarFooter>
 
       <SidebarRail />
+
+      <Dialog open={projectActivitiesOpen} onOpenChange={(open) => {
+        setProjectActivitiesOpen(open);
+        if (!open) {
+          setPaSearch("");
+          setPaJobTypeFilter("all");
+        }
+      }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Select a Job</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <Input
+              placeholder="Search by job name or number..."
+              value={paSearch}
+              onChange={(e) => setPaSearch(e.target.value)}
+              data-testid="input-pa-job-search"
+            />
+            <Select value={paJobTypeFilter} onValueChange={setPaJobTypeFilter}>
+              <SelectTrigger data-testid="select-pa-job-type">
+                <SelectValue placeholder="Filter by job type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Job Types</SelectItem>
+                {paJobTypes.map((jt: any) => (
+                  <SelectItem key={jt.id} value={jt.id}>{jt.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <ScrollArea className="max-h-[360px]">
+            <div className="flex flex-col gap-1 pr-3">
+              {filteredPaJobs.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No jobs found</p>
+              ) : (
+                filteredPaJobs.map((job: any) => {
+                  const jobType = paJobTypes.find((jt: any) => jt.id === job.jobTypeId);
+                  return (
+                    <button
+                      key={job.id}
+                      className="flex items-center gap-3 p-3 rounded-md text-left hover-elevate active-elevate-2 w-full"
+                      onClick={() => {
+                        setProjectActivitiesOpen(false);
+                        setPaSearch("");
+                        setPaJobTypeFilter("all");
+                        setLocation(`/jobs/${job.id}/activities`);
+                      }}
+                      data-testid={`button-pa-job-${job.id}`}
+                    >
+                      <div className="flex flex-col flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate">
+                          {job.jobNumber} - {job.name}
+                        </span>
+                        {jobType && (
+                          <span className="text-xs text-muted-foreground">{jobType.name}</span>
+                        )}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 }
