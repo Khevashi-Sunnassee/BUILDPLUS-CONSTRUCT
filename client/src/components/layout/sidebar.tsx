@@ -73,6 +73,9 @@ import {
   SidebarHeader,
   SidebarFooter,
   SidebarRail,
+  SidebarMenuSub,
+  SidebarMenuSubItem,
+  SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -85,7 +88,6 @@ import {
 
 const mainNavItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
-  { title: "Tasks", url: "/tasks", icon: ListTodo },
   { title: "Chat", url: "/chat", icon: MessageSquare },
   { title: "Jobs", url: "/admin/jobs", icon: Briefcase },
   { title: "Panel Register", url: "/admin/panels", icon: ClipboardList },
@@ -288,7 +290,7 @@ export function AppSidebar() {
             <CollapsibleContent>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {mainNavItems.filter(item => !isItemHidden(item.url)).map((item) => (
+                  {mainNavItems.filter(item => !isItemHidden(item.url)).slice(0, 1).map((item) => (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
@@ -302,17 +304,63 @@ export function AppSidebar() {
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   ))}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      isActive={location.includes("/activities")}
-                      className="transition-colors cursor-pointer"
-                      onClick={() => setProjectActivitiesOpen(true)}
-                      data-testid="nav-project-activities"
-                    >
-                      <Workflow className="h-4 w-4" />
-                      <span>Project Activities</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {!isItemHidden("/tasks") && (
+                    <Collapsible defaultOpen={isActive("/tasks") || location.includes("/activities")} className="group/tasks-collapsible">
+                      <SidebarMenuItem>
+                        <CollapsibleTrigger asChild>
+                          <SidebarMenuButton
+                            isActive={isActive("/tasks") || location.includes("/activities")}
+                            className="transition-colors cursor-pointer"
+                            data-testid="nav-tasks"
+                          >
+                            <ListTodo className="h-4 w-4" />
+                            <span>Tasks</span>
+                            <ChevronRight className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/tasks-collapsible:rotate-90" />
+                          </SidebarMenuButton>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <SidebarMenuSub>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={isActive("/tasks")}
+                              >
+                                <Link href="/tasks" data-testid="nav-tasks-list">
+                                  <ListTodo className="h-4 w-4" />
+                                  <span>Task List</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                            <SidebarMenuSubItem>
+                              <SidebarMenuSubButton
+                                isActive={location.includes("/activities")}
+                                className="cursor-pointer"
+                                onClick={() => setProjectActivitiesOpen(true)}
+                                data-testid="nav-project-activities"
+                              >
+                                <Workflow className="h-4 w-4" />
+                                <span>Job Activities</span>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  )}
+                  {mainNavItems.filter(item => !isItemHidden(item.url)).slice(1).map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(item.url)}
+                        className="transition-colors"
+                      >
+                        <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
                 </SidebarMenu>
               </SidebarGroupContent>
             </CollapsibleContent>
