@@ -1115,25 +1115,44 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
       return res.status(400).json({ error: "No 'Activities' sheet found in the file" });
     }
 
+    function getCellText(cell: ExcelJS.Cell): string {
+      const val = cell.value;
+      if (val === null || val === undefined) return "";
+      if (typeof val === "string") return val.trim();
+      if (typeof val === "number" || typeof val === "boolean") return String(val);
+      if (typeof val === "object" && "richText" in (val as any)) {
+        return ((val as any).richText || []).map((r: any) => r.text || "").join("").trim();
+      }
+      if (typeof val === "object" && "text" in (val as any)) {
+        return String((val as any).text || "").trim();
+      }
+      if (typeof val === "object" && "result" in (val as any)) {
+        return String((val as any).result || "").trim();
+      }
+      return String(val).trim();
+    }
+
     const rows: any[] = [];
     const errors: string[] = [];
 
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber === 1) return;
 
+      const stageNumberText = getCellText(row.getCell(1));
       const stageNumberRaw = row.getCell(1).value;
-      const stageNameRaw = String(row.getCell(2).value || "").trim();
-      const category = String(row.getCell(3).value || "").trim() || null;
-      const name = String(row.getCell(4).value || "").trim();
-      const description = String(row.getCell(5).value || "").trim() || null;
+      const stageNameRaw = getCellText(row.getCell(2));
+      const category = getCellText(row.getCell(3)) || null;
+      const name = getCellText(row.getCell(4));
+      const description = getCellText(row.getCell(5)) || null;
+      const estimatedDaysText = getCellText(row.getCell(6));
       const estimatedDaysRaw = row.getCell(6).value;
-      const consultantRaw = String(row.getCell(7).value || "").trim();
-      const deliverable = String(row.getCell(8).value || "").trim() || null;
-      const phase = String(row.getCell(9).value || "").trim() || null;
+      const consultantRaw = getCellText(row.getCell(7));
+      const deliverable = getCellText(row.getCell(8)) || null;
+      const phase = getCellText(row.getCell(9)) || null;
 
       if (!name) return;
 
-      const stageNumber = typeof stageNumberRaw === "number" ? stageNumberRaw : parseInt(String(stageNumberRaw));
+      const stageNumber = typeof stageNumberRaw === "number" ? stageNumberRaw : parseInt(stageNumberText || String(stageNumberRaw));
       let stage = stageByNumber.get(stageNumber);
       if (!stage && stageNameRaw) {
         stage = stageByName.get(stageNameRaw.toLowerCase());
@@ -1143,7 +1162,7 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
         return;
       }
 
-      const estimatedDays = typeof estimatedDaysRaw === "number" ? estimatedDaysRaw : parseInt(String(estimatedDaysRaw)) || 14;
+      const estimatedDays = typeof estimatedDaysRaw === "number" ? estimatedDaysRaw : parseInt(estimatedDaysText || String(estimatedDaysRaw)) || 14;
 
       let consultantId: string | null = null;
       let consultantName: string | null = consultantRaw || null;
