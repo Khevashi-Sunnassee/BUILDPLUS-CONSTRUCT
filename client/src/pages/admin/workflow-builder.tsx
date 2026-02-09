@@ -47,6 +47,7 @@ import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate } from "@shared/schema";
 
 import { STAGE_COLORS, getStageColor } from "@/lib/stage-colors";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 type TemplateWithSubtasks = ActivityTemplate & {
   subtasks: Array<{ id: string; name: string; estimatedDays: number | null; sortOrder: number }>;
@@ -522,9 +523,12 @@ export default function WorkflowBuilderPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
-              Workflow: {jobType?.name}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+                Workflow: {jobType?.name}
+              </h1>
+              <PageHelpButton pageHelpKey="page.admin.workflow-builder" />
+            </div>
             <p className="text-muted-foreground">
               {templates?.length || 0} activities across {templatesByStage.size} stages
             </p>

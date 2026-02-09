@@ -2300,6 +2300,275 @@ Comprehensive view of an individual employee's record. View and edit all persona
     category: "Admin",
     pageRoute: "/admin/employees/:id",
   },
+  {
+    key: "page.job-activities",
+    scope: "PAGE",
+    title: "Project Activities",
+    shortText: "View and manage workflow activities for a specific job with status tracking, comments, and task management.",
+    bodyMd: `## Project Activities
+
+Track and manage all workflow activities for a job. Activities are created from workflow templates and progress through stages from start to completion.
+
+### Buttons & Actions
+
+- **Back** (arrow icon) - Return to the Tasks page
+- **Instantiate Activities** - Create activities for this job based on the assigned workflow template. Only available when no activities exist yet
+- **Search** - Filter activities by name
+- **Stage Filter** - Filter activities by workflow stage
+- **Status Filter** - Filter activities by status (Not Started, In Progress, Stuck, Done, On Hold, Skipped)
+- **Show Done** (eye icon) - Toggle visibility of completed activities. Hidden by default for a cleaner view
+- **Collapse All / Expand All** - Collapse or expand all activity stages at once
+- **Download** - Export activities to Excel spreadsheet
+- **View Toggle** (table/chart icons) - Switch between Table View and Gantt Chart View
+- **Status Badge** - Click to change an activity's status
+- **Edit Dates** - Click start or end dates inline to change them
+- **Chat** (message icon) - Open the activity detail panel to view and add comments
+- **Files** (paperclip icon) - Open the activity detail panel to view and upload files
+- **Tasks** (list icon) - Expand the nested tasks panel for an activity
+
+### Activity Statuses
+
+| Status | Meaning |
+|--------|---------|
+| **Not Started** | Activity has not begun |
+| **In Progress** | Currently being worked on |
+| **Stuck** | Blocked and needs attention |
+| **Done** | Completed successfully |
+| **On Hold** | Temporarily paused |
+| **Skipped** | Will not be completed |
+
+### Activity Detail Panel
+
+When you click the chat or files icon on an activity, a side panel opens with:
+- **Updates Tab** - View activity comments and post new updates
+- **Files Tab** - Upload and manage files attached to the activity
+
+### Nested Tasks
+
+Click the tasks icon on any activity to expand an inline task panel where you can:
+- Create subtasks within the activity
+- Assign tasks to team members
+- Set due dates (must be within the activity date range)
+- Track task completion
+- Add comments and files to individual tasks
+- Drag and drop to reorder tasks
+
+### Progress Tracking
+
+- Progress bar shows percentage of completed activities
+- Summary cards show total, done, and overdue counts
+- Progress is calculated from all activities regardless of the current filter
+
+### Tips
+- Use the Gantt Chart view for a visual timeline of all activities
+- Activities are grouped by stage for easy navigation
+- Overdue activities are highlighted in red
+- The Show Done toggle helps keep your view focused on active work`,
+    keywords: ["activities", "workflow", "project", "stages", "status", "tasks"],
+    category: "Tasks",
+    pageRoute: "/jobs/:jobId/activities",
+  },
+  {
+    key: "page.job-activities-gantt",
+    scope: "PAGE",
+    title: "Project Activities - Gantt Chart",
+    shortText: "Visual timeline view of project activities with stage grouping and date tracking.",
+    bodyMd: `## Gantt Chart View
+
+A visual timeline representation of all project activities for a job. See how activities overlap and track their progress over time.
+
+### What You Will See
+
+- **Horizontal Timeline** - Activities displayed as horizontal bars along a date axis
+- **Stage Grouping** - Activities grouped by their workflow stage with colour coding
+- **Today Marker** - A vertical line showing today's date for reference
+- **Status Colours** - Bars are colour-coded by activity status (green for done, blue for in progress, red for stuck, etc.)
+
+### Navigation
+
+- **Scroll Horizontally** - Pan left and right to view different time periods
+- **Scroll Vertically** - See more activities above and below
+- **Switch to Table View** - Use the view toggle button to return to the table layout
+
+### Tips
+- The Gantt chart is read-only - switch to table view to make changes
+- Use this view for project planning meetings and timeline reviews
+- Overdue activities are easy to spot visually
+- Stage colours match across both table and Gantt views`,
+    keywords: ["gantt", "chart", "timeline", "visual", "schedule", "activities"],
+    category: "Tasks",
+    pageRoute: "/jobs/:jobId/activities",
+  },
+  {
+    key: "page.admin.job-types",
+    scope: "PAGE",
+    title: "Job Types",
+    shortText: "Define job types and link them to workflow templates for project activities.",
+    bodyMd: `## Job Types
+
+Manage the types of jobs your organisation handles. Each job type can be linked to a workflow template that defines the stages and activities for that type of project.
+
+### Buttons & Actions
+
+- **Create Job Type** - Opens a form to add a new job type with a name and description
+- **Edit** (pencil icon) - Modify an existing job type's name, description, or active status
+- **Delete** (trash icon) - Remove a job type (requires confirmation, cannot delete if jobs are assigned)
+- **Workflow** (workflow icon) - Open the Workflow Builder to design the activity template for this job type
+- **Active Toggle** - Enable or disable a job type without deleting it
+- **Save** - Save changes to a new or edited job type
+- **Cancel** - Close the form without saving
+
+### Job Type Fields
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Display name for the job type (e.g., Residential, Commercial, Infrastructure) |
+| **Description** | Detailed description of what this job type covers |
+| **Active** | Whether this job type is available for new jobs |
+
+### Workflow Integration
+
+Each job type can have a workflow template that defines:
+- **Stages** - The major phases of work (e.g., Design, Approvals, Construction)
+- **Activities** - Specific tasks within each stage
+- **Consultants** - The types of consultants involved
+
+When a job is assigned this job type, activities can be automatically created from the template.
+
+### Tips
+- Create job types that match your main project categories
+- Inactive job types are hidden from selection but existing jobs keep their assignment
+- Click the workflow icon to set up or modify the activity template
+- The workflow template is shared across all jobs of that type`,
+    keywords: ["job types", "categories", "workflow", "templates", "admin"],
+    category: "Admin",
+    pageRoute: "/admin/job-types",
+  },
+  {
+    key: "page.admin.workflow-builder",
+    scope: "PAGE",
+    title: "Workflow Builder",
+    shortText: "Design workflow templates with stages, activities, and consultants for job types.",
+    bodyMd: `## Workflow Builder
+
+Design the workflow template for a job type. Define the stages, activities, consultants, and estimated durations that will be used when activities are instantiated for jobs of this type.
+
+### Buttons & Actions
+
+- **Back** (arrow icon) - Return to the Job Types list
+- **Add Stage** - Create a new workflow stage (a major phase of work)
+- **Edit Stage** (pencil icon) - Modify a stage's name, description, or colour
+- **Delete Stage** (trash icon) - Remove a stage and all its activities (requires confirmation)
+- **Add Activity** - Create a new activity within a stage
+- **Edit Activity** (pencil icon) - Modify an activity's details
+- **Delete Activity** (trash icon) - Remove an activity from the workflow
+- **Add Consultant** - Add a new consultant type that can be assigned to activities
+- **Edit Consultant** (pencil icon) - Modify a consultant's details
+- **Delete Consultant** (trash icon) - Remove a consultant type
+- **Add Subtask** - Add a subtask to an activity template
+- **Delete Subtask** (trash icon) - Remove a subtask
+- **Import** - Import a workflow template from an Excel file
+- **Export** - Export the current workflow template to Excel for backup or sharing
+- **Collapse/Expand** - Click stage headers to show or hide activities within that stage
+- **Drag Handle** (grip icon) - Drag activities to reorder them within a stage
+
+### Workflow Structure
+
+| Level | Description |
+|-------|-------------|
+| **Stages** | Major phases of the project (e.g., Pre-Construction, Design Development, Construction) |
+| **Activities** | Individual work items within a stage (e.g., Town Planning Application, Structural Design) |
+| **Subtasks** | Smaller steps within an activity (e.g., Draft Application, Submit to Council) |
+| **Consultants** | Types of professionals involved (e.g., Architect, Structural Engineer, Town Planner) |
+
+### Activity Template Fields
+
+| Field | Description |
+|-------|-------------|
+| **Name** | Activity display name |
+| **Stage** | Which stage this activity belongs to |
+| **Consultant** | The type of consultant responsible |
+| **Estimated Days** | Expected duration in working days |
+| **Phase** | Optional phase classification |
+| **Description** | Detailed description of the activity |
+
+### Stage Colours
+Each stage can be assigned a colour for visual identification. These colours carry through to the Project Activities page and Gantt chart.
+
+### Import/Export
+- **Export** creates an Excel file of the entire workflow template
+- **Import** loads a workflow from an Excel file, useful for sharing templates between job types
+
+### Tips
+- Plan your workflow structure before building it
+- Use stages to group related activities into logical phases
+- Set estimated days to help with project scheduling
+- Drag activities to change their order within a stage
+- The workflow template is a blueprint - each job creates its own copy of activities that can be customised`,
+    keywords: ["workflow", "builder", "template", "stages", "activities", "design"],
+    category: "Admin",
+    pageRoute: "/admin/job-types/:id/workflow",
+  },
+  {
+    key: "page.job-programme",
+    scope: "PAGE",
+    title: "Job Programme",
+    shortText: "Manage production level scheduling with pour labels, cycle times, and date calculations.",
+    bodyMd: `## Job Programme
+
+Enhanced scheduling for job production at the level/pour level. Plan the sequence, timing, and cycle times for each production level and pour.
+
+### Buttons & Actions
+
+- **Back** (arrow icon) - Return to the Job edit dialog
+- **Split Level** - Split a building level into multiple pours (A, B, C) for staged production
+- **Delete Pour** (trash icon) - Remove a split pour (requires confirmation)
+- **Recalculate Dates** (calculator icon) - Automatically recalculate all dates based on cycle times, working days, and factory calendar
+- **Save All** (save icon) - Save all changes made to the programme
+- **Reset** (refresh icon) - Discard all unsaved changes and reload from database
+- **Move Up/Down** (arrow icons) - Reorder production levels
+- **Drag Handle** (grip icon) - Drag and drop to reorder levels
+
+### Programme Fields
+
+| Field | Description |
+|-------|-------------|
+| **Level** | Building level name |
+| **Pour Label** | Pour identifier (A, B, C) for split levels |
+| **Sequence** | Production order |
+| **Cycle Days** | Number of working days for this level's production cycle |
+| **Est. Start** | Estimated start date (auto-calculated or manually set) |
+| **Est. End** | Estimated end date (auto-calculated based on cycle days) |
+| **Manual Start** | Manually override the start date |
+| **Manual End** | Manually override the end date |
+| **Notes** | Additional notes for this level |
+
+### Date Calculation
+
+Dates are calculated using:
+- **Working Days** - Only factory work days are counted (weekends excluded)
+- **CFMEU Holidays** - Public holidays from the linked CFMEU calendar are excluded
+- **Cycle Days** - The number of production days for each level
+- **Sequential Flow** - Each level starts after the previous level ends
+
+### Level Splitting
+
+Split a level into multiple pours when production needs to be staged:
+1. Click the Split Level button on a level row
+2. The level is split into pours (e.g., Level 1 becomes Level 1A, Level 1B)
+3. Each pour gets its own cycle time and date range
+4. Split pours can be individually deleted
+
+### Tips
+- Use Recalculate Dates after changing cycle times to update the full schedule
+- Manual date overrides take precedence over calculated dates
+- The programme respects factory-specific working day calendars
+- Drag and drop levels to change the production sequence
+- Save frequently to avoid losing changes`,
+    keywords: ["programme", "schedule", "levels", "pours", "cycle times", "production"],
+    category: "Production",
+    pageRoute: "/admin/jobs/:id/programme",
+  },
 ];
 
 export async function seedHelpEntries() {

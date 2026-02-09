@@ -25,6 +25,7 @@ import { Plus, Pencil, Trash2, Workflow, Loader2, Settings2, Layers, ArrowRight,
 import { useLocation } from "wouter";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType } from "@shared/schema";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 export default function AdminJobTypesPage() {
   const { toast } = useToast();
@@ -144,7 +145,10 @@ export default function AdminJobTypesPage() {
     <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Job Types & Workflows</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">Job Types & Workflows</h1>
+            <PageHelpButton pageHelpKey="page.admin.job-types" />
+          </div>
           <p className="text-muted-foreground">Manage job types and build activity workflows for each type</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

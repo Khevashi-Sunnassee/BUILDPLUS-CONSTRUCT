@@ -39,6 +39,7 @@ import { format, isAfter, isBefore, startOfDay } from "date-fns";
 import { getStageColor } from "@/lib/stage-colors";
 import { ActivityTasksPanel } from "@/pages/tasks/ActivityTasksPanel";
 import { GanttChart } from "@/pages/job-activities-gantt";
+import { PageHelpButton } from "@/components/help/page-help-button";
 
 type ActivityWithAssignees = JobActivity & {
   assignees?: Array<{ id: string; activityId: string; userId: string }>;
@@ -290,9 +291,12 @@ export default function JobActivitiesPage() {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
-              Project Activities
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight" data-testid="text-page-title">
+                Project Activities
+              </h1>
+              <PageHelpButton pageHelpKey="page.job-activities" />
+            </div>
             <p className="text-muted-foreground">
               {job ? `${job.jobNumber || ""} - ${job.name || ""}` : "Loading job..."}
               {hasActivities && ` | ${doneCount}/${totalActivities} complete (${progressPct}%)`}

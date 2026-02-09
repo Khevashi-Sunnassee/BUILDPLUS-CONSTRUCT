@@ -501,7 +501,7 @@ export default function JobProgrammePage() {
               <h1 className="text-xl font-semibold" data-testid="text-page-title">
                 Job Programme
               </h1>
-              <PageHelpButton pageId="job_programme" />
+              <PageHelpButton pageHelpKey="page.job-programme" />
             </div>
             <p className="text-sm text-muted-foreground" data-testid="text-job-info">
               {job.jobNumber} - {job.name}
