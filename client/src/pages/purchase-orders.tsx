@@ -605,7 +605,15 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
       onOpenChange(false);
     },
     onError: (err: any) => {
-      toast({ title: "Failed to send email", description: err.message || "An error occurred", variant: "destructive" });
+      let errorMsg = err.message || "An error occurred";
+      try {
+        const jsonMatch = errorMsg.match(/\d+:\s*(\{.*\})/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[1]);
+          errorMsg = parsed.error || errorMsg;
+        }
+      } catch {}
+      toast({ title: "Failed to send email", description: errorMsg, variant: "destructive" });
     },
   });
 

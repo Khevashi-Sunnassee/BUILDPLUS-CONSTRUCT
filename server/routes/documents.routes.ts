@@ -777,6 +777,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
     }
 
     const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+    const failedDocs: string[] = [];
 
     const docs = await storage.getDocumentsByIds(documentIds);
     const docsMap = new Map(docs.map(d => [d.id, d]));
@@ -785,6 +786,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
       try {
         const doc = docsMap.get(docId);
         if (!doc) {
+          failedDocs.push(`Unknown document (${docId})`);
           logger.warn({ docId }, "Document not found for email attachment, skipping");
           continue;
         }
@@ -806,12 +808,15 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
           contentType: (metadata as Record<string, string>).contentType || "application/octet-stream",
         });
       } catch (err) {
+        const doc = docsMap.get(docId);
+        failedDocs.push(doc ? `${doc.title} (${doc.originalName})` : docId);
         logger.warn({ docId, err }, "Failed to load document for email attachment, skipping");
       }
     }
 
     if (attachments.length === 0) {
-      return res.status(400).json({ error: "No documents could be loaded for attachment" });
+      const failedList = failedDocs.join(", ");
+      return res.status(400).json({ error: `Could not load document files for attachment: ${failedList}. The files may have been deleted from storage.` });
     }
 
     let bcc: string | undefined;
