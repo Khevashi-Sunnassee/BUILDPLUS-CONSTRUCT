@@ -365,6 +365,9 @@ export const productionMethods = {
     const createdSlots: ProductionSlot[] = [];
 
     if (programmeEntries.length > 0) {
+      const seqOrderToSlotId: Map<number, string> = new Map();
+      let previousSlotId: string | null = null;
+
       for (let i = 0; i < programmeEntries.length; i++) {
         const entry = programmeEntries[i];
         const levelKey = entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level;
@@ -379,6 +382,20 @@ export const productionMethods = {
           panelProductionDue = subtractWorkingDays(onsiteStartBaseDate, productionDaysInAdvance, workDays, holidays);
         }
 
+        let predecessorSlotId: string | null = null;
+        let slotRelationship: string | null = null;
+
+        if (entry.predecessorSequenceOrder != null) {
+          const predSlotId = seqOrderToSlotId.get(entry.predecessorSequenceOrder);
+          if (predSlotId) {
+            predecessorSlotId = predSlotId;
+            slotRelationship = entry.relationship || "FS";
+          }
+        } else if (previousSlotId) {
+          predecessorSlotId = previousSlotId;
+          slotRelationship = "FS";
+        }
+
         const [slot] = await db.insert(productionSlots).values({
           jobId,
           buildingNumber: entry.buildingNumber,
@@ -388,8 +405,12 @@ export const productionMethods = {
           productionSlotDate: panelProductionDue,
           status: "SCHEDULED",
           isBooked: false,
+          predecessorSlotId,
+          relationship: slotRelationship,
         }).returning();
         createdSlots.push(slot);
+        seqOrderToSlotId.set(entry.sequenceOrder, slot.id);
+        previousSlotId = slot.id;
       }
     } else {
       if (!job.expectedCycleTimePerFloor) {
@@ -413,6 +434,7 @@ export const productionMethods = {
 
       const defaultCycleTime = job.expectedCycleTimePerFloor;
       let cumulativeWorkingDays = 0;
+      let prevSlotId: string | null = null;
 
       for (let i = 0; i < levelsToProcess.length; i++) {
         const level = levelsToProcess[i];
@@ -428,8 +450,11 @@ export const productionMethods = {
           productionSlotDate: panelProductionDue,
           status: "SCHEDULED",
           isBooked: false,
+          predecessorSlotId: prevSlotId,
+          relationship: prevSlotId ? "FS" : null,
         }).returning();
         createdSlots.push(slot);
+        prevSlotId = slot.id;
         cumulativeWorkingDays += defaultCycleTime;
       }
     }

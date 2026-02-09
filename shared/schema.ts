@@ -363,6 +363,8 @@ export const productionSlots = pgTable("production_slots", {
   status: productionSlotStatusEnum("status").default("SCHEDULED").notNull(),
   dateLastReportedOnsite: timestamp("date_last_reported_onsite"),
   isBooked: boolean("is_booked").default(false),
+  predecessorSlotId: varchar("predecessor_slot_id", { length: 36 }),
+  relationship: text("relationship"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

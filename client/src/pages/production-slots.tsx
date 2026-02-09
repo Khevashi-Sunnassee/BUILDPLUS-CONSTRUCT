@@ -1656,6 +1656,7 @@ export default function ProductionSlotsPage() {
                             {groupBy !== "client" && <TableHead>Client</TableHead>}
                             <TableHead>Building</TableHead>
                             <TableHead>Level</TableHead>
+                            <TableHead>Predecessor</TableHead>
                             <TableHead>Panels</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Actions</TableHead>
@@ -1688,6 +1689,12 @@ export default function ProductionSlotsPage() {
                               {groupBy !== "client" && <TableCell>{slot.job.client || "-"}</TableCell>}
                               <TableCell>{slot.buildingNumber}</TableCell>
                               <TableCell>{slot.level}</TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {slot.predecessorSlotId ? (() => {
+                                  const predSlot = slots.find((s: ProductionSlotWithDetails) => s.id === slot.predecessorSlotId);
+                                  return predSlot ? `${predSlot.level} (${slot.relationship || "FS"})` : `- (${slot.relationship || "FS"})`;
+                                })() : "-"}
+                              </TableCell>
                               <TableCell>
                                 <Button 
                                   variant="ghost" 
@@ -1792,6 +1799,7 @@ export default function ProductionSlotsPage() {
                   <TableHead>Client</TableHead>
                   <TableHead>Building</TableHead>
                   <TableHead>Level</TableHead>
+                  <TableHead>Predecessor</TableHead>
                   <TableHead>Panels</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
@@ -1821,6 +1829,12 @@ export default function ProductionSlotsPage() {
                     <TableCell>{slot.job.client || "-"}</TableCell>
                     <TableCell>{slot.buildingNumber}</TableCell>
                     <TableCell>{slot.level}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {slot.predecessorSlotId ? (() => {
+                        const predSlot = slots.find((s: ProductionSlotWithDetails) => s.id === slot.predecessorSlotId);
+                        return predSlot ? `${predSlot.level} (${slot.relationship || "FS"})` : `- (${slot.relationship || "FS"})`;
+                      })() : "-"}
+                    </TableCell>
                     <TableCell>
                       <Button 
                         variant="ghost" 
