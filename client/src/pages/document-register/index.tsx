@@ -223,7 +223,7 @@ export default function DocumentRegister() {
     });
   }, []);
 
-  const selectedDocuments = documents.filter((d) => selectedDocIds.has(d.id));
+  const selectedDocuments = useMemo(() => documents.filter((d) => selectedDocIds.has(d.id)), [documents, selectedDocIds]);
 
   const renderPagination = () => {
     if (!pagination || pagination.totalPages <= 1) return null;

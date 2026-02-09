@@ -63,7 +63,8 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
         `Hi,\n\nPlease find attached the documents you requested.\n\n${buildDocumentList(selectedDocuments)}\n\nKind regards`
       );
     }
-  }, [open, selectedDocuments, buildDocumentList]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const sendMutation = useMutation({
     mutationFn: async () => {

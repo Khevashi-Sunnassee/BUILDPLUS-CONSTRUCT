@@ -99,7 +99,8 @@ export function CreateBundleDialog({
         expiresAt: "",
       });
     }
-  }, [open, initialSelectedDocs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const getTenderPackageName = () => {
     const now = new Date();
