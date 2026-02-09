@@ -761,6 +761,9 @@ dataManagementRouter.delete("/api/admin/data-management/job-activities/:id", req
     const [activity] = await db.select({ id: jobActivities.id }).from(jobActivities).where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId)));
     if (!activity) return res.status(404).json({ error: "Job activity not found or does not belong to your company" });
 
+    await db.delete(jobActivityFiles).where(eq(jobActivityFiles.activityId, id));
+    await db.delete(jobActivityUpdates).where(eq(jobActivityUpdates.activityId, id));
+    await db.delete(jobActivityAssignees).where(eq(jobActivityAssignees.activityId, id));
     await db.delete(jobActivities).where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
@@ -1100,7 +1103,14 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
         const [total] = await db.select({ count: count() }).from(jobActivities).where(eq(jobActivities.companyId, companyId));
         totalCount = total.count;
         protectedCount = 0;
-        await db.delete(jobActivities).where(eq(jobActivities.companyId, companyId));
+        const allActivities = await db.select({ id: jobActivities.id }).from(jobActivities).where(eq(jobActivities.companyId, companyId));
+        if (allActivities.length > 0) {
+          const activityIds = allActivities.map(a => a.id);
+          await db.delete(jobActivityFiles).where(inArray(jobActivityFiles.activityId, activityIds));
+          await db.delete(jobActivityUpdates).where(inArray(jobActivityUpdates.activityId, activityIds));
+          await db.delete(jobActivityAssignees).where(inArray(jobActivityAssignees.activityId, activityIds));
+          await db.delete(jobActivities).where(eq(jobActivities.companyId, companyId));
+        }
         deletedCount = totalCount;
         break;
       }

@@ -215,6 +215,59 @@ const ENTITY_TABS: EntityTabConfig[] = [
     ],
     getRowName: (r: any) => r.loadNumber || `Load List ${r.id}`,
   },
+  {
+    key: "activity-templates",
+    label: "Activity Templates",
+    entityType: "activity-templates",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_ACTIVITY_TEMPLATES,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "jobTypeName", label: "Job Type", render: (r: any) => r.jobTypeName || "-" },
+      { key: "stageName", label: "Stage", render: (r: any) => r.stageName || "-" },
+      { key: "category", label: "Category", render: (r: any) => r.category || "-" },
+      { key: "consultantName", label: "Consultant", render: (r: any) => r.consultantName || "-" },
+      { key: "estimatedDays", label: "Est. Days", render: (r: any) => r.estimatedDays ?? "-" },
+    ],
+    getRowName: (r: any) => r.name || `Template ${r.id}`,
+  },
+  {
+    key: "job-activities",
+    label: "Job Activities",
+    entityType: "job-activities",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_JOB_ACTIVITIES,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "jobName", label: "Job", render: (r: any) => r.jobName ? `${r.jobName}${r.jobNumber ? ` (${r.jobNumber})` : ""}` : "-" },
+      { key: "stageName", label: "Stage", render: (r: any) => r.stageName || "-" },
+      { key: "status", label: "Status", render: (r: any) => <Badge variant="secondary">{r.status || "Unknown"}</Badge> },
+      { key: "consultantName", label: "Consultant", render: (r: any) => r.consultantName || "-" },
+      { key: "jobPhase", label: "Phase", render: (r: any) => r.jobPhase || "-" },
+    ],
+    getRowName: (r: any) => r.name || `Activity ${r.id}`,
+  },
+  {
+    key: "activity-stages",
+    label: "Activity Stages",
+    entityType: "activity-stages",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_ACTIVITY_STAGES,
+    columns: [
+      { key: "stageNumber", label: "Stage #", render: (r: any) => r.stageNumber ?? "-" },
+      { key: "name", label: "Name" },
+      { key: "sortOrder", label: "Sort Order", render: (r: any) => r.sortOrder ?? "-" },
+    ],
+    getRowName: (r: any) => r.name || `Stage ${r.id}`,
+  },
+  {
+    key: "activity-consultants",
+    label: "Activity Consultants",
+    entityType: "activity-consultants",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_ACTIVITY_CONSULTANTS,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "sortOrder", label: "Sort Order", render: (r: any) => r.sortOrder ?? "-" },
+    ],
+    getRowName: (r: any) => r.name || `Consultant ${r.id}`,
+  },
 ];
 
 function EntityTable({
