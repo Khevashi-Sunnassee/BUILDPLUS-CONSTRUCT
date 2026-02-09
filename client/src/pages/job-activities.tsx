@@ -84,6 +84,8 @@ export default function JobActivitiesPage() {
   const [phaseFilter, setPhaseFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [collapsedStages, setCollapsedStages] = useState<Set<string>>(new Set());
+  const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [selectedActivity, setSelectedActivity] = useState<ActivityWithAssignees | null>(null);
   const [showInstantiateDialog, setShowInstantiateDialog] = useState(false);
   const [selectedJobTypeId, setSelectedJobTypeId] = useState("");
@@ -220,6 +222,41 @@ export default function JobActivitiesPage() {
     setCollapsedStages(new Set());
   }
 
+  function expandAllActivities() {
+    const ids = parentActivities.filter(a => (childActivities.get(a.id) || []).length > 0).map(a => a.id);
+    setExpandedActivities(new Set(ids));
+  }
+
+  function collapseAllActivities() {
+    setExpandedActivities(new Set());
+  }
+
+  function expandAllTasks() {
+    setExpandedTasks(new Set(parentActivities.map(a => a.id)));
+  }
+
+  function collapseAllTasks() {
+    setExpandedTasks(new Set());
+  }
+
+  function toggleActivityExpanded(activityId: string) {
+    setExpandedActivities(prev => {
+      const next = new Set(prev);
+      if (next.has(activityId)) next.delete(activityId);
+      else next.add(activityId);
+      return next;
+    });
+  }
+
+  function toggleTasksExpanded(activityId: string) {
+    setExpandedTasks(prev => {
+      const next = new Set(prev);
+      if (next.has(activityId)) next.delete(activityId);
+      else next.add(activityId);
+      return next;
+    });
+  }
+
   const uniquePhases = useMemo(() => {
     if (!activities) return [];
     const phases = new Set(activities.filter(a => a.jobPhase).map(a => a.jobPhase!));
@@ -328,6 +365,24 @@ export default function JobActivitiesPage() {
                 <Button variant="outline" size="sm" onClick={expandAll} data-testid="button-expand-all">
                   <ChevronsUpDown className="h-4 w-4 mr-1" />
                   Expand All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={expandedActivities.size > 0 ? collapseAllActivities : expandAllActivities}
+                  data-testid="button-expand-activities"
+                >
+                  <ChevronDown className="h-4 w-4 mr-1" />
+                  {expandedActivities.size > 0 ? "Collapse" : "Expand"} Activities
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={expandedTasks.size > 0 ? collapseAllTasks : expandAllTasks}
+                  data-testid="button-expand-tasks"
+                >
+                  <ListChecks className="h-4 w-4 mr-1" />
+                  {expandedTasks.size > 0 ? "Collapse" : "Expand"} Tasks
                 </Button>
               </>
             )}
@@ -438,6 +493,10 @@ export default function JobActivitiesPage() {
                                     users={users || []}
                                     jobs={jobsList || []}
                                     jobId={jobId}
+                                    expanded={expandedActivities.has(activity.id)}
+                                    tasksExpanded={expandedTasks.has(activity.id)}
+                                    onToggleExpanded={() => toggleActivityExpanded(activity.id)}
+                                    onToggleTasksExpanded={() => toggleTasksExpanded(activity.id)}
                                   />
                                 );
                               })}
@@ -484,6 +543,10 @@ function ActivityRow({
   users,
   jobs,
   jobId,
+  expanded,
+  tasksExpanded,
+  onToggleExpanded,
+  onToggleTasksExpanded,
 }: {
   activity: ActivityWithAssignees;
   children: ActivityWithAssignees[];
@@ -493,9 +556,11 @@ function ActivityRow({
   users: any[];
   jobs: any[];
   jobId: string;
+  expanded: boolean;
+  tasksExpanded: boolean;
+  onToggleExpanded: () => void;
+  onToggleTasksExpanded: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [tasksExpanded, setTasksExpanded] = useState(false);
   const statusOpt = getStatusOption(activity.status);
   const overdue = isOverdue(activity);
   const rowBg = getRowClassName(activity);
@@ -511,7 +576,7 @@ function ActivityRow({
           <div className="flex items-center gap-2">
             {children.length > 0 && (
               <button
-                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+                onClick={(e) => { e.stopPropagation(); onToggleExpanded(); }}
                 className="p-0.5"
                 data-testid={`button-expand-${activity.id}`}
               >
@@ -523,7 +588,7 @@ function ActivityRow({
               <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
             )}
             <button
-              onClick={(e) => { e.stopPropagation(); setTasksExpanded(!tasksExpanded); }}
+              onClick={(e) => { e.stopPropagation(); onToggleTasksExpanded(); }}
               className={cn(
                 "p-0.5 rounded transition-colors",
                 tasksExpanded ? "text-primary" : "text-muted-foreground opacity-0 group-hover:opacity-100",
