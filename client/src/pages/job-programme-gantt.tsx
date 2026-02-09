@@ -5,6 +5,13 @@ import { cn } from "@/lib/utils";
 import { Minus, Plus, Printer } from "lucide-react";
 import type { JobLevelCycleTime } from "@shared/schema";
 
+function formatLevelDisplay(level: string, pourLabel?: string | null): string {
+  const numMatch = level.match(/^L?(\d+)$/i);
+  const prefix = numMatch ? `Level ${numMatch[1]}` : level;
+  if (pourLabel) return `${prefix} - Pour ${pourLabel}`;
+  return `${prefix} - Pour Date`;
+}
+
 const BUILDING_HEX_COLORS = [
   "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#f43f5e",
   "#06b6d4", "#f97316", "#14b8a6", "#ec4899", "#6366f1",
@@ -217,7 +224,7 @@ export function ProgrammeGanttChart({
       const color = BUILDING_HEX_COLORS[colorIdx];
       svgBars += `<rect x="${startOffset + 1}" y="${barY}" width="${barWidth}" height="14" rx="2" fill="${color}" opacity="0.85" />`;
       if (barWidth > 40) {
-        const label = entry.pourLabel ? `${entry.level} ${entry.pourLabel}` : entry.level;
+        const label = formatLevelDisplay(entry.level, entry.pourLabel);
         const truncLabel = label.length > barWidth / 5 ? label.slice(0, Math.floor(barWidth / 5)) + "..." : label;
         svgBars += `<text x="${startOffset + barWidth / 2 + 1}" y="${barY + 10}" text-anchor="middle" fill="white" font-size="7" font-weight="500">${truncLabel}</text>`;
       }
@@ -242,7 +249,7 @@ export function ProgrammeGanttChart({
     sortedEntries.forEach((entry) => {
       const colorIdx = (entry.buildingNumber - 1) % BUILDING_HEX_COLORS.length;
       const color = BUILDING_HEX_COLORS[colorIdx];
-      const displayLabel = entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level;
+      const displayLabel = formatLevelDisplay(entry.level, entry.pourLabel);
       labelRows += `<div style="height:${PRINT_ROW_HEIGHT}px;display:flex;align-items:center;gap:4px;padding:0 6px;border-bottom:1px solid #eee;font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">`;
       labelRows += `<span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${color};flex-shrink:0;"></span>`;
       labelRows += `<span style="color:#555;font-weight:500;">${displayLabel}</span>`;
@@ -318,7 +325,7 @@ export function ProgrammeGanttChart({
           <div ref={labelScrollRef} className="overflow-y-auto overflow-x-hidden" style={{ flex: 1 }}>
             {sortedEntries.map((entry) => {
               const colorIdx = (entry.buildingNumber - 1) % BUILDING_HEX_COLORS.length;
-              const displayLabel = entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level;
+              const displayLabel = formatLevelDisplay(entry.level, entry.pourLabel);
               return (
                 <div
                   key={entry.id}
@@ -331,7 +338,7 @@ export function ProgrammeGanttChart({
                     style={{ backgroundColor: BUILDING_HEX_COLORS[colorIdx] }}
                   />
                   <span className="truncate font-medium">{displayLabel}</span>
-                  <span className="text-muted-foreground ml-auto">B{entry.buildingNumber}</span>
+                  <span className="text-muted-foreground ml-auto text-xs">Bldg {entry.buildingNumber}</span>
                 </div>
               );
             })}
@@ -468,12 +475,12 @@ export function ProgrammeGanttChart({
                       backgroundColor: BUILDING_HEX_COLORS[colorIdx],
                       opacity: 0.85,
                     }}
-                    title={`${entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level}: ${format(startDate, "dd/MM")} - ${format(endDate, "dd/MM")} (${entry.cycleDays}d)`}
+                    title={`${formatLevelDisplay(entry.level, entry.pourLabel)}: ${format(startDate, "dd/MM")} - ${format(endDate, "dd/MM")} (${entry.cycleDays}d)`}
                     data-testid={`gantt-bar-${entry.id}`}
                   >
                     {barWidth > 50 && (
                       <span className="truncate px-1">
-                        {entry.pourLabel ? `${entry.level} ${entry.pourLabel}` : entry.level}
+                        {formatLevelDisplay(entry.level, entry.pourLabel)}
                       </span>
                     )}
                   </div>

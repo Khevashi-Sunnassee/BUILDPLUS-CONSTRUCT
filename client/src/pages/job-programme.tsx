@@ -91,6 +91,13 @@ function formatShortDate(date: string | Date | null | undefined): string {
   }
 }
 
+function formatLevelDisplay(level: string, pourLabel?: string | null): string {
+  const numMatch = level.match(/^L?(\d+)$/i);
+  const prefix = numMatch ? `Level ${numMatch[1]}` : level;
+  if (pourLabel) return `${prefix} - Pour ${pourLabel}`;
+  return `${prefix} - Pour Date`;
+}
+
 function SortableRow({
   entry,
   index,
@@ -127,9 +134,7 @@ function SortableRow({
     opacity: isDragging ? 0.4 : 1,
   };
 
-  const displayLabel = entry.pourLabel
-    ? `${entry.level} Pour ${entry.pourLabel}`
-    : entry.level;
+  const displayLabel = formatLevelDisplay(entry.level, entry.pourLabel);
 
   const effectiveStart = entry.manualStartDate || entry.estimatedStartDate;
   const effectiveEnd = entry.manualEndDate || entry.estimatedEndDate;
@@ -139,7 +144,7 @@ function SortableRow({
     .filter(e => e.sequenceOrder < entry.sequenceOrder)
     .map(e => ({
       value: String(e.sequenceOrder),
-      label: `${e.sequenceOrder + 1} - ${e.pourLabel ? `${e.level} Pour ${e.pourLabel}` : e.level}`,
+      label: `${e.sequenceOrder + 1} - ${formatLevelDisplay(e.level, e.pourLabel)}`,
     }));
 
   const predValue = entry.predecessorSequenceOrder != null ? String(entry.predecessorSequenceOrder) : "";
@@ -166,9 +171,9 @@ function SortableRow({
         <td className="px-2 py-1.5 w-8 text-center font-mono text-xs text-muted-foreground">
           {entry.sequenceOrder + 1}
         </td>
-        <td className="px-2 py-1.5 w-12">
-          <Badge variant="outline" className="text-xs" data-testid={`badge-building-${entry.id}`}>
-            B{entry.buildingNumber}
+        <td className="px-2 py-1.5 min-w-[80px]">
+          <Badge variant="outline" className="text-xs whitespace-nowrap" data-testid={`badge-building-${entry.id}`}>
+            Building {entry.buildingNumber}
           </Badge>
         </td>
         <td className="px-2 py-1.5 min-w-[120px]">
@@ -445,12 +450,12 @@ export default function JobProgrammePage() {
         relationship: idx > 0 ? "FS" : null,
       }));
 
-      const saveRes = await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME(jobId!), { entries });
-      return saveRes.json();
+      await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME(jobId!), { entries });
+      await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME_RECALC(jobId!), {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/jobs', jobId, 'programme'] });
-      toast({ title: "Programme generated from job settings" });
+      toast({ title: "Programme generated and dates calculated" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err?.message || "Failed to generate programme", variant: "destructive" });
@@ -477,12 +482,12 @@ export default function JobProgrammePage() {
         relationship: idx > 0 ? "FS" : null,
       }));
 
-      const saveRes = await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME(jobId!), { entries });
-      return saveRes.json();
+      await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME(jobId!), { entries });
+      await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME_RECALC(jobId!), {});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/jobs', jobId, 'programme'] });
-      toast({ title: "Programme generated from panels" });
+      toast({ title: "Programme generated and dates calculated" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err?.message || "Failed to generate programme from panels", variant: "destructive" });
@@ -721,7 +726,7 @@ export default function JobProgrammePage() {
                         <tr className="border-b border-border text-xs text-muted-foreground">
                           <th className="px-2 py-2 w-8"></th>
                           <th className="px-2 py-2 w-8 text-center">#</th>
-                          <th className="px-2 py-2 w-12">Bldg</th>
+                          <th className="px-2 py-2 min-w-[80px]">Building</th>
                           <th className="px-2 py-2 min-w-[120px]">Level / Pour</th>
                           <th className="px-2 py-2 w-16">Days</th>
                           <th className="px-2 py-2 w-28">Pred</th>
