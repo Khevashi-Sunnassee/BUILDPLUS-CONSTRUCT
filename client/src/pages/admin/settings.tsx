@@ -103,6 +103,8 @@ export default function AdminSettingsPage() {
     { key: "contracts", label: "Contracts", description: "All contract records" },
     { key: "progress_claims", label: "Progress Claims", description: "Progress claims and line items" },
     { key: "broadcast_templates", label: "Broadcast Templates", description: "Broadcast templates and messages" },
+    { key: "activity_templates", label: "Activity Templates", description: "Workflow activity templates and subtasks" },
+    { key: "job_activities", label: "Job Activities", description: "Job activity instances, assignees, updates and files" },
   ], []);
 
   const dayNames = useMemo(() => ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], []);

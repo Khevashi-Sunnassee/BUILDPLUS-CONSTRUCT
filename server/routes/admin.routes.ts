@@ -17,6 +17,8 @@ import {
   contracts,
   progressClaims, progressClaimItems,
   broadcastTemplates, broadcastMessages,
+  activityTemplates, activityTemplateSubtasks,
+  jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
 } from "@shared/schema";
 import { sql, isNotNull } from "drizzle-orm";
 import logger from "../lib/logger";
@@ -145,6 +147,8 @@ const dataDeletionCategories = [
   "contracts",
   "progress_claims",
   "broadcast_templates",
+  "activity_templates",
+  "job_activities",
 ] as const;
 
 type DeletionCategory = typeof dataDeletionCategories[number];
@@ -200,6 +204,12 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     
     const [broadcastTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastTemplates);
     counts.broadcast_templates = Number(broadcastTemplateCount.count);
+    
+    const [activityTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(activityTemplates);
+    counts.activity_templates = Number(activityTemplateCount.count);
+    
+    const [jobActivityCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivities);
+    counts.job_activities = Number(jobActivityCount.count);
     
     res.json(counts);
   } catch (error: any) {
@@ -337,6 +347,23 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       const [msgCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastMessages);
       if (Number(msgCount.count) > 0) {
         warnings.push(`${msgCount.count} broadcast message(s) will also be deleted with templates.`);
+      }
+    }
+    
+    if (selected.has("activity_templates")) {
+      const [subtaskCount] = await db.select({ count: sql<number>`count(*)` }).from(activityTemplateSubtasks);
+      if (Number(subtaskCount.count) > 0) {
+        warnings.push(`${subtaskCount.count} activity template subtask(s) will also be deleted.`);
+      }
+    }
+    
+    if (selected.has("job_activities")) {
+      const [assigneeCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivityAssignees);
+      const [updateCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivityUpdates);
+      const [fileCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivityFiles);
+      const totalRelated = Number(assigneeCount.count) + Number(updateCount.count) + Number(fileCount.count);
+      if (totalRelated > 0) {
+        warnings.push(`${totalRelated} activity assignee(s), update(s), and file(s) will also be deleted.`);
       }
     }
     
@@ -484,6 +511,21 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       await db.delete(broadcastMessages);
       const result = await db.delete(broadcastTemplates);
       deletedCounts.broadcast_templates = result.rowCount || 0;
+    }
+    
+    if (selected.has("job_activities")) {
+      await db.delete(jobActivityFiles);
+      await db.delete(jobActivityUpdates);
+      await db.delete(jobActivityAssignees);
+      await db.update(tasks).set({ jobActivityId: null }).where(isNotNull(tasks.jobActivityId));
+      const result = await db.delete(jobActivities);
+      deletedCounts.job_activities = result.rowCount || 0;
+    }
+    
+    if (selected.has("activity_templates")) {
+      await db.delete(activityTemplateSubtasks);
+      const result = await db.delete(activityTemplates);
+      deletedCounts.activity_templates = result.rowCount || 0;
     }
     
     res.json({ 
