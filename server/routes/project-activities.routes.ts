@@ -2,7 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import ExcelJS from "exceljs";
 import { z } from "zod";
-import { eq, and, asc, desc } from "drizzle-orm";
+import { eq, and, asc, desc, count, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   jobTypes, activityStages, activityConsultants,
@@ -48,7 +48,20 @@ router.get("/api/job-types", requireAuth, async (req, res) => {
     const result = await db.select().from(jobTypes)
       .where(eq(jobTypes.companyId, companyId!))
       .orderBy(asc(jobTypes.sortOrder), asc(jobTypes.name));
-    res.json(result);
+
+    const templateCounts = await db
+      .select({ jobTypeId: activityTemplates.jobTypeId, count: count() })
+      .from(activityTemplates)
+      .where(eq(activityTemplates.companyId, companyId!))
+      .groupBy(activityTemplates.jobTypeId);
+
+    const countMap = new Map(templateCounts.map(tc => [tc.jobTypeId, tc.count]));
+    const resultWithCounts = result.map(jt => ({
+      ...jt,
+      activityCount: countMap.get(jt.id) || 0,
+    }));
+
+    res.json(resultWithCounts);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job types");
     res.status(500).json({ error: "Failed to fetch job types" });

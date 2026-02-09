@@ -216,6 +216,7 @@ export default function AdminJobTypesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead className="text-center">Activities</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -225,6 +226,11 @@ export default function AdminJobTypesPage() {
                   <TableRow key={jt.id} data-testid={`row-job-type-${jt.id}`}>
                     <TableCell className="font-medium" data-testid={`text-job-type-name-${jt.id}`}>{jt.name}</TableCell>
                     <TableCell className="text-muted-foreground max-w-xs truncate">{jt.description || "-"}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="secondary" data-testid={`badge-activity-count-${jt.id}`}>
+                        {(jt as any).activityCount ?? 0}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={jt.isActive ? "default" : "secondary"} data-testid={`badge-status-${jt.id}`}>
                         {jt.isActive ? "Active" : "Inactive"}
