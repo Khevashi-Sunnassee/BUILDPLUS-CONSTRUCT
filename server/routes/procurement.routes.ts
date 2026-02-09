@@ -75,12 +75,19 @@ const SUPPLIER_HEADER_MAP: Record<string, string> = {
   "email address": "email",
   "phone": "phone",
   "phone number": "phone",
+  "phone no. 1": "phone",
+  "phone no. 2": "phone2",
   "abn": "abn",
+  "a.b.n.": "abn",
   "acn": "acn",
+  "a.c.n.": "acn",
   "address line 1": "addressLine1",
+  "address street line 1": "addressLine1",
   "address": "addressLine1",
   "street": "addressLine1",
   "address line 2": "addressLine2",
+  "address street line 2": "addressLine2",
+  "address street line 3": "addressLine2Extra",
   "city": "city",
   "suburb": "city",
   "state": "state",
@@ -90,6 +97,9 @@ const SUPPLIER_HEADER_MAP: Record<string, string> = {
   "payment terms": "paymentTerms",
   "terms": "paymentTerms",
   "notes": "notes",
+  "status": "status",
+  "type (supplier)": "type",
+  "card id": "cardId",
 };
 
 const ALLOWED_IMPORT_TYPES = [
@@ -278,13 +288,20 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
         if (rowData.abn) updateData.abn = rowData.abn;
         if (rowData.acn) updateData.acn = rowData.acn;
         if (rowData.addressLine1) updateData.addressLine1 = rowData.addressLine1;
-        if (rowData.addressLine2) updateData.addressLine2 = rowData.addressLine2;
+        let addr2 = rowData.addressLine2 || "";
+        if (rowData.addressLine2Extra) {
+          addr2 = addr2 ? `${addr2}, ${rowData.addressLine2Extra}` : rowData.addressLine2Extra;
+        }
+        if (addr2) updateData.addressLine2 = addr2;
         if (rowData.city) updateData.city = rowData.city;
         if (rowData.state) updateData.state = rowData.state;
-        if (rowData.postcode) updateData.postcode = rowData.postcode;
+        if (rowData.postcode) updateData.postcode = String(rowData.postcode);
         if (rowData.country) updateData.country = rowData.country;
         if (rowData.paymentTerms) updateData.paymentTerms = rowData.paymentTerms;
         if (rowData.notes) updateData.notes = rowData.notes;
+        if (rowData.status) {
+          updateData.isActive = String(rowData.status).toLowerCase().trim() !== "inactive";
+        }
 
         const existing = supplierByName[key];
         if (existing) {

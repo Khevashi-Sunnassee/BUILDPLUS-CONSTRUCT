@@ -1,4 +1,6 @@
 import { Router } from "express";
+import multer from "multer";
+import ExcelJS from "exceljs";
 import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
@@ -101,6 +103,107 @@ const licenceSchema = z.object({
   notes: z.string().optional().nullable(),
 });
 
+const EMPLOYEE_TEMPLATE_COLUMNS = [
+  { header: "Employee Number", key: "employeeNumber", width: 18 },
+  { header: "First Name", key: "firstName", width: 20 },
+  { header: "Last Name", key: "lastName", width: 20 },
+  { header: "Preferred Name", key: "preferredName", width: 20 },
+  { header: "Date of Birth", key: "dateOfBirth", width: 18 },
+  { header: "Email", key: "email", width: 30 },
+  { header: "Phone", key: "phone", width: 20 },
+  { header: "Address Line 1", key: "addressLine1", width: 30 },
+  { header: "Address Line 2", key: "addressLine2", width: 30 },
+  { header: "Suburb", key: "suburb", width: 20 },
+  { header: "State", key: "state", width: 10 },
+  { header: "Postcode", key: "postcode", width: 10 },
+  { header: "Notes", key: "notes", width: 40 },
+];
+
+const EMPLOYEE_HEADER_MAP: Record<string, string> = {
+  "name": "fullName",
+  "employee name": "fullName",
+  "employee number": "employeeNumber",
+  "card id": "employeeNumber",
+  "first name": "firstName",
+  "last name": "lastName",
+  "preferred name": "preferredName",
+  "middle name": "middleName",
+  "date of birth": "dateOfBirth",
+  "date of birth (dd/mm/yyyy)": "dateOfBirth",
+  "email": "email",
+  "email address": "email",
+  "phone": "phone",
+  "phone number": "phone",
+  "phone no. 1": "phone",
+  "phone no. 2": "phone2",
+  "address line 1": "addressLine1",
+  "address street line 1": "addressLine1",
+  "address": "addressLine1",
+  "street": "addressLine1",
+  "address line 2": "addressLine2",
+  "address street line 2": "addressLine2",
+  "address street line 3": "addressLine2Extra",
+  "city": "suburb",
+  "suburb": "suburb",
+  "state": "state",
+  "postcode": "postcode",
+  "zip": "postcode",
+  "country": "country",
+  "notes": "notes",
+  "status": "status",
+  "type (employee)": "type",
+};
+
+const ALLOWED_IMPORT_TYPES = [
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_IMPORT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed. Only Excel and CSV files are accepted.`));
+    }
+  },
+});
+
+function parseEmployeeName(fullName: string): { firstName: string; lastName: string; middleName?: string } {
+  const trimmed = fullName.trim();
+  if (trimmed.includes(",")) {
+    const parts = trimmed.split(",").map(s => s.trim());
+    const lastName = parts[0];
+    const firstParts = (parts[1] || "").split(/\s+/);
+    const firstName = firstParts[0] || "";
+    const middleName = firstParts.slice(1).join(" ") || undefined;
+    return { firstName, lastName, middleName };
+  }
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return { firstName: parts[0], lastName: "" };
+  if (parts.length === 2) return { firstName: parts[0], lastName: parts[1] };
+  return { firstName: parts[0], lastName: parts[parts.length - 1], middleName: parts.slice(1, -1).join(" ") };
+}
+
+function parseDateOfBirth(val: string): string | null {
+  if (!val) return null;
+  const trimmed = String(val).trim();
+  const ddmmyyyy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (ddmmyyyy) {
+    const [, dd, mm, yyyy] = ddmmyyyy;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  }
+  const yyyymmdd = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (yyyymmdd) {
+    const [, yyyy, mm, dd] = yyyymmdd;
+    return `${yyyy}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
+  }
+  return trimmed;
+}
+
 // ============== Employee CRUD ==============
 
 router.get("/api/employees", requireAuth, async (req, res) => {
@@ -126,6 +229,239 @@ router.get("/api/employees/active", requireAuth, async (req, res) => {
     const msg = error instanceof Error ? error.message : "Failed to fetch employees";
     logger.error({ err: error }, "Error fetching active employees");
     res.status(500).json({ error: msg });
+  }
+});
+
+router.get("/api/employees/template", requireAuth, async (_req, res) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Employees");
+    sheet.columns = EMPLOYEE_TEMPLATE_COLUMNS.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=Employee_Import_Template.xlsx");
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to generate employee template");
+    res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
+router.get("/api/employees/export", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const allEmployees = await storage.getAllEmployees(companyId);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Employees");
+    sheet.columns = EMPLOYEE_TEMPLATE_COLUMNS.map(c => ({ header: c.header, key: c.key, width: c.width }));
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+
+    for (const e of allEmployees) {
+      sheet.addRow({
+        employeeNumber: e.employeeNumber || "",
+        firstName: e.firstName || "",
+        lastName: e.lastName || "",
+        preferredName: e.preferredName || "",
+        dateOfBirth: e.dateOfBirth || "",
+        email: e.email || "",
+        phone: e.phone || "",
+        addressLine1: e.addressLine1 || "",
+        addressLine2: e.addressLine2 || "",
+        suburb: e.suburb || "",
+        state: e.state || "",
+        postcode: e.postcode || "",
+        notes: e.notes || "",
+      });
+    }
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=Employees_Export.xlsx");
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to export employees");
+    res.status(500).json({ error: "Failed to export employees" });
+  }
+});
+
+router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const sheet = workbook.worksheets[0];
+
+    let headerRowIndex = 0;
+    const columnMap: Record<number, string> = {};
+    for (let r = 1; r <= Math.min(10, sheet.rowCount); r++) {
+      const row = sheet.getRow(r);
+      let matchCount = 0;
+      for (let c = 1; c <= sheet.columnCount; c++) {
+        const cell = row.getCell(c);
+        let val = cell.value;
+        if (val && typeof val === "object" && "richText" in val) {
+          val = (val as any).richText.map((t: any) => t.text).join("");
+        }
+        if (!val) continue;
+        const headerStr = String(val).toLowerCase().trim();
+        const mappedKey = EMPLOYEE_HEADER_MAP[headerStr];
+        if (mappedKey) {
+          matchCount++;
+          columnMap[c] = mappedKey;
+        }
+      }
+      if (matchCount >= 2) {
+        headerRowIndex = r;
+        break;
+      }
+    }
+
+    if (!headerRowIndex) {
+      return res.status(400).json({ error: "Could not find header row. Please ensure the spreadsheet has recognizable column headers (e.g. Name, Email, Phone)." });
+    }
+
+    const existingEmployees = await storage.getAllEmployees(companyId);
+    const employeeByName: Record<string, typeof existingEmployees[0]> = {};
+    for (const e of existingEmployees) {
+      const key = `${e.lastName.toLowerCase().trim()},${e.firstName.toLowerCase().trim()}`;
+      employeeByName[key] = e;
+    }
+
+    let autoNum = existingEmployees.length;
+
+    const created: string[] = [];
+    const updated: string[] = [];
+    const skipped: string[] = [];
+    const errors: string[] = [];
+
+    for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
+      const row = sheet.getRow(r);
+      const rowData: Record<string, any> = {};
+      let hasData = false;
+
+      for (const [colStr, key] of Object.entries(columnMap)) {
+        const col = parseInt(colStr);
+        const cell = row.getCell(col);
+        let val = cell.value;
+        if (val && typeof val === "object" && "richText" in val) {
+          val = (val as any).richText.map((t: any) => t.text).join("");
+        }
+        if (val !== null && val !== undefined && String(val).trim() !== "") {
+          rowData[key] = String(val).trim();
+          hasData = true;
+        }
+      }
+
+      if (!hasData) continue;
+
+      let firstName = rowData.firstName || "";
+      let lastName = rowData.lastName || "";
+      let middleName = rowData.middleName || undefined;
+
+      if (!firstName && !lastName && rowData.fullName) {
+        const parsed = parseEmployeeName(rowData.fullName);
+        firstName = parsed.firstName;
+        lastName = parsed.lastName;
+        middleName = parsed.middleName || middleName;
+      }
+
+      if (!firstName && !lastName) continue;
+
+      const displayName = `${lastName}, ${firstName}`.trim();
+
+      try {
+        const updateData: Record<string, any> = {};
+        if (middleName) updateData.middleName = middleName;
+        if (rowData.preferredName) updateData.preferredName = rowData.preferredName;
+        if (rowData.dateOfBirth) updateData.dateOfBirth = parseDateOfBirth(rowData.dateOfBirth);
+        if (rowData.email) updateData.email = rowData.email;
+        if (rowData.phone) updateData.phone = rowData.phone;
+        if (rowData.addressLine1) updateData.addressLine1 = rowData.addressLine1;
+        let addr2 = rowData.addressLine2 || "";
+        if (rowData.addressLine2Extra) {
+          addr2 = addr2 ? `${addr2}, ${rowData.addressLine2Extra}` : rowData.addressLine2Extra;
+        }
+        if (addr2) updateData.addressLine2 = addr2;
+        if (rowData.suburb) updateData.suburb = rowData.suburb;
+        if (rowData.state) updateData.state = rowData.state;
+        if (rowData.postcode) updateData.postcode = String(rowData.postcode);
+        if (rowData.notes) updateData.notes = rowData.notes;
+        if (rowData.status) {
+          updateData.isActive = String(rowData.status).toLowerCase().trim() !== "inactive";
+        }
+
+        const nameKey = `${lastName.toLowerCase().trim()},${firstName.toLowerCase().trim()}`;
+        const existing = employeeByName[nameKey];
+
+        if (existing) {
+          const fieldsToUpdate: Record<string, any> = {};
+          let hasChanges = false;
+          for (const [field, value] of Object.entries(updateData)) {
+            const currentVal = (existing as any)[field];
+            if (!currentVal && value) {
+              fieldsToUpdate[field] = value;
+              hasChanges = true;
+            }
+          }
+
+          if (hasChanges) {
+            await storage.updateEmployee(existing.id, fieldsToUpdate);
+            updated.push(displayName);
+          } else {
+            skipped.push(displayName);
+          }
+        } else {
+          let employeeNumber = rowData.employeeNumber;
+          if (!employeeNumber || employeeNumber === "*None") {
+            autoNum++;
+            employeeNumber = `EMP${String(autoNum).padStart(4, "0")}`;
+          }
+
+          const newEmployee = await storage.createEmployee({
+            companyId,
+            employeeNumber,
+            firstName,
+            lastName,
+            ...updateData,
+            isActive: updateData.isActive !== undefined ? updateData.isActive : true,
+          });
+          employeeByName[nameKey] = newEmployee;
+          created.push(displayName);
+        }
+      } catch (rowError: unknown) {
+        errors.push(`Row ${r} (${displayName}): ${rowError instanceof Error ? rowError.message : String(rowError)}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      created: created.length,
+      updated: updated.length,
+      skipped: skipped.length,
+      errors: errors.length,
+      details: {
+        created: created.slice(0, 50),
+        updated: updated.slice(0, 50),
+        skipped: skipped.slice(0, 20),
+        errors: errors.slice(0, 50),
+      },
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error importing employees");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import employees" });
   }
 });
 

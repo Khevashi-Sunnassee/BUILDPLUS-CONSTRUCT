@@ -118,6 +118,9 @@ export const PROCUREMENT_ROUTES = {
   CUSTOMERS: '/api/customers',
   CUSTOMERS_ACTIVE: '/api/customers/active',
   CUSTOMERS_QUICK: '/api/customers/quick',
+  CUSTOMERS_TEMPLATE: '/api/customers/template',
+  CUSTOMERS_IMPORT: '/api/customers/import',
+  CUSTOMERS_EXPORT: '/api/customers/export',
   CUSTOMER_BY_ID: (id: string | number) => `/api/customers/${id}`,
 
   // Suppliers
@@ -720,6 +723,9 @@ export type UploadRoutes = typeof UPLOAD_ROUTES;
 export const EMPLOYEE_ROUTES = {
   LIST: '/api/employees',
   ACTIVE: '/api/employees/active',
+  TEMPLATE: '/api/employees/template',
+  IMPORT: '/api/employees/import',
+  EXPORT: '/api/employees/export',
   BY_ID: (id: string | number) => `/api/employees/${id}`,
   EMPLOYMENTS: (employeeId: string | number) => `/api/employees/${employeeId}/employments`,
   EMPLOYMENT_BY_ID: (employeeId: string | number, id: string | number) => `/api/employees/${employeeId}/employments/${id}`,

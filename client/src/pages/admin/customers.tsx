@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,6 +11,11 @@ import {
   Save,
   Loader2,
   Search,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,6 +102,20 @@ const AUSTRALIAN_STATES = [
   { value: "ACT", label: "Australian Capital Territory" },
 ];
 
+interface ImportResult {
+  success: boolean;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  details: {
+    created: string[];
+    updated: string[];
+    skipped: string[];
+    errors: string[];
+  };
+}
+
 export default function AdminCustomersPage() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -104,10 +123,50 @@ export default function AdminCustomersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: customersList, isLoading } = useQuery<Customer[]>({
     queryKey: [PROCUREMENT_ROUTES.CUSTOMERS],
   });
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(PROCUREMENT_ROUTES.CUSTOMERS_IMPORT, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Import failed" }));
+        throw new Error(err.error || "Import failed");
+      }
+      return res.json() as Promise<ImportResult>;
+    },
+    onSuccess: (result) => {
+      setImportResult(result);
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.CUSTOMERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_ACTIVE] });
+      toast({
+        title: "Import complete",
+        description: `${result.created} created, ${result.updated} updated, ${result.skipped} unchanged`,
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportResult(null);
+    importMutation.mutate(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const filteredCustomers = customersList?.filter((c) => {
     if (!searchQuery) return true;
@@ -258,10 +317,20 @@ export default function AdminCustomersPage() {
           </div>
           <p className="text-muted-foreground">Manage customers and their contact information</p>
         </div>
-        <Button onClick={openCreateDialog} data-testid="button-create-customer">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Customer
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => window.open(PROCUREMENT_ROUTES.CUSTOMERS_EXPORT, "_blank")} data-testid="button-export-customers">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline" onClick={() => { setImportResult(null); setImportDialogOpen(true); }} data-testid="button-import-customers">
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={openCreateDialog} data-testid="button-create-customer">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Customer
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -663,6 +732,118 @@ export default function AdminCustomersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Customers
+            </DialogTitle>
+            <DialogDescription>
+              Upload an Excel file to import customers. Existing customers (matched by name) will have their missing details updated. New customers will be created.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => window.open(PROCUREMENT_ROUTES.CUSTOMERS_TEMPLATE, "_blank")} data-testid="button-download-customer-template">
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
+              </Button>
+              <p className="text-sm text-muted-foreground">Use this template for best results</p>
+            </div>
+
+            <div className="border-2 border-dashed rounded-md p-6 text-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-customer-import-file"
+              />
+              {importMutation.isPending ? (
+                <div className="space-y-2">
+                  <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Importing customers...</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="button-select-customer-file"
+                  >
+                    Select File
+                  </Button>
+                  <p className="text-sm text-muted-foreground">Accepts .xlsx, .xls, or .csv files</p>
+                </div>
+              )}
+            </div>
+
+            {importResult && (
+              <div className="space-y-3 border rounded-md p-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="font-medium">Import Complete</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default">{importResult.created}</Badge>
+                    <span>New customers created</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary">{importResult.updated}</Badge>
+                    <span>Customers updated</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline">{importResult.skipped}</Badge>
+                    <span>Unchanged (skipped)</span>
+                  </div>
+                  {importResult.errors > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="destructive">{importResult.errors}</Badge>
+                      <span>Errors</span>
+                    </div>
+                  )}
+                </div>
+
+                {importResult.details.created.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Created:</p>
+                    <p className="text-xs">{importResult.details.created.join(", ")}</p>
+                  </div>
+                )}
+                {importResult.details.updated.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Updated:</p>
+                    <p className="text-xs">{importResult.details.updated.join(", ")}</p>
+                  </div>
+                )}
+                {importResult.details.errors.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Errors:</p>
+                    {importResult.details.errors.map((err, i) => (
+                      <p key={i} className="text-xs text-destructive flex items-start gap-1">
+                        <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                        {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)} data-testid="button-close-customer-import-dialog">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

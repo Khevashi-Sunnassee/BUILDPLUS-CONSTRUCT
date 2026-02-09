@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,6 +13,11 @@ import {
   Loader2,
   Search,
   Eye,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -133,6 +138,20 @@ const defaultFormValues: EmployeeFormData = {
   isActive: true,
 };
 
+interface ImportResult {
+  success: boolean;
+  created: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+  details: {
+    created: string[];
+    updated: string[];
+    skipped: string[];
+    errors: string[];
+  };
+}
+
 export default function AdminEmployeesPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
@@ -141,10 +160,49 @@ export default function AdminEmployeesPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: employeesList, isLoading } = useQuery<Employee[]>({
     queryKey: [EMPLOYEE_ROUTES.LIST],
   });
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(EMPLOYEE_ROUTES.IMPORT, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Import failed" }));
+        throw new Error(err.error || "Import failed");
+      }
+      return res.json() as Promise<ImportResult>;
+    },
+    onSuccess: (result) => {
+      setImportResult(result);
+      queryClient.invalidateQueries({ queryKey: [EMPLOYEE_ROUTES.LIST] });
+      toast({
+        title: "Import complete",
+        description: `${result.created} created, ${result.updated} updated, ${result.skipped} unchanged`,
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportResult(null);
+    importMutation.mutate(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const filteredEmployees = employeesList?.filter((e) => {
     if (!searchQuery) return true;
@@ -271,10 +329,20 @@ export default function AdminEmployeesPage() {
           </div>
           <p className="text-muted-foreground">Manage employees and their information</p>
         </div>
-        <Button onClick={openCreateDialog} data-testid="button-create-employee">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Employee
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => window.open(EMPLOYEE_ROUTES.EXPORT, "_blank")} data-testid="button-export-employees">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button variant="outline" onClick={() => { setImportResult(null); setImportDialogOpen(true); }} data-testid="button-import-employees">
+            <Upload className="h-4 w-4 mr-2" />
+            Import
+          </Button>
+          <Button onClick={openCreateDialog} data-testid="button-create-employee">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Employee
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -834,6 +902,118 @@ export default function AdminEmployeesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Import Employees
+            </DialogTitle>
+            <DialogDescription>
+              Upload an Excel file to import employees. Existing employees (matched by last name + first name) will have their missing details updated. New employees will be created.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => window.open(EMPLOYEE_ROUTES.TEMPLATE, "_blank")} data-testid="button-download-employee-template">
+                <Download className="h-4 w-4 mr-2" />
+                Download Template
+              </Button>
+              <p className="text-sm text-muted-foreground">Use this template for best results</p>
+            </div>
+
+            <div className="border-2 border-dashed rounded-md p-6 text-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileSelect}
+                className="hidden"
+                data-testid="input-employee-import-file"
+              />
+              {importMutation.isPending ? (
+                <div className="space-y-2">
+                  <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">Importing employees...</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    data-testid="button-select-employee-file"
+                  >
+                    Select File
+                  </Button>
+                  <p className="text-sm text-muted-foreground">Accepts .xlsx, .xls, or .csv files</p>
+                </div>
+              )}
+            </div>
+
+            {importResult && (
+              <div className="space-y-3 border rounded-md p-4" data-testid="employee-import-result">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <span className="font-medium">Import Complete</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default" data-testid="text-employee-import-created">{importResult.created}</Badge>
+                    <span>New employees created</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" data-testid="text-employee-import-updated">{importResult.updated}</Badge>
+                    <span>Employees updated</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" data-testid="text-employee-import-skipped">{importResult.skipped}</Badge>
+                    <span>Unchanged (skipped)</span>
+                  </div>
+                  {importResult.errors > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="destructive" data-testid="text-employee-import-errors">{importResult.errors}</Badge>
+                      <span>Errors</span>
+                    </div>
+                  )}
+                </div>
+
+                {importResult.details.created.length > 0 && (
+                  <div data-testid="text-employee-import-created-list">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Created:</p>
+                    <p className="text-xs">{importResult.details.created.join(", ")}</p>
+                  </div>
+                )}
+                {importResult.details.updated.length > 0 && (
+                  <div data-testid="text-employee-import-updated-list">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Updated:</p>
+                    <p className="text-xs">{importResult.details.updated.join(", ")}</p>
+                  </div>
+                )}
+                {importResult.details.errors.length > 0 && (
+                  <div data-testid="text-employee-import-errors-list">
+                    <p className="text-xs font-medium text-muted-foreground mb-1">Errors:</p>
+                    {importResult.details.errors.map((err, i) => (
+                      <p key={i} className="text-xs text-destructive flex items-start gap-1" data-testid={`text-employee-import-error-${i}`}>
+                        <AlertCircle className="h-3 w-3 mt-0.5 shrink-0" />
+                        {err}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setImportDialogOpen(false)} data-testid="button-close-employee-import-dialog">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
