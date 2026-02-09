@@ -147,7 +147,7 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     const validated = parseResult.data;
     const updateData: Record<string, any> = { ...validated };
     delete updateData.companyId;
-    if (updateData.password === "") {
+    if (updateData.password === "" || updateData.password === undefined) {
       delete updateData.password;
     }
     if (updateData.phone === "") {
