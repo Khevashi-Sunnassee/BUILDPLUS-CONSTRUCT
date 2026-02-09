@@ -592,7 +592,7 @@ export default function PhotoGallery() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
-                  {documentTypes.map((type) => (
+                  {documentTypes.slice().sort((a, b) => (a.typeName || '').localeCompare(b.typeName || '')).map((type) => (
                     <SelectItem key={type.id} value={type.id}>{type.typeName}</SelectItem>
                   ))}
                 </SelectContent>
@@ -604,7 +604,7 @@ export default function PhotoGallery() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Disciplines</SelectItem>
-                  {disciplines.map((d) => (
+                  {disciplines.slice().sort((a, b) => (a.disciplineName || '').localeCompare(b.disciplineName || '')).map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.disciplineName}</SelectItem>
                   ))}
                 </SelectContent>
@@ -616,7 +616,7 @@ export default function PhotoGallery() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Jobs</SelectItem>
-                  {jobs.map((job) => (
+                  {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                     <SelectItem key={job.id} value={job.id}>{job.jobNumber} - {job.name}</SelectItem>
                   ))}
                 </SelectContent>

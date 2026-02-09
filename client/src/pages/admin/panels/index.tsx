@@ -1516,7 +1516,7 @@ export default function AdminPanelsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Factories</SelectItem>
-                    {factories?.filter(f => f.isActive).map(factory => (
+                    {factories?.filter(f => f.isActive).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map(factory => (
                       <SelectItem key={factory.id} value={factory.id}>
                         {factory.name}
                       </SelectItem>
@@ -1530,7 +1530,7 @@ export default function AdminPanelsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Jobs</SelectItem>
-                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map(job => (
+                      {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map(job => (
                         <SelectItem key={job.id} value={job.id}>
                           {job.jobNumber} - {job.name}
                         </SelectItem>

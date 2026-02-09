@@ -217,7 +217,7 @@ export default function ChecklistReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" data-testid="option-template-all">All Templates</SelectItem>
-                {templates?.map((template) => (
+                {templates?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((template) => (
                   <SelectItem key={template.id} value={template.id} data-testid={`option-template-${template.id}`}>
                     {template.name}
                   </SelectItem>
@@ -243,7 +243,7 @@ export default function ChecklistReportsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all" data-testid="option-job-all">All Jobs</SelectItem>
-                {jobs?.filter(j => isJobVisibleInDropdowns(String((j as any).jobPhase ?? "CONTRACTED") as any)).map((job) => (
+                {jobs?.filter(j => isJobVisibleInDropdowns(String((j as any).jobPhase ?? "CONTRACTED") as any)).slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((job) => (
                   <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                     {job.name}
                   </SelectItem>

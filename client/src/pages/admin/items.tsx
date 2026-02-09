@@ -818,7 +818,7 @@ export default function AdminItemsPage() {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   <SelectItem value="uncategorized">Uncategorized</SelectItem>
-                  {allCategories?.map((category) => (
+                  {allCategories?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((category) => (
                     <SelectItem key={category.id} value={category.id}>
                       {category.name}{!category.isActive ? " (Inactive)" : ""}
                     </SelectItem>
@@ -1078,7 +1078,7 @@ export default function AdminItemsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {activeCategories?.map((category) => (
+                          {activeCategories?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((category) => (
                             <SelectItem key={category.id} value={category.id}>
                               {category.name}
                             </SelectItem>
@@ -1102,7 +1102,7 @@ export default function AdminItemsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {suppliers?.map((supplier) => (
+                          {suppliers?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((supplier) => (
                             <SelectItem key={supplier.id} value={supplier.id}>
                               {supplier.name}
                             </SelectItem>

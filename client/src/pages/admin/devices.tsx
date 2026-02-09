@@ -326,7 +326,7 @@ export default function AdminDevicesPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {users?.map((user) => (
+                        {users?.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => (
                           <SelectItem key={user.id} value={user.id}>
                             {user.name || user.email}
                           </SelectItem>

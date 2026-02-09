@@ -575,7 +575,7 @@ export default function DailyReportDetailPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((j) => (
+                            {[...jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)) || []].sort((a, b) => (a.code || a.name || '').localeCompare(b.code || b.name || '')).map((j) => (
                               <SelectItem key={j.id} value={j.id}>
                                 {j.code || j.name}
                               </SelectItem>
@@ -599,7 +599,7 @@ export default function DailyReportDetailPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">None</SelectItem>
-                            {workTypes?.map((wt) => (
+                            {workTypes?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((wt) => (
                               <SelectItem key={wt.id} value={String(wt.id)}>
                                 {wt.name}
                               </SelectItem>

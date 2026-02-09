@@ -547,7 +547,7 @@ function ReoScheduleBuilderDialog({
                     <SelectValue placeholder="Select supplier..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((s) => (
+                    {[...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((s) => (
                       <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -837,7 +837,7 @@ export default function ProcurementReoSchedulingPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Jobs</SelectItem>
-                  {allJobs.map((job: any) => (
+                  {[...allJobs].sort((a: any, b: any) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job: any) => (
                     <SelectItem key={job.id} value={job.id}>
                       {job.jobNumber} - {job.name}
                     </SelectItem>
@@ -1215,7 +1215,7 @@ export default function ProcurementReoSchedulingPage() {
                   <SelectValue placeholder="Select a supplier" />
                 </SelectTrigger>
                 <SelectContent>
-                  {suppliers.map((supplier) => (
+                  {[...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((supplier) => (
                     <SelectItem key={supplier.id} value={supplier.id}>
                       {supplier.name}
                     </SelectItem>

@@ -291,7 +291,7 @@ function SendMessageTab({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No template</SelectItem>
-                {activeTemplates.map((t) => (
+                {activeTemplates.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((t) => (
                   <SelectItem key={t.id} value={t.id}>
                     {t.name}
                   </SelectItem>

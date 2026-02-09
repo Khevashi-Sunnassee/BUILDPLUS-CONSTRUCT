@@ -886,7 +886,7 @@ export default function ProductionReportDetailPage() {
                     <SelectValue placeholder="Select job" />
                   </SelectTrigger>
                   <SelectContent>
-                    {activeJobs?.map((job) => (
+                    {[...(activeJobs || [])].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job) => (
                       <SelectItem key={job.id} value={job.id}>
                         {job.jobNumber} - {job.name}
                       </SelectItem>
@@ -923,7 +923,7 @@ export default function ProductionReportDetailPage() {
                             Use the Panel Register to approve panels.
                           </div>
                         ) : (
-                          selectedJobPanels.map((panel) => (
+                          [...selectedJobPanels].sort((a, b) => (a.panelMark || '').localeCompare(b.panelMark || '')).map((panel) => (
                             <SelectItem key={panel.id} value={panel.id}>
                               {panel.panelMark} - {panel.panelType?.replace("_", " ") || "WALL"} ({panel.day28Fc || "0"} MPa)
                             </SelectItem>

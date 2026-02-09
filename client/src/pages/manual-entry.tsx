@@ -1091,7 +1091,7 @@ export default function ManualEntryPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No job selected</SelectItem>
-                            {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((job) => (
+                            {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                               <SelectItem key={job.id} value={job.id}>
                                 {job.jobNumber} - {job.name}
                               </SelectItem>
@@ -1187,7 +1187,7 @@ export default function ManualEntryPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No work type</SelectItem>
-                            {workTypes?.map((wt) => (
+                            {workTypes?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((wt) => (
                               <SelectItem key={wt.id} value={String(wt.id)}>
                                 {wt.name}
                               </SelectItem>

@@ -1390,7 +1390,7 @@ export default function KPIDashboardPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Components</SelectItem>
-                        {costDailyData?.componentNames?.map(name => (
+                        {costDailyData?.componentNames?.slice().sort((a, b) => a.localeCompare(b)).map(name => (
                           <SelectItem key={name} value={name}>{name}</SelectItem>
                         ))}
                       </SelectContent>

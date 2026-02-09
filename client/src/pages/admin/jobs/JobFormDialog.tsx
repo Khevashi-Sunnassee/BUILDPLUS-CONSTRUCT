@@ -275,7 +275,7 @@ export function JobFormDialog({
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="__none__">No customer</SelectItem>
-                            {activeCustomers?.map((customer) => (
+                            {activeCustomers?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((customer) => (
                               <SelectItem key={customer.id} value={customer.id}>
                                 {customer.name}
                               </SelectItem>
@@ -444,7 +444,7 @@ export function JobFormDialog({
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No Project Manager</SelectItem>
-                            {users?.map((user) => (
+                            {users?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((user) => (
                               <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                             ))}
                           </SelectContent>
@@ -470,7 +470,7 @@ export function JobFormDialog({
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No Factory Assigned</SelectItem>
-                            {factories?.map((factory) => (
+                            {factories?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((factory) => (
                               <SelectItem key={factory.id} value={factory.id}>
                                 <div className="flex items-center gap-2">
                                   <div 

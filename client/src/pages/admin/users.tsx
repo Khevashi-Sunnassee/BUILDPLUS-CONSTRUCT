@@ -713,7 +713,7 @@ export default function AdminUsersPage() {
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="none">No department</SelectItem>
-                              {activeDepartments.map((dept) => (
+                              {activeDepartments.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((dept) => (
                                 <SelectItem key={dept.id} value={dept.id}>
                                   {dept.name} ({dept.code})
                                 </SelectItem>
@@ -742,7 +742,7 @@ export default function AdminUsersPage() {
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="none">No default</SelectItem>
-                            {activeFactories.map((factory) => (
+                            {activeFactories.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((factory) => (
                               <SelectItem key={factory.id} value={factory.id}>
                                 {factory.name} ({factory.code})
                               </SelectItem>

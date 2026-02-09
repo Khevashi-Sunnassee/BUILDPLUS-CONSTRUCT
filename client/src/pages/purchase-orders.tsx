@@ -975,7 +975,7 @@ export default function PurchaseOrdersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Suppliers</SelectItem>
-                {suppliers.map((supplier) => (
+                {[...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((supplier) => (
                   <SelectItem key={supplier.id} value={supplier.id}>
                     {supplier.name}
                   </SelectItem>

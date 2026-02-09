@@ -755,7 +755,7 @@ export default function SalesPipelinePage() {
                   <SelectValue placeholder="Select customer..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((c) => (
+                  {[...customers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                   ))}
                 </SelectContent>

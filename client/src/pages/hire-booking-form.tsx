@@ -452,7 +452,7 @@ export default function HireBookingFormPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {internalAssets.map((asset) => (
+                          {[...internalAssets].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((asset) => (
                             <SelectItem key={asset.id} value={asset.id}>
                               {asset.assetTag} - {asset.name} ({asset.category})
                             </SelectItem>
@@ -483,7 +483,7 @@ export default function HireBookingFormPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {suppliers.map((s) => (
+                          {[...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((s) => (
                             <SelectItem key={s.id} value={s.id}>
                               {s.name}
                             </SelectItem>
@@ -532,7 +532,7 @@ export default function HireBookingFormPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {jobsList.map((j) => (
+                        {[...jobsList].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((j) => (
                           <SelectItem key={j.id} value={j.id}>
                             {j.jobNumber} - {j.name}
                           </SelectItem>
@@ -611,7 +611,7 @@ export default function HireBookingFormPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {employeesList.map((e) => (
+                          {[...employeesList].sort((a, b) => { const aName = `${a.firstName} ${a.lastName}`.toLowerCase(); const bName = `${b.firstName} ${b.lastName}`.toLowerCase(); return aName.localeCompare(bName); }).map((e) => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.firstName} {e.lastName} ({e.employeeNumber})
                             </SelectItem>
@@ -640,7 +640,7 @@ export default function HireBookingFormPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {employeesList.map((e) => (
+                          {[...employeesList].sort((a, b) => { const aName = `${a.firstName} ${a.lastName}`.toLowerCase(); const bName = `${b.firstName} ${b.lastName}`.toLowerCase(); return aName.localeCompare(bName); }).map((e) => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.firstName} {e.lastName} ({e.employeeNumber})
                             </SelectItem>
@@ -669,7 +669,7 @@ export default function HireBookingFormPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {employeesList.map((e) => (
+                          {[...employeesList].sort((a, b) => { const aName = `${a.firstName} ${a.lastName}`.toLowerCase(); const bName = `${b.firstName} ${b.lastName}`.toLowerCase(); return aName.localeCompare(bName); }).map((e) => (
                             <SelectItem key={e.id} value={e.id}>
                               {e.firstName} {e.lastName} ({e.employeeNumber})
                             </SelectItem>

@@ -267,7 +267,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {documentTypes.map((type) => (
+                        {documentTypes.slice().sort((a, b) => (a.typeName || '').localeCompare(b.typeName || '')).map((type) => (
                           <SelectItem key={type.id} value={type.id}>
                             {type.prefix} - {type.typeName}
                           </SelectItem>
@@ -292,7 +292,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {disciplines.map((d) => (
+                        {disciplines.slice().sort((a, b) => (a.disciplineName || '').localeCompare(b.disciplineName || '')).map((d) => (
                           <SelectItem key={d.id} value={d.id}>
                             {d.shortForm || d.disciplineName} - {d.disciplineName}
                           </SelectItem>
@@ -317,7 +317,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {categories.map((c) => (
+                        {categories.slice().sort((a, b) => (a.categoryName || '').localeCompare(b.categoryName || '')).map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.categoryName}
                           </SelectItem>
@@ -372,7 +372,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {jobs.map((job) => (
+                        {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                           <SelectItem key={job.id} value={job.id}>
                             {job.jobNumber} - {job.name}
                           </SelectItem>
@@ -397,7 +397,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {panels.map((panel) => (
+                        {panels.slice().sort((a, b) => (a.panelMark || '').localeCompare(b.panelMark || '')).map((panel) => (
                           <SelectItem key={panel.id} value={panel.id}>
                             {panel.panelMark}
                           </SelectItem>
@@ -422,7 +422,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {suppliers.map((supplier) => (
+                        {suppliers.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((supplier) => (
                           <SelectItem key={supplier.id} value={supplier.id}>
                             {supplier.name}
                           </SelectItem>
@@ -447,7 +447,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {purchaseOrders.map((po) => (
+                        {purchaseOrders.slice().sort((a, b) => (a.poNumber || '').localeCompare(b.poNumber || '')).map((po) => (
                           <SelectItem key={po.id} value={po.id}>
                             {po.poNumber}
                           </SelectItem>
@@ -472,7 +472,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {tasks.map((task) => (
+                        {tasks.slice().sort((a, b) => (a.title || '').localeCompare(b.title || '')).map((task) => (
                           <SelectItem key={task.id} value={task.id}>
                             {task.title}
                           </SelectItem>

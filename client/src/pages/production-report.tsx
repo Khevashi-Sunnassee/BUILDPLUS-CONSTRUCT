@@ -488,7 +488,7 @@ export default function ProductionReportPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {activeFactories.length > 0 ? (
-                        activeFactories.map((f) => (
+                        [...activeFactories].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((f) => (
                           <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                         ))
                       ) : (
@@ -569,7 +569,7 @@ export default function ProductionReportPage() {
                 <SelectContent>
                   <SelectItem value="all">All Factories</SelectItem>
                   {activeFactories.length > 0 ? (
-                    activeFactories.map((f) => (
+                    [...activeFactories].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((f) => (
                       <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
                     ))
                   ) : (

@@ -153,7 +153,7 @@ export function PanelEditDialog({
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((job) => (
+                          {jobs?.filter(j => isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                             <SelectItem key={job.id} value={job.id}>
                               {job.jobNumber} - {job.name}
                             </SelectItem>
@@ -217,7 +217,7 @@ export function PanelEditDialog({
                         </FormControl>
                         <SelectContent>
                           {panelTypes && panelTypes.length > 0 ? (
-                            panelTypes.map((pt) => (
+                            panelTypes.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((pt) => (
                               <SelectItem key={pt.id} value={pt.code}>{pt.name}</SelectItem>
                             ))
                           ) : (
@@ -253,7 +253,7 @@ export function PanelEditDialog({
                         </FormControl>
                         <SelectContent>
                           {workTypes && workTypes.length > 0 ? (
-                            workTypes.map((wt) => (
+                            workTypes.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((wt) => (
                               <SelectItem key={wt.id} value={wt.id.toString()}>{wt.name}</SelectItem>
                             ))
                           ) : (

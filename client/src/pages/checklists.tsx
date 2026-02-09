@@ -465,7 +465,7 @@ export default function ChecklistsPage() {
                   <SelectValue placeholder="Select a template" />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeTemplates.map((template) => (
+                  {activeTemplates.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((template) => (
                     <SelectItem key={template.id} value={template.id} data-testid={`option-template-${template.id}`}>
                       {template.name}
                     </SelectItem>
@@ -481,7 +481,7 @@ export default function ChecklistsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__none__" data-testid="option-job-none">None</SelectItem>
-                  {jobs?.filter(j => isJobVisibleInDropdowns(String((j as any).jobPhase ?? "CONTRACTED") as any)).map((job) => (
+                  {jobs?.filter(j => isJobVisibleInDropdowns(String((j as any).jobPhase ?? "CONTRACTED") as any)).slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                     <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                       {job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name}
                     </SelectItem>

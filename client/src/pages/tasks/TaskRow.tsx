@@ -498,7 +498,7 @@ export function TaskRow({
           </PopoverTrigger>
           <PopoverContent className="w-64 p-2" align="start">
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {users.map((user) => {
+              {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => {
                 const isAssigned = (task.assignees || []).some((a) => a.userId === user.id);
                 return (
                   <div
@@ -536,7 +536,7 @@ export function TaskRow({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="none">No job</SelectItem>
-            {jobs.map((job) => (
+            {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
               <SelectItem key={job.id} value={job.id}>
                 {job.jobNumber}
               </SelectItem>
@@ -806,7 +806,7 @@ export function TaskRow({
             </PopoverTrigger>
             <PopoverContent className="w-64 p-2" align="start">
               <div className="space-y-1 max-h-60 overflow-y-auto">
-                {users.map((user) => {
+                {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => {
                   const isAssigned = newSubtaskAssignees.includes(user.id);
                   return (
                     <div
@@ -844,7 +844,7 @@ export function TaskRow({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No job</SelectItem>
-              {jobs.map((job) => (
+              {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                 <SelectItem key={job.id} value={job.id}>
                   {job.jobNumber}
                 </SelectItem>

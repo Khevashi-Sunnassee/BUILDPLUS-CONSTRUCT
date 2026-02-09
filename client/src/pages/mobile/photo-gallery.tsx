@@ -648,7 +648,7 @@ export default function MobilePhotoGallery() {
                   <SelectValue placeholder={jobsLoading ? "Loading jobs..." : "Select a job"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {jobs.map((job) => (
+                  {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                     <SelectItem key={job.id} value={String(job.id)} data-testid={`option-job-${job.id}`}>
                       {job.jobNumber} - {job.name}
                     </SelectItem>

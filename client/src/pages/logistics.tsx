@@ -1219,7 +1219,7 @@ export default function LogisticsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)).map((job) => (
+                          {[...(jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)) || [])].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job) => (
                             <SelectItem key={job.id} value={job.id}>
                               {job.jobNumber} - {job.name}
                             </SelectItem>
@@ -1243,7 +1243,7 @@ export default function LogisticsPage() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {trailerTypes?.map((tt) => (
+                          {[...(trailerTypes || [])].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((tt) => (
                             <SelectItem key={tt.id} value={tt.id}>
                               {tt.name}
                             </SelectItem>

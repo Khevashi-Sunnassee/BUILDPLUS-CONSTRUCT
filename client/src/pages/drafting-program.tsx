@@ -371,7 +371,7 @@ export default function DraftingProgramPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Jobs</SelectItem>
-                  {allJobs.map((job) => (
+                  {allJobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                     <SelectItem key={job.id} value={job.id}>
                       {job.jobNumber} - {job.name}
                     </SelectItem>
@@ -389,7 +389,7 @@ export default function DraftingProgramPage() {
                 <SelectContent>
                   <SelectItem value="all">All Assignees</SelectItem>
                   <SelectItem value="unassigned">Unassigned</SelectItem>
-                  {uniqueAssignees.map((u: any) => (
+                  {uniqueAssignees.slice().sort((a: any, b: any) => (a?.name || a?.email || '').localeCompare(b?.name || b?.email || '')).map((u: any) => (
                     <SelectItem key={u?.id} value={u?.id || ""}>
                       {u?.name || u?.email}
                     </SelectItem>
@@ -747,7 +747,7 @@ export default function DraftingProgramPage() {
                   <SelectValue placeholder="Select a drafter" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allUsers.map((u: UserType) => (
+                  {allUsers.slice().sort((a: UserType, b: UserType) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((u: UserType) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.name || u.email}
                     </SelectItem>

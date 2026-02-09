@@ -610,7 +610,7 @@ export default function TasksPage() {
               <SelectContent>
                 <SelectItem value="all">All Jobs</SelectItem>
                 <SelectItem value="none">No Job Assigned</SelectItem>
-                {jobs.map((job) => (
+                {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map((job) => (
                   <SelectItem key={job.id} value={job.id}>
                     {job.jobNumber} - {job.name}
                   </SelectItem>

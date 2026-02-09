@@ -519,7 +519,7 @@ export default function ChatPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {jobs.map(job => (
+                        {jobs.slice().sort((a, b) => (a.jobNumber || '').localeCompare(b.jobNumber || '') || (a.name || '').localeCompare(b.name || '')).map(job => (
                           <SelectItem key={job.id} value={job.id.toString()}>
                             {job.jobNumber} - {job.name}
                           </SelectItem>
@@ -539,7 +539,7 @@ export default function ChatPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
-                        {panels.slice(0, 100).map(panel => (
+                        {panels.slice(0, 100).sort((a, b) => (a.panelMark || '').localeCompare(b.panelMark || '')).map(panel => (
                           <SelectItem key={panel.id} value={panel.id.toString()}>
                             {panel.panelMark}
                           </SelectItem>
@@ -551,7 +551,7 @@ export default function ChatPage() {
                   <div className="space-y-2">
                     <Label>Members (select at least one)</Label>
                     <ScrollArea className="h-48 border rounded-md p-2">
-                      {users.map(user => (
+                      {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map(user => (
                         <div key={user.id} className="flex items-center gap-2 py-1">
                           <Checkbox
                             checked={newConversation.memberIds.includes(String(user.id))}

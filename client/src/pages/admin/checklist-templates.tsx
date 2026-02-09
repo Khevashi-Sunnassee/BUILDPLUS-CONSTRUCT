@@ -1194,7 +1194,7 @@ export default function AdminChecklistTemplatesPage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {entityTypes?.map((type) => (
+                        {entityTypes?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((type) => (
                           <SelectItem key={type.id} value={type.id}>
                             {type.name}
                           </SelectItem>
@@ -1339,7 +1339,7 @@ export default function AdminChecklistTemplatesPage() {
                         </FormControl>
                         <SelectContent>
                           <SelectItem value="__none__">None</SelectItem>
-                          {entityTypes?.map((type) => (
+                          {entityTypes?.slice().sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((type) => (
                             <SelectItem key={type.id} value={type.id}>
                               {type.name}
                             </SelectItem>
@@ -1370,6 +1370,7 @@ export default function AdminChecklistTemplatesPage() {
                           <SelectItem value="__none__">None</SelectItem>
                           {entitySubtypes
                             ?.filter((s) => s.entityTypeId === templateForm.watch("entityTypeId"))
+                            .slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                             .map((subtype) => (
                               <SelectItem key={subtype.id} value={subtype.id}>
                                 {subtype.name}

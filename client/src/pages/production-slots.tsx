@@ -1460,7 +1460,7 @@ export default function ProductionSlotsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Jobs</SelectItem>
-                  {allJobs.map((job: any) => (
+                  {[...allJobs].sort((a: any, b: any) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job: any) => (
                     <SelectItem key={job.id} value={job.id}>{job.jobNumber} - {job.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -1474,7 +1474,7 @@ export default function ProductionSlotsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Factories</SelectItem>
-                  {factories.filter(f => f.isActive).map((factory) => (
+                  {[...factories.filter(f => f.isActive)].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((factory) => (
                     <SelectItem key={factory.id} value={factory.id}>{factory.name}</SelectItem>
                   ))}
                 </SelectContent>

@@ -850,7 +850,7 @@ export default function WeeklyJobLogsPage() {
                               <SelectValue placeholder="Select job" />
                             </SelectTrigger>
                             <SelectContent>
-                              {activeJobs.map((job) => (
+                              {[...activeJobs].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job) => (
                                 <SelectItem key={job.id} value={job.id}>
                                   {job.jobNumber} - {job.name}
                                 </SelectItem>

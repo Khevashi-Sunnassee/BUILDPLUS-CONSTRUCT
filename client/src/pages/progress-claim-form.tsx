@@ -571,7 +571,7 @@ export default function ProgressClaimFormPage() {
                     <SelectValue placeholder="Choose a job..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {jobsList.map((job) => (
+                    {[...jobsList].sort((a, b) => (a.jobNumber || a.name || '').localeCompare(b.jobNumber || b.name || '')).map((job) => (
                       <SelectItem key={job.id} value={job.id} data-testid={`option-job-${job.id}`}>
                         {job.jobNumber} - {job.name}
                       </SelectItem>

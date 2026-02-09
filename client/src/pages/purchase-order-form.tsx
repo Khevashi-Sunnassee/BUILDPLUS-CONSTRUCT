@@ -1207,7 +1207,7 @@ export default function PurchaseOrderFormPage() {
                         <SelectValue placeholder="Select a supplier" />
                       </SelectTrigger>
                       <SelectContent>
-                        {suppliers.map((supplier) => (
+                        {[...suppliers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((supplier) => (
                           <SelectItem key={supplier.id} value={supplier.id}>
                             {supplier.name}
                           </SelectItem>
