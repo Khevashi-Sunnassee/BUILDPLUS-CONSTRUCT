@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import {
   Search,
@@ -15,8 +15,11 @@ import {
   ZoomOut,
   RotateCcw,
   MessageSquare,
+  Camera,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiUpload } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -225,6 +228,35 @@ export default function MobilePhotoGallery() {
   const [excludeChat, setExcludeChat] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [viewingPhoto, setViewingPhoto] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTakePhoto = () => {
+    cameraInputRef.current?.click();
+  };
+
+  const handleCameraCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      formData.append("title", `Photo ${timestamp}`);
+
+      await apiUpload("/api/documents/upload", formData);
+
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.LIST] });
+      toast({ title: "Photo uploaded successfully" });
+    } catch (error: any) {
+      toast({ title: "Failed to upload photo", description: error.message, variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+      if (cameraInputRef.current) cameraInputRef.current.value = "";
+    }
+  };
 
   const { data: photosResult, isLoading } = useQuery<{ documents: Photo[]; total: number }>({
     queryKey: [DOCUMENT_ROUTES.LIST, "mobile-photos", { search: searchQuery, jobId: selectedJobId, typeId: selectedTypeId, excludeChat }],
@@ -494,6 +526,31 @@ export default function MobilePhotoGallery() {
             ))}
           </div>
         )}
+      </div>
+
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleCameraCapture}
+        className="hidden"
+        data-testid="input-camera-capture"
+      />
+
+      <div className="fixed bottom-20 right-4 z-30" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+        <button
+          onClick={handleTakePhoto}
+          disabled={isUploading}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-blue-500 text-white shadow-lg shadow-blue-500/30 active:scale-[0.97] disabled:opacity-60"
+          data-testid="button-take-photo"
+        >
+          {isUploading ? (
+            <Loader2 className="h-6 w-6 animate-spin" />
+          ) : (
+            <Camera className="h-6 w-6" />
+          )}
+        </button>
       </div>
 
       <MobileBottomNav />
