@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, apiUpload, getCsrfToken } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
