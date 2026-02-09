@@ -13,6 +13,7 @@ import {
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { logJobChange } from "../services/job-audit.service";
 
 const router = Router();
 
@@ -763,6 +764,15 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       }
     });
 
+    logJobChange(jobId, "ACTIVITIES_INSTANTIATED", req.session.userId || null, req.session.userName || null, {
+      changedFields: {
+        jobTypeId,
+        jobTypeName: jt.name,
+        startDate,
+        activitiesCreated: createdActivities.length,
+      },
+    });
+
     res.status(201).json({ success: true, count: createdActivities.length });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error instantiating activities");
@@ -883,10 +893,39 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
       updateData.reminderDate = updateData.reminderDate ? new Date(updateData.reminderDate) : null;
     }
 
+    const changedFields: Record<string, { from: any; to: any }> = {};
+    const trackFields = ["status", "startDate", "endDate", "estimatedDays", "predecessorSortOrder", "relationship", "name", "consultantName", "deliverable", "notes", "category", "jobPhase", "reminderDate"];
+    for (const field of trackFields) {
+      if (updateData[field] !== undefined) {
+        const oldVal = (existing as any)[field];
+        const newVal = updateData[field];
+        const oldStr = oldVal instanceof Date ? oldVal.toISOString() : String(oldVal ?? "");
+        const newStr = newVal instanceof Date ? newVal.toISOString() : String(newVal ?? "");
+        if (oldStr !== newStr) {
+          changedFields[field] = { from: oldVal ?? null, to: newVal ?? null };
+        }
+      }
+    }
+
     const [result] = await db.update(jobActivities)
       .set(updateData)
       .where(eq(jobActivities.id, String(req.params.id)))
       .returning();
+
+    if (Object.keys(changedFields).length > 0 && existing.jobId) {
+      const actionType = changedFields.status ? "ACTIVITY_STATUS_CHANGED" :
+        (changedFields.startDate || changedFields.endDate) ? "ACTIVITY_DATES_CHANGED" :
+        (changedFields.predecessorSortOrder || changedFields.relationship) ? "ACTIVITY_PREDECESSOR_CHANGED" :
+        "ACTIVITY_UPDATED";
+      logJobChange(existing.jobId, actionType, req.session?.userId || null, req.session?.userName || null, {
+        changedFields: {
+          activityId: existing.id,
+          activityName: existing.name,
+          ...changedFields,
+        },
+      });
+    }
+
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating activity");
@@ -902,6 +941,17 @@ router.delete("/api/job-activities/:id", requireAuth, requireRole("ADMIN", "MANA
     if (!existing) return res.status(404).json({ error: "Activity not found" });
 
     await db.delete(jobActivities).where(eq(jobActivities.id, String(req.params.id)));
+
+    if (existing.jobId) {
+      logJobChange(existing.jobId, "ACTIVITY_DELETED", req.session?.userId || null, req.session?.userName || null, {
+        changedFields: {
+          activityId: existing.id,
+          activityName: existing.name,
+          status: existing.status,
+        },
+      });
+    }
+
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting activity");
@@ -999,6 +1049,15 @@ router.post("/api/jobs/:jobId/activities/recalculate", requireAuth, async (req, 
             .set({ startDate: upd.startDate, endDate: upd.endDate, updatedAt: new Date() })
             .where(eq(jobActivities.id, upd.id));
         }
+      });
+    }
+
+    if (updates.length > 0) {
+      logJobChange(jobId, "ACTIVITIES_DATES_RECALCULATED", req.session?.userId || null, req.session?.userName || null, {
+        changedFields: {
+          activitiesUpdated: updates.length,
+          updatedActivities: updates.map(u => u.id),
+        },
       });
     }
 

@@ -69,6 +69,14 @@ function isOverdue(activity: ActivityWithAssignees): boolean {
   return isBefore(endDate, today);
 }
 
+function isDatePast(date: string | Date | null | undefined, status: string): boolean {
+  if (status === "DONE" || status === "SKIPPED") return false;
+  if (!date) return false;
+  const today = startOfDay(new Date());
+  const d = startOfDay(new Date(date));
+  return isBefore(d, today);
+}
+
 function getRowClassName(activity: ActivityWithAssignees): string {
   if (activity.status === "DONE") return "bg-green-50 dark:bg-green-950/20";
   if (isOverdue(activity)) return "bg-red-50 dark:bg-red-950/20";
@@ -1153,7 +1161,7 @@ function ActivityRow({
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
             type="date"
-            className="h-7 text-xs w-[120px]"
+            className={`h-7 text-xs w-[120px] ${isDatePast(activity.startDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
             value={activity.startDate ? format(new Date(activity.startDate), "yyyy-MM-dd") : ""}
             onChange={(e) => onFieldChange(activity.id, { startDate: e.target.value || null }, true)}
             data-testid={`input-start-date-${activity.id}`}
@@ -1162,7 +1170,7 @@ function ActivityRow({
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
             type="date"
-            className={`h-7 text-xs w-[120px] ${overdue ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
+            className={`h-7 text-xs w-[120px] ${isDatePast(activity.endDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
             value={activity.endDate ? format(new Date(activity.endDate), "yyyy-MM-dd") : ""}
             onChange={(e) => onFieldChange(activity.id, { endDate: e.target.value || null }, false)}
             data-testid={`input-end-date-${activity.id}`}
@@ -1235,7 +1243,7 @@ function ActivityRow({
             <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
               <Input
                 type="date"
-                className="h-6 text-xs w-[120px]"
+                className={`h-6 text-xs w-[120px] ${isDatePast(child.startDate, child.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
                 value={child.startDate ? format(new Date(child.startDate), "yyyy-MM-dd") : ""}
                 onChange={(e) => onFieldChange(child.id, { startDate: e.target.value || null }, false)}
               />
@@ -1243,7 +1251,7 @@ function ActivityRow({
             <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
               <Input
                 type="date"
-                className={`h-6 text-xs w-[120px] ${childOverdue ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
+                className={`h-6 text-xs w-[120px] ${isDatePast(child.endDate, child.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
                 value={child.endDate ? format(new Date(child.endDate), "yyyy-MM-dd") : ""}
                 onChange={(e) => onFieldChange(child.id, { endDate: e.target.value || null }, false)}
               />
@@ -1503,18 +1511,20 @@ function ActivitySidebar({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">Start Date</Label>
+                  <Label className={`text-xs ${isDatePast(activity.startDate, activity.status) ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>Start Date</Label>
                   <Input
                     type="date"
+                    className={isDatePast(activity.startDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}
                     value={activity.startDate ? format(new Date(activity.startDate), "yyyy-MM-dd") : ""}
                     onChange={(e) => updateActivityMutation.mutate({ id: activity.id, startDate: e.target.value || null, _recalculate: true })}
                     data-testid="sidebar-input-start-date"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-muted-foreground text-xs">End Date</Label>
+                  <Label className={`text-xs ${isDatePast(activity.endDate, activity.status) ? "text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>End Date</Label>
                   <Input
                     type="date"
+                    className={isDatePast(activity.endDate, activity.status) ? "border-red-500 text-red-600 dark:text-red-400" : ""}
                     value={activity.endDate ? format(new Date(activity.endDate), "yyyy-MM-dd") : ""}
                     onChange={(e) => updateActivityMutation.mutate({ id: activity.id, endDate: e.target.value || null })}
                     data-testid="sidebar-input-end-date"

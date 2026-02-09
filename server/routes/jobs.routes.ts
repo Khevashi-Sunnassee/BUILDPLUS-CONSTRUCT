@@ -973,6 +973,9 @@ router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MAN
     }
     if (parseResult.data.notes !== undefined) updateData.notes = parseResult.data.notes;
 
+    const [existing] = await db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.id, String(req.params.entryId)));
+
     const [updated] = await db.update(jobLevelCycleTimes)
       .set(updateData)
       .where(eq(jobLevelCycleTimes.id, String(req.params.entryId)))
@@ -981,6 +984,32 @@ router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MAN
     if (!updated) {
       return res.status(404).json({ error: "Programme entry not found" });
     }
+
+    if (existing) {
+      const changedFields: Record<string, { from: any; to: any }> = {};
+      const trackKeys = ["cycleDays", "predecessorSequenceOrder", "relationship", "manualStartDate", "manualEndDate", "notes"];
+      for (const key of trackKeys) {
+        if (updateData[key] !== undefined) {
+          const oldVal = (existing as any)[key];
+          const newVal = updateData[key];
+          const oldStr = oldVal instanceof Date ? oldVal.toISOString() : String(oldVal ?? "");
+          const newStr = newVal instanceof Date ? newVal.toISOString() : String(newVal ?? "");
+          if (oldStr !== newStr) {
+            changedFields[key] = { from: oldVal ?? null, to: newVal ?? null };
+          }
+        }
+      }
+      if (Object.keys(changedFields).length > 0) {
+        const entryLabel = existing.pourLabel ? `${existing.level} Pour ${existing.pourLabel}` : existing.level;
+        const actionType = (changedFields.manualStartDate || changedFields.manualEndDate) ? "PROGRAMME_DATES_CHANGED" :
+          (changedFields.predecessorSequenceOrder || changedFields.relationship) ? "PROGRAMME_PREDECESSOR_CHANGED" :
+          "PROGRAMME_ENTRY_UPDATED";
+        logJobChange(job.id, actionType, req.session?.userId || null, req.session?.userName || null, {
+          changedFields: { entryId: existing.id, entryLabel, ...changedFields },
+        });
+      }
+    }
+
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating programme entry");
@@ -1047,6 +1076,11 @@ router.post("/api/admin/jobs/:id/programme/split", requireRole("ADMIN", "MANAGER
 
     const { entryId } = z.object({ entryId: z.string() }).parse(req.body);
     const result = await storage.splitProgrammeEntry(String(req.params.id), entryId);
+
+    logJobChange(job.id, "PROGRAMME_LEVEL_SPLIT", req.session?.userId || null, req.session?.userName || null, {
+      changedFields: { entryId, newEntryCount: result.length },
+    });
+
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error splitting programme entry");
@@ -1064,6 +1098,11 @@ router.post("/api/admin/jobs/:id/programme/reorder", requireRole("ADMIN", "MANAG
 
     const { orderedIds } = z.object({ orderedIds: z.array(z.string()) }).parse(req.body);
     const result = await storage.reorderProgramme(String(req.params.id), orderedIds);
+
+    logJobChange(job.id, "PROGRAMME_REORDERED", req.session?.userId || null, req.session?.userName || null, {
+      changedFields: { entriesReordered: orderedIds.length },
+    });
+
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error reordering programme");
@@ -1182,6 +1221,11 @@ router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "M
     });
 
     const result = await storage.saveJobProgramme(String(req.params.id), updatedEntries);
+
+    logJobChange(job.id, "PROGRAMME_DATES_RECALCULATED", req.session?.userId || null, req.session?.userName || null, {
+      changedFields: { entriesRecalculated: updatedEntries.length },
+    });
+
     res.json(result.sort((a, b) => a.sequenceOrder - b.sequenceOrder));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error recalculating programme dates");
@@ -1196,7 +1240,13 @@ router.delete("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MA
     if (!job || job.companyId !== req.companyId) {
       return res.status(404).json({ error: "Job not found" });
     }
-    const result = await storage.deleteProgrammeEntry(String(req.params.id), String(req.params.entryId));
+    const entryId = String(req.params.entryId);
+    const result = await storage.deleteProgrammeEntry(String(req.params.id), entryId);
+
+    logJobChange(job.id, "PROGRAMME_ENTRY_DELETED", req.session?.userId || null, req.session?.userName || null, {
+      changedFields: { entryId },
+    });
+
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting programme entry");
