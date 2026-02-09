@@ -413,9 +413,6 @@ export default function AdminCustomersPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-customer-phone">
                     <span className="flex items-center">Phone<SortIcon column="phone" /></span>
                   </TableHead>
-                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("abn")} data-testid="sort-customer-abn">
-                    <span className="flex items-center">ABN<SortIcon column="abn" /></span>
-                  </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("location")} data-testid="sort-customer-location">
                     <span className="flex items-center">Location<SortIcon column="location" /></span>
                   </TableHead>
@@ -439,9 +436,6 @@ export default function AdminCustomersPage() {
                     </TableCell>
                     <TableCell data-testid={`text-customer-phone-${customer.id}`}>
                       {customer.phone || "-"}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm" data-testid={`text-customer-abn-${customer.id}`}>
-                      {customer.abn || "-"}
                     </TableCell>
                     <TableCell data-testid={`text-customer-location-${customer.id}`}>
                       {[customer.city, customer.state].filter(Boolean).join(", ") || "-"}
