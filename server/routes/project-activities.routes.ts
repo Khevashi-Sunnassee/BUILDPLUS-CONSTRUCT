@@ -346,6 +346,8 @@ const templateSchema = z.object({
   consultantName: z.string().optional().nullable(),
   deliverable: z.string().optional().nullable(),
   jobPhase: z.string().optional().nullable(),
+  predecessorSortOrder: z.number().int().optional().nullable(),
+  relationship: z.enum(["FS", "SS", "FF", "SF"]).optional().nullable(),
   sortOrder: z.number().int().optional(),
 });
 
@@ -588,13 +590,64 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       return result;
     }
 
+    function subtractWorkingDays(from: Date, days: number): Date {
+      const result = new Date(from);
+      let subtracted = 0;
+      while (subtracted < days) {
+        result.setDate(result.getDate() - 1);
+        const dow = result.getDay();
+        if (dow !== 0 && dow !== 6) {
+          subtracted++;
+        }
+      }
+      return result;
+    }
+
     const createdActivities: any[] = [];
-    let currentStartDate = ensureWorkingDay(new Date(startDate));
+    const projectStart = ensureWorkingDay(new Date(startDate));
+
+    const resolvedDates = new Map<number, { start: Date; end: Date }>();
+
+    for (const template of templates) {
+      const estimatedDays = template.estimatedDays || 14;
+      const predOrder = template.predecessorSortOrder;
+      const rel = template.relationship || "FS";
+      let activityStart: Date;
+
+      if (predOrder != null && predOrder < template.sortOrder && resolvedDates.has(predOrder)) {
+        const pred = resolvedDates.get(predOrder)!;
+        switch (rel) {
+          case "FS":
+            activityStart = nextWorkingDay(pred.end);
+            break;
+          case "SS":
+            activityStart = new Date(pred.start);
+            break;
+          case "FF": {
+            const tempEnd = new Date(pred.end);
+            activityStart = subtractWorkingDays(tempEnd, estimatedDays - 1);
+            break;
+          }
+          case "SF": {
+            const tempEnd = new Date(pred.start);
+            activityStart = subtractWorkingDays(tempEnd, estimatedDays - 1);
+            break;
+          }
+          default:
+            activityStart = nextWorkingDay(pred.end);
+        }
+        activityStart = ensureWorkingDay(activityStart);
+      } else {
+        activityStart = new Date(projectStart);
+      }
+
+      const activityEndDate = addWorkingDays(activityStart, estimatedDays - 1);
+      resolvedDates.set(template.sortOrder, { start: activityStart, end: activityEndDate });
+    }
 
     await db.transaction(async (tx) => {
       for (const template of templates) {
-        const estimatedDays = template.estimatedDays || 14;
-        const activityEndDate = addWorkingDays(currentStartDate, estimatedDays - 1);
+        const dates = resolvedDates.get(template.sortOrder)!;
 
         const [activity] = await tx.insert(jobActivities).values({
           jobId,
@@ -609,15 +662,15 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
           deliverable: template.deliverable,
           jobPhase: template.jobPhase,
           sortOrder: template.sortOrder,
-          startDate: currentStartDate,
-          endDate: activityEndDate,
+          startDate: dates.start,
+          endDate: dates.end,
           createdById: req.session.userId,
         }).returning();
 
         createdActivities.push(activity);
 
         const subs = filteredSubtasks.filter(s => s.templateId === template.id);
-        let subStartDate = new Date(currentStartDate);
+        let subStartDate = new Date(dates.start);
         for (const sub of subs) {
           const subDays = sub.estimatedDays || 7;
           const subEndDate = addWorkingDays(subStartDate, subDays - 1);
@@ -637,8 +690,6 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
           });
           subStartDate = nextWorkingDay(subEndDate);
         }
-
-        currentStartDate = nextWorkingDay(activityEndDate);
       }
     });
 

@@ -3483,6 +3483,8 @@ export const activityTemplates = pgTable("activity_templates", {
   consultantName: text("consultant_name"),
   deliverable: text("deliverable"),
   jobPhase: text("job_phase"),
+  predecessorSortOrder: integer("predecessor_sort_order"),
+  relationship: text("relationship"),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

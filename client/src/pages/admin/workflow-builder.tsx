@@ -41,7 +41,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronRight,
-  Loader2, Calendar, Clock, User, FileText, Layers, ListPlus, Download, Upload,
+  Loader2, Calendar, Clock, User, FileText, Layers, ListPlus, Download, Upload, Link2,
 } from "lucide-react";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate } from "@shared/schema";
@@ -51,6 +51,13 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 
 type TemplateWithSubtasks = ActivityTemplate & {
   subtasks: Array<{ id: string; name: string; estimatedDays: number | null; sortOrder: number }>;
+};
+
+const RELATIONSHIP_LABELS: Record<string, string> = {
+  FS: "Finish to Start",
+  SS: "Start to Start",
+  FF: "Finish to Finish",
+  SF: "Start to Finish",
 };
 
 function SortableActivity({
@@ -134,6 +141,12 @@ function SortableActivity({
                   {template.deliverable}
                 </span>
               )}
+              {(template as any).predecessorSortOrder != null && (template as any).relationship && (
+                <span className="flex items-center gap-1">
+                  <Link2 className="h-3 w-3" />
+                  Pred: {(template as any).predecessorSortOrder + 1} ({(template as any).relationship})
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -207,6 +220,8 @@ export default function WorkflowBuilderPage() {
   const [formConsultantId, setFormConsultantId] = useState("");
   const [formConsultantName, setFormConsultantName] = useState("");
   const [formDeliverable, setFormDeliverable] = useState("");
+  const [formPredecessor, setFormPredecessor] = useState<number | null>(null);
+  const [formRelationship, setFormRelationship] = useState("");
   const [formJobPhase, setFormJobPhase] = useState("");
 
   const { data: jobType, isLoading: loadingJobType } = useQuery<JobType>({
@@ -242,6 +257,11 @@ export default function WorkflowBuilderPage() {
     }
     return map;
   }, [templates, stages]);
+
+  const allTemplatesSorted = useMemo(() => {
+    if (!templates) return [];
+    return [...templates].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+  }, [templates]);
 
   const usedStageIds = useMemo(() => new Set(templates?.map(t => t.stageId) || []), [templates]);
 
@@ -406,6 +426,8 @@ export default function WorkflowBuilderPage() {
     setFormConsultantName("");
     setFormDeliverable("");
     setFormJobPhase("");
+    setFormPredecessor(null);
+    setFormRelationship("");
   }
 
   function openCreateDialog(stageId?: string) {
@@ -419,6 +441,8 @@ export default function WorkflowBuilderPage() {
     setFormConsultantName("");
     setFormDeliverable("");
     setFormJobPhase("");
+    setFormPredecessor(null);
+    setFormRelationship("");
     setShowTemplateDialog(true);
   }
 
@@ -433,12 +457,18 @@ export default function WorkflowBuilderPage() {
     setFormConsultantName(template.consultantName || "");
     setFormDeliverable(template.deliverable || "");
     setFormJobPhase(template.jobPhase || "");
+    setFormPredecessor((template as any).predecessorSortOrder ?? null);
+    setFormRelationship((template as any).relationship || "");
     setShowTemplateDialog(true);
   }
 
   function handleTemplateSubmit() {
     if (!formName.trim() || !formStageId) {
       toast({ title: "Name and Stage are required", variant: "destructive" });
+      return;
+    }
+    if (formPredecessor !== null && !formRelationship) {
+      toast({ title: "Relationship type is required when a predecessor is set", variant: "destructive" });
       return;
     }
 
@@ -453,6 +483,8 @@ export default function WorkflowBuilderPage() {
       consultantName: selectedConsultant?.name || formConsultantName.trim() || null,
       deliverable: formDeliverable.trim() || null,
       jobPhase: formJobPhase || null,
+      predecessorSortOrder: formPredecessor,
+      relationship: formRelationship || null,
     };
 
     if (editingTemplate) {
@@ -741,6 +773,57 @@ export default function WorkflowBuilderPage() {
                 placeholder="e.g. DA drawings"
                 data-testid="input-template-deliverable"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Predecessor</Label>
+                <Select
+                  value={formPredecessor !== null ? String(formPredecessor) : "none"}
+                  onValueChange={(val) => {
+                    setFormPredecessor(val === "none" ? null : parseInt(val));
+                    if (val === "none") setFormRelationship("");
+                    else if (!formRelationship) setFormRelationship("FS");
+                  }}
+                >
+                  <SelectTrigger data-testid="select-predecessor">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {allTemplatesSorted
+                      .filter(t => {
+                        if (editingTemplate && t.id === editingTemplate.id) return false;
+                        if (editingTemplate && t.sortOrder >= editingTemplate.sortOrder) return false;
+                        return true;
+                      })
+                      .map((t) => (
+                        <SelectItem key={t.id} value={String(t.sortOrder)}>
+                          {t.sortOrder + 1}. {t.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Relationship</Label>
+                <Select
+                  value={formRelationship || "none"}
+                  onValueChange={(val) => setFormRelationship(val === "none" ? "" : val)}
+                  disabled={formPredecessor === null}
+                >
+                  <SelectTrigger data-testid="select-relationship">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="FS">Finish to Start (FS)</SelectItem>
+                    <SelectItem value="SS">Start to Start (SS)</SelectItem>
+                    <SelectItem value="FF">Finish to Finish (FF)</SelectItem>
+                    <SelectItem value="SF">Start to Finish (SF)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="space-y-2">
