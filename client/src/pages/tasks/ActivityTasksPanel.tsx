@@ -23,8 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   Plus, Calendar as CalendarIcon, MessageSquare, Paperclip,
-  Trash2, GripVertical, Users, Bell, Check, Eye, EyeOff,
-  Loader2,
+  GripVertical, Users, Bell, Eye, EyeOff, Loader2, MoreHorizontal, Trash2,
 } from "lucide-react";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -35,6 +34,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Task, TaskStatus, TaskPriority, User, Job } from "./types";
 import { STATUS_CONFIG, PRIORITY_CONFIG, PROJECT_STAGES, getInitials } from "./types";
+
+const GRID_TEMPLATE = "40px minmax(200px,1fr) 40px 100px 100px 120px 90px 120px 100px 60px 60px 40px";
 
 interface ActivityTasksPanelProps {
   activityId: string;
@@ -132,64 +133,86 @@ export function ActivityTasksPanel({
   }
 
   return (
-    <div className="space-y-1" data-testid={`activity-tasks-panel-${activityId}`}>
-      <div className="flex items-center justify-between px-2 py-1">
-        <span className="text-xs font-medium text-muted-foreground">
-          Tasks ({tasks.length}{completedCount > 0 ? `, ${completedCount} done` : ""})
-        </span>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 text-xs gap-1"
-          onClick={() => setShowCompleted(!showCompleted)}
-          data-testid={`button-toggle-completed-${activityId}`}
-        >
-          {showCompleted ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-          {showCompleted ? "Hide Done" : "Show Done"}
-        </Button>
-      </div>
+    <div data-testid={`activity-tasks-panel-${activityId}`}>
+      <div className="overflow-x-auto">
+        <div className="min-w-max">
+          <div className="grid text-xs text-muted-foreground font-medium border-b bg-muted/50 py-1.5" style={{ gridTemplateColumns: GRID_TEMPLATE }}>
+            <div />
+            <div className="px-2 flex items-center justify-between">
+              <span>Item ({tasks.length}{completedCount > 0 ? `, ${completedCount} done` : ""})</span>
+            </div>
+            <div />
+            <div className="px-2 text-center">Users</div>
+            <div className="px-2">Job</div>
+            <div className="px-2 text-center">Status</div>
+            <div className="px-2 text-center">Priority</div>
+            <div className="px-2">Stage</div>
+            <div className="px-2">Date</div>
+            <div className="px-2 text-center">Reminder</div>
+            <div className="px-2 text-center">Files</div>
+            <div className="px-1 flex items-center justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 text-[10px] gap-0.5 px-1"
+                onClick={() => setShowCompleted(!showCompleted)}
+                data-testid={`button-toggle-completed-${activityId}`}
+              >
+                {showCompleted ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+              </Button>
+            </div>
+          </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={visibleTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-          {visibleTasks.map(task => (
-            <SortableActivityTask
-              key={task.id}
-              task={task}
-              users={users}
-              jobs={jobs}
-              activityId={activityId}
-              queryKey={queryKey}
-              activityStartDate={activityStartDate}
-              activityEndDate={activityEndDate}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={visibleTasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
+              {visibleTasks.map(task => (
+                <SortableActivityTask
+                  key={task.id}
+                  task={task}
+                  users={users}
+                  jobs={jobs}
+                  activityId={activityId}
+                  jobId={jobId}
+                  queryKey={queryKey}
+                  activityStartDate={activityStartDate}
+                  activityEndDate={activityEndDate}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
 
-      <div className="flex items-center gap-2 px-2 py-1">
-        <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-        <Input
-          ref={newTaskInputRef}
-          placeholder="Add a task..."
-          className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 bg-transparent"
-          value={newTaskTitle}
-          onChange={(e) => setNewTaskTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleCreateTask();
-          }}
-          data-testid={`input-new-task-${activityId}`}
-        />
-        {newTaskTitle.trim() && (
-          <Button
-            size="sm"
-            className="h-6 text-xs"
-            onClick={handleCreateTask}
-            disabled={createTaskMutation.isPending}
-            data-testid={`button-add-task-${activityId}`}
+          <div
+            className="grid items-center border-b border-dashed border-border/30 bg-muted/20"
+            style={{ gridTemplateColumns: GRID_TEMPLATE }}
           >
-            Add
-          </Button>
-        )}
+            <div />
+            <div className="flex items-center gap-2 py-1 px-2">
+              <Plus className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <Input
+                ref={newTaskInputRef}
+                placeholder="Add a task..."
+                className="h-7 text-xs border-0 shadow-none focus-visible:ring-0 bg-transparent"
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleCreateTask();
+                }}
+                disabled={createTaskMutation.isPending}
+                data-testid={`input-new-task-${activityId}`}
+              />
+            </div>
+            <div />
+            <div />
+            <div className="px-2 text-xs text-muted-foreground truncate">{jobs.find(j => j.id === jobId)?.jobNumber || ""}</div>
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+            <div />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -200,6 +223,7 @@ function SortableActivityTask({
   users,
   jobs,
   activityId,
+  jobId,
   queryKey,
   activityStartDate,
   activityEndDate,
@@ -208,6 +232,7 @@ function SortableActivityTask({
   users: User[];
   jobs: Job[];
   activityId: string;
+  jobId: string;
   queryKey: string[];
   activityStartDate?: string | null;
   activityEndDate?: string | null;
@@ -229,6 +254,7 @@ function SortableActivityTask({
         users={users}
         jobs={jobs}
         activityId={activityId}
+        jobId={jobId}
         queryKey={queryKey}
         sortableAttributes={attributes}
         sortableListeners={listeners}
@@ -244,6 +270,7 @@ function ActivityTaskRow({
   users,
   jobs,
   activityId,
+  jobId,
   queryKey,
   sortableAttributes,
   sortableListeners,
@@ -254,6 +281,7 @@ function ActivityTaskRow({
   users: User[];
   jobs: Job[];
   activityId: string;
+  jobId: string;
   queryKey: string[];
   sortableAttributes?: Record<string, any>;
   sortableListeners?: Record<string, any>;
@@ -344,6 +372,18 @@ function ActivityTaskRow({
     }
   }
 
+  function handleStatusChange(status: TaskStatus) {
+    updateMutation.mutate({ status } as any);
+  }
+
+  function handlePriorityChange(val: string) {
+    updateMutation.mutate({ priority: val === "none" ? null : val } as any);
+  }
+
+  function handleStageChange(val: string) {
+    updateMutation.mutate({ projectStage: val === "none" ? null : val } as any);
+  }
+
   function validateDate(date: Date | undefined): boolean {
     if (!date) return true;
     if (activityStartDate && isBefore(date, startOfDay(new Date(activityStartDate)))) {
@@ -361,157 +401,235 @@ function ActivityTaskRow({
     return true;
   }
 
+  function handleDateChange(date: Date | undefined) {
+    if (validateDate(date)) {
+      updateMutation.mutate({ dueDate: date ? date.toISOString() : null } as any);
+    }
+  }
+
+  function handleReminderChange(date: Date | undefined) {
+    updateMutation.mutate({ reminderDate: date ? date.toISOString() : null } as any);
+  }
+
   const isDone = task.status === "DONE";
   const isOverdue = task.dueDate && !isDone && isBefore(startOfDay(new Date(task.dueDate)), startOfDay(new Date()));
-  const statusCfg = STATUS_CONFIG[task.status as TaskStatus] || STATUS_CONFIG.NOT_STARTED;
+  const jobData = jobs.find(j => j.id === jobId);
 
   return (
     <>
       <div
         className={cn(
-          "flex items-center gap-1 px-1 py-0.5 rounded group",
-          isDone && "opacity-60",
+          "grid items-center border-b border-border/50 hover-elevate group relative",
+          isDone && "bg-green-50 dark:bg-green-950/30",
           isOverdue && "bg-red-50/50 dark:bg-red-950/10",
         )}
+        style={{ gridTemplateColumns: GRID_TEMPLATE }}
         data-testid={`activity-task-row-${task.id}`}
       >
         <div
-          className="cursor-grab opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-          {...sortableAttributes}
-          {...sortableListeners}
+          className="flex items-center justify-center px-1"
+          {...(sortableAttributes || {})}
+          {...(sortableListeners || {})}
         >
-          <GripVertical className="h-3 w-3 text-muted-foreground" />
+          <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab opacity-0 group-hover:opacity-100" />
         </div>
 
-        <Checkbox
-          checked={isDone}
-          onCheckedChange={(checked) => {
-            updateMutation.mutate({ status: checked ? "DONE" : "NOT_STARTED" } as any);
-          }}
-          className="h-3.5 w-3.5 flex-shrink-0"
-          data-testid={`checkbox-task-${task.id}`}
-        />
+        <div className="flex items-center gap-2 py-1 px-2">
+          <Checkbox
+            checked={isDone}
+            onCheckedChange={(checked) => {
+              updateMutation.mutate({ status: checked ? "DONE" : "NOT_STARTED" } as any);
+            }}
+            className="h-4 w-4 flex-shrink-0"
+            data-testid={`checkbox-task-${task.id}`}
+          />
+          <Input
+            ref={titleInputRef}
+            className={cn(
+              "h-7 border-0 bg-transparent focus-visible:ring-1 text-sm flex-1 min-w-0",
+              isDone && "line-through text-muted-foreground",
+            )}
+            value={localTitle}
+            onChange={(e) => setLocalTitle(e.target.value)}
+            onBlur={handleTitleBlur}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") titleInputRef.current?.blur();
+            }}
+            data-testid={`input-task-title-${task.id}`}
+          />
+        </div>
 
-        <Input
-          ref={titleInputRef}
-          className={cn(
-            "h-6 text-xs border-0 shadow-none focus-visible:ring-0 bg-transparent flex-1 min-w-0",
-            isDone && "line-through text-muted-foreground",
-          )}
-          value={localTitle}
-          onChange={(e) => setLocalTitle(e.target.value)}
-          onBlur={handleTitleBlur}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") titleInputRef.current?.blur();
-          }}
-          data-testid={`input-task-title-${task.id}`}
-        />
+        <div className="flex items-center justify-center">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                data-testid={`btn-updates-${task.id}`}
+              >
+                <MessageSquare className="h-4 w-4" />
+                {task.updatesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                    {task.updatesCount}
+                  </span>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Updates</TooltipContent>
+          </Tooltip>
+        </div>
 
         <Popover open={showAssigneePopover} onOpenChange={setShowAssigneePopover}>
           <PopoverTrigger asChild>
-            <button
-              className="flex items-center gap-0.5 flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
-              data-testid={`button-assignees-${task.id}`}
+            <div
+              className="flex items-center gap-1 px-2 py-1 cursor-pointer hover:bg-muted/50 rounded"
+              data-testid={`assignees-${task.id}`}
             >
-              {task.assignees.length > 0 ? (
-                <div className="flex -space-x-1.5">
-                  {task.assignees.slice(0, 3).map(a => (
-                    <Avatar key={a.id} className="h-5 w-5 border border-background">
-                      <AvatarFallback className="text-[8px]">
-                        {getInitials(a.user?.name || a.user?.email || "")}
+              {(task.assignees?.length || 0) > 0 ? (
+                <div className="flex -space-x-2">
+                  {(task.assignees || []).slice(0, 3).map((assignee) => (
+                    <Avatar key={assignee.id} className="h-6 w-6 border-2 border-background">
+                      <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                        {getInitials(assignee.user?.name)}
                       </AvatarFallback>
                     </Avatar>
                   ))}
-                  {task.assignees.length > 3 && (
-                    <span className="text-[9px] text-muted-foreground ml-1">+{task.assignees.length - 3}</span>
+                  {(task.assignees?.length || 0) > 3 && (
+                    <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] border-2 border-background">
+                      +{(task.assignees?.length || 0) - 3}
+                    </div>
                   )}
                 </div>
               ) : (
-                <Users className="h-3 w-3 text-muted-foreground" />
+                <Users className="h-4 w-4 text-muted-foreground" />
               )}
-            </button>
+            </div>
           </PopoverTrigger>
-          <PopoverContent className="w-52 p-2" align="end">
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {users.map(u => {
-                const isAssigned = task.assignees.some(a => a.userId === u.id);
+          <PopoverContent className="w-64 p-2" align="start">
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {users.slice().sort((a, b) => (a.name || a.email || '').localeCompare(b.name || b.email || '')).map((user) => {
+                const isAssigned = (task.assignees || []).some((a) => a.userId === user.id);
                 return (
-                  <button
-                    key={u.id}
+                  <div
+                    key={user.id}
                     className={cn(
-                      "flex items-center gap-2 w-full px-2 py-1 rounded text-xs hover-elevate",
-                      isAssigned && "bg-accent",
+                      "flex items-center gap-2 p-2 rounded cursor-pointer hover-elevate",
+                      isAssigned && "bg-primary/10"
                     )}
-                    onClick={() => toggleAssignee(u.id)}
-                    data-testid={`button-toggle-assignee-${u.id}-${task.id}`}
+                    onClick={() => toggleAssignee(user.id)}
+                    data-testid={`assignee-option-${user.id}-${task.id}`}
                   >
-                    <Avatar className="h-4 w-4">
-                      <AvatarFallback className="text-[7px]">{getInitials(u.name || u.email)}</AvatarFallback>
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-[10px]">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="truncate">{u.name || u.email}</span>
-                    {isAssigned && <Check className="h-3 w-3 ml-auto text-green-500 flex-shrink-0" />}
-                  </button>
+                    <span className="text-sm flex-1">{user.name || user.email}</span>
+                    {isAssigned && <div className="h-2 w-2 rounded-full bg-primary" />}
+                  </div>
                 );
               })}
             </div>
           </PopoverContent>
         </Popover>
 
-        <Select
-          value={task.status}
-          onValueChange={(val) => updateMutation.mutate({ status: val } as any)}
-        >
-          <SelectTrigger className="h-5 w-auto text-[10px] border-0 shadow-none px-1.5 gap-0.5" data-testid={`select-status-${task.id}`}>
-            <span
-              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-              style={{ backgroundColor: statusCfg.color }}
-            />
+        <div className="px-2 text-xs text-muted-foreground truncate" data-testid={`text-job-${task.id}`}>
+          {jobData ? jobData.jobNumber : "No job"}
+        </div>
+
+        <Select value={task.status} onValueChange={(v) => handleStatusChange(v as TaskStatus)}>
+          <SelectTrigger
+            className="h-7 border-0 text-xs justify-center"
+            data-testid={`select-status-${task.id}`}
+          >
+            <div
+              className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", STATUS_CONFIG[task.status as TaskStatus]?.bgClass || "bg-gray-500")}
+            >
+              {STATUS_CONFIG[task.status as TaskStatus]?.label || task.status}
+            </div>
           </SelectTrigger>
           <SelectContent>
-            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+            {Object.entries(STATUS_CONFIG).map(([key, config]) => (
               <SelectItem key={key} value={key}>
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: cfg.color }} />
-                  {cfg.label}
+                <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", config.bgClass)}>
+                  {config.label}
                 </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {task.priority && (
-          <span className={cn(
-            "text-[9px] px-1 rounded font-medium text-white flex-shrink-0",
-            PRIORITY_CONFIG[task.priority as TaskPriority]?.bgClass || "bg-gray-500",
-          )}>
-            {PRIORITY_CONFIG[task.priority as TaskPriority]?.label || task.priority}
-          </span>
-        )}
+        <Select
+          value={task.priority || "none"}
+          onValueChange={handlePriorityChange}
+        >
+          <SelectTrigger
+            className="h-7 border-0 text-xs justify-center"
+            data-testid={`select-priority-${task.id}`}
+          >
+            {task.priority && PRIORITY_CONFIG[task.priority as TaskPriority] ? (
+              <div
+                className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", PRIORITY_CONFIG[task.priority as TaskPriority].bgClass)}
+              >
+                {PRIORITY_CONFIG[task.priority as TaskPriority].label}
+              </div>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No priority</SelectItem>
+            {Object.entries(PRIORITY_CONFIG).map(([key, config]) => (
+              <SelectItem key={key} value={key}>
+                <div className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", config.bgClass)}>
+                  {config.label}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={task.projectStage || "none"}
+          onValueChange={handleStageChange}
+        >
+          <SelectTrigger
+            className="h-7 border-0 text-xs"
+            data-testid={`select-stage-${task.id}`}
+          >
+            <SelectValue placeholder="Stage" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">No stage</SelectItem>
+            {PROJECT_STAGES.map((stage) => (
+              <SelectItem key={stage} value={stage}>
+                {stage}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
         <Popover>
           <PopoverTrigger asChild>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               className={cn(
-                "flex items-center gap-0.5 text-[10px] flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity",
-                isOverdue && "text-red-500 opacity-100",
+                "h-7 px-2 text-xs justify-start",
+                isOverdue && "text-red-500 hover:text-red-600"
               )}
-              data-testid={`button-due-date-${task.id}`}
+              data-testid={`btn-date-${task.id}`}
             >
-              <CalendarIcon className="h-3 w-3" />
-              {task.dueDate && (
-                <span>{format(new Date(task.dueDate), "MMM d")}</span>
-              )}
-            </button>
+              <CalendarIcon className={cn("h-3 w-3 mr-1", isOverdue && "text-red-500")} />
+              {task.dueDate ? format(new Date(task.dueDate), "dd/MM/yy") : "No date"}
+            </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
+          <PopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
               selected={task.dueDate ? new Date(task.dueDate) : undefined}
-              onSelect={(date) => {
-                if (validateDate(date)) {
-                  updateMutation.mutate({ dueDate: date ? date.toISOString() : null } as any);
-                }
-              }}
+              onSelect={handleDateChange}
               disabled={(date) => {
                 if (activityStartDate && isBefore(date, startOfDay(new Date(activityStartDate)))) return true;
                 if (activityEndDate) {
@@ -521,14 +639,15 @@ function ActivityTaskRow({
                 }
                 return false;
               }}
+              initialFocus
             />
             {task.dueDate && (
               <div className="p-2 border-t">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full h-7 text-xs text-destructive"
-                  onClick={() => updateMutation.mutate({ dueDate: null } as any)}
+                  className="w-full text-destructive hover:text-destructive"
+                  onClick={() => handleDateChange(undefined)}
                 >
                   Clear date
                 </Button>
@@ -537,25 +656,81 @@ function ActivityTaskRow({
           </PopoverContent>
         </Popover>
 
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          {task.updatesCount > 0 && (
-            <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
-              <MessageSquare className="h-2.5 w-2.5" />{task.updatesCount}
-            </span>
-          )}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-7 px-2 text-xs justify-center",
+                task.reminderDate && "text-amber-600 dark:text-amber-400"
+              )}
+              data-testid={`btn-reminder-${task.id}`}
+            >
+              <Bell className={cn("h-4 w-4", task.reminderDate && "fill-current")} />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <div className="p-2 border-b">
+              <p className="text-sm font-medium">Set Reminder</p>
+            </div>
+            <Calendar
+              mode="single"
+              selected={task.reminderDate ? new Date(task.reminderDate) : undefined}
+              onSelect={handleReminderChange}
+              initialFocus
+            />
+            {task.reminderDate && (
+              <div className="p-2 border-t">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full text-destructive hover:text-destructive"
+                  onClick={() => handleReminderChange(undefined)}
+                >
+                  Clear Reminder
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
+
+        <div className="flex items-center justify-center gap-1 text-muted-foreground">
           {task.filesCount > 0 && (
-            <span className="flex items-center gap-0.5 text-[9px] text-muted-foreground">
-              <Paperclip className="h-2.5 w-2.5" />{task.filesCount}
-            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 text-xs">
+                  <Paperclip className="h-3 w-3" />
+                  {task.filesCount}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>Files</TooltipContent>
+            </Tooltip>
           )}
-          <button
-            className="p-0.5 text-muted-foreground hover:text-destructive transition-colors"
-            onClick={() => setShowDeleteConfirm(true)}
-            data-testid={`button-delete-task-${task.id}`}
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
         </div>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="opacity-0 group-hover:opacity-100"
+              data-testid={`btn-task-menu-${task.id}`}
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+              data-testid={`menu-delete-task-${task.id}`}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
