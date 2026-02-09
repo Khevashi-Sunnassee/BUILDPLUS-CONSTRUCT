@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Trash2, Search, X, Loader2, Database, AlertTriangle } from "lucide-react";
+import { Trash2, Search, X, Loader2, Database, AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
 import { ADMIN_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
@@ -25,6 +28,13 @@ interface DeleteTarget {
   entityType: string;
   apiPath: string;
   queryKey: string;
+}
+
+interface BulkDeleteResult {
+  totalCount: number;
+  deletedCount: number;
+  protectedCount: number;
+  protectedReason: string;
 }
 
 interface EntityTabConfig {
@@ -37,6 +47,48 @@ interface EntityTabConfig {
 }
 
 const ENTITY_TABS: EntityTabConfig[] = [
+  {
+    key: "suppliers",
+    label: "Suppliers",
+    entityType: "suppliers",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_SUPPLIERS,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "keyContact", label: "Key Contact", render: (r: any) => r.keyContact || "-" },
+      { key: "email", label: "Email", render: (r: any) => r.email || "-" },
+      { key: "phone", label: "Phone", render: (r: any) => r.phone || "-" },
+      { key: "isActive", label: "Status", render: (r: any) => <Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Inactive"}</Badge> },
+    ],
+    getRowName: (r: any) => r.name,
+  },
+  {
+    key: "customers",
+    label: "Customers",
+    entityType: "customers",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_CUSTOMERS,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "keyContact", label: "Key Contact", render: (r: any) => r.keyContact || "-" },
+      { key: "email", label: "Email", render: (r: any) => r.email || "-" },
+      { key: "phone", label: "Phone", render: (r: any) => r.phone || "-" },
+      { key: "isActive", label: "Status", render: (r: any) => <Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Inactive"}</Badge> },
+    ],
+    getRowName: (r: any) => r.name,
+  },
+  {
+    key: "employees",
+    label: "Employees",
+    entityType: "employees",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_EMPLOYEES,
+    columns: [
+      { key: "employeeNumber", label: "Emp #", render: (r: any) => r.employeeNumber || "-" },
+      { key: "name", label: "Name", render: (r: any) => `${r.firstName} ${r.lastName}` },
+      { key: "email", label: "Email", render: (r: any) => r.email || "-" },
+      { key: "phone", label: "Phone", render: (r: any) => r.phone || "-" },
+      { key: "isActive", label: "Status", render: (r: any) => <Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Inactive"}</Badge> },
+    ],
+    getRowName: (r: any) => `${r.firstName} ${r.lastName}`,
+  },
   {
     key: "items",
     label: "Items",
@@ -264,9 +316,11 @@ function EntityTable({
 
 export default function DataManagementPage() {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("items");
+  const [activeTab, setActiveTab] = useState("suppliers");
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState<string | null>(null);
+  const [bulkDeleteResult, setBulkDeleteResult] = useState<BulkDeleteResult | null>(null);
 
   const deleteMutation = useMutation({
     mutationFn: async ({ apiPath }: { apiPath: string }) => {
@@ -289,6 +343,31 @@ export default function DataManagementPage() {
     },
   });
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async ({ entityType }: { entityType: string }) => {
+      const res = await apiRequest("DELETE", `/api/admin/data-management/${entityType}/bulk-delete`);
+      return await res.json() as BulkDeleteResult;
+    },
+    onSuccess: (data: BulkDeleteResult) => {
+      setBulkDeleteConfirm(null);
+      setBulkDeleteResult(data);
+      const activeConfig = ENTITY_TABS.find((t) => t.key === activeTab);
+      if (activeConfig) {
+        queryClient.invalidateQueries({ queryKey: [activeConfig.queryKey] });
+      }
+    },
+    onError: (error: any) => {
+      setBulkDeleteConfirm(null);
+      toast({
+        title: "Bulk Delete Failed",
+        description: error.message || "Failed to perform bulk delete.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const activeConfig = ENTITY_TABS.find((t) => t.key === activeTab);
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -298,7 +377,7 @@ export default function DataManagementPage() {
             <PageHelpButton pageHelpKey="data_management" />
           </div>
           <p className="text-sm text-muted-foreground mt-1" data-testid="text-page-description">
-            Delete individual records across the system. Records with dependencies will be blocked from deletion.
+            Delete individual records or bulk-delete all records. Records with dependencies will be skipped during bulk delete.
           </p>
         </div>
       </div>
@@ -312,26 +391,37 @@ export default function DataManagementPage() {
             </CardTitle>
             <CardDescription>Select an entity type and manage records</CardDescription>
           </div>
-          <div className="relative w-64">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search records..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-              data-testid="input-search"
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                onClick={() => setSearchQuery("")}
-                data-testid="button-clear-search"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="relative w-64">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search records..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+                data-testid="input-search"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
+                  onClick={() => setSearchQuery("")}
+                  data-testid="button-clear-search"
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            <Button
+              variant="destructive"
+              onClick={() => setBulkDeleteConfirm(activeTab)}
+              disabled={bulkDeleteMutation.isPending}
+              data-testid="button-bulk-delete"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete All {activeConfig?.label}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -396,6 +486,92 @@ export default function DataManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={!!bulkDeleteConfirm} onOpenChange={(open) => { if (!open) setBulkDeleteConfirm(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Bulk Delete All {activeConfig?.label}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will attempt to delete <span className="font-semibold">all {activeConfig?.label.toLowerCase()}</span> in your company.
+              Records that are linked to other data (e.g. jobs, purchase orders) will be automatically skipped to protect data integrity.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-bulk-delete" disabled={bulkDeleteMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (bulkDeleteConfirm) {
+                  bulkDeleteMutation.mutate({ entityType: bulkDeleteConfirm });
+                }
+              }}
+              disabled={bulkDeleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-bulk-delete"
+            >
+              {bulkDeleteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete All"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={!!bulkDeleteResult} onOpenChange={(open) => { if (!open) setBulkDeleteResult(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Bulk Delete Complete
+            </DialogTitle>
+            <DialogDescription>
+              The bulk delete operation has finished. Here are the results:
+            </DialogDescription>
+          </DialogHeader>
+          {bulkDeleteResult && (
+            <div className="space-y-3 py-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Total records found</span>
+                <span className="font-semibold" data-testid="text-bulk-total">{bulkDeleteResult.totalCount}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-green-600 dark:text-green-400">Successfully deleted</span>
+                <span className="font-semibold text-green-600 dark:text-green-400" data-testid="text-bulk-deleted">{bulkDeleteResult.deletedCount}</span>
+              </div>
+              {bulkDeleteResult.protectedCount > 0 && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                      <ShieldAlert className="h-4 w-4" />
+                      Skipped (protected)
+                    </span>
+                    <span className="font-semibold text-amber-600 dark:text-amber-400" data-testid="text-bulk-protected">{bulkDeleteResult.protectedCount}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground bg-muted rounded-md p-2">
+                    {bulkDeleteResult.protectedCount} record(s) were skipped because they are {bulkDeleteResult.protectedReason}.
+                    Remove those dependencies first to delete these records.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setBulkDeleteResult(null)} data-testid="button-close-bulk-result">
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -425,6 +425,13 @@ export const ADMIN_ROUTES = {
   DATA_MGMT_DELIVERY_DELETE: (id: string) => `/api/admin/data-management/deliveries/${id}`,
   DATA_MGMT_LOAD_LISTS: '/api/admin/data-management/load-lists',
   DATA_MGMT_LOAD_LIST_DELETE: (id: string) => `/api/admin/data-management/load-lists/${id}`,
+  DATA_MGMT_SUPPLIERS: '/api/admin/data-management/suppliers',
+  DATA_MGMT_SUPPLIER_DELETE: (id: string) => `/api/admin/data-management/suppliers/${id}`,
+  DATA_MGMT_CUSTOMERS: '/api/admin/data-management/customers',
+  DATA_MGMT_CUSTOMER_DELETE: (id: string) => `/api/admin/data-management/customers/${id}`,
+  DATA_MGMT_EMPLOYEES: '/api/admin/data-management/employees',
+  DATA_MGMT_EMPLOYEE_DELETE: (id: string) => `/api/admin/data-management/employees/${id}`,
+  DATA_MGMT_BULK_DELETE: (entityType: string) => `/api/admin/data-management/${entityType}/bulk-delete`,
 } as const;
 
 // ============================================================================
