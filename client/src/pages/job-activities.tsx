@@ -196,18 +196,6 @@ export default function JobActivitiesPage() {
     },
   });
 
-  const updateActivityMutation = useMutation({
-    mutationFn: async ({ id, ...data }: any) => {
-      return apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
   const recalculateMutation = useMutation({
     mutationFn: async () => {
       return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_RECALCULATE(jobId), {});
@@ -216,6 +204,22 @@ export default function JobActivitiesPage() {
       const data = await res.json();
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
       toast({ title: "Dates recalculated", description: `${data.updated} activities updated` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateActivityMutation = useMutation({
+    mutationFn: async ({ id, _recalculate, ...data }: any) => {
+      const res = await apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
+      return { res, _recalculate };
+    },
+    onSuccess: async ({ _recalculate }: any) => {
+      await queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+      if (_recalculate) {
+        recalculateMutation.mutate();
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -532,11 +536,8 @@ export default function JobActivitiesPage() {
                                     onStatusChange={(id, status) => {
                                       updateActivityMutation.mutate({ id, status });
                                     }}
-                                    onDateChange={(id, field, value) => {
-                                      updateActivityMutation.mutate({ id, [field]: value || null });
-                                    }}
-                                    onPredecessorChange={(id, predecessorSortOrder, relationship) => {
-                                      updateActivityMutation.mutate({ id, predecessorSortOrder, relationship });
+                                    onFieldChange={(id, data, recalculate) => {
+                                      updateActivityMutation.mutate({ id, ...data, _recalculate: recalculate });
                                     }}
                                     users={users || []}
                                     jobs={jobsList || []}
@@ -589,8 +590,7 @@ function ActivityRow({
   allParentActivities,
   onSelect,
   onStatusChange,
-  onDateChange,
-  onPredecessorChange,
+  onFieldChange,
   users,
   jobs,
   jobId,
@@ -604,8 +604,7 @@ function ActivityRow({
   allParentActivities: ActivityWithAssignees[];
   onSelect: (a: ActivityWithAssignees) => void;
   onStatusChange: (id: string, status: string) => void;
-  onDateChange: (id: string, field: string, value: string) => void;
-  onPredecessorChange: (id: string, predecessorSortOrder: number | null, relationship: string | null) => void;
+  onFieldChange: (id: string, data: Record<string, any>, recalculate: boolean) => void;
   users: any[];
   jobs: any[];
   jobId: string;
@@ -659,17 +658,69 @@ function ActivityRow({
             {statusOpt.label}
           </span>
         </td>
-        <td className="px-3 py-2 text-center">{activity.estimatedDays || "-"}</td>
-        <td className="px-3 py-2 text-center text-xs text-muted-foreground" onClick={(e) => e.stopPropagation()}>
-          {activity.predecessorSortOrder != null ? (
-            <span className="inline-flex items-center gap-0.5">
-              <Link2 className="h-3 w-3" />
-              {activity.predecessorSortOrder + 1}
-            </span>
-          ) : "-"}
+        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+          <Input
+            type="number"
+            className="h-7 text-xs w-[70px] text-center"
+            defaultValue={activity.estimatedDays ?? ""}
+            key={`days-${activity.id}-${activity.estimatedDays}`}
+            min={1}
+            onBlur={(e) => {
+              const val = parseInt(e.target.value);
+              if (!isNaN(val) && val > 0 && val !== activity.estimatedDays) {
+                onFieldChange(activity.id, { estimatedDays: val }, true);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            data-testid={`input-days-${activity.id}`}
+          />
         </td>
-        <td className="px-3 py-2 text-center text-xs text-muted-foreground">
-          {activity.relationship || "-"}
+        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+          <Select
+            value={activity.predecessorSortOrder != null ? String(activity.predecessorSortOrder) : "none"}
+            onValueChange={(v) => {
+              const predOrder = v === "none" ? null : parseInt(v);
+              const rel = predOrder != null ? (activity.relationship || "FS") : null;
+              onFieldChange(activity.id, { predecessorSortOrder: predOrder, relationship: rel }, true);
+            }}
+          >
+            <SelectTrigger className="h-7 text-xs w-[70px]" data-testid={`select-pred-${activity.id}`}>
+              <SelectValue placeholder="-" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">-</SelectItem>
+              {allParentActivities
+                .filter(a => a.sortOrder < activity.sortOrder)
+                .map(a => (
+                  <SelectItem key={a.id} value={String(a.sortOrder)}>
+                    {a.sortOrder + 1}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+        </td>
+        <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+          <Select
+            value={activity.relationship || "FS"}
+            onValueChange={(v) => {
+              onFieldChange(activity.id, { relationship: v }, true);
+            }}
+            disabled={activity.predecessorSortOrder == null}
+          >
+            <SelectTrigger className="h-7 text-xs w-[60px]" data-testid={`select-rel-${activity.id}`}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="FS">FS</SelectItem>
+              <SelectItem value="SS">SS</SelectItem>
+              <SelectItem value="FF">FF</SelectItem>
+              <SelectItem value="SF">SF</SelectItem>
+            </SelectContent>
+          </Select>
         </td>
         <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[140px]">{activity.consultantName || "-"}</td>
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
@@ -677,7 +728,7 @@ function ActivityRow({
             type="date"
             className="h-7 text-xs w-[120px]"
             value={activity.startDate ? format(new Date(activity.startDate), "yyyy-MM-dd") : ""}
-            onChange={(e) => onDateChange(activity.id, "startDate", e.target.value)}
+            onChange={(e) => onFieldChange(activity.id, { startDate: e.target.value || null }, true)}
             data-testid={`input-start-date-${activity.id}`}
           />
         </td>
@@ -686,7 +737,7 @@ function ActivityRow({
             type="date"
             className={`h-7 text-xs w-[120px] ${overdue ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
             value={activity.endDate ? format(new Date(activity.endDate), "yyyy-MM-dd") : ""}
-            onChange={(e) => onDateChange(activity.id, "endDate", e.target.value)}
+            onChange={(e) => onFieldChange(activity.id, { endDate: e.target.value || null }, false)}
             data-testid={`input-end-date-${activity.id}`}
           />
         </td>
@@ -731,7 +782,26 @@ function ActivityRow({
                 {childStatus.label}
               </span>
             </td>
-            <td className="px-3 py-1.5 text-center text-xs">{child.estimatedDays || "-"}</td>
+            <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
+              <Input
+                type="number"
+                className="h-6 text-xs w-[70px] text-center"
+                defaultValue={child.estimatedDays ?? ""}
+                key={`days-${child.id}-${child.estimatedDays}`}
+                min={1}
+                onBlur={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val > 0 && val !== child.estimatedDays) {
+                    onFieldChange(child.id, { estimatedDays: val }, false);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    (e.target as HTMLInputElement).blur();
+                  }
+                }}
+              />
+            </td>
             <td className="px-3 py-1.5 text-center text-xs text-muted-foreground">-</td>
             <td className="px-3 py-1.5 text-center text-xs text-muted-foreground">-</td>
             <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.consultantName || "-"}</td>
@@ -740,7 +810,7 @@ function ActivityRow({
                 type="date"
                 className="h-6 text-xs w-[120px]"
                 value={child.startDate ? format(new Date(child.startDate), "yyyy-MM-dd") : ""}
-                onChange={(e) => onDateChange(child.id, "startDate", e.target.value)}
+                onChange={(e) => onFieldChange(child.id, { startDate: e.target.value || null }, false)}
               />
             </td>
             <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
@@ -748,7 +818,7 @@ function ActivityRow({
                 type="date"
                 className={`h-6 text-xs w-[120px] ${childOverdue ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
                 value={child.endDate ? format(new Date(child.endDate), "yyyy-MM-dd") : ""}
-                onChange={(e) => onDateChange(child.id, "endDate", e.target.value)}
+                onChange={(e) => onFieldChange(child.id, { endDate: e.target.value || null }, false)}
               />
             </td>
             <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.deliverable || "-"}</td>
@@ -926,12 +996,25 @@ function ActivitySidebar({
     },
   });
 
-  const updateActivityMutation = useMutation({
-    mutationFn: async ({ id, ...data }: any) => {
-      return apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
+  const recalculateMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_RECALCULATE(jobId), {});
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+    },
+  });
+
+  const updateActivityMutation = useMutation({
+    mutationFn: async ({ id, _recalculate, ...data }: any) => {
+      const res = await apiRequest("PATCH", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_BY_ID(id), data);
+      return { res, _recalculate };
+    },
+    onSuccess: async ({ _recalculate }: any) => {
+      await queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+      if (_recalculate) {
+        recalculateMutation.mutate();
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -997,7 +1080,7 @@ function ActivitySidebar({
                   <Input
                     type="date"
                     value={activity.startDate ? format(new Date(activity.startDate), "yyyy-MM-dd") : ""}
-                    onChange={(e) => updateActivityMutation.mutate({ id: activity.id, startDate: e.target.value || null })}
+                    onChange={(e) => updateActivityMutation.mutate({ id: activity.id, startDate: e.target.value || null, _recalculate: true })}
                     data-testid="sidebar-input-start-date"
                   />
                 </div>
@@ -1039,7 +1122,7 @@ function ActivitySidebar({
                       onValueChange={(v) => {
                         const predOrder = v === "none" ? null : parseInt(v);
                         const rel = predOrder != null ? (activity.relationship || "FS") : null;
-                        updateActivityMutation.mutate({ id: activity.id, predecessorSortOrder: predOrder, relationship: rel });
+                        updateActivityMutation.mutate({ id: activity.id, predecessorSortOrder: predOrder, relationship: rel, _recalculate: true });
                       }}
                     >
                       <SelectTrigger data-testid="sidebar-select-predecessor">
@@ -1062,7 +1145,7 @@ function ActivitySidebar({
                     <Select
                       value={activity.relationship || "FS"}
                       onValueChange={(v) => {
-                        updateActivityMutation.mutate({ id: activity.id, relationship: v });
+                        updateActivityMutation.mutate({ id: activity.id, relationship: v, _recalculate: true });
                       }}
                       disabled={activity.predecessorSortOrder == null}
                     >
