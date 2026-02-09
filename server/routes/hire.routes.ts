@@ -144,6 +144,7 @@ router.get("/api/hire-bookings/next-number", requireAuth, async (req: Request, r
 router.get("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const id = String(req.params.id);
 
     const result = await db
@@ -226,6 +227,7 @@ router.post("/api/hire-bookings", requireAuth, async (req: Request, res: Respons
 router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const id = String(req.params.id);
 
     const existing = await db
@@ -306,6 +308,7 @@ async function transitionStatus(
 ) {
   try {
     const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const id = String(req.params.id);
 
     const existing = await db
@@ -388,6 +391,7 @@ router.post("/api/hire-bookings/:id/close", requireAuth, requireRole("ADMIN", "M
 router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const id = String(req.params.id);
 
     const existing = await db

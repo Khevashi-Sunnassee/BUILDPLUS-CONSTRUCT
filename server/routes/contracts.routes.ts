@@ -23,6 +23,14 @@ const objectStorageService = new ObjectStorageService();
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/png", "image/gif", "text/plain"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Allowed: PDF, DOC, DOCX, JPEG, PNG, GIF, TXT"));
+    }
+  },
 });
 
 const updateContractSchema = insertContractSchema.partial().omit({ companyId: true });

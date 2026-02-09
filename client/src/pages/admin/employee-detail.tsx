@@ -130,7 +130,7 @@ const employmentSchema = z.object({
   endDate: z.string().optional(),
   probationEndDate: z.string().optional(),
   classificationLevel: z.string().optional(),
-  instrumentId: z.string().optional(),
+  instrumentId: z.string().nullable().optional(),
   status: z.string().default("prospect"),
   baseRate: z.string().optional(),
   rateBasis: z.string().optional(),
@@ -309,17 +309,17 @@ export default function EmployeeDetailPage() {
     enabled: !!id,
   });
 
-  const { data: onboardings, isLoading: onboardingsLoading } = useQuery({
+  const { data: onboardings, isLoading: onboardingsLoading } = useQuery<any[]>({
     queryKey: ['/api/employees', id, 'onboardings'],
     enabled: !!id,
   });
 
-  const { data: instruments } = useQuery({
+  const { data: instruments } = useQuery<any[]>({
     queryKey: ["/api/onboarding/instruments"],
     enabled: !!id,
   });
 
-  const { data: templates } = useQuery({
+  const { data: templates } = useQuery<any[]>({
     queryKey: ['/api/onboarding/templates'],
     enabled: !!id,
   });

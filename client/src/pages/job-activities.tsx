@@ -558,7 +558,7 @@ export default function JobActivitiesPage() {
           rx += statusCol;
 
           pdf.setTextColor(107, 114, 128);
-          pdf.text(activity.days != null ? String(activity.days) : "-", rx + 2, currentY + 4.5);
+          pdf.text(activity.estimatedDays != null ? String(activity.estimatedDays) : "-", rx + 2, currentY + 4.5);
           rx += daysCol;
 
           pdf.text(activity.predecessorSortOrder != null ? String(activity.predecessorSortOrder) : "-", rx + 2, currentY + 4.5);
