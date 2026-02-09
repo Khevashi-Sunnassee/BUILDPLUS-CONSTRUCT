@@ -25,15 +25,179 @@ import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCenter,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   ArrowLeft, Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronRight,
   Loader2, Calendar, Clock, User, FileText, Layers, ListPlus, Download, Upload,
 } from "lucide-react";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate } from "@shared/schema";
 
+const STAGE_COLORS: Record<number, { bg: string; accent: string; badge: string; text: string }> = {
+  0: { bg: "bg-blue-50 dark:bg-blue-950/30", accent: "bg-blue-500", badge: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200", text: "text-blue-700 dark:text-blue-300" },
+  1: { bg: "bg-emerald-50 dark:bg-emerald-950/30", accent: "bg-emerald-500", badge: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200", text: "text-emerald-700 dark:text-emerald-300" },
+  2: { bg: "bg-violet-50 dark:bg-violet-950/30", accent: "bg-violet-500", badge: "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200", text: "text-violet-700 dark:text-violet-300" },
+  3: { bg: "bg-amber-50 dark:bg-amber-950/30", accent: "bg-amber-500", badge: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200", text: "text-amber-700 dark:text-amber-300" },
+  4: { bg: "bg-rose-50 dark:bg-rose-950/30", accent: "bg-rose-500", badge: "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200", text: "text-rose-700 dark:text-rose-300" },
+  5: { bg: "bg-cyan-50 dark:bg-cyan-950/30", accent: "bg-cyan-500", badge: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200", text: "text-cyan-700 dark:text-cyan-300" },
+  6: { bg: "bg-orange-50 dark:bg-orange-950/30", accent: "bg-orange-500", badge: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200", text: "text-orange-700 dark:text-orange-300" },
+  7: { bg: "bg-teal-50 dark:bg-teal-950/30", accent: "bg-teal-500", badge: "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200", text: "text-teal-700 dark:text-teal-300" },
+  8: { bg: "bg-pink-50 dark:bg-pink-950/30", accent: "bg-pink-500", badge: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200", text: "text-pink-700 dark:text-pink-300" },
+  9: { bg: "bg-indigo-50 dark:bg-indigo-950/30", accent: "bg-indigo-500", badge: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200", text: "text-indigo-700 dark:text-indigo-300" },
+  10: { bg: "bg-lime-50 dark:bg-lime-950/30", accent: "bg-lime-500", badge: "bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200", text: "text-lime-700 dark:text-lime-300" },
+  11: { bg: "bg-fuchsia-50 dark:bg-fuchsia-950/30", accent: "bg-fuchsia-500", badge: "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-200", text: "text-fuchsia-700 dark:text-fuchsia-300" },
+};
+
+function getStageColor(index: number) {
+  return STAGE_COLORS[index % Object.keys(STAGE_COLORS).length];
+}
+
 type TemplateWithSubtasks = ActivityTemplate & {
   subtasks: Array<{ id: string; name: string; estimatedDays: number | null; sortOrder: number }>;
 };
+
+function SortableActivity({
+  template,
+  stageColorIndex,
+  onEdit,
+  onDelete,
+  onAddSubtask,
+  onDeleteSubtask,
+  phaseColor,
+}: {
+  template: TemplateWithSubtasks;
+  stageColorIndex: number;
+  onEdit: (t: TemplateWithSubtasks) => void;
+  onDelete: (t: TemplateWithSubtasks) => void;
+  onAddSubtask: (templateId: string) => void;
+  onDeleteSubtask: (id: string) => void;
+  phaseColor: (phase: string | null) => string;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: template.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  const colors = getStageColor(stageColorIndex);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="flex rounded-md overflow-hidden border"
+      data-testid={`template-row-${template.id}`}
+    >
+      <div className={`w-1 shrink-0 ${colors.accent}`} />
+      <div className="flex-1 p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          <button
+            className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+            {...attributes}
+            {...listeners}
+            data-testid={`drag-handle-${template.id}`}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium" data-testid={`text-template-name-${template.id}`}>{template.name}</span>
+              {template.category && (
+                <Badge variant="outline" className="text-xs">{template.category}</Badge>
+              )}
+              {template.jobPhase && (
+                <Badge variant={phaseColor(template.jobPhase) as any} className="text-xs">{template.jobPhase}</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                {template.estimatedDays} days
+              </span>
+              {template.consultantName && (
+                <span className="flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  {template.consultantName}
+                </span>
+              )}
+              {template.deliverable && (
+                <span className="flex items-center gap-1">
+                  <FileText className="h-3 w-3" />
+                  {template.deliverable}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onAddSubtask(template.id)}
+            data-testid={`button-add-subtask-${template.id}`}
+          >
+            <ListPlus className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => onEdit(template)} data-testid={`button-edit-template-${template.id}`}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button size="icon" variant="ghost" onClick={() => onDelete(template)} data-testid={`button-delete-template-${template.id}`}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
+      {template.subtasks && template.subtasks.length > 0 && (
+        <div className="ml-8 space-y-1">
+          {template.subtasks.map((sub) => (
+            <div key={sub.id} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-muted/50 text-sm">
+              <span>{sub.name}</span>
+              <div className="flex items-center gap-2">
+                {sub.estimatedDays && (
+                  <span className="text-muted-foreground">{sub.estimatedDays}d</span>
+                )}
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => onDeleteSubtask(sub.id)}
+                  data-testid={`button-delete-subtask-${sub.id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      </div>
+    </div>
+  );
+}
 
 export default function WorkflowBuilderPage() {
   const { toast } = useToast();
@@ -85,7 +249,9 @@ export default function WorkflowBuilderPage() {
     if (!templates || !stages) return new Map<string, { stage: ActivityStage; templates: TemplateWithSubtasks[] }>();
     const map = new Map<string, { stage: ActivityStage; templates: TemplateWithSubtasks[] }>();
     for (const stage of stages) {
-      const stageTemplates = templates.filter(t => t.stageId === stage.id);
+      const stageTemplates = templates
+        .filter(t => t.stageId === stage.id)
+        .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
       if (stageTemplates.length > 0) {
         map.set(stage.id, { stage, templates: stageTemplates });
       }
@@ -94,6 +260,31 @@ export default function WorkflowBuilderPage() {
   }, [templates, stages]);
 
   const usedStageIds = useMemo(() => new Set(templates?.map(t => t.stageId) || []), [templates]);
+
+  const stageColorMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (stages) {
+      stages.forEach((s, i) => map.set(s.id, i));
+    }
+    return map;
+  }, [stages]);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  const reorderMutation = useMutation({
+    mutationFn: async (templateIds: string[]) => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.TEMPLATES_REORDER(jobTypeId), { templateIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Reorder failed", description: error.message, variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
+    },
+  });
 
   const createTemplateMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -306,6 +497,30 @@ export default function WorkflowBuilderPage() {
     }
   };
 
+  function handleDragEnd(stageId: string, event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const stageData = templatesByStage.get(stageId);
+    if (!stageData) return;
+
+    const oldIndex = stageData.templates.findIndex(t => t.id === active.id);
+    const newIndex = stageData.templates.findIndex(t => t.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const reordered = arrayMove(stageData.templates, oldIndex, newIndex);
+    const allTemplateIds = (stages || [])
+      .filter(s => usedStageIds.has(s.id))
+      .flatMap(s => {
+        if (s.id === stageId) {
+          return reordered.map(t => t.id);
+        }
+        return templatesByStage.get(s.id)?.templates.map(t => t.id) || [];
+      });
+
+    reorderMutation.mutate(allTemplateIds);
+  }
+
   if (loadingJobType || loadingTemplates) {
     return (
       <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-4">
@@ -377,18 +592,20 @@ export default function WorkflowBuilderPage() {
             const stageData = templatesByStage.get(stage.id);
             if (!stageData) return null;
             const isCollapsed = collapsedStages.has(stage.id);
+            const colorIndex = stageColorMap.get(stage.id) ?? 0;
+            const colors = getStageColor(colorIndex);
 
             return (
-              <Card key={stage.id}>
+              <Card key={stage.id} className="overflow-visible">
                 <div
-                  className="flex items-center justify-between px-4 py-3 cursor-pointer hover-elevate"
+                  className={`flex items-center justify-between gap-4 px-4 py-3 cursor-pointer ${colors.bg} rounded-t-md`}
                   onClick={() => toggleStageCollapse(stage.id)}
                   data-testid={`stage-header-${stage.id}`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-wrap">
                     {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                    <Badge variant="outline" className="font-mono">{stage.stageNumber}</Badge>
-                    <span className="font-semibold">{stage.name}</span>
+                    <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded ${colors.badge}`}>{stage.stageNumber}</span>
+                    <span className={`font-semibold ${colors.text}`}>{stage.name}</span>
                     <Badge variant="secondary">{stageData.templates.length}</Badge>
                   </div>
                   <Button
@@ -402,89 +619,37 @@ export default function WorkflowBuilderPage() {
                 </div>
 
                 {!isCollapsed && (
-                  <CardContent className="pt-0 pb-3 px-4">
-                    <div className="space-y-2">
-                      {stageData.templates.map((template) => (
-                        <div key={template.id} className="border rounded-md p-3 space-y-2" data-testid={`template-row-${template.id}`}>
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-medium" data-testid={`text-template-name-${template.id}`}>{template.name}</span>
-                                {template.category && (
-                                  <Badge variant="outline" className="text-xs">{template.category}</Badge>
-                                )}
-                                {template.jobPhase && (
-                                  <Badge variant={phaseColor(template.jobPhase) as any} className="text-xs">{template.jobPhase}</Badge>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="h-3 w-3" />
-                                  {template.estimatedDays} days
-                                </span>
-                                {template.consultantName && (
-                                  <span className="flex items-center gap-1">
-                                    <User className="h-3 w-3" />
-                                    {template.consultantName}
-                                  </span>
-                                )}
-                                {template.deliverable && (
-                                  <span className="flex items-center gap-1">
-                                    <FileText className="h-3 w-3" />
-                                    {template.deliverable}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                onClick={() => {
-                                  setSubtaskParentId(template.id);
-                                  setSubtaskName("");
-                                  setSubtaskDays(undefined);
-                                  setShowSubtaskDialog(true);
-                                }}
-                                data-testid={`button-add-subtask-${template.id}`}
-                              >
-                                <ListPlus className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => openEditDialog(template)} data-testid={`button-edit-template-${template.id}`}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button size="icon" variant="ghost" onClick={() => setDeleteConfirm(template)} data-testid={`button-delete-template-${template.id}`}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          {template.subtasks && template.subtasks.length > 0 && (
-                            <div className="ml-6 space-y-1">
-                              {template.subtasks.map((sub) => (
-                                <div key={sub.id} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-muted/50 text-sm">
-                                  <span>{sub.name}</span>
-                                  <div className="flex items-center gap-2">
-                                    {sub.estimatedDays && (
-                                      <span className="text-muted-foreground">{sub.estimatedDays}d</span>
-                                    )}
-                                    <Button
-                                      size="icon"
-                                      variant="ghost"
-                                      className="h-6 w-6"
-                                      onClick={() => deleteSubtaskMutation.mutate(sub.id)}
-                                      data-testid={`button-delete-subtask-${sub.id}`}
-                                    >
-                                      <Trash2 className="h-3 w-3" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
+                  <CardContent className="pt-3 pb-3 px-4 overflow-visible">
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={(event) => handleDragEnd(stage.id, event)}
+                    >
+                      <SortableContext
+                        items={stageData.templates.map(t => t.id)}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        <div className="space-y-2">
+                          {stageData.templates.map((template) => (
+                            <SortableActivity
+                              key={template.id}
+                              template={template}
+                              stageColorIndex={colorIndex}
+                              onEdit={openEditDialog}
+                              onDelete={setDeleteConfirm}
+                              onAddSubtask={(templateId) => {
+                                setSubtaskParentId(templateId);
+                                setSubtaskName("");
+                                setSubtaskDays(undefined);
+                                setShowSubtaskDialog(true);
+                              }}
+                              onDeleteSubtask={(id) => deleteSubtaskMutation.mutate(id)}
+                              phaseColor={phaseColor}
+                            />
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </SortableContext>
+                    </DndContext>
                   </CardContent>
                 )}
               </Card>
