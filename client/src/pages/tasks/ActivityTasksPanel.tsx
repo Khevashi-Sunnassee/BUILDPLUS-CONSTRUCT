@@ -36,7 +36,7 @@ import type { Task, TaskStatus, TaskPriority, User, Job } from "./types";
 import { STATUS_CONFIG, PRIORITY_CONFIG, PROJECT_STAGES, getInitials } from "./types";
 import { TaskSidebar } from "./TaskSidebar";
 
-const GRID_TEMPLATE = "40px minmax(200px,1fr) 40px 100px 100px 120px 90px 120px 100px 60px 60px 40px";
+const GRID_TEMPLATE = "40px minmax(200px,1fr) 40px 100px 120px 90px 120px 100px 60px 60px 40px";
 
 interface ActivityTasksPanelProps {
   activityId: string;
@@ -146,7 +146,6 @@ export function ActivityTasksPanel({
             </div>
             <div />
             <div className="px-2 text-center">Users</div>
-            <div className="px-2">Job</div>
             <div className="px-2 text-center">Status</div>
             <div className="px-2 text-center">Priority</div>
             <div className="px-2">Stage</div>
@@ -210,7 +209,6 @@ export function ActivityTasksPanel({
             </div>
             <div />
             <div />
-            <div className="px-2 text-xs text-muted-foreground truncate">{jobs.find(j => j.id === jobId)?.jobNumber || ""}</div>
             <div />
             <div />
             <div />
@@ -552,10 +550,6 @@ function ActivityTaskRow({
             </div>
           </PopoverContent>
         </Popover>
-
-        <div className="px-2 text-xs text-muted-foreground truncate" data-testid={`text-job-${task.id}`}>
-          {jobData ? jobData.jobNumber : "No job"}
-        </div>
 
         <Select value={task.status} onValueChange={(v) => handleStatusChange(v as TaskStatus)}>
           <SelectTrigger
