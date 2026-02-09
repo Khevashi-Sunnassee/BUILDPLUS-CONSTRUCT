@@ -53,6 +53,10 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 ## Audit & Quality Standards
 All audit procedures, the fixed scoring rubric, the Verified Fixes Registry, and the Known Issues Tracker are maintained in **`AUDIT_STANDARDS.md`**. When performing any audit, always read that file first.
 
+There are **two separate audit types** in `AUDIT_STANDARDS.md`:
+1. **Comprehensive Debugging & QA Audit** — Code-level audit covering TypeScript, security, backend, database, frontend quality, performance, observability, rules compliance, and testing. Uses the Fixed Scoring Rubric (9 categories, weighted 5-20% each, letter grade A-F).
+2. **Full UI Audit** — Page-by-page, button-by-button visual verification of the entire application (desktop + mobile). Starts with a database data snapshot, then checks every page's displayed data against the database, tests all CRUD operations, verifies multi-step workflows, and checks cross-cutting concerns (console errors, responsive layout, dark mode, session persistence). Uses its own output format with pass/fail per page.
+
 ## Coding Rules & Conventions
 
 ### Schema & Database Rules
