@@ -989,4 +989,211 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
   }
 });
 
+// ============================================================================
+// IMPORT / EXPORT TEMPLATE
+// ============================================================================
+
+router.get("/api/job-types/:jobTypeId/templates/download-template", requireAuth, async (req, res) => {
+  try {
+    const jobTypeId = String(req.params.jobTypeId);
+    const companyId = req.companyId;
+
+    const allStages = await db.select().from(activityStages)
+      .where(eq(activityStages.companyId, companyId!))
+      .orderBy(asc(activityStages.stageNumber));
+
+    const allConsultants = await db.select().from(activityConsultants)
+      .where(eq(activityConsultants.companyId, companyId!))
+      .orderBy(asc(activityConsultants.sortOrder));
+
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+
+    const mainSheet = workbook.addWorksheet("Activities");
+    mainSheet.columns = [
+      { header: "Stage Number", key: "stageNumber", width: 15 },
+      { header: "Stage Name", key: "stageName", width: 35 },
+      { header: "Category", key: "category", width: 20 },
+      { header: "Activity Name", key: "name", width: 40 },
+      { header: "Description", key: "description", width: 40 },
+      { header: "Estimated Days", key: "estimatedDays", width: 16 },
+      { header: "Consultant", key: "consultant", width: 30 },
+      { header: "Deliverable", key: "deliverable", width: 30 },
+      { header: "Phase", key: "phase", width: 25 },
+    ];
+
+    const headerRow = mainSheet.getRow(1);
+    headerRow.font = { bold: true };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+
+    mainSheet.addRow({
+      stageNumber: 1,
+      stageName: allStages.find(s => s.stageNumber === 1)?.name || "Strategy & Feasibility",
+      category: "Architecture",
+      name: "Example: Prepare feasibility study",
+      description: "Prepare initial feasibility study report",
+      estimatedDays: 14,
+      consultant: allConsultants[0]?.name || "Architect",
+      deliverable: "Feasibility report",
+      phase: "OPPORTUNITY",
+    });
+
+    const refSheet = workbook.addWorksheet("Reference - Stages");
+    refSheet.columns = [
+      { header: "Stage Number", key: "stageNumber", width: 15 },
+      { header: "Stage Name", key: "stageName", width: 40 },
+    ];
+    const refHeaderRow = refSheet.getRow(1);
+    refHeaderRow.font = { bold: true };
+    refHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+    for (const stage of allStages) {
+      refSheet.addRow({ stageNumber: stage.stageNumber, stageName: stage.name });
+    }
+
+    const consultantSheet = workbook.addWorksheet("Reference - Consultants");
+    consultantSheet.columns = [
+      { header: "#", key: "num", width: 8 },
+      { header: "Consultant Name", key: "name", width: 40 },
+    ];
+    const conHeaderRow = consultantSheet.getRow(1);
+    conHeaderRow.font = { bold: true };
+    conHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+    allConsultants.forEach((c, i) => {
+      consultantSheet.addRow({ num: i + 1, name: c.name });
+    });
+
+    const phaseSheet = workbook.addWorksheet("Reference - Phases");
+    phaseSheet.columns = [
+      { header: "Phase Value", key: "phase", width: 30 },
+    ];
+    const phaseHeaderRow = phaseSheet.getRow(1);
+    phaseHeaderRow.font = { bold: true };
+    phaseHeaderRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE0E0E0" } };
+    ["OPPORTUNITY", "QUOTING", "WON_AWAITING_CONTRACT", "CONTRACTED", "LOST"].forEach(p => {
+      phaseSheet.addRow({ phase: p });
+    });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=workflow_template.xlsx`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error generating template");
+    res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
+router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
+  try {
+    const jobTypeId = String(req.params.jobTypeId);
+    const companyId = req.companyId;
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+
+    const [jobType] = await db.select().from(jobTypes)
+      .where(and(eq(jobTypes.id, jobTypeId), eq(jobTypes.companyId, companyId!)));
+    if (!jobType) {
+      return res.status(404).json({ error: "Job type not found" });
+    }
+
+    const allStages = await db.select().from(activityStages)
+      .where(eq(activityStages.companyId, companyId!));
+    const stageByNumber = new Map(allStages.map(s => [s.stageNumber, s]));
+    const stageByName = new Map(allStages.map(s => [s.name.toLowerCase().trim(), s]));
+
+    const allConsultants = await db.select().from(activityConsultants)
+      .where(eq(activityConsultants.companyId, companyId!));
+    const consultantByName = new Map(allConsultants.map(c => [c.name.toLowerCase().trim(), c]));
+
+    const ExcelJS = await import("exceljs");
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+
+    const sheet = workbook.getWorksheet("Activities") || workbook.getWorksheet(1);
+    if (!sheet) {
+      return res.status(400).json({ error: "No 'Activities' sheet found in the file" });
+    }
+
+    const rows: any[] = [];
+    const errors: string[] = [];
+
+    sheet.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return;
+
+      const stageNumberRaw = row.getCell(1).value;
+      const stageNameRaw = String(row.getCell(2).value || "").trim();
+      const category = String(row.getCell(3).value || "").trim() || null;
+      const name = String(row.getCell(4).value || "").trim();
+      const description = String(row.getCell(5).value || "").trim() || null;
+      const estimatedDaysRaw = row.getCell(6).value;
+      const consultantRaw = String(row.getCell(7).value || "").trim();
+      const deliverable = String(row.getCell(8).value || "").trim() || null;
+      const phase = String(row.getCell(9).value || "").trim() || null;
+
+      if (!name) return;
+
+      const stageNumber = typeof stageNumberRaw === "number" ? stageNumberRaw : parseInt(String(stageNumberRaw));
+      let stage = stageByNumber.get(stageNumber);
+      if (!stage && stageNameRaw) {
+        stage = stageByName.get(stageNameRaw.toLowerCase());
+      }
+      if (!stage) {
+        errors.push(`Row ${rowNumber}: Stage "${stageNumberRaw || stageNameRaw}" not found`);
+        return;
+      }
+
+      const estimatedDays = typeof estimatedDaysRaw === "number" ? estimatedDaysRaw : parseInt(String(estimatedDaysRaw)) || 14;
+
+      let consultantId: string | null = null;
+      let consultantName: string | null = consultantRaw || null;
+      if (consultantRaw) {
+        const found = consultantByName.get(consultantRaw.toLowerCase());
+        if (found) {
+          consultantId = found.id;
+          consultantName = found.name;
+        }
+      }
+
+      rows.push({
+        jobTypeId,
+        companyId: companyId!,
+        stageId: stage.id,
+        category,
+        name,
+        description,
+        estimatedDays,
+        consultantId,
+        consultantName,
+        deliverable,
+        jobPhase: phase,
+        sortOrder: rowNumber - 1,
+      });
+    });
+
+    if (rows.length === 0) {
+      return res.status(400).json({
+        error: "No valid activities found in the file",
+        details: errors.length > 0 ? errors : undefined,
+      });
+    }
+
+    await db.transaction(async (tx) => {
+      for (const row of rows) {
+        await tx.insert(activityTemplates).values(row);
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      imported: rows.length,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error importing activities");
+    res.status(500).json({ error: "Failed to import activities" });
+  }
+});
+
 export const projectActivitiesRouter = router;

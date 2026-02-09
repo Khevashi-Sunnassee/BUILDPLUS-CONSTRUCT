@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRoute, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/collapsible";
 import {
   ArrowLeft, Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronRight,
-  Loader2, Calendar, Clock, User, FileText, Layers, ListPlus,
+  Loader2, Calendar, Clock, User, FileText, Layers, ListPlus, Download, Upload,
 } from "lucide-react";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate } from "@shared/schema";
@@ -163,6 +163,62 @@ export default function WorkflowBuilderPage() {
     },
   });
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  async function handleDownloadTemplate() {
+    setIsDownloading(true);
+    try {
+      const res = await fetch(PROJECT_ACTIVITIES_ROUTES.TEMPLATES_DOWNLOAD(jobTypeId), { credentials: "include" });
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `workflow_template_${jobType?.name?.replace(/\s+/g, "_") || jobTypeId}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Template downloaded" });
+    } catch {
+      toast({ title: "Failed to download template", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiUpload(PROJECT_ACTIVITIES_ROUTES.TEMPLATES_IMPORT(jobTypeId), formData);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Import failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
+      toast({
+        title: `Imported ${data.imported} activities`,
+        description: data.errors?.length ? `${data.errors.length} rows had warnings` : undefined,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (file) {
+      importMutation.mutate(file);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   function closeTemplateDialog() {
     setShowTemplateDialog(false);
     setEditingTemplate(null);
@@ -276,10 +332,28 @@ export default function WorkflowBuilderPage() {
             </p>
           </div>
         </div>
-        <Button onClick={() => openCreateDialog()} data-testid="button-add-activity">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Activity
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={handleDownloadTemplate} disabled={isDownloading} data-testid="button-download-template">
+            {isDownloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Download Template
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending} data-testid="button-import-template">
+            {importMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            Import
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={handleFileSelect}
+            data-testid="input-import-file"
+          />
+          <Button onClick={() => openCreateDialog()} data-testid="button-add-activity">
+            <Plus className="h-4 w-4 mr-2" />
+            Add Activity
+          </Button>
+        </div>
       </div>
 
       {(!templates || templates.length === 0) ? (
