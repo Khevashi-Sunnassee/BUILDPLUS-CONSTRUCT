@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -172,8 +172,10 @@ export default function AdminEmployeesPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      const csrfToken = getCsrfToken();
       const res = await fetch(EMPLOYEE_ROUTES.IMPORT, {
         method: "POST",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
