@@ -5,7 +5,7 @@ import {
   AlertCircle,
   ExternalLink,
 } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -128,6 +128,7 @@ export function JobFormDialog({
   jobTypes,
 }: JobFormDialogProps) {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -884,135 +885,88 @@ export function JobFormDialog({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium">Level-Specific Cycle Times</h3>
+                  <h3 className="font-medium">Job Programme</h3>
                   <p className="text-sm text-muted-foreground">
-                    Configure different production cycle times for each building level
+                    Manage production levels, cycle times, predecessors, and scheduling via the Job Programme page
                   </p>
                 </div>
-                <div className="flex gap-2 flex-wrap">
-                  <Link href={editingJob ? `/admin/jobs/${editingJob.id}/programme` : "#"}>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      disabled={!editingJob}
-                      data-testid="button-open-job-programme"
-                    >
-                      <ExternalLink className="h-4 w-4 mr-1" />
-                      Open Job Programme
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      if (!editingJob) return;
-                      setIsLoadingLevelData(true);
-                      try {
-                        const response = await fetch(ADMIN_ROUTES.JOB_GENERATE_LEVELS(editingJob.id));
-                        if (response.ok) {
-                          const data = await response.json();
-                          setLevelCycleTimes(data);
-                          toast({ title: "Levels generated from job settings" });
-                        } else {
-                          const error = await response.json();
-                          toast({ title: "Error", description: error.error || "Failed to generate levels", variant: "destructive" });
-                        }
-                      } catch (error) {
-                        toast({ title: "Error", description: "Failed to generate levels", variant: "destructive" });
-                      } finally {
-                        setIsLoadingLevelData(false);
-                      }
-                    }}
-                    disabled={isLoadingLevelData}
-                    data-testid="button-generate-from-settings"
-                  >
-                    {isLoadingLevelData ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate from Job Settings"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      if (!editingJob) return;
-                      setIsLoadingLevelData(true);
-                      try {
-                        const response = await fetch(ADMIN_ROUTES.JOB_BUILD_LEVELS(editingJob.id));
-                        if (response.ok) {
-                          const data = await response.json();
-                          setLevelCycleTimes(data);
-                          toast({ title: "Levels refreshed from panels" });
-                        }
-                      } catch (error) {
-                        toast({ title: "Error", description: "Failed to refresh levels", variant: "destructive" });
-                      } finally {
-                        setIsLoadingLevelData(false);
-                      }
-                    }}
-                    disabled={isLoadingLevelData}
-                    data-testid="button-refresh-levels"
-                  >
-                    {isLoadingLevelData ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh from Panels"}
-                  </Button>
-                </div>
               </div>
-              
-              {isLoadingLevelData ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : levelCycleTimes.length === 0 ? (
-                <div className="py-8 text-center border rounded-md bg-muted/30">
-                  <AlertCircle className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-muted-foreground">No panels registered for this job yet.</p>
-                  <p className="text-sm text-muted-foreground">Add panels to configure level-specific cycle times.</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Building</TableHead>
-                      <TableHead>Level</TableHead>
-                      <TableHead className="w-32">Cycle Days</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {levelCycleTimes.map((item, index) => (
-                      <TableRow key={`${item.buildingNumber}-${item.level}`}>
-                        <TableCell>
-                          <Badge variant="outline">B{item.buildingNumber}</Badge>
-                        </TableCell>
-                        <TableCell>{item.level}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            min={1}
-                            value={item.cycleDays}
-                            onChange={(e) => handleLevelCycleTimeChange(index, parseInt(e.target.value) || 1)}
-                            className="w-20"
-                            data-testid={`input-cycle-days-${item.buildingNumber}-${item.level}`}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-              
-              <DialogFooter>
+
+              <div className="py-8 text-center border rounded-md bg-muted/30">
+                <ExternalLink className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-muted-foreground mb-1">The Job Programme page provides full control over production scheduling.</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Generate levels, set cycle times, configure predecessor relationships, split into pours, and view the Gantt chart.
+                </p>
                 <Button
                   onClick={() => {
                     if (!editingJob) return;
-                    saveLevelCycleTimesMutation.mutate({
-                      jobId: editingJob.id,
-                      cycleTimes: levelCycleTimes,
-                    });
+                    onOpenChange(false);
+                    setLocation(`/admin/jobs/${editingJob.id}/programme`);
                   }}
-                  disabled={saveLevelCycleTimesMutation.isPending || levelCycleTimes.length === 0}
-                  data-testid="button-save-level-cycle-times"
+                  disabled={!editingJob}
+                  data-testid="button-open-job-programme"
                 >
-                  {saveLevelCycleTimesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Save Cycle Times
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Job Programme
                 </Button>
-              </DialogFooter>
+              </div>
+
+              {levelCycleTimes.length > 0 && (
+                <>
+                  <div>
+                    <h4 className="font-medium text-sm">Current Levels</h4>
+                    <p className="text-xs text-muted-foreground">
+                      {levelCycleTimes.length} level{levelCycleTimes.length !== 1 ? "s" : ""} configured
+                    </p>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Building</TableHead>
+                        <TableHead>Level</TableHead>
+                        <TableHead className="w-32">Cycle Days</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {levelCycleTimes.map((item, index) => (
+                        <TableRow key={`${item.buildingNumber}-${item.level}`}>
+                          <TableCell>
+                            <Badge variant="outline">B{item.buildingNumber}</Badge>
+                          </TableCell>
+                          <TableCell>{item.level}</TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={1}
+                              value={item.cycleDays}
+                              onChange={(e) => handleLevelCycleTimeChange(index, parseInt(e.target.value) || 1)}
+                              className="w-20"
+                              data-testid={`input-cycle-days-${item.buildingNumber}-${item.level}`}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  <DialogFooter>
+                    <Button
+                      onClick={() => {
+                        if (!editingJob) return;
+                        saveLevelCycleTimesMutation.mutate({
+                          jobId: editingJob.id,
+                          cycleTimes: levelCycleTimes,
+                        });
+                      }}
+                      disabled={saveLevelCycleTimesMutation.isPending || levelCycleTimes.length === 0}
+                      data-testid="button-save-level-cycle-times"
+                    >
+                      {saveLevelCycleTimesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                      Save Cycle Times
+                    </Button>
+                  </DialogFooter>
+                </>
+              )}
             </div>
           </TabsContent>
 

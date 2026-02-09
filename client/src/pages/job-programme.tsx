@@ -425,6 +425,70 @@ export default function JobProgrammePage() {
     },
   });
 
+  const generateFromSettingsMutation = useMutation({
+    mutationFn: async () => {
+      const levelsRes = await fetch(ADMIN_ROUTES.JOB_GENERATE_LEVELS(jobId!));
+      if (!levelsRes.ok) {
+        const err = await levelsRes.json();
+        throw new Error(err.error || "Failed to generate levels from job settings");
+      }
+      const levels: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[] = await levelsRes.json();
+      if (levels.length === 0) throw new Error("No levels generated. Check the job has lowest/highest level configured.");
+
+      const entries = levels.map((l, idx) => ({
+        buildingNumber: l.buildingNumber,
+        level: l.level,
+        levelOrder: l.levelOrder,
+        sequenceOrder: idx,
+        cycleDays: l.cycleDays,
+        predecessorSequenceOrder: idx > 0 ? idx - 1 : null,
+        relationship: idx > 0 ? "FS" : null,
+      }));
+
+      const saveRes = await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME(jobId!), { entries });
+      return saveRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/jobs', jobId, 'programme'] });
+      toast({ title: "Programme generated from job settings" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err?.message || "Failed to generate programme", variant: "destructive" });
+    },
+  });
+
+  const generateFromPanelsMutation = useMutation({
+    mutationFn: async () => {
+      const levelsRes = await fetch(ADMIN_ROUTES.JOB_BUILD_LEVELS(jobId!));
+      if (!levelsRes.ok) {
+        const err = await levelsRes.json();
+        throw new Error(err.error || "Failed to build levels from panels");
+      }
+      const levels: { buildingNumber: number; level: string; levelOrder: number; cycleDays: number }[] = await levelsRes.json();
+      if (levels.length === 0) throw new Error("No panels found for this job. Register panels first.");
+
+      const entries = levels.map((l, idx) => ({
+        buildingNumber: l.buildingNumber,
+        level: l.level,
+        levelOrder: l.levelOrder,
+        sequenceOrder: idx,
+        cycleDays: l.cycleDays,
+        predecessorSequenceOrder: idx > 0 ? idx - 1 : null,
+        relationship: idx > 0 ? "FS" : null,
+      }));
+
+      const saveRes = await apiRequest("POST", ADMIN_ROUTES.JOB_PROGRAMME(jobId!), { entries });
+      return saveRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/jobs', jobId, 'programme'] });
+      toast({ title: "Programme generated from panels" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err?.message || "Failed to generate programme from panels", variant: "destructive" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (entryId: string) => {
       const res = await apiRequest("DELETE", `${ADMIN_ROUTES.JOB_PROGRAMME(jobId!)}/${entryId}`);
@@ -479,7 +543,7 @@ export default function JobProgrammePage() {
     });
   }, []);
 
-  const isSaving = patchEntryMutation.isPending || splitMutation.isPending || reorderMutation.isPending || recalcMutation.isPending || deleteMutation.isPending;
+  const isSaving = patchEntryMutation.isPending || splitMutation.isPending || reorderMutation.isPending || recalcMutation.isPending || deleteMutation.isPending || generateFromSettingsMutation.isPending || generateFromPanelsMutation.isPending;
   const isLoading = jobLoading || programmeLoading;
 
   if (isLoading) {
@@ -618,10 +682,28 @@ export default function JobProgrammePage() {
               <div className="py-12 text-center border rounded-md bg-muted/30">
                 <Layers className="h-8 w-8 mx-auto mb-2 opacity-50" />
                 <p className="text-muted-foreground">No programme entries yet.</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Go to the job settings and use "Generate from Job Settings" or "Refresh from Panels"
-                  in the Job Programme tab to create entries.
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  Generate production levels to build your programme with editable cycle times, predecessors, and Gantt chart.
                 </p>
+                <div className="flex items-center justify-center gap-3 flex-wrap">
+                  <Button
+                    onClick={() => generateFromSettingsMutation.mutate()}
+                    disabled={isSaving}
+                    data-testid="btn-generate-from-settings"
+                  >
+                    {generateFromSettingsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Building2 className="h-4 w-4 mr-2" />}
+                    Generate from Job Settings
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => generateFromPanelsMutation.mutate()}
+                    disabled={isSaving}
+                    data-testid="btn-generate-from-panels"
+                  >
+                    {generateFromPanelsMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Layers className="h-4 w-4 mr-2" />}
+                    Generate from Panels
+                  </Button>
+                </div>
               </div>
             ) : (
               <div className="overflow-x-auto">
