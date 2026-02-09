@@ -522,9 +522,10 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
   try {
     const companyId = req.companyId;
     const jobId = String(req.params.jobId);
-    const { jobTypeId } = req.body;
+    const { jobTypeId, startDate } = req.body;
 
     if (!jobTypeId) return res.status(400).json({ error: "jobTypeId is required" });
+    if (!startDate) return res.status(400).json({ error: "startDate is required" });
 
     const [jt] = await db.select().from(jobTypes)
       .where(and(eq(jobTypes.id, jobTypeId), eq(jobTypes.companyId, companyId!)));
@@ -543,10 +544,44 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
     const templateIds = new Set(templates.map(t => t.id));
     const filteredSubtasks = allSubtasks.filter(s => templateIds.has(s.templateId));
 
+    function addWorkingDays(from: Date, days: number): Date {
+      const result = new Date(from);
+      let added = 0;
+      while (added < days) {
+        result.setDate(result.getDate() + 1);
+        const dow = result.getDay();
+        if (dow !== 0 && dow !== 6) {
+          added++;
+        }
+      }
+      return result;
+    }
+
+    function nextWorkingDay(from: Date): Date {
+      const result = new Date(from);
+      result.setDate(result.getDate() + 1);
+      while (result.getDay() === 0 || result.getDay() === 6) {
+        result.setDate(result.getDate() + 1);
+      }
+      return result;
+    }
+
+    function ensureWorkingDay(d: Date): Date {
+      const result = new Date(d);
+      while (result.getDay() === 0 || result.getDay() === 6) {
+        result.setDate(result.getDate() + 1);
+      }
+      return result;
+    }
+
     const createdActivities: any[] = [];
+    let currentStartDate = ensureWorkingDay(new Date(startDate));
 
     await db.transaction(async (tx) => {
       for (const template of templates) {
+        const estimatedDays = template.estimatedDays || 14;
+        const activityEndDate = addWorkingDays(currentStartDate, estimatedDays - 1);
+
         const [activity] = await tx.insert(jobActivities).values({
           jobId,
           templateId: template.id,
@@ -560,13 +595,18 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
           deliverable: template.deliverable,
           jobPhase: template.jobPhase,
           sortOrder: template.sortOrder,
+          startDate: currentStartDate,
+          endDate: activityEndDate,
           createdById: req.session.userId,
         }).returning();
 
         createdActivities.push(activity);
 
         const subs = filteredSubtasks.filter(s => s.templateId === template.id);
+        let subStartDate = new Date(currentStartDate);
         for (const sub of subs) {
+          const subDays = sub.estimatedDays || 7;
+          const subEndDate = addWorkingDays(subStartDate, subDays - 1);
           await tx.insert(jobActivities).values({
             jobId,
             templateId: template.id,
@@ -577,9 +617,14 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
             estimatedDays: sub.estimatedDays,
             jobPhase: template.jobPhase,
             sortOrder: sub.sortOrder,
+            startDate: subStartDate,
+            endDate: subEndDate,
             createdById: req.session.userId,
           });
+          subStartDate = nextWorkingDay(subEndDate);
         }
+
+        currentStartDate = nextWorkingDay(activityEndDate);
       }
     });
 

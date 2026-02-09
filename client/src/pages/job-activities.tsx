@@ -24,14 +24,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   ArrowLeft, ChevronDown, ChevronRight, Clock, User, FileText,
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
-  Send, ChevronsDownUp, ChevronsUpDown, Download,
+  Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
 } from "lucide-react";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, JobActivity } from "@shared/schema";
-import { format } from "date-fns";
+import { format, isAfter, isBefore, startOfDay } from "date-fns";
+
+import { getStageColor } from "@/lib/stage-colors";
 
 type ActivityWithAssignees = JobActivity & {
   assignees?: Array<{ id: string; activityId: string; userId: string }>;
@@ -48,6 +51,23 @@ const STATUS_OPTIONS = [
 
 function getStatusOption(status: string) {
   return STATUS_OPTIONS.find(s => s.value === status) || STATUS_OPTIONS[0];
+}
+
+function isOverdue(activity: ActivityWithAssignees): boolean {
+  if (activity.status === "DONE" || activity.status === "SKIPPED") return false;
+  if (!activity.endDate) return false;
+  const today = startOfDay(new Date());
+  const endDate = startOfDay(new Date(activity.endDate));
+  return isBefore(endDate, today);
+}
+
+function getRowClassName(activity: ActivityWithAssignees): string {
+  if (activity.status === "DONE") return "bg-green-50 dark:bg-green-950/20";
+  if (isOverdue(activity)) return "bg-red-50 dark:bg-red-950/20";
+  if (activity.status === "STUCK") return "bg-red-50/50 dark:bg-red-950/10";
+  if (activity.status === "ON_HOLD") return "bg-yellow-50 dark:bg-yellow-950/20";
+  if (activity.status === "IN_PROGRESS") return "bg-blue-50/50 dark:bg-blue-950/10";
+  return "";
 }
 
 export default function JobActivitiesPage() {
@@ -140,9 +160,17 @@ export default function JobActivitiesPage() {
     });
   }, [stages, activitiesByStage]);
 
+  const stageColorMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (stages) {
+      stages.forEach((s, i) => map.set(s.id, i));
+    }
+    return map;
+  }, [stages]);
+
   const instantiateMutation = useMutation({
-    mutationFn: async (jobTypeId: string) => {
-      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_INSTANTIATE(jobId), { jobTypeId });
+    mutationFn: async (payload: { jobTypeId: string; startDate: string }) => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES_INSTANTIATE(jobId), payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
@@ -193,6 +221,7 @@ export default function JobActivitiesPage() {
 
   const totalActivities = parentActivities.length;
   const doneCount = parentActivities.filter(a => a.status === "DONE").length;
+  const overdueCount = parentActivities.filter(a => isOverdue(a)).length;
   const progressPct = totalActivities > 0 ? Math.round((doneCount / totalActivities) * 100) : 0;
 
   if (loadingActivities) {
@@ -219,6 +248,11 @@ export default function JobActivitiesPage() {
             <p className="text-muted-foreground">
               {job ? `${job.jobNumber || ""} - ${job.name || ""}` : "Loading job..."}
               {hasActivities && ` | ${doneCount}/${totalActivities} complete (${progressPct}%)`}
+              {overdueCount > 0 && (
+                <span className="text-red-500 ml-2">
+                  | {overdueCount} overdue
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -289,7 +323,7 @@ export default function JobActivitiesPage() {
           {hasActivities && (
             <div className="w-full bg-muted rounded-full h-2">
               <div
-                className="bg-primary h-2 rounded-full transition-all"
+                className="bg-green-500 h-2 rounded-full transition-all"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
@@ -301,19 +335,28 @@ export default function JobActivitiesPage() {
               const stageActivities = activitiesByStage.get(stageId) || [];
               const isCollapsed = collapsedStages.has(stageId);
               const stageDone = stageActivities.filter(a => a.status === "DONE").length;
+              const stageOverdue = stageActivities.filter(a => isOverdue(a)).length;
+              const colorIndex = stageColorMap.get(stageId) ?? 0;
+              const colors = getStageColor(colorIndex);
 
               return (
-                <Card key={stageId}>
+                <Card key={stageId} className="overflow-visible">
                   <div
-                    className="flex items-center justify-between px-4 py-3 cursor-pointer hover-elevate"
+                    className={`flex items-center justify-between gap-4 px-4 py-3 cursor-pointer ${colors.bg} rounded-t-md`}
                     onClick={() => toggleStageCollapse(stageId)}
                     data-testid={`stage-header-${stageId}`}
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      {stage && <Badge variant="outline" className="font-mono">{stage.stageNumber}</Badge>}
-                      <span className="font-semibold">{stage?.name || "Other"}</span>
+                      {stage && <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded ${colors.badge}`}>{stage.stageNumber}</span>}
+                      <span className={`font-semibold ${colors.text}`}>{stage?.name || "Other"}</span>
                       <Badge variant="secondary">{stageDone}/{stageActivities.length}</Badge>
+                      {stageOverdue > 0 && (
+                        <Badge variant="destructive" className="text-xs">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          {stageOverdue} overdue
+                        </Badge>
+                      )}
                     </div>
                   </div>
 
@@ -363,42 +406,16 @@ export default function JobActivitiesPage() {
         </>
       )}
 
-      <Dialog open={showInstantiateDialog} onOpenChange={(open) => { if (!open) setShowInstantiateDialog(false); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Load Activities from Workflow</DialogTitle>
-            <DialogDescription>
-              Select a job type to load its workflow activities into this job.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Job Type</Label>
-              <Select value={selectedJobTypeId} onValueChange={setSelectedJobTypeId}>
-                <SelectTrigger data-testid="select-job-type-instantiate">
-                  <SelectValue placeholder="Select a job type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobTypesData?.filter(jt => jt.isActive).map(jt => (
-                    <SelectItem key={jt.id} value={jt.id}>{jt.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowInstantiateDialog(false)}>Cancel</Button>
-            <Button
-              onClick={() => selectedJobTypeId && instantiateMutation.mutate(selectedJobTypeId)}
-              disabled={!selectedJobTypeId || instantiateMutation.isPending}
-              data-testid="button-confirm-instantiate"
-            >
-              {instantiateMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Load Activities
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <InstantiateDialog
+        open={showInstantiateDialog}
+        onOpenChange={(open) => { if (!open) setShowInstantiateDialog(false); }}
+        jobTypesData={jobTypesData || []}
+        job={job}
+        selectedJobTypeId={selectedJobTypeId}
+        setSelectedJobTypeId={setSelectedJobTypeId}
+        onConfirm={(jobTypeId, startDate) => instantiateMutation.mutate({ jobTypeId, startDate })}
+        isPending={instantiateMutation.isPending}
+      />
 
       <ActivitySidebar
         activity={selectedActivity}
@@ -425,11 +442,13 @@ function ActivityRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const statusOpt = getStatusOption(activity.status);
+  const overdue = isOverdue(activity);
+  const rowBg = getRowClassName(activity);
 
   return (
     <>
       <tr
-        className="border-t hover-elevate cursor-pointer"
+        className={`border-t cursor-pointer ${rowBg}`}
         onClick={() => onSelect(activity)}
         data-testid={`activity-row-${activity.id}`}
       >
@@ -445,20 +464,16 @@ function ActivityRow({
               </button>
             )}
             <span className="font-medium" data-testid={`text-activity-name-${activity.id}`}>{activity.name}</span>
+            {overdue && (
+              <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+            )}
           </div>
         </td>
         <td className="px-3 py-2 text-muted-foreground text-xs">{activity.category || "-"}</td>
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-          <Select value={activity.status} onValueChange={(v) => onStatusChange(activity.id, v)}>
-            <SelectTrigger className="h-7 text-xs w-[110px]" data-testid={`select-status-${activity.id}`}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_OPTIONS.map(s => (
-                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusOpt.color}`}>
+            {statusOpt.label}
+          </span>
         </td>
         <td className="px-3 py-2 text-center">{activity.estimatedDays || "-"}</td>
         <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[140px]">{activity.consultantName || "-"}</td>
@@ -474,7 +489,7 @@ function ActivityRow({
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
             type="date"
-            className="h-7 text-xs w-[120px]"
+            className={`h-7 text-xs w-[120px] ${overdue ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
             value={activity.endDate ? format(new Date(activity.endDate), "yyyy-MM-dd") : ""}
             onChange={(e) => onDateChange(activity.id, "endDate", e.target.value)}
             data-testid={`input-end-date-${activity.id}`}
@@ -483,51 +498,158 @@ function ActivityRow({
         <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[140px]">{activity.deliverable || "-"}</td>
       </tr>
 
-      {expanded && children.map(child => (
-        <tr
-          key={child.id}
-          className="border-t bg-muted/30 cursor-pointer hover-elevate"
-          onClick={() => onSelect(child)}
-          data-testid={`activity-row-child-${child.id}`}
-        >
-          <td className="px-3 py-1.5 pl-10">
-            <span className="text-sm">{child.name}</span>
-          </td>
-          <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.category || "-"}</td>
-          <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
-            <Select value={child.status} onValueChange={(v) => onStatusChange(child.id, v)}>
-              <SelectTrigger className="h-6 text-xs w-[110px]" data-testid={`select-status-${child.id}`}>
-                <SelectValue />
+      {expanded && children.map(child => {
+        const childOverdue = isOverdue(child);
+        const childRowBg = getRowClassName(child);
+        const childStatus = getStatusOption(child.status);
+        return (
+          <tr
+            key={child.id}
+            className={`border-t cursor-pointer ${childRowBg || "bg-muted/30"}`}
+            onClick={() => onSelect(child)}
+            data-testid={`activity-row-child-${child.id}`}
+          >
+            <td className="px-3 py-1.5 pl-10">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{child.name}</span>
+                {childOverdue && <AlertTriangle className="h-3 w-3 text-red-500 flex-shrink-0" />}
+              </div>
+            </td>
+            <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.category || "-"}</td>
+            <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${childStatus.color}`}>
+                {childStatus.label}
+              </span>
+            </td>
+            <td className="px-3 py-1.5 text-center text-xs">{child.estimatedDays || "-"}</td>
+            <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.consultantName || "-"}</td>
+            <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
+              <Input
+                type="date"
+                className="h-6 text-xs w-[120px]"
+                value={child.startDate ? format(new Date(child.startDate), "yyyy-MM-dd") : ""}
+                onChange={(e) => onDateChange(child.id, "startDate", e.target.value)}
+              />
+            </td>
+            <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
+              <Input
+                type="date"
+                className={`h-6 text-xs w-[120px] ${childOverdue ? "border-red-500 text-red-600 dark:text-red-400" : ""}`}
+                value={child.endDate ? format(new Date(child.endDate), "yyyy-MM-dd") : ""}
+                onChange={(e) => onDateChange(child.id, "endDate", e.target.value)}
+              />
+            </td>
+            <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.deliverable || "-"}</td>
+          </tr>
+        );
+      })}
+    </>
+  );
+}
+
+function InstantiateDialog({
+  open,
+  onOpenChange,
+  jobTypesData,
+  job,
+  selectedJobTypeId,
+  setSelectedJobTypeId,
+  onConfirm,
+  isPending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  jobTypesData: JobType[];
+  job: any;
+  selectedJobTypeId: string;
+  setSelectedJobTypeId: (id: string) => void;
+  onConfirm: (jobTypeId: string, startDate: string) => void;
+  isPending: boolean;
+}) {
+  const [dateSource, setDateSource] = useState<"job" | "custom">("job");
+  const [customStartDate, setCustomStartDate] = useState("");
+
+  const jobStartDate = job?.estimatedStartDate
+    ? format(new Date(job.estimatedStartDate), "yyyy-MM-dd")
+    : job?.productionStartDate
+      ? format(new Date(job.productionStartDate), "yyyy-MM-dd")
+      : "";
+
+  const effectiveStartDate = dateSource === "job" ? jobStartDate : customStartDate;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Load Activities from Workflow</DialogTitle>
+          <DialogDescription>
+            Select a job type and project start date. Activities will be scheduled sequentially (finish-to-start) based on their estimated durations.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Job Type</Label>
+            <Select value={selectedJobTypeId} onValueChange={setSelectedJobTypeId}>
+              <SelectTrigger data-testid="select-job-type-instantiate">
+                <SelectValue placeholder="Select a job type" />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map(s => (
-                  <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                {jobTypesData?.filter(jt => jt.isActive).map(jt => (
+                  <SelectItem key={jt.id} value={jt.id}>{jt.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </td>
-          <td className="px-3 py-1.5 text-center text-xs">{child.estimatedDays || "-"}</td>
-          <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.consultantName || "-"}</td>
-          <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
-            <Input
-              type="date"
-              className="h-6 text-xs w-[120px]"
-              value={child.startDate ? format(new Date(child.startDate), "yyyy-MM-dd") : ""}
-              onChange={(e) => onDateChange(child.id, "startDate", e.target.value)}
-            />
-          </td>
-          <td className="px-3 py-1.5" onClick={(e) => e.stopPropagation()}>
-            <Input
-              type="date"
-              className="h-6 text-xs w-[120px]"
-              value={child.endDate ? format(new Date(child.endDate), "yyyy-MM-dd") : ""}
-              onChange={(e) => onDateChange(child.id, "endDate", e.target.value)}
-            />
-          </td>
-          <td className="px-3 py-1.5 text-muted-foreground text-xs">{child.deliverable || "-"}</td>
-        </tr>
-      ))}
-    </>
+          </div>
+
+          <div className="space-y-3">
+            <Label>Project Start Date</Label>
+            <RadioGroup
+              value={dateSource}
+              onValueChange={(v) => setDateSource(v as "job" | "custom")}
+              className="space-y-2"
+            >
+              <div className="flex items-center gap-3">
+                <RadioGroupItem value="job" id="date-job" data-testid="radio-date-job" />
+                <Label htmlFor="date-job" className="font-normal cursor-pointer">
+                  Use job start date
+                  {jobStartDate ? (
+                    <span className="ml-2 text-muted-foreground">({format(new Date(jobStartDate), "dd MMM yyyy")})</span>
+                  ) : (
+                    <span className="ml-2 text-destructive text-xs">(No start date set on job)</span>
+                  )}
+                </Label>
+              </div>
+              <div className="flex items-center gap-3">
+                <RadioGroupItem value="custom" id="date-custom" data-testid="radio-date-custom" />
+                <Label htmlFor="date-custom" className="font-normal cursor-pointer">
+                  Use a different date
+                </Label>
+              </div>
+            </RadioGroup>
+
+            {dateSource === "custom" && (
+              <Input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                data-testid="input-custom-start-date"
+              />
+            )}
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button
+            onClick={() => selectedJobTypeId && effectiveStartDate && onConfirm(selectedJobTypeId, effectiveStartDate)}
+            disabled={!selectedJobTypeId || !effectiveStartDate || isPending}
+            data-testid="button-confirm-instantiate"
+          >
+            {isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            Load Activities
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
