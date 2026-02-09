@@ -29,7 +29,7 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, Clock, User, FileText,
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
   Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
-  ListChecks,
+  ListChecks, BarChart3, TableProperties,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
@@ -38,6 +38,7 @@ import { format, isAfter, isBefore, startOfDay } from "date-fns";
 
 import { getStageColor } from "@/lib/stage-colors";
 import { ActivityTasksPanel } from "@/pages/tasks/ActivityTasksPanel";
+import { GanttChart } from "@/pages/job-activities-gantt";
 
 type ActivityWithAssignees = JobActivity & {
   assignees?: Array<{ id: string; activityId: string; userId: string }>;
@@ -87,6 +88,7 @@ export default function JobActivitiesPage() {
   const [showInstantiateDialog, setShowInstantiateDialog] = useState(false);
   const [selectedJobTypeId, setSelectedJobTypeId] = useState("");
   const [showCompleted, setShowCompleted] = useState(true);
+  const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
 
   const { data: job } = useQuery<any>({
     queryKey: [`/api/admin/jobs/${jobId}`],
@@ -317,14 +319,41 @@ export default function JobActivitiesPage() {
               </SelectContent>
             </Select>
 
-            <Button variant="outline" size="sm" onClick={collapseAll} data-testid="button-collapse-all">
-              <ChevronsDownUp className="h-4 w-4 mr-1" />
-              Collapse All
-            </Button>
-            <Button variant="outline" size="sm" onClick={expandAll} data-testid="button-expand-all">
-              <ChevronsUpDown className="h-4 w-4 mr-1" />
-              Expand All
-            </Button>
+            {viewMode === "table" && (
+              <>
+                <Button variant="outline" size="sm" onClick={collapseAll} data-testid="button-collapse-all">
+                  <ChevronsDownUp className="h-4 w-4 mr-1" />
+                  Collapse All
+                </Button>
+                <Button variant="outline" size="sm" onClick={expandAll} data-testid="button-expand-all">
+                  <ChevronsUpDown className="h-4 w-4 mr-1" />
+                  Expand All
+                </Button>
+              </>
+            )}
+
+            <div className="flex items-center border rounded-md overflow-visible">
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-r-none gap-1"
+                onClick={() => setViewMode("table")}
+                data-testid="button-view-table"
+              >
+                <TableProperties className="h-4 w-4" />
+                Table
+              </Button>
+              <Button
+                variant={viewMode === "gantt" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-l-none gap-1"
+                onClick={() => setViewMode("gantt")}
+                data-testid="button-view-gantt"
+              >
+                <BarChart3 className="h-4 w-4" />
+                Gantt
+              </Button>
+            </div>
           </div>
 
           {hasActivities && (
@@ -336,83 +365,92 @@ export default function JobActivitiesPage() {
             </div>
           )}
 
-          <div className="space-y-3">
-            {orderedStageIds.map((stageId) => {
-              const stage = stageMap.get(stageId);
-              const stageActivities = activitiesByStage.get(stageId) || [];
-              const isCollapsed = collapsedStages.has(stageId);
-              const stageDone = stageActivities.filter(a => a.status === "DONE").length;
-              const stageOverdue = stageActivities.filter(a => isOverdue(a)).length;
-              const colorIndex = stageColorMap.get(stageId) ?? 0;
-              const colors = getStageColor(colorIndex);
+          {viewMode === "gantt" ? (
+            <GanttChart
+              activities={filteredActivities}
+              stages={stages || []}
+              stageColorMap={stageColorMap}
+              onSelectActivity={setSelectedActivity}
+            />
+          ) : (
+            <div className="space-y-3">
+              {orderedStageIds.map((stageId) => {
+                const stage = stageMap.get(stageId);
+                const stageActivities = activitiesByStage.get(stageId) || [];
+                const isCollapsed = collapsedStages.has(stageId);
+                const stageDone = stageActivities.filter(a => a.status === "DONE").length;
+                const stageOverdue = stageActivities.filter(a => isOverdue(a)).length;
+                const colorIndex = stageColorMap.get(stageId) ?? 0;
+                const colors = getStageColor(colorIndex);
 
-              return (
-                <Card key={stageId} className="overflow-visible">
-                  <div
-                    className={`flex items-center justify-between gap-4 px-4 py-3 cursor-pointer ${colors.bg} rounded-t-md`}
-                    onClick={() => toggleStageCollapse(stageId)}
-                    data-testid={`stage-header-${stageId}`}
-                  >
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      {stage && <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded ${colors.badge}`}>{stage.stageNumber}</span>}
-                      <span className={`font-semibold ${colors.text}`}>{stage?.name || "Other"}</span>
-                      <Badge variant="secondary">{stageDone}/{stageActivities.length}</Badge>
-                      {stageOverdue > 0 && (
-                        <Badge variant="destructive" className="text-xs">
-                          <AlertTriangle className="h-3 w-3 mr-1" />
-                          {stageOverdue} overdue
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {!isCollapsed && (
-                    <CardContent className="pt-0 pb-2 px-2">
-                      <div className="border rounded-md overflow-hidden">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="bg-muted/50 text-left">
-                              <th className="px-3 py-2 font-medium">Activity</th>
-                              <th className="px-3 py-2 font-medium w-[100px]">Category</th>
-                              <th className="px-3 py-2 font-medium w-[120px]">Status</th>
-                              <th className="px-3 py-2 font-medium w-[80px]">Days</th>
-                              <th className="px-3 py-2 font-medium w-[140px]">Consultant</th>
-                              <th className="px-3 py-2 font-medium w-[120px]">Start Date</th>
-                              <th className="px-3 py-2 font-medium w-[120px]">End Date</th>
-                              <th className="px-3 py-2 font-medium w-[140px]">Deliverable</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {stageActivities.map((activity) => {
-                              const children = childActivities.get(activity.id) || [];
-                              return (
-                                <ActivityRow
-                                  key={activity.id}
-                                  activity={activity}
-                                  children={children}
-                                  onSelect={setSelectedActivity}
-                                  onStatusChange={(id, status) => {
-                                    updateActivityMutation.mutate({ id, status });
-                                  }}
-                                  onDateChange={(id, field, value) => {
-                                    updateActivityMutation.mutate({ id, [field]: value || null });
-                                  }}
-                                  users={users || []}
-                                  jobs={jobsList || []}
-                                  jobId={jobId}
-                                />
-                              );
-                            })}
-                          </tbody>
-                        </table>
+                return (
+                  <Card key={stageId} className="overflow-visible">
+                    <div
+                      className={`flex items-center justify-between gap-4 px-4 py-3 cursor-pointer ${colors.bg} rounded-t-md`}
+                      onClick={() => toggleStageCollapse(stageId)}
+                      data-testid={`stage-header-${stageId}`}
+                    >
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {stage && <span className={`font-mono text-sm font-bold px-2 py-0.5 rounded ${colors.badge}`}>{stage.stageNumber}</span>}
+                        <span className={`font-semibold ${colors.text}`}>{stage?.name || "Other"}</span>
+                        <Badge variant="secondary">{stageDone}/{stageActivities.length}</Badge>
+                        {stageOverdue > 0 && (
+                          <Badge variant="destructive" className="text-xs">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            {stageOverdue} overdue
+                          </Badge>
+                        )}
                       </div>
-                    </CardContent>
-                  )}
-                </Card>
-              );
-            })}
-          </div>
+                    </div>
+
+                    {!isCollapsed && (
+                      <CardContent className="pt-0 pb-2 px-2">
+                        <div className="border rounded-md overflow-hidden">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-muted/50 text-left">
+                                <th className="px-3 py-2 font-medium">Activity</th>
+                                <th className="px-3 py-2 font-medium w-[100px]">Category</th>
+                                <th className="px-3 py-2 font-medium w-[120px]">Status</th>
+                                <th className="px-3 py-2 font-medium w-[80px]">Days</th>
+                                <th className="px-3 py-2 font-medium w-[140px]">Consultant</th>
+                                <th className="px-3 py-2 font-medium w-[120px]">Start Date</th>
+                                <th className="px-3 py-2 font-medium w-[120px]">End Date</th>
+                                <th className="px-3 py-2 font-medium w-[140px]">Deliverable</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {stageActivities.map((activity) => {
+                                const children = childActivities.get(activity.id) || [];
+                                return (
+                                  <ActivityRow
+                                    key={activity.id}
+                                    activity={activity}
+                                    children={children}
+                                    onSelect={setSelectedActivity}
+                                    onStatusChange={(id, status) => {
+                                      updateActivityMutation.mutate({ id, status });
+                                    }}
+                                    onDateChange={(id, field, value) => {
+                                      updateActivityMutation.mutate({ id, [field]: value || null });
+                                    }}
+                                    users={users || []}
+                                    jobs={jobsList || []}
+                                    jobId={jobId}
+                                  />
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
         </>
       )}
 
