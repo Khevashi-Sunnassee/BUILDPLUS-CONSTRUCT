@@ -47,6 +47,7 @@ const taskCreateSchema = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).nullable().optional(),
   jobId: z.string().nullable().optional(),
   parentId: z.string().nullable().optional(),
+  jobActivityId: z.string().nullable().optional(),
 });
 
 const taskUpdateSchema_partial = z.object({
@@ -59,6 +60,7 @@ const taskUpdateSchema_partial = z.object({
   priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).nullable().optional(),
   jobId: z.string().nullable().optional(),
   parentId: z.string().nullable().optional(),
+  jobActivityId: z.string().nullable().optional(),
   sortOrder: z.number().optional(),
 });
 

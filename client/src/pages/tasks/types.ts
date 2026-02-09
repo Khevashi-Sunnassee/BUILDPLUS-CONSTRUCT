@@ -26,6 +26,7 @@ export interface Task {
   groupId: string;
   parentId: string | null;
   jobId: string | null;
+  jobActivityId: string | null;
   title: string;
   status: TaskStatus;
   dueDate: string | null;

@@ -8,6 +8,7 @@ import {
   jobTypes, activityStages, activityConsultants,
   activityTemplates, activityTemplateSubtasks,
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
+  taskGroups, tasks,
 } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
@@ -1256,6 +1257,154 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
   } catch (error: unknown) {
     logger.error({ err: error }, "Error importing activities");
     res.status(500).json({ error: "Failed to import activities" });
+  }
+});
+
+const activityTaskCreateSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  status: z.enum(["NOT_STARTED", "IN_PROGRESS", "STUCK", "DONE", "ON_HOLD"]).optional().default("NOT_STARTED"),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional().nullable(),
+  consultant: z.string().optional().nullable(),
+  projectStage: z.string().optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  reminderDate: z.string().optional().nullable(),
+  jobId: z.string().optional().nullable(),
+});
+
+router.get("/api/job-activities/:activityId/tasks", requireAuth, requirePermission("tasks"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const activityId = String(req.params.activityId);
+
+    const [activity] = await db.select().from(jobActivities).where(
+      and(eq(jobActivities.id, activityId), eq(jobActivities.companyId, companyId!))
+    );
+    if (!activity) return res.status(404).json({ error: "Activity not found" });
+
+    const { storage } = await import("../storage");
+    const activityTasks = await storage.getTasksByActivity(activityId, companyId!);
+    res.json(activityTasks);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching activity tasks");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch activity tasks" });
+  }
+});
+
+router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const activityId = String(req.params.activityId);
+    const userId = req.session.userId;
+
+    const parsed = activityTaskCreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const [activity] = await db.select().from(jobActivities).where(
+      and(eq(jobActivities.id, activityId), eq(jobActivities.companyId, companyId!))
+    );
+    if (!activity) return res.status(404).json({ error: "Activity not found" });
+
+    const validatedData = parsed.data;
+
+    if (validatedData.dueDate) {
+      const dueDate = new Date(validatedData.dueDate);
+      if (isNaN(dueDate.getTime())) {
+        return res.status(400).json({ error: "Invalid due date" });
+      }
+      if (activity.startDate && dueDate < new Date(activity.startDate)) {
+        return res.status(400).json({ error: "Due date must be on or after activity start date" });
+      }
+      if (activity.endDate && dueDate > new Date(activity.endDate)) {
+        return res.status(400).json({ error: "Due date must be on or before activity end date" });
+      }
+    }
+
+    if (validatedData.reminderDate) {
+      const reminderDate = new Date(validatedData.reminderDate);
+      if (isNaN(reminderDate.getTime())) {
+        return res.status(400).json({ error: "Invalid reminder date" });
+      }
+    }
+
+    const { storage } = await import("../storage");
+
+    let groupId = activity.taskGroupId;
+    if (!groupId) {
+      const group = await storage.createTaskGroup({
+        companyId: companyId!,
+        name: `Activity: ${activity.name}`,
+        color: "#6366f1",
+      });
+      groupId = group.id;
+      await db.update(jobActivities).set({ taskGroupId: groupId }).where(eq(jobActivities.id, activityId));
+    }
+
+    const taskData: any = {
+      groupId,
+      jobActivityId: activityId,
+      jobId: activity.jobId,
+      title: validatedData.title,
+      status: validatedData.status,
+      priority: validatedData.priority || null,
+      consultant: validatedData.consultant || null,
+      projectStage: validatedData.projectStage || null,
+      createdById: userId,
+    };
+
+    if (validatedData.dueDate) {
+      taskData.dueDate = new Date(validatedData.dueDate);
+    }
+    if (validatedData.reminderDate) {
+      taskData.reminderDate = new Date(validatedData.reminderDate);
+    }
+
+    const task = await storage.createTask(taskData);
+    const taskWithDetails = await storage.getTask(task.id);
+    res.status(201).json(taskWithDetails || task);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error creating activity task");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create activity task" });
+  }
+});
+
+router.post("/api/job-activities/:activityId/tasks/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const activityId = String(req.params.activityId);
+
+    const reorderSchema = z.object({ taskIds: z.array(z.string()) });
+    const parsed = reorderSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "taskIds must be an array of strings" });
+    }
+
+    const { taskIds } = parsed.data;
+
+    const [activity] = await db.select().from(jobActivities).where(
+      and(eq(jobActivities.id, activityId), eq(jobActivities.companyId, companyId!))
+    );
+    if (!activity) return res.status(404).json({ error: "Activity not found" });
+
+    const { storage } = await import("../storage");
+    const allTasks = await storage.getTasksByActivity(activityId, companyId!);
+    const validTaskIds = new Set(allTasks.map(t => t.id));
+
+    for (const id of taskIds) {
+      if (!validTaskIds.has(id)) {
+        return res.status(400).json({ error: `Task ${id} does not belong to this activity` });
+      }
+    }
+
+    for (let i = 0; i < taskIds.length; i++) {
+      await storage.updateTask(taskIds[i], { sortOrder: i } as any);
+    }
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error reordering activity tasks");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reorder activity tasks" });
   }
 });
 

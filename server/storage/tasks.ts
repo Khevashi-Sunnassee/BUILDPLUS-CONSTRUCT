@@ -205,6 +205,41 @@ export const taskMethods = {
     return getTaskWithDetails(id);
   },
 
+  async getTasksByActivity(activityId: string, companyId?: string): Promise<TaskWithDetails[]> {
+    if (companyId) {
+      const activityTasks = await db.select({ t: tasks }).from(tasks)
+        .innerJoin(taskGroups, eq(tasks.groupId, taskGroups.id))
+        .where(and(
+          eq(tasks.jobActivityId, activityId),
+          isNull(tasks.parentId),
+          eq(taskGroups.companyId, companyId),
+        ))
+        .orderBy(asc(tasks.sortOrder));
+
+      const result: TaskWithDetails[] = [];
+      for (const row of activityTasks) {
+        const taskDetails = await getTaskWithDetails(row.t.id);
+        if (taskDetails) {
+          result.push(taskDetails);
+        }
+      }
+      return result;
+    }
+
+    const activityTasks = await db.select().from(tasks)
+      .where(and(eq(tasks.jobActivityId, activityId), isNull(tasks.parentId)))
+      .orderBy(asc(tasks.sortOrder));
+
+    const result: TaskWithDetails[] = [];
+    for (const task of activityTasks) {
+      const taskDetails = await getTaskWithDetails(task.id);
+      if (taskDetails) {
+        result.push(taskDetails);
+      }
+    }
+    return result;
+  },
+
   async createTask(data: InsertTask): Promise<Task> {
     const [maxOrder] = await db.select({ maxOrder: sql<number>`COALESCE(MAX(sort_order), 0)` })
       .from(tasks)

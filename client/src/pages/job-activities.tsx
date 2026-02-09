@@ -29,12 +29,15 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, Clock, User, FileText,
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
   Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
+  ListChecks,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, JobActivity } from "@shared/schema";
 import { format, isAfter, isBefore, startOfDay } from "date-fns";
 
 import { getStageColor } from "@/lib/stage-colors";
+import { ActivityTasksPanel } from "@/pages/tasks/ActivityTasksPanel";
 
 type ActivityWithAssignees = JobActivity & {
   assignees?: Array<{ id: string; activityId: string; userId: string }>;
@@ -105,6 +108,10 @@ export default function JobActivitiesPage() {
 
   const { data: users } = useQuery<any[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: jobsList } = useQuery<any[]>({
+    queryKey: ["/api/admin/jobs"],
   });
 
   const stageMap = useMemo(() => {
@@ -391,6 +398,9 @@ export default function JobActivitiesPage() {
                                   onDateChange={(id, field, value) => {
                                     updateActivityMutation.mutate({ id, [field]: value || null });
                                   }}
+                                  users={users || []}
+                                  jobs={jobsList || []}
+                                  jobId={jobId}
                                 />
                               );
                             })}
@@ -433,14 +443,21 @@ function ActivityRow({
   onSelect,
   onStatusChange,
   onDateChange,
+  users,
+  jobs,
+  jobId,
 }: {
   activity: ActivityWithAssignees;
   children: ActivityWithAssignees[];
   onSelect: (a: ActivityWithAssignees) => void;
   onStatusChange: (id: string, status: string) => void;
   onDateChange: (id: string, field: string, value: string) => void;
+  users: any[];
+  jobs: any[];
+  jobId: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [tasksExpanded, setTasksExpanded] = useState(false);
   const statusOpt = getStatusOption(activity.status);
   const overdue = isOverdue(activity);
   const rowBg = getRowClassName(activity);
@@ -448,7 +465,7 @@ function ActivityRow({
   return (
     <>
       <tr
-        className={`border-t cursor-pointer ${rowBg}`}
+        className={`border-t cursor-pointer group ${rowBg}`}
         onClick={() => onSelect(activity)}
         data-testid={`activity-row-${activity.id}`}
       >
@@ -467,6 +484,17 @@ function ActivityRow({
             {overdue && (
               <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
             )}
+            <button
+              onClick={(e) => { e.stopPropagation(); setTasksExpanded(!tasksExpanded); }}
+              className={cn(
+                "p-0.5 rounded transition-colors",
+                tasksExpanded ? "text-primary" : "text-muted-foreground opacity-0 group-hover:opacity-100",
+              )}
+              style={{ opacity: tasksExpanded ? 1 : undefined }}
+              data-testid={`button-tasks-${activity.id}`}
+            >
+              <ListChecks className="h-3.5 w-3.5" />
+            </button>
           </div>
         </td>
         <td className="px-3 py-2 text-muted-foreground text-xs">{activity.category || "-"}</td>
@@ -497,6 +525,21 @@ function ActivityRow({
         </td>
         <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[140px]">{activity.deliverable || "-"}</td>
       </tr>
+
+      {tasksExpanded && (
+        <tr data-testid={`activity-tasks-row-${activity.id}`}>
+          <td colSpan={8} className="px-4 py-2 bg-muted/30">
+            <ActivityTasksPanel
+              activityId={activity.id}
+              jobId={jobId}
+              activityStartDate={activity.startDate ? String(activity.startDate) : null}
+              activityEndDate={activity.endDate ? String(activity.endDate) : null}
+              users={users}
+              jobs={jobs}
+            />
+          </td>
+        </tr>
+      )}
 
       {expanded && children.map(child => {
         const childOverdue = isOverdue(child);
