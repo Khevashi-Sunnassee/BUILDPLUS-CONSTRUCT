@@ -29,7 +29,7 @@ import {
   ArrowLeft, ChevronDown, ChevronRight, Clock, User, FileText,
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
   Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
-  ListChecks, BarChart3, TableProperties,
+  ListChecks, BarChart3, TableProperties, Eye, EyeOff, CheckCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
@@ -89,7 +89,7 @@ export default function JobActivitiesPage() {
   const [selectedActivity, setSelectedActivity] = useState<ActivityWithAssignees | null>(null);
   const [showInstantiateDialog, setShowInstantiateDialog] = useState(false);
   const [selectedJobTypeId, setSelectedJobTypeId] = useState("");
-  const [showCompleted, setShowCompleted] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
 
   const { data: job } = useQuery<any>({
@@ -142,12 +142,13 @@ export default function JobActivitiesPage() {
     if (!activities) return new Map<string, ActivityWithAssignees[]>();
     const m = new Map<string, ActivityWithAssignees[]>();
     activities.filter(a => a.parentId).forEach(a => {
+      if (!showCompleted && a.status === "DONE") return;
       const list = m.get(a.parentId!) || [];
       list.push(a);
       m.set(a.parentId!, list);
     });
     return m;
-  }, [activities]);
+  }, [activities, showCompleted]);
 
   const activitiesByStage = useMemo(() => {
     const m = new Map<string, ActivityWithAssignees[]>();
@@ -265,9 +266,10 @@ export default function JobActivitiesPage() {
 
   const hasActivities = activities && activities.length > 0;
 
-  const totalActivities = parentActivities.length;
-  const doneCount = parentActivities.filter(a => a.status === "DONE").length;
-  const overdueCount = parentActivities.filter(a => isOverdue(a)).length;
+  const allParentActivities = useMemo(() => (activities || []).filter(a => !a.parentId), [activities]);
+  const totalActivities = allParentActivities.length;
+  const doneCount = allParentActivities.filter(a => a.status === "DONE").length;
+  const overdueCount = allParentActivities.filter(a => isOverdue(a)).length;
   const progressPct = totalActivities > 0 ? Math.round((doneCount / totalActivities) * 100) : 0;
 
   if (loadingActivities) {
@@ -386,6 +388,16 @@ export default function JobActivitiesPage() {
                 </Button>
               </>
             )}
+
+            <Button
+              variant={showCompleted ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowCompleted(!showCompleted)}
+              data-testid="button-show-done"
+            >
+              {showCompleted ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
+              Show Done
+            </Button>
 
             <div className="flex items-center border rounded-md overflow-visible">
               <Button

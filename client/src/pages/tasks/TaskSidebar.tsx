@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,16 +26,24 @@ import { getInitials } from "./types";
 export function TaskSidebar({
   task,
   onClose,
+  initialTab,
 }: {
   task: Task | null;
   onClose: () => void;
+  initialTab?: "updates" | "files" | "activity";
 }) {
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState<"updates" | "files" | "activity">("updates");
+  const [activeTab, setActiveTab] = useState<"updates" | "files" | "activity">(initialTab || "updates");
   const [newUpdate, setNewUpdate] = useState("");
   const [pastedImages, setPastedImages] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (initialTab && task) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, task]);
 
   const { data: updates = [], isLoading: updatesLoading } = useQuery<TaskUpdate[]>({
     queryKey: [TASKS_ROUTES.UPDATES(task?.id || "")],

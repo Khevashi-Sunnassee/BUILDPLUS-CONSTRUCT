@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Task, TaskStatus, TaskPriority, User, Job } from "./types";
 import { STATUS_CONFIG, PRIORITY_CONFIG, PROJECT_STAGES, getInitials } from "./types";
+import { TaskSidebar } from "./TaskSidebar";
 
 const GRID_TEMPLATE = "40px minmax(200px,1fr) 40px 100px 100px 120px 90px 120px 100px 60px 60px 40px";
 
@@ -57,6 +58,8 @@ export function ActivityTasksPanel({
   const { toast } = useToast();
   const [showCompleted, setShowCompleted] = useState(true);
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<"updates" | "files">("updates");
   const newTaskInputRef = useRef<HTMLInputElement>(null);
 
   const queryKey = [PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activityId)];
@@ -176,6 +179,10 @@ export function ActivityTasksPanel({
                   queryKey={queryKey}
                   activityStartDate={activityStartDate}
                   activityEndDate={activityEndDate}
+                  onOpenSidebar={(t, tab) => {
+                    setSelectedTask(t);
+                    setSidebarInitialTab(tab);
+                  }}
                 />
               ))}
             </SortableContext>
@@ -214,6 +221,12 @@ export function ActivityTasksPanel({
           </div>
         </div>
       </div>
+
+      <TaskSidebar
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        initialTab={sidebarInitialTab}
+      />
     </div>
   );
 }
@@ -227,6 +240,7 @@ function SortableActivityTask({
   queryKey,
   activityStartDate,
   activityEndDate,
+  onOpenSidebar,
 }: {
   task: Task;
   users: User[];
@@ -236,6 +250,7 @@ function SortableActivityTask({
   queryKey: string[];
   activityStartDate?: string | null;
   activityEndDate?: string | null;
+  onOpenSidebar: (task: Task, tab: "updates" | "files") => void;
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -260,6 +275,7 @@ function SortableActivityTask({
         sortableListeners={listeners}
         activityStartDate={activityStartDate}
         activityEndDate={activityEndDate}
+        onOpenSidebar={onOpenSidebar}
       />
     </div>
   );
@@ -276,6 +292,7 @@ function ActivityTaskRow({
   sortableListeners,
   activityStartDate,
   activityEndDate,
+  onOpenSidebar,
 }: {
   task: Task;
   users: User[];
@@ -287,6 +304,7 @@ function ActivityTaskRow({
   sortableListeners?: Record<string, any>;
   activityStartDate?: string | null;
   activityEndDate?: string | null;
+  onOpenSidebar: (task: Task, tab: "updates" | "files") => void;
 }) {
   const { toast } = useToast();
   const [localTitle, setLocalTitle] = useState(task.title);
@@ -466,6 +484,7 @@ function ActivityTaskRow({
                 variant="ghost"
                 size="sm"
                 className="h-7 w-7 p-0"
+                onClick={() => onOpenSidebar(task, "updates")}
                 data-testid={`btn-updates-${task.id}`}
               >
                 <MessageSquare className="h-4 w-4" />
@@ -696,17 +715,25 @@ function ActivityTaskRow({
         </Popover>
 
         <div className="flex items-center justify-center gap-1 text-muted-foreground">
-          {task.filesCount > 0 && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="flex items-center gap-1 text-xs">
-                  <Paperclip className="h-3 w-3" />
-                  {task.filesCount}
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>Files</TooltipContent>
-            </Tooltip>
-          )}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => onOpenSidebar(task, "files")}
+                data-testid={`btn-files-${task.id}`}
+              >
+                <Paperclip className="h-3.5 w-3.5" />
+                {task.filesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] text-primary-foreground flex items-center justify-center">
+                    {task.filesCount}
+                  </span>
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Files</TooltipContent>
+          </Tooltip>
         </div>
 
         <DropdownMenu>
