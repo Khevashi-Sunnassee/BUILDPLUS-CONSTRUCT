@@ -498,6 +498,7 @@ export default function JobActivitiesPage() {
               stages={stages || []}
               stageColorMap={stageColorMap}
               onSelectActivity={setSelectedActivity}
+              jobTitle={job ? `${job.jobNumber || ""} - ${job.name || ""}` : "Project Activities"}
             />
           ) : (
             <div className="space-y-3">

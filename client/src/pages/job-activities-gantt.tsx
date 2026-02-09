@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, useCallback, useEffect } from "react";
 import { format, differenceInCalendarDays, addDays, startOfDay, isWeekend, endOfMonth, eachMonthOfInterval, eachWeekOfInterval } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Minus, Plus } from "lucide-react";
+import { Minus, Plus, Printer } from "lucide-react";
 import type { ActivityStage, JobActivity } from "@shared/schema";
 
 type ActivityWithAssignees = JobActivity & {
@@ -36,6 +36,7 @@ interface GanttChartProps {
   stages: ActivityStage[];
   stageColorMap: Map<string, number>;
   onSelectActivity: (activity: ActivityWithAssignees) => void;
+  jobTitle?: string;
 }
 
 export function GanttChart({
@@ -43,6 +44,7 @@ export function GanttChart({
   stages,
   stageColorMap,
   onSelectActivity,
+  jobTitle,
 }: GanttChartProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const labelScrollRef = useRef<HTMLDivElement>(null);
@@ -201,6 +203,168 @@ export function GanttChart({
     };
   }, []);
 
+  const handlePrint = useCallback(() => {
+    const PRINT_DAY_WIDTH = 18;
+    const PRINT_ROW_HEIGHT = 24;
+    const PRINT_LABEL_WIDTH = 200;
+    const PRINT_HEADER_HEIGHT = 40;
+    const printChartWidth = totalDays * PRINT_DAY_WIDTH;
+    const printChartHeight = orderedActivities.length * PRINT_ROW_HEIGHT;
+    const printToday = startOfDay(new Date());
+    const printTodayOffset = differenceInCalendarDays(printToday, timelineStart) * PRINT_DAY_WIDTH;
+
+    const statusLabels: Record<string, string> = {
+      NOT_STARTED: "Not Started", IN_PROGRESS: "In Progress", STUCK: "Stuck",
+      DONE: "Done", ON_HOLD: "On Hold", SKIPPED: "Skipped",
+    };
+
+    let svgBars = "";
+    let svgWeekends = "";
+    let svgRows = "";
+    let svgWeeks = "";
+
+    for (let dayIdx = 0; dayIdx < totalDays; dayIdx++) {
+      const date = addDays(timelineStart, dayIdx);
+      if (isWeekend(date)) {
+        svgWeekends += `<rect x="${dayIdx * PRINT_DAY_WIDTH}" y="0" width="${PRINT_DAY_WIDTH}" height="${printChartHeight}" fill="rgba(128,128,128,0.08)" />`;
+      }
+    }
+
+    orderedActivities.forEach((_, i) => {
+      svgRows += `<line x1="0" y1="${(i + 1) * PRINT_ROW_HEIGHT}" x2="${printChartWidth}" y2="${(i + 1) * PRINT_ROW_HEIGHT}" stroke="#ddd" stroke-width="0.5" />`;
+    });
+
+    weeks.forEach((weekDate) => {
+      const offset = differenceInCalendarDays(weekDate, timelineStart) * PRINT_DAY_WIDTH;
+      if (offset >= 0) {
+        svgWeeks += `<line x1="${offset}" y1="0" x2="${offset}" y2="${printChartHeight}" stroke="#ddd" stroke-width="0.5" stroke-dasharray="2,4" />`;
+      }
+    });
+
+    const sortOrderToRowIdx = new Map<number, number>();
+    orderedActivities.forEach(({ activity }, idx) => { sortOrderToRowIdx.set(activity.sortOrder, idx); });
+
+    let svgArrows = "";
+    orderedActivities.forEach(({ activity }, i) => {
+      if (activity.predecessorSortOrder == null) return;
+      const predRowIdx = sortOrderToRowIdx.get(activity.predecessorSortOrder);
+      if (predRowIdx == null) return;
+      const pred = orderedActivities[predRowIdx]?.activity;
+      if (!pred?.endDate || !activity.startDate) return;
+      const predEnd = startOfDay(new Date(pred.endDate));
+      const currStart = startOfDay(new Date(activity.startDate));
+      const x1 = (differenceInCalendarDays(predEnd, timelineStart) + 1) * PRINT_DAY_WIDTH;
+      const y1 = predRowIdx * PRINT_ROW_HEIGHT + PRINT_ROW_HEIGHT / 2;
+      const x2 = differenceInCalendarDays(currStart, timelineStart) * PRINT_DAY_WIDTH;
+      const y2 = i * PRINT_ROW_HEIGHT + PRINT_ROW_HEIGHT / 2;
+      const midX = x1 + 6;
+      svgArrows += `<path d="M ${x1} ${y1} L ${midX} ${y1} L ${midX} ${y2} L ${x2} ${y2}" fill="none" stroke="#999" stroke-width="0.8" />`;
+      svgArrows += `<polygon points="${x2},${y2} ${x2 - 3},${y2 - 2} ${x2 - 3},${y2 + 2}" fill="#999" />`;
+    });
+
+    orderedActivities.forEach(({ activity, stageIndex }, rowIdx) => {
+      if (!activity.startDate && !activity.endDate) return;
+      const sd = activity.startDate ? startOfDay(new Date(activity.startDate)) : startOfDay(new Date(activity.endDate!));
+      const ed = activity.endDate ? startOfDay(new Date(activity.endDate)) : sd;
+      const startOffset = differenceInCalendarDays(sd, timelineStart) * PRINT_DAY_WIDTH;
+      const duration = differenceInCalendarDays(ed, sd) + 1;
+      const barWidth = Math.max(duration * PRINT_DAY_WIDTH - 2, PRINT_DAY_WIDTH * 0.5);
+      const barY = rowIdx * PRINT_ROW_HEIGHT + (PRINT_ROW_HEIGHT - 14) / 2;
+      const color = STAGE_HEX_COLORS[stageIndex % STAGE_HEX_COLORS.length];
+      const statusConfig = STATUS_BAR_PATTERNS[activity.status] || STATUS_BAR_PATTERNS.NOT_STARTED;
+      svgBars += `<rect x="${startOffset + 1}" y="${barY}" width="${barWidth}" height="14" rx="2" fill="${color}" opacity="${statusConfig.opacity}" />`;
+      if (barWidth > 40) {
+        const label = activity.name.length > barWidth / 5 ? activity.name.slice(0, Math.floor(barWidth / 5)) + "..." : activity.name;
+        svgBars += `<text x="${startOffset + barWidth / 2 + 1}" y="${barY + 10}" text-anchor="middle" fill="white" font-size="7" font-weight="500">${label}</text>`;
+      }
+    });
+
+    const todayLine = `<line x1="${printTodayOffset}" y1="0" x2="${printTodayOffset}" y2="${printChartHeight}" stroke="#ef4444" stroke-width="1" stroke-dasharray="3,2" />`;
+
+    let monthHeaders = "";
+    months.forEach((monthDate) => {
+      const monthStart = monthDate < timelineStart ? timelineStart : monthDate;
+      const monthEnd = endOfMonth(monthDate);
+      const effectiveEnd = monthEnd > addDays(timelineStart, totalDays) ? addDays(timelineStart, totalDays) : monthEnd;
+      const startOffset = differenceInCalendarDays(monthStart, timelineStart) * PRINT_DAY_WIDTH;
+      const mDays = differenceInCalendarDays(effectiveEnd, monthStart) + 1;
+      const width = mDays * PRINT_DAY_WIDTH;
+      if (width > 0) {
+        monthHeaders += `<div style="position:absolute;left:${startOffset}px;width:${width}px;height:${PRINT_HEADER_HEIGHT}px;display:flex;align-items:center;justify-content:center;border-right:1px solid #ddd;font-size:9px;font-weight:600;color:#666;">${format(monthDate, "MMM yyyy")}</div>`;
+      }
+    });
+
+    let labelRows = "";
+    orderedActivities.forEach(({ activity, stageIndex }) => {
+      const color = STAGE_HEX_COLORS[stageIndex % STAGE_HEX_COLORS.length];
+      const statusLabel = statusLabels[activity.status] || activity.status;
+      labelRows += `<div style="height:${PRINT_ROW_HEIGHT}px;display:flex;align-items:center;gap:4px;padding:0 6px;border-bottom:1px solid #eee;font-size:8px;white-space:nowrap;overflow:hidden;">
+        <span style="width:6px;height:6px;border-radius:50%;background:${color};flex-shrink:0;"></span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">${activity.name}</span>
+        <span style="color:#999;font-size:7px;">${statusLabel}</span>
+      </div>`;
+    });
+
+    const totalWidth = PRINT_LABEL_WIDTH + printChartWidth;
+    const totalHeight = PRINT_HEADER_HEIGHT + printChartHeight + 60;
+
+    const html = `<!DOCTYPE html>
+<html><head><title>Gantt Chart - ${jobTitle || "Project Activities"}</title>
+<style>
+  @page { size: landscape; margin: 10mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #333; background: white; }
+  .print-title { padding: 8px 12px; font-size: 14px; font-weight: 700; border-bottom: 2px solid #333; }
+  .print-subtitle { padding: 4px 12px 8px; font-size: 10px; color: #666; }
+  .gantt-wrapper { overflow: visible; }
+  .gantt-container { display: flex; width: ${totalWidth}px; }
+  .labels { width: ${PRINT_LABEL_WIDTH}px; flex-shrink: 0; border-right: 1px solid #ccc; }
+  .labels-header { height: ${PRINT_HEADER_HEIGHT}px; display: flex; align-items: flex-end; padding: 0 6px 2px; border-bottom: 1px solid #ccc; font-size: 8px; font-weight: 600; color: #666; }
+  .chart-area { flex: 1; overflow: visible; }
+  .month-header { position: relative; height: ${PRINT_HEADER_HEIGHT}px; border-bottom: 1px solid #ccc; }
+  .legend { display: flex; gap: 12px; padding: 6px 12px; font-size: 8px; color: #666; border-top: 1px solid #ccc; margin-top: 4px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 3px; }
+  .legend-swatch { width: 10px; height: 5px; border-radius: 1px; }
+  @media print {
+    .no-print { display: none !important; }
+  }
+</style></head><body>
+<div class="no-print" style="padding:8px 12px;text-align:right;">
+  <button onclick="window.print()" style="padding:6px 16px;font-size:13px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;">Print</button>
+</div>
+<div class="print-title">${jobTitle || "Project Activities"} - Gantt Chart</div>
+<div class="print-subtitle">Generated ${format(new Date(), "dd MMM yyyy HH:mm")} &nbsp;|&nbsp; ${format(timelineStart, "dd MMM yyyy")} to ${format(timelineEnd, "dd MMM yyyy")} &nbsp;|&nbsp; ${orderedActivities.length} activities</div>
+<div class="gantt-wrapper">
+  <div class="gantt-container">
+    <div class="labels">
+      <div class="labels-header">Activity</div>
+      ${labelRows}
+    </div>
+    <div class="chart-area">
+      <div class="month-header">${monthHeaders}</div>
+      <svg width="${printChartWidth}" height="${printChartHeight}" style="display:block;">
+        ${svgWeekends}${svgRows}${svgWeeks}${svgArrows}${svgBars}${todayLine}
+      </svg>
+    </div>
+  </div>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:#888;opacity:0.4;"></div>Not Started</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#3b82f6;opacity:0.85;"></div>In Progress</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#22c55e;border:1px solid #16a34a;"></div>Done</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#f87171;opacity:0.85;"></div>Stuck</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#eab308;opacity:0.5;"></div>On Hold</div>
+  <div class="legend-item"><span style="width:10px;border-top:1px dashed #ef4444;display:inline-block;"></span>Today</div>
+</div>
+</body></html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+  }, [orderedActivities, timelineStart, timelineEnd, totalDays, dayWidth, months, weeks, jobTitle]);
+
   return (
     <div className="border rounded-md bg-background overflow-hidden flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 400 }} data-testid="gantt-chart">
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b flex-shrink-0">
@@ -235,6 +399,16 @@ export function GanttChart({
           <span className="text-[10px] text-muted-foreground ml-1 hidden md:inline">
             Ctrl+Scroll to zoom
           </span>
+          <div className="w-px h-4 bg-border mx-1" />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrint}
+            data-testid="button-gantt-print"
+          >
+            <Printer className="h-3 w-3 mr-1" />
+            Print
+          </Button>
         </div>
       </div>
 
