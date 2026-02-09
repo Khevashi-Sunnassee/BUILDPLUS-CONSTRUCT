@@ -329,25 +329,11 @@ export const productionMethods = {
   async generateProductionSlotsForJob(jobId: string, skipEmptyLevels: boolean = false): Promise<ProductionSlot[]> {
     const [job] = await db.select().from(jobs).where(eq(jobs.id, jobId));
     if (!job) throw new Error("Job not found");
-    if (!job.productionStartDate || !job.expectedCycleTimePerFloor) {
-      throw new Error("Job missing required fields: productionStartDate or expectedCycleTimePerFloor");
+    if (!job.productionStartDate) {
+      throw new Error("Job missing required field: productionStartDate");
     }
     
-    let levelList: string[] = [];
-    
-    if (job.lowestLevel && job.highestLevel) {
-      levelList = generateLevelRange(job.lowestLevel, job.highestLevel);
-    } else if (job.levels) {
-      levelList = job.levels.split(",").map(l => l.trim()).filter(l => l);
-    }
-    
-    if (levelList.length === 0) {
-      throw new Error("Job must have either lowestLevel/highestLevel or levels defined");
-    }
-
     await db.delete(productionSlots).where(eq(productionSlots.jobId, jobId));
-
-    const sortedLevels = sortLevelsIntelligently(levelList, job.lowestLevel, job.highestLevel);
 
     const panels = await db.select().from(panelRegister).where(eq(panelRegister.jobId, jobId));
     const panelCountByLevel: Record<string, number> = {};
@@ -355,19 +341,8 @@ export const productionMethods = {
       const level = panel.level || "Unknown";
       panelCountByLevel[level] = (panelCountByLevel[level] || 0) + 1;
     }
-    
-    const levelsToProcess = skipEmptyLevels 
-      ? sortedLevels.filter(level => (panelCountByLevel[level] || 0) > 0)
-      : sortedLevels;
-
-    const levelCycleTimesData = await productionMethods.getJobLevelCycleTimes(jobId);
-    const cycleTimeMap = new Map<string, number>(
-      levelCycleTimesData.map(ct => [`${ct.buildingNumber}-${ct.level}`, ct.cycleDays])
-    );
-    const defaultCycleTime = job.expectedCycleTimePerFloor;
 
     const workDays = await getFactoryWorkDays(job.factoryId);
-    
     let cfmeuCalendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD" | null = null;
     if (job.factoryId) {
       const [factory] = await db.select().from(factories).where(eq(factories.id, job.factoryId));
@@ -375,43 +350,90 @@ export const productionMethods = {
         cfmeuCalendarType = factory.cfmeuCalendar;
       }
     }
-    
     const onsiteStartBaseDate = new Date(job.productionStartDate);
     const holidayRangeStart = new Date(onsiteStartBaseDate);
     holidayRangeStart.setFullYear(holidayRangeStart.getFullYear() - 2);
     const holidayRangeEnd = new Date(onsiteStartBaseDate);
     holidayRangeEnd.setFullYear(holidayRangeEnd.getFullYear() + 2);
-    
     const holidays = await getCfmeuHolidaysInRange(cfmeuCalendarType, holidayRangeStart, holidayRangeEnd);
-
     const productionDaysInAdvance = job.productionDaysInAdvance ?? 10;
 
-    const createdSlots: ProductionSlot[] = [];
-    let cumulativeWorkingDays = 0;
-    
-    for (let i = 0; i < levelsToProcess.length; i++) {
-      const level = levelsToProcess[i];
-      
-      const onsiteDate = addWorkingDays(onsiteStartBaseDate, cumulativeWorkingDays, workDays, holidays);
-      
-      const panelProductionDue = subtractWorkingDays(onsiteDate, productionDaysInAdvance, workDays, holidays);
-      
-      const levelCycleTime = cycleTimeMap.get(`1-${level}`) ?? defaultCycleTime;
+    const programmeEntries = await db.select().from(jobLevelCycleTimes)
+      .where(eq(jobLevelCycleTimes.jobId, jobId))
+      .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
 
-      const [slot] = await db.insert(productionSlots).values({
-        jobId,
-        buildingNumber: 1,
-        level,
-        levelOrder: i,
-        panelCount: panelCountByLevel[level] || 0,
-        productionSlotDate: panelProductionDue,
-        status: "SCHEDULED",
-        isBooked: false,
-      }).returning();
-      createdSlots.push(slot);
-      
-      cumulativeWorkingDays += levelCycleTime;
+    const createdSlots: ProductionSlot[] = [];
+
+    if (programmeEntries.length > 0) {
+      for (let i = 0; i < programmeEntries.length; i++) {
+        const entry = programmeEntries[i];
+        const levelKey = entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level;
+
+        if (skipEmptyLevels && (panelCountByLevel[entry.level] || 0) === 0) continue;
+
+        const onsiteDate = entry.manualEndDate || entry.estimatedEndDate;
+        let panelProductionDue: Date;
+        if (onsiteDate) {
+          panelProductionDue = subtractWorkingDays(new Date(onsiteDate), productionDaysInAdvance, workDays, holidays);
+        } else {
+          panelProductionDue = subtractWorkingDays(onsiteStartBaseDate, productionDaysInAdvance, workDays, holidays);
+        }
+
+        const [slot] = await db.insert(productionSlots).values({
+          jobId,
+          buildingNumber: entry.buildingNumber,
+          level: entry.pourLabel ? `${entry.level} Pour ${entry.pourLabel}` : entry.level,
+          levelOrder: i,
+          panelCount: panelCountByLevel[entry.level] || 0,
+          productionSlotDate: panelProductionDue,
+          status: "SCHEDULED",
+          isBooked: false,
+        }).returning();
+        createdSlots.push(slot);
+      }
+    } else {
+      if (!job.expectedCycleTimePerFloor) {
+        throw new Error("Job missing required fields: expectedCycleTimePerFloor (no programme entries found for fallback)");
+      }
+
+      let levelList: string[] = [];
+      if (job.lowestLevel && job.highestLevel) {
+        levelList = generateLevelRange(job.lowestLevel, job.highestLevel);
+      } else if (job.levels) {
+        levelList = job.levels.split(",").map(l => l.trim()).filter(l => l);
+      }
+      if (levelList.length === 0) {
+        throw new Error("Job must have either lowestLevel/highestLevel or levels defined");
+      }
+
+      const sortedLevels = sortLevelsIntelligently(levelList, job.lowestLevel, job.highestLevel);
+      const levelsToProcess = skipEmptyLevels
+        ? sortedLevels.filter(level => (panelCountByLevel[level] || 0) > 0)
+        : sortedLevels;
+
+      const defaultCycleTime = job.expectedCycleTimePerFloor;
+      let cumulativeWorkingDays = 0;
+
+      for (let i = 0; i < levelsToProcess.length; i++) {
+        const level = levelsToProcess[i];
+        const onsiteDate = addWorkingDays(onsiteStartBaseDate, cumulativeWorkingDays, workDays, holidays);
+        const panelProductionDue = subtractWorkingDays(onsiteDate, productionDaysInAdvance, workDays, holidays);
+
+        const [slot] = await db.insert(productionSlots).values({
+          jobId,
+          buildingNumber: 1,
+          level,
+          levelOrder: i,
+          panelCount: panelCountByLevel[level] || 0,
+          productionSlotDate: panelProductionDue,
+          status: "SCHEDULED",
+          isBooked: false,
+        }).returning();
+        createdSlots.push(slot);
+        cumulativeWorkingDays += defaultCycleTime;
+      }
     }
+
     return createdSlots;
   },
 
@@ -607,6 +629,8 @@ export const productionMethods = {
     pourLabel?: string | null;
     sequenceOrder: number;
     cycleDays: number;
+    predecessorSequenceOrder?: number | null;
+    relationship?: string | null;
     estimatedStartDate?: Date | null;
     estimatedEndDate?: Date | null;
     manualStartDate?: Date | null;
@@ -626,6 +650,8 @@ export const productionMethods = {
         pourLabel: entry.pourLabel || null,
         sequenceOrder: entry.sequenceOrder,
         cycleDays: entry.cycleDays,
+        predecessorSequenceOrder: entry.predecessorSequenceOrder ?? null,
+        relationship: entry.predecessorSequenceOrder != null ? (entry.relationship || "FS") : null,
         estimatedStartDate: entry.estimatedStartDate || null,
         estimatedEndDate: entry.estimatedEndDate || null,
         manualStartDate: entry.manualStartDate || null,
@@ -711,11 +737,36 @@ export const productionMethods = {
 
     const entryMap = new Map(entries.map(e => [e.id, e]));
 
+    const oldSeqToNewSeq = new Map<number, number>();
     for (let i = 0; i < orderedIds.length; i++) {
       const entry = entryMap.get(orderedIds[i]);
       if (entry) {
+        oldSeqToNewSeq.set(entry.sequenceOrder, i);
+      }
+    }
+
+    for (let i = 0; i < orderedIds.length; i++) {
+      const entry = entryMap.get(orderedIds[i]);
+      if (entry) {
+        const updateData: Record<string, any> = { sequenceOrder: i, updatedAt: new Date() };
+
+        if (entry.predecessorSequenceOrder != null) {
+          const newPredSeq = oldSeqToNewSeq.get(entry.predecessorSequenceOrder);
+          if (newPredSeq != null) {
+            if (newPredSeq < i) {
+              updateData.predecessorSequenceOrder = newPredSeq;
+            } else {
+              updateData.predecessorSequenceOrder = null;
+              updateData.relationship = null;
+            }
+          } else {
+            updateData.predecessorSequenceOrder = null;
+            updateData.relationship = null;
+          }
+        }
+
         await db.update(jobLevelCycleTimes)
-          .set({ sequenceOrder: i, updatedAt: new Date() })
+          .set(updateData)
           .where(eq(jobLevelCycleTimes.id, orderedIds[i]));
       }
     }
@@ -726,19 +777,58 @@ export const productionMethods = {
   },
 
   async deleteProgrammeEntry(jobId: string, entryId: string): Promise<JobLevelCycleTime[]> {
+    const entryToDelete = await db.select().from(jobLevelCycleTimes)
+      .where(and(eq(jobLevelCycleTimes.id, entryId), eq(jobLevelCycleTimes.jobId, jobId)));
+    
+    const deletedSeqOrder = entryToDelete[0]?.sequenceOrder;
+
     await db.delete(jobLevelCycleTimes).where(
       and(eq(jobLevelCycleTimes.id, entryId), eq(jobLevelCycleTimes.jobId, jobId))
     );
     
+    if (deletedSeqOrder != null) {
+      const referencing = await db.select().from(jobLevelCycleTimes)
+        .where(and(
+          eq(jobLevelCycleTimes.jobId, jobId),
+          eq(jobLevelCycleTimes.predecessorSequenceOrder, deletedSeqOrder)
+        ));
+      for (const ref of referencing) {
+        await db.update(jobLevelCycleTimes)
+          .set({ predecessorSequenceOrder: null, relationship: null, updatedAt: new Date() })
+          .where(eq(jobLevelCycleTimes.id, ref.id));
+      }
+    }
+
     const remaining = await db.select().from(jobLevelCycleTimes)
       .where(eq(jobLevelCycleTimes.jobId, jobId))
       .orderBy(asc(jobLevelCycleTimes.sequenceOrder));
 
+    const oldSeqToNewSeq = new Map<number, number>();
     for (let i = 0; i < remaining.length; i++) {
-      if (remaining[i].sequenceOrder !== i) {
+      oldSeqToNewSeq.set(remaining[i].sequenceOrder, i);
+    }
+
+    for (let i = 0; i < remaining.length; i++) {
+      const entry = remaining[i];
+      const updateData: Record<string, any> = {};
+      if (entry.sequenceOrder !== i) {
+        updateData.sequenceOrder = i;
+        updateData.updatedAt = new Date();
+      }
+      if (entry.predecessorSequenceOrder != null) {
+        const newPredSeq = oldSeqToNewSeq.get(entry.predecessorSequenceOrder);
+        if (newPredSeq != null && newPredSeq < i) {
+          updateData.predecessorSequenceOrder = newPredSeq;
+        } else if (newPredSeq == null || newPredSeq >= i) {
+          updateData.predecessorSequenceOrder = null;
+          updateData.relationship = null;
+        }
+      }
+      if (Object.keys(updateData).length > 0) {
+        if (!updateData.updatedAt) updateData.updatedAt = new Date();
         await db.update(jobLevelCycleTimes)
-          .set({ sequenceOrder: i, updatedAt: new Date() })
-          .where(eq(jobLevelCycleTimes.id, remaining[i].id));
+          .set(updateData)
+          .where(eq(jobLevelCycleTimes.id, entry.id));
       }
     }
 

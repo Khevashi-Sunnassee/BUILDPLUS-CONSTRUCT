@@ -1,8 +1,8 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
-import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, subtractWorkingDays, addWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs } from "@shared/schema";
+import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, isWorkingDay, subtractWorkingDays, addWorkingDays } from "../storage";
+import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs, jobLevelCycleTimes } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
@@ -932,6 +932,62 @@ router.get("/api/admin/jobs/:id/programme", requireAuth, async (req: Request, re
   }
 });
 
+// PATCH /api/admin/jobs/:id/programme/:entryId - Update a single programme entry
+router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(String(req.params.id));
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const updateSchema = z.object({
+      cycleDays: z.number().int().min(1).optional(),
+      predecessorSequenceOrder: z.number().int().nullable().optional(),
+      relationship: z.enum(["FS", "SS", "FF", "SF"]).nullable().optional(),
+      manualStartDate: z.string().nullable().optional(),
+      manualEndDate: z.string().nullable().optional(),
+      notes: z.string().nullable().optional(),
+    });
+
+    const parseResult = updateSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({ error: "Invalid update data", details: parseResult.error.format() });
+    }
+
+    const updateData: Record<string, any> = { updatedAt: new Date() };
+    if (parseResult.data.cycleDays !== undefined) updateData.cycleDays = parseResult.data.cycleDays;
+    if (parseResult.data.predecessorSequenceOrder !== undefined) {
+      updateData.predecessorSequenceOrder = parseResult.data.predecessorSequenceOrder;
+      if (parseResult.data.predecessorSequenceOrder === null) {
+        updateData.relationship = null;
+      }
+    }
+    if (parseResult.data.relationship !== undefined) {
+      updateData.relationship = parseResult.data.relationship;
+    }
+    if (parseResult.data.manualStartDate !== undefined) {
+      updateData.manualStartDate = parseResult.data.manualStartDate ? new Date(parseResult.data.manualStartDate) : null;
+    }
+    if (parseResult.data.manualEndDate !== undefined) {
+      updateData.manualEndDate = parseResult.data.manualEndDate ? new Date(parseResult.data.manualEndDate) : null;
+    }
+    if (parseResult.data.notes !== undefined) updateData.notes = parseResult.data.notes;
+
+    const [updated] = await db.update(jobLevelCycleTimes)
+      .set(updateData)
+      .where(eq(jobLevelCycleTimes.id, String(req.params.entryId)))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Programme entry not found" });
+    }
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error updating programme entry");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update programme entry" });
+  }
+});
+
 // POST /api/admin/jobs/:id/programme - Save job programme (bulk upsert)
 router.post("/api/admin/jobs/:id/programme", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
@@ -948,6 +1004,8 @@ router.post("/api/admin/jobs/:id/programme", requireRole("ADMIN", "MANAGER"), as
       pourLabel: z.string().nullable().optional(),
       sequenceOrder: z.number().int().min(0),
       cycleDays: z.number().int().min(1),
+      predecessorSequenceOrder: z.number().int().nullable().optional(),
+      relationship: z.enum(["FS", "SS", "FF", "SF"]).nullable().optional(),
       estimatedStartDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
       estimatedEndDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
       manualStartDate: z.string().nullable().optional().refine(v => !v || !isNaN(Date.parse(v)), "Invalid date"),
@@ -963,6 +1021,8 @@ router.post("/api/admin/jobs/:id/programme", requireRole("ADMIN", "MANAGER"), as
 
     const entries = parseResult.data.entries.map(e => ({
       ...e,
+      predecessorSequenceOrder: e.predecessorSequenceOrder ?? null,
+      relationship: e.predecessorSequenceOrder != null ? (e.relationship || "FS") : null,
       estimatedStartDate: e.estimatedStartDate ? new Date(e.estimatedStartDate) : null,
       estimatedEndDate: e.estimatedEndDate ? new Date(e.estimatedEndDate) : null,
       manualStartDate: e.manualStartDate ? new Date(e.manualStartDate) : null,
@@ -1011,7 +1071,7 @@ router.post("/api/admin/jobs/:id/programme/reorder", requireRole("ADMIN", "MANAG
   }
 });
 
-// POST /api/admin/jobs/:id/programme/recalculate - Recalculate estimated dates
+// POST /api/admin/jobs/:id/programme/recalculate - Recalculate estimated dates using predecessor logic
 router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const job = await storage.getJob(String(req.params.id));
@@ -1028,26 +1088,97 @@ router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "M
       return res.json([]);
     }
 
-    const factoryWorkDays = job.factoryId ? await getFactoryWorkDays(job.factoryId) : null;
-    const startDate = new Date(job.productionStartDate);
-    const endDate = new Date(startDate);
-    endDate.setFullYear(endDate.getFullYear() + 5);
-    const holidays = await getCfmeuHolidaysInRange(startDate, endDate);
+    const factoryWorkDays = await getFactoryWorkDays(job.factoryId ?? null);
+    const baseDate = new Date(job.productionStartDate);
+    const rangeEnd = new Date(baseDate);
+    rangeEnd.setFullYear(rangeEnd.getFullYear() + 5);
 
-    let currentDate = new Date(job.productionStartDate);
+    let cfmeuCalendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD" | null = null;
+    if (job.factoryId) {
+      const factoryData = await db.select().from(factories).where(eq(factories.id, job.factoryId));
+      if (factoryData[0]?.cfmeuCalendar) {
+        cfmeuCalendarType = factoryData[0].cfmeuCalendar;
+      }
+    }
+    const holidays = await getCfmeuHolidaysInRange(cfmeuCalendarType, baseDate, rangeEnd);
+
+    function ensureWorkDay(d: Date): Date {
+      const result = new Date(d);
+      while (!isWorkingDay(result, factoryWorkDays, holidays)) {
+        result.setDate(result.getDate() + 1);
+      }
+      return result;
+    }
+
+    function nextWorkDay(d: Date): Date {
+      const result = new Date(d);
+      result.setDate(result.getDate() + 1);
+      while (!isWorkingDay(result, factoryWorkDays, holidays)) {
+        result.setDate(result.getDate() + 1);
+      }
+      return result;
+    }
+
+    function resolvePredecessorStart(
+      predDates: { start: Date; end: Date },
+      rel: string,
+      cycleDays: number
+    ): Date {
+      let start: Date;
+      switch (rel) {
+        case "FS":
+          start = nextWorkDay(predDates.end);
+          break;
+        case "SS":
+          start = new Date(predDates.start);
+          break;
+        case "FF":
+          start = subtractWorkingDays(new Date(predDates.end), cycleDays - 1, factoryWorkDays, holidays);
+          break;
+        case "SF":
+          start = subtractWorkingDays(new Date(predDates.start), cycleDays - 1, factoryWorkDays, holidays);
+          break;
+        default:
+          start = nextWorkDay(predDates.end);
+      }
+      return ensureWorkDay(start);
+    }
+
+    const projectStart = ensureWorkDay(new Date(job.productionStartDate));
+    const resolvedDates = new Map<number, { start: Date; end: Date }>();
+
     const updatedEntries = entries.map((entry, idx) => {
-      const effectiveStart = entry.manualStartDate || currentDate;
-      const effectiveEnd = addWorkingDays(new Date(effectiveStart), entry.cycleDays, factoryWorkDays, holidays);
-      
-      const updated = {
+      const cycleDays = entry.cycleDays || 1;
+      const predOrder = entry.predecessorSequenceOrder;
+      const rel = entry.relationship || "FS";
+      let entryStart: Date;
+
+      if (entry.manualStartDate) {
+        entryStart = ensureWorkDay(new Date(entry.manualStartDate));
+      } else if (predOrder != null && resolvedDates.has(predOrder)) {
+        const predDates = resolvedDates.get(predOrder)!;
+        entryStart = resolvePredecessorStart(predDates, rel, cycleDays);
+      } else if (predOrder != null && !resolvedDates.has(predOrder)) {
+        const prevEntry = idx > 0 ? resolvedDates.get(entries[idx - 1].sequenceOrder) : null;
+        entryStart = prevEntry ? nextWorkDay(prevEntry.end) : new Date(projectStart);
+        logger.warn({ entryId: entry.id, predOrder }, "Predecessor sequenceOrder not found, falling back");
+      } else {
+        const prevEntry = idx > 0 ? resolvedDates.get(entries[idx - 1].sequenceOrder) : null;
+        entryStart = prevEntry ? nextWorkDay(prevEntry.end) : new Date(projectStart);
+      }
+
+      const entryEnd = entry.manualEndDate
+        ? ensureWorkDay(new Date(entry.manualEndDate))
+        : addWorkingDays(new Date(entryStart), cycleDays - 1, factoryWorkDays, holidays);
+
+      resolvedDates.set(entry.sequenceOrder, { start: entryStart, end: entryEnd });
+
+      return {
         ...entry,
         sequenceOrder: idx,
-        estimatedStartDate: new Date(effectiveStart),
-        estimatedEndDate: effectiveEnd,
+        estimatedStartDate: entryStart,
+        estimatedEndDate: entryEnd,
       };
-
-      currentDate = addWorkingDays(effectiveEnd, 1, factoryWorkDays, holidays);
-      return updated;
     });
 
     const result = await storage.saveJobProgramme(String(req.params.id), updatedEntries);

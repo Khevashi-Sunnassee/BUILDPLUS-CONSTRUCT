@@ -337,6 +337,8 @@ export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
   pourLabel: text("pour_label"),
   sequenceOrder: integer("sequence_order").notNull().default(0),
   cycleDays: integer("cycle_days").notNull(),
+  predecessorSequenceOrder: integer("predecessor_sequence_order"),
+  relationship: text("relationship"),
   estimatedStartDate: timestamp("estimated_start_date"),
   estimatedEndDate: timestamp("estimated_end_date"),
   manualStartDate: timestamp("manual_start_date"),

@@ -350,6 +350,7 @@ export const ADMIN_ROUTES = {
   JOB_GENERATE_LEVELS: (id: string | number) => `/api/admin/jobs/${id}/generate-levels`,
   JOB_LEVEL_CYCLE_TIMES: (id: string | number) => `/api/admin/jobs/${id}/level-cycle-times`,
   JOB_PROGRAMME: (id: string | number) => `/api/admin/jobs/${id}/programme`,
+  JOB_PROGRAMME_ENTRY: (jobId: string | number, entryId: string | number) => `/api/admin/jobs/${jobId}/programme/${entryId}`,
   JOB_PROGRAMME_SPLIT: (id: string | number) => `/api/admin/jobs/${id}/programme/split`,
   JOB_PROGRAMME_REORDER: (id: string | number) => `/api/admin/jobs/${id}/programme/reorder`,
   JOB_PROGRAMME_RECALC: (id: string | number) => `/api/admin/jobs/${id}/programme/recalculate`,
