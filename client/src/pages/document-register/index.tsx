@@ -147,11 +147,12 @@ export default function DocumentRegister() {
   const groupedDocuments = useMemo(() => {
     if (groupBy === "none" || groupBy === "job_discipline") return null;
 
-    const groups = new Map<string, { label: string; docs: DocumentWithDetails[] }>();
+    const groups = new Map<string, { label: string; docs: DocumentWithDetails[]; color?: string | null }>();
 
     for (const doc of documents) {
       let key = "";
       let label = "";
+      let color: string | null | undefined;
 
       switch (groupBy) {
         case "job":
@@ -161,6 +162,7 @@ export default function DocumentRegister() {
         case "discipline":
           key = doc.discipline?.id || "_unassigned";
           label = doc.discipline?.disciplineName || "Unassigned";
+          color = doc.discipline?.color;
           break;
         case "type":
           key = doc.type?.id || "_unassigned";
@@ -182,7 +184,7 @@ export default function DocumentRegister() {
       }
 
       if (!groups.has(key)) {
-        groups.set(key, { label, docs: [] });
+        groups.set(key, { label, docs: [], color });
       }
       groups.get(key)!.docs.push(doc);
     }
@@ -201,7 +203,7 @@ export default function DocumentRegister() {
 
     const jobGroups = new Map<string, {
       label: string;
-      disciplines: Map<string, { label: string; docs: DocumentWithDetails[] }>;
+      disciplines: Map<string, { label: string; color?: string | null; docs: DocumentWithDetails[] }>;
       totalCount: number;
     }>();
 
@@ -210,6 +212,7 @@ export default function DocumentRegister() {
       const jobLabel = doc.job ? `${doc.job.jobNumber} - ${doc.job.name}` : "Unassigned";
       const discKey = doc.discipline?.id || "_unassigned";
       const discLabel = doc.discipline?.disciplineName || "Unassigned";
+      const discColor = doc.discipline?.color;
 
       if (!jobGroups.has(jobKey)) {
         jobGroups.set(jobKey, { label: jobLabel, disciplines: new Map(), totalCount: 0 });
@@ -218,7 +221,7 @@ export default function DocumentRegister() {
       jobGroup.totalCount++;
 
       if (!jobGroup.disciplines.has(discKey)) {
-        jobGroup.disciplines.set(discKey, { label: discLabel, docs: [] });
+        jobGroup.disciplines.set(discKey, { label: discLabel, color: discColor, docs: [] });
       }
       jobGroup.disciplines.get(discKey)!.docs.push(doc);
     }
@@ -242,6 +245,7 @@ export default function DocumentRegister() {
           .map(([discKey, discGroup]) => ({
             discKey,
             discLabel: discGroup.label,
+            discColor: discGroup.color,
             docs: discGroup.docs,
           })),
       }));
@@ -545,7 +549,14 @@ export default function DocumentRegister() {
                                   className="flex items-center gap-3 w-full pl-8 pr-4 py-2 text-left hover-elevate transition-colors border-b"
                                   onClick={() => toggleGroup(`disc:${jobGroup.jobKey}:${discGroup.discKey}`)}
                                   data-testid={`button-toggle-group-disc-${discGroup.discKey}`}
+                                  style={discGroup.discColor ? { backgroundColor: `${discGroup.discColor}15` } : undefined}
                                 >
+                                  {discGroup.discColor && (
+                                    <span
+                                      className="inline-block w-3 h-3 rounded-full shrink-0"
+                                      style={{ backgroundColor: discGroup.discColor }}
+                                    />
+                                  )}
                                   <ChevronDown
                                     className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${discCollapsed ? "-rotate-90" : ""}`}
                                   />
@@ -582,7 +593,7 @@ export default function DocumentRegister() {
           ) : groupedDocuments ? (
             <>
               <div className="space-y-4">
-                {groupedDocuments.map(([key, { label, docs }]) => {
+                {groupedDocuments.map(([key, { label, docs, color }]) => {
                   const isCollapsed = collapsedGroups.has(key);
                   return (
                     <div key={key} className="border rounded-md overflow-visible" data-testid={`group-${groupBy}-${key}`}>
@@ -591,8 +602,15 @@ export default function DocumentRegister() {
                         className="flex items-center justify-between gap-3 w-full px-4 py-3 text-left hover-elevate transition-colors"
                         onClick={() => toggleGroup(key)}
                         data-testid={`button-toggle-group-${key}`}
+                        style={color ? { backgroundColor: `${color}15` } : undefined}
                       >
                         <div className="flex items-center gap-3">
+                          {color && (
+                            <span
+                              className="inline-block w-3 h-3 rounded-full shrink-0"
+                              style={{ backgroundColor: color }}
+                            />
+                          )}
                           <ChevronDown
                             className={`h-4 w-4 text-muted-foreground transition-transform ${isCollapsed ? "-rotate-90" : ""}`}
                           />
