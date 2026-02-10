@@ -1144,6 +1144,13 @@ chatRouter.get("/topics", requireAuth, requireChatPermission, async (req, res) =
   }
 });
 
+const TOPIC_DEFAULT_COLORS = [
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#ec4899',
+  '#8b5cf6', '#06b6d4', '#f97316', '#84cc16', '#e11d48',
+  '#14b8a6', '#a855f7', '#0ea5e9', '#d946ef', '#65a30d',
+  '#6366f1', '#22c55e', '#eab308', '#f43f5e', '#2dd4bf',
+];
+
 chatRouter.post("/topics", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;
@@ -1151,12 +1158,18 @@ chatRouter.post("/topics", requireAuth, requireChatPermission, async (req, res) 
     const schema = z.object({ name: z.string().min(1).max(100) });
     const { name } = schema.parse(req.body);
 
+    const existingTopics = await db.select({ color: chatTopics.color })
+      .from(chatTopics).where(eq(chatTopics.companyId, companyId));
+    const usedColors = new Set(existingTopics.map(t => t.color?.toLowerCase()));
+    const nextColor = TOPIC_DEFAULT_COLORS.find(c => !usedColors.has(c.toLowerCase())) || TOPIC_DEFAULT_COLORS[existingTopics.length % TOPIC_DEFAULT_COLORS.length];
+
     const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${chatTopics.sortOrder}), 0)` })
       .from(chatTopics).where(eq(chatTopics.companyId, companyId));
 
     const [topic] = await db.insert(chatTopics).values({
       companyId,
       name,
+      color: nextColor,
       sortOrder: (maxOrder[0]?.max ?? 0) + 1,
       createdById: userId,
     }).returning();
