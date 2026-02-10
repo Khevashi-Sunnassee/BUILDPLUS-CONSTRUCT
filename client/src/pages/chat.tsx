@@ -256,6 +256,16 @@ export default function ChatPage() {
     },
   });
 
+  const markAsReadMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      return apiRequest("POST", CHAT_ROUTES.MARK_READ, { conversationId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOTAL_UNREAD] });
+    },
+  });
+
   const sendMessageMutation = useMutation({
     mutationFn: async ({ content, files }: { content: string; files: File[] }) => {
       const mentionMatches = content.match(/@(\w+)/g) || [];
@@ -293,8 +303,12 @@ export default function ChatPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS, selectedConversationId, "messages"] });
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOTAL_UNREAD] });
       setMessageContent("");
       setPendingFiles([]);
+      if (selectedConversationId) {
+        markAsReadMutation.mutate(selectedConversationId);
+      }
     },
     onError: (error: any) => {
       toast({ title: "Failed to send message", description: error.message, variant: "destructive" });
@@ -350,16 +364,6 @@ export default function ChatPage() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to delete message", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const markAsReadMutation = useMutation({
-    mutationFn: async (conversationId: string) => {
-      return apiRequest("POST", CHAT_ROUTES.MARK_READ, { conversationId });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
-      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOTAL_UNREAD] });
     },
   });
 

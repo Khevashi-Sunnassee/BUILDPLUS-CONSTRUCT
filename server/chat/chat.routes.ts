@@ -140,6 +140,7 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
         .where(and(
           inArray(chatMessages.conversationId, convIds),
           isNull(chatMessages.deletedAt),
+          sql`${chatMessages.senderId} != ${userId}`,
           sql`CASE ${sql.join(caseFragments, sql` `)} ELSE false END`
         ))
         .groupBy(chatMessages.conversationId);
@@ -1089,6 +1090,7 @@ chatRouter.get("/total-unread", requireAuth, requireChatPermission, async (req, 
       .where(and(
         inArray(chatMessages.conversationId, convIds),
         isNull(chatMessages.deletedAt),
+        sql`${chatMessages.senderId} != ${userId}`,
         sql`CASE ${sql.join(caseFragments, sql` `)} ELSE false END`
       ));
 
