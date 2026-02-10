@@ -49,22 +49,88 @@ interface UserWithPermissions {
 }
 
 const FUNCTION_LABELS: Record<string, string> = {
-  daily_reports: "Drafting Register",
-  production_report: "Production Schedule",
-  logistics: "Logistics",
-  weekly_wages: "Weekly Wage Reports",
-  kpi_dashboard: "KPI Dashboard",
+  tasks: "Tasks",
+  chat: "Chat",
   jobs: "Jobs",
   panel_register: "Panel Register",
-  admin_users: "Admin: Users",
-  admin_devices: "Admin: Devices",
-  admin_jobs: "Admin: Jobs",
-  admin_settings: "Admin: Settings",
-  admin_panel_types: "Admin: Panel Types",
-  admin_work_types: "Admin: Work Types",
-  admin_trailer_types: "Admin: Trailer Types",
-  admin_user_permissions: "Admin: User Permissions",
+  document_register: "Document Register",
+  photo_gallery: "Photo Gallery",
+  checklists: "Checklists",
+  weekly_job_logs: "Weekly Job Logs",
+  broadcast: "Broadcast",
+  production_slots: "Production Slots",
+  production_report: "Production Schedule",
+  drafting_program: "Drafting Program",
+  daily_reports: "Drafting Register",
+  reo_scheduling: "Reo Scheduling",
+  pm_call_logs: "PM Call Logs",
+  logistics: "Logistics",
+  sales_pipeline: "Sales Pipeline",
+  contract_hub: "Contract Hub",
+  progress_claims: "Progress Claims",
+  purchase_orders: "Purchase Orders",
+  hire_bookings: "Hire Bookings",
+  weekly_wages: "Weekly Wages",
+  admin_assets: "Asset Register",
+  kpi_dashboard: "KPI Dashboard",
+  manager_review: "Manager Review",
+  checklist_reports: "Checklist Reports",
+  admin_settings: "Settings",
+  admin_companies: "Companies",
+  admin_factories: "Factories",
+  admin_panel_types: "Panel Types",
+  admin_document_config: "Document Config",
+  admin_checklist_templates: "Checklist Templates",
+  admin_item_catalog: "Items & Categories",
+  admin_devices: "Devices",
+  admin_users: "Users",
+  admin_user_permissions: "User Permissions",
+  admin_job_types: "Job Types & Workflows",
+  admin_jobs: "Jobs Management",
+  admin_customers: "Customers",
+  admin_suppliers: "Suppliers",
+  admin_employees: "Employees",
+  admin_zones: "Zones",
+  admin_work_types: "Work Types",
+  admin_trailer_types: "Trailer Types",
+  admin_data_management: "Data Management",
 };
+
+interface PermissionSection {
+  label: string;
+  keys: string[];
+}
+
+const PERMISSION_SECTIONS: PermissionSection[] = [
+  {
+    label: "Main Navigation",
+    keys: ["tasks", "chat", "jobs", "panel_register", "document_register", "photo_gallery", "checklists", "weekly_job_logs", "broadcast"],
+  },
+  {
+    label: "Production & Scheduling",
+    keys: ["production_slots", "production_report", "drafting_program", "daily_reports", "reo_scheduling", "pm_call_logs", "logistics"],
+  },
+  {
+    label: "Finance & Commercial",
+    keys: ["sales_pipeline", "contract_hub", "progress_claims", "purchase_orders", "hire_bookings", "weekly_wages", "admin_assets"],
+  },
+  {
+    label: "Management & Reporting",
+    keys: ["kpi_dashboard", "manager_review", "checklist_reports"],
+  },
+  {
+    label: "Administration",
+    keys: ["admin_settings", "admin_companies", "admin_factories", "admin_panel_types", "admin_document_config", "admin_checklist_templates", "admin_item_catalog", "admin_devices", "admin_users", "admin_user_permissions", "admin_job_types", "admin_jobs", "admin_data_management"],
+  },
+  {
+    label: "Contacts",
+    keys: ["admin_customers", "admin_suppliers", "admin_employees"],
+  },
+  {
+    label: "Other",
+    keys: ["admin_zones", "admin_work_types", "admin_trailer_types"],
+  },
+];
 
 const PERMISSION_COLORS: Record<PermissionLevel, string> = {
   HIDDEN: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
@@ -82,7 +148,7 @@ const PERMISSION_ICONS: Record<PermissionLevel, React.ReactNode> = {
   VIEW_AND_UPDATE_OWN: <Pencil className="h-3 w-3" />,
 };
 
-const SUPPORTS_OWN_LEVELS = ["purchase_orders", "tasks"];
+const SUPPORTS_OWN_LEVELS = ["purchase_orders", "tasks", "weekly_job_logs", "pm_call_logs"];
 
 export default function UserPermissionsPage() {
   const { toast } = useToast();
@@ -314,77 +380,87 @@ export default function UserPermissionsPage() {
                         </Button>
                       </div>
                     )}
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-1/2">Function</TableHead>
-                          <TableHead>Permission Level</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {FUNCTION_KEYS.map(functionKey => {
-                          const currentLevel = getPermissionForFunction(permissions, functionKey);
-                          return (
-                            <TableRow key={functionKey} data-testid={`row-permission-${user.id}-${functionKey}`}>
-                              <TableCell className="font-medium">{FUNCTION_LABELS[functionKey] || functionKey}</TableCell>
-                              <TableCell>
-                                <Select
-                                  value={currentLevel}
-                                  onValueChange={(value) => {
-                                    updatePermissionMutation.mutate({
-                                      userId: user.id,
-                                      functionKey,
-                                      permissionLevel: value as PermissionLevel,
-                                    });
-                                  }}
-                                  disabled={updatePermissionMutation.isPending}
-                                >
-                                  <SelectTrigger className="w-48" data-testid={`select-permission-${user.id}-${functionKey}`}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="HIDDEN">
-                                      <div className="flex items-center gap-2">
-                                        <EyeOff className="h-4 w-4 text-red-500" />
-                                        Hidden
-                                      </div>
-                                    </SelectItem>
-                                    {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
-                                      <SelectItem value="VIEW_OWN">
-                                        <div className="flex items-center gap-2">
-                                          <Eye className="h-4 w-4 text-blue-500" />
-                                          View Own Only
-                                        </div>
-                                      </SelectItem>
-                                    )}
-                                    <SelectItem value="VIEW">
-                                      <div className="flex items-center gap-2">
-                                        <Eye className="h-4 w-4 text-yellow-500" />
-                                        View All
-                                      </div>
-                                    </SelectItem>
-                                    {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
-                                      <SelectItem value="VIEW_AND_UPDATE_OWN">
-                                        <div className="flex items-center gap-2">
-                                          <Pencil className="h-4 w-4 text-cyan-500" />
-                                          View & Edit Own Only
-                                        </div>
-                                      </SelectItem>
-                                    )}
-                                    <SelectItem value="VIEW_AND_UPDATE">
-                                      <div className="flex items-center gap-2">
-                                        <Pencil className="h-4 w-4 text-green-500" />
-                                        View & Edit All
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                    <div className="space-y-4">
+                      {PERMISSION_SECTIONS.map(section => (
+                        <div key={section.label}>
+                          <div className="flex items-center gap-2 py-2 mb-1">
+                            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">{section.label}</h4>
+                            <div className="flex-1 h-px bg-border" />
+                          </div>
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="w-1/2">Feature</TableHead>
+                                <TableHead>Access Level</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {section.keys.map(functionKey => {
+                                const currentLevel = getPermissionForFunction(permissions, functionKey);
+                                return (
+                                  <TableRow key={functionKey} data-testid={`row-permission-${user.id}-${functionKey}`}>
+                                    <TableCell className="font-medium">{FUNCTION_LABELS[functionKey] || functionKey}</TableCell>
+                                    <TableCell>
+                                      <Select
+                                        value={currentLevel}
+                                        onValueChange={(value) => {
+                                          updatePermissionMutation.mutate({
+                                            userId: user.id,
+                                            functionKey,
+                                            permissionLevel: value as PermissionLevel,
+                                          });
+                                        }}
+                                        disabled={updatePermissionMutation.isPending}
+                                      >
+                                        <SelectTrigger className="w-48" data-testid={`select-permission-${user.id}-${functionKey}`}>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="HIDDEN">
+                                            <div className="flex items-center gap-2">
+                                              <EyeOff className="h-4 w-4 text-red-500" />
+                                              Hidden
+                                            </div>
+                                          </SelectItem>
+                                          {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                            <SelectItem value="VIEW_OWN">
+                                              <div className="flex items-center gap-2">
+                                                <Eye className="h-4 w-4 text-blue-500" />
+                                                View Own Only
+                                              </div>
+                                            </SelectItem>
+                                          )}
+                                          <SelectItem value="VIEW">
+                                            <div className="flex items-center gap-2">
+                                              <Eye className="h-4 w-4 text-yellow-500" />
+                                              View All
+                                            </div>
+                                          </SelectItem>
+                                          {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                            <SelectItem value="VIEW_AND_UPDATE_OWN">
+                                              <div className="flex items-center gap-2">
+                                                <Pencil className="h-4 w-4 text-cyan-500" />
+                                                View & Edit Own Only
+                                              </div>
+                                            </SelectItem>
+                                          )}
+                                          <SelectItem value="VIEW_AND_UPDATE">
+                                            <div className="flex items-center gap-2">
+                                              <Pencil className="h-4 w-4 text-green-500" />
+                                              View & Edit All
+                                            </div>
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </CollapsibleContent>
               </Card>

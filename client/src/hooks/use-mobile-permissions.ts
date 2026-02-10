@@ -12,13 +12,14 @@ const mobileFunctionKeyMap: Record<string, string> = {
   "purchase-orders": "purchase_orders",
   "weekly-report": "weekly_job_logs",
   documents: "document_register",
-  "photo-gallery": "document_register",
+  "photo-gallery": "photo_gallery",
   checklists: "checklists",
-  broadcast: "chat",
-  "pm-call-logs": "production_report",
+  broadcast: "broadcast",
+  "pm-call-logs": "pm_call_logs",
   "qr-scanner": "panel_register",
-  "new-opportunity": "jobs",
+  "new-opportunity": "sales_pipeline",
   "photo-capture": "document_register",
+  "hire-bookings": "hire_bookings",
 };
 
 export function useMobilePermissions() {
