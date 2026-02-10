@@ -1548,6 +1548,7 @@ export const customers = pgTable("customers", {
   paymentTerms: text("payment_terms"),
   notes: text("notes"),
   isActive: boolean("is_active").default(true).notNull(),
+  website: text("website"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

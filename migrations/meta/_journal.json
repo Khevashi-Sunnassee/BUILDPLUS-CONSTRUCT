@@ -8,6 +8,13 @@
       "when": 1770755946133,
       "tag": "0000_nappy_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770756184671,
+      "tag": "0001_cool_exiles",
+      "breakpoints": true
     }
   ]
 }
