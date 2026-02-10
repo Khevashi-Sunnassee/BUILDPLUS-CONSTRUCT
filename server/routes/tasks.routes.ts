@@ -9,6 +9,19 @@ import { emailService } from "../services/email.service";
 
 const router = Router();
 
+async function isAdminOrManager(req: any): Promise<boolean> {
+  const userId = req.session?.userId;
+  if (!userId) return false;
+  const user = await storage.getUser(userId);
+  return user?.role === "ADMIN" || user?.role === "MANAGER";
+}
+
+function canAccessTask(task: { createdById?: string | null; assignees?: { userId: string }[] }, userId: string): boolean {
+  if (task.createdById === userId) return true;
+  if (task.assignees?.some(a => a.userId === userId)) return true;
+  return false;
+}
+
 const ALLOWED_TASK_FILE_TYPES = [
   "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml",
   "image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence",
@@ -72,10 +85,8 @@ router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (r
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const userId = req.session.userId;
-    const user = userId ? await storage.getUser(userId) : null;
-    const isAdminOrManager = user?.role === "ADMIN" || user?.role === "MANAGER";
-    const filterUserId = isAdminOrManager ? undefined : userId;
+    const adminManager = await isAdminOrManager(req);
+    const filterUserId = adminManager ? undefined : req.session.userId;
     const groups = await storage.getAllTaskGroups(companyId, filterUserId);
     res.json(groups);
   } catch (error: unknown) {
@@ -89,6 +100,10 @@ router.get("/api/task-groups/:id", requireAuth, requirePermission("tasks"), asyn
     const companyId = req.companyId;
     const group = await storage.getTaskGroup(String(req.params.id));
     if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId) {
+      group.tasks = group.tasks.filter(task => canAccessTask(task, req.session.userId!));
+    }
     res.json(group);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task group");
@@ -185,6 +200,10 @@ router.get("/api/tasks/:id", requireAuth, requirePermission("tasks"), async (req
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(task, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     res.json(task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task");
@@ -245,6 +264,10 @@ router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND
       const group = await storage.getTaskGroup(existingTask.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(existingTask, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const updateData = { ...parsed.data } as any;
     if (updateData.dueDate !== undefined) {
       updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
@@ -269,6 +292,10 @@ router.delete("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AN
     if (existingTask.groupId) {
       const group = await storage.getTaskGroup(existingTask.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(existingTask, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
     }
     await storage.deleteTask(String(req.params.id));
     res.json({ success: true });
@@ -334,6 +361,10 @@ router.get("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks"), 
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(task, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const assignees = await storage.getTaskAssignees(String(req.params.id));
     res.json(assignees);
   } catch (error: unknown) {
@@ -350,6 +381,10 @@ router.put("/api/tasks/:id/assignees", requireAuth, requirePermission("tasks", "
     if (task.groupId) {
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(task, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
     }
     const { userIds } = req.body;
     if (!Array.isArray(userIds)) {
@@ -371,6 +406,10 @@ router.get("/api/tasks/:id/updates", requireAuth, requirePermission("tasks"), as
     if (task.groupId) {
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(task, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
     }
     const updates = await storage.getTaskUpdates(String(req.params.id));
     res.json(updates);
@@ -397,6 +436,10 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
     if (task.groupId) {
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && userId && !canAccessTask(task, userId)) {
+      return res.status(403).json({ error: "Access denied" });
     }
     
     const update = await storage.createTaskUpdate({
@@ -455,6 +498,10 @@ router.get("/api/tasks/:id/files", requireAuth, requirePermission("tasks"), asyn
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
     }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(task, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const files = await storage.getTaskFiles(String(req.params.id));
     res.json(files);
   } catch (error: unknown) {
@@ -471,6 +518,10 @@ router.post("/api/tasks/:id/files", requireAuth, requirePermission("tasks", "VIE
     if (task.groupId) {
       const group = await storage.getTaskGroup(task.groupId);
       if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const adminManager = await isAdminOrManager(req);
+    if (!adminManager && req.session.userId && !canAccessTask(task, req.session.userId)) {
+      return res.status(403).json({ error: "Access denied" });
     }
     const userId = req.session.userId;
     const file = req.file;
