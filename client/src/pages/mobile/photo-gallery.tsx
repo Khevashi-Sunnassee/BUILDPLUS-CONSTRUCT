@@ -40,6 +40,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiUpload } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 const PHOTO_SUBJECTS = [
@@ -257,6 +258,7 @@ function PinchZoomImageViewer({ src, alt }: { src: string; alt: string }) {
 }
 
 export default function MobilePhotoGallery() {
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
@@ -359,6 +361,15 @@ export default function MobilePhotoGallery() {
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
+
+  const isPrivileged = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+  const { data: myJobMemberships = [] } = useQuery<string[]>({
+    queryKey: [JOBS_ROUTES.MY_MEMBERSHIPS],
+    enabled: !isPrivileged,
+  });
+
+  const isUnauthorizedJob = !isPrivileged && selectedJobId && !myJobMemberships.includes(selectedJobId);
 
   const photos = photosResult?.documents || [];
 
@@ -568,7 +579,15 @@ export default function MobilePhotoGallery() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
-        {isLoading ? (
+        {isUnauthorizedJob ? (
+          <div className="flex flex-col items-center justify-center py-16" data-testid="unauthorized-job-message">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20 mb-3">
+              <X className="h-6 w-6 text-red-400" />
+            </div>
+            <p className="text-white/80 text-sm font-medium text-center">You are currently not authorised to view this job</p>
+            <p className="text-white/40 text-xs mt-1 text-center">Contact the administrator for access</p>
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
           </div>
