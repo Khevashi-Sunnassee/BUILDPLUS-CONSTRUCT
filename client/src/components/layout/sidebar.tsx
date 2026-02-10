@@ -240,15 +240,16 @@ export function AppSidebar() {
 
   const alwaysVisibleUrls = ["/dashboard", "/help"];
 
+  const isAdminOrManager = user?.role === "ADMIN" || user?.role === "MANAGER";
+
   const isItemHidden = (url: string): boolean => {
     if (alwaysVisibleUrls.includes(url)) return false;
+    if (isAdminOrManager) return false;
     if (permissionsLoading) return true;
     const functionKey = urlToFunctionKey[url];
-    if (!functionKey) return myPermissions.length > 0;
+    if (!functionKey) return true;
     const permission = myPermissions.find(p => p.functionKey === functionKey);
-    if (!permission) {
-      return myPermissions.length > 0;
-    }
+    if (!permission) return true;
     return permission.permissionLevel === "HIDDEN";
   };
 
@@ -287,6 +288,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
+        {mainNavItems.some(item => !isItemHidden(item.url)) && (
         <Collapsible open={mainExpanded} onOpenChange={setMainExpanded}>
           <SidebarGroup>
             <CollapsibleTrigger className="w-full">
@@ -332,7 +334,9 @@ export function AppSidebar() {
             </CollapsibleContent>
           </SidebarGroup>
         </Collapsible>
+        )}
 
+        {productionNavItems.some(item => !isItemHidden(item.url)) && (
         <Collapsible open={productionExpanded} onOpenChange={setProductionExpanded}>
           <SidebarGroup>
             <CollapsibleTrigger className="w-full">
@@ -363,7 +367,9 @@ export function AppSidebar() {
             </CollapsibleContent>
           </SidebarGroup>
         </Collapsible>
+        )}
 
+        {adminFinanceNavItems.some(item => !isItemHidden(item.url)) && (
         <Collapsible open={adminFinanceExpanded} onOpenChange={setAdminFinanceExpanded}>
           <SidebarGroup>
             <CollapsibleTrigger className="w-full">
@@ -394,6 +400,7 @@ export function AppSidebar() {
             </CollapsibleContent>
           </SidebarGroup>
         </Collapsible>
+        )}
 
         {(user?.role === "MANAGER" || user?.role === "ADMIN") && (
           <Collapsible open={managementExpanded} onOpenChange={setManagementExpanded}>

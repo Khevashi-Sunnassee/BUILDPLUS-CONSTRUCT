@@ -29,14 +29,15 @@ export function useMobilePermissions() {
     enabled: !!user,
   });
 
+  const isAdminOrManager = user?.role === "ADMIN" || user?.role === "MANAGER";
+
   const isHidden = (mobileKey: string): boolean => {
+    if (isAdminOrManager) return false;
     if (isLoading || !myPermissions) return true;
     const functionKey = mobileFunctionKeyMap[mobileKey];
-    if (!functionKey) return myPermissions.length > 0;
+    if (!functionKey) return true;
     const permission = myPermissions.find(p => p.functionKey === functionKey);
-    if (!permission) {
-      return myPermissions.length > 0;
-    }
+    if (!permission) return true;
     return permission.permissionLevel === "HIDDEN";
   };
 

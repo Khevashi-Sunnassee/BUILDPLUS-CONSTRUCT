@@ -243,7 +243,11 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
       ...taskData,
       createdById: userId,
     });
-    res.status(201).json(task);
+    if (userId) {
+      await storage.setTaskAssignees(task.id, [userId]);
+    }
+    const taskWithDetails = await storage.getTask(task.id);
+    res.status(201).json(taskWithDetails || task);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task" });

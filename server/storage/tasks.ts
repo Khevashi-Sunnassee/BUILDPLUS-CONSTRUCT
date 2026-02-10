@@ -131,8 +131,7 @@ export const taskMethods = {
           return false;
         });
         const groupCreatedByUser = group.createdById === userId;
-        const legacyGroup = !group.createdById;
-        if (filtered.length > 0 || groupCreatedByUser || legacyGroup) {
+        if (filtered.length > 0 || groupCreatedByUser) {
           result.push({ ...group, tasks: filtered });
         }
       } else {
