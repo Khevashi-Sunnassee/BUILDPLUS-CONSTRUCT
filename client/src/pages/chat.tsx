@@ -176,9 +176,10 @@ export default function ChatPage() {
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionCursorPosition, setMentionCursorPosition] = useState(0);
   const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
-  const [showTopicDialog, setShowTopicDialog] = useState(false);
-  const [editingTopic, setEditingTopic] = useState<ChatTopic | null>(null);
-  const [topicName, setTopicName] = useState("");
+  const [showNewTopicInput, setShowNewTopicInput] = useState(false);
+  const [newTopicName, setNewTopicName] = useState("");
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editingTopicName, setEditingTopicName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -386,9 +387,8 @@ export default function ChatPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
-      setShowTopicDialog(false);
-      setTopicName("");
-      setEditingTopic(null);
+      setShowNewTopicInput(false);
+      setNewTopicName("");
       toast({ title: "Topic created" });
     },
     onError: (error: any) => {
@@ -402,9 +402,8 @@ export default function ChatPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
-      setShowTopicDialog(false);
-      setTopicName("");
-      setEditingTopic(null);
+      setEditingTopicId(null);
+      setEditingTopicName("");
       toast({ title: "Topic updated" });
     },
     onError: (error: any) => {
@@ -618,6 +617,15 @@ export default function ChatPage() {
           <div className="flex items-center justify-between gap-2 mb-3">
             <h2 className="text-lg font-semibold">Messages</h2>
             <PageHelpButton pageHelpKey="page.chat" />
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => { setShowNewTopicInput(!showNewTopicInput); setNewTopicName(""); }}
+              data-testid="button-add-topic"
+              title="Add Topic"
+            >
+              <FolderOpen className="h-4 w-4" />
+            </Button>
             <Dialog open={showNewConversationDialog} onOpenChange={setShowNewConversationDialog}>
               <DialogTrigger asChild>
                 <Button size="icon" variant="ghost" data-testid="button-new-conversation">
@@ -746,116 +754,46 @@ export default function ChatPage() {
               data-testid="input-search-conversations"
             />
           </div>
-          <div className="flex items-center gap-1 mt-2">
+        </div>
+
+        {showNewTopicInput && (
+          <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30">
+            <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Input
+              value={newTopicName}
+              onChange={(e) => setNewTopicName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newTopicName.trim()) createTopicMutation.mutate(newTopicName.trim());
+                if (e.key === "Escape") { setShowNewTopicInput(false); setNewTopicName(""); }
+              }}
+              placeholder="Enter topic name..."
+              className="h-8 text-sm"
+              autoFocus
+              data-testid="input-new-topic"
+            />
+            <Button
+              size="sm"
+              onClick={() => newTopicName.trim() && createTopicMutation.mutate(newTopicName.trim())}
+              disabled={!newTopicName.trim() || createTopicMutation.isPending}
+              data-testid="button-create-topic"
+            >
+              Create
+            </Button>
             <Button
               size="sm"
               variant="ghost"
-              className="text-xs h-7 px-2 flex-1"
-              onClick={() => {
-                setEditingTopic(null);
-                setTopicName("");
-                setShowTopicDialog(true);
-              }}
-              data-testid="button-manage-topics"
+              onClick={() => { setShowNewTopicInput(false); setNewTopicName(""); }}
+              data-testid="button-cancel-topic"
             >
-              <Tag className="h-3 w-3 mr-1" />
-              Manage Topics
+              <X className="h-3 w-3" />
             </Button>
           </div>
-        </div>
-
-        <Dialog open={showTopicDialog} onOpenChange={(open) => { setShowTopicDialog(open); if (!open) { setEditingTopic(null); setTopicName(""); } }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingTopic ? "Rename Topic" : "Manage Topics"}</DialogTitle>
-              <DialogDescription>
-                {editingTopic ? "Update the name of this topic." : "Create and manage topics to organize your conversations."}
-              </DialogDescription>
-            </DialogHeader>
-            {editingTopic ? (
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Topic Name</Label>
-                  <Input
-                    value={topicName}
-                    onChange={(e) => setTopicName(e.target.value)}
-                    placeholder="Topic name"
-                    data-testid="input-topic-name"
-                  />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => { setEditingTopic(null); setTopicName(""); }} data-testid="button-cancel-topic">
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={() => updateTopicMutation.mutate({ id: editingTopic.id, name: topicName })}
-                    disabled={!topicName.trim() || updateTopicMutation.isPending}
-                    data-testid="button-save-topic"
-                  >
-                    Save
-                  </Button>
-                </DialogFooter>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    value={topicName}
-                    onChange={(e) => setTopicName(e.target.value)}
-                    placeholder="New topic name"
-                    onKeyDown={(e) => { if (e.key === "Enter" && topicName.trim()) createTopicMutation.mutate(topicName.trim()); }}
-                    data-testid="input-new-topic"
-                  />
-                  <Button
-                    onClick={() => createTopicMutation.mutate(topicName.trim())}
-                    disabled={!topicName.trim() || createTopicMutation.isPending}
-                    data-testid="button-create-topic"
-                  >
-                    Add
-                  </Button>
-                </div>
-                {topics.length > 0 ? (
-                  <div className="space-y-1">
-                    {topics.map(topic => (
-                      <div key={topic.id} className="flex items-center justify-between gap-2 p-2 rounded-md border" data-testid={`topic-item-${topic.id}`}>
-                        <div className="flex items-center gap-2 min-w-0">
-                          <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm truncate">{topic.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => { setEditingTopic(topic); setTopicName(topic.name); }}
-                            data-testid={`button-edit-topic-${topic.id}`}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-destructive"
-                            onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
-                            data-testid={`button-delete-topic-${topic.id}`}
-                          >
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-2">No topics yet. Create one to organize conversations.</p>
-                )}
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
+        )}
 
         <ScrollArea className="flex-1">
           {conversationsLoading ? (
             <div className="p-4 text-center text-muted-foreground">Loading...</div>
-          ) : filteredConversations.length === 0 ? (
+          ) : filteredConversations.length === 0 && topics.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">No conversations</div>
           ) : (
             <div className="p-2">
@@ -864,7 +802,7 @@ export default function ChatPage() {
                 const grouped = topics.map(topic => ({
                   topic,
                   convs: filteredConversations.filter(c => c.topicId === topic.id),
-                })).filter(g => g.convs.length > 0);
+                }));
 
                 const renderConvItem = (conv: Conversation) => (
                   <div key={conv.id} className="group flex items-start" data-testid={`conversation-row-${conv.id}`}>
@@ -941,23 +879,79 @@ export default function ChatPage() {
                     {grouped.map(({ topic, convs }) => {
                       const isCollapsed = collapsedTopics.has(topic.id);
                       const topicUnread = convs.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+                      const isEditing = editingTopicId === topic.id;
                       return (
                         <div key={topic.id} className="mb-1" data-testid={`topic-group-${topic.id}`}>
-                          <button
-                            onClick={() => toggleTopicCollapse(topic.id)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate text-left"
-                            data-testid={`button-toggle-topic-${topic.id}`}
-                          >
-                            {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
+                          <div className="group/topic flex items-center gap-1 px-2 py-1.5 rounded-md hover-elevate">
+                            <button
+                              onClick={() => toggleTopicCollapse(topic.id)}
+                              className="shrink-0 p-0.5"
+                              data-testid={`button-toggle-topic-${topic.id}`}
+                            >
+                              {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                            </button>
                             <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate flex-1">{topic.name}</span>
+                            {isEditing ? (
+                              <Input
+                                value={editingTopicName}
+                                onChange={(e) => setEditingTopicName(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" && editingTopicName.trim()) updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
+                                  if (e.key === "Escape") { setEditingTopicId(null); setEditingTopicName(""); }
+                                }}
+                                onBlur={() => {
+                                  if (editingTopicName.trim() && editingTopicName.trim() !== topic.name) {
+                                    updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
+                                  } else {
+                                    setEditingTopicId(null); setEditingTopicName("");
+                                  }
+                                }}
+                                className="h-6 text-xs px-1 py-0 flex-1"
+                                autoFocus
+                                data-testid={`input-rename-topic-${topic.id}`}
+                              />
+                            ) : (
+                              <button
+                                onClick={() => toggleTopicCollapse(topic.id)}
+                                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate flex-1 text-left"
+                                data-testid={`text-topic-name-${topic.id}`}
+                              >
+                                {topic.name}
+                              </button>
+                            )}
                             {topicUnread > 0 && (
                               <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
                                 {topicUnread > 99 ? "99+" : topicUnread}
                               </Badge>
                             )}
                             <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px]">{convs.length}</Badge>
-                          </button>
+                            {!isEditing && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 invisible group-hover/topic:visible" data-testid={`button-topic-menu-${topic.id}`}>
+                                    <MoreVertical className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={() => { setEditingTopicId(topic.id); setEditingTopicName(topic.name); }}
+                                    data-testid={`button-edit-topic-${topic.id}`}
+                                  >
+                                    <Pencil className="h-3 w-3 mr-2" />
+                                    Rename
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
+                                    data-testid={`button-delete-topic-${topic.id}`}
+                                  >
+                                    <Trash2 className="h-3 w-3 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
                           {!isCollapsed && (
                             <div className="ml-2 border-l pl-1">
                               {convs.map(renderConvItem)}

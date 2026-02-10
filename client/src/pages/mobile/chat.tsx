@@ -140,9 +140,10 @@ export default function MobileChatPage() {
   const [newConvJobId, setNewConvJobId] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
   const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
-  const [showTopicSheet, setShowTopicSheet] = useState(false);
-  const [editingTopic, setEditingTopic] = useState<ChatTopic | null>(null);
-  const [topicName, setTopicName] = useState("");
+  const [showNewTopicInput, setShowNewTopicInput] = useState(false);
+  const [newTopicName, setNewTopicName] = useState("");
+  const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
+  const [editingTopicName, setEditingTopicName] = useState("");
   const [showTopicAssign, setShowTopicAssign] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -274,8 +275,8 @@ export default function MobileChatPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
-      setTopicName("");
-      setEditingTopic(null);
+      setShowNewTopicInput(false);
+      setNewTopicName("");
       toast({ title: "Topic created" });
     },
     onError: (error: any) => {
@@ -289,8 +290,8 @@ export default function MobileChatPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
-      setTopicName("");
-      setEditingTopic(null);
+      setEditingTopicId(null);
+      setEditingTopicName("");
       toast({ title: "Topic updated" });
     },
     onError: (error: any) => {
@@ -802,7 +803,7 @@ export default function MobileChatPage() {
   const grouped = topics.map(topic => ({
     topic,
     convs: sortedConversations.filter(c => c.topicId === topic.id),
-  })).filter(g => g.convs.length > 0);
+  }));
 
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
@@ -818,15 +819,11 @@ export default function MobileChatPage() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => {
-                setEditingTopic(null);
-                setTopicName("");
-                setShowTopicSheet(true);
-              }}
+              onClick={() => { setShowNewTopicInput(!showNewTopicInput); setNewTopicName(""); }}
               className="text-white/60"
-              data-testid="button-manage-topics-mobile"
+              data-testid="button-add-topic-mobile"
             >
-              <Tag className="h-5 w-5" />
+              <FolderOpen className="h-5 w-5" />
             </Button>
             <Button
               variant="ghost"
@@ -841,6 +838,39 @@ export default function MobileChatPage() {
         </div>
       </div>
 
+      {showNewTopicInput && (
+        <div className="flex items-center gap-2 px-4 py-2 border-b border-white/10 bg-white/5">
+          <FolderOpen className="h-4 w-4 text-white/40 shrink-0" />
+          <Input
+            value={newTopicName}
+            onChange={(e) => setNewTopicName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && newTopicName.trim()) createTopicMutation.mutate(newTopicName.trim());
+              if (e.key === "Escape") { setShowNewTopicInput(false); setNewTopicName(""); }
+            }}
+            placeholder="Enter topic name..."
+            className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/30 h-8 text-sm"
+            autoFocus
+            data-testid="input-new-topic-mobile"
+          />
+          <Button
+            size="sm"
+            onClick={() => newTopicName.trim() && createTopicMutation.mutate(newTopicName.trim())}
+            disabled={!newTopicName.trim() || createTopicMutation.isPending}
+            className="bg-blue-500"
+            data-testid="button-create-topic-mobile"
+          >
+            Create
+          </Button>
+          <button
+            onClick={() => { setShowNewTopicInput(false); setNewTopicName(""); }}
+            className="p-1 text-white/40"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
         {isLoading ? (
           <div className="space-y-3">
@@ -848,7 +878,7 @@ export default function MobileChatPage() {
               <Skeleton key={i} className="h-16 rounded-2xl bg-white/10" />
             ))}
           </div>
-        ) : sortedConversations.length === 0 ? (
+        ) : sortedConversations.length === 0 && topics.length === 0 ? (
           <div className="text-center py-12">
             <MessageSquare className="h-12 w-12 mx-auto text-white/30 mb-3" />
             <p className="text-white/60">No conversations yet</p>
@@ -865,23 +895,71 @@ export default function MobileChatPage() {
             {grouped.map(({ topic, convs }) => {
               const isCollapsed = collapsedTopics.has(topic.id);
               const topicUnread = convs.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+              const isEditing = editingTopicId === topic.id;
               return (
                 <div key={topic.id} data-testid={`topic-group-${topic.id}`}>
-                  <button
-                    onClick={() => toggleTopicCollapse(topic.id)}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl active:scale-[0.99]"
-                    data-testid={`button-toggle-topic-${topic.id}`}
-                  >
-                    {isCollapsed ? <ChevronRight className="h-4 w-4 text-white/40 shrink-0" /> : <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />}
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl">
+                    <button
+                      onClick={() => toggleTopicCollapse(topic.id)}
+                      className="shrink-0"
+                      data-testid={`button-toggle-topic-${topic.id}`}
+                    >
+                      {isCollapsed ? <ChevronRight className="h-4 w-4 text-white/40" /> : <ChevronDown className="h-4 w-4 text-white/40" />}
+                    </button>
                     <FolderOpen className="h-4 w-4 text-white/40 shrink-0" />
-                    <span className="text-xs font-semibold uppercase tracking-wider text-white/40 flex-1 text-left truncate">{topic.name}</span>
+                    {isEditing ? (
+                      <Input
+                        value={editingTopicName}
+                        onChange={(e) => setEditingTopicName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && editingTopicName.trim()) updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
+                          if (e.key === "Escape") { setEditingTopicId(null); setEditingTopicName(""); }
+                        }}
+                        onBlur={() => {
+                          if (editingTopicName.trim() && editingTopicName.trim() !== topic.name) {
+                            updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
+                          } else {
+                            setEditingTopicId(null); setEditingTopicName("");
+                          }
+                        }}
+                        className="h-6 text-xs px-1 py-0 flex-1 bg-white/10 border-white/20 text-white"
+                        autoFocus
+                        data-testid={`input-rename-topic-${topic.id}-mobile`}
+                      />
+                    ) : (
+                      <button
+                        onClick={() => toggleTopicCollapse(topic.id)}
+                        className="text-xs font-semibold uppercase tracking-wider text-white/40 flex-1 text-left truncate"
+                        data-testid={`text-topic-name-${topic.id}`}
+                      >
+                        {topic.name}
+                      </button>
+                    )}
                     {topicUnread > 0 && (
                       <span className="inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
                         {topicUnread > 99 ? "99+" : topicUnread}
                       </span>
                     )}
                     <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px] bg-white/10 text-white/50 border-0">{convs.length}</Badge>
-                  </button>
+                    {!isEditing && (
+                      <div className="flex items-center shrink-0">
+                        <button
+                          onClick={() => { setEditingTopicId(topic.id); setEditingTopicName(topic.name); }}
+                          className="p-1 text-white/30 active:text-white/60"
+                          data-testid={`button-edit-topic-${topic.id}-mobile`}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
+                          className="p-1 text-white/30 active:text-red-400"
+                          data-testid={`button-delete-topic-${topic.id}-mobile`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   {!isCollapsed && (
                     <div className="ml-4 pl-2 border-l border-white/10 space-y-2 mt-1">
                       {convs.map(renderConversationItem)}
@@ -931,106 +1009,6 @@ export default function MobileChatPage() {
                 {showTopicAssign && conversations.find(c => c.id === showTopicAssign)?.topicId === topic.id && <Check className="h-4 w-4 shrink-0" />}
               </button>
             ))}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={showTopicSheet} onOpenChange={(open) => { if (!open) { setShowTopicSheet(false); setEditingTopic(null); setTopicName(""); } }}>
-        <SheetContent side="bottom" className="bg-[#0D1117] border-white/10 text-white rounded-t-2xl max-h-[70vh] p-0 flex flex-col">
-          <SheetHeader className="px-4 pt-4 pb-3 border-b border-white/10 flex-shrink-0">
-            <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="text-white text-lg">{editingTopic ? "Rename Topic" : "Manage Topics"}</SheetTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => { setShowTopicSheet(false); setEditingTopic(null); setTopicName(""); }}
-                className="text-white/60"
-                data-testid="button-close-topics"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          </SheetHeader>
-          <div className="flex-1 overflow-y-auto px-4 py-4">
-            {editingTopic ? (
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-white/40 uppercase tracking-wider mb-1.5 block">Topic Name</label>
-                  <Input
-                    value={topicName}
-                    onChange={(e) => setTopicName(e.target.value)}
-                    placeholder="Topic name"
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
-                    data-testid="input-topic-name-mobile"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 border-white/10 text-white"
-                    onClick={() => { setEditingTopic(null); setTopicName(""); }}
-                    data-testid="button-cancel-topic-mobile"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    className="flex-1 bg-blue-500"
-                    onClick={() => updateTopicMutation.mutate({ id: editingTopic.id, name: topicName })}
-                    disabled={!topicName.trim() || updateTopicMutation.isPending}
-                    data-testid="button-save-topic-mobile"
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  <Input
-                    value={topicName}
-                    onChange={(e) => setTopicName(e.target.value)}
-                    placeholder="New topic name"
-                    className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/30"
-                    onKeyDown={(e) => { if (e.key === "Enter" && topicName.trim()) createTopicMutation.mutate(topicName.trim()); }}
-                    data-testid="input-new-topic-mobile"
-                  />
-                  <Button
-                    onClick={() => createTopicMutation.mutate(topicName.trim())}
-                    disabled={!topicName.trim() || createTopicMutation.isPending}
-                    className="bg-blue-500"
-                    data-testid="button-create-topic-mobile"
-                  >
-                    Add
-                  </Button>
-                </div>
-                {topics.length > 0 ? (
-                  <div className="space-y-2">
-                    {topics.map(topic => (
-                      <div key={topic.id} className="flex items-center gap-2 px-3 py-3 rounded-xl border border-white/10 bg-white/[0.03]" data-testid={`topic-item-${topic.id}-mobile`}>
-                        <FolderOpen className="h-4 w-4 text-white/40 shrink-0" />
-                        <span className="text-sm text-white flex-1 truncate">{topic.name}</span>
-                        <button
-                          onClick={() => { setEditingTopic(topic); setTopicName(topic.name); }}
-                          className="p-2 text-white/40 active:text-white/80"
-                          data-testid={`button-edit-topic-${topic.id}-mobile`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
-                          className="p-2 text-red-400/60 active:text-red-400"
-                          data-testid={`button-delete-topic-${topic.id}-mobile`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-white/40 text-center py-4">No topics yet. Create one to organize conversations.</p>
-                )}
-              </div>
-            )}
           </div>
         </SheetContent>
       </Sheet>
