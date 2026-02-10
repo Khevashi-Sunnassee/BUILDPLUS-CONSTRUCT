@@ -1701,6 +1701,7 @@ export const taskGroups = pgTable("task_groups", {
   color: text("color").default("#6366f1"),
   sortOrder: integer("sort_order").default(0).notNull(),
   isCollapsed: boolean("is_collapsed").default(false).notNull(),
+  createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

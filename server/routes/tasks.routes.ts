@@ -119,7 +119,8 @@ router.post("/api/task-groups", requireAuth, requirePermission("tasks", "VIEW_AN
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const group = await storage.createTaskGroup({ ...parsed.data, companyId });
+    const userId = req.session.userId;
+    const group = await storage.createTaskGroup({ ...parsed.data, companyId, createdById: userId });
     res.status(201).json(group);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task group");

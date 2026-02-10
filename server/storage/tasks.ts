@@ -130,7 +130,11 @@ export const taskMethods = {
           if (task.assignees?.some(a => a.userId === userId)) return true;
           return false;
         });
-        result.push({ ...group, tasks: filtered });
+        const groupCreatedByUser = group.createdById === userId;
+        const legacyGroup = !group.createdById;
+        if (filtered.length > 0 || groupCreatedByUser || legacyGroup) {
+          result.push({ ...group, tasks: filtered });
+        }
       } else {
         result.push({ ...group, tasks: tasksWithDetails });
       }
