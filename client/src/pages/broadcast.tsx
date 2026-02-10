@@ -359,7 +359,7 @@ function SendMessageTab({
           <div className="space-y-2">
             <Label>Channels</Label>
             <div className="flex flex-wrap gap-4">
-              {(["SMS", "WHATSAPP", "EMAIL"] as const).map((channel) => {
+              {(["SMS", "EMAIL"] as const).map((channel) => {
                 const available = channelStatus
                   ? channelStatus[channel.toLowerCase() as keyof ChannelStatus]
                   : false;
@@ -1026,7 +1026,7 @@ function TemplatesTab() {
             <div className="space-y-2">
               <Label>Default Channels</Label>
               <div className="flex flex-wrap gap-4">
-                {(["SMS", "WHATSAPP", "EMAIL"] as const).map((channel) => (
+                {(["SMS", "EMAIL"] as const).map((channel) => (
                   <div key={channel} className="flex items-center gap-2">
                     <Checkbox
                       id={`tpl-channel-${channel}`}
@@ -1411,7 +1411,7 @@ export default function BroadcastPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Broadcast Messaging</h1>
             <PageHelpButton pageHelpKey="page.broadcast" />
           </div>
-          <p className="text-muted-foreground text-sm">Send messages to users via SMS, WhatsApp, and Email</p>
+          <p className="text-muted-foreground text-sm">Send messages to users via SMS and Email</p>
         </div>
       </div>
 

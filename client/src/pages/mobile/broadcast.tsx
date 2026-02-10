@@ -256,7 +256,7 @@ export default function MobileBroadcastPage() {
             <div>
               <div className="text-xs text-white/40 mb-2">Channels</div>
               <div className="flex flex-wrap gap-2">
-                {(["SMS", "WHATSAPP", "EMAIL"] as const).map((channel) => {
+                {(["SMS", "EMAIL"] as const).map((channel) => {
                   const selected = selectedChannels.includes(channel);
                   const available = channelStatus
                     ? channelStatus[channel.toLowerCase() as keyof ChannelStatus]
