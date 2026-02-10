@@ -26,9 +26,12 @@ interface ChatConversation {
   unreadCount: number;
 }
 
-interface TaskNotification {
+interface TaskGroup {
   id: string;
-  readAt: string | null;
+  tasks: Array<{
+    id: string;
+    status: string;
+  }>;
 }
 
 interface Job {
@@ -147,8 +150,8 @@ export default function MobileDashboard() {
     enabled: showChat,
   });
 
-  const { data: taskNotifications = [], isLoading: loadingTasks } = useQuery<TaskNotification[]>({
-    queryKey: [TASKS_ROUTES.NOTIFICATIONS],
+  const { data: taskGroups = [], isLoading: loadingTasks } = useQuery<TaskGroup[]>({
+    queryKey: [TASKS_ROUTES.GROUPS],
     enabled: showTasks,
   });
 
@@ -179,8 +182,9 @@ export default function MobileDashboard() {
   const isLoading = (showChat && loadingConversations) || (showTasks && loadingTasks) || (showJobs && loadingJobs) || (showPanels && loadingPanels);
 
   const unreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-  const openTasks = taskNotifications.filter(n => !n.readAt).length;
-  const totalTasks = taskNotifications.length;
+  const allTasks = taskGroups.flatMap(g => g.tasks);
+  const totalTasks = allTasks.length;
+  const openTasks = allTasks.filter(t => t.status !== "DONE").length;
   const activeJobs = jobs.filter(j => j.status === "ACTIVE").length;
   const inProgressPanels = panels.filter(p => p.productionApprovalStatus === "APPROVED").length;
   const criticalIssues = panels.filter(p => p.productionApprovalStatus === "REJECTED").length;
