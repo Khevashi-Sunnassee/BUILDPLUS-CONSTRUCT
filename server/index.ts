@@ -10,6 +10,7 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 import { seedDatabase, ensureSystemChecklistModules } from "./seed";
 import { seedHelpEntries } from "./seed-help";
+import { runMigrations } from "./migrate";
 import logger from "./lib/logger";
 import { errorMonitor } from "./lib/error-monitor";
 import { pool } from "./db";
@@ -266,6 +267,7 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
+  await runMigrations();
   await seedDatabase();
   await ensureSystemChecklistModules();
   await seedHelpEntries();
