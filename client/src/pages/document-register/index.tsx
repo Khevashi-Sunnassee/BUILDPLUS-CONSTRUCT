@@ -30,6 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { useAuth } from "@/lib/auth";
+import { ShieldAlert } from "lucide-react";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import {
   statusConfig,
@@ -49,6 +51,7 @@ import { VisualComparisonDialog } from "./VisualComparisonDialog";
 import { DocumentTable } from "./DocumentTable";
 
 export default function DocumentRegister() {
+  const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -113,6 +116,15 @@ export default function DocumentRegister() {
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
+
+  const isPrivileged = user?.role === "ADMIN" || user?.role === "MANAGER";
+
+  const { data: myJobMemberships = [] } = useQuery<string[]>({
+    queryKey: [JOBS_ROUTES.MY_MEMBERSHIPS],
+    enabled: !isPrivileged,
+  });
+
+  const isUnauthorizedJob = !isPrivileged && jobFilter && jobFilter !== "all" && !myJobMemberships.includes(jobFilter);
 
   const handleSearch = () => {
     setSearch(searchInput);
@@ -505,7 +517,13 @@ export default function DocumentRegister() {
             </div>
           )}
 
-          {documentsLoading ? (
+          {isUnauthorizedJob ? (
+            <div className="text-center py-12" data-testid="unauthorized-job-message">
+              <ShieldAlert className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium">You are currently not authorised to view this job</h3>
+              <p className="text-muted-foreground">Contact the administrator for access</p>
+            </div>
+          ) : documentsLoading ? (
             <div className="space-y-2">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-16 w-full" />

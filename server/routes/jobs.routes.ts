@@ -350,6 +350,18 @@ router.get("/api/projects", requireAuth, async (req: Request, res: Response) => 
   res.json(jobsList.map(j => ({ id: j.id, name: j.name, code: j.code || j.jobNumber })));
 });
 
+router.get("/api/jobs/my-memberships", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const memberships = await db.select({ jobId: jobMembers.jobId })
+      .from(jobMembers)
+      .where(eq(jobMembers.userId, req.session.userId!));
+    res.json(memberships.map(m => m.jobId));
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching user job memberships");
+    res.status(500).json({ error: "Failed to fetch memberships" });
+  }
+});
+
 // GET /api/jobs - Get all jobs (active only, for general use)
 router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
   const allJobs = await storage.getAllJobs(req.companyId);

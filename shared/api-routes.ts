@@ -186,6 +186,7 @@ export const JOBS_ROUTES = {
   PANEL_RATES: (id: string | number) => `/api/jobs/${id}/panel-rates`,
   PANEL_RATE_BY_TYPE: (jobId: string | number, panelTypeId: string | number) => `/api/jobs/${jobId}/panel-rates/${panelTypeId}`,
   TOTALS: (id: string | number) => `/api/jobs/${id}/totals`,
+  MY_MEMBERSHIPS: '/api/jobs/my-memberships',
   OPPORTUNITIES: '/api/jobs/opportunities',
   OPPORTUNITY_BY_ID: (id: string | number) => `/api/jobs/opportunities/${id}`,
   OPPORTUNITY_HISTORY: (id: string | number) => `/api/jobs/opportunities/${id}/history`,
