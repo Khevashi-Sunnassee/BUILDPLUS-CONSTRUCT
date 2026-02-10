@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +38,11 @@ import {
   UserPlus,
   Smile,
   ImageOff,
+  ChevronDown,
+  ChevronRight,
+  FolderOpen,
+  Pencil,
+  Tag,
 } from "lucide-react";
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import {
@@ -45,6 +50,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { compressImages } from "@/lib/image-compress";
@@ -65,6 +74,7 @@ interface Conversation {
   id: string;
   name: string | null;
   type: "DM" | "GROUP" | "CHANNEL";
+  topicId: string | null;
   jobId: string | null;
   panelId: string | null;
   createdAt: string;
@@ -75,6 +85,15 @@ interface Conversation {
   unreadMentions?: number;
   job?: Job;
   panel?: PanelRegister;
+}
+
+interface ChatTopic {
+  id: string;
+  companyId: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  createdById: string | null;
 }
 
 interface MessageAttachment {
@@ -156,6 +175,10 @@ export default function ChatPage() {
   const [mentionQuery, setMentionQuery] = useState("");
   const [showMentionDropdown, setShowMentionDropdown] = useState(false);
   const [mentionCursorPosition, setMentionCursorPosition] = useState(0);
+  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+  const [showTopicDialog, setShowTopicDialog] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<ChatTopic | null>(null);
+  const [topicName, setTopicName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -186,6 +209,10 @@ export default function ChatPage() {
 
   const { data: panels = [] } = useQuery<PanelRegister[]>({
     queryKey: [PANELS_ROUTES.LIST],
+  });
+
+  const { data: topics = [] } = useQuery<ChatTopic[]>({
+    queryKey: [CHAT_ROUTES.TOPICS],
   });
 
   const selectedConversation = conversations.find(c => c.id === selectedConversationId);
@@ -352,6 +379,73 @@ export default function ChatPage() {
       toast({ title: "Failed to delete conversation", description: error.message, variant: "destructive" });
     },
   });
+
+  const createTopicMutation = useMutation({
+    mutationFn: async (name: string) => {
+      return apiRequest("POST", CHAT_ROUTES.TOPICS, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
+      setShowTopicDialog(false);
+      setTopicName("");
+      setEditingTopic(null);
+      toast({ title: "Topic created" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateTopicMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      return apiRequest("PATCH", CHAT_ROUTES.TOPIC_BY_ID(id), { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
+      setShowTopicDialog(false);
+      setTopicName("");
+      setEditingTopic(null);
+      toast({ title: "Topic updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTopicMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", CHAT_ROUTES.TOPIC_BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      toast({ title: "Topic deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const assignTopicMutation = useMutation({
+    mutationFn: async ({ conversationId, topicId }: { conversationId: string; topicId: string | null }) => {
+      return apiRequest("PATCH", CHAT_ROUTES.CONVERSATION_TOPIC(conversationId), { topicId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to assign topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleTopicCollapse = useCallback((topicId: string) => {
+    setCollapsedTopics(prev => {
+      const next = new Set(prev);
+      if (next.has(topicId)) next.delete(topicId);
+      else next.add(topicId);
+      return next;
+    });
+  }, []);
 
   const deleteMessageMutation = useMutation({
     mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
@@ -652,7 +746,111 @@ export default function ChatPage() {
               data-testid="input-search-conversations"
             />
           </div>
+          <div className="flex items-center gap-1 mt-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-xs h-7 px-2 flex-1"
+              onClick={() => {
+                setEditingTopic(null);
+                setTopicName("");
+                setShowTopicDialog(true);
+              }}
+              data-testid="button-manage-topics"
+            >
+              <Tag className="h-3 w-3 mr-1" />
+              Manage Topics
+            </Button>
+          </div>
         </div>
+
+        <Dialog open={showTopicDialog} onOpenChange={(open) => { setShowTopicDialog(open); if (!open) { setEditingTopic(null); setTopicName(""); } }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingTopic ? "Rename Topic" : "Manage Topics"}</DialogTitle>
+              <DialogDescription>
+                {editingTopic ? "Update the name of this topic." : "Create and manage topics to organize your conversations."}
+              </DialogDescription>
+            </DialogHeader>
+            {editingTopic ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Topic Name</Label>
+                  <Input
+                    value={topicName}
+                    onChange={(e) => setTopicName(e.target.value)}
+                    placeholder="Topic name"
+                    data-testid="input-topic-name"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => { setEditingTopic(null); setTopicName(""); }} data-testid="button-cancel-topic">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={() => updateTopicMutation.mutate({ id: editingTopic.id, name: topicName })}
+                    disabled={!topicName.trim() || updateTopicMutation.isPending}
+                    data-testid="button-save-topic"
+                  >
+                    Save
+                  </Button>
+                </DialogFooter>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    value={topicName}
+                    onChange={(e) => setTopicName(e.target.value)}
+                    placeholder="New topic name"
+                    onKeyDown={(e) => { if (e.key === "Enter" && topicName.trim()) createTopicMutation.mutate(topicName.trim()); }}
+                    data-testid="input-new-topic"
+                  />
+                  <Button
+                    onClick={() => createTopicMutation.mutate(topicName.trim())}
+                    disabled={!topicName.trim() || createTopicMutation.isPending}
+                    data-testid="button-create-topic"
+                  >
+                    Add
+                  </Button>
+                </div>
+                {topics.length > 0 ? (
+                  <div className="space-y-1">
+                    {topics.map(topic => (
+                      <div key={topic.id} className="flex items-center justify-between gap-2 p-2 rounded-md border" data-testid={`topic-item-${topic.id}`}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm truncate">{topic.name}</span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => { setEditingTopic(topic); setTopicName(topic.name); }}
+                            data-testid={`button-edit-topic-${topic.id}`}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive"
+                            onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
+                            data-testid={`button-delete-topic-${topic.id}`}
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-2">No topics yet. Create one to organize conversations.</p>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         <ScrollArea className="flex-1">
           {conversationsLoading ? (
@@ -661,41 +859,122 @@ export default function ChatPage() {
             <div className="p-4 text-center text-muted-foreground">No conversations</div>
           ) : (
             <div className="p-2">
-              {filteredConversations.map(conv => (
-                <button
-                  key={conv.id}
-                  onClick={() => handleSelectConversation(conv.id)}
-                  className={cn(
-                    "w-full flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
-                    selectedConversationId === conv.id && "bg-accent"
-                  )}
-                  data-testid={`conversation-${conv.id}`}
-                >
-                  <div className="mt-0.5 text-muted-foreground shrink-0">
-                    {getConversationIcon(conv)}
+              {(() => {
+                const ungrouped = filteredConversations.filter(c => !c.topicId);
+                const grouped = topics.map(topic => ({
+                  topic,
+                  convs: filteredConversations.filter(c => c.topicId === topic.id),
+                })).filter(g => g.convs.length > 0);
+
+                const renderConvItem = (conv: Conversation) => (
+                  <div key={conv.id} className="group flex items-start" data-testid={`conversation-row-${conv.id}`}>
+                    <button
+                      onClick={() => handleSelectConversation(conv.id)}
+                      className={cn(
+                        "flex-1 flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
+                        selectedConversationId === conv.id && "bg-accent"
+                      )}
+                      data-testid={`conversation-${conv.id}`}
+                    >
+                      <div className="mt-0.5 text-muted-foreground shrink-0">
+                        {getConversationIcon(conv)}
+                      </div>
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <div className="font-medium truncate text-sm">
+                          {getConversationDisplayName(conv)}
+                        </div>
+                        {conv.lastMessage && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {conv.lastMessage.body}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <Badge variant="outline" className="text-xs">
+                          {conv.type}
+                        </Badge>
+                        {(conv.unreadCount ?? 0) > 0 && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid={`badge-unread-${conv.id}`}>
+                            {(conv.unreadCount ?? 0) > 99 ? "99+" : conv.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                    {topics.length > 0 && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="mt-2 shrink-0 invisible group-hover:visible"
+                            data-testid={`button-assign-topic-${conv.id}`}
+                          >
+                            <Tag className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => assignTopicMutation.mutate({ conversationId: conv.id, topicId: null })}
+                            data-testid={`topic-assign-none-${conv.id}`}
+                          >
+                            No Topic
+                          </DropdownMenuItem>
+                          {topics.map(topic => (
+                            <DropdownMenuItem
+                              key={topic.id}
+                              onClick={() => assignTopicMutation.mutate({ conversationId: conv.id, topicId: topic.id })}
+                              data-testid={`topic-assign-${topic.id}-${conv.id}`}
+                            >
+                              <FolderOpen className="h-3 w-3 mr-2" />
+                              {topic.name}
+                              {conv.topicId === topic.id && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <div className="font-medium truncate text-sm">
-                      {getConversationDisplayName(conv)}
-                    </div>
-                    {conv.lastMessage && (
-                      <div className="text-xs text-muted-foreground truncate">
-                        {conv.lastMessage.body}
+                );
+
+                return (
+                  <>
+                    {grouped.map(({ topic, convs }) => {
+                      const isCollapsed = collapsedTopics.has(topic.id);
+                      const topicUnread = convs.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+                      return (
+                        <div key={topic.id} className="mb-1" data-testid={`topic-group-${topic.id}`}>
+                          <button
+                            onClick={() => toggleTopicCollapse(topic.id)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover-elevate text-left"
+                            data-testid={`button-toggle-topic-${topic.id}`}
+                          >
+                            {isCollapsed ? <ChevronRight className="h-3 w-3 shrink-0" /> : <ChevronDown className="h-3 w-3 shrink-0" />}
+                            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate flex-1">{topic.name}</span>
+                            {topicUnread > 0 && (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
+                                {topicUnread > 99 ? "99+" : topicUnread}
+                              </Badge>
+                            )}
+                            <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px]">{convs.length}</Badge>
+                          </button>
+                          {!isCollapsed && (
+                            <div className="ml-2 border-l pl-1">
+                              {convs.map(renderConvItem)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {ungrouped.length > 0 && grouped.length > 0 && (
+                      <div className="px-2 py-1.5">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ungrouped</span>
                       </div>
                     )}
-                  </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <Badge variant="outline" className="text-xs">
-                      {conv.type}
-                    </Badge>
-                    {(conv.unreadCount ?? 0) > 0 && (
-                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid={`badge-unread-${conv.id}`}>
-                        {(conv.unreadCount ?? 0) > 99 ? "99+" : conv.unreadCount}
-                      </Badge>
-                    )}
-                  </div>
-                </button>
-              ))}
+                    {ungrouped.map(renderConvItem)}
+                  </>
+                );
+              })()}
             </div>
           )}
         </ScrollArea>
@@ -763,6 +1042,37 @@ export default function ChatPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
+                    {topics.length > 0 && (
+                      <>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger data-testid="button-move-to-topic">
+                            <Tag className="h-4 w-4 mr-2" />
+                            Move to Topic
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuItem
+                              onClick={() => assignTopicMutation.mutate({ conversationId: selectedConversation.id, topicId: null })}
+                              data-testid="topic-move-none"
+                            >
+                              No Topic
+                              {!selectedConversation.topicId && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                            </DropdownMenuItem>
+                            {topics.map(topic => (
+                              <DropdownMenuItem
+                                key={topic.id}
+                                onClick={() => assignTopicMutation.mutate({ conversationId: selectedConversation.id, topicId: topic.id })}
+                                data-testid={`topic-move-${topic.id}`}
+                              >
+                                <FolderOpen className="h-3 w-3 mr-2" />
+                                {topic.name}
+                                {selectedConversation.topicId === topic.id && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem
                       className="text-destructive focus:text-destructive"
                       onClick={() => {

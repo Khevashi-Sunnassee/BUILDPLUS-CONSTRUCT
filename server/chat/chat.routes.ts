@@ -14,8 +14,9 @@ import {
   userChatSettings,
   chatMessageMentions,
   userPermissions,
+  chatTopics,
 } from "@shared/schema";
-import { and, eq, desc, gt, isNull, sql, inArray } from "drizzle-orm";
+import { and, eq, desc, gt, isNull, sql, inArray, asc } from "drizzle-orm";
 import { chatUpload } from "./chat.files";
 import { extractMentionUserIds } from "./chat.utils";
 import { documentRegisterService } from "../services/document-register.service";
@@ -1126,6 +1127,119 @@ chatRouter.post("/conversations/:conversationId/members", requireAuth, requireCh
     }
 
     res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.get("/topics", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const companyId = req.session.companyId!;
+    const topics = await db.select().from(chatTopics)
+      .where(eq(chatTopics.companyId, companyId))
+      .orderBy(asc(chatTopics.sortOrder), asc(chatTopics.createdAt));
+    res.json(topics);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.post("/topics", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const companyId = req.session.companyId!;
+    const schema = z.object({ name: z.string().min(1).max(100) });
+    const { name } = schema.parse(req.body);
+
+    const maxOrder = await db.select({ max: sql<number>`COALESCE(MAX(${chatTopics.sortOrder}), 0)` })
+      .from(chatTopics).where(eq(chatTopics.companyId, companyId));
+
+    const [topic] = await db.insert(chatTopics).values({
+      companyId,
+      name,
+      sortOrder: (maxOrder[0]?.max ?? 0) + 1,
+      createdById: userId,
+    }).returning();
+
+    res.json(topic);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.patch("/topics/:topicId", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const companyId = req.session.companyId!;
+    const topicId = String(req.params.topicId);
+    const schema = z.object({ name: z.string().min(1).max(100) });
+    const { name } = schema.parse(req.body);
+
+    const [updated] = await db.update(chatTopics)
+      .set({ name })
+      .where(and(eq(chatTopics.id, topicId), eq(chatTopics.companyId, companyId)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Topic not found" });
+    res.json(updated);
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.delete("/topics/:topicId", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const companyId = req.session.companyId!;
+    const topicId = String(req.params.topicId);
+
+    await db.update(conversations)
+      .set({ topicId: null })
+      .where(eq(conversations.topicId, topicId));
+
+    await db.delete(chatTopics)
+      .where(and(eq(chatTopics.id, topicId), eq(chatTopics.companyId, companyId)));
+
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.post("/topics/reorder", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const companyId = req.session.companyId!;
+    const schema = z.object({ topicIds: z.array(z.string()) });
+    const { topicIds } = schema.parse(req.body);
+
+    await db.transaction(async (tx) => {
+      for (let i = 0; i < topicIds.length; i++) {
+        await tx.update(chatTopics)
+          .set({ sortOrder: i })
+          .where(and(eq(chatTopics.id, topicIds[i]), eq(chatTopics.companyId, companyId)));
+      }
+    });
+
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
+chatRouter.patch("/conversations/:conversationId/topic", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+    const conversationId = String(req.params.conversationId);
+    await assertMember(userId, conversationId);
+
+    const schema = z.object({ topicId: z.string().nullable() });
+    const { topicId } = schema.parse(req.body);
+
+    const [updated] = await db.update(conversations)
+      .set({ topicId })
+      .where(eq(conversations.id, conversationId))
+      .returning();
+
+    if (!updated) return res.status(404).json({ error: "Conversation not found" });
+    res.json(updated);
   } catch (e: any) {
     res.status(400).json({ error: e.message || String(e) });
   }

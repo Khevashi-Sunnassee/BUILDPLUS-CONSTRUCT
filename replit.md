@@ -22,7 +22,7 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 - **AI Integration:** OpenAI is used for PDF analysis to extract panel specifications and AI-powered visual comparisons for documents.
 - **Financial & Logistics:** Configurable rates, cost analysis, production tracking, and a logistics system for load list creation and delivery recording.
 - **Scheduling:** Drafting and procurement scheduling linked to production slots, supporting multi-factory operations and CFMEU calendars.
-- **Communication:** A Teams-style chat system with direct messages, groups, channels, @mentions, notifications, and file attachments.
+- **Communication:** A Teams-style chat system with direct messages, groups, channels, @mentions, notifications, file attachments, and message topics (collapsible folder-like grouping for conversations via `chat_topics` table with sortOrder, CRUD management dialog, and topic assignment per conversation).
 - **Sales & Document Management:** A mobile-first pre-sales opportunity management system with a detailed sales pipeline, and a comprehensive document management system with version control, bundles, and entity linking.
 - **Photo Gallery:** A visual gallery for images from the document register, offering search, filtering, grouping, full-screen viewing, multi-select with email, and download functionalities on both web and mobile.
 - **Mobile Functionality:** QR scanner for panels and document bundles, mobile panel checklists with conditional fields and system-locked templates, and mobile PM Call Logs (list, 5-step wizard form, detail view) at `/mobile/pm-call-logs`.

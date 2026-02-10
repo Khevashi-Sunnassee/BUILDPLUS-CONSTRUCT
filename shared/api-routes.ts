@@ -329,6 +329,10 @@ export const CHAT_ROUTES = {
   PANELS: '/api/chat/panels',
   PANELS_COUNTS: '/api/chat/panels/counts',
   PANEL_CONVERSATION: (panelId: string | number) => `/api/chat/panels/${panelId}/conversation`,
+  TOPICS: '/api/chat/topics',
+  TOPIC_BY_ID: (id: string | number) => `/api/chat/topics/${id}`,
+  TOPIC_REORDER: '/api/chat/topics/reorder',
+  CONVERSATION_TOPIC: (conversationId: string | number) => `/api/chat/conversations/${conversationId}/topic`,
 } as const;
 
 // ============================================================================
