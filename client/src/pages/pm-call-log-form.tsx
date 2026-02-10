@@ -58,12 +58,14 @@ interface LevelStatus {
   originalEndDate: string | null;
   adjustedStartDate: string | null;
   adjustedEndDate: string | null;
+  showTimeInfo: boolean;
+  confirmedTime: string;
+  confirmedDeliveryDate: string;
 }
 
 const STEPS = [
   { id: "job", title: "Select Job", icon: Construction },
   { id: "schedule", title: "Pour Schedule Review", icon: Calendar },
-  { id: "logistics", title: "Logistics", icon: Truck },
   { id: "concerns", title: "Concerns & Issues", icon: AlertTriangle },
   { id: "actions", title: "Actions & Notifications", icon: Send },
   { id: "review", title: "Review & Submit", icon: Check },
@@ -96,8 +98,6 @@ export default function PmCallLogFormPage() {
 
   const [levelStatuses, setLevelStatuses] = useState<LevelStatus[]>([]);
 
-  const [deliveryTime, setDeliveryTime] = useState("");
-  const [nextDeliveryDate, setNextDeliveryDate] = useState("");
 
   const [draftingConcerns, setDraftingConcerns] = useState("");
   const [clientDesignChanges, setClientDesignChanges] = useState("");
@@ -167,6 +167,9 @@ export default function PmCallLogFormPage() {
           originalEndDate: lvl.manualEndDate || lvl.estimatedEndDate,
           adjustedStartDate: null,
           adjustedEndDate: null,
+          showTimeInfo: false,
+          confirmedTime: "",
+          confirmedDeliveryDate: "",
         }))
       );
     }
@@ -206,13 +209,27 @@ export default function PmCallLogFormPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
+      const levelsWithTimes = levelStatuses.filter((l) => l.confirmedTime || l.confirmedDeliveryDate);
+      const aggregatedDeliveryTime = levelsWithTimes
+        .map((l) => {
+          const label = formatLevelDisplay(l.level, l.pourLabel, l.buildingNumber);
+          return l.confirmedTime ? `${label}: ${l.confirmedTime}` : null;
+        })
+        .filter(Boolean)
+        .join("; ") || null;
+      const latestDeliveryDate = levelsWithTimes
+        .map((l) => l.confirmedDeliveryDate)
+        .filter(Boolean)
+        .sort()
+        .pop() || null;
+
       return apiRequest("POST", PM_CALL_LOGS_ROUTES.LIST, {
         jobId: selectedJobId,
         contactName,
         contactPhone: contactPhone || null,
         callDateTime,
-        deliveryTime: deliveryTime || null,
-        nextDeliveryDate: nextDeliveryDate || null,
+        deliveryTime: aggregatedDeliveryTime,
+        nextDeliveryDate: latestDeliveryDate,
         draftingConcerns: draftingConcerns || null,
         clientDesignChanges: clientDesignChanges || null,
         issuesReported: issuesReported || null,
@@ -390,6 +407,22 @@ export default function PmCallLogFormPage() {
                           <Button
                             size="sm"
                             variant="outline"
+                            className={lvl.showTimeInfo ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:text-white dark:border-blue-600 dark:hover:bg-blue-700 no-default-hover-elevate" : ""}
+                            onClick={() => {
+                              setLevelStatuses((prev) => {
+                                const updated = [...prev];
+                                updated[idx] = { ...updated[idx], showTimeInfo: !updated[idx].showTimeInfo };
+                                return updated;
+                              });
+                            }}
+                            data-testid={`button-confirm-time-${idx}`}
+                          >
+                            <Truck className="h-3.5 w-3.5 mr-1" />
+                            Confirm Time
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant={lvl.status === "ON_TIME" ? "outline" : "default"}
                             className={lvl.status === "ON_TIME" ? "bg-green-600 text-white border-green-600 hover:bg-green-700 dark:bg-green-600 dark:text-white dark:border-green-600 dark:hover:bg-green-700 no-default-hover-elevate" : ""}
                             onClick={() => handleLevelStatusChange(idx, "ON_TIME")}
                             data-testid={`button-ontime-${idx}`}
@@ -408,6 +441,43 @@ export default function PmCallLogFormPage() {
                           </Button>
                         </div>
                       </div>
+
+                      {lvl.showTimeInfo && (
+                        <div className="mt-3 pt-3 border-t">
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">Delivery Time</Label>
+                              <Input
+                                value={lvl.confirmedTime}
+                                onChange={(e) => {
+                                  setLevelStatuses((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx] = { ...updated[idx], confirmedTime: e.target.value };
+                                    return updated;
+                                  });
+                                }}
+                                placeholder="e.g. 6:00 AM"
+                                data-testid={`input-confirmed-time-${idx}`}
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Delivery Date</Label>
+                              <Input
+                                type="date"
+                                value={lvl.confirmedDeliveryDate}
+                                onChange={(e) => {
+                                  setLevelStatuses((prev) => {
+                                    const updated = [...prev];
+                                    updated[idx] = { ...updated[idx], confirmedDeliveryDate: e.target.value };
+                                    return updated;
+                                  });
+                                }}
+                                data-testid={`input-confirmed-delivery-date-${idx}`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {lvl.status === "LATE" && (
                         <div className="mt-3 pt-3 border-t space-y-3">
@@ -440,38 +510,6 @@ export default function PmCallLogFormPage() {
         );
 
       case 2:
-        return (
-          <div className="space-y-6">
-            <div>
-              <h3 className="font-medium">Logistics Update</h3>
-              <p className="text-sm text-muted-foreground">Record any logistics information discussed during the call.</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="deliveryTime">Time of Delivery</Label>
-                <Input
-                  id="deliveryTime"
-                  value={deliveryTime}
-                  onChange={(e) => setDeliveryTime(e.target.value)}
-                  placeholder="e.g. 6:00 AM"
-                  data-testid="input-delivery-time"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nextDeliveryDate">Date of Next Delivery</Label>
-                <Input
-                  id="nextDeliveryDate"
-                  type="date"
-                  value={nextDeliveryDate}
-                  onChange={(e) => setNextDeliveryDate(e.target.value)}
-                  data-testid="input-next-delivery-date"
-                />
-              </div>
-            </div>
-          </div>
-        );
-
-      case 3:
         return (
           <div className="space-y-6">
             <div>
@@ -533,7 +571,7 @@ export default function PmCallLogFormPage() {
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div className="space-y-6">
             <div>
@@ -697,7 +735,7 @@ export default function PmCallLogFormPage() {
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div className="space-y-6">
             <div>
@@ -738,50 +776,38 @@ export default function PmCallLogFormPage() {
                 <CardContent className="p-4 pt-0">
                   <div className="space-y-2">
                     {levelStatuses.map((lvl, idx) => (
-                      <div key={idx} className="flex flex-wrap items-center justify-between gap-2 text-sm py-1">
-                        <span>
-                          {formatLevelDisplay(lvl.level, lvl.pourLabel, lvl.buildingNumber)}
-                        </span>
-                        {lvl.status === "PENDING" ? (
-                          <Badge variant="outline" data-testid={`badge-review-pending-${idx}`}>
-                            Pending
-                          </Badge>
-                        ) : lvl.status === "ON_TIME" ? (
-                          <Badge className="bg-green-600 text-white border-green-600 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-review-ontime-${idx}`}>
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            On Time
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" data-testid={`badge-review-late-${idx}`}>
-                            <Clock className="h-3 w-3 mr-1" />
-                            {lvl.daysLate} days late
-                          </Badge>
-                        )}
+                      <div key={idx} className="text-sm py-1 space-y-1">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span>
+                            {formatLevelDisplay(lvl.level, lvl.pourLabel, lvl.buildingNumber)}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {(lvl.confirmedTime || lvl.confirmedDeliveryDate) && (
+                              <Badge variant="outline" data-testid={`badge-review-logistics-${idx}`}>
+                                <Truck className="h-3 w-3 mr-1" />
+                                {lvl.confirmedTime}{lvl.confirmedTime && lvl.confirmedDeliveryDate ? " / " : ""}{lvl.confirmedDeliveryDate ? formatDate(lvl.confirmedDeliveryDate) : ""}
+                              </Badge>
+                            )}
+                            {lvl.status === "PENDING" ? (
+                              <Badge variant="outline" data-testid={`badge-review-pending-${idx}`}>
+                                Pending
+                              </Badge>
+                            ) : lvl.status === "ON_TIME" ? (
+                              <Badge className="bg-green-600 text-white border-green-600 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-review-ontime-${idx}`}>
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                On Time
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" data-testid={`badge-review-late-${idx}`}>
+                                <Clock className="h-3 w-3 mr-1" />
+                                {lvl.daysLate} days late
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {(deliveryTime || nextDeliveryDate) && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Logistics</CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-0 grid gap-2 md:grid-cols-2">
-                  {deliveryTime && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Delivery Time</p>
-                      <p className="font-medium">{deliveryTime}</p>
-                    </div>
-                  )}
-                  {nextDeliveryDate && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Next Delivery</p>
-                      <p className="font-medium">{formatDate(nextDeliveryDate)}</p>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             )}
