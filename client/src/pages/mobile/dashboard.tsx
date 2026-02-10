@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import { useMobilePermissions } from "@/hooks/use-mobile-permissions";
 
 interface ChatConversation {
   id: string;
@@ -130,36 +131,52 @@ function NavRow({
 
 export default function MobileDashboard() {
   const { user } = useAuth();
+  const { isHidden } = useMobilePermissions();
+
+  const showTasks = !isHidden("tasks");
+  const showChat = !isHidden("chat");
+  const showJobs = !isHidden("jobs");
+  const showPanels = !isHidden("panels");
+  const showLogistics = !isHidden("logistics");
+  const showPOs = !isHidden("purchase-orders");
+  const showDocuments = !isHidden("documents");
+  const showChecklists = !isHidden("checklists");
 
   const { data: conversations = [], isLoading: loadingConversations } = useQuery<ChatConversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
+    enabled: showChat,
   });
 
   const { data: taskNotifications = [], isLoading: loadingTasks } = useQuery<TaskNotification[]>({
     queryKey: [TASKS_ROUTES.NOTIFICATIONS],
+    enabled: showTasks,
   });
 
   const { data: jobs = [], isLoading: loadingJobs } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
+    enabled: showJobs,
   });
 
   const { data: panels = [], isLoading: loadingPanels } = useQuery<Panel[]>({
     queryKey: [PANELS_ROUTES.LIST],
+    enabled: showPanels,
   });
 
   const { data: loadLists = [] } = useQuery<LoadList[]>({
     queryKey: [LOGISTICS_ROUTES.LOAD_LISTS],
+    enabled: showLogistics,
   });
 
   const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
+    enabled: showPOs,
   });
 
   const { data: globalSettings } = useQuery<GlobalSettings>({
     queryKey: [ADMIN_ROUTES.SETTINGS],
   });
 
-  const isLoading = loadingConversations || loadingTasks || loadingJobs || loadingPanels;
+  const isLoading = (showChat && loadingConversations) || (showTasks && loadingTasks) || (showJobs && loadingJobs) || (showPanels && loadingPanels);
 
   const unreadMessages = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
   const openTasks = taskNotifications.filter(n => !n.readAt).length;
@@ -167,6 +184,12 @@ export default function MobileDashboard() {
   const activeJobs = jobs.filter(j => j.status === "ACTIVE").length;
   const inProgressPanels = panels.filter(p => p.productionApprovalStatus === "APPROVED").length;
   const criticalIssues = panels.filter(p => p.productionApprovalStatus === "REJECTED").length;
+
+  const statCards = [];
+  if (showTasks) statCards.push(<StatCard key="tasks" value={totalTasks} title="Tasks" subtitle={`${openTasks} open`} accent="blue" />);
+  if (showJobs) statCards.push(<StatCard key="jobs" value={activeJobs} title="Jobs" subtitle="In Progress" accent="green" />);
+  if (showPanels) statCards.push(<StatCard key="panels" value={inProgressPanels} title="Panels" subtitle="In Progress" accent="yellow" />);
+  if (showPanels) statCards.push(<StatCard key="critical" value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />);
 
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
@@ -194,16 +217,18 @@ export default function MobileDashboard() {
             <button className="text-white/80" data-testid="button-search">
               <Search className="h-5 w-5" />
             </button>
-            <Link href="/mobile/chat">
-              <button className="relative text-white/80" data-testid="button-chat-header">
-                <MessageSquare className="h-5 w-5" />
-                {unreadMessages > 0 && (
-                  <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
-                    {unreadMessages > 99 ? "99+" : unreadMessages}
-                  </span>
-                )}
-              </button>
-            </Link>
+            {showChat && (
+              <Link href="/mobile/chat">
+                <button className="relative text-white/80" data-testid="button-chat-header">
+                  <MessageSquare className="h-5 w-5" />
+                  {unreadMessages > 0 && (
+                    <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                      {unreadMessages > 99 ? "99+" : unreadMessages}
+                    </span>
+                  )}
+                </button>
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -219,76 +244,91 @@ export default function MobileDashboard() {
               </div>
             ))}
           </div>
-        ) : (
-          <div className="grid grid-cols-4 gap-2">
-            <StatCard value={totalTasks} title="Tasks" subtitle={`${openTasks} open`} accent="blue" />
-            <StatCard value={activeJobs} title="Jobs" subtitle="In Progress" accent="green" />
-            <StatCard value={inProgressPanels} title="Panels" subtitle="In Progress" accent="yellow" />
-            <StatCard value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />
+        ) : statCards.length > 0 ? (
+          <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${Math.min(statCards.length, 4)}, 1fr)` }}>
+            {statCards}
           </div>
-        )}
+        ) : null}
 
         <div className="mt-6 space-y-3">
-          <NavRow
-            icon={<ListTodo className="h-5 w-5 text-blue-400" />}
-            iconBg="bg-blue-500/20"
-            label="Tasks"
-            count={openTasks}
-            href="/mobile/tasks"
-          />
-          <NavRow
-            icon={<MessageSquare className="h-5 w-5 text-purple-400" />}
-            iconBg="bg-purple-500/20"
-            label="Chat"
-            badge={unreadMessages}
-            href="/mobile/chat"
-          />
-          <NavRow
-            icon={<Briefcase className="h-5 w-5 text-emerald-400" />}
-            iconBg="bg-emerald-500/20"
-            label="Jobs"
-            count={activeJobs}
-            href="/mobile/jobs"
-          />
-          <NavRow
-            icon={<ClipboardList className="h-5 w-5 text-amber-400" />}
-            iconBg="bg-amber-500/20"
-            label="Panel Register"
-            count={panels.length}
-            href="/mobile/panels"
-          />
-          <NavRow
-            icon={<Truck className="h-5 w-5 text-orange-400" />}
-            iconBg="bg-orange-500/20"
-            label="Logistics"
-            count={loadLists.length}
-            href="/mobile/logistics"
-          />
-          <NavRow
-            icon={<ShoppingCart className="h-5 w-5 text-fuchsia-400" />}
-            iconBg="bg-fuchsia-500/20"
-            label="Purchase Orders"
-            count={purchaseOrders.length}
-            href="/mobile/purchase-orders"
-          />
-          <NavRow
-            icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
-            iconBg="bg-cyan-500/20"
-            label="Documents"
-            href="/mobile/documents"
-          />
-          <NavRow
-            icon={<ImageIcon className="h-5 w-5 text-pink-400" />}
-            iconBg="bg-pink-500/20"
-            label="Photo Gallery"
-            href="/mobile/photo-gallery"
-          />
-          <NavRow
-            icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}
-            iconBg="bg-teal-500/20"
-            label="Checklists"
-            href="/mobile/checklists"
-          />
+          {showTasks && (
+            <NavRow
+              icon={<ListTodo className="h-5 w-5 text-blue-400" />}
+              iconBg="bg-blue-500/20"
+              label="Tasks"
+              count={openTasks}
+              href="/mobile/tasks"
+            />
+          )}
+          {showChat && (
+            <NavRow
+              icon={<MessageSquare className="h-5 w-5 text-purple-400" />}
+              iconBg="bg-purple-500/20"
+              label="Chat"
+              badge={unreadMessages}
+              href="/mobile/chat"
+            />
+          )}
+          {showJobs && (
+            <NavRow
+              icon={<Briefcase className="h-5 w-5 text-emerald-400" />}
+              iconBg="bg-emerald-500/20"
+              label="Jobs"
+              count={activeJobs}
+              href="/mobile/jobs"
+            />
+          )}
+          {showPanels && (
+            <NavRow
+              icon={<ClipboardList className="h-5 w-5 text-amber-400" />}
+              iconBg="bg-amber-500/20"
+              label="Panel Register"
+              count={panels.length}
+              href="/mobile/panels"
+            />
+          )}
+          {showLogistics && (
+            <NavRow
+              icon={<Truck className="h-5 w-5 text-orange-400" />}
+              iconBg="bg-orange-500/20"
+              label="Logistics"
+              count={loadLists.length}
+              href="/mobile/logistics"
+            />
+          )}
+          {showPOs && (
+            <NavRow
+              icon={<ShoppingCart className="h-5 w-5 text-fuchsia-400" />}
+              iconBg="bg-fuchsia-500/20"
+              label="Purchase Orders"
+              count={purchaseOrders.length}
+              href="/mobile/purchase-orders"
+            />
+          )}
+          {showDocuments && (
+            <NavRow
+              icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
+              iconBg="bg-cyan-500/20"
+              label="Documents"
+              href="/mobile/documents"
+            />
+          )}
+          {showDocuments && (
+            <NavRow
+              icon={<ImageIcon className="h-5 w-5 text-pink-400" />}
+              iconBg="bg-pink-500/20"
+              label="Photo Gallery"
+              href="/mobile/photo-gallery"
+            />
+          )}
+          {showChecklists && (
+            <NavRow
+              icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}
+              iconBg="bg-teal-500/20"
+              label="Checklists"
+              href="/mobile/checklists"
+            />
+          )}
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import { useMobilePermissions } from "@/hooks/use-mobile-permissions";
 
 interface MenuItemProps {
   icon: React.ReactNode;
@@ -47,6 +48,20 @@ function MenuItem({ icon, iconBg, label, href }: MenuItemProps) {
 
 export default function MobileMore() {
   const { logout } = useAuth();
+  const { isHidden } = useMobilePermissions();
+
+  const showScan = !isHidden("qr-scanner");
+  const showOpportunity = !isHidden("new-opportunity");
+  const showPhoto = !isHidden("photo-capture");
+  const showTasks = !isHidden("tasks");
+  const showPanels = !isHidden("panels");
+  const showLogistics = !isHidden("logistics");
+  const showPOs = !isHidden("purchase-orders");
+  const showWeeklyReport = !isHidden("weekly-report");
+  const showPmCallLogs = !isHidden("pm-call-logs");
+  const showDocuments = !isHidden("documents");
+  const showChecklists = !isHidden("checklists");
+  const showBroadcast = !isHidden("broadcast");
 
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
@@ -57,108 +72,132 @@ export default function MobileMore() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-3">
-        <Link href="/mobile/scan">
-          <button
-            className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 text-left active:scale-[0.99] mb-2"
-            data-testid="menu-qr-scanner"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
-              <ScanLine className="h-6 w-6 text-blue-400" />
-            </div>
-            <div className="flex-1">
-              <div className="text-base font-semibold text-white">QR Scanner</div>
-              <div className="text-xs text-white/50">Scan panels and document bundles</div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-blue-400/60" />
-          </button>
-        </Link>
+        {showScan && (
+          <Link href="/mobile/scan">
+            <button
+              className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-blue-500/30 bg-blue-500/10 px-4 text-left active:scale-[0.99] mb-2"
+              data-testid="menu-qr-scanner"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/20">
+                <ScanLine className="h-6 w-6 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <div className="text-base font-semibold text-white">QR Scanner</div>
+                <div className="text-xs text-white/50">Scan panels and document bundles</div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-blue-400/60" />
+            </button>
+          </Link>
+        )}
 
-        <Link href="/mobile/opportunities/new">
-          <button
-            className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-green-500/30 bg-green-500/10 px-4 text-left active:scale-[0.99] mb-2"
-            data-testid="menu-new-opportunity"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
-              <Target className="h-6 w-6 text-green-400" />
-            </div>
-            <div className="flex-1">
-              <div className="text-base font-semibold text-white">New Opportunity</div>
-              <div className="text-xs text-white/50">Quick entry for field sales</div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-green-400/60" />
-          </button>
-        </Link>
+        {showOpportunity && (
+          <Link href="/mobile/opportunities/new">
+            <button
+              className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-green-500/30 bg-green-500/10 px-4 text-left active:scale-[0.99] mb-2"
+              data-testid="menu-new-opportunity"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-green-500/20">
+                <Target className="h-6 w-6 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <div className="text-base font-semibold text-white">New Opportunity</div>
+                <div className="text-xs text-white/50">Quick entry for field sales</div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-green-400/60" />
+            </button>
+          </Link>
+        )}
 
-        <Link href="/mobile/photo-capture">
-          <button
-            className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 text-left active:scale-[0.99] mb-2"
-            data-testid="menu-add-photo"
-          >
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20">
-              <Camera className="h-6 w-6 text-amber-400" />
-            </div>
-            <div className="flex-1">
-              <div className="text-base font-semibold text-white">Add Photo</div>
-              <div className="text-xs text-white/50">Capture and register site photos</div>
-            </div>
-            <ChevronRight className="h-5 w-5 text-amber-400/60" />
-          </button>
-        </Link>
+        {showPhoto && (
+          <Link href="/mobile/photo-capture">
+            <button
+              className="flex h-[72px] w-full items-center gap-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 text-left active:scale-[0.99] mb-2"
+              data-testid="menu-add-photo"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/20">
+                <Camera className="h-6 w-6 text-amber-400" />
+              </div>
+              <div className="flex-1">
+                <div className="text-base font-semibold text-white">Add Photo</div>
+                <div className="text-xs text-white/50">Capture and register site photos</div>
+              </div>
+              <ChevronRight className="h-5 w-5 text-amber-400/60" />
+            </button>
+          </Link>
+        )}
 
-        <MenuItem
-          icon={<ListTodo className="h-5 w-5 text-blue-400" />}
-          iconBg="bg-blue-500/20"
-          label="Tasks"
-          href="/mobile/tasks"
-        />
-        <MenuItem
-          icon={<ClipboardList className="h-5 w-5 text-amber-400" />}
-          iconBg="bg-amber-500/20"
-          label="Panel Register"
-          href="/mobile/panels"
-        />
-        <MenuItem
-          icon={<Truck className="h-5 w-5 text-orange-400" />}
-          iconBg="bg-orange-500/20"
-          label="Logistics"
-          href="/mobile/logistics"
-        />
-        <MenuItem
-          icon={<ShoppingCart className="h-5 w-5 text-fuchsia-400" />}
-          iconBg="bg-fuchsia-500/20"
-          label="Purchase Orders"
-          href="/mobile/purchase-orders"
-        />
-        <MenuItem
-          icon={<FileText className="h-5 w-5 text-indigo-400" />}
-          iconBg="bg-indigo-500/20"
-          label="Weekly Report"
-          href="/mobile/weekly-report"
-        />
-        <MenuItem
-          icon={<Phone className="h-5 w-5 text-violet-400" />}
-          iconBg="bg-violet-500/20"
-          label="PM Call Logs"
-          href="/mobile/pm-call-logs"
-        />
-        <MenuItem
-          icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
-          iconBg="bg-cyan-500/20"
-          label="Documents"
-          href="/mobile/documents"
-        />
-        <MenuItem
-          icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}
-          iconBg="bg-teal-500/20"
-          label="Checklists"
-          href="/mobile/checklists"
-        />
-        <MenuItem
-          icon={<Radio className="h-5 w-5 text-rose-400" />}
-          iconBg="bg-rose-500/20"
-          label="Broadcast"
-          href="/mobile/broadcast"
-        />
+        {showTasks && (
+          <MenuItem
+            icon={<ListTodo className="h-5 w-5 text-blue-400" />}
+            iconBg="bg-blue-500/20"
+            label="Tasks"
+            href="/mobile/tasks"
+          />
+        )}
+        {showPanels && (
+          <MenuItem
+            icon={<ClipboardList className="h-5 w-5 text-amber-400" />}
+            iconBg="bg-amber-500/20"
+            label="Panel Register"
+            href="/mobile/panels"
+          />
+        )}
+        {showLogistics && (
+          <MenuItem
+            icon={<Truck className="h-5 w-5 text-orange-400" />}
+            iconBg="bg-orange-500/20"
+            label="Logistics"
+            href="/mobile/logistics"
+          />
+        )}
+        {showPOs && (
+          <MenuItem
+            icon={<ShoppingCart className="h-5 w-5 text-fuchsia-400" />}
+            iconBg="bg-fuchsia-500/20"
+            label="Purchase Orders"
+            href="/mobile/purchase-orders"
+          />
+        )}
+        {showWeeklyReport && (
+          <MenuItem
+            icon={<FileText className="h-5 w-5 text-indigo-400" />}
+            iconBg="bg-indigo-500/20"
+            label="Weekly Report"
+            href="/mobile/weekly-report"
+          />
+        )}
+        {showPmCallLogs && (
+          <MenuItem
+            icon={<Phone className="h-5 w-5 text-violet-400" />}
+            iconBg="bg-violet-500/20"
+            label="PM Call Logs"
+            href="/mobile/pm-call-logs"
+          />
+        )}
+        {showDocuments && (
+          <MenuItem
+            icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
+            iconBg="bg-cyan-500/20"
+            label="Documents"
+            href="/mobile/documents"
+          />
+        )}
+        {showChecklists && (
+          <MenuItem
+            icon={<ClipboardCheck className="h-5 w-5 text-teal-400" />}
+            iconBg="bg-teal-500/20"
+            label="Checklists"
+            href="/mobile/checklists"
+          />
+        )}
+        {showBroadcast && (
+          <MenuItem
+            icon={<Radio className="h-5 w-5 text-rose-400" />}
+            iconBg="bg-rose-500/20"
+            label="Broadcast"
+            href="/mobile/broadcast"
+          />
+        )}
         
         <div className="pt-4 border-t border-white/10 mt-4">
           <MenuItem
