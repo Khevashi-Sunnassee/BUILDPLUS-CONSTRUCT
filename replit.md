@@ -97,5 +97,18 @@ There are **two separate audit types** in `AUDIT_STANDARDS.md`:
 - **Run all tests:** `npx vitest run`
 - **Test approach:** E2E tests hit the live server at localhost:5000 with actual database writes. Sequential execution prevents login rate limiting.
 
+### Database Migrations & Deployment
+- **Migration system:** Drizzle ORM migrations in `migrations/` directory, auto-applied on app startup via `server/migrate.ts`.
+- **Migration runner:** Executes pending migrations before the app starts serving requests. Uses a dedicated connection pool with 2-minute statement timeout.
+- **Pre-deployment workflow:**
+  1. Make schema changes in `shared/schema.ts`
+  2. Run `bash scripts/generate-migration.sh` (or `npx drizzle-kit generate`) to create a new migration file
+  3. Review the generated SQL in `migrations/`
+  4. Commit the migration file
+  5. Deploy — the app will auto-apply pending migrations on startup
+- **Migration files:** `migrations/0000_nappy_killraven.sql` (initial baseline, 113 tables), `migrations/0001_cool_exiles.sql` (added `website` column to customers)
+- **Safety:** Never use `db:push` in production. Always use the migration workflow above. Migrations are tracked in `drizzle.__drizzle_migrations` table.
+- **Rollback:** Drizzle migrations are forward-only. To revert, create a new migration that undoes the change (e.g., `ALTER TABLE ... DROP COLUMN ...`).
+
 ### Documentation Maintenance Rule
 Any code change touching security, auth, validation, or database schema MUST update `AUDIT_STANDARDS.md` (Known Issues Tracker and Verified Fixes Registry). Stale documentation is a risk.
