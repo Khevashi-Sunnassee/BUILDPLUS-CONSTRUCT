@@ -113,7 +113,7 @@ export default function PmCallLogFormPage() {
   const [notificationEmails, setNotificationEmails] = useState("");
   const [notificationPhone, setNotificationPhone] = useState("");
 
-  const { data: jobs, isLoading: jobsLoading } = useQuery<{ id: string; name: string }[]>({
+  const { data: jobs, isLoading: jobsLoading } = useQuery<{ id: string; name: string; siteContact?: string | null; siteContactPhone?: string | null; primaryContact?: string | null }[]>({
     queryKey: [JOBS_ROUTES.LIST],
   });
 
@@ -145,6 +145,11 @@ export default function PmCallLogFormPage() {
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
     setLevelStatuses([]);
+    const job = jobs?.find((j) => j.id === jobId);
+    if (job) {
+      setContactName(job.siteContact || job.primaryContact || "");
+      setContactPhone(job.siteContactPhone || "");
+    }
   };
 
   const initializeLevelStatuses = () => {
