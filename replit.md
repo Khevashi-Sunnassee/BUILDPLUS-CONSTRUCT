@@ -25,7 +25,7 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 - **Communication:** A Teams-style chat system with direct messages, groups, channels, @mentions, notifications, and file attachments.
 - **Sales & Document Management:** A mobile-first pre-sales opportunity management system with a detailed sales pipeline, and a comprehensive document management system with version control, bundles, and entity linking.
 - **Photo Gallery:** A visual gallery for images from the document register, offering search, filtering, grouping, full-screen viewing, multi-select with email, and download functionalities on both web and mobile.
-- **Mobile Functionality:** QR scanner for panels and document bundles, and mobile panel checklists with conditional fields and system-locked templates.
+- **Mobile Functionality:** QR scanner for panels and document bundles, mobile panel checklists with conditional fields and system-locked templates, and mobile PM Call Logs (list, 5-step wizard form, detail view) at `/mobile/pm-call-logs`.
 - **Advanced Features:** Panel consolidation, contract retention tracking with automated deductions, and visual document comparison with pixel-level overlay and AI summarization.
 - **Landing Page:** A branded landing page for unauthenticated users, routing authenticated users directly to the dashboard.
 - **Asset Register:** Comprehensive asset lifecycle management with over 50 fields, supporting more than 40 asset categories, auto-generated asset tags, depreciation tracking, lease/finance management, insurance tracking, maintenance scheduling, transfer history, and AI-powered asset analysis.

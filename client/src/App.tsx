@@ -105,6 +105,9 @@ const MobileNewOpportunity = lazy(() => import("@/pages/mobile/new-opportunity")
 const MobilePhotoGalleryPage = lazy(() => import("@/pages/mobile/photo-gallery"));
 const MobilePhotoCapturePage = lazy(() => import("@/pages/mobile/photo-capture"));
 const MobileJobDetailPage = lazy(() => import("@/pages/mobile/job-detail"));
+const MobilePmCallLogsPage = lazy(() => import("@/pages/mobile/pm-call-logs"));
+const MobilePmCallLogFormPage = lazy(() => import("@/pages/mobile/pm-call-log-form"));
+const MobilePmCallLogDetailPage = lazy(() => import("@/pages/mobile/pm-call-log-detail"));
 const PhotoGalleryPage = lazy(() => import("@/pages/photo-gallery"));
 const SalesPipelinePage = lazy(() => import("@/pages/sales-pipeline"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
@@ -892,6 +895,21 @@ function Router() {
       <Route path="/mobile/opportunities/new">
         <ProtectedRoute>
           <MobileNewOpportunity />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/pm-call-logs/new">
+        <ProtectedRoute>
+          <MobilePmCallLogFormPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/pm-call-logs/:id">
+        <ProtectedRoute>
+          <MobilePmCallLogDetailPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/pm-call-logs">
+        <ProtectedRoute>
+          <MobilePmCallLogsPage />
         </ProtectedRoute>
       </Route>
 

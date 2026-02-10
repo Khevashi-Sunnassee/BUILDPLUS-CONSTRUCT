@@ -14,6 +14,7 @@ import {
   ListTodo,
   Target,
   Camera,
+  Phone,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -133,6 +134,12 @@ export default function MobileMore() {
           iconBg="bg-indigo-500/20"
           label="Weekly Report"
           href="/mobile/weekly-report"
+        />
+        <MenuItem
+          icon={<Phone className="h-5 w-5 text-violet-400" />}
+          iconBg="bg-violet-500/20"
+          label="PM Call Logs"
+          href="/mobile/pm-call-logs"
         />
         <MenuItem
           icon={<FolderOpen className="h-5 w-5 text-cyan-400" />}
