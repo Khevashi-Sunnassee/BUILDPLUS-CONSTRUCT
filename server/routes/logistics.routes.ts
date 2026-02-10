@@ -61,8 +61,8 @@ router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
     }
     const zone = await storage.createZone(req.body);
     res.json(zone);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create zone" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create zone" });
   }
 });
 
@@ -112,8 +112,8 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
       createdById: req.session.userId!,
     }, panelIds || []);
     res.json(loadList);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create load list" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create load list" });
   }
 });
 
@@ -187,8 +187,8 @@ router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
       }
     }
     res.json(record);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create delivery record" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create delivery record" });
   }
 });
 
@@ -216,8 +216,8 @@ router.get("/api/load-lists/:id/return", requireAuth, async (req, res) => {
   try {
     const loadReturn = await storage.getLoadReturn(req.params.id as string);
     res.json(loadReturn || null);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to get load return" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to get load return" });
   }
 });
 
@@ -260,8 +260,8 @@ router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
     }
 
     res.json(loadReturn);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create load return" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create load return" });
   }
 });
 
@@ -275,8 +275,8 @@ router.post("/api/test-gmail", requireAuth, async (req, res) => {
       `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #1a56db;">LTE Performance Management System</h2><p>This is a test email sent via <strong>Gmail</strong> from the LTE system.</p><p><strong>Sent at:</strong> ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" })}</p><p style="color: #666; font-size: 12px; margin-top: 20px;">This is an automated test message.</p></div>`
     );
     res.json(result);
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ success: false, error: error instanceof Error ? error.message : String(error) });
   }
 });
 

@@ -15,8 +15,8 @@ router.get("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
   try {
     const allCompanies = await storage.getAllCompanies();
     res.json(allCompanies);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch companies" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch companies" });
   }
 });
 
@@ -28,8 +28,8 @@ router.get("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request
       return res.status(404).json({ error: "Company not found" });
     }
     res.json(company);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch company" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch company" });
   }
 });
 
@@ -50,11 +50,11 @@ router.post("/api/admin/companies", requireRole("ADMIN"), async (req, res) => {
       isActive: data.isActive,
     });
     res.status(201).json(company);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", issues: error.issues });
     }
-    res.status(500).json({ error: error.message || "Failed to create company" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create company" });
   }
 });
 
@@ -75,11 +75,11 @@ router.put("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request
       return res.status(404).json({ error: "Company not found" });
     }
     res.json(company);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation error", issues: error.issues });
     }
-    res.status(500).json({ error: error.message || "Failed to update company" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update company" });
   }
 });
 
@@ -95,8 +95,8 @@ router.delete("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Requ
     }
     await storage.deleteCompany(companyId);
     res.json({ ok: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete company" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete company" });
   }
 });
 

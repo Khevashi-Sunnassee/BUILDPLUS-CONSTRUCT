@@ -1,6 +1,6 @@
 # Audit Standards, Scoring Rubric & Issue Tracker
 ## LTE Performance Management System
-### Last Updated: 2026-02-09
+### Last Updated: 2026-02-10
 
 ---
 
@@ -115,7 +115,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 
 | ID | Fix Description | Verification Method | Date Verified |
 |---|---|---|---|
-| VF-001 | TypeScript: 0 compilation errors | `npx tsc --noEmit` returns no errors | 2026-02-08 — **REGRESSED 2026-02-09**: 16 errors in 4 files (hire.routes.ts 7, employee-detail.tsx 6, job-activities.tsx 2, ActivityTasksPanel.tsx 1). See KI-019. |
+| VF-001 | TypeScript: 0 compilation errors | `npx tsc --noEmit` returns no errors | 2026-02-10: 0 errors confirmed. Previously regressed (KI-019), now resolved. |
 | VF-002 | CSRF protection via double-submit cookie | `server/middleware/csrf.ts` exists, imported in `server/routes/index.ts` | 2026-02-08 |
 | VF-003 | Content Security Policy enabled in Helmet | `server/index.ts` has `contentSecurityPolicy: { directives: ... }` (not `false`) | 2026-02-08 |
 | VF-004 | DOMPurify on all dangerouslySetInnerHTML/innerHTML | All `dangerouslySetInnerHTML` and `innerHTML` in client/src use `DOMPurify.sanitize()` | 2026-02-08 |
@@ -158,6 +158,13 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-041 | Hire Booking Engine: hire_bookings table with 9 indexes, Zod safeParse, requireAuth on all routes | `SELECT count(*) FROM pg_indexes WHERE tablename='hire_bookings'` returns 9. `grep -c safeParse server/routes/hire.routes.ts` returns validation. | 2026-02-09 |
 | VF-042 | hire_bookings updated_at trigger added | `SELECT trigger_name FROM information_schema.triggers WHERE event_object_table='hire_bookings' AND trigger_name LIKE 'trg_%'` returns trg_hire_bookings_updated_at | 2026-02-09 |
 | VF-043 | Job audit trail: frontend handles both PHASE_CHANGE and PHASE_CHANGED action strings | `grep "PHASE_CHANGE\|STATUS_CHANGE" client/src/pages/admin/jobs/AuditLogPanel.tsx` shows both variants checked | 2026-02-09 |
+| VF-044 | All catch blocks use `catch (error: unknown)` with type-guarded error access | `grep -c "catch (error: any)" server/routes/*.ts` returns 0 in all files. All error.message access uses `error instanceof Error ? error.message : String(error)` | 2026-02-10 |
+| VF-045 | Dynamic imports for exceljs, jspdf, html2canvas (on-demand loading) | `grep -rn "import ExcelJS\|import jsPDF\|import html2canvas" client/src/pages/` returns 0 static imports. All use `await import()` inside functions | 2026-02-10 |
+| VF-046 | Zod validation on auth login endpoint | `grep safeParse server/routes/auth.routes.ts` shows loginSchema.safeParse on POST /login | 2026-02-10 |
+| VF-047 | contracts.routes.ts fileFilter added to multer upload config | `grep fileFilter server/routes/contracts.routes.ts` returns match | 2026-02-10 |
+| VF-048 | chart.tsx dangerouslySetInnerHTML uses DOMPurify.sanitize() | `grep DOMPurify client/src/components/ui/chart.tsx` shows import and usage | 2026-02-10 |
+| VF-049 | Database indexes: 532 total (up from 450+) | `SELECT count(*) FROM pg_indexes WHERE schemaname='public'` returns 532 | 2026-02-10 |
+| VF-050 | 95 lazy-loaded page routes with Suspense fallback | `grep -c "lazy(" client/src/App.tsx` returns 95 | 2026-02-10 |
 
 ---
 
@@ -186,12 +193,12 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | KI-016 | Missing composite indexes on 3 tables | P2 | FIXED | Database | Composite indexes added: progress_claims(jobId,status), panel_audit_logs(panelId,createdAt), timer_sessions(userId,startedAt). See VF-025 | 2026-02-08 |
 | KI-017 | No form auto-save or unsaved changes warning | P3 | FIXED | Frontend | useUnsavedChanges hook on purchase-order and manual-entry forms. See VF-033 | 2026-02-08 |
 | KI-018 | Some delete operations lack confirmation | P3 | FIXED | Frontend | Verified all cited operations already have AlertDialog confirmations. See VF-034 | 2026-02-08 |
-| KI-019 | 16 TypeScript errors across 4 files | P1 | OPEN | TypeScript | hire.routes.ts (7 overload errors on eq(hireBookings.companyId)), employee-detail.tsx (6 type errors: instrumentId mismatch, missing array methods), job-activities.tsx (2: `.days` not on ActivityWithAssignees), ActivityTasksPanel.tsx (1: missing ASSIGNEE_BY_ID). VF-001 REGRESSED. | 2026-02-09 |
-| KI-020 | 3 large vendor chunks >500KB not code-split | P2 | OPEN | Performance | exceljs.min (937KB), index-DX4FlX7e (729KB), purchase-orders (429KB). Should use dynamic import() or manualChunks. 11 chunks total >100KB. | 2026-02-09 |
-| KI-021 | 425 remaining `: any` type annotations | P2 | OPEN | TypeScript | Catch blocks fixed (357 unknown), but 425 explicit `: any` remain in routes/storage/client code. Target: reduce by 50% per sprint. | 2026-02-09 |
-| KI-022 | chart.tsx dangerouslySetInnerHTML without DOMPurify | P3 | MITIGATED | Security | Uses static theme CSS strings from THEMES constant (not user input). Low risk but inconsistent with VF-004 policy. | 2026-02-09 |
+| KI-019 | 16 TypeScript errors across 4 files | P1 | FIXED | TypeScript | All errors resolved. 0 TS errors as of 2026-02-10. See VF-001 (re-verified), VF-044. | 2026-02-10 |
+| KI-020 | 3 large vendor chunks >500KB not code-split | P2 | MITIGATED | Performance | exceljs/jspdf/html2canvas converted to dynamic import(). 2 chunks remain >500KB (exceljs 937KB as lazy chunk, core index 737KB - framework bundle). See VF-045. | 2026-02-10 |
+| KI-021 | Remaining `: any` type annotations | P2 | MITIGATED | TypeScript | All catch blocks now use `unknown` (VF-044). ~71 remaining `: any` in routes are parameter/type assertions, trending down. | 2026-02-10 |
+| KI-022 | chart.tsx dangerouslySetInnerHTML without DOMPurify | P3 | FIXED | Security | chart.tsx now uses DOMPurify.sanitize(). See VF-048. | 2026-02-10 |
 | KI-023 | No integration/E2E tests for critical workflows | P2 | OPEN | Testing | 219 unit tests cover financial calcs, lifecycle, validation, API routes. No E2E tests for multi-step workflows (panel lifecycle, approval flows, production slot generation). | 2026-02-09 |
-| KI-024 | contracts.routes.ts upload missing fileFilter | P2 | OPEN | Security | contracts.routes.ts multer config has size limit (25MB) but no fileFilter for type checking. Other upload routes (documents, employees, panels) have fileFilter. | 2026-02-09 |
+| KI-024 | contracts.routes.ts upload missing fileFilter | P2 | FIXED | Security | fileFilter added to contracts.routes.ts multer config. See VF-047. | 2026-02-10 |
 
 **Maintenance Rule:** Any code change touching security, auth, validation, or database schema MUST update this tracker and the Verified Fixes Registry. Stale documentation is a risk.
 

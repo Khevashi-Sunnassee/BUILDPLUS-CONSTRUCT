@@ -203,7 +203,7 @@ router.get("/api/production-days", requireAuth, async (req: Request, res: Respon
     
     const productionDaysData = await storage.getProductionDays(startDate, endDate);
     res.json(productionDaysData);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production days");
     res.status(500).json({ error: "Failed to fetch production days" });
   }
@@ -234,8 +234,8 @@ router.post("/api/production-days", requireAuth, async (req: Request, res: Respo
     });
     
     res.json(day);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create production day" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create production day" });
   }
 });
 
@@ -245,7 +245,7 @@ router.delete("/api/production-days/:date", requireRole("MANAGER", "ADMIN"), asy
     const factory = String(req.query.factory || "QLD");
     await storage.deleteProductionDayByDateAndFactory(date, factory);
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting production day");
     res.status(500).json({ error: "Failed to delete production day" });
   }

@@ -19,7 +19,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Calendar, Clock, AlertTriangle, Check, RefreshCw, BookOpen, ListPlus, Eye, History, ChevronDown, ChevronRight, Briefcase, Building2, CalendarDays, Search, Layers, CalendarPlus, CalendarX, Factory as FactoryIcon, LayoutGrid, ChevronLeft, FileDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format, parseISO, differenceInDays, addDays, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, getDay } from "date-fns";
-import jsPDF from "jspdf";
 import type { Job, ProductionSlot, ProductionSlotAdjustment, User, PanelRegister, GlobalSettings, Factory, CfmeuHoliday } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
@@ -274,7 +273,8 @@ function CalendarView({
   }, [days.length, start, end]);
 
   // Vector-based PDF export function
-  const exportCalendarToPDF = useCallback(() => {
+  const exportCalendarToPDF = useCallback(async () => {
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       orientation: "landscape",
       unit: "mm",
@@ -845,7 +845,8 @@ export default function ProductionSlotsPage() {
   };
 
   // Vector-based PDF export for grid view
-  const exportGridToPDF = useCallback(() => {
+  const exportGridToPDF = useCallback(async () => {
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       orientation: "landscape",
       unit: "mm",

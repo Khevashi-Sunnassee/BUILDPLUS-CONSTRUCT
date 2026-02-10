@@ -32,7 +32,6 @@ import {
   ListChecks, BarChart3, TableProperties, Eye, EyeOff, CheckCircle,
   RefreshCw, Link2, Printer,
 } from "lucide-react";
-import jsPDF from "jspdf";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { PROJECT_ACTIVITIES_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
@@ -329,6 +328,7 @@ export default function JobActivitiesPage() {
   const exportActivitiesToPDF = async () => {
     setIsExporting(true);
     try {
+      const { default: jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "mm",

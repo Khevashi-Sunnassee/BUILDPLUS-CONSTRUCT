@@ -39,8 +39,8 @@ router.get("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request, 
   try {
     const types = await storage.getAllPanelTypes();
     res.json(types);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch panel types" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel types" });
   }
 });
 
@@ -59,8 +59,8 @@ router.get("/api/panel-types/admin/cost-summaries", requireRole("ADMIN"), async 
     }
     
     res.json(summaries);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch cost summaries" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch cost summaries" });
   }
 });
 
@@ -69,8 +69,8 @@ router.get("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Reque
     const type = await storage.getPanelType(req.params.id as string);
     if (!type) return res.status(404).json({ error: "Panel type not found" });
     res.json(type);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch panel type" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel type" });
   }
 });
 
@@ -80,8 +80,8 @@ router.post("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request,
     if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const type = await storage.createPanelType(result.data);
     res.json(type);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create panel type" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create panel type" });
   }
 });
 
@@ -92,8 +92,8 @@ router.put("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Reque
     const type = await storage.updatePanelType(req.params.id as string, result.data);
     if (!type) return res.status(404).json({ error: "Panel type not found" });
     res.json(type);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to update panel type" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update panel type" });
   }
 });
 
@@ -101,8 +101,8 @@ router.delete("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Re
   try {
     await storage.deletePanelType(req.params.id as string);
     res.json({ ok: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to delete panel type" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete panel type" });
   }
 });
 
@@ -110,8 +110,8 @@ router.get("/api/panel-types/:id/cost-components", requireAuth, async (req: Requ
   try {
     const components = await storage.getCostComponentsByPanelType(req.params.id as string);
     res.json(components);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch cost components" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch cost components" });
   }
 });
 
@@ -133,8 +133,8 @@ router.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (
       }))
     );
     res.json(inserted);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to update cost components" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update cost components" });
   }
 });
 
@@ -142,8 +142,8 @@ router.get("/api/panel-types", requireAuth, async (req: Request, res: Response) 
   try {
     const types = await storage.getAllPanelTypes();
     res.json(types.filter(t => t.isActive));
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch panel types" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel types" });
   }
 });
 

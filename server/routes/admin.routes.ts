@@ -91,8 +91,8 @@ router.post("/api/admin/work-types", requireRole("ADMIN"), async (req, res) => {
     }
     const workType = await storage.createWorkType(parsed.data);
     res.json(workType);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create work type" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create work type" });
   }
 });
 
@@ -113,8 +113,8 @@ router.put("/api/admin/work-types/:id", requireRole("ADMIN"), async (req, res) =
       return res.status(404).json({ error: "Work type not found" });
     }
     res.json(workType);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to update work type" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update work type" });
   }
 });
 
@@ -212,9 +212,9 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     counts.job_activities = Number(jobActivityCount.count);
     
     res.json(counts);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching data counts");
-    res.status(500).json({ error: error.message || "Failed to fetch data counts" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch data counts" });
   }
 });
 
@@ -372,9 +372,9 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       errors,
       warnings
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error validating deletion");
-    res.status(500).json({ error: error.message || "Failed to validate deletion" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to validate deletion" });
   }
 });
 
@@ -532,9 +532,9 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       success: true,
       deleted: deletedCounts
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error performing deletion");
-    res.status(500).json({ error: error.message || "Failed to delete data" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete data" });
   }
 });
 

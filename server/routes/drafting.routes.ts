@@ -24,9 +24,9 @@ router.get("/api/drafting-program", requireAuth, requirePermission("production_r
     
     const programs = await storage.getDraftingPrograms(Object.keys(filters).length > 0 ? filters : undefined);
     res.json(programs);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting program");
-    res.status(500).json({ error: error.message || "Failed to fetch drafting program" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting program" });
   }
 });
 
@@ -63,9 +63,9 @@ router.get("/api/drafting-program/my-allocated", requireAuth, requirePermission(
         totalEstimatedHours,
       }
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching my allocated panels");
-    res.status(500).json({ error: error.message || "Failed to fetch allocated panels" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch allocated panels" });
   }
 });
 
@@ -74,9 +74,9 @@ router.get("/api/drafting-program/:id", requireAuth, requirePermission("producti
     const program = await storage.getDraftingProgram(String(req.params.id));
     if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
     res.json(program);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting program entry");
-    res.status(500).json({ error: error.message || "Failed to fetch drafting program entry" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch drafting program entry" });
   }
 });
 
@@ -84,9 +84,9 @@ router.post("/api/drafting-program/generate", requireAuth, requirePermission("pr
   try {
     const result = await storage.generateDraftingProgramFromProductionSlots();
     res.json({ success: true, ...result });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error generating drafting program");
-    res.status(500).json({ error: error.message || "Failed to generate drafting program" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to generate drafting program" });
   }
 });
 
@@ -105,9 +105,9 @@ router.post("/api/drafting-program/:id/assign", requireAuth, requirePermission("
     const updated = await storage.assignDraftingResource(String(req.params.id), assignedToId, new Date(proposedStartDate));
     if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error assigning drafting resource");
-    res.status(500).json({ error: error.message || "Failed to assign drafting resource" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to assign drafting resource" });
   }
 });
 
@@ -133,9 +133,9 @@ router.patch("/api/drafting-program/:id", requireAuth, requirePermission("produc
     const updated = await storage.updateDraftingProgram(String(req.params.id), updateData);
     if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating drafting program");
-    res.status(500).json({ error: error.message || "Failed to update drafting program" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update drafting program" });
   }
 });
 
@@ -143,9 +143,9 @@ router.delete("/api/drafting-program/:id", requireAuth, requirePermission("produ
   try {
     await storage.deleteDraftingProgram(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting drafting program entry");
-    res.status(500).json({ error: error.message || "Failed to delete drafting program entry" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete drafting program entry" });
   }
 });
 
@@ -154,9 +154,9 @@ router.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission
     const jobId = String(req.params.jobId);
     const deleted = await storage.deleteDraftingProgramByJob(jobId);
     res.json({ success: true, deleted });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting drafting program entries for job");
-    res.status(500).json({ error: error.message || "Failed to delete drafting program entries" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete drafting program entries" });
   }
 });
 

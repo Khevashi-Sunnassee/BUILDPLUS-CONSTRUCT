@@ -4,8 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "date-fns";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { WEEKLY_REPORTS_ROUTES, SETTINGS_ROUTES, USER_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 import {
   DollarSign,
@@ -382,6 +380,10 @@ export default function WeeklyWageReportsPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         backgroundColor: "#ffffff",

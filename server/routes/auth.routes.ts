@@ -8,12 +8,15 @@ const router = Router();
 
 router.post("/login", async (req, res) => {
   try {
-    const data = loginSchema.parse(req.body);
-    const user = await storage.getUserByEmail(data.email);
+    const result = loginSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: "Invalid input", issues: result.error.issues });
+    }
+    const user = await storage.getUserByEmail(result.data.email);
     if (!user || !user.isActive) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
-    const valid = await storage.validatePassword(user, data.password);
+    const valid = await storage.validatePassword(user, result.data.password);
     if (!valid) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -22,9 +25,6 @@ router.post("/login", async (req, res) => {
     req.session.name = user.name ?? undefined;
     res.json({ user: { ...user, passwordHash: undefined } });
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: "Invalid input", issues: error.issues });
-    }
     res.status(500).json({ error: "Internal server error" });
   }
 });

@@ -92,11 +92,11 @@ router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"),
       fileName: pdfFileName,
       documentId: registeredDoc.id,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "PDF upload error");
     res.status(500).json({
       error: "Failed to upload PDF",
-      details: error.message,
+      details: error instanceof Error ? error.message : String(error),
     });
   }
 });
@@ -120,11 +120,11 @@ router.get("/api/panels/admin/:id/download-pdf", requireRole("ADMIN", "MANAGER")
     res.setHeader("Content-Disposition", `inline; filename="${panel.panelMark}_IFC.pdf"`);
     
     objectFile.createReadStream().pipe(res);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "PDF download error");
     res.status(500).json({
       error: "Failed to download PDF",
-      details: error.message,
+      details: error instanceof Error ? error.message : String(error),
     });
   }
 });
@@ -201,11 +201,11 @@ Return ONLY valid JSON, no explanation text.`
       extracted: extractedData,
       panelId: id,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "PDF analysis error");
     res.status(500).json({ 
       error: "Failed to analyze PDF", 
-      details: error.message 
+      details: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -266,9 +266,9 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
     updatePanelLifecycleStatus(id as string, PANEL_LIFECYCLE_STATUS.PRODUCTION_APPROVED, "Approved for production", userId, { loadWidth, loadHeight, panelThickness, panelVolume, panelMass });
     
     res.json({ success: true, panel: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Approval error");
-    res.status(500).json({ error: "Failed to approve panel", details: error.message });
+    res.status(500).json({ error: "Failed to approve panel", details: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -286,9 +286,9 @@ router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MAN
     updatePanelLifecycleStatus(id as string, PANEL_LIFECYCLE_STATUS.REGISTERED, "Production approval revoked", req.session.userId);
     
     res.json({ success: true, panel: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Revoke error");
-    res.status(500).json({ error: "Failed to revoke approval", details: error.message });
+    res.status(500).json({ error: "Failed to revoke approval", details: error instanceof Error ? error.message : String(error) });
   }
 });
 

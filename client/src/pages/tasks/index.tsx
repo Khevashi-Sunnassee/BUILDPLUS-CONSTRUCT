@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import jsPDF from "jspdf";
 import {
   DndContext,
   DragEndEvent,
@@ -216,6 +215,7 @@ export default function TasksPage() {
   const exportToPDF = async () => {
     setIsExporting(true);
     try {
+      const { default: jsPDF } = await import("jspdf");
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "mm",

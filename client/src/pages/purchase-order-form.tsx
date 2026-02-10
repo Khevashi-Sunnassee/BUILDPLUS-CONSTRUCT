@@ -7,7 +7,6 @@ import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format, parseISO, addDays } from "date-fns";
-import jsPDF from "jspdf";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -612,6 +611,7 @@ export default function PurchaseOrderFormPage() {
   const handlePrint = useCallback(async () => {
     if (!existingPO) return;
     
+    const { default: jsPDF } = await import("jspdf");
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",

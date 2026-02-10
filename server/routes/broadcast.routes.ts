@@ -15,8 +15,8 @@ router.get("/api/broadcast-templates", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "No company context" });
     const templates = await storage.getBroadcastTemplates(companyId);
     res.json(templates);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -26,8 +26,8 @@ router.get("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
     const template = await storage.getBroadcastTemplate(id);
     if (!template) return res.status(404).json({ error: "Template not found" });
     res.json(template);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -42,8 +42,8 @@ router.post("/api/broadcast-templates", requireAuth, async (req, res) => {
     });
     const template = await storage.createBroadcastTemplate(data);
     res.status(201).json(template);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -61,8 +61,8 @@ router.patch("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
     const template = await storage.updateBroadcastTemplate(id, parsed.data);
     if (!template) return res.status(404).json({ error: "Template not found" });
     res.json(template);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -75,8 +75,8 @@ router.delete("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
     }
     await storage.deleteBroadcastTemplate(String(req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -86,8 +86,8 @@ router.get("/api/broadcasts", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "No company context" });
     const messages = await storage.getBroadcastMessages(companyId);
     res.json(messages);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -95,8 +95,8 @@ router.get("/api/broadcasts/channels-status", requireAuth, async (_req, res) => 
   try {
     const status = broadcastService.getChannelStatus();
     res.json(status);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -105,8 +105,8 @@ router.get("/api/broadcasts/:id", requireAuth, async (req, res) => {
     const message = await storage.getBroadcastMessage(String(req.params.id));
     if (!message) return res.status(404).json({ error: "Broadcast not found" });
     res.json(message);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -114,8 +114,8 @@ router.get("/api/broadcasts/:id/deliveries", requireAuth, async (req, res) => {
   try {
     const deliveries = await storage.getBroadcastDeliveries(String(req.params.id));
     res.json(deliveries);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -129,8 +129,8 @@ router.post("/api/broadcasts/deliveries/:deliveryId/resend", requireAuth, async 
       return res.status(400).json({ error: result.error });
     }
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -219,9 +219,9 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
         type: "employee" as const,
       })),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ error }, "Failed to fetch broadcast recipients");
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 
@@ -258,8 +258,8 @@ router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
     });
 
     res.status(201).json(broadcastMessage);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : String(error) });
   }
 });
 

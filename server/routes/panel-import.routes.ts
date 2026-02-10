@@ -278,8 +278,8 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
       logPanelChange(panelId, "Panel imported from estimate", req.session.userId, { changedFields: { source: "estimate_import" }, newLifecycleStatus: 0 });
     }
     res.json(result);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Import failed" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Import failed" });
   }
 });
 
@@ -956,9 +956,9 @@ router.post("/api/jobs/:jobId/import-estimate",
         success: true, totals, sheets: results,
         errors: importErrors.length > 0 ? importErrors.slice(0, 10) : undefined,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error({ err: error }, "Estimate import error");
-      res.status(500).json({ error: error.message || "Failed to import estimate" });
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to import estimate" });
     }
   }
 );

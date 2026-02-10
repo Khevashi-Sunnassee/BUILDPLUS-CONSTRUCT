@@ -175,11 +175,11 @@ router.post("/api/admin/users", requireRole("ADMIN"), async (req, res) => {
     const userData = { ...validated, companyId: req.companyId };
     const user = await storage.createUser(userData);
     res.json({ ...user, passwordHash: undefined });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error.message || "Failed to create user" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create user" });
   }
 });
 
@@ -220,11 +220,11 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
     }
     const user = await storage.updateUser(req.params.id as string, updateData);
     res.json({ ...user, passwordHash: undefined });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error.message || "Failed to update user" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update user" });
   }
 });
 
@@ -348,8 +348,8 @@ router.get("/api/admin/departments", requireRole("ADMIN"), async (req, res) => {
   try {
     const departments = await storage.getDepartmentsByCompany(req.companyId!);
     res.json(departments);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to fetch departments" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch departments" });
   }
 });
 
@@ -365,11 +365,11 @@ router.post("/api/admin/departments", requireRole("ADMIN"), async (req, res) => 
     const validated = parseResult.data;
     const department = await storage.createDepartment({ ...validated, companyId: req.companyId });
     res.json(department);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error.message || "Failed to create department" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create department" });
   }
 });
 
@@ -387,11 +387,11 @@ router.put("/api/admin/departments/:id", requireRole("ADMIN"), async (req, res) 
     const validated = parseResult.data;
     const department = await storage.updateDepartment(id, validated);
     res.json(department);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Validation failed", details: error.errors });
     }
-    res.status(400).json({ error: error.message || "Failed to update department" });
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update department" });
   }
 });
 
@@ -404,8 +404,8 @@ router.delete("/api/admin/departments/:id", requireRole("ADMIN"), async (req, re
     }
     await storage.deleteDepartment(id);
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to delete department" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to delete department" });
   }
 });
 

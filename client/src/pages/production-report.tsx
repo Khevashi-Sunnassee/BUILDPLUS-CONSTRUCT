@@ -2,8 +2,6 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfQuarter, endOfQuarter } from "date-fns";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Calendar,
@@ -314,6 +312,10 @@ export default function ProductionReportPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,

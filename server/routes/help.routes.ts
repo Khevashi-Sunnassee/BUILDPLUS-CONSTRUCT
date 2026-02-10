@@ -45,7 +45,7 @@ router.get("/api/help", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Help entry not found" });
     }
     res.json(entry);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error fetching help entry:", error);
     res.status(500).json({ error: "Failed to fetch help entry" });
   }
@@ -88,7 +88,7 @@ router.get("/api/help/search", requireAuth, async (req: Request, res: Response) 
       .limit(Number(limit));
 
     res.json(results);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error searching help:", error);
     res.status(500).json({ error: "Failed to search help entries" });
   }
@@ -102,7 +102,7 @@ router.get("/api/help/categories", requireAuth, async (_req: Request, res: Respo
       .where(and(eq(helpEntries.status, "PUBLISHED"), sql`${helpEntries.category} IS NOT NULL`))
       .orderBy(asc(helpEntries.category));
     res.json(cats.map((c) => c.category).filter(Boolean));
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch categories" });
   }
 });
@@ -116,7 +116,7 @@ router.get("/api/help/recent", requireAuth, async (_req: Request, res: Response)
       .orderBy(desc(helpEntries.updatedAt))
       .limit(10);
     res.json(recent);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch recent help" });
   }
 });
@@ -140,7 +140,7 @@ router.post("/api/help/feedback", requireAuth, async (req: Request, res: Respons
       })
       .returning();
     res.json(feedback);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error saving help feedback:", error);
     res.status(500).json({ error: "Failed to save feedback" });
   }
@@ -153,7 +153,7 @@ router.get("/api/help/admin/list", requireAuth, requireRole("ADMIN"), async (_re
       .from(helpEntries)
       .orderBy(asc(helpEntries.category), asc(helpEntries.key));
     res.json(all);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to list help entries" });
   }
 });
@@ -191,7 +191,7 @@ router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Re
       } as any)
       .returning();
     res.json(entry);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error creating help entry:", error);
     res.status(500).json({ error: "Failed to create help entry" });
   }
@@ -239,7 +239,7 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
       .where(eq(helpEntries.id, id))
       .returning();
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error updating help entry:", error);
     res.status(500).json({ error: "Failed to update help entry" });
   }
@@ -257,7 +257,7 @@ router.delete("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (r
       return res.status(404).json({ error: "Help entry not found" });
     }
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to archive help entry" });
   }
 });
@@ -271,7 +271,7 @@ router.get("/api/help/admin/:id/versions", requireAuth, requireRole("ADMIN"), as
       .where(eq(helpEntryVersions.helpEntryId, id))
       .orderBy(desc(helpEntryVersions.version));
     res.json(versions);
-  } catch (error: any) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Failed to fetch versions" });
   }
 });

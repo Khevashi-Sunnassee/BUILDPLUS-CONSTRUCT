@@ -37,7 +37,7 @@ router.get("/api/reo-schedules/ifc-panels", requireAuth, async (req: Request, re
     }
     
     res.json(results);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching IFC panels for procurement");
     res.status(500).json({ message: "Failed to fetch IFC panels" });
   }
@@ -52,7 +52,7 @@ router.get("/api/reo-schedules", requireAuth, async (req: Request, res: Response
 
     const schedules = await storage.getReoSchedulesByCompany(companyId);
     res.json(schedules);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching reo schedules");
     res.status(500).json({ message: "Failed to fetch reo schedules" });
   }
@@ -73,7 +73,7 @@ router.get("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Resp
     }
 
     res.json(schedule);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching reo schedule");
     res.status(500).json({ message: "Failed to fetch reo schedule" });
   }
@@ -95,7 +95,7 @@ router.get("/api/reo-schedules/panel/:panelId", requireAuth, async (req: Request
 
     const scheduleWithDetails = await storage.getReoScheduleWithDetails(schedule.id);
     res.json(scheduleWithDetails);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching reo schedule by panel");
     res.status(500).json({ message: "Failed to fetch reo schedule" });
   }
@@ -118,7 +118,7 @@ router.post("/api/reo-schedules", requireAuth, async (req: Request, res: Respons
 
     const schedule = await storage.createReoSchedule(data);
     res.status(201).json(schedule);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
@@ -146,7 +146,7 @@ router.patch("/api/reo-schedules/:id", requireAuth, async (req: Request, res: Re
 
     const updated = await storage.updateReoSchedule(id, parsed.data);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating reo schedule");
     res.status(500).json({ message: "Failed to update reo schedule" });
   }
@@ -168,7 +168,7 @@ router.get("/api/reo-schedules/:scheduleId/items", requireAuth, async (req: Requ
 
     const items = await storage.getReoScheduleItems(scheduleId);
     res.json(items);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching reo schedule items");
     res.status(500).json({ message: "Failed to fetch reo schedule items" });
   }
@@ -195,7 +195,7 @@ router.post("/api/reo-schedules/:scheduleId/items", requireAuth, async (req: Req
 
     const item = await storage.createReoScheduleItem(data);
     res.status(201).json(item);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
@@ -228,7 +228,7 @@ router.patch("/api/reo-schedules/:scheduleId/items/:itemId", requireAuth, async 
     }
 
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating reo schedule item");
     res.status(500).json({ message: "Failed to update reo schedule item" });
   }
@@ -251,7 +251,7 @@ router.delete("/api/reo-schedules/:scheduleId/items/:itemId", requireAuth, async
 
     await storage.deleteReoScheduleItem(itemId);
     res.status(204).send();
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting reo schedule item");
     res.status(500).json({ message: "Failed to delete reo schedule item" });
   }
@@ -282,7 +282,7 @@ router.post("/api/reo-schedules/:scheduleId/items/bulk-status", requireAuth, asy
 
     const updated = await storage.updateReoScheduleItemsStatus(scheduleId, itemIds, status);
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating reo schedule items status");
     res.status(500).json({ message: "Failed to update reo schedule items status" });
   }
@@ -362,7 +362,7 @@ router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: R
       itemsCreated: createdItems.length,
       items: createdItems,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error during AI processing");
     res.status(500).json({ message: "Failed to process with AI" });
   }
@@ -426,7 +426,7 @@ router.post("/api/reo-schedules/:scheduleId/create-po", requireAuth, async (req:
       purchaseOrder: po,
       itemsLinked: approvedItems.length,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating PO from reo schedule");
     res.status(500).json({ message: "Failed to create purchase order" });
   }

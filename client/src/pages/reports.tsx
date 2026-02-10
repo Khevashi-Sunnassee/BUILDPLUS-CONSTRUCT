@@ -17,8 +17,6 @@ import {
   FileDown,
   Loader2,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -212,6 +210,10 @@ export default function ReportsPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,

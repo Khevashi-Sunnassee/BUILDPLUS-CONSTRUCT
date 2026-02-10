@@ -78,9 +78,9 @@ router.get("/api/production-schedule/stats", requireAuth, requirePermission("pro
     }
 
     res.json(stats);
-  } catch (error: any) {
-    logger.error(`Error fetching production schedule stats: ${error.message}`);
-    res.status(500).json({ error: error.message || "Failed to fetch stats" });
+  } catch (error: unknown) {
+    logger.error(`Error fetching production schedule stats: ${error instanceof Error ? error.message : String(error)}`);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch stats" });
   }
 });
 
@@ -189,9 +189,9 @@ router.get("/api/production-schedule/ready-panels", requireAuth, requirePermissi
     });
 
     res.json(readyPanels);
-  } catch (error: any) {
-    logger.error(`Error fetching ready panels: ${error.message}`);
-    res.status(500).json({ error: error.message || "Failed to fetch ready panels" });
+  } catch (error: unknown) {
+    logger.error(`Error fetching ready panels: ${error instanceof Error ? error.message : String(error)}`);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch ready panels" });
   }
 });
 
@@ -265,9 +265,9 @@ router.get("/api/production-schedule/days", requireAuth, requirePermission("prod
     const days = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
     res.json(days);
-  } catch (error: any) {
-    logger.error(`Error fetching production days: ${error.message}`);
-    res.status(500).json({ error: error.message || "Failed to fetch production days" });
+  } catch (error: unknown) {
+    logger.error(`Error fetching production days: ${error instanceof Error ? error.message : String(error)}`);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch production days" });
   }
 });
 
@@ -336,9 +336,9 @@ router.post("/api/production-schedule/add-panels", requireAuth, requirePermissio
       created: created.length,
       errors: errors.length > 0 ? errors : undefined,
     });
-  } catch (error: any) {
-    logger.error(`Error adding panels to production: ${error.message}`);
-    res.status(500).json({ error: error.message || "Failed to add panels" });
+  } catch (error: unknown) {
+    logger.error(`Error adding panels to production: ${error instanceof Error ? error.message : String(error)}`);
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to add panels" });
   }
 });
 

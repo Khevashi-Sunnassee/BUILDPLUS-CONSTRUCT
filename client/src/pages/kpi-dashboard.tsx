@@ -43,8 +43,6 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
@@ -393,6 +391,10 @@ export default function KPIDashboardPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,

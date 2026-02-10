@@ -4,8 +4,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { LOGISTICS_ROUTES, ADMIN_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, SETTINGS_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import {
   Truck,
@@ -634,6 +632,10 @@ export default function LogisticsPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,

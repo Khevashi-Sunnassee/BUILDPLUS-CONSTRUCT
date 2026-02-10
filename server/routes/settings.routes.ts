@@ -47,8 +47,8 @@ router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
     });
   }
   res.json(settings);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to load settings" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load settings" });
   }
 });
 
@@ -75,8 +75,8 @@ router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
     }
     const settings = await storage.updateGlobalSettings(body);
     res.json(settings);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to update settings" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update settings" });
   }
 });
 
@@ -92,8 +92,8 @@ router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) =
     }
     const settings = await storage.updateGlobalSettings({ logoBase64: logoBase64 || null });
     res.json({ success: true, logoBase64: settings.logoBase64 });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to upload logo" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to upload logo" });
   }
 });
 
@@ -106,8 +106,8 @@ router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req
     const { companyName } = result.data;
     const settings = await storage.updateGlobalSettings({ companyName });
     res.json({ success: true, companyName: settings.companyName });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to save company name" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save company name" });
   }
 });
 
@@ -118,8 +118,8 @@ router.get("/api/settings/logo", async (req, res) => {
       logoBase64: settings?.logoBase64 || null,
       companyName: settings?.companyName || "LTE Precast Concrete Structures"
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to load logo" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load logo" });
   }
 });
 
@@ -130,8 +130,8 @@ router.get("/api/settings/po-terms", requireAuth, async (req, res) => {
       poTermsHtml: settings?.poTermsHtml || "",
       includePOTerms: settings?.includePOTerms || false,
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || "Failed to load PO terms" });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load PO terms" });
   }
 });
 
@@ -161,8 +161,8 @@ router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
     });
     const settings = await storage.updateGlobalSettings({ poTermsHtml: cleanHtml });
     res.json({ success: true, poTermsHtml: settings.poTermsHtml });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to save PO terms" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to save PO terms" });
   }
 });
 

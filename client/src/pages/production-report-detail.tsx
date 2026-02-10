@@ -6,8 +6,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
 import { useRoute, useLocation } from "wouter";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { PRODUCTION_ROUTES, ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import {
   Factory,
@@ -445,6 +443,10 @@ export default function ProductionReportDetailPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,

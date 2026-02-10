@@ -2,7 +2,6 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import DOMPurify from "dompurify";
-import jsPDF from "jspdf";
 import * as pdfjsLib from "pdfjs-dist";
 import { format, parseISO } from "date-fns";
 
@@ -150,13 +149,14 @@ function htmlToPlainTextLines(html: string): string[] {
   return text.split("\n").filter((line) => line.trim() !== "");
 }
 
-function generatePoPdf(
+async function generatePoPdf(
   po: PurchaseOrderWithDetails,
   lineItems: PurchaseOrderItem[],
   settings?: { logoBase64: string | null; companyName: string } | null,
   compressedLogo?: string | null,
   poTermsData?: { poTermsHtml: string; includePOTerms: boolean } | null
-): jsPDF {
+) {
+  const { default: jsPDF } = await import("jspdf");
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
@@ -556,7 +556,7 @@ function SendPOEmailDialog({ open, onOpenChange, po }: SendPOEmailDialogProps) {
           if (settings?.logoBase64) {
             compressedLogo = await compressLogoForPdf(settings.logoBase64);
           }
-          const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
+          const pdf = await generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
           const base64String = pdf.output("datauristring").split(",")[1] || "";
           setPdfBase64(base64String);
 
@@ -934,7 +934,7 @@ export default function PurchaseOrdersPage() {
       if (settings?.logoBase64) {
         compressedLogo = await compressLogoForPdf(settings.logoBase64);
       }
-      const pdf = generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
+      const pdf = await generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
       pdf.autoPrint();
       const pdfDataUri = pdf.output("dataurlnewwindow");
       if (!pdfDataUri) {

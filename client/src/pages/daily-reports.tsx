@@ -3,8 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import {
   Calendar,
   ChevronRight,
@@ -390,6 +388,10 @@ export default function DailyReportsPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,

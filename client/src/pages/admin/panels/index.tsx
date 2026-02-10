@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, Fragment, useCallback, useMemo } from "rea
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import ExcelJS from "exceljs";
 import {
   ClipboardList,
   Plus,
@@ -902,6 +901,7 @@ export default function AdminPanelsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     const arrayBuffer = await file.arrayBuffer();
+    const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
     const worksheet = workbook.worksheets[0];
@@ -929,6 +929,7 @@ export default function AdminPanelsPage() {
   };
 
   const downloadTemplate = async () => {
+    const ExcelJS = (await import("exceljs")).default;
     if (!jobs || jobs.length === 0) {
       toast({
         title: "No Jobs in System",

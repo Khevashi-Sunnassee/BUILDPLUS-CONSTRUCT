@@ -160,9 +160,9 @@ router.get("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const allFactories = await db.select().from(factories).where(eq(factories.companyId, companyId)).orderBy(factories.name);
     res.json(allFactories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factories");
-    res.status(500).json({ error: error.message || "Failed to fetch factories" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch factories" });
   }
 });
 
@@ -172,9 +172,9 @@ router.get("/api/factories", requireAuth, async (req, res) => {
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const activeFactories = await db.select().from(factories).where(and(eq(factories.companyId, companyId), eq(factories.isActive, true))).orderBy(factories.name);
     res.json(activeFactories);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factories");
-    res.status(500).json({ error: error.message || "Failed to fetch factories" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch factories" });
   }
 });
 
@@ -188,9 +188,9 @@ router.get("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) =>
     }
     const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, factoryId)).orderBy(productionBeds.name);
     res.json({ ...factory[0], beds });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching factory");
-    res.status(500).json({ error: error.message || "Failed to fetch factory" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch factory" });
   }
 });
 
@@ -201,9 +201,9 @@ router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
     const parsed = insertFactorySchema.parse({ ...req.body, companyId });
     const [created] = await db.insert(factories).values(parsed).returning();
     res.json(created);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating factory");
-    res.status(500).json({ error: error.message || "Failed to create factory" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create factory" });
   }
 });
 
@@ -224,9 +224,9 @@ router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) 
       return res.status(404).json({ error: "Factory not found" });
     }
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating factory");
-    res.status(500).json({ error: error.message || "Failed to update factory" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update factory" });
   }
 });
 
@@ -238,9 +238,9 @@ router.delete("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res)
       return res.status(404).json({ error: "Factory not found" });
     }
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting factory");
-    res.status(500).json({ error: error.message || "Failed to delete factory" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete factory" });
   }
 });
 
@@ -251,9 +251,9 @@ router.get("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async (
     if (factory.length === 0) return res.status(404).json({ error: "Factory not found" });
     const beds = await db.select().from(productionBeds).where(eq(productionBeds.factoryId, String(req.params.factoryId))).orderBy(productionBeds.name);
     res.json(beds);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production beds");
-    res.status(500).json({ error: error.message || "Failed to fetch production beds" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch production beds" });
   }
 });
 
@@ -265,9 +265,9 @@ router.post("/api/admin/factories/:factoryId/beds", requireRole("ADMIN"), async 
     const parsed = insertProductionBedSchema.parse({ ...req.body, factoryId: String(req.params.factoryId) });
     const [created] = await db.insert(productionBeds).values(parsed).returning();
     res.json(created);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error creating production bed");
-    res.status(500).json({ error: error.message || "Failed to create production bed" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create production bed" });
   }
 });
 
@@ -288,9 +288,9 @@ router.patch("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN")
       return res.status(404).json({ error: "Production bed not found" });
     }
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating production bed");
-    res.status(500).json({ error: error.message || "Failed to update production bed" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update production bed" });
   }
 });
 
@@ -306,9 +306,9 @@ router.delete("/api/admin/factories/:factoryId/beds/:bedId", requireRole("ADMIN"
       return res.status(404).json({ error: "Production bed not found" });
     }
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting production bed");
-    res.status(500).json({ error: error.message || "Failed to delete production bed" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete production bed" });
   }
 });
 
@@ -338,9 +338,9 @@ router.get("/api/cfmeu-holidays", requireAuth, async (req, res) => {
       .limit(safeLimit);
     
     res.json(holidays);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching CFMEU holidays");
-    res.status(500).json({ error: error.message || "Failed to fetch holidays" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch holidays" });
   }
 });
 
@@ -361,9 +361,9 @@ router.get("/api/admin/cfmeu-calendars", requireRole("ADMIN"), async (req, res) 
     }
 
     res.json({ holidays, summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching CFMEU calendars");
-    res.status(500).json({ error: error.message || "Failed to fetch calendars" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch calendars" });
   }
 });
 
@@ -397,9 +397,9 @@ router.post("/api/admin/cfmeu-calendars/sync", requireRole("ADMIN"), async (req,
       skipped: totalSkipped,
       message: `Synced ${calendarType} calendar: ${totalImported} holidays imported`
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error syncing CFMEU calendar");
-    res.status(500).json({ error: error.message || "Failed to sync calendar" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to sync calendar" });
   }
 });
 
@@ -432,9 +432,9 @@ router.post("/api/admin/cfmeu-calendars/sync-all", requireRole("ADMIN"), async (
     }
 
     res.json({ success: true, results });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error syncing all CFMEU calendars");
-    res.status(500).json({ error: error.message || "Failed to sync calendars" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to sync calendars" });
   }
 });
 
@@ -448,9 +448,9 @@ router.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), 
   try {
     const result = await db.delete(cfmeuHolidays).where(eq(cfmeuHolidays.calendarType, calendarType as CfmeuCalendarType));
     res.json({ success: true, deleted: result.rowCount || 0 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting CFMEU calendar");
-    res.status(500).json({ error: error.message || "Failed to delete calendar" });
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete calendar" });
   }
 });
 

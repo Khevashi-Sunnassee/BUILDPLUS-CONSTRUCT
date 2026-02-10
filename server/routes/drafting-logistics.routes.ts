@@ -326,7 +326,7 @@ router.get("/api/reports/logistics", requireAuth, async (req, res) => {
       totals,
       phaseAverages,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Logistics report error");
     res.status(500).json({ error: "Failed to generate logistics report" });
   }

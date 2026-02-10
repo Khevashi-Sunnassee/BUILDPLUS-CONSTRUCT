@@ -3,8 +3,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { format } from "date-fns";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import {
   ArrowLeft,
   Calendar,
@@ -215,6 +213,10 @@ export default function DailyReportDetailPage() {
     
     setIsExporting(true);
     try {
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import("html2canvas"),
+        import("jspdf"),
+      ]);
       const canvas = await html2canvas(reportRef.current, {
         scale: 2,
         useCORS: true,
@@ -229,13 +231,11 @@ export default function DailyReportDetailPage() {
             clonedElement.style.backgroundColor = "#ffffff";
             clonedElement.style.color = "#000000";
           }
-          // Hide elements marked with data-pdf-hide
           clonedDoc.querySelectorAll("[data-pdf-hide]").forEach((el) => {
             if (el instanceof HTMLElement) {
               el.style.display = "none";
             }
           });
-          // Remove all grey/dark backgrounds
           clonedDoc.querySelectorAll("*").forEach((el) => {
             if (el instanceof HTMLElement) {
               el.style.backgroundColor = "transparent";

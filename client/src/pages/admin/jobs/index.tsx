@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, Fragment, useMemo, useCallback } from "rea
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import ExcelJS from "exceljs";
 import {
   Briefcase,
   Plus,
@@ -593,6 +592,7 @@ export default function AdminJobsPage() {
     if (!file) return;
 
     const arrayBuffer = await file.arrayBuffer();
+    const ExcelJS = (await import("exceljs")).default;
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
     const worksheet = workbook.worksheets[0];
@@ -618,6 +618,7 @@ export default function AdminJobsPage() {
   };
 
   const downloadTemplate = async () => {
+    const ExcelJS = (await import("exceljs")).default;
     const template = [
       { 
         "Job Number": "JOB001", 

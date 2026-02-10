@@ -96,8 +96,8 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
     };
     const entry = await storage.createProductionEntry(entryData);
     res.json(entry);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to create production entry" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create production entry" });
   }
 });
 
@@ -142,8 +142,8 @@ router.put("/api/production-entries/:id", requireAuth, requirePermission("produc
     
     const entry = await storage.updateProductionEntry(String(req.params.id), { ...entryFields, panelId, status });
     res.json(entry);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to update production entry" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to update production entry" });
   }
 });
 
@@ -161,8 +161,8 @@ router.delete("/api/production-entries/:id", requireAuth, requirePermission("pro
     
     await storage.deleteProductionEntry(entryId);
     res.json({ ok: true });
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to delete production entry" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to delete production entry" });
   }
 });
 
@@ -244,8 +244,8 @@ router.get("/api/production-slots/:slotId/panel-entries", requireAuth, requirePe
     }
     
     res.json(entries);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to fetch panel entries" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to fetch panel entries" });
   }
 });
 
@@ -342,8 +342,8 @@ router.post("/api/production-slots/:slotId/assign-panels", requireAuth, requireP
     }
 
     res.json(results);
-  } catch (error: any) {
-    res.status(400).json({ error: error.message || "Failed to assign panels" });
+  } catch (error: unknown) {
+    res.status(400).json({ error: error instanceof Error ? error.message : "Failed to assign panels" });
   }
 });
 
