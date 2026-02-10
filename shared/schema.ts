@@ -1836,17 +1836,30 @@ export const userChatSettings = pgTable("user_chat_settings", {
   popupIdx: index("user_chat_settings_popup_idx").on(table.popupEnabled),
 }));
 
+export const chatTopics = pgTable("chat_topics", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdById: varchar("created_by_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+}, (table) => ({
+  companyIdx: index("chat_topics_company_idx").on(table.companyId),
+}));
+
 export const conversations = pgTable("conversations", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   type: conversationTypeEnum("type").notNull(),
   name: text("name"),
+  topicId: varchar("topic_id", { length: 36 }).references(() => chatTopics.id, { onDelete: "set null" }),
   jobId: varchar("job_id", { length: 36 }).references(() => jobs.id, { onDelete: "set null" }),
   panelId: varchar("panel_id", { length: 36 }).references(() => panelRegister.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   typeIdx: index("conversations_type_idx").on(table.type),
+  topicIdx: index("conversations_topic_idx").on(table.topicId),
   jobIdx: index("conversations_job_idx").on(table.jobId),
   panelIdx: index("conversations_panel_idx").on(table.panelId),
   companyIdx: index("conversations_company_idx").on(table.companyId),
@@ -1929,6 +1942,10 @@ export const chatNotifications = pgTable("chat_notifications", {
 }));
 
 // Chat Insert Schemas and Types
+export const insertChatTopicSchema = createInsertSchema(chatTopics).omit({ id: true, createdAt: true });
+export type InsertChatTopic = z.infer<typeof insertChatTopicSchema>;
+export type ChatTopic = typeof chatTopics.$inferSelect;
+
 export const insertConversationSchema = createInsertSchema(conversations).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type Conversation = typeof conversations.$inferSelect;
