@@ -825,3 +825,14 @@ export const ONBOARDING_ROUTES = {
 } as const;
 export type OnboardingRoutes = typeof ONBOARDING_ROUTES;
 export type HireRoutes = typeof HIRE_ROUTES;
+
+// ============================================================================
+// PM CALL LOGS
+// ============================================================================
+export const PM_CALL_LOGS_ROUTES = {
+  LIST: '/api/pm-call-logs',
+  BY_ID: (id: string | number) => `/api/pm-call-logs/${id}`,
+  LEVELS: (id: string | number) => `/api/pm-call-logs/${id}/levels`,
+  JOB_UPCOMING_LEVELS: (jobId: string | number) => `/api/pm-call-logs/job/${jobId}/upcoming-levels`,
+} as const;
+export type PmCallLogsRoutes = typeof PM_CALL_LOGS_ROUTES;

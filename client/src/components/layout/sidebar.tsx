@@ -59,6 +59,7 @@ import {
   Tag,
   Wrench,
   Workflow,
+  Phone,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -103,6 +104,7 @@ const productionNavItems = [
   { title: "Drafting Program", url: "/drafting-program", icon: Clock },
   { title: "Drafting Register", url: "/daily-reports", icon: FileText },
   { title: "Reo Scheduling", url: "/procurement-reo", icon: Layers },
+  { title: "PM Call Logs", url: "/pm-call-logs", icon: Phone },
   { title: "Logistics", url: "/logistics", icon: Truck },
 ];
 
@@ -154,6 +156,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/production-slots": "production_report",
   "/production-schedule": "production_report",
   "/drafting-program": "production_report",
+  "/pm-call-logs": "production_report",
   "/logistics": "logistics",
   "/weekly-wages": "weekly_wages",
   "/weekly-job-logs": "weekly_job_logs",

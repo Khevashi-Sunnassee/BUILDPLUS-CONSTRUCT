@@ -3623,3 +3623,65 @@ export type InsertJobActivityFile = z.infer<typeof insertJobActivityFileSchema>;
 export type JobActivityFile = typeof jobActivityFiles.$inferSelect;
 
 export type ActivityStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD" | "SKIPPED";
+
+// ============================================================================
+// PM CALL LOGS
+// ============================================================================
+export const callLogLevelStatusEnum = pgEnum("call_log_level_status", ["ON_TIME", "LATE"]);
+
+export const pmCallLogs = pgTable("pm_call_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  contactName: text("contact_name").notNull(),
+  contactPhone: text("contact_phone"),
+  callDateTime: timestamp("call_date_time").notNull(),
+  deliveryTime: text("delivery_time"),
+  nextDeliveryDate: timestamp("next_delivery_date"),
+  draftingConcerns: text("drafting_concerns"),
+  clientDesignChanges: text("client_design_changes"),
+  issuesReported: text("issues_reported"),
+  installationProblems: text("installation_problems"),
+  notes: text("notes"),
+  notifyManager: boolean("notify_manager").default(false).notNull(),
+  notifyClient: boolean("notify_client").default(false).notNull(),
+  notifyProduction: boolean("notify_production").default(false).notNull(),
+  updateProductionSchedule: boolean("update_production_schedule").default(false).notNull(),
+  updateDraftingSchedule: boolean("update_drafting_schedule").default(false).notNull(),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdIdx: index("pm_call_logs_job_id_idx").on(table.jobId),
+  companyIdIdx: index("pm_call_logs_company_id_idx").on(table.companyId),
+  createdByIdx: index("pm_call_logs_created_by_idx").on(table.createdById),
+  callDateIdx: index("pm_call_logs_call_date_idx").on(table.callDateTime),
+}));
+
+export const pmCallLogLevels = pgTable("pm_call_log_levels", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  callLogId: varchar("call_log_id", { length: 36 }).notNull().references(() => pmCallLogs.id, { onDelete: "cascade" }),
+  levelCycleTimeId: varchar("level_cycle_time_id", { length: 36 }).notNull().references(() => jobLevelCycleTimes.id),
+  level: text("level").notNull(),
+  buildingNumber: integer("building_number").notNull().default(1),
+  pourLabel: text("pour_label"),
+  sequenceOrder: integer("sequence_order").notNull().default(0),
+  status: callLogLevelStatusEnum("status").notNull(),
+  daysLate: integer("days_late").default(0),
+  originalStartDate: timestamp("original_start_date"),
+  originalEndDate: timestamp("original_end_date"),
+  adjustedStartDate: timestamp("adjusted_start_date"),
+  adjustedEndDate: timestamp("adjusted_end_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  callLogIdIdx: index("pm_call_log_levels_call_log_id_idx").on(table.callLogId),
+  levelCycleTimeIdIdx: index("pm_call_log_levels_level_cycle_time_id_idx").on(table.levelCycleTimeId),
+}));
+
+export const insertPmCallLogSchema = createInsertSchema(pmCallLogs).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertPmCallLog = z.infer<typeof insertPmCallLogSchema>;
+export type PmCallLog = typeof pmCallLogs.$inferSelect;
+
+export const insertPmCallLogLevelSchema = createInsertSchema(pmCallLogLevels).omit({ id: true, createdAt: true });
+export type InsertPmCallLogLevel = z.infer<typeof insertPmCallLogLevelSchema>;
+export type PmCallLogLevel = typeof pmCallLogLevels.$inferSelect;

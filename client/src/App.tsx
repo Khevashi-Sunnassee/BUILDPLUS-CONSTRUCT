@@ -109,6 +109,9 @@ const PhotoGalleryPage = lazy(() => import("@/pages/photo-gallery"));
 const SalesPipelinePage = lazy(() => import("@/pages/sales-pipeline"));
 const HelpCenterPage = lazy(() => import("@/pages/help-center"));
 const AdminHelpPage = lazy(() => import("@/pages/admin/help"));
+const PmCallLogsPage = lazy(() => import("@/pages/pm-call-logs"));
+const PmCallLogFormPage = lazy(() => import("@/pages/pm-call-log-form"));
+const PmCallLogDetailPage = lazy(() => import("@/pages/pm-call-log-detail"));
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode; requiredRole?: string[] }) {
   const { user, isLoading } = useAuth();
@@ -374,6 +377,30 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <HireBookingFormPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/pm-call-logs">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PmCallLogsPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/pm-call-logs/new">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PmCallLogFormPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/pm-call-logs/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <PmCallLogDetailPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
