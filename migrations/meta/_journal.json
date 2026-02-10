@@ -15,6 +15,13 @@
       "when": 1770756184671,
       "tag": "0001_cool_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770758264235,
+      "tag": "0002_unknown_virginia_dare",
+      "breakpoints": true
     }
   ]
 }

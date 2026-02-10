@@ -49,6 +49,7 @@ import { onboardingRouter } from "./onboarding.routes";
 import { hireRouter } from "./hire.routes";
 import { projectActivitiesRouter } from "./project-activities.routes";
 import { pmCallLogsRouter } from "./pm-call-logs.routes";
+import { invitationRouter } from "./invitation.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -161,6 +162,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(hireRouter);
   app.use(projectActivitiesRouter);
   app.use(pmCallLogsRouter);
+  app.use(invitationRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

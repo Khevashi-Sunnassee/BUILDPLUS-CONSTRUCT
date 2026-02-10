@@ -15,6 +15,7 @@ import { documentMethods } from "./documents";
 import { schedulingMethods } from "./scheduling";
 import { broadcastMethods } from "./broadcast";
 import { employeeMethods } from "./employees";
+import { invitationMethods } from "./invitations";
 
 export type { IStorage } from "./types";
 export type {
@@ -76,6 +77,14 @@ export class DatabaseStorage implements IStorage {
   deleteMappingRule = userMethods.deleteMappingRule;
   getMappingRule = userMethods.getMappingRule;
   getMappingRules = userMethods.getMappingRules;
+
+  createInvitation = invitationMethods.createInvitation;
+  getInvitationByToken = invitationMethods.getInvitationByToken;
+  getInvitationById = invitationMethods.getInvitationById;
+  getInvitationsByCompany = invitationMethods.getInvitationsByCompany;
+  markInvitationAccepted = invitationMethods.markInvitationAccepted;
+  cancelInvitation = invitationMethods.cancelInvitation;
+  expireOldInvitations = invitationMethods.expireOldInvitations;
 
   getDailyLog = dailyLogMethods.getDailyLog;
   getDailyLogsByUser = dailyLogMethods.getDailyLogsByUser;

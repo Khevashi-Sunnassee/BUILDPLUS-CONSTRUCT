@@ -35,6 +35,17 @@ export const USER_ROUTES = {
 } as const;
 
 // ============================================================================
+// INVITATIONS
+// ============================================================================
+export const INVITATION_ROUTES = {
+  ADMIN_CREATE: '/api/admin/invitations',
+  ADMIN_LIST: '/api/admin/invitations',
+  ADMIN_CANCEL: (id: string) => `/api/admin/invitations/${id}/cancel`,
+  VALIDATE: (token: string) => `/api/invitations/${token}`,
+  REGISTER: (token: string) => `/api/invitations/${token}/register`,
+} as const;
+
+// ============================================================================
 // SETTINGS
 // ============================================================================
 export const SETTINGS_ROUTES = {

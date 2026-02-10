@@ -81,6 +81,7 @@ const AdminJobTypesPage = lazy(() => import("@/pages/admin/job-types"));
 const WorkflowBuilderPage = lazy(() => import("@/pages/admin/workflow-builder"));
 const JobActivitiesPage = lazy(() => import("@/pages/job-activities"));
 
+const RegisterPage = lazy(() => import("@/pages/register"));
 const MobileLoginPage = lazy(() => import("@/pages/mobile/login"));
 const MobileDashboard = lazy(() => import("@/pages/mobile/dashboard"));
 const MobileTasksPage = lazy(() => import("@/pages/mobile/tasks"));
@@ -206,6 +207,12 @@ function Router() {
 
       <Route path="/mobile/login">
         {user ? <Redirect to="/mobile/dashboard" /> : <MobileLoginPage />}
+      </Route>
+
+      <Route path="/register/:token">
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>}>
+          <RegisterPage />
+        </Suspense>
       </Route>
 
       <Route path="/bundle/:qrCodeId">

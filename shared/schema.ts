@@ -105,6 +105,31 @@ export const users = pgTable("users", {
   companyIdx: index("users_company_idx").on(table.companyId),
 }));
 
+export const invitationStatusEnum = pgEnum("invitation_status", ["PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"]);
+
+export const userInvitations = pgTable("user_invitations", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  email: text("email").notNull(),
+  role: roleEnum("role").default("USER").notNull(),
+  userType: userTypeEnum("user_type").default("EMPLOYEE").notNull(),
+  departmentId: varchar("department_id", { length: 36 }).references(() => departments.id),
+  tokenHash: text("token_hash").notNull(),
+  status: invitationStatusEnum("status").default("PENDING").notNull(),
+  invitedBy: varchar("invited_by", { length: 36 }).notNull().references(() => users.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tokenHashIdx: uniqueIndex("user_invitations_token_hash_idx").on(table.tokenHash),
+  emailCompanyIdx: index("user_invitations_email_company_idx").on(table.email, table.companyId),
+  statusIdx: index("user_invitations_status_idx").on(table.status),
+}));
+
+export const insertUserInvitationSchema = createInsertSchema(userInvitations).omit({ id: true, tokenHash: true, status: true, acceptedAt: true, createdAt: true });
+export type InsertUserInvitation = z.infer<typeof insertUserInvitationSchema>;
+export type UserInvitation = typeof userInvitations.$inferSelect;
+
 export const userPermissions = pgTable("user_permissions", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),

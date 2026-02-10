@@ -22,7 +22,7 @@ import {
   PowerOff,
   Clock,
 } from "lucide-react";
-import { ADMIN_ROUTES, USER_ROUTES } from "@shared/api-routes";
+import { ADMIN_ROUTES, USER_ROUTES, INVITATION_ROUTES } from "@shared/api-routes";
 import { Factory as FactoryIcon } from "lucide-react";
 import type { Factory } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -154,6 +154,10 @@ export default function AdminUsersPage() {
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [workHoursDialogOpen, setWorkHoursDialogOpen] = useState(false);
   const [workHoursUser, setWorkHoursUser] = useState<UserType | null>(null);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"USER" | "MANAGER" | "ADMIN">("USER");
+  const [inviteUserType, setInviteUserType] = useState<"EMPLOYEE" | "EXTERNAL">("EMPLOYEE");
 
   const { data: users, isLoading } = useQuery<UserType[]>({
     queryKey: [ADMIN_ROUTES.USERS],
@@ -282,6 +286,23 @@ export default function AdminUsersPage() {
     },
     onError: () => {
       toast({ title: "Failed to update work hours", variant: "destructive" });
+    },
+  });
+
+  const inviteMutation = useMutation({
+    mutationFn: async (data: { email: string; role: string; userType: string }) => {
+      return apiRequest("POST", INVITATION_ROUTES.ADMIN_CREATE, data);
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: [ADMIN_ROUTES.USERS] });
+      toast({ title: "Invitation sent", description: `An invitation email has been sent to ${inviteEmail}` });
+      setInviteDialogOpen(false);
+      setInviteEmail("");
+      setInviteRole("USER");
+      setInviteUserType("EMPLOYEE");
+    },
+    onError: (err: any) => {
+      toast({ title: "Failed to send invitation", description: err.message || "An error occurred", variant: "destructive" });
     },
   });
 
@@ -417,10 +438,16 @@ export default function AdminUsersPage() {
             Manage users and their roles
           </p>
         </div>
-        <Button onClick={openNewUser} data-testid="button-add-user">
-          <Plus className="h-4 w-4 mr-2" />
-          Add User
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setInviteDialogOpen(true)} data-testid="button-invite-user">
+            <Mail className="h-4 w-4 mr-2" />
+            Invite User
+          </Button>
+          <Button onClick={openNewUser} data-testid="button-add-user">
+            <Plus className="h-4 w-4 mr-2" />
+            Add User
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -951,6 +978,82 @@ export default function AdminUsersPage() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invite User</DialogTitle>
+            <DialogDescription>
+              Send an email invitation for a new user to set up their own account
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email Address *</label>
+              <Input
+                type="email"
+                placeholder="user@example.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                data-testid="input-invite-email"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Role</label>
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "USER" | "MANAGER" | "ADMIN")}>
+                <SelectTrigger data-testid="select-invite-role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USER">User</SelectItem>
+                  <SelectItem value="MANAGER">Manager</SelectItem>
+                  <SelectItem value="ADMIN">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">User Type</label>
+              <Select value={inviteUserType} onValueChange={(v) => setInviteUserType(v as "EMPLOYEE" | "EXTERNAL")}>
+                <SelectTrigger data-testid="select-invite-user-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                  <SelectItem value="EXTERNAL">External</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setInviteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (!inviteEmail || !inviteEmail.includes("@")) {
+                  toast({ title: "Please enter a valid email address", variant: "destructive" });
+                  return;
+                }
+                inviteMutation.mutate({ email: inviteEmail, role: inviteRole, userType: inviteUserType });
+              }}
+              disabled={inviteMutation.isPending}
+              data-testid="button-send-invite"
+            >
+              {inviteMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="h-4 w-4 mr-2" />
+                  Send Invitation
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

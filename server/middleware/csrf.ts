@@ -11,9 +11,14 @@ const EXEMPT_PATHS = new Set([
   "/auth/register",
 ]);
 
+const EXEMPT_PATH_PREFIXES = [
+  "/invitations/",
+];
+
 function isExemptPath(path: string): boolean {
   if (EXEMPT_PATHS.has(path)) return true;
   if (path.startsWith("/agent/")) return true;
+  if (EXEMPT_PATH_PREFIXES.some(prefix => path.startsWith(prefix))) return true;
   if (path === "/health") return true;
   return false;
 }

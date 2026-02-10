@@ -32,6 +32,7 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 - **Hire Booking Engine:** Equipment hire management with an approval workflow, supporting internal and external assets.
 - **Job Programme:** Enhanced scheduling for job production levels, including pour labels, sequence ordering, estimated/manual dates, and notes. Features drag-and-drop reordering, inline editing, split-level functionality, and automatic date recalculation based on working days.
 - **Project Activities / Workflow System:** Template-driven activity workflow system where admins define job types with workflow templates. Activities are instantiated per job, supporting 6 statuses, inline date editing, comments/chat, file attachments, and MS Project-style predecessor/dependency relationships. Includes nested task management within activities.
+- **User Invitation System:** Admin-initiated email invitations with SHA-256 hashed tokens, 7-day expiry, single-use enforcement. Public registration page at `/register/:token` with required profile fields (name, phone, address, password). Invitation tracking with PENDING/ACCEPTED/EXPIRED/CANCELLED statuses. CSRF-exempt public endpoints for token validation and registration.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
