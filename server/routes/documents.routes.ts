@@ -4,7 +4,9 @@ import crypto from "crypto";
 import OpenAI from "openai";
 import sharp from "sharp";
 import { z } from "zod";
-import { storage } from "../storage";
+import { storage, db } from "../storage";
+import { eq } from "drizzle-orm";
+import { jobMembers } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
 import { emailService } from "../services/email.service";
@@ -369,6 +371,15 @@ router.get("/api/documents", requireAuth, async (req, res) => {
   try {
     const { page, limit, search, status, typeId, disciplineId, categoryId, jobId, panelId, supplierId, purchaseOrderId, taskId, showLatestOnly, mimeTypePrefix, excludeChat } = req.query;
     
+    let allowedJobIds: string[] | undefined;
+    const user = await storage.getUser(req.session.userId!);
+    if (user && user.role !== "ADMIN" && user.role !== "MANAGER") {
+      const memberships = await db.select({ jobId: jobMembers.jobId })
+        .from(jobMembers)
+        .where(eq(jobMembers.userId, req.session.userId!));
+      allowedJobIds = memberships.map(m => m.jobId);
+    }
+
     const result = await storage.getDocuments({
       page: page ? parseInt(String(page)) : 1,
       limit: limit ? parseInt(String(limit)) : 50,
@@ -385,6 +396,7 @@ router.get("/api/documents", requireAuth, async (req, res) => {
       showLatestOnly: showLatestOnly === "true",
       mimeTypePrefix: mimeTypePrefix ? String(mimeTypePrefix) : undefined,
       excludeChat: excludeChat === "true",
+      allowedJobIds,
     });
     
     res.json(result);

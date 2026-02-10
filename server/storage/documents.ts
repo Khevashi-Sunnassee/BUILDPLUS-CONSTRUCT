@@ -151,6 +151,7 @@ export const documentMethods = {
     showLatestOnly?: boolean;
     mimeTypePrefix?: string;
     excludeChat?: boolean;
+    allowedJobIds?: string[];
   }): Promise<{ documents: DocumentWithDetails[]; total: number; page: number; limit: number; totalPages: number }> {
     const page = filters.page || 1;
     const limit = filters.limit || 50;
@@ -181,6 +182,13 @@ export const documentMethods = {
     if (filters.excludeChat) {
       conditions.push(sql`${documents.conversationId} IS NULL`);
       conditions.push(sql`${documents.messageId} IS NULL`);
+    }
+    if (filters.allowedJobIds) {
+      if (filters.allowedJobIds.length === 0) {
+        conditions.push(sql`${documents.jobId} IS NULL`);
+      } else {
+        conditions.push(sql`(${documents.jobId} IS NULL OR ${documents.jobId} IN (${sql.join(filters.allowedJobIds.map(id => sql`${id}`), sql`, `)}))`);
+      }
     }
 
     const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
