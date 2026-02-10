@@ -1354,20 +1354,6 @@ export default function PurchaseOrderFormPage() {
                   )}
                 </div>
 
-                <div>
-                  <Label className="text-sm font-medium">Notes</Label>
-                  {canEdit ? (
-                    <Textarea
-                      value={form.watch("notes") || ""}
-                      onChange={(e) => form.setValue("notes", e.target.value)}
-                      placeholder="Additional notes"
-                      className="min-h-[60px]"
-                      data-testid="textarea-notes"
-                    />
-                  ) : (
-                    <p className="mt-1 whitespace-pre-line">{existingPO?.notes || "-"}</p>
-                  )}
-                </div>
               </div>
             </div>
           </Form>
@@ -1611,6 +1597,23 @@ export default function PurchaseOrderFormPage() {
                 </div>
               </div>
             </div>
+          </div>
+
+          <Separator />
+
+          <div>
+            <Label className="text-sm font-medium">Notes</Label>
+            {canEdit ? (
+              <Textarea
+                value={form.watch("notes") || ""}
+                onChange={(e) => form.setValue("notes", e.target.value)}
+                placeholder="Additional notes"
+                className="min-h-[60px] mt-1"
+                data-testid="textarea-notes"
+              />
+            ) : (
+              <p className="mt-1 whitespace-pre-line">{existingPO?.notes || "-"}</p>
+            )}
           </div>
 
           <Separator />
