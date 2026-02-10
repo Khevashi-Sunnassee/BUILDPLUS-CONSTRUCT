@@ -414,7 +414,7 @@ export interface IStorage {
   createPurchaseOrderAttachment(data: InsertPurchaseOrderAttachment): Promise<PurchaseOrderAttachment>;
   deletePurchaseOrderAttachment(id: string): Promise<void>;
 
-  getAllTaskGroups(companyId?: string): Promise<TaskGroupWithTasks[]>;
+  getAllTaskGroups(companyId?: string, userId?: string): Promise<TaskGroupWithTasks[]>;
   getTaskGroup(id: string): Promise<TaskGroupWithTasks | undefined>;
   createTaskGroup(data: InsertTaskGroup): Promise<TaskGroup>;
   updateTaskGroup(id: string, data: Partial<InsertTaskGroup>): Promise<TaskGroup | undefined>;

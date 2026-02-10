@@ -72,7 +72,11 @@ router.get("/api/task-groups", requireAuth, requirePermission("tasks"), async (r
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const groups = await storage.getAllTaskGroups(companyId);
+    const userId = req.session.userId;
+    const user = userId ? await storage.getUser(userId) : null;
+    const isAdminOrManager = user?.role === "ADMIN" || user?.role === "MANAGER";
+    const filterUserId = isAdminOrManager ? undefined : userId;
+    const groups = await storage.getAllTaskGroups(companyId, filterUserId);
     res.json(groups);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching task groups");

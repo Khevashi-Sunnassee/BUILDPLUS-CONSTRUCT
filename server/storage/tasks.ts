@@ -105,7 +105,7 @@ async function getTaskWithDetails(taskId: string): Promise<TaskWithDetails | und
 }
 
 export const taskMethods = {
-  async getAllTaskGroups(companyId?: string): Promise<TaskGroupWithTasks[]> {
+  async getAllTaskGroups(companyId?: string, userId?: string): Promise<TaskGroupWithTasks[]> {
     const groups = await db.select().from(taskGroups)
       .where(companyId ? eq(taskGroups.companyId, companyId) : undefined)
       .orderBy(asc(taskGroups.sortOrder));
@@ -124,10 +124,16 @@ export const taskMethods = {
         }
       }
 
-      result.push({
-        ...group,
-        tasks: tasksWithDetails,
-      });
+      if (userId) {
+        const filtered = tasksWithDetails.filter(task => {
+          if (task.createdById === userId) return true;
+          if (task.assignees?.some(a => a.userId === userId)) return true;
+          return false;
+        });
+        result.push({ ...group, tasks: filtered });
+      } else {
+        result.push({ ...group, tasks: tasksWithDetails });
+      }
     }
 
     return result;
