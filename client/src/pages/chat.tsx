@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +48,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { compressImages } from "@/lib/image-compress";
+import { playNotificationSound } from "@/lib/notification-sound";
+import { useAuth } from "@/lib/auth";
 import type { User, Job, PanelRegister } from "@shared/schema";
 
 interface ConversationMember {
@@ -141,6 +143,7 @@ function ChatImageAttachment({ att, fileUrl }: { att: MessageAttachment; fileUrl
 
 export default function ChatPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [messageContent, setMessageContent] = useState("");
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
@@ -157,6 +160,8 @@ export default function ChatPage() {
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const prevMessageIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef(true);
 
   const [newConversation, setNewConversation] = useState({
     name: "",
@@ -198,6 +203,37 @@ export default function ChatPage() {
       }
     }, 100);
   }, [messages, selectedConversationId]);
+
+  useEffect(() => {
+    if (!messages.length) {
+      prevMessageIdsRef.current = new Set();
+      initialLoadRef.current = true;
+      return;
+    }
+
+    const currentIds = new Set(messages.map(m => m.id));
+
+    if (initialLoadRef.current) {
+      prevMessageIdsRef.current = currentIds;
+      initialLoadRef.current = false;
+      return;
+    }
+
+    const newMessages = messages.filter(
+      m => !prevMessageIdsRef.current.has(m.id) && m.userId !== String(currentUser?.id)
+    );
+
+    if (newMessages.length > 0) {
+      playNotificationSound();
+    }
+
+    prevMessageIdsRef.current = currentIds;
+  }, [messages, currentUser?.id]);
+
+  useEffect(() => {
+    initialLoadRef.current = true;
+    prevMessageIdsRef.current = new Set();
+  }, [selectedConversationId]);
 
   const createConversationMutation = useMutation({
     mutationFn: async (data: typeof newConversation) => {

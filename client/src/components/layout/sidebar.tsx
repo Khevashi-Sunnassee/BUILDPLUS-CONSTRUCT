@@ -1,9 +1,10 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { USER_ROUTES, SETTINGS_ROUTES, PROJECT_ACTIVITIES_ROUTES, CHAT_ROUTES } from "@shared/api-routes";
+import { playNotificationSound } from "@/lib/notification-sound";
 import {
   Dialog,
   DialogContent,
@@ -235,6 +236,20 @@ export function AppSidebar() {
     refetchInterval: 15000,
   });
   const totalChatUnread = chatUnreadData?.totalUnread || 0;
+  const prevUnreadRef = useRef<number>(0);
+  const initialUnreadLoadRef = useRef(true);
+
+  useEffect(() => {
+    if (initialUnreadLoadRef.current) {
+      prevUnreadRef.current = totalChatUnread;
+      initialUnreadLoadRef.current = false;
+      return;
+    }
+    if (totalChatUnread > prevUnreadRef.current && !location.startsWith("/chat")) {
+      playNotificationSound();
+    }
+    prevUnreadRef.current = totalChatUnread;
+  }, [totalChatUnread, location]);
 
   const { data: paJobs = [] } = useQuery<any[]>({
     queryKey: ['/api/admin/jobs'],
