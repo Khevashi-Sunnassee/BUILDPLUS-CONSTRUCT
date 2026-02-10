@@ -346,6 +346,20 @@ export const jobs = pgTable("jobs", {
   jobTypeIdx: index("jobs_job_type_idx").on(table.jobTypeId),
 }));
 
+export const jobMembers = pgTable("job_members", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  invitedBy: varchar("invited_by", { length: 36 }).references(() => users.id),
+  invitedAt: timestamp("invited_at").defaultNow().notNull(),
+}, (table) => ({
+  jobUserIdx: uniqueIndex("job_members_job_user_idx").on(table.jobId, table.userId),
+  jobIdIdx: index("job_members_job_id_idx").on(table.jobId),
+  userIdIdx: index("job_members_user_id_idx").on(table.userId),
+  companyIdx: index("job_members_company_idx").on(table.companyId),
+}));
+
 export const jobLevelCycleTimes = pgTable("job_level_cycle_times", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
@@ -1410,6 +1424,12 @@ export type InsertMappingRule = z.infer<typeof insertMappingRuleSchema>;
 export type MappingRule = typeof mappingRules.$inferSelect;
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+export const insertJobMemberSchema = createInsertSchema(jobMembers).omit({
+  id: true,
+  invitedAt: true,
+});
+export type JobMember = typeof jobMembers.$inferSelect;
+export type InsertJobMember = z.infer<typeof insertJobMemberSchema>;
 export type JobLevelCycleTime = typeof jobLevelCycleTimes.$inferSelect;
 export type InsertJobLevelCycleTime = typeof jobLevelCycleTimes.$inferInsert;
 export type InsertPanelRegister = z.infer<typeof insertPanelRegisterSchema>;

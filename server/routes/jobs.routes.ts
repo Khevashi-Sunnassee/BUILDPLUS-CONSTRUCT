@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { z } from "zod";
 import { eq, and, inArray, desc, sql } from "drizzle-orm";
 import { storage, db, getFactoryWorkDays, getCfmeuHolidaysInRange, isWorkingDay, subtractWorkingDays, addWorkingDays } from "../storage";
-import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs, jobLevelCycleTimes } from "@shared/schema";
+import { insertJobSchema, jobs, factories, customers, contracts, salesStatusHistory, jobAuditLogs, jobLevelCycleTimes, jobMembers, users } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { SALES_STAGES, STAGE_STATUSES, getDefaultStatus, isValidStatusForStage } from "@shared/sales-pipeline";
@@ -10,6 +10,7 @@ import type { SalesStage } from "@shared/sales-pipeline";
 import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceToPhase, getDefaultStatusForPhase, intToPhase, phaseToInt } from "@shared/job-phases";
 import type { JobPhase, JobStatus } from "@shared/job-phases";
 import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
+import { emailService } from "../services/email.service";
 
 async function resolveUserName(req: Request): Promise<string | null> {
   if (req.session?.name) return req.session.name;
@@ -1421,6 +1422,136 @@ router.get("/api/admin/jobs/:id/audit-log", requireAuth, async (req: Request, re
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching job audit log");
     res.status(500).json({ error: "Failed to fetch audit log" });
+  }
+});
+
+// GET /api/admin/jobs/:id/members - Get job members
+router.get("/api/admin/jobs/:id/members", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const jobId = String(req.params.id);
+    const job = await storage.getJob(jobId);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const members = await db.select({
+      id: jobMembers.id,
+      jobId: jobMembers.jobId,
+      userId: jobMembers.userId,
+      invitedBy: jobMembers.invitedBy,
+      invitedAt: jobMembers.invitedAt,
+      userName: users.name,
+      userEmail: users.email,
+      userRole: users.role,
+    })
+      .from(jobMembers)
+      .innerJoin(users, eq(jobMembers.userId, users.id))
+      .where(eq(jobMembers.jobId, jobId));
+
+    res.json(members);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching job members");
+    res.status(500).json({ error: "Failed to fetch job members" });
+  }
+});
+
+// POST /api/admin/jobs/:id/members - Add a member to a job (and send invitation email)
+router.post("/api/admin/jobs/:id/members", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const jobId = String(req.params.id);
+    const schema = z.object({ userId: z.string().min(1) });
+    const { userId } = schema.parse(req.body);
+
+    const job = await storage.getJob(jobId);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    const invitedUser = await storage.getUser(userId);
+    if (!invitedUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (invitedUser.companyId !== req.companyId) {
+      return res.status(403).json({ error: "User does not belong to your company" });
+    }
+
+    const existing = await db.select()
+      .from(jobMembers)
+      .where(and(eq(jobMembers.jobId, jobId), eq(jobMembers.userId, userId)));
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "User is already a member of this job" });
+    }
+
+    const [member] = await db.insert(jobMembers).values({
+      companyId: req.companyId!,
+      jobId,
+      userId,
+      invitedBy: req.session.userId!,
+    }).returning();
+
+    // Send invitation email
+    if (invitedUser.email && emailService.isConfigured()) {
+      const inviterName = req.session.name || "A team member";
+      const subject = `You've been added to Job: ${job.jobNumber} - ${job.name}`;
+      const body = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+            <h2 style="margin: 0;">Job Invitation</h2>
+          </div>
+          <div style="padding: 24px; background: #f8fafc; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 8px 8px;">
+            <p>Hi ${invitedUser.name || invitedUser.email},</p>
+            <p><strong>${inviterName}</strong> has added you to the following job:</p>
+            <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+              <tr>
+                <td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold; width: 140px;">Job Number</td>
+                <td style="padding: 8px 12px; background: white;">${job.jobNumber}</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Job Name</td>
+                <td style="padding: 8px 12px; background: white;">${job.name}</td>
+              </tr>
+              ${job.address ? `<tr><td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Address</td><td style="padding: 8px 12px; background: white;">${job.address}</td></tr>` : ""}
+              ${job.client ? `<tr><td style="padding: 8px 12px; background: #e2e8f0; font-weight: bold;">Client</td><td style="padding: 8px 12px; background: white;">${job.client}</td></tr>` : ""}
+            </table>
+            <p>You now have access to documents and files associated with this job.</p>
+            <p style="color: #64748b; font-size: 12px; margin-top: 24px;">This is an automated notification from your project management system.</p>
+          </div>
+        </div>
+      `;
+      emailService.sendEmail(invitedUser.email, subject, body).catch((err) => {
+        logger.error({ err, userId, jobId }, "Failed to send job invitation email");
+      });
+    }
+
+    res.json(member);
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid request data", details: error.errors });
+    }
+    logger.error({ err: error }, "Error adding job member");
+    res.status(500).json({ error: "Failed to add job member" });
+  }
+});
+
+// DELETE /api/admin/jobs/:id/members/:userId - Remove a member from a job
+router.delete("/api/admin/jobs/:id/members/:userId", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
+  try {
+    const jobId = String(req.params.id);
+    const userId = String(req.params.userId);
+
+    const job = await storage.getJob(jobId);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+
+    await db.delete(jobMembers)
+      .where(and(eq(jobMembers.jobId, jobId), eq(jobMembers.userId, userId)));
+
+    res.json({ ok: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error removing job member");
+    res.status(500).json({ error: "Failed to remove job member" });
   }
 });
 

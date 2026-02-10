@@ -1,9 +1,14 @@
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import {
   Plus,
   Save,
   Loader2,
   AlertCircle,
   ExternalLink,
+  UserPlus,
+  X,
+  Mail,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -12,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Form,
   FormControl,
@@ -63,6 +69,7 @@ import {
   type LevelCycleTime,
 } from "./types";
 import { AuditLogPanel } from "./AuditLogPanel";
+import { JobMembersPanel } from "./JobMembersPanel";
 
 interface JobFormDialogProps {
   open: boolean;
@@ -143,11 +150,14 @@ export function JobFormDialog({
         <Form {...jobForm}>
           <form onSubmit={jobForm.handleSubmit(onSubmit, onFormError)} className="space-y-4">
         <Tabs value={editDialogTab} onValueChange={setEditDialogTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="details" data-testid="tab-job-details">Job Details</TabsTrigger>
             <TabsTrigger value="production" data-testid="tab-production">Production</TabsTrigger>
             <TabsTrigger value="levelCycleTimes" disabled={!editingJob} data-testid="tab-level-cycle-times">
               Level Cycle Times
+            </TabsTrigger>
+            <TabsTrigger value="members" disabled={!editingJob} data-testid="tab-job-members">
+              Members
             </TabsTrigger>
             <TabsTrigger value="auditLog" disabled={!editingJob} data-testid="tab-audit-log">
               Audit Log
@@ -970,6 +980,20 @@ export function JobFormDialog({
             </div>
           </TabsContent>
 
+          <TabsContent value="members" className="mt-4">
+            <div className="space-y-3">
+              <div>
+                <h3 className="font-medium">Job Members</h3>
+                <p className="text-sm text-muted-foreground">Manage which users have access to this job's documents and files</p>
+              </div>
+              {editingJob ? (
+                <JobMembersPanel jobId={editingJob.id} users={users} />
+              ) : (
+                <p className="text-sm text-muted-foreground">Save the job first to manage members.</p>
+              )}
+            </div>
+          </TabsContent>
+
           <TabsContent value="auditLog" className="mt-4">
             <div className="space-y-3">
               <div>
@@ -985,7 +1009,7 @@ export function JobFormDialog({
           </TabsContent>
         </Tabs>
         
-        {editDialogTab !== "levelCycleTimes" && editDialogTab !== "auditLog" && (
+        {editDialogTab !== "levelCycleTimes" && editDialogTab !== "auditLog" && editDialogTab !== "members" && (
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => {
               onOpenChange(false);
