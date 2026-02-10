@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
@@ -197,15 +197,31 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { user, logout } = useAuth();
   
+  const adminSectionUrls = adminNavItems.map(i => i.url);
+  const productionSectionUrls = productionNavItems.map(i => i.url);
+  const financeSectionUrls = adminFinanceNavItems.map(i => i.url);
+  const managementSectionUrls = managerNavItems.map(i => i.url);
+  const contactsSectionUrls = contactsNavItems.map(i => i.url);
+
+  const locationMatchesSection = (urls: string[]) => urls.some(u => location.startsWith(u));
+
   const [mainExpanded, setMainExpanded] = useState(true);
-  const [productionExpanded, setProductionExpanded] = useState(true);
-  const [adminFinanceExpanded, setAdminFinanceExpanded] = useState(true);
-  const [managementExpanded, setManagementExpanded] = useState(true);
-  const [contactsExpanded, setContactsExpanded] = useState(true);
-  const [adminExpanded, setAdminExpanded] = useState(false);
+  const [productionExpanded, setProductionExpanded] = useState(() => locationMatchesSection(productionSectionUrls));
+  const [adminFinanceExpanded, setAdminFinanceExpanded] = useState(() => locationMatchesSection(financeSectionUrls));
+  const [managementExpanded, setManagementExpanded] = useState(() => locationMatchesSection(managementSectionUrls));
+  const [contactsExpanded, setContactsExpanded] = useState(() => locationMatchesSection(contactsSectionUrls));
+  const [adminExpanded, setAdminExpanded] = useState(() => locationMatchesSection(adminSectionUrls));
   const [projectActivitiesOpen, setProjectActivitiesOpen] = useState(false);
   const [paSearch, setPaSearch] = useState("");
   const [paJobTypeFilter, setPaJobTypeFilter] = useState("all");
+
+  useEffect(() => {
+    if (locationMatchesSection(adminSectionUrls)) setAdminExpanded(true);
+    if (locationMatchesSection(productionSectionUrls)) setProductionExpanded(true);
+    if (locationMatchesSection(financeSectionUrls)) setAdminFinanceExpanded(true);
+    if (locationMatchesSection(managementSectionUrls)) setManagementExpanded(true);
+    if (locationMatchesSection(contactsSectionUrls)) setContactsExpanded(true);
+  }, [location]);
 
   const { data: myPermissions = [], isLoading: permissionsLoading } = useQuery<UserPermission[]>({
     queryKey: [USER_ROUTES.MY_PERMISSIONS],
