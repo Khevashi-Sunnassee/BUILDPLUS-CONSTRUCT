@@ -18,6 +18,7 @@ import { apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
 import { CHAT_ROUTES, USER_ROUTES, JOBS_ROUTES, PANELS_ROUTES } from "@shared/api-routes";
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
 import {
   Plus,
   Send,
@@ -160,6 +161,32 @@ function ChatImageAttachment({ att, fileUrl }: { att: MessageAttachment; fileUrl
   );
 }
 
+function DraggableConversation({ conv, isDragging, children }: { conv: Conversation; isDragging: boolean; children: React.ReactNode }) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: conv.id });
+  const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
+  return (
+    <div ref={setNodeRef} style={style} {...listeners} {...attributes} className={cn(isDragging && "opacity-30")}>
+      {children}
+    </div>
+  );
+}
+
+function DroppableTopicZone({ topicId, isDragging, children }: { topicId: string; isDragging: boolean; children: React.ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({ id: topicId });
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "rounded-md transition-colors",
+        isDragging && "ring-1 ring-dashed ring-muted-foreground/30",
+        isOver && "bg-accent/50 ring-2 ring-primary/50"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
@@ -180,6 +207,7 @@ export default function ChatPage() {
   const [newTopicName, setNewTopicName] = useState("");
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editingTopicName, setEditingTopicName] = useState("");
+  const [draggingConvId, setDraggingConvId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -445,6 +473,27 @@ export default function ChatPage() {
       return next;
     });
   }, []);
+
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  );
+
+  const handleDragStart = useCallback((event: DragStartEvent) => {
+    setDraggingConvId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    setDraggingConvId(null);
+    const { active, over } = event;
+    if (!over) return;
+    const conversationId = String(active.id);
+    const droppableId = String(over.id);
+    const topicId = droppableId === "ungrouped-drop" ? null : droppableId;
+    const conv = conversations.find(c => c.id === conversationId);
+    if (conv && conv.topicId !== topicId) {
+      assignTopicMutation.mutate({ conversationId, topicId });
+    }
+  }, [conversations, assignTopicMutation]);
 
   const deleteMessageMutation = useMutation({
     mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
@@ -796,6 +845,7 @@ export default function ChatPage() {
           ) : filteredConversations.length === 0 && topics.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground">No conversations</div>
           ) : (
+            <DndContext sensors={dndSensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
             <div className="p-2">
               {(() => {
                 const ungrouped = filteredConversations.filter(c => !c.topicId);
@@ -805,73 +855,75 @@ export default function ChatPage() {
                 }));
 
                 const renderConvItem = (conv: Conversation) => (
-                  <div key={conv.id} className="group flex items-start" data-testid={`conversation-row-${conv.id}`}>
-                    <button
-                      onClick={() => handleSelectConversation(conv.id)}
-                      className={cn(
-                        "flex-1 flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
-                        selectedConversationId === conv.id && "bg-accent"
-                      )}
-                      data-testid={`conversation-${conv.id}`}
-                    >
-                      <div className="mt-0.5 text-muted-foreground shrink-0">
-                        {getConversationIcon(conv)}
-                      </div>
-                      <div className="flex-1 min-w-0 overflow-hidden">
-                        <div className="font-medium truncate text-sm">
-                          {getConversationDisplayName(conv)}
+                  <DraggableConversation key={conv.id} conv={conv} isDragging={draggingConvId === conv.id}>
+                    <div className="group flex items-start" data-testid={`conversation-row-${conv.id}`}>
+                      <button
+                        onClick={() => handleSelectConversation(conv.id)}
+                        className={cn(
+                          "flex-1 flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
+                          selectedConversationId === conv.id && "bg-accent"
+                        )}
+                        data-testid={`conversation-${conv.id}`}
+                      >
+                        <div className="mt-0.5 text-muted-foreground shrink-0">
+                          {getConversationIcon(conv)}
                         </div>
-                        {conv.lastMessage && (
-                          <div className="text-xs text-muted-foreground truncate">
-                            {conv.lastMessage.body}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="font-medium truncate text-sm">
+                            {getConversationDisplayName(conv)}
                           </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        <Badge variant="outline" className="text-xs">
-                          {conv.type}
-                        </Badge>
-                        {(conv.unreadCount ?? 0) > 0 && (
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid={`badge-unread-${conv.id}`}>
-                            {(conv.unreadCount ?? 0) > 99 ? "99+" : conv.unreadCount}
+                          {conv.lastMessage && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {conv.lastMessage.body}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <Badge variant="outline" className="text-xs">
+                            {conv.type}
                           </Badge>
-                        )}
-                      </div>
-                    </button>
-                    {topics.length > 0 && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="mt-2 shrink-0 invisible group-hover:visible"
-                            data-testid={`button-assign-topic-${conv.id}`}
-                          >
-                            <Tag className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => assignTopicMutation.mutate({ conversationId: conv.id, topicId: null })}
-                            data-testid={`topic-assign-none-${conv.id}`}
-                          >
-                            No Topic
-                          </DropdownMenuItem>
-                          {topics.map(topic => (
-                            <DropdownMenuItem
-                              key={topic.id}
-                              onClick={() => assignTopicMutation.mutate({ conversationId: conv.id, topicId: topic.id })}
-                              data-testid={`topic-assign-${topic.id}-${conv.id}`}
+                          {(conv.unreadCount ?? 0) > 0 && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid={`badge-unread-${conv.id}`}>
+                              {(conv.unreadCount ?? 0) > 99 ? "99+" : conv.unreadCount}
+                            </Badge>
+                          )}
+                        </div>
+                      </button>
+                      {topics.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="mt-2 shrink-0 invisible group-hover:visible"
+                              data-testid={`button-assign-topic-${conv.id}`}
                             >
-                              <FolderOpen className="h-3 w-3 mr-2" />
-                              {topic.name}
-                              {conv.topicId === topic.id && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                              <Tag className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => assignTopicMutation.mutate({ conversationId: conv.id, topicId: null })}
+                              data-testid={`topic-assign-none-${conv.id}`}
+                            >
+                              No Topic
                             </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
+                            {topics.map(topic => (
+                              <DropdownMenuItem
+                                key={topic.id}
+                                onClick={() => assignTopicMutation.mutate({ conversationId: conv.id, topicId: topic.id })}
+                                data-testid={`topic-assign-${topic.id}-${conv.id}`}
+                              >
+                                <FolderOpen className="h-3 w-3 mr-2" />
+                                {topic.name}
+                                {conv.topicId === topic.id && <span className="ml-auto text-xs text-muted-foreground">current</span>}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </DraggableConversation>
                 );
 
                 return (
@@ -881,95 +933,112 @@ export default function ChatPage() {
                       const topicUnread = convs.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
                       const isEditing = editingTopicId === topic.id;
                       return (
-                        <div key={topic.id} className="mb-1" data-testid={`topic-group-${topic.id}`}>
-                          <div className="group/topic flex items-center gap-1 px-2 py-1.5 rounded-md hover-elevate">
-                            <button
-                              onClick={() => toggleTopicCollapse(topic.id)}
-                              className="shrink-0 p-0.5"
-                              data-testid={`button-toggle-topic-${topic.id}`}
-                            >
-                              {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                            </button>
-                            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                            {isEditing ? (
-                              <Input
-                                value={editingTopicName}
-                                onChange={(e) => setEditingTopicName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && editingTopicName.trim()) updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
-                                  if (e.key === "Escape") { setEditingTopicId(null); setEditingTopicName(""); }
-                                }}
-                                onBlur={() => {
-                                  if (editingTopicName.trim() && editingTopicName.trim() !== topic.name) {
-                                    updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
-                                  } else {
-                                    setEditingTopicId(null); setEditingTopicName("");
-                                  }
-                                }}
-                                className="h-6 text-xs px-1 py-0 flex-1"
-                                autoFocus
-                                data-testid={`input-rename-topic-${topic.id}`}
-                              />
-                            ) : (
+                        <DroppableTopicZone key={topic.id} topicId={topic.id} isDragging={!!draggingConvId}>
+                          <div className="mb-1" data-testid={`topic-group-${topic.id}`}>
+                            <div className="group/topic flex items-center gap-1 px-2 py-1.5 rounded-md hover-elevate">
                               <button
                                 onClick={() => toggleTopicCollapse(topic.id)}
-                                className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate flex-1 text-left"
-                                data-testid={`text-topic-name-${topic.id}`}
+                                className="shrink-0 p-0.5"
+                                data-testid={`button-toggle-topic-${topic.id}`}
                               >
-                                {topic.name}
+                                {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                               </button>
-                            )}
-                            {topicUnread > 0 && (
-                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
-                                {topicUnread > 99 ? "99+" : topicUnread}
-                              </Badge>
-                            )}
-                            <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px]">{convs.length}</Badge>
-                            {!isEditing && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 invisible group-hover/topic:visible" data-testid={`button-topic-menu-${topic.id}`}>
-                                    <MoreVertical className="h-3 w-3" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => { setEditingTopicId(topic.id); setEditingTopicName(topic.name); }}
-                                    data-testid={`button-edit-topic-${topic.id}`}
-                                  >
-                                    <Pencil className="h-3 w-3 mr-2" />
-                                    Rename
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
-                                    data-testid={`button-delete-topic-${topic.id}`}
-                                  >
-                                    <Trash2 className="h-3 w-3 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              {isEditing ? (
+                                <Input
+                                  value={editingTopicName}
+                                  onChange={(e) => setEditingTopicName(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && editingTopicName.trim()) updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
+                                    if (e.key === "Escape") { setEditingTopicId(null); setEditingTopicName(""); }
+                                  }}
+                                  onBlur={() => {
+                                    if (editingTopicName.trim() && editingTopicName.trim() !== topic.name) {
+                                      updateTopicMutation.mutate({ id: topic.id, name: editingTopicName.trim() });
+                                    } else {
+                                      setEditingTopicId(null); setEditingTopicName("");
+                                    }
+                                  }}
+                                  className="h-6 text-xs px-1 py-0 flex-1"
+                                  autoFocus
+                                  data-testid={`input-rename-topic-${topic.id}`}
+                                />
+                              ) : (
+                                <button
+                                  onClick={() => toggleTopicCollapse(topic.id)}
+                                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate flex-1 text-left"
+                                  data-testid={`text-topic-name-${topic.id}`}
+                                >
+                                  {topic.name}
+                                </button>
+                              )}
+                              {topicUnread > 0 && (
+                                <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center">
+                                  {topicUnread > 99 ? "99+" : topicUnread}
+                                </Badge>
+                              )}
+                              <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px]">{convs.length}</Badge>
+                              {!isEditing && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0 invisible group-hover/topic:visible" data-testid={`button-topic-menu-${topic.id}`}>
+                                      <MoreVertical className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem
+                                      onClick={() => { setEditingTopicId(topic.id); setEditingTopicName(topic.name); }}
+                                      data-testid={`button-edit-topic-${topic.id}`}
+                                    >
+                                      <Pencil className="h-3 w-3 mr-2" />
+                                      Rename
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
+                                      data-testid={`button-delete-topic-${topic.id}`}
+                                    >
+                                      <Trash2 className="h-3 w-3 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )}
+                            </div>
+                            {!isCollapsed && (
+                              <div className="ml-2 border-l pl-1">
+                                {convs.map(renderConvItem)}
+                              </div>
                             )}
                           </div>
-                          {!isCollapsed && (
-                            <div className="ml-2 border-l pl-1">
-                              {convs.map(renderConvItem)}
-                            </div>
-                          )}
-                        </div>
+                        </DroppableTopicZone>
                       );
                     })}
                     {ungrouped.length > 0 && grouped.length > 0 && (
-                      <div className="px-2 py-1.5">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ungrouped</span>
-                      </div>
+                      <DroppableTopicZone topicId="ungrouped-drop" isDragging={!!draggingConvId}>
+                        <div className="px-2 py-1.5">
+                          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ungrouped</span>
+                        </div>
+                      </DroppableTopicZone>
                     )}
                     {ungrouped.map(renderConvItem)}
                   </>
                 );
               })()}
             </div>
+            <DragOverlay>
+              {draggingConvId && (() => {
+                const conv = filteredConversations.find(c => c.id === draggingConvId);
+                if (!conv) return null;
+                return (
+                  <div className="flex items-center gap-3 p-3 rounded-md bg-card border shadow-lg opacity-90 max-w-[280px]">
+                    <div className="text-muted-foreground shrink-0">{getConversationIcon(conv)}</div>
+                    <div className="font-medium truncate text-sm">{getConversationDisplayName(conv)}</div>
+                  </div>
+                );
+              })()}
+            </DragOverlay>
+            </DndContext>
           )}
         </ScrollArea>
       </div>
