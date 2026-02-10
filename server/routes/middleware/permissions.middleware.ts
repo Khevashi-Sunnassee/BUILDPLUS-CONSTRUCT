@@ -4,6 +4,14 @@ import type { FunctionKey } from "@shared/schema";
 
 export type PermissionLevel = "VIEW" | "VIEW_AND_UPDATE";
 
+declare global {
+  namespace Express {
+    interface Request {
+      permissionLevel?: string;
+    }
+  }
+}
+
 export const requirePermission = (functionKey: string, minimumLevel: PermissionLevel = "VIEW") => {
   return async (req: Request, res: Response, next: NextFunction) => {
     if (!req.session.userId) {
@@ -16,6 +24,7 @@ export const requirePermission = (functionKey: string, minimumLevel: PermissionL
     }
     
     if (user.role === "ADMIN") {
+      req.permissionLevel = "VIEW_AND_UPDATE";
       return next();
     }
     
@@ -25,8 +34,17 @@ export const requirePermission = (functionKey: string, minimumLevel: PermissionL
       return res.status(403).json({ error: "Access denied to this function" });
     }
     
-    if (minimumLevel === "VIEW_AND_UPDATE" && permission.permissionLevel === "VIEW") {
-      return res.status(403).json({ error: "You only have view access to this function" });
+    const level = permission.permissionLevel;
+    req.permissionLevel = level;
+
+    if (minimumLevel === "VIEW_AND_UPDATE") {
+      if (level === "VIEW" || level === "VIEW_OWN") {
+        return res.status(403).json({ error: "You only have view access to this function" });
+      }
+    }
+
+    if (minimumLevel === "VIEW") {
+      // VIEW_OWN and VIEW_AND_UPDATE_OWN both grant at least view access (filtered by ownership at route level)
     }
     
     next();

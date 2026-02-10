@@ -70,13 +70,19 @@ const PERMISSION_COLORS: Record<PermissionLevel, string> = {
   HIDDEN: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
   VIEW: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300",
   VIEW_AND_UPDATE: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
+  VIEW_OWN: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+  VIEW_AND_UPDATE_OWN: "bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300",
 };
 
 const PERMISSION_ICONS: Record<PermissionLevel, React.ReactNode> = {
   HIDDEN: <EyeOff className="h-3 w-3" />,
   VIEW: <Eye className="h-3 w-3" />,
   VIEW_AND_UPDATE: <Pencil className="h-3 w-3" />,
+  VIEW_OWN: <Eye className="h-3 w-3" />,
+  VIEW_AND_UPDATE_OWN: <Pencil className="h-3 w-3" />,
 };
+
+const SUPPORTS_OWN_LEVELS = ["purchase_orders", "tasks"];
 
 export default function UserPermissionsPage() {
   const { toast } = useToast();
@@ -130,14 +136,14 @@ export default function UserPermissionsPage() {
   };
 
   const countPermissions = (permissions: UserPermission[]) => {
-    const counts = { HIDDEN: 0, VIEW: 0, VIEW_AND_UPDATE: 0, unset: 0 };
+    const counts = { HIDDEN: 0, VIEW: 0, VIEW_AND_UPDATE: 0, VIEW_OWN: 0, VIEW_AND_UPDATE_OWN: 0, unset: 0 };
     const permMap = new Map(permissions.map(p => [p.functionKey, p.permissionLevel]));
     
     for (const key of FUNCTION_KEYS) {
       const level = permMap.get(key);
       if (!level) {
         counts.unset++;
-      } else {
+      } else if (level in counts) {
         counts[level as keyof typeof counts]++;
       }
     }
@@ -182,14 +188,23 @@ export default function UserPermissionsPage() {
           <CardDescription>Understanding what each level means</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800">
               <div className="p-2 rounded-full bg-red-100 dark:bg-red-900">
                 <EyeOff className="h-4 w-4 text-red-600 dark:text-red-400" />
               </div>
               <div>
                 <p className="font-semibold text-red-700 dark:text-red-300">Hidden</p>
-                <p className="text-sm text-red-600 dark:text-red-400">Function is not visible to user</p>
+                <p className="text-sm text-red-600 dark:text-red-400">Not visible to user</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+              <div className="p-2 rounded-full bg-blue-100 dark:bg-blue-900">
+                <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-blue-700 dark:text-blue-300">View Own</p>
+                <p className="text-sm text-blue-600 dark:text-blue-400">See only own records</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800">
@@ -197,8 +212,17 @@ export default function UserPermissionsPage() {
                 <Eye className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div>
-                <p className="font-semibold text-yellow-700 dark:text-yellow-300">View Only</p>
-                <p className="text-sm text-yellow-600 dark:text-yellow-400">Can see but not modify data</p>
+                <p className="font-semibold text-yellow-700 dark:text-yellow-300">View All</p>
+                <p className="text-sm text-yellow-600 dark:text-yellow-400">See all records</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200 dark:border-cyan-800">
+              <div className="p-2 rounded-full bg-cyan-100 dark:bg-cyan-900">
+                <Pencil className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <p className="font-semibold text-cyan-700 dark:text-cyan-300">Edit Own</p>
+                <p className="text-sm text-cyan-600 dark:text-cyan-400">View & edit own records</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
@@ -206,8 +230,8 @@ export default function UserPermissionsPage() {
                 <Pencil className="h-4 w-4 text-green-600 dark:text-green-400" />
               </div>
               <div>
-                <p className="font-semibold text-green-700 dark:text-green-300">View & Update</p>
-                <p className="text-sm text-green-600 dark:text-green-400">Full access to view and modify</p>
+                <p className="font-semibold text-green-700 dark:text-green-300">Edit All</p>
+                <p className="text-sm text-green-600 dark:text-green-400">Full access to all records</p>
               </div>
             </div>
           </div>
@@ -243,9 +267,19 @@ export default function UserPermissionsPage() {
                               {PERMISSION_ICONS.HIDDEN} {counts.HIDDEN} Hidden
                             </Badge>
                           )}
+                          {counts.VIEW_OWN > 0 && (
+                            <Badge className={PERMISSION_COLORS.VIEW_OWN}>
+                              {PERMISSION_ICONS.VIEW_OWN} {counts.VIEW_OWN} Own
+                            </Badge>
+                          )}
                           {counts.VIEW > 0 && (
                             <Badge className={PERMISSION_COLORS.VIEW}>
                               {PERMISSION_ICONS.VIEW} {counts.VIEW} View
+                            </Badge>
+                          )}
+                          {counts.VIEW_AND_UPDATE_OWN > 0 && (
+                            <Badge className={PERMISSION_COLORS.VIEW_AND_UPDATE_OWN}>
+                              {PERMISSION_ICONS.VIEW_AND_UPDATE_OWN} {counts.VIEW_AND_UPDATE_OWN} Edit Own
                             </Badge>
                           )}
                           {counts.VIEW_AND_UPDATE > 0 && (
@@ -315,16 +349,32 @@ export default function UserPermissionsPage() {
                                         Hidden
                                       </div>
                                     </SelectItem>
+                                    {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                      <SelectItem value="VIEW_OWN">
+                                        <div className="flex items-center gap-2">
+                                          <Eye className="h-4 w-4 text-blue-500" />
+                                          View Own Only
+                                        </div>
+                                      </SelectItem>
+                                    )}
                                     <SelectItem value="VIEW">
                                       <div className="flex items-center gap-2">
                                         <Eye className="h-4 w-4 text-yellow-500" />
-                                        View Only
+                                        View All
                                       </div>
                                     </SelectItem>
+                                    {SUPPORTS_OWN_LEVELS.includes(functionKey) && (
+                                      <SelectItem value="VIEW_AND_UPDATE_OWN">
+                                        <div className="flex items-center gap-2">
+                                          <Pencil className="h-4 w-4 text-cyan-500" />
+                                          View & Edit Own Only
+                                        </div>
+                                      </SelectItem>
+                                    )}
                                     <SelectItem value="VIEW_AND_UPDATE">
                                       <div className="flex items-center gap-2">
                                         <Pencil className="h-4 w-4 text-green-500" />
-                                        View & Update
+                                        View & Edit All
                                       </div>
                                     </SelectItem>
                                   </SelectContent>

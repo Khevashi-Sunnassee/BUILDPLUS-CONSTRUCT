@@ -13,7 +13,7 @@ export const salesStageEnum = pgEnum("sales_stage", ["OPPORTUNITY", "PRE_QUALIFI
 export const opportunityTypeEnum = pgEnum("opportunity_type", ["BUILDER_SELECTED", "OPEN_TENDER", "NEGOTIATED_CONTRACT", "GENERAL_PRICING"]);
 export const panelStatusEnum = pgEnum("panel_status", ["NOT_STARTED", "IN_PROGRESS", "COMPLETED", "ON_HOLD", "PENDING"]);
 export const loadListStatusEnum = pgEnum("load_list_status", ["PENDING", "COMPLETE"]);
-export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE"]);
+export const permissionLevelEnum = pgEnum("permission_level", ["HIDDEN", "VIEW", "VIEW_AND_UPDATE", "VIEW_OWN", "VIEW_AND_UPDATE_OWN"]);
 export const weeklyReportStatusEnum = pgEnum("weekly_report_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 export const documentStatusEnum = pgEnum("document_status", ["DRAFT", "IFA", "IFC", "APPROVED"]);
 export const productionSlotStatusEnum = pgEnum("production_slot_status", ["SCHEDULED", "PENDING_UPDATE", "BOOKED", "COMPLETED"]);
@@ -1457,7 +1457,7 @@ export const insertUserPermissionSchema = createInsertSchema(userPermissions).om
 });
 export type InsertUserPermission = z.infer<typeof insertUserPermissionSchema>;
 export type UserPermission = typeof userPermissions.$inferSelect;
-export type PermissionLevel = "HIDDEN" | "VIEW" | "VIEW_AND_UPDATE";
+export type PermissionLevel = "HIDDEN" | "VIEW" | "VIEW_AND_UPDATE" | "VIEW_OWN" | "VIEW_AND_UPDATE_OWN";
 
 export type Role = "USER" | "MANAGER" | "ADMIN";
 export type LogStatus = "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";

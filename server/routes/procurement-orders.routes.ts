@@ -3,6 +3,7 @@ import { z } from "zod";
 import multer from "multer";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
+import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { twilioService } from "../services/twilio.service";
 import { insertPurchaseOrderSchema, purchaseOrderItems, purchaseOrders } from "@shared/schema";
@@ -46,7 +47,7 @@ const receivePurchaseOrderSchema = z.object({
   receivedItemIds: z.array(z.string()),
 });
 
-router.get("/api/purchase-orders", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders", requireAuth, requirePermission("purchase_orders"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
@@ -56,6 +57,11 @@ router.get("/api/purchase-orders", requireAuth, async (req, res) => {
       orders = await storage.getPurchaseOrdersByStatus(status, companyId);
     } else {
       orders = await storage.getAllPurchaseOrders(companyId);
+    }
+    const level = req.permissionLevel;
+    if (level === "VIEW_OWN" || level === "VIEW_AND_UPDATE_OWN") {
+      const userId = req.session.userId;
+      orders = orders.filter((o: any) => o.requestedById === userId);
     }
     res.json(orders);
   } catch (error: unknown) {
@@ -88,11 +94,15 @@ router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => 
   }
 });
 
-router.get("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+router.get("/api/purchase-orders/:id", requireAuth, requirePermission("purchase_orders"), async (req, res) => {
   try {
     const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
+    const level = req.permissionLevel;
+    if ((level === "VIEW_OWN" || level === "VIEW_AND_UPDATE_OWN") && order.requestedById !== req.session.userId) {
+      return res.status(403).json({ error: "You can only view your own purchase orders" });
+    }
     res.json(order);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase order");
@@ -128,15 +138,19 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
   }
 });
 
-router.patch("/api/purchase-orders/:id", requireAuth, async (req, res) => {
+router.patch("/api/purchase-orders/:id", requireAuth, requirePermission("purchase_orders"), async (req, res) => {
   try {
     const companyId = req.companyId;
     const order = await storage.getPurchaseOrder(String(req.params.id));
     if (!order || order.companyId !== companyId) return res.status(404).json({ error: "Purchase order not found" });
     
     const userId = req.session.userId;
-    if (order.requestedById !== userId) {
-      return res.status(403).json({ error: "Only the requester can edit this purchase order" });
+    const level = req.permissionLevel;
+    if (level === "VIEW" || level === "VIEW_OWN") {
+      return res.status(403).json({ error: "You only have view access to purchase orders" });
+    }
+    if (level !== "VIEW_AND_UPDATE" && order.requestedById !== userId) {
+      return res.status(403).json({ error: "You can only edit your own purchase orders" });
     }
     
     if (order.status !== "DRAFT" && order.status !== "REJECTED") {
