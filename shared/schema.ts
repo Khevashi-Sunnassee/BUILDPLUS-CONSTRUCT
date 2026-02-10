@@ -117,6 +117,7 @@ export const userInvitations = pgTable("user_invitations", {
   tokenHash: text("token_hash").notNull(),
   status: invitationStatusEnum("status").default("PENDING").notNull(),
   invitedBy: varchar("invited_by", { length: 36 }).notNull().references(() => users.id),
+  permissions: json("permissions").$type<Record<string, string>>(),
   expiresAt: timestamp("expires_at").notNull(),
   acceptedAt: timestamp("accepted_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

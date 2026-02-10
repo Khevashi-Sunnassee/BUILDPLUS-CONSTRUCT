@@ -22,6 +22,13 @@
       "when": 1770758264235,
       "tag": "0002_unknown_virginia_dare",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770761384002,
+      "tag": "0003_overconfident_shotgun",
+      "breakpoints": true
     }
   ]
 }

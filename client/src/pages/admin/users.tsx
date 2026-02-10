@@ -76,7 +76,70 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import type { User as UserType, Role, Department } from "@shared/schema";
+import { FUNCTION_KEYS } from "@shared/schema";
+import type { PermissionLevel } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+const INVITE_FUNCTION_LABELS: Record<string, string> = {
+  tasks: "Tasks",
+  chat: "Chat",
+  jobs: "Jobs",
+  panel_register: "Panel Register",
+  document_register: "Document Register",
+  photo_gallery: "Photo Gallery",
+  checklists: "Checklists",
+  weekly_job_logs: "Weekly Job Logs",
+  broadcast: "Broadcast",
+  production_slots: "Production Slots",
+  production_report: "Production Schedule",
+  drafting_program: "Drafting Program",
+  daily_reports: "Drafting Register",
+  reo_scheduling: "Reo Scheduling",
+  pm_call_logs: "PM Call Logs",
+  logistics: "Logistics",
+  sales_pipeline: "Sales Pipeline",
+  contract_hub: "Contract Hub",
+  progress_claims: "Progress Claims",
+  purchase_orders: "Purchase Orders",
+  hire_bookings: "Hire Bookings",
+  weekly_wages: "Weekly Wages",
+  admin_assets: "Asset Register",
+  kpi_dashboard: "KPI Dashboard",
+  manager_review: "Manager Review",
+  checklist_reports: "Checklist Reports",
+  admin_settings: "Settings",
+  admin_companies: "Companies",
+  admin_factories: "Factories",
+  admin_panel_types: "Panel Types",
+  admin_document_config: "Document Config",
+  admin_checklist_templates: "Checklist Templates",
+  admin_item_catalog: "Items & Categories",
+  admin_devices: "Devices",
+  admin_users: "Users",
+  admin_user_permissions: "User Permissions",
+  admin_job_types: "Job Types & Workflows",
+  admin_jobs: "Jobs Management",
+  admin_customers: "Customers",
+  admin_suppliers: "Suppliers",
+  admin_employees: "Employees",
+  admin_zones: "Zones",
+  admin_work_types: "Work Types",
+  admin_trailer_types: "Trailer Types",
+  admin_data_management: "Data Management",
+};
+
+const INVITE_PERMISSION_SECTIONS = [
+  { label: "Main Navigation", keys: ["tasks", "chat", "jobs", "panel_register", "document_register", "photo_gallery", "checklists", "weekly_job_logs", "broadcast"] },
+  { label: "Production & Scheduling", keys: ["production_slots", "production_report", "drafting_program", "daily_reports", "reo_scheduling", "pm_call_logs", "logistics"] },
+  { label: "Finance & Commercial", keys: ["sales_pipeline", "contract_hub", "progress_claims", "purchase_orders", "hire_bookings", "weekly_wages", "admin_assets"] },
+  { label: "Management & Reporting", keys: ["kpi_dashboard", "manager_review", "checklist_reports"] },
+  { label: "Administration", keys: ["admin_settings", "admin_companies", "admin_factories", "admin_panel_types", "admin_document_config", "admin_checklist_templates", "admin_item_catalog", "admin_devices", "admin_users", "admin_user_permissions", "admin_job_types", "admin_jobs", "admin_data_management"] },
+  { label: "Contacts", keys: ["admin_customers", "admin_suppliers", "admin_employees"] },
+  { label: "Other", keys: ["admin_zones", "admin_work_types", "admin_trailer_types"] },
+];
 
 const createUserSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email address"),
@@ -158,6 +221,12 @@ export default function AdminUsersPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"USER" | "MANAGER" | "ADMIN">("USER");
   const [inviteUserType, setInviteUserType] = useState<"EMPLOYEE" | "EXTERNAL">("EMPLOYEE");
+  const [invitePermissions, setInvitePermissions] = useState<Record<string, PermissionLevel>>(() => {
+    const defaults: Record<string, PermissionLevel> = {};
+    FUNCTION_KEYS.forEach(key => { defaults[key] = "VIEW_AND_UPDATE"; });
+    return defaults;
+  });
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
 
   const { data: users, isLoading } = useQuery<UserType[]>({
     queryKey: [ADMIN_ROUTES.USERS],
@@ -290,7 +359,7 @@ export default function AdminUsersPage() {
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async (data: { email: string; role: string; userType: string }) => {
+    mutationFn: async (data: { email: string; role: string; userType: string; permissions?: Record<string, string> }) => {
       return apiRequest("POST", INVITATION_ROUTES.ADMIN_CREATE, data);
     },
     onSuccess: (data: any) => {
@@ -300,6 +369,10 @@ export default function AdminUsersPage() {
       setInviteEmail("");
       setInviteRole("USER");
       setInviteUserType("EMPLOYEE");
+      const defaults: Record<string, PermissionLevel> = {};
+      FUNCTION_KEYS.forEach(key => { defaults[key] = "VIEW_AND_UPDATE"; });
+      setInvitePermissions(defaults);
+      setExpandedSections(new Set());
     },
     onError: (err: any) => {
       toast({ title: "Failed to send invitation", description: err.message || "An error occurred", variant: "destructive" });
@@ -982,51 +1055,196 @@ export default function AdminUsersPage() {
       </Dialog>
 
       <Dialog open={inviteDialogOpen} onOpenChange={setInviteDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Invite User</DialogTitle>
             <DialogDescription>
-              Send an email invitation for a new user to set up their own account
+              Set up email, role, and module permissions in one step. The invited user will register with these permissions pre-configured.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email Address *</label>
-              <Input
-                type="email"
-                placeholder="user@example.com"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                data-testid="input-invite-email"
-              />
+          <ScrollArea className="flex-1 pr-4">
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Email Address *</label>
+                <Input
+                  type="email"
+                  placeholder="user@example.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  data-testid="input-invite-email"
+                />
+              </div>
+              <div className="flex flex-wrap gap-4">
+                <div className="space-y-2 flex-1 min-w-[140px]">
+                  <label className="text-sm font-medium">Role</label>
+                  <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "USER" | "MANAGER" | "ADMIN")}>
+                    <SelectTrigger data-testid="select-invite-role">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USER">User</SelectItem>
+                      <SelectItem value="MANAGER">Manager</SelectItem>
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 flex-1 min-w-[140px]">
+                  <label className="text-sm font-medium">User Type</label>
+                  <Select value={inviteUserType} onValueChange={(v) => setInviteUserType(v as "EMPLOYEE" | "EXTERNAL")}>
+                    <SelectTrigger data-testid="select-invite-user-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                      <SelectItem value="EXTERNAL">External</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <label className="text-sm font-medium">Module Permissions</label>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const updated = { ...invitePermissions };
+                        FUNCTION_KEYS.forEach(key => { updated[key] = "VIEW_AND_UPDATE"; });
+                        setInvitePermissions(updated);
+                      }}
+                      data-testid="button-permissions-all-full"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      All Full
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const updated = { ...invitePermissions };
+                        FUNCTION_KEYS.forEach(key => { updated[key] = "VIEW"; });
+                        setInvitePermissions(updated);
+                      }}
+                      data-testid="button-permissions-all-view"
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      All View
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const updated = { ...invitePermissions };
+                        FUNCTION_KEYS.forEach(key => { updated[key] = "HIDDEN"; });
+                        setInvitePermissions(updated);
+                      }}
+                      data-testid="button-permissions-all-hidden"
+                    >
+                      <EyeOff className="h-3 w-3 mr-1" />
+                      All Hidden
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  {INVITE_PERMISSION_SECTIONS.map((section) => {
+                    const isExpanded = expandedSections.has(section.label);
+                    const sectionLevels = section.keys.map(k => invitePermissions[k] || "VIEW_AND_UPDATE");
+                    const allSame = sectionLevels.every(l => l === sectionLevels[0]);
+                    const summaryText = allSame
+                      ? sectionLevels[0] === "VIEW_AND_UPDATE" ? "Full Access" : sectionLevels[0] === "VIEW" ? "View Only" : sectionLevels[0] === "HIDDEN" ? "Hidden" : "Mixed"
+                      : "Mixed";
+
+                    return (
+                      <Collapsible
+                        key={section.label}
+                        open={isExpanded}
+                        onOpenChange={() => {
+                          setExpandedSections(prev => {
+                            const next = new Set(prev);
+                            if (next.has(section.label)) next.delete(section.label);
+                            else next.add(section.label);
+                            return next;
+                          });
+                        }}
+                      >
+                        <CollapsibleTrigger asChild>
+                          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md cursor-pointer hover-elevate" data-testid={`section-${section.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                            <div className="flex items-center gap-2">
+                              {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+                              <span className="text-sm font-medium">{section.label}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="secondary" className="text-xs">
+                                {summaryText}
+                              </Badge>
+                              <Select
+                                value=""
+                                onValueChange={(v) => {
+                                  const updated = { ...invitePermissions };
+                                  section.keys.forEach(key => { updated[key] = v as PermissionLevel; });
+                                  setInvitePermissions(updated);
+                                }}
+                              >
+                                <SelectTrigger
+                                  className="h-7 w-[90px] text-xs"
+                                  onClick={(e) => e.stopPropagation()}
+                                  data-testid={`select-section-${section.label.toLowerCase().replace(/\s+/g, '-')}`}
+                                >
+                                  <SelectValue placeholder="Set all" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="VIEW_AND_UPDATE">Full Access</SelectItem>
+                                  <SelectItem value="VIEW">View Only</SelectItem>
+                                  <SelectItem value="HIDDEN">Hidden</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="pl-8 pr-2 pb-2 space-y-1">
+                            {section.keys.map(key => {
+                              const level = invitePermissions[key] || "VIEW_AND_UPDATE";
+                              return (
+                                <div key={key} className="flex items-center justify-between gap-2 py-1">
+                                  <span className="text-sm text-muted-foreground">{INVITE_FUNCTION_LABELS[key] || key}</span>
+                                  <Select
+                                    value={level}
+                                    onValueChange={(v) => {
+                                      setInvitePermissions(prev => ({ ...prev, [key]: v as PermissionLevel }));
+                                    }}
+                                  >
+                                    <SelectTrigger
+                                      className="h-7 w-[130px] text-xs"
+                                      data-testid={`select-permission-${key}`}
+                                    >
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="VIEW_AND_UPDATE">Full Access</SelectItem>
+                                      <SelectItem value="VIEW">View Only</SelectItem>
+                                      <SelectItem value="HIDDEN">Hidden</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Role</label>
-              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as "USER" | "MANAGER" | "ADMIN")}>
-                <SelectTrigger data-testid="select-invite-role">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USER">User</SelectItem>
-                  <SelectItem value="MANAGER">Manager</SelectItem>
-                  <SelectItem value="ADMIN">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">User Type</label>
-              <Select value={inviteUserType} onValueChange={(v) => setInviteUserType(v as "EMPLOYEE" | "EXTERNAL")}>
-                <SelectTrigger data-testid="select-invite-user-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="EMPLOYEE">Employee</SelectItem>
-                  <SelectItem value="EXTERNAL">External</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
+          </ScrollArea>
+          <DialogFooter className="pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setInviteDialogOpen(false)}>
               Cancel
             </Button>
@@ -1036,7 +1254,7 @@ export default function AdminUsersPage() {
                   toast({ title: "Please enter a valid email address", variant: "destructive" });
                   return;
                 }
-                inviteMutation.mutate({ email: inviteEmail, role: inviteRole, userType: inviteUserType });
+                inviteMutation.mutate({ email: inviteEmail, role: inviteRole, userType: inviteUserType, permissions: invitePermissions });
               }}
               disabled={inviteMutation.isPending}
               data-testid="button-send-invite"

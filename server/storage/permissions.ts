@@ -45,7 +45,7 @@ export const permissionMethods = {
       ));
   },
 
-  async initializeUserPermissions(userId: string): Promise<UserPermission[]> {
+  async initializeUserPermissions(userId: string, customPermissions?: Record<string, string>): Promise<UserPermission[]> {
     const existingPerms = await permissionMethods.getUserPermissions(userId);
     const existingKeys = new Set(existingPerms.map(p => p.functionKey));
     const missingKeys = FUNCTION_KEYS.filter(key => !existingKeys.has(key));
@@ -56,7 +56,9 @@ export const permissionMethods = {
       .values(missingKeys.map(functionKey => ({
         userId,
         functionKey,
-        permissionLevel: "VIEW_AND_UPDATE" as PermissionLevel,
+        permissionLevel: (customPermissions && customPermissions[functionKey]
+          ? customPermissions[functionKey]
+          : "VIEW_AND_UPDATE") as PermissionLevel,
       })))
       .returning();
     

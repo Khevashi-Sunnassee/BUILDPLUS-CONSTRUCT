@@ -3,6 +3,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { emailService } from "../services/email.service";
+import { permissionMethods } from "../storage/permissions";
 import logger from "../lib/logger";
 
 const router = Router();
@@ -13,6 +14,7 @@ const createInvitationSchema = z.object({
   role: z.enum(["USER", "MANAGER", "ADMIN"]).default("USER"),
   userType: z.enum(["EMPLOYEE", "EXTERNAL"]).default("EMPLOYEE"),
   departmentId: z.string().nullable().optional(),
+  permissions: z.record(z.string(), z.enum(["HIDDEN", "VIEW", "VIEW_AND_UPDATE", "VIEW_OWN", "VIEW_AND_UPDATE_OWN"])).optional(),
 });
 
 router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => {
@@ -22,7 +24,7 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
       return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
     }
 
-    const { email, role, userType, departmentId } = parsed.data;
+    const { email, role, userType, departmentId, permissions } = parsed.data;
     const companyId = parsed.data.companyId || req.companyId!;
 
     const company = await storage.getCompany(companyId);
@@ -41,6 +43,7 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
       role,
       userType,
       departmentId: departmentId || null,
+      permissions: permissions || null,
       invitedBy: req.session.userId!,
     });
 
@@ -226,6 +229,14 @@ router.post("/api/invitations/:token/register", async (req, res) => {
     });
 
     await storage.markInvitationAccepted(invitation.id);
+
+    if (invitation.permissions && Object.keys(invitation.permissions).length > 0) {
+      await permissionMethods.initializeUserPermissions(user.id, invitation.permissions);
+      logger.info({ userId: user.id, permissionCount: Object.keys(invitation.permissions).length }, "Applied invitation permissions");
+    } else {
+      await permissionMethods.initializeUserPermissions(user.id);
+      logger.info({ userId: user.id }, "Applied default permissions");
+    }
 
     logger.info({ userId: user.id, email: user.email, companyId: user.companyId }, "User registered via invitation");
 

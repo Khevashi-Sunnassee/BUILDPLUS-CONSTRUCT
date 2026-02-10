@@ -17,6 +17,7 @@ export const invitationMethods = {
     role: "USER" | "MANAGER" | "ADMIN";
     userType: "EMPLOYEE" | "EXTERNAL";
     departmentId?: string | null;
+    permissions?: Record<string, string> | null;
     invitedBy: string;
     expiresInDays?: number;
   }): Promise<{ invitation: UserInvitation; token: string }> {
@@ -31,6 +32,7 @@ export const invitationMethods = {
       role: data.role,
       userType: data.userType,
       departmentId: data.departmentId || null,
+      permissions: data.permissions || null,
       tokenHash,
       invitedBy: data.invitedBy,
       expiresAt,
