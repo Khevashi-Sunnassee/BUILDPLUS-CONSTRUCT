@@ -165,6 +165,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | VF-048 | chart.tsx dangerouslySetInnerHTML uses DOMPurify.sanitize() | `grep DOMPurify client/src/components/ui/chart.tsx` shows import and usage | 2026-02-10 |
 | VF-049 | Database indexes: 532 total (up from 450+) | `SELECT count(*) FROM pg_indexes WHERE schemaname='public'` returns 532 | 2026-02-10 |
 | VF-050 | 95 lazy-loaded page routes with Suspense fallback | `grep -c "lazy(" client/src/App.tsx` returns 95 | 2026-02-10 |
+| VF-051 | Comprehensive E2E test suite: 83 tests across 6 files | `npx vitest run tests/e2e-*.test.ts` shows 83 tests passing. Covers hire booking (15 tests), tasks (17 tests), documents (17 tests), panels (10 tests), RBAC/auth (15 tests), progress claims (9 tests). | 2026-02-10 |
 
 ---
 
@@ -197,7 +198,7 @@ Items that have been implemented and verified. Every audit MUST confirm these ar
 | KI-020 | 3 large vendor chunks >500KB not code-split | P2 | MITIGATED | Performance | exceljs/jspdf/html2canvas converted to dynamic import(). 2 chunks remain >500KB (exceljs 937KB as lazy chunk, core index 737KB - framework bundle). See VF-045. | 2026-02-10 |
 | KI-021 | Remaining `: any` type annotations | P2 | MITIGATED | TypeScript | All catch blocks now use `unknown` (VF-044). ~71 remaining `: any` in routes are parameter/type assertions, trending down. | 2026-02-10 |
 | KI-022 | chart.tsx dangerouslySetInnerHTML without DOMPurify | P3 | FIXED | Security | chart.tsx now uses DOMPurify.sanitize(). See VF-048. | 2026-02-10 |
-| KI-023 | No integration/E2E tests for critical workflows | P2 | OPEN | Testing | 219 unit tests cover financial calcs, lifecycle, validation, API routes. No E2E tests for multi-step workflows (panel lifecycle, approval flows, production slot generation). | 2026-02-09 |
+| KI-023 | No integration/E2E tests for critical workflows | P2 | FIXED | Testing | 83 E2E tests across 6 files covering hire booking workflow, task management, document register, panel lifecycle, RBAC/auth security, and progress claims. See VF-051. | 2026-02-10 |
 | KI-024 | contracts.routes.ts upload missing fileFilter | P2 | FIXED | Security | fileFilter added to contracts.routes.ts multer config. See VF-047. | 2026-02-10 |
 
 **Maintenance Rule:** Any code change touching security, auth, validation, or database schema MUST update this tracker and the Verified Fixes Registry. Stale documentation is a risk.

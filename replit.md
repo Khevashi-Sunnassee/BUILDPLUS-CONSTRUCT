@@ -89,5 +89,13 @@ There are **two separate audit types** in `AUDIT_STANDARDS.md`:
 - CSRF middleware is applied globally to `/api` routes — do not bypass without explicit justification.
 - File uploads MUST have type filtering and size limits via multer configuration.
 
+### Testing
+- **Framework:** Vitest (v4.x), configured in `vitest.config.ts` with sequential file execution (`fileParallelism: false`, `maxWorkers: 1`).
+- **E2E Tests:** 6 test files (`tests/e2e-*.test.ts`) with 83 tests covering hire booking workflow, task management, document register, panel lifecycle, RBAC/auth security, and progress claims.
+- **E2E Helpers:** Shared test utilities in `tests/e2e-helpers.ts` with login caching, authenticated fetch wrappers (adminGet/adminPost/adminPatch/adminPut/adminDelete), CSRF handling, and unique name generators.
+- **Run E2E tests:** `npx vitest run tests/e2e-*.test.ts`
+- **Run all tests:** `npx vitest run`
+- **Test approach:** E2E tests hit the live server at localhost:5000 with actual database writes. Sequential execution prevents login rate limiting.
+
 ### Documentation Maintenance Rule
 Any code change touching security, auth, validation, or database schema MUST update `AUDIT_STANDARDS.md` (Known Issues Tracker and Verified Fixes Registry). Stale documentation is a risk.
