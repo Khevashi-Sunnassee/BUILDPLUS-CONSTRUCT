@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,12 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { format } from "date-fns";
-import { MessageSquare, Users, Hash, Send, ChevronLeft, Plus, X, Image, Loader2, Check, Search as SearchIcon } from "lucide-react";
+import {
+  MessageSquare, Users, Hash, Send, ChevronLeft, Plus, X, Image, Loader2,
+  Check, Search as SearchIcon, ChevronDown, ChevronRight, FolderOpen, Tag,
+  Pencil, Trash2, MoreVertical, ImageOff,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { compressImages } from "@/lib/image-compress";
+import { playNotificationSound } from "@/lib/notification-sound";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
 interface Job {
@@ -50,6 +56,7 @@ interface Conversation {
   id: string;
   name: string | null;
   type: "DM" | "GROUP" | "CHANNEL";
+  topicId: string | null;
   unreadCount: number;
   unreadMentions: number;
   lastMessage?: {
@@ -58,6 +65,63 @@ interface Conversation {
     sender?: { name: string | null };
   } | null;
   members?: Array<{ user?: User }>;
+}
+
+interface ChatTopic {
+  id: string;
+  companyId: string;
+  name: string;
+  sortOrder: number;
+  createdAt: string;
+  createdById: string | null;
+}
+
+function MobileChatImageAttachment({ att }: { att: ChatAttachment }) {
+  const [removed, setRemoved] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  if (removed) {
+    return (
+      <div className="flex items-center gap-2 p-2 rounded-lg bg-black/20 text-white/50 text-sm" data-testid={`attachment-removed-${att.id}`}>
+        <ImageOff className="h-4 w-4 shrink-0" />
+        <span>Image removed</span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <img
+        src={att.url}
+        alt={att.fileName}
+        className="rounded-lg max-w-full max-h-64 object-contain cursor-pointer"
+        onClick={() => setPreviewOpen(true)}
+        onError={() => setRemoved(true)}
+        data-testid={`attachment-image-${att.id}`}
+      />
+      {previewOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setPreviewOpen(false)}
+          data-testid="modal-image-preview"
+        >
+          <button
+            onClick={() => setPreviewOpen(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center z-10"
+            data-testid="button-close-preview"
+          >
+            <X className="h-6 w-6 text-white" />
+          </button>
+          <img
+            src={att.url}
+            alt="Preview"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  );
 }
 
 export default function MobileChatPage() {
@@ -75,12 +139,20 @@ export default function MobileChatPage() {
   const [newConvMembers, setNewConvMembers] = useState<string[]>([]);
   const [newConvJobId, setNewConvJobId] = useState<string | null>(null);
   const [memberSearch, setMemberSearch] = useState("");
+  const [collapsedTopics, setCollapsedTopics] = useState<Set<string>>(new Set());
+  const [showTopicSheet, setShowTopicSheet] = useState(false);
+  const [editingTopic, setEditingTopic] = useState<ChatTopic | null>(null);
+  const [topicName, setTopicName] = useState("");
+  const [showTopicAssign, setShowTopicAssign] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevMessageIdsRef = useRef<Set<string>>(new Set());
+  const initialLoadRef = useRef(true);
 
   const { data: conversations = [], isLoading } = useQuery<Conversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
+    refetchInterval: 10000,
   });
 
   const { data: allUsers = [] } = useQuery<User[]>({
@@ -91,6 +163,10 @@ export default function MobileChatPage() {
   const { data: jobs = [] } = useQuery<Job[]>({
     queryKey: [JOBS_ROUTES.LIST],
     enabled: showNewConversation,
+  });
+
+  const { data: topics = [] } = useQuery<ChatTopic[]>({
+    queryKey: [CHAT_ROUTES.TOPICS],
   });
 
   const filteredUsers = allUsers.filter(u => {
@@ -143,6 +219,7 @@ export default function MobileChatPage() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: [CHAT_ROUTES.MESSAGES(selectedConversationId || "")],
     enabled: !!selectedConversationId,
+    refetchInterval: 5000,
   });
 
   const sendMessageMutation = useMutation({
@@ -169,13 +246,93 @@ export default function MobileChatPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.MESSAGES(selectedConversationId!)] });
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOTAL_UNREAD] });
       setMessageContent("");
       clearSelectedFiles();
+      if (selectedConversationId) {
+        markReadMutation.mutate(selectedConversationId);
+      }
     },
     onError: () => {
       toast({ title: "Failed to send message", variant: "destructive" });
     },
   });
+
+  const markReadMutation = useMutation({
+    mutationFn: async (conversationId: string) => {
+      return apiRequest("POST", CHAT_ROUTES.MARK_READ, { conversationId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOTAL_UNREAD] });
+    },
+  });
+
+  const createTopicMutation = useMutation({
+    mutationFn: async (name: string) => {
+      return apiRequest("POST", CHAT_ROUTES.TOPICS, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
+      setTopicName("");
+      setEditingTopic(null);
+      toast({ title: "Topic created" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateTopicMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      return apiRequest("PATCH", CHAT_ROUTES.TOPIC_BY_ID(id), { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
+      setTopicName("");
+      setEditingTopic(null);
+      toast({ title: "Topic updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteTopicMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", CHAT_ROUTES.TOPIC_BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      toast({ title: "Topic deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to delete topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const assignTopicMutation = useMutation({
+    mutationFn: async ({ conversationId, topicId }: { conversationId: string; topicId: string | null }) => {
+      return apiRequest("PATCH", CHAT_ROUTES.CONVERSATION_TOPIC(conversationId), { topicId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      setShowTopicAssign(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to assign topic", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleTopicCollapse = useCallback((topicId: string) => {
+    setCollapsedTopics(prev => {
+      const next = new Set(prev);
+      if (next.has(topicId)) next.delete(topicId);
+      else next.add(topicId);
+      return next;
+    });
+  }, []);
 
   const handleFilePick = async (e: { target: HTMLInputElement }) => {
     const rawFiles = Array.from(e.target.files || []);
@@ -215,17 +372,6 @@ export default function MobileChatPage() {
     clearSelectedFiles();
   }, [selectedConversationId]);
 
-  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
-
-  const markReadMutation = useMutation({
-    mutationFn: async (conversationId: string) => {
-      return apiRequest("POST", CHAT_ROUTES.MARK_READ_CONVERSATION(conversationId), {});
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
-    },
-  });
-
   useEffect(() => {
     if (selectedConversationId) {
       markReadMutation.mutate(selectedConversationId);
@@ -235,6 +381,32 @@ export default function MobileChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!messages.length) {
+      prevMessageIdsRef.current = new Set();
+      initialLoadRef.current = true;
+      return;
+    }
+    const currentIds = new Set(messages.map(m => m.id));
+    if (initialLoadRef.current) {
+      prevMessageIdsRef.current = currentIds;
+      initialLoadRef.current = false;
+      return;
+    }
+    const newMessages = messages.filter(
+      m => !prevMessageIdsRef.current.has(m.id) && m.senderId !== String(currentUser?.id)
+    );
+    if (newMessages.length > 0) {
+      playNotificationSound();
+    }
+    prevMessageIdsRef.current = currentIds;
+  }, [messages, currentUser?.id]);
+
+  useEffect(() => {
+    initialLoadRef.current = true;
+    prevMessageIdsRef.current = new Set();
+  }, [selectedConversationId]);
 
   useEffect(() => {
     if (!selectedConversationId) return;
@@ -322,6 +494,17 @@ export default function MobileChatPage() {
           <h1 className="text-white text-lg font-semibold flex-1 truncate">
             {convName}
           </h1>
+          {topics.length > 0 && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowTopicAssign(selectedConversation.id)}
+              className="text-white/60"
+              data-testid="button-assign-topic-header"
+            >
+              <Tag className="h-4 w-4" />
+            </Button>
+          )}
         </header>
 
         <main 
@@ -341,67 +524,79 @@ export default function MobileChatPage() {
               <p className="text-sm text-white/40">Start the conversation!</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {messages.map((message) => {
-                const isOwn = message.senderId === currentUser?.id;
+            <div className="space-y-1">
+              {messages.map((message, idx) => {
+                const isOwn = message.senderId === String(currentUser?.id);
                 const senderName = message.sender?.name || message.sender?.email || "Unknown";
+                const msgDate = new Date(message.createdAt);
+                const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                const showDateSeparator = !prevMsg || format(new Date(prevMsg.createdAt), "yyyy-MM-dd") !== format(msgDate, "yyyy-MM-dd");
+                const timeStr = format(msgDate, "dd/MM/yyyy h:mm a");
 
                 return (
-                  <div
-                    key={message.id}
-                    className={cn("flex", isOwn ? "justify-end" : "justify-start")}
-                  >
-                    <div className={cn(
-                      "max-w-[80%] rounded-2xl px-4 py-2",
-                      isOwn 
-                        ? "bg-purple-500 text-white rounded-br-md" 
-                        : "bg-white/10 text-white rounded-bl-md"
-                    )}>
-                      {!isOwn && selectedConversation.type !== "DM" && (
-                        <p className="text-xs font-medium text-white/60 mb-1">
-                          {senderName}
-                        </p>
+                  <div key={message.id} data-testid={`message-${message.id}`}>
+                    {showDateSeparator && (
+                      <div className="flex items-center gap-3 my-3">
+                        <div className="flex-1 border-t border-white/10" />
+                        <span className="text-xs text-white/40 font-medium">
+                          {format(msgDate, "dd/MM/yyyy")}
+                        </span>
+                        <div className="flex-1 border-t border-white/10" />
+                      </div>
+                    )}
+                    <div className={cn("flex gap-2 mb-1", isOwn ? "justify-end" : "justify-start")}>
+                      {!isOwn && (
+                        <Avatar className="h-7 w-7 mt-1 shrink-0">
+                          <AvatarFallback className="bg-purple-500/20 text-purple-400 text-[10px]">
+                            {getInitials(senderName)}
+                          </AvatarFallback>
+                        </Avatar>
                       )}
-                      {message.attachments && message.attachments.length > 0 && (
-                        <div className="space-y-2 mb-1">
-                          {message.attachments.map((att) => {
-                            const isImage = att.mimeType.startsWith("image/");
-                            return isImage ? (
-                              <img
-                                key={att.id}
-                                src={att.url}
-                                alt={att.fileName}
-                                className="rounded-lg max-w-full max-h-64 object-contain cursor-pointer"
-                                onClick={() => setPreviewImageUrl(att.url)}
-                                data-testid={`attachment-image-${att.id}`}
-                              />
-                            ) : (
-                              <a
-                                key={att.id}
-                                href={att.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20 text-sm"
-                                data-testid={`attachment-file-${att.id}`}
-                              >
-                                <Image className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">{att.fileName}</span>
-                              </a>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {message.body && (
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {message.body}
-                        </p>
-                      )}
-                      <p className={cn(
-                        "text-xs mt-1",
-                        isOwn ? "text-white/70" : "text-white/50"
+                      <div className={cn(
+                        "max-w-[75%] rounded-2xl px-3 py-2",
+                        isOwn 
+                          ? "bg-primary text-primary-foreground rounded-tr-none" 
+                          : "bg-white/10 text-white rounded-tl-none"
                       )}>
-                        {format(new Date(message.createdAt), "HH:mm")}
-                      </p>
+                        {!isOwn && selectedConversation.type !== "DM" && (
+                          <p className="text-xs font-medium text-white/60 mb-0.5">
+                            {senderName}
+                          </p>
+                        )}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="space-y-2 mb-1">
+                            {message.attachments.map((att) => {
+                              const isImage = att.mimeType.startsWith("image/");
+                              return isImage ? (
+                                <MobileChatImageAttachment key={att.id} att={att} />
+                              ) : (
+                                <a
+                                  key={att.id}
+                                  href={att.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/20 text-sm"
+                                  data-testid={`attachment-file-${att.id}`}
+                                >
+                                  <Image className="h-4 w-4 flex-shrink-0" />
+                                  <span className="truncate">{att.fileName}</span>
+                                </a>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {message.body && (
+                          <p className="text-sm whitespace-pre-wrap break-words">
+                            {message.body}
+                          </p>
+                        )}
+                        <p className={cn(
+                          "text-[10px] mt-0.5",
+                          isOwn ? "text-primary-foreground/70" : "text-white/40"
+                        )}>
+                          {timeStr}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -411,27 +606,41 @@ export default function MobileChatPage() {
           )}
         </main>
 
-        {previewImageUrl && (
-          <div 
-            className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
-            onClick={() => setPreviewImageUrl(null)}
-            data-testid="modal-image-preview"
-          >
-            <button
-              onClick={() => setPreviewImageUrl(null)}
-              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 flex items-center justify-center z-10"
-              data-testid="button-close-preview"
-            >
-              <X className="h-6 w-6 text-white" />
-            </button>
-            <img
-              src={previewImageUrl}
-              alt="Preview"
-              className="max-w-full max-h-full object-contain rounded-lg"
-              onClick={(e) => e.stopPropagation()}
-            />
-          </div>
-        )}
+        <Sheet open={showTopicAssign === selectedConversation.id} onOpenChange={(open) => { if (!open) setShowTopicAssign(null); }}>
+          <SheetContent side="bottom" className="bg-[#0D1117] border-white/10 text-white rounded-t-2xl max-h-[50vh] p-0 flex flex-col">
+            <SheetHeader className="px-4 pt-4 pb-3 border-b border-white/10 flex-shrink-0">
+              <SheetTitle className="text-white text-lg">Move to Topic</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+              <button
+                onClick={() => assignTopicMutation.mutate({ conversationId: selectedConversation.id, topicId: null })}
+                className={cn(
+                  "w-full text-left text-sm px-3 py-3 rounded-xl active:scale-[0.99]",
+                  !selectedConversation.topicId ? "bg-blue-400/10 text-blue-400" : "text-white/60"
+                )}
+                data-testid="topic-assign-none-mobile"
+              >
+                No Topic
+                {!selectedConversation.topicId && <Check className="h-4 w-4 inline ml-2" />}
+              </button>
+              {topics.map(topic => (
+                <button
+                  key={topic.id}
+                  onClick={() => assignTopicMutation.mutate({ conversationId: selectedConversation.id, topicId: topic.id })}
+                  className={cn(
+                    "w-full flex items-center gap-2 text-sm px-3 py-3 rounded-xl active:scale-[0.99]",
+                    selectedConversation.topicId === topic.id ? "bg-blue-400/10 text-blue-400" : "text-white/60"
+                  )}
+                  data-testid={`topic-assign-${topic.id}-mobile`}
+                >
+                  <FolderOpen className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 truncate">{topic.name}</span>
+                  {selectedConversation.topicId === topic.id && <Check className="h-4 w-4 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
 
         <footer className="flex-shrink-0 border-t border-white/10 bg-[#0D1117]">
           <input
@@ -526,6 +735,75 @@ export default function MobileChatPage() {
     );
   }
 
+  const renderConversationItem = (conv: Conversation) => {
+    const name = getConversationName(conv);
+    const Icon = getConversationIcon(conv.type);
+    
+    return (
+      <div key={conv.id} className="flex items-center gap-1">
+        <button
+          onClick={() => setSelectedConversationId(conv.id)}
+          className={cn(
+            "flex-1 flex items-center gap-3 p-3 rounded-2xl border border-white/10 text-left active:scale-[0.99]",
+            conv.unreadCount > 0 ? "bg-white/5" : "bg-white/[0.03]"
+          )}
+          data-testid={`conversation-${conv.id}`}
+        >
+          <Avatar className="h-12 w-12 flex-shrink-0">
+            <AvatarFallback className="bg-purple-500/20 text-purple-400">
+              {conv.type === "DM" ? getInitials(name) : <Icon className="h-5 w-5" />}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className={cn(
+                "font-medium text-sm truncate text-white",
+                conv.unreadCount > 0 && "font-semibold"
+              )}>
+                {name}
+              </h3>
+              {conv.lastMessage?.createdAt && (
+                <span className="text-xs text-white/50 flex-shrink-0">
+                  {format(new Date(conv.lastMessage.createdAt), "HH:mm")}
+                </span>
+              )}
+            </div>
+            {conv.lastMessage?.body && (
+              <p className={cn(
+                "text-sm truncate",
+                conv.unreadCount > 0 ? "text-white/80" : "text-white/50"
+              )}>
+                {conv.lastMessage.body}
+              </p>
+            )}
+          </div>
+
+          {conv.unreadCount > 0 && (
+            <span className="inline-flex min-w-[22px] h-[22px] items-center justify-center rounded-full bg-red-500 px-2 text-[12px] font-semibold text-white flex-shrink-0">
+              {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
+            </span>
+          )}
+        </button>
+        {topics.length > 0 && (
+          <button
+            onClick={() => setShowTopicAssign(conv.id)}
+            className="p-2 text-white/30 active:text-white/60 shrink-0"
+            data-testid={`button-assign-topic-${conv.id}`}
+          >
+            <Tag className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const ungrouped = sortedConversations.filter(c => !c.topicId);
+  const grouped = topics.map(topic => ({
+    topic,
+    convs: sortedConversations.filter(c => c.topicId === topic.id),
+  })).filter(g => g.convs.length > 0);
+
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -536,15 +814,30 @@ export default function MobileChatPage() {
               {conversations.length} {conversations.length === 1 ? 'conversation' : 'conversations'}
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowNewConversation(true)}
-            className="text-blue-400 mt-1"
-            data-testid="button-new-conversation-mobile"
-          >
-            <Plus className="h-6 w-6" />
-          </Button>
+          <div className="flex items-center gap-1 mt-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setEditingTopic(null);
+                setTopicName("");
+                setShowTopicSheet(true);
+              }}
+              className="text-white/60"
+              data-testid="button-manage-topics-mobile"
+            >
+              <Tag className="h-5 w-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowNewConversation(true)}
+              className="text-blue-400"
+              data-testid="button-new-conversation-mobile"
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -569,61 +862,178 @@ export default function MobileChatPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {sortedConversations.map((conv) => {
-              const name = getConversationName(conv);
-              const Icon = getConversationIcon(conv.type);
-              
+            {grouped.map(({ topic, convs }) => {
+              const isCollapsed = collapsedTopics.has(topic.id);
+              const topicUnread = convs.reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
               return (
-                <button
-                  key={conv.id}
-                  onClick={() => setSelectedConversationId(conv.id)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-3 rounded-2xl border border-white/10 text-left active:scale-[0.99]",
-                    conv.unreadCount > 0 ? "bg-white/5" : "bg-white/[0.03]"
-                  )}
-                  data-testid={`conversation-${conv.id}`}
-                >
-                  <Avatar className="h-12 w-12 flex-shrink-0">
-                    <AvatarFallback className="bg-purple-500/20 text-purple-400">
-                      {conv.type === "DM" ? getInitials(name) : <Icon className="h-5 w-5" />}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className={cn(
-                        "font-medium text-sm truncate text-white",
-                        conv.unreadCount > 0 && "font-semibold"
-                      )}>
-                        {name}
-                      </h3>
-                      {conv.lastMessage?.createdAt && (
-                        <span className="text-xs text-white/50 flex-shrink-0">
-                          {format(new Date(conv.lastMessage.createdAt), "HH:mm")}
-                        </span>
-                      )}
-                    </div>
-                    {conv.lastMessage?.body && (
-                      <p className={cn(
-                        "text-sm truncate",
-                        conv.unreadCount > 0 ? "text-white/80" : "text-white/50"
-                      )}>
-                        {conv.lastMessage.body}
-                      </p>
+                <div key={topic.id} data-testid={`topic-group-${topic.id}`}>
+                  <button
+                    onClick={() => toggleTopicCollapse(topic.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl active:scale-[0.99]"
+                    data-testid={`button-toggle-topic-${topic.id}`}
+                  >
+                    {isCollapsed ? <ChevronRight className="h-4 w-4 text-white/40 shrink-0" /> : <ChevronDown className="h-4 w-4 text-white/40 shrink-0" />}
+                    <FolderOpen className="h-4 w-4 text-white/40 shrink-0" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-white/40 flex-1 text-left truncate">{topic.name}</span>
+                    {topicUnread > 0 && (
+                      <span className="inline-flex min-w-[18px] h-[18px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-semibold text-white">
+                        {topicUnread > 99 ? "99+" : topicUnread}
+                      </span>
                     )}
-                  </div>
-
-                  {conv.unreadCount > 0 && (
-                    <span className="inline-flex min-w-[22px] h-[22px] items-center justify-center rounded-full bg-red-500 px-2 text-[12px] font-semibold text-white flex-shrink-0">
-                      {conv.unreadCount > 99 ? "99+" : conv.unreadCount}
-                    </span>
+                    <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px] bg-white/10 text-white/50 border-0">{convs.length}</Badge>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="ml-4 pl-2 border-l border-white/10 space-y-2 mt-1">
+                      {convs.map(renderConversationItem)}
+                    </div>
                   )}
-                </button>
+                </div>
               );
             })}
+            {ungrouped.length > 0 && grouped.length > 0 && (
+              <div className="px-3 py-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/40">Ungrouped</span>
+              </div>
+            )}
+            {ungrouped.map(renderConversationItem)}
           </div>
         )}
       </div>
+
+      <Sheet open={showTopicAssign !== null && !selectedConversationId} onOpenChange={(open) => { if (!open) setShowTopicAssign(null); }}>
+        <SheetContent side="bottom" className="bg-[#0D1117] border-white/10 text-white rounded-t-2xl max-h-[50vh] p-0 flex flex-col">
+          <SheetHeader className="px-4 pt-4 pb-3 border-b border-white/10 flex-shrink-0">
+            <SheetTitle className="text-white text-lg">Move to Topic</SheetTitle>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1">
+            <button
+              onClick={() => showTopicAssign && assignTopicMutation.mutate({ conversationId: showTopicAssign, topicId: null })}
+              className={cn(
+                "w-full text-left text-sm px-3 py-3 rounded-xl active:scale-[0.99]",
+                showTopicAssign && !conversations.find(c => c.id === showTopicAssign)?.topicId ? "bg-blue-400/10 text-blue-400" : "text-white/60"
+              )}
+              data-testid="topic-assign-none-list"
+            >
+              No Topic
+            </button>
+            {topics.map(topic => (
+              <button
+                key={topic.id}
+                onClick={() => showTopicAssign && assignTopicMutation.mutate({ conversationId: showTopicAssign, topicId: topic.id })}
+                className={cn(
+                  "w-full flex items-center gap-2 text-sm px-3 py-3 rounded-xl active:scale-[0.99]",
+                  showTopicAssign && conversations.find(c => c.id === showTopicAssign)?.topicId === topic.id ? "bg-blue-400/10 text-blue-400" : "text-white/60"
+                )}
+                data-testid={`topic-assign-${topic.id}-list`}
+              >
+                <FolderOpen className="h-4 w-4 shrink-0" />
+                <span className="flex-1 truncate">{topic.name}</span>
+                {showTopicAssign && conversations.find(c => c.id === showTopicAssign)?.topicId === topic.id && <Check className="h-4 w-4 shrink-0" />}
+              </button>
+            ))}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={showTopicSheet} onOpenChange={(open) => { if (!open) { setShowTopicSheet(false); setEditingTopic(null); setTopicName(""); } }}>
+        <SheetContent side="bottom" className="bg-[#0D1117] border-white/10 text-white rounded-t-2xl max-h-[70vh] p-0 flex flex-col">
+          <SheetHeader className="px-4 pt-4 pb-3 border-b border-white/10 flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <SheetTitle className="text-white text-lg">{editingTopic ? "Rename Topic" : "Manage Topics"}</SheetTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => { setShowTopicSheet(false); setEditingTopic(null); setTopicName(""); }}
+                className="text-white/60"
+                data-testid="button-close-topics"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </SheetHeader>
+          <div className="flex-1 overflow-y-auto px-4 py-4">
+            {editingTopic ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-white/40 uppercase tracking-wider mb-1.5 block">Topic Name</label>
+                  <Input
+                    value={topicName}
+                    onChange={(e) => setTopicName(e.target.value)}
+                    placeholder="Topic name"
+                    className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                    data-testid="input-topic-name-mobile"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 border-white/10 text-white"
+                    onClick={() => { setEditingTopic(null); setTopicName(""); }}
+                    data-testid="button-cancel-topic-mobile"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className="flex-1 bg-blue-500"
+                    onClick={() => updateTopicMutation.mutate({ id: editingTopic.id, name: topicName })}
+                    disabled={!topicName.trim() || updateTopicMutation.isPending}
+                    data-testid="button-save-topic-mobile"
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <Input
+                    value={topicName}
+                    onChange={(e) => setTopicName(e.target.value)}
+                    placeholder="New topic name"
+                    className="flex-1 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                    onKeyDown={(e) => { if (e.key === "Enter" && topicName.trim()) createTopicMutation.mutate(topicName.trim()); }}
+                    data-testid="input-new-topic-mobile"
+                  />
+                  <Button
+                    onClick={() => createTopicMutation.mutate(topicName.trim())}
+                    disabled={!topicName.trim() || createTopicMutation.isPending}
+                    className="bg-blue-500"
+                    data-testid="button-create-topic-mobile"
+                  >
+                    Add
+                  </Button>
+                </div>
+                {topics.length > 0 ? (
+                  <div className="space-y-2">
+                    {topics.map(topic => (
+                      <div key={topic.id} className="flex items-center gap-2 px-3 py-3 rounded-xl border border-white/10 bg-white/[0.03]" data-testid={`topic-item-${topic.id}-mobile`}>
+                        <FolderOpen className="h-4 w-4 text-white/40 shrink-0" />
+                        <span className="text-sm text-white flex-1 truncate">{topic.name}</span>
+                        <button
+                          onClick={() => { setEditingTopic(topic); setTopicName(topic.name); }}
+                          className="p-2 text-white/40 active:text-white/80"
+                          data-testid={`button-edit-topic-${topic.id}-mobile`}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
+                          className="p-2 text-red-400/60 active:text-red-400"
+                          data-testid={`button-delete-topic-${topic.id}-mobile`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-white/40 text-center py-4">No topics yet. Create one to organize conversations.</p>
+                )}
+              </div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Sheet open={showNewConversation} onOpenChange={(open) => { if (!open) resetNewConversation(); }}>
         <SheetContent side="bottom" className="bg-[#0D1117] border-white/10 text-white rounded-t-2xl h-[85vh] p-0 flex flex-col">
