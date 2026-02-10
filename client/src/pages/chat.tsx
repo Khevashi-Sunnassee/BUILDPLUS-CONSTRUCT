@@ -220,7 +220,7 @@ export default function ChatPage() {
     }
 
     const newMessages = messages.filter(
-      m => !prevMessageIdsRef.current.has(m.id) && m.userId !== String(currentUser?.id)
+      m => !prevMessageIdsRef.current.has(m.id) && m.senderId !== String(currentUser?.id)
     );
 
     if (newMessages.length > 0) {
