@@ -35,6 +35,8 @@ import {
   activityStages,
   activityConsultants,
   jobTypes,
+  hireBookings,
+  tasks,
 } from "@shared/schema";
 import { inArray, notInArray } from "drizzle-orm";
 
@@ -183,6 +185,13 @@ dataManagementRouter.delete("/api/admin/data-management/assets/:id", requireRole
 
     const [asset] = await db.select({ id: assets.id }).from(assets).where(and(eq(assets.id, id), eq(assets.companyId, companyId)));
     if (!asset) return res.status(404).json({ error: "Asset not found or does not belong to your company" });
+
+    const [hireCount] = await db.select({ count: count() }).from(hireBookings).where(and(eq(hireBookings.assetId, id), eq(hireBookings.companyId, companyId)));
+    if (hireCount.count > 0) {
+      return res.status(409).json({
+        error: `Cannot delete: this asset is referenced by ${hireCount.count} hire booking(s). Remove those bookings first.`,
+      });
+    }
 
     await db.delete(assetMaintenanceRecords).where(and(eq(assetMaintenanceRecords.assetId, id), eq(assetMaintenanceRecords.companyId, companyId)));
     await db.delete(assetTransfers).where(and(eq(assetTransfers.assetId, id), eq(assetTransfers.companyId, companyId)));
@@ -571,6 +580,31 @@ dataManagementRouter.delete("/api/admin/data-management/suppliers/:id", requireR
       return res.status(409).json({ error: `Cannot delete: this supplier is linked to ${itemCount.count} item(s).` });
     }
 
+    const [docCount] = await db.select({ count: count() }).from(documents).where(and(eq(documents.supplierId, id), eq(documents.companyId, companyId)));
+    if (docCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this supplier is linked to ${docCount.count} document(s).` });
+    }
+
+    const [bundleCount] = await db.select({ count: count() }).from(documentBundles).where(and(eq(documentBundles.supplierId, id), eq(documentBundles.companyId, companyId)));
+    if (bundleCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this supplier is linked to ${bundleCount.count} document bundle(s).` });
+    }
+
+    const [assetCount] = await db.select({ count: count() }).from(assets).where(and(eq(assets.supplierId, id), eq(assets.companyId, companyId)));
+    if (assetCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this supplier is linked to ${assetCount.count} asset(s).` });
+    }
+
+    const [checklistCount] = await db.select({ count: count() }).from(checklistInstances).where(and(eq(checklistInstances.supplierId, id), eq(checklistInstances.companyId, companyId)));
+    if (checklistCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this supplier is linked to ${checklistCount.count} checklist(s).` });
+    }
+
+    const [hireCount] = await db.select({ count: count() }).from(hireBookings).where(and(eq(hireBookings.supplierId, id), eq(hireBookings.companyId, companyId)));
+    if (hireCount.count > 0) {
+      return res.status(409).json({ error: `Cannot delete: this supplier is linked to ${hireCount.count} hire booking(s).` });
+    }
+
     await db.delete(suppliers).where(and(eq(suppliers.id, id), eq(suppliers.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
@@ -663,6 +697,16 @@ dataManagementRouter.delete("/api/admin/data-management/employees/:id", requireR
 
     const [employee] = await db.select({ id: employees.id }).from(employees).where(and(eq(employees.id, id), eq(employees.companyId, companyId)));
     if (!employee) return res.status(404).json({ error: "Employee not found or does not belong to your company" });
+
+    const [hireRequestedBy] = await db.select({ count: count() }).from(hireBookings).where(and(eq(hireBookings.requestedByUserId, id), eq(hireBookings.companyId, companyId)));
+    const [hireResponsible] = await db.select({ count: count() }).from(hireBookings).where(and(eq(hireBookings.responsiblePersonUserId, id), eq(hireBookings.companyId, companyId)));
+    const [hireSiteContact] = await db.select({ count: count() }).from(hireBookings).where(and(eq(hireBookings.siteContactUserId, id), eq(hireBookings.companyId, companyId)));
+    const totalHireRefs = hireRequestedBy.count + hireResponsible.count + hireSiteContact.count;
+    if (totalHireRefs > 0) {
+      return res.status(409).json({
+        error: `Cannot delete: this employee is referenced by ${totalHireRefs} hire booking(s). Remove those references first.`,
+      });
+    }
 
     await db.delete(employees).where(and(eq(employees.id, id), eq(employees.companyId, companyId)));
     res.json({ success: true });
@@ -761,6 +805,7 @@ dataManagementRouter.delete("/api/admin/data-management/job-activities/:id", req
     const [activity] = await db.select({ id: jobActivities.id }).from(jobActivities).where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId)));
     if (!activity) return res.status(404).json({ error: "Job activity not found or does not belong to your company" });
 
+    await db.update(tasks).set({ jobActivityId: null }).where(eq(tasks.jobActivityId, id));
     await db.delete(jobActivityFiles).where(eq(jobActivityFiles.activityId, id));
     await db.delete(jobActivityUpdates).where(eq(jobActivityUpdates.activityId, id));
     await db.delete(jobActivityAssignees).where(eq(jobActivityAssignees.activityId, id));
@@ -870,8 +915,9 @@ async function getProtectedSupplierIds(companyId: string): Promise<string[]> {
   const bundleSuppliers = await db.selectDistinct({ id: documentBundles.supplierId }).from(documentBundles).where(and(eq(documentBundles.companyId, companyId), sql`${documentBundles.supplierId} IS NOT NULL`));
   const assetSuppliers = await db.selectDistinct({ id: assets.supplierId }).from(assets).where(and(eq(assets.companyId, companyId), sql`${assets.supplierId} IS NOT NULL`));
   const checklistSuppliers = await db.selectDistinct({ id: checklistInstances.supplierId }).from(checklistInstances).where(and(eq(checklistInstances.companyId, companyId), sql`${checklistInstances.supplierId} IS NOT NULL`));
+  const hireSuppliers = await db.selectDistinct({ id: hireBookings.supplierId }).from(hireBookings).where(and(eq(hireBookings.companyId, companyId), sql`${hireBookings.supplierId} IS NOT NULL`));
   const ids = new Set<string>();
-  for (const row of [...poSuppliers, ...itemSuppliers, ...docSuppliers, ...bundleSuppliers, ...assetSuppliers, ...checklistSuppliers]) {
+  for (const row of [...poSuppliers, ...itemSuppliers, ...docSuppliers, ...bundleSuppliers, ...assetSuppliers, ...checklistSuppliers, ...hireSuppliers]) {
     if (row.id) ids.add(row.id);
   }
   return Array.from(ids);
@@ -895,6 +941,22 @@ async function getProtectedItemCategoryIds(companyId: string): Promise<string[]>
 async function getProtectedBroadcastTemplateIds(companyId: string): Promise<string[]> {
   const tmplMessages = await db.selectDistinct({ id: broadcastMessages.templateId }).from(broadcastMessages).innerJoin(broadcastTemplates, eq(broadcastMessages.templateId, broadcastTemplates.id)).where(and(eq(broadcastTemplates.companyId, companyId), sql`${broadcastMessages.templateId} IS NOT NULL`));
   return tmplMessages.filter(r => r.id).map(r => r.id!);
+}
+
+async function getProtectedAssetIds(companyId: string): Promise<string[]> {
+  const hireAssets = await db.selectDistinct({ id: hireBookings.assetId }).from(hireBookings).where(and(eq(hireBookings.companyId, companyId), sql`${hireBookings.assetId} IS NOT NULL`));
+  return hireAssets.filter(r => r.id).map(r => r.id!);
+}
+
+async function getProtectedEmployeeIds(companyId: string): Promise<string[]> {
+  const hireRequested = await db.selectDistinct({ id: hireBookings.requestedByUserId }).from(hireBookings).where(eq(hireBookings.companyId, companyId));
+  const hireResponsible = await db.selectDistinct({ id: hireBookings.responsiblePersonUserId }).from(hireBookings).where(eq(hireBookings.companyId, companyId));
+  const hireSiteContact = await db.selectDistinct({ id: hireBookings.siteContactUserId }).from(hireBookings).where(and(eq(hireBookings.companyId, companyId), sql`${hireBookings.siteContactUserId} IS NOT NULL`));
+  const ids = new Set<string>();
+  for (const row of [...hireRequested, ...hireResponsible, ...hireSiteContact]) {
+    if (row.id) ids.add(row.id);
+  }
+  return Array.from(ids);
 }
 
 async function getProtectedDocumentIds(companyId: string): Promise<string[]> {
@@ -955,13 +1017,15 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
       case "employees": {
         const [total] = await db.select({ count: count() }).from(employees).where(eq(employees.companyId, companyId));
         totalCount = total.count;
-        protectedCount = 0;
-        protectedReason = "";
+        const protectedEmpIds = await getProtectedEmployeeIds(companyId);
+        protectedCount = protectedEmpIds.length;
+        protectedReason = "linked to hire bookings";
         const allEmps = await db.select({ id: employees.id }).from(employees).where(eq(employees.companyId, companyId));
-        for (const emp of allEmps) {
-          await db.delete(employees).where(and(eq(employees.id, emp.id), eq(employees.companyId, companyId)));
+        const safeEmpIds = allEmps.filter(e => !protectedEmpIds.includes(e.id)).map(e => e.id);
+        if (safeEmpIds.length > 0) {
+          await db.delete(employees).where(and(eq(employees.companyId, companyId), inArray(employees.id, safeEmpIds)));
         }
-        deletedCount = totalCount;
+        deletedCount = safeEmpIds.length;
         break;
       }
       case "items": {
@@ -995,14 +1059,17 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
       case "assets": {
         const [total] = await db.select({ count: count() }).from(assets).where(eq(assets.companyId, companyId));
         totalCount = total.count;
-        protectedCount = 0;
+        const protectedAssetIds = await getProtectedAssetIds(companyId);
+        protectedCount = protectedAssetIds.length;
+        protectedReason = "linked to hire bookings";
         const allAssets = await db.select({ id: assets.id }).from(assets).where(eq(assets.companyId, companyId));
-        for (const asset of allAssets) {
-          await db.delete(assetMaintenanceRecords).where(and(eq(assetMaintenanceRecords.assetId, asset.id), eq(assetMaintenanceRecords.companyId, companyId)));
-          await db.delete(assetTransfers).where(and(eq(assetTransfers.assetId, asset.id), eq(assetTransfers.companyId, companyId)));
+        const safeAssetIds = allAssets.filter(a => !protectedAssetIds.includes(a.id)).map(a => a.id);
+        if (safeAssetIds.length > 0) {
+          await db.delete(assetMaintenanceRecords).where(inArray(assetMaintenanceRecords.assetId, safeAssetIds));
+          await db.delete(assetTransfers).where(inArray(assetTransfers.assetId, safeAssetIds));
+          await db.delete(assets).where(inArray(assets.id, safeAssetIds));
         }
-        await db.delete(assets).where(eq(assets.companyId, companyId));
-        deletedCount = totalCount;
+        deletedCount = safeAssetIds.length;
         break;
       }
       case "progress-claims": {
@@ -1106,6 +1173,7 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
         const allActivities = await db.select({ id: jobActivities.id }).from(jobActivities).where(eq(jobActivities.companyId, companyId));
         if (allActivities.length > 0) {
           const activityIds = allActivities.map(a => a.id);
+          await db.update(tasks).set({ jobActivityId: null }).where(inArray(tasks.jobActivityId, activityIds));
           await db.delete(jobActivityFiles).where(inArray(jobActivityFiles.activityId, activityIds));
           await db.delete(jobActivityUpdates).where(inArray(jobActivityUpdates.activityId, activityIds));
           await db.delete(jobActivityAssignees).where(inArray(jobActivityAssignees.activityId, activityIds));
