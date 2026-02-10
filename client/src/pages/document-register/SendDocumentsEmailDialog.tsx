@@ -5,6 +5,7 @@ import {
   Send,
   Loader2,
   Paperclip,
+  Archive,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,8 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
       return res.json();
     },
     onSuccess: (data: any) => {
-      toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} files attached)` });
+      const zippedNote = data.zipped ? " (sent as zip)" : "";
+      toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} files attached${zippedNote})` });
       onOpenChange(false);
       resetForm();
       onSuccess();
@@ -219,7 +221,21 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                   </div>
                   <Separator />
                   <div className="space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
+                    <div className="flex items-center justify-between flex-wrap gap-1">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
+                      {(() => {
+                        const totalBytes = selectedDocuments.reduce((sum, d) => sum + (d.fileSize || 0), 0);
+                        const willZip = totalBytes > 5 * 1024 * 1024;
+                        return (
+                          <div className="flex items-center gap-1.5" data-testid="text-total-attachment-size">
+                            {willZip && <Archive className="h-3.5 w-3.5 text-muted-foreground" />}
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(totalBytes)}{willZip ? " — will be zipped" : ""}
+                            </p>
+                          </div>
+                        );
+                      })()}
+                    </div>
                     {selectedDocuments.map((doc) => (
                       <div key={doc.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-attachment-${doc.id}`}>
                         <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />

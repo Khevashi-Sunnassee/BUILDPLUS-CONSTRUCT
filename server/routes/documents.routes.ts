@@ -3,6 +3,8 @@ import multer from "multer";
 import crypto from "crypto";
 import OpenAI from "openai";
 import sharp from "sharp";
+import archiver from "archiver";
+import { PassThrough } from "stream";
 import { z } from "zod";
 import { storage, db } from "../storage";
 import { eq } from "drizzle-orm";
@@ -841,18 +843,58 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
 
     const htmlBody = message.replace(/\n/g, "<br>");
 
+    const ZIP_THRESHOLD = 5 * 1024 * 1024; // 5MB
+    const totalSize = attachments.reduce((sum, att) => sum + att.content.length, 0);
+    let finalAttachments = attachments;
+    let wasZipped = false;
+
+    if (totalSize > ZIP_THRESHOLD) {
+      try {
+        const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
+          const chunks: Buffer[] = [];
+          const passthrough = new PassThrough();
+          const archive = archiver("zip", { zlib: { level: 6 } });
+
+          archive.on("error", (err: Error) => reject(err));
+          passthrough.on("data", (chunk: Buffer) => chunks.push(chunk));
+          passthrough.on("end", () => resolve(Buffer.concat(chunks)));
+          passthrough.on("error", (err: Error) => reject(err));
+
+          archive.pipe(passthrough);
+
+          for (const att of attachments) {
+            archive.append(att.content, { name: att.filename });
+          }
+          archive.finalize();
+        });
+
+        finalAttachments = [{
+          filename: "documents.zip",
+          content: zipBuffer,
+          contentType: "application/zip",
+        }];
+        wasZipped = true;
+        logger.info(
+          { originalSize: totalSize, zippedSize: zipBuffer.length, fileCount: attachments.length },
+          "Documents zipped for email (total exceeded 5MB)"
+        );
+      } catch (zipErr) {
+        logger.warn({ err: zipErr }, "Failed to zip documents, sending individually instead");
+      }
+    }
+
     const result = await emailService.sendEmailWithAttachment({
       to,
       cc: cc || undefined,
       bcc,
       subject,
       body: htmlBody,
-      attachments,
+      attachments: finalAttachments,
     });
 
     if (result.success) {
-      logger.info({ documentCount: attachments.length, to }, "Documents email sent successfully");
-      res.json({ success: true, messageId: result.messageId, attachedCount: attachments.length });
+      logger.info({ documentCount: attachments.length, to, zipped: wasZipped }, "Documents email sent successfully");
+      res.json({ success: true, messageId: result.messageId, attachedCount: attachments.length, zipped: wasZipped });
     } else {
       logger.error({ error: result.error }, "Failed to send documents email");
       res.status(500).json({ error: result.error || "Failed to send email" });
