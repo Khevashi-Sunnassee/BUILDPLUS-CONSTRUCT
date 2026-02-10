@@ -89,11 +89,12 @@ export default function DocumentRegister() {
     if (disciplineFilter && disciplineFilter !== "all") params.append("disciplineId", disciplineFilter);
     if (jobFilter && jobFilter !== "all") params.append("jobId", jobFilter);
     params.append("showLatestOnly", String(showLatestOnly));
+    params.append("excludeChat", "true");
     return params.toString();
   }, [page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, showLatestOnly]);
 
   const { data: documentsData, isLoading: documentsLoading } = useQuery<DocumentsResponse>({
-    queryKey: [DOCUMENT_ROUTES.LIST, page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, showLatestOnly],
+    queryKey: [DOCUMENT_ROUTES.LIST, page, search, statusFilter, typeFilter, disciplineFilter, jobFilter, showLatestOnly, "excludeChat"],
     queryFn: async () => {
       const response = await fetch(`${DOCUMENT_ROUTES.LIST}?${buildQueryString()}`);
       if (!response.ok) throw new Error("Failed to fetch documents");

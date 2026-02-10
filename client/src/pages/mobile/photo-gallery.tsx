@@ -262,7 +262,7 @@ export default function MobilePhotoGallery() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [selectedTypeId, setSelectedTypeId] = useState<string | null>(null);
-  const [excludeChat, setExcludeChat] = useState(true);
+  const [excludeChat, setExcludeChat] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [viewingPhoto, setViewingPhoto] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
