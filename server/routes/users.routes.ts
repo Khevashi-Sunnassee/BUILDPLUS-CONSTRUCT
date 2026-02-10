@@ -1,9 +1,12 @@
 import { Router } from "express";
 import { z } from "zod";
-import { storage } from "../storage";
+import { eq, and, lte, notInArray } from "drizzle-orm";
+import { storage, db } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
+import { tasks, taskAssignees, taskGroups, jobs } from "@shared/schema";
 import type { FunctionKey } from "@shared/schema";
+import logger from "../lib/logger";
 
 const router = Router();
 
@@ -52,6 +55,53 @@ router.put("/api/user/settings", requireAuth, async (req, res) => {
 router.get("/api/dashboard/stats", requireAuth, async (req, res) => {
   const stats = await storage.getDashboardStats(req.session.userId!);
   res.json(stats);
+});
+
+// Dashboard: Get due/overdue tasks assigned to current user
+router.get("/api/dashboard/my-due-tasks", requireAuth, async (req, res) => {
+  try {
+    const now = new Date();
+    const result = await db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        status: tasks.status,
+        dueDate: tasks.dueDate,
+        priority: tasks.priority,
+        groupId: tasks.groupId,
+        groupName: taskGroups.name,
+        jobId: tasks.jobId,
+        jobName: jobs.name,
+        jobNumber: jobs.jobNumber,
+      })
+      .from(tasks)
+      .innerJoin(taskAssignees, eq(taskAssignees.taskId, tasks.id))
+      .innerJoin(taskGroups, eq(taskGroups.id, tasks.groupId))
+      .leftJoin(jobs, eq(jobs.id, tasks.jobId))
+      .where(
+        and(
+          eq(taskAssignees.userId, req.session.userId!),
+          lte(tasks.dueDate, now),
+          notInArray(tasks.status, ["DONE"])
+        )
+      );
+
+    const tasksWithOverdue = result.map(t => ({
+      ...t,
+      isOverdue: t.dueDate ? new Date(t.dueDate) < now : false,
+    }));
+
+    tasksWithOverdue.sort((a, b) => {
+      if (!a.dueDate) return 1;
+      if (!b.dueDate) return -1;
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+
+    res.json({ tasks: tasksWithOverdue.slice(0, 20), totalCount: tasksWithOverdue.length });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching due tasks");
+    res.status(500).json({ error: "Failed to fetch due tasks" });
+  }
 });
 
 // Get current user's permissions

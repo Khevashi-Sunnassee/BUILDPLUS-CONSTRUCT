@@ -13,7 +13,9 @@ import {
   Timer,
   MessageSquare,
   ListTodo,
-  Check
+  Check,
+  AlertTriangle,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,6 +58,20 @@ interface DashboardStats {
   }>;
 }
 
+interface DueTask {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: string | null;
+  priority: string | null;
+  groupId: string;
+  groupName: string;
+  jobId: string | null;
+  jobName: string | null;
+  jobNumber: string | null;
+  isOverdue: boolean;
+}
+
 interface TaskNotification {
   id: string;
   userId: string;
@@ -93,6 +109,12 @@ export default function DashboardPage() {
   const { data: taskNotifications = [] } = useQuery<TaskNotification[]>({
     queryKey: [TASKS_ROUTES.NOTIFICATIONS],
   });
+
+  const { data: dueTasksData, isLoading: dueTasksLoading } = useQuery<{ tasks: DueTask[]; totalCount: number }>({
+    queryKey: [DASHBOARD_ROUTES.MY_DUE_TASKS],
+  });
+  const dueTasks = dueTasksData?.tasks || [];
+  const dueTasksTotalCount = dueTasksData?.totalCount || 0;
 
   const markTaskNotificationRead = useMutation({
     mutationFn: (id: string) => apiRequest("POST", TASKS_ROUTES.NOTIFICATION_READ(id)),
@@ -146,6 +168,65 @@ export default function DashboardPage() {
           Welcome back, {user?.name || user?.email?.split("@")[0]}
         </p>
       </div>
+
+      {!dueTasksLoading && dueTasksTotalCount > 0 && (
+        <Card className="border-orange-500 bg-orange-500/5" data-testid="card-due-tasks">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Due & Overdue Tasks
+            </CardTitle>
+            <Badge variant="default" className="text-lg px-3 py-1 bg-orange-500">
+              {dueTasksTotalCount}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {dueTasks.map(task => (
+                <div
+                  key={task.id}
+                  className="flex items-center justify-between p-2 rounded-md bg-background cursor-pointer hover-elevate"
+                  onClick={() => navigate("/tasks")}
+                  data-testid={`due-task-${task.id}`}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{task.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {task.jobNumber && (
+                        <span className="text-xs text-muted-foreground">
+                          {task.jobNumber}
+                        </span>
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {task.groupName}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {task.dueDate && (
+                      <Badge variant={task.isOverdue ? "destructive" : "secondary"} className="text-xs">
+                        {task.isOverdue ? "Overdue" : "Due"} {format(new Date(task.dueDate), "dd/MM/yyyy")}
+                      </Badge>
+                    )}
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {dueTasksTotalCount > dueTasks.length && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                +{dueTasksTotalCount - dueTasks.length} more due tasks
+              </p>
+            )}
+            <Link href="/tasks" className="block mt-3">
+              <Button className="w-full" variant="outline" data-testid="button-view-due-tasks">
+                <ListTodo className="h-4 w-4 mr-2" />
+                View All Tasks
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {totalUnread > 0 && (
         <Card className="border-primary bg-primary/5" data-testid="card-unread-messages">

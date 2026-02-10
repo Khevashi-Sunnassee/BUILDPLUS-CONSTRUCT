@@ -496,6 +496,7 @@ export const REPORTS_ROUTES = {
 export const DASHBOARD_ROUTES = {
   STATS: '/api/dashboard/stats',
   KPI: '/api/dashboard/kpi',
+  MY_DUE_TASKS: '/api/dashboard/my-due-tasks',
 } as const;
 
 // ============================================================================
