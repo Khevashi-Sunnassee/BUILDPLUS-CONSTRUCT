@@ -49,7 +49,7 @@ interface CallLogDetail {
     buildingNumber: number;
     pourLabel: string | null;
     sequenceOrder: number;
-    status: "ON_TIME" | "LATE";
+    status: "PENDING" | "ON_TIME" | "LATE";
     daysLate: number;
     originalStartDate: string | null;
     originalEndDate: string | null;
@@ -187,11 +187,14 @@ export default function PmCallLogDetailPage() {
                 >
                   <div className="min-w-0">
                     <span className="font-medium text-sm">
-                      {lvl.pourLabel ? `${lvl.level} (${lvl.pourLabel})` : lvl.level}
+                      {(() => {
+                        const numMatch = lvl.level.match(/^L?(\d+)$/i);
+                        const levelPart = numMatch ? `Level ${numMatch[1]}` : lvl.level;
+                        const pourPart = lvl.pourLabel ? ` - Pour ${lvl.pourLabel}` : "";
+                        const buildingPart = lvl.buildingNumber > 1 ? `Building ${lvl.buildingNumber} - ` : "";
+                        return `${buildingPart}${levelPart}${pourPart}`;
+                      })()}
                     </span>
-                    {lvl.buildingNumber > 1 && (
-                      <Badge variant="outline" className="ml-2">Bldg {lvl.buildingNumber}</Badge>
-                    )}
                     <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-3">
                       <span>Original: {formatDate(lvl.originalStartDate)} — {formatDate(lvl.originalEndDate)}</span>
                       {lvl.status === "LATE" && lvl.adjustedStartDate && (
@@ -201,8 +204,10 @@ export default function PmCallLogDetailPage() {
                       )}
                     </div>
                   </div>
-                  {lvl.status === "ON_TIME" ? (
-                    <Badge variant="secondary">
+                  {lvl.status === "PENDING" ? (
+                    <Badge variant="outline">Pending</Badge>
+                  ) : lvl.status === "ON_TIME" ? (
+                    <Badge className="bg-green-600 text-white border-green-600 no-default-hover-elevate no-default-active-elevate">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       On Time
                     </Badge>

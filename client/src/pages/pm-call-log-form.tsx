@@ -52,7 +52,7 @@ interface LevelStatus {
   buildingNumber: number;
   pourLabel: string | null;
   sequenceOrder: number;
-  status: "ON_TIME" | "LATE";
+  status: "PENDING" | "ON_TIME" | "LATE";
   daysLate: number;
   originalStartDate: string | null;
   originalEndDate: string | null;
@@ -134,6 +134,14 @@ export default function PmCallLogFormPage() {
     [jobs, selectedJobId]
   );
 
+  function formatLevelDisplay(level: string, pourLabel: string | null, buildingNumber: number): string {
+    const numMatch = level.match(/^L?(\d+)$/i);
+    const levelPart = numMatch ? `Level ${numMatch[1]}` : level;
+    const pourPart = pourLabel ? ` - Pour ${pourLabel}` : "";
+    const buildingPart = buildingNumber > 1 ? `Building ${buildingNumber} - ` : "";
+    return `${buildingPart}${levelPart}${pourPart}`;
+  }
+
   const handleJobSelect = (jobId: string) => {
     setSelectedJobId(jobId);
     setLevelStatuses([]);
@@ -148,7 +156,7 @@ export default function PmCallLogFormPage() {
           buildingNumber: lvl.buildingNumber,
           pourLabel: lvl.pourLabel,
           sequenceOrder: lvl.sequenceOrder,
-          status: "ON_TIME" as const,
+          status: "PENDING" as const,
           daysLate: 0,
           originalStartDate: lvl.manualStartDate || lvl.estimatedStartDate,
           originalEndDate: lvl.manualEndDate || lvl.estimatedEndDate,
@@ -159,7 +167,7 @@ export default function PmCallLogFormPage() {
     }
   };
 
-  const handleLevelStatusChange = (idx: number, status: "ON_TIME" | "LATE") => {
+  const handleLevelStatusChange = (idx: number, status: "PENDING" | "ON_TIME" | "LATE") => {
     setLevelStatuses((prev) => {
       const updated = [...prev];
       updated[idx] = {
@@ -365,11 +373,8 @@ export default function PmCallLogFormPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm" data-testid={`text-level-name-${idx}`}>
-                              {lvl.pourLabel ? `${lvl.level} (${lvl.pourLabel})` : lvl.level}
+                              {formatLevelDisplay(lvl.level, lvl.pourLabel, lvl.buildingNumber)}
                             </span>
-                            {lvl.buildingNumber > 1 && (
-                              <Badge variant="outline">Bldg {lvl.buildingNumber}</Badge>
-                            )}
                           </div>
                           <div className="text-xs text-muted-foreground mt-1 flex flex-wrap gap-3">
                             <span>Start: {formatDate(lvl.originalStartDate)}</span>
@@ -379,7 +384,8 @@ export default function PmCallLogFormPage() {
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            variant={lvl.status === "ON_TIME" ? "default" : "outline"}
+                            variant="outline"
+                            className={lvl.status === "ON_TIME" ? "bg-green-600 text-white border-green-600 hover:bg-green-700 dark:bg-green-600 dark:text-white dark:border-green-600 dark:hover:bg-green-700 no-default-hover-elevate" : ""}
                             onClick={() => handleLevelStatusChange(idx, "ON_TIME")}
                             data-testid={`button-ontime-${idx}`}
                           >
@@ -729,10 +735,14 @@ export default function PmCallLogFormPage() {
                     {levelStatuses.map((lvl, idx) => (
                       <div key={idx} className="flex flex-wrap items-center justify-between gap-2 text-sm py-1">
                         <span>
-                          {lvl.pourLabel ? `${lvl.level} (${lvl.pourLabel})` : lvl.level}
+                          {formatLevelDisplay(lvl.level, lvl.pourLabel, lvl.buildingNumber)}
                         </span>
-                        {lvl.status === "ON_TIME" ? (
-                          <Badge variant="secondary" data-testid={`badge-review-ontime-${idx}`}>
+                        {lvl.status === "PENDING" ? (
+                          <Badge variant="outline" data-testid={`badge-review-pending-${idx}`}>
+                            Pending
+                          </Badge>
+                        ) : lvl.status === "ON_TIME" ? (
+                          <Badge className="bg-green-600 text-white border-green-600 no-default-hover-elevate no-default-active-elevate" data-testid={`badge-review-ontime-${idx}`}>
                             <CheckCircle2 className="h-3 w-3 mr-1" />
                             On Time
                           </Badge>

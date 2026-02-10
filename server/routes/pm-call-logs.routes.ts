@@ -53,7 +53,7 @@ const createCallLogSchema = z.object({
     buildingNumber: z.number().int().default(1),
     pourLabel: z.string().nullable().optional(),
     sequenceOrder: z.number().int().default(0),
-    status: z.enum(["ON_TIME", "LATE"]),
+    status: z.enum(["PENDING", "ON_TIME", "LATE"]),
     daysLate: z.number().int().min(0).default(0),
     originalStartDate: z.string().nullable().optional(),
     originalEndDate: z.string().nullable().optional(),
@@ -230,7 +230,7 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
             buildingNumber: lvl.buildingNumber,
             pourLabel: lvl.pourLabel || null,
             sequenceOrder: lvl.sequenceOrder,
-            status: lvl.status as "ON_TIME" | "LATE",
+            status: lvl.status as "PENDING" | "ON_TIME" | "LATE",
             daysLate: lvl.daysLate,
             originalStartDate: lvl.originalStartDate ? new Date(lvl.originalStartDate) : null,
             originalEndDate: lvl.originalEndDate ? new Date(lvl.originalEndDate) : null,
@@ -424,12 +424,13 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
       if (logData.notificationPhone) {
         const phoneNumbers = logData.notificationPhone.split(",").map((p: string) => p.trim()).filter(Boolean);
         const onTimeCount = levels.filter((l) => l.status === "ON_TIME").length;
+        const pendingCount = levels.filter((l) => l.status === "PENDING").length;
         const lateCount = lateLevels.length;
 
         let smsBody = `PM Call Log: ${jobName}\n`;
         smsBody += `Date: ${new Date(logData.callDateTime).toLocaleDateString("en-AU")}\n`;
         smsBody += `Contact: ${logData.contactName}\n`;
-        smsBody += `Status: ${onTimeCount} on time, ${lateCount} late\n`;
+        smsBody += `Status: ${onTimeCount} on time, ${lateCount} late${pendingCount > 0 ? `, ${pendingCount} pending` : ""}\n`;
 
         if (lateLevels.length > 0) {
           smsBody += `\nLate Items:\n`;

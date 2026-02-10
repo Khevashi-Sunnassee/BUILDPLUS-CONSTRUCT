@@ -3627,7 +3627,7 @@ export type ActivityStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | 
 // ============================================================================
 // PM CALL LOGS
 // ============================================================================
-export const callLogLevelStatusEnum = pgEnum("call_log_level_status", ["ON_TIME", "LATE"]);
+export const callLogLevelStatusEnum = pgEnum("call_log_level_status", ["PENDING", "ON_TIME", "LATE"]);
 
 export const pmCallLogs = pgTable("pm_call_logs", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
