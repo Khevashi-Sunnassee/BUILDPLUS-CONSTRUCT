@@ -782,80 +782,147 @@ export default function ChatPage() {
               ) : messages.length === 0 ? (
                 <div className="text-center text-muted-foreground">No messages yet</div>
               ) : (
-                <div className="space-y-4">
-                  {messages.map(msg => (
-                    <div key={msg.id} className="flex gap-3 group" data-testid={`message-${msg.id}`}>
-                      <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarFallback className="text-xs">
-                          {getInitials(msg.sender?.name, msg.sender?.email)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">
-                            {msg.sender?.name || msg.sender?.email || "Unknown"}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {format(new Date(msg.createdAt), "MMM d, h:mm a")}
-                          </span>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => {
-                              if (confirm("Delete this message?")) {
-                                deleteMessageMutation.mutate({
-                                  conversationId: selectedConversation.id,
-                                  messageId: msg.id,
-                                });
-                              }
-                            }}
-                            data-testid={`button-delete-message-${msg.id}`}
-                          >
-                            <Trash2 className="h-3 w-3 text-destructive" />
-                          </Button>
-                        </div>
-                        <p className="text-sm mt-1 whitespace-pre-wrap">{msg.body}</p>
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="mt-2 space-y-2">
-                            {msg.attachments.map(att => {
-                              const isImage = att.mimeType?.startsWith("image/");
-                              const fileUrl = att.url || att.filePath;
-                              const fileType = att.mimeType || att.fileType || "";
-                              const fileSize = att.sizeBytes || att.fileSize || 0;
-                              
-                              return isImage ? (
-                                <ChatImageAttachment key={att.id} att={att} fileUrl={fileUrl || ""} />
-                              ) : (
-                                <a
-                                  key={att.id}
-                                  href={fileUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 p-2 rounded-md bg-muted hover-elevate text-sm"
-                                  data-testid={`attachment-${att.id}`}
-                                >
-                                  {getFileIcon(fileType)}
-                                  <span className="truncate flex-1">{att.fileName}</span>
-                                  <span className="text-xs text-muted-foreground">{formatFileSize(fileSize)}</span>
-                                  <Download className="h-4 w-4" />
-                                </a>
-                              );
-                            })}
+                <div className="space-y-1">
+                  {messages.map((msg, idx) => {
+                    const isMe = msg.senderId === String(currentUser?.id);
+                    const msgDate = new Date(msg.createdAt);
+                    const prevMsg = idx > 0 ? messages[idx - 1] : null;
+                    const showDateSeparator = !prevMsg || format(new Date(prevMsg.createdAt), "yyyy-MM-dd") !== format(msgDate, "yyyy-MM-dd");
+                    const timeStr = format(msgDate, "dd/MM/yyyy h:mm a");
+
+                    return (
+                      <div key={msg.id} data-testid={`message-${msg.id}`}>
+                        {showDateSeparator && (
+                          <div className="flex items-center justify-center my-4">
+                            <div className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                              {format(msgDate, "EEEE, d MMMM yyyy")}
+                            </div>
                           </div>
                         )}
-                        {msg.mentions && msg.mentions.length > 0 && (
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {msg.mentions.map(mention => (
-                              <Badge key={mention.id} variant="secondary" className="text-xs">
-                                @{mention.user?.name || mention.user?.email || "unknown"}
-                              </Badge>
-                            ))}
+                        {isMe ? (
+                          <div className="flex flex-col items-end group mb-2">
+                            <div className="text-[11px] text-muted-foreground mb-0.5 mr-1">{timeStr}</div>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-6 w-6 invisible group-hover:visible shrink-0"
+                                onClick={() => {
+                                  if (confirm("Delete this message?")) {
+                                    deleteMessageMutation.mutate({
+                                      conversationId: selectedConversation.id,
+                                      messageId: msg.id,
+                                    });
+                                  }
+                                }}
+                                data-testid={`button-delete-message-${msg.id}`}
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                              <div className="bg-primary text-primary-foreground rounded-md rounded-tr-none px-3 py-2 max-w-[75%]">
+                                {msg.body && <p className="text-sm whitespace-pre-wrap">{msg.body}</p>}
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div className="mt-1 space-y-1">
+                                    {msg.attachments.map(att => {
+                                      const isImage = att.mimeType?.startsWith("image/");
+                                      const fileUrl = att.url || att.filePath;
+                                      const fileType = att.mimeType || att.fileType || "";
+                                      const fileSize = att.sizeBytes || att.fileSize || 0;
+                                      return isImage ? (
+                                        <ChatImageAttachment key={att.id} att={att} fileUrl={fileUrl || ""} />
+                                      ) : (
+                                        <a key={att.id} href={fileUrl} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-2 p-2 rounded-md bg-primary-foreground/20 text-sm"
+                                          data-testid={`attachment-${att.id}`}>
+                                          {getFileIcon(fileType)}
+                                          <span className="truncate flex-1">{att.fileName}</span>
+                                          <span className="text-xs opacity-70">{formatFileSize(fileSize)}</span>
+                                          <Download className="h-4 w-4" />
+                                        </a>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {msg.mentions && msg.mentions.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {msg.mentions.map(mention => (
+                                      <Badge key={mention.id} variant="secondary" className="text-xs">
+                                        @{mention.user?.name || mention.user?.email || "unknown"}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2 group mb-2">
+                            <Avatar className="h-8 w-8 shrink-0 mt-5">
+                              <AvatarFallback className="text-xs">
+                                {getInitials(msg.sender?.name, msg.sender?.email)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="max-w-[75%]">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="font-medium text-xs">{msg.sender?.name || msg.sender?.email || "Unknown"}</span>
+                                <span className="text-[11px] text-muted-foreground">{timeStr}</span>
+                              </div>
+                              <div className="bg-muted rounded-md rounded-tl-none px-3 py-2">
+                                {msg.body && <p className="text-sm whitespace-pre-wrap">{msg.body}</p>}
+                                {msg.attachments && msg.attachments.length > 0 && (
+                                  <div className="mt-1 space-y-1">
+                                    {msg.attachments.map(att => {
+                                      const isImage = att.mimeType?.startsWith("image/");
+                                      const fileUrl = att.url || att.filePath;
+                                      const fileType = att.mimeType || att.fileType || "";
+                                      const fileSize = att.sizeBytes || att.fileSize || 0;
+                                      return isImage ? (
+                                        <ChatImageAttachment key={att.id} att={att} fileUrl={fileUrl || ""} />
+                                      ) : (
+                                        <a key={att.id} href={fileUrl} target="_blank" rel="noopener noreferrer"
+                                          className="flex items-center gap-2 p-2 rounded-md bg-background hover-elevate text-sm"
+                                          data-testid={`attachment-${att.id}`}>
+                                          {getFileIcon(fileType)}
+                                          <span className="truncate flex-1">{att.fileName}</span>
+                                          <span className="text-xs text-muted-foreground">{formatFileSize(fileSize)}</span>
+                                          <Download className="h-4 w-4" />
+                                        </a>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {msg.mentions && msg.mentions.length > 0 && (
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    {msg.mentions.map(mention => (
+                                      <Badge key={mention.id} variant="secondary" className="text-xs">
+                                        @{mention.user?.name || mention.user?.email || "unknown"}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 invisible group-hover:visible shrink-0 mt-5"
+                              onClick={() => {
+                                if (confirm("Delete this message?")) {
+                                  deleteMessageMutation.mutate({
+                                    conversationId: selectedConversation.id,
+                                    messageId: msg.id,
+                                  });
+                                }
+                              }}
+                              data-testid={`button-delete-message-${msg.id}`}
+                            >
+                              <Trash2 className="h-3 w-3 text-destructive" />
+                            </Button>
                           </div>
                         )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div ref={messagesEndRef} />
                 </div>
               )}
