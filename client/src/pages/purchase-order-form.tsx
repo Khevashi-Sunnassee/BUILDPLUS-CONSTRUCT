@@ -1372,17 +1372,17 @@ export default function PurchaseOrderFormPage() {
             </div>
 
             <div className="border rounded-lg overflow-hidden">
-              <Table data-testid="table-line-items">
+              <Table className="table-fixed w-full" data-testid="table-line-items">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     {receivingMode && <TableHead className="w-[50px]">Received</TableHead>}
-                    <TableHead className="w-[200px]">Item</TableHead>
-                    <TableHead className="w-[120px]">Job</TableHead>
-                    <TableHead className="min-w-[200px]">Description</TableHead>
-                    <TableHead className="w-[80px] text-right">Qty</TableHead>
-                    <TableHead className="w-[80px]">Unit</TableHead>
-                    <TableHead className="w-[120px] text-right">Unit Price</TableHead>
-                    <TableHead className="w-[120px] text-right">Line Total</TableHead>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="w-[100px]">Job</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-[70px] text-right">Qty</TableHead>
+                    <TableHead className="w-[70px]">Unit</TableHead>
+                    <TableHead className="w-[100px] text-right">Unit Price</TableHead>
+                    <TableHead className="w-[100px] text-right">Line Total</TableHead>
                     {canEdit && <TableHead className="w-[50px]"></TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -1414,23 +1414,23 @@ export default function PurchaseOrderFormPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              className="h-9 w-full justify-start text-left font-normal"
+                              className="h-auto min-h-9 w-full justify-start text-left font-normal whitespace-normal break-words"
                               onClick={() => openItemPicker(line.id)}
                               data-testid={`select-item-${index}`}
                             >
                               {line.itemId && line.itemId !== MANUAL_ENTRY_ID ? (
-                                <span className="truncate">
+                                <span className="break-words">
                                   {line.itemCode ? `${line.itemCode} - ` : ""}
                                   {items.find(i => i.id === line.itemId)?.name || line.description || "Selected"}
                                 </span>
                               ) : line.itemId === MANUAL_ENTRY_ID ? (
-                                <span className="truncate text-muted-foreground">Manual Entry</span>
+                                <span className="text-muted-foreground">Manual Entry</span>
                               ) : (
                                 <span className="text-muted-foreground">Select item...</span>
                               )}
                             </Button>
                           ) : (
-                            <span className="text-sm">{line.itemCode || "-"}</span>
+                            <span className="text-sm break-words">{line.itemCode || "-"}</span>
                           )}
                         </TableCell>
                         <TableCell className="p-1">
@@ -1483,7 +1483,7 @@ export default function PurchaseOrderFormPage() {
                               data-testid={`input-description-${index}`}
                             />
                           ) : (
-                            <span className="text-sm">{line.description}</span>
+                            <span className="text-sm break-words">{line.description}</span>
                           )}
                         </TableCell>
                         <TableCell className="p-1">
