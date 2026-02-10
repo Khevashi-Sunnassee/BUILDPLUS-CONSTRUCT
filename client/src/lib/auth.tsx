@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { User } from "@shared/schema";
 import { AUTH_ROUTES } from "@shared/api-routes";
+import { queryClient } from "./queryClient";
 
 interface AuthContextType {
   user: User | null;
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       throw new Error(data.error || "Login failed");
     }
+    queryClient.clear();
     await fetchUser();
   };
 
@@ -58,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       credentials: "include",
       headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
     });
+    queryClient.clear();
     setUser(null);
   };
 
