@@ -58,7 +58,7 @@ export default function DocumentRegister() {
   const [jobFilter, setJobFilter] = useState<string>("");
   const [showLatestOnly, setShowLatestOnly] = useState(true);
   const [showFilters, setShowFilters] = useState(true);
-  const [groupBy, setGroupBy] = useState<string>("job");
+  const [groupBy, setGroupBy] = useState<string>("job_discipline");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -144,7 +144,7 @@ export default function DocumentRegister() {
   }, []);
 
   const groupedDocuments = useMemo(() => {
-    if (groupBy === "none") return null;
+    if (groupBy === "none" || groupBy === "job_discipline") return null;
 
     const groups = new Map<string, { label: string; docs: DocumentWithDetails[] }>();
 
@@ -191,6 +191,59 @@ export default function DocumentRegister() {
       if (keyB === "_unassigned") return -1;
       return a.label.localeCompare(b.label);
     });
+
+    return sorted;
+  }, [documents, groupBy]);
+
+  const twoLevelGroupedDocuments = useMemo(() => {
+    if (groupBy !== "job_discipline") return null;
+
+    const jobGroups = new Map<string, {
+      label: string;
+      disciplines: Map<string, { label: string; docs: DocumentWithDetails[] }>;
+      totalCount: number;
+    }>();
+
+    for (const doc of documents) {
+      const jobKey = doc.job?.id || "_unassigned";
+      const jobLabel = doc.job ? `${doc.job.jobNumber} - ${doc.job.name}` : "Unassigned";
+      const discKey = doc.discipline?.id || "_unassigned";
+      const discLabel = doc.discipline?.disciplineName || "Unassigned";
+
+      if (!jobGroups.has(jobKey)) {
+        jobGroups.set(jobKey, { label: jobLabel, disciplines: new Map(), totalCount: 0 });
+      }
+      const jobGroup = jobGroups.get(jobKey)!;
+      jobGroup.totalCount++;
+
+      if (!jobGroup.disciplines.has(discKey)) {
+        jobGroup.disciplines.set(discKey, { label: discLabel, docs: [] });
+      }
+      jobGroup.disciplines.get(discKey)!.docs.push(doc);
+    }
+
+    const sorted = Array.from(jobGroups.entries())
+      .sort(([keyA, a], [keyB, b]) => {
+        if (keyA === "_unassigned") return 1;
+        if (keyB === "_unassigned") return -1;
+        return a.label.localeCompare(b.label);
+      })
+      .map(([jobKey, jobGroup]) => ({
+        jobKey,
+        jobLabel: jobGroup.label,
+        totalCount: jobGroup.totalCount,
+        disciplines: Array.from(jobGroup.disciplines.entries())
+          .sort(([keyA, a], [keyB, b]) => {
+            if (keyA === "_unassigned") return 1;
+            if (keyB === "_unassigned") return -1;
+            return a.label.localeCompare(b.label);
+          })
+          .map(([discKey, discGroup]) => ({
+            discKey,
+            discLabel: discGroup.label,
+            docs: discGroup.docs,
+          })),
+      }));
 
     return sorted;
   }, [documents, groupBy]);
@@ -374,10 +427,11 @@ export default function DocumentRegister() {
               <Layers className="h-4 w-4 text-muted-foreground" />
               <Label className="text-sm text-muted-foreground whitespace-nowrap">Group by</Label>
               <Select value={groupBy} onValueChange={(v) => { setGroupBy(v); setCollapsedGroups(new Set()); }}>
-                <SelectTrigger className="w-[160px]" data-testid="select-group-by">
+                <SelectTrigger className="w-[180px]" data-testid="select-group-by">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="job_discipline">Job + Discipline</SelectItem>
                   <SelectItem value="job">Job</SelectItem>
                   <SelectItem value="discipline">Discipline</SelectItem>
                   <SelectItem value="type">Type</SelectItem>
@@ -458,6 +512,72 @@ export default function DocumentRegister() {
               <h3 className="text-lg font-medium">No documents found</h3>
               <p className="text-muted-foreground">Upload your first document to get started</p>
             </div>
+          ) : twoLevelGroupedDocuments ? (
+            <>
+              <div className="space-y-4">
+                {twoLevelGroupedDocuments.map((jobGroup) => {
+                  const jobCollapsed = collapsedGroups.has(`job:${jobGroup.jobKey}`);
+                  return (
+                    <div key={jobGroup.jobKey} className="border rounded-md overflow-visible" data-testid={`group-job-${jobGroup.jobKey}`}>
+                      <button
+                        type="button"
+                        className="flex items-center justify-between gap-3 w-full px-4 py-3 text-left hover-elevate transition-colors"
+                        onClick={() => toggleGroup(`job:${jobGroup.jobKey}`)}
+                        data-testid={`button-toggle-group-job-${jobGroup.jobKey}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <ChevronDown
+                            className={`h-4 w-4 text-muted-foreground transition-transform ${jobCollapsed ? "-rotate-90" : ""}`}
+                          />
+                          <span className="font-medium">{jobGroup.jobLabel}</span>
+                          <Badge variant="secondary">{jobGroup.totalCount}</Badge>
+                        </div>
+                      </button>
+                      {!jobCollapsed && (
+                        <div className="border-t">
+                          {jobGroup.disciplines.map((discGroup) => {
+                            const discCollapsed = collapsedGroups.has(`disc:${jobGroup.jobKey}:${discGroup.discKey}`);
+                            return (
+                              <div key={discGroup.discKey} data-testid={`group-discipline-${discGroup.discKey}`}>
+                                <button
+                                  type="button"
+                                  className="flex items-center gap-3 w-full pl-8 pr-4 py-2 text-left hover-elevate transition-colors border-b"
+                                  onClick={() => toggleGroup(`disc:${jobGroup.jobKey}:${discGroup.discKey}`)}
+                                  data-testid={`button-toggle-group-disc-${discGroup.discKey}`}
+                                >
+                                  <ChevronDown
+                                    className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${discCollapsed ? "-rotate-90" : ""}`}
+                                  />
+                                  <span className="text-sm font-medium text-muted-foreground">{discGroup.discLabel}</span>
+                                  <Badge variant="secondary">{discGroup.docs.length}</Badge>
+                                </button>
+                                {!discCollapsed && (
+                                  <DocumentTable
+                                    documents={discGroup.docs}
+                                    selectedDocIds={selectedDocIds}
+                                    onToggleDocSelection={toggleDocSelection}
+                                    onToggleSelectAll={toggleSelectAll}
+                                    onOpenVersionHistory={(doc) => {
+                                      setVersionHistoryDoc(doc);
+                                      setIsVersionHistoryOpen(true);
+                                    }}
+                                    onOpenNewVersion={(doc) => {
+                                      setSelectedDocumentForVersion(doc);
+                                      setIsVersionDialogOpen(true);
+                                    }}
+                                  />
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {renderPagination()}
+            </>
           ) : groupedDocuments ? (
             <>
               <div className="space-y-4">
