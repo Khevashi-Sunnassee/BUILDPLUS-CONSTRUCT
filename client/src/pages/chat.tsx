@@ -145,6 +145,7 @@ export default function ChatPage() {
   const [messageContent, setMessageContent] = useState("");
   const [showNewConversationDialog, setShowNewConversationDialog] = useState(false);
   const [showAddMembersDialog, setShowAddMembersDialog] = useState(false);
+  const [addingMemberIds, setAddingMemberIds] = useState<Set<string>>(new Set());
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isCompressing, setIsCompressing] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -266,15 +267,25 @@ export default function ChatPage() {
 
   const addMembersMutation = useMutation({
     mutationFn: async (userIds: string[]) => {
+      setAddingMemberIds(prev => new Set([...prev, ...userIds]));
       return apiRequest("POST", CHAT_ROUTES.MEMBERS(selectedConversationId!), { userIds });
     },
-    onSuccess: () => {
+    onSuccess: (_data, userIds) => {
+      setAddingMemberIds(prev => {
+        const next = new Set(prev);
+        userIds.forEach(id => next.delete(id));
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
-      setShowAddMembersDialog(false);
-      toast({ title: "Members added" });
+      toast({ title: "Member added" });
     },
-    onError: (error: any) => {
-      toast({ title: "Failed to add members", description: error.message, variant: "destructive" });
+    onError: (error: any, userIds) => {
+      setAddingMemberIds(prev => {
+        const next = new Set(prev);
+        userIds.forEach(id => next.delete(id));
+        return next;
+      });
+      toast({ title: "Failed to add member", description: error.message, variant: "destructive" });
     },
   });
 
@@ -679,22 +690,29 @@ export default function ChatPage() {
                       <DialogTitle>Add Members</DialogTitle>
                     </DialogHeader>
                     <ScrollArea className="h-60 border rounded-md p-2">
-                      {users
-                        .filter(u => !selectedConversation.members?.some(m => m.userId === String(u.id)))
-                        .map(user => (
+                      {(() => {
+                        const availableUsers = users.filter(u =>
+                          !selectedConversation.members?.some(m => m.userId === String(u.id)) &&
+                          !addingMemberIds.has(String(u.id))
+                        );
+                        if (availableUsers.length === 0) {
+                          return <div className="p-4 text-center text-muted-foreground text-sm">All users are already members</div>;
+                        }
+                        return availableUsers.map(user => (
                           <div key={user.id} className="flex items-center justify-between py-2">
                             <span className="text-sm">{user.name || user.email}</span>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => addMembersMutation.mutate([String(user.id)])}
-                              disabled={addMembersMutation.isPending}
+                              disabled={addingMemberIds.has(String(user.id))}
                               data-testid={`button-add-member-${user.id}`}
                             >
                               Add
                             </Button>
                           </div>
-                        ))}
+                        ));
+                      })()}
                     </ScrollArea>
                   </DialogContent>
                 </Dialog>
