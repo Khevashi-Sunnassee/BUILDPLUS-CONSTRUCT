@@ -152,7 +152,7 @@ export function TaskRow({
   const [newSubtaskReminderDate, setNewSubtaskReminderDate] = useState<Date | null>(null);
   const [newSubtaskProjectStage, setNewSubtaskProjectStage] = useState<string | null>(null);
   const [showNewSubtaskAssigneePopover, setShowNewSubtaskAssigneePopover] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const subtaskInputRef = useRef<HTMLInputElement>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showAssigneePopover, setShowAssigneePopover] = useState(false);
@@ -164,6 +164,13 @@ export function TaskRow({
     setLocalTitle(task.title);
     setLocalConsultant(task.consultant || "");
   }, [task.title, task.consultant]);
+
+  useEffect(() => {
+    if (titleInputRef.current) {
+      titleInputRef.current.style.height = "auto";
+      titleInputRef.current.style.height = titleInputRef.current.scrollHeight + "px";
+    }
+  }, [localTitle]);
 
   useEffect(() => {
     if (showSubtasks && subtaskInputRef.current) {
@@ -391,7 +398,7 @@ export function TaskRow({
         data-testid={`task-row-${task.id}`}
       >
         <div 
-          className="h-full w-1 rounded-r-sm"
+          className="h-full w-1 rounded-r-sm self-stretch"
           style={{ backgroundColor: jobColor || 'transparent' }}
           title={task.job ? `${task.job.jobNumber} - ${task.job.name}` : undefined}
         />
@@ -415,12 +422,12 @@ export function TaskRow({
           )} />
         </div>
 
-        <div className={cn("flex items-center gap-2 py-1 pr-2", isSubtask && "pl-6")}>
+        <div className={cn("flex items-start gap-2 py-1 pr-2", isSubtask && "pl-6")}>
           {!isSubtask && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-5 w-5 p-0 shrink-0"
+              className="h-5 w-5 p-0 shrink-0 mt-1"
               onClick={() => onToggleExpanded?.()}
               data-testid={`btn-toggle-subtasks-${task.id}`}
             >
@@ -431,18 +438,23 @@ export function TaskRow({
               )}
             </Button>
           )}
-          <Input
+          <textarea
             ref={titleInputRef}
             value={localTitle}
-            onChange={(e) => setLocalTitle(e.target.value)}
+            onChange={(e) => {
+              setLocalTitle(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = e.target.scrollHeight + "px";
+            }}
             onBlur={handleTitleBlur}
-            onKeyDown={(e) => e.key === "Enter" && titleInputRef.current?.blur()}
-            className="h-7 border-0 bg-transparent focus-visible:ring-1 text-sm"
+            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); titleInputRef.current?.blur(); } }}
+            rows={1}
+            className="flex-1 min-h-[28px] py-1 px-2 border-0 bg-transparent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring text-sm resize-none overflow-hidden rounded-md"
             placeholder="Task name..."
             data-testid={`input-task-title-${task.id}`}
           />
           {!isSubtask && hasSubtasks && (
-            <span className="text-xs text-muted-foreground shrink-0">
+            <span className="text-xs text-muted-foreground shrink-0 mt-1">
               {(task.subtasks || []).length}
             </span>
           )}
