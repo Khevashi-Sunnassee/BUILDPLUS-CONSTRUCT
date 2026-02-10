@@ -70,6 +70,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth";
 import type { Job, User as UserType, GlobalSettings, Factory, Customer, JobType } from "@shared/schema";
 import { ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, PANEL_TYPES_ROUTES, FACTORIES_ROUTES, PRODUCTION_ROUTES, DRAFTING_ROUTES, PROCUREMENT_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import {
@@ -113,7 +114,9 @@ import {
 
 export default function AdminJobsPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
+  const isPrivileged = user?.role === "ADMIN" || user?.role === "MANAGER";
   const [jobDialogOpen, setJobDialogOpen] = useState(false);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -939,18 +942,22 @@ export default function AdminJobsPage() {
             className="hidden"
             data-testid="input-file-upload"
           />
-          <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
-            <Download className="h-4 w-4 mr-2" />
-            Template
-          </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-import">
-            <Upload className="h-4 w-4 mr-2" />
-            Import Excel
-          </Button>
-          <Button onClick={openCreateDialog} data-testid="button-create-job">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Job
-          </Button>
+          {isPrivileged && (
+            <>
+              <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+                <Download className="h-4 w-4 mr-2" />
+                Template
+              </Button>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()} data-testid="button-import">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Excel
+              </Button>
+              <Button onClick={openCreateDialog} data-testid="button-create-job">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Job
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1191,35 +1198,39 @@ export default function AdminJobsPage() {
                           >
                             <FileUp className="h-4 w-4 text-blue-600" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenCostOverrides(job)}
-                            title="Cost Overrides"
-                            data-testid={`button-cost-overrides-${job.id}`}
-                          >
-                            <DollarSign className="h-4 w-4 text-green-600" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEditDialog(job)}
-                            data-testid={`button-edit-job-${job.id}`}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                              setDeletingJobId(job.id);
-                              setDeletingJobPanelCount(job.panelCount || 0);
-                              setDeleteDialogOpen(true);
-                            }}
-                            data-testid={`button-delete-job-${job.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
+                          {isPrivileged && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleOpenCostOverrides(job)}
+                                title="Cost Overrides"
+                                data-testid={`button-cost-overrides-${job.id}`}
+                              >
+                                <DollarSign className="h-4 w-4 text-green-600" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => openEditDialog(job)}
+                                data-testid={`button-edit-job-${job.id}`}
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setDeletingJobId(job.id);
+                                  setDeletingJobPanelCount(job.panelCount || 0);
+                                  setDeleteDialogOpen(true);
+                                }}
+                                data-testid={`button-delete-job-${job.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

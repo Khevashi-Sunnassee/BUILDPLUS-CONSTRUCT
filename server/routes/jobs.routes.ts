@@ -488,19 +488,54 @@ router.delete("/api/jobs/:jobId/panel-rates/:rateId", requireRole("ADMIN"), asyn
 
 // Admin job endpoints
 
-// GET /api/admin/jobs - Get all jobs (for admin)
-router.get("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: Response) => {
-  const allJobs = await storage.getAllJobs(req.companyId);
-  res.json(serializeJobsPhase(allJobs));
+// GET /api/admin/jobs - Get all jobs (admin sees all, others see only their memberships)
+router.get("/api/admin/jobs", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const user = await storage.getUser(req.session.userId!);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    
+    const allJobs = await storage.getAllJobs(req.companyId);
+    const serialized = serializeJobsPhase(allJobs);
+    
+    if (user.role === "ADMIN" || user.role === "MANAGER") {
+      return res.json(serialized);
+    }
+    
+    const memberships = await db.select({ jobId: jobMembers.jobId })
+      .from(jobMembers)
+      .where(eq(jobMembers.userId, user.id));
+    const allowedJobIds = new Set(memberships.map(m => m.jobId));
+    
+    res.json(serialized.filter((job: any) => allowedJobIds.has(job.id)));
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching jobs");
+    res.status(500).json({ error: "Failed to fetch jobs" });
+  }
 });
 
-// GET /api/admin/jobs/:id - Get single job
-router.get("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
-  const job = await storage.getJob(req.params.id as string);
-  if (!job || job.companyId !== req.companyId) {
-    return res.status(404).json({ error: "Job not found" });
+// GET /api/admin/jobs/:id - Get single job (admin sees all, others only if member)
+router.get("/api/admin/jobs/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const job = await storage.getJob(req.params.id as string);
+    if (!job || job.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Job not found" });
+    }
+    const user = await storage.getUser(req.session.userId!);
+    if (!user) return res.status(401).json({ error: "Unauthorized" });
+    
+    if (user.role !== "ADMIN" && user.role !== "MANAGER") {
+      const membership = await db.select({ jobId: jobMembers.jobId })
+        .from(jobMembers)
+        .where(and(eq(jobMembers.userId, user.id), eq(jobMembers.jobId, job.id)));
+      if (membership.length === 0) {
+        return res.status(403).json({ error: "Not a member of this job" });
+      }
+    }
+    res.json(serializeJobPhase(job));
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching job");
+    res.status(500).json({ error: "Failed to fetch job" });
   }
-  res.json(serializeJobPhase(job));
 });
 
 // POST /api/admin/jobs - Create job

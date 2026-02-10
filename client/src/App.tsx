@@ -497,7 +497,7 @@ function Router() {
       </Route>
 
       <Route path="/admin/jobs">
-        <ProtectedRoute requiredRole={["ADMIN"]}>
+        <ProtectedRoute>
           <AuthenticatedLayout>
             <AdminJobsPage />
           </AuthenticatedLayout>
