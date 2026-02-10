@@ -13,7 +13,7 @@ import { format } from "date-fns";
 import {
   MessageSquare, Users, Hash, Send, ChevronLeft, Plus, X, Image, Loader2,
   Check, Search as SearchIcon, ChevronDown, ChevronRight, FolderOpen, Tag,
-  Pencil, Trash2, MoreVertical, ImageOff,
+  Pencil, Trash2, MoreVertical, ImageOff, Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
@@ -71,10 +71,21 @@ interface ChatTopic {
   id: string;
   companyId: string;
   name: string;
+  color: string | null;
   sortOrder: number;
   createdAt: string;
   createdById: string | null;
 }
+
+const TOPIC_COLOR_PALETTE = [
+  "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+  "#f43f5e", "#ef4444", "#f97316", "#f59e0b", "#eab308",
+  "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4",
+  "#0ea5e9", "#3b82f6", "#2563eb", "#7c3aed", "#c026d3",
+  "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#0891b2",
+  "#4f46e5", "#9333ea", "#db2777", "#dc2626", "#d97706",
+  "#65a30d", "#059669", "#0d9488", "#0284c7", "#1d4ed8",
+];
 
 function MobileChatImageAttachment({ att }: { att: ChatAttachment }) {
   const [removed, setRemoved] = useState(false);
@@ -144,6 +155,7 @@ export default function MobileChatPage() {
   const [newTopicName, setNewTopicName] = useState("");
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
   const [editingTopicName, setEditingTopicName] = useState("");
+  const [colorPickerTopicId, setColorPickerTopicId] = useState<string | null>(null);
   const [showTopicAssign, setShowTopicAssign] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -285,8 +297,11 @@ export default function MobileChatPage() {
   });
 
   const updateTopicMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      return apiRequest("PATCH", CHAT_ROUTES.TOPIC_BY_ID(id), { name });
+    mutationFn: async ({ id, name, color }: { id: string; name?: string; color?: string }) => {
+      const body: Record<string, string> = {};
+      if (name) body.name = name;
+      if (color) body.color = color;
+      return apiRequest("PATCH", CHAT_ROUTES.TOPIC_BY_ID(id), body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
@@ -898,15 +913,18 @@ export default function MobileChatPage() {
               const isEditing = editingTopicId === topic.id;
               return (
                 <div key={topic.id} data-testid={`topic-group-${topic.id}`}>
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl">
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl"
+                    style={{ backgroundColor: `${topic.color || '#6366f1'}20`, borderLeft: `3px solid ${topic.color || '#6366f1'}` }}
+                  >
                     <button
                       onClick={() => toggleTopicCollapse(topic.id)}
                       className="shrink-0"
                       data-testid={`button-toggle-topic-${topic.id}`}
                     >
-                      {isCollapsed ? <ChevronRight className="h-4 w-4 text-white/40" /> : <ChevronDown className="h-4 w-4 text-white/40" />}
+                      {isCollapsed ? <ChevronRight className="h-4 w-4" style={{ color: topic.color || '#6366f1' }} /> : <ChevronDown className="h-4 w-4" style={{ color: topic.color || '#6366f1' }} />}
                     </button>
-                    <FolderOpen className="h-4 w-4 text-white/40 shrink-0" />
+                    <FolderOpen className="h-4 w-4 shrink-0" style={{ color: topic.color || '#6366f1' }} />
                     {isEditing ? (
                       <Input
                         value={editingTopicName}
@@ -929,7 +947,8 @@ export default function MobileChatPage() {
                     ) : (
                       <button
                         onClick={() => toggleTopicCollapse(topic.id)}
-                        className="text-xs font-semibold uppercase tracking-wider text-white/40 flex-1 text-left truncate"
+                        className="text-xs font-semibold uppercase tracking-wider flex-1 text-left truncate"
+                        style={{ color: topic.color || '#6366f1' }}
                         data-testid={`text-topic-name-${topic.id}`}
                       >
                         {topic.name}
@@ -943,6 +962,13 @@ export default function MobileChatPage() {
                     <Badge variant="secondary" className="text-[10px] px-1 py-0 h-[16px] bg-white/10 text-white/50 border-0">{convs.length}</Badge>
                     {!isEditing && (
                       <div className="flex items-center shrink-0">
+                        <button
+                          onClick={() => setColorPickerTopicId(colorPickerTopicId === topic.id ? null : topic.id)}
+                          className="p-1 text-white/30 active:text-white/60"
+                          data-testid={`button-color-topic-${topic.id}-mobile`}
+                        >
+                          <Palette className="h-3 w-3" />
+                        </button>
                         <button
                           onClick={() => { setEditingTopicId(topic.id); setEditingTopicName(topic.name); }}
                           className="p-1 text-white/30 active:text-white/60"
@@ -960,8 +986,34 @@ export default function MobileChatPage() {
                       </div>
                     )}
                   </div>
+                  {colorPickerTopicId === topic.id && (
+                    <div className="px-3 py-2 rounded-b-xl" style={{ backgroundColor: `${topic.color || '#6366f1'}10` }}>
+                      <div className="grid grid-cols-7 gap-2" data-testid={`color-picker-topic-${topic.id}-mobile`}>
+                        {TOPIC_COLOR_PALETTE.map((color) => {
+                          const isUsed = topics.some((t: ChatTopic) => t.id !== topic.id && t.color?.toLowerCase() === color.toLowerCase());
+                          const isSelected = (topic.color || '#6366f1').toLowerCase() === color.toLowerCase();
+                          return (
+                            <button
+                              key={color}
+                              className={cn(
+                                "w-7 h-7 rounded-md flex items-center justify-center",
+                                isUsed ? "opacity-25" : "cursor-pointer",
+                                isSelected && "ring-2 ring-offset-1 ring-white"
+                              )}
+                              style={{ backgroundColor: color }}
+                              onClick={() => { if (!isUsed) { updateTopicMutation.mutate({ id: topic.id, color }); setColorPickerTopicId(null); } }}
+                              disabled={isUsed}
+                              data-testid={`color-swatch-topic-${topic.id}-${color.replace("#", "")}-mobile`}
+                            >
+                              {isSelected && <Check className="h-3.5 w-3.5 text-white drop-shadow-sm" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   {!isCollapsed && (
-                    <div className="ml-4 pl-2 border-l border-white/10 space-y-2 mt-1">
+                    <div className="ml-4 pl-2 mt-1 space-y-2" style={{ borderLeft: `2px solid ${topic.color || '#6366f1'}40` }}>
                       {convs.map(renderConversationItem)}
                     </div>
                   )}

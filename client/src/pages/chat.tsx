@@ -44,6 +44,8 @@ import {
   FolderOpen,
   Pencil,
   Tag,
+  Palette,
+  Check,
 } from "lucide-react";
 import EmojiPicker, { EmojiClickData, Theme } from "emoji-picker-react";
 import {
@@ -61,6 +63,16 @@ import { compressImages } from "@/lib/image-compress";
 import { playNotificationSound } from "@/lib/notification-sound";
 import { useAuth } from "@/lib/auth";
 import type { User, Job, PanelRegister } from "@shared/schema";
+
+const TOPIC_COLOR_PALETTE = [
+  "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+  "#f43f5e", "#ef4444", "#f97316", "#f59e0b", "#eab308",
+  "#84cc16", "#22c55e", "#10b981", "#14b8a6", "#06b6d4",
+  "#0ea5e9", "#3b82f6", "#2563eb", "#7c3aed", "#c026d3",
+  "#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#0891b2",
+  "#4f46e5", "#9333ea", "#db2777", "#dc2626", "#d97706",
+  "#65a30d", "#059669", "#0d9488", "#0284c7", "#1d4ed8",
+];
 
 interface ConversationMember {
   id: string;
@@ -92,6 +104,7 @@ interface ChatTopic {
   id: string;
   companyId: string;
   name: string;
+  color: string | null;
   sortOrder: number;
   createdAt: string;
   createdById: string | null;
@@ -425,8 +438,11 @@ export default function ChatPage() {
   });
 
   const updateTopicMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      return apiRequest("PATCH", CHAT_ROUTES.TOPIC_BY_ID(id), { name });
+    mutationFn: async ({ id, name, color }: { id: string; name?: string; color?: string }) => {
+      const body: Record<string, string> = {};
+      if (name) body.name = name;
+      if (color) body.color = color;
+      return apiRequest("PATCH", CHAT_ROUTES.TOPIC_BY_ID(id), body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOPICS] });
@@ -935,7 +951,10 @@ export default function ChatPage() {
                       return (
                         <DroppableTopicZone key={topic.id} topicId={topic.id} isDragging={!!draggingConvId}>
                           <div className="mb-1" data-testid={`topic-group-${topic.id}`}>
-                            <div className="group/topic flex items-center gap-1 px-2 py-1.5 rounded-md hover-elevate">
+                            <div
+                              className="group/topic flex items-center gap-1 px-2 py-1.5 rounded-md hover-elevate"
+                              style={{ backgroundColor: `${topic.color || '#6366f1'}20`, borderLeft: `3px solid ${topic.color || '#6366f1'}` }}
+                            >
                               <button
                                 onClick={() => toggleTopicCollapse(topic.id)}
                                 className="shrink-0 p-0.5"
@@ -943,7 +962,7 @@ export default function ChatPage() {
                               >
                                 {isCollapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                               </button>
-                              <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <FolderOpen className="h-3.5 w-3.5 shrink-0" style={{ color: topic.color || '#6366f1' }} />
                               {isEditing ? (
                                 <Input
                                   value={editingTopicName}
@@ -966,7 +985,8 @@ export default function ChatPage() {
                               ) : (
                                 <button
                                   onClick={() => toggleTopicCollapse(topic.id)}
-                                  className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate flex-1 text-left"
+                                  className="text-xs font-semibold uppercase tracking-wider truncate flex-1 text-left"
+                                  style={{ color: topic.color || '#6366f1' }}
                                   data-testid={`text-topic-name-${topic.id}`}
                                 >
                                   {topic.name}
@@ -993,6 +1013,38 @@ export default function ChatPage() {
                                       <Pencil className="h-3 w-3 mr-2" />
                                       Rename
                                     </DropdownMenuItem>
+                                    <DropdownMenuSub>
+                                      <DropdownMenuSubTrigger data-testid={`menu-color-topic-${topic.id}`}>
+                                        <Palette className="h-3 w-3 mr-2" />
+                                        Change color
+                                      </DropdownMenuSubTrigger>
+                                      <DropdownMenuSubContent className="p-2">
+                                        <div className="grid grid-cols-7 gap-1.5" data-testid={`color-picker-topic-${topic.id}`}>
+                                          {TOPIC_COLOR_PALETTE.map((color) => {
+                                            const isUsed = topics.some((t: ChatTopic) => t.id !== topic.id && t.color?.toLowerCase() === color.toLowerCase());
+                                            const isSelected = (topic.color || '#6366f1').toLowerCase() === color.toLowerCase();
+                                            return (
+                                              <button
+                                                key={color}
+                                                className={cn(
+                                                  "w-6 h-6 rounded-md flex items-center justify-center",
+                                                  isUsed ? "opacity-25 cursor-not-allowed" : "cursor-pointer",
+                                                  isSelected && "ring-2 ring-offset-1 ring-foreground"
+                                                )}
+                                                style={{ backgroundColor: color }}
+                                                onClick={() => { if (!isUsed) updateTopicMutation.mutate({ id: topic.id, color }); }}
+                                                disabled={isUsed}
+                                                title={isUsed ? "Already used by another topic" : isSelected ? "Current color" : ""}
+                                                data-testid={`color-swatch-topic-${topic.id}-${color.replace("#", "")}`}
+                                              >
+                                                {isSelected && <Check className="h-3.5 w-3.5 text-white drop-shadow-sm" />}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </DropdownMenuSubContent>
+                                    </DropdownMenuSub>
+                                    <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       className="text-destructive"
                                       onClick={() => { if (confirm("Delete this topic? Conversations will be ungrouped.")) deleteTopicMutation.mutate(topic.id); }}
@@ -1006,7 +1058,7 @@ export default function ChatPage() {
                               )}
                             </div>
                             {!isCollapsed && (
-                              <div className="ml-2 border-l pl-1">
+                              <div className="ml-2 pl-1" style={{ borderLeft: `2px solid ${topic.color || '#6366f1'}40` }}>
                                 {convs.map(renderConvItem)}
                               </div>
                             )}

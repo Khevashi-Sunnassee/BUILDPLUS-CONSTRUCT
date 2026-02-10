@@ -1171,11 +1171,14 @@ chatRouter.patch("/topics/:topicId", requireAuth, requireChatPermission, async (
   try {
     const companyId = req.session.companyId!;
     const topicId = String(req.params.topicId);
-    const schema = z.object({ name: z.string().min(1).max(100) });
-    const { name } = schema.parse(req.body);
+    const schema = z.object({ name: z.string().min(1).max(100).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }).refine(d => d.name || d.color, { message: "name or color required" });
+    const data = schema.parse(req.body);
+    const setData: Record<string, any> = {};
+    if (data.name) setData.name = data.name;
+    if (data.color) setData.color = data.color;
 
     const [updated] = await db.update(chatTopics)
-      .set({ name })
+      .set(setData)
       .where(and(eq(chatTopics.id, topicId), eq(chatTopics.companyId, companyId)))
       .returning();
 
