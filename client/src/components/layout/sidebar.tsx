@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { USER_ROUTES, SETTINGS_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
+import { USER_ROUTES, SETTINGS_ROUTES, PROJECT_ACTIVITIES_ROUTES, CHAT_ROUTES } from "@shared/api-routes";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +76,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -228,6 +229,13 @@ export function AppSidebar() {
     enabled: !!user,
   });
 
+  const { data: chatUnreadData } = useQuery<{ totalUnread: number }>({
+    queryKey: [CHAT_ROUTES.TOTAL_UNREAD],
+    enabled: !!user,
+    refetchInterval: 15000,
+  });
+  const totalChatUnread = chatUnreadData?.totalUnread || 0;
+
   const { data: paJobs = [] } = useQuery<any[]>({
     queryKey: ['/api/admin/jobs'],
     enabled: projectActivitiesOpen,
@@ -326,7 +334,12 @@ export function AppSidebar() {
                         >
                           <Link href={item.url} data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}>
                             <item.icon className="h-4 w-4" />
-                            <span>{item.title}</span>
+                            <span className="flex-1">{item.title}</span>
+                            {item.title === "Chat" && totalChatUnread > 0 && (
+                              <Badge variant="destructive" className="ml-auto text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid="badge-chat-unread">
+                                {totalChatUnread > 99 ? "99+" : totalChatUnread}
+                              </Badge>
+                            )}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

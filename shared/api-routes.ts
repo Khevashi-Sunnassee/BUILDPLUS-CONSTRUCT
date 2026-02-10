@@ -323,6 +323,7 @@ export const CHAT_ROUTES = {
   MEMBERS: (conversationId: string | number) => `/api/chat/conversations/${conversationId}/members`,
   USERS: '/api/chat/users',
   UNREAD_COUNT: '/api/chat/unread-count',
+  TOTAL_UNREAD: '/api/chat/total-unread',
   MARK_READ: '/api/chat/mark-read',
   MARK_READ_CONVERSATION: (conversationId: string | number) => `/api/chat/conversations/${conversationId}/read`,
   PANELS: '/api/chat/panels',

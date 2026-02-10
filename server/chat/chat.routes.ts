@@ -1059,6 +1059,46 @@ chatRouter.get("/unread-counts", requireAuth, requireChatPermission, async (req,
   }
 });
 
+chatRouter.get("/total-unread", requireAuth, requireChatPermission, async (req, res) => {
+  try {
+    const userId = req.session.userId!;
+
+    const memberships = await db
+      .select({
+        conversationId: conversationMembers.conversationId,
+        lastReadAt: conversationMembers.lastReadAt,
+      })
+      .from(conversationMembers)
+      .where(eq(conversationMembers.userId, userId));
+
+    if (!memberships.length) return res.json({ totalUnread: 0 });
+
+    const convIds = memberships.map(m => m.conversationId);
+    const membershipMap = new Map(memberships.map(m => [m.conversationId, m.lastReadAt ?? new Date(0)]));
+
+    const caseFragments = convIds.map(convId => {
+      const lastReadAt = membershipMap.get(convId) ?? new Date(0);
+      return sql`WHEN ${chatMessages.conversationId} = ${convId} THEN ${chatMessages.createdAt} > ${lastReadAt}`;
+    });
+
+    const unreadResults = await db
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(chatMessages)
+      .where(and(
+        inArray(chatMessages.conversationId, convIds),
+        isNull(chatMessages.deletedAt),
+        sql`CASE ${sql.join(caseFragments, sql` `)} ELSE false END`
+      ));
+
+    const totalUnread = Number(unreadResults[0]?.count || 0);
+    res.json({ totalUnread });
+  } catch (e: any) {
+    res.status(400).json({ error: e.message || String(e) });
+  }
+});
+
 chatRouter.post("/conversations/:conversationId/members", requireAuth, requireChatPermission, async (req, res) => {
   try {
     const userId = req.session.userId!;

@@ -69,6 +69,8 @@ interface Conversation {
   createdById?: string;
   members?: ConversationMember[];
   lastMessage?: Message;
+  unreadCount?: number;
+  unreadMentions?: number;
   job?: Job;
   panel?: PanelRegister;
 }
@@ -165,6 +167,7 @@ export default function ChatPage() {
 
   const { data: conversations = [], isLoading: conversationsLoading } = useQuery<Conversation[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS],
+    refetchInterval: 10000,
   });
 
   const { data: users = [] } = useQuery<User[]>({
@@ -184,6 +187,7 @@ export default function ChatPage() {
   const { data: messages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: [CHAT_ROUTES.CONVERSATIONS, selectedConversationId, "messages"],
     enabled: !!selectedConversationId,
+    refetchInterval: 5000,
   });
 
   useEffect(() => {
@@ -308,6 +312,7 @@ export default function ChatPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.TOTAL_UNREAD] });
     },
   });
 
@@ -628,9 +633,16 @@ export default function ChatPage() {
                       </div>
                     )}
                   </div>
-                  <Badge variant="outline" className="text-xs shrink-0">
-                    {conv.type}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Badge variant="outline" className="text-xs">
+                      {conv.type}
+                    </Badge>
+                    {(conv.unreadCount ?? 0) > 0 && (
+                      <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid={`badge-unread-${conv.id}`}>
+                        {(conv.unreadCount ?? 0) > 99 ? "99+" : conv.unreadCount}
+                      </Badge>
+                    )}
+                  </div>
                 </button>
               ))}
             </div>
@@ -648,8 +660,10 @@ export default function ChatPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold">{getConversationDisplayName(selectedConversation)}</h3>
-                  <div className="text-xs text-muted-foreground">
-                    {selectedConversation.members?.length || 0} members
+                  <div className="text-xs text-muted-foreground truncate max-w-md">
+                    {selectedConversation.members && selectedConversation.members.length > 0
+                      ? selectedConversation.members.map(m => m.user?.name || m.user?.email || "Unknown").join(", ")
+                      : "No members"}
                   </div>
                 </div>
               </div>
