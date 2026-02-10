@@ -24,14 +24,15 @@ const mobileFunctionKeyMap: Record<string, string> = {
 export function useMobilePermissions() {
   const { user } = useAuth();
 
-  const { data: myPermissions = [] } = useQuery<UserPermission[]>({
+  const { data: myPermissions, isLoading } = useQuery<UserPermission[]>({
     queryKey: [USER_ROUTES.MY_PERMISSIONS],
     enabled: !!user,
   });
 
   const isHidden = (mobileKey: string): boolean => {
+    if (isLoading || !myPermissions) return true;
     const functionKey = mobileFunctionKeyMap[mobileKey];
-    if (!functionKey) return false;
+    if (!functionKey) return myPermissions.length > 0;
     const permission = myPermissions.find(p => p.functionKey === functionKey);
     if (!permission) {
       return myPermissions.length > 0;
@@ -39,5 +40,5 @@ export function useMobilePermissions() {
     return permission.permissionLevel === "HIDDEN";
   };
 
-  return { isHidden, myPermissions };
+  return { isHidden, myPermissions: myPermissions || [], isLoading };
 }

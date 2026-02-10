@@ -207,7 +207,7 @@ export function AppSidebar() {
   const [paSearch, setPaSearch] = useState("");
   const [paJobTypeFilter, setPaJobTypeFilter] = useState("all");
 
-  const { data: myPermissions = [] } = useQuery<UserPermission[]>({
+  const { data: myPermissions = [], isLoading: permissionsLoading } = useQuery<UserPermission[]>({
     queryKey: [USER_ROUTES.MY_PERMISSIONS],
     enabled: !!user,
   });
@@ -238,11 +238,18 @@ export function AppSidebar() {
   });
   const logoSrc = logoData?.logoBase64 || null;
 
+  const alwaysVisibleUrls = ["/dashboard", "/help"];
+
   const isItemHidden = (url: string): boolean => {
+    if (alwaysVisibleUrls.includes(url)) return false;
+    if (permissionsLoading) return true;
     const functionKey = urlToFunctionKey[url];
-    if (!functionKey) return false;
+    if (!functionKey) return myPermissions.length > 0;
     const permission = myPermissions.find(p => p.functionKey === functionKey);
-    return permission?.permissionLevel === "HIDDEN";
+    if (!permission) {
+      return myPermissions.length > 0;
+    }
+    return permission.permissionLevel === "HIDDEN";
   };
 
   const isActive = (url: string) => {
