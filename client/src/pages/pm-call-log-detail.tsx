@@ -38,6 +38,9 @@ interface CallLogDetail {
   notifyProduction: boolean;
   updateProductionSchedule: boolean;
   updateDraftingSchedule: boolean;
+  notificationEmails: string | null;
+  notificationPhone: string | null;
+  notificationResults: Array<{ channel: string; to: string; success: boolean; error?: string; messageId?: string }> | null;
   createdByName: string | null;
   createdAt: string;
   levels: {
@@ -291,7 +294,7 @@ export default function PmCallLogDetailPage() {
             Actions Taken
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {log.updateProductionSchedule && <Badge>Production Schedule Updated</Badge>}
             {log.updateDraftingSchedule && <Badge>Drafting Schedule Updated</Badge>}
@@ -302,6 +305,25 @@ export default function PmCallLogDetailPage() {
               <span className="text-sm text-muted-foreground">No actions were triggered</span>
             )}
           </div>
+
+          {log.notificationResults && log.notificationResults.length > 0 && (
+            <div className="pt-4 border-t space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Notification Delivery Results</p>
+              {log.notificationResults.map((nr, idx) => (
+                <div key={idx} className="flex items-center gap-2 text-sm">
+                  <Badge variant={nr.success ? "default" : "destructive"} className="text-xs">
+                    {nr.channel === "email" ? "Email" : "SMS"}
+                  </Badge>
+                  <span className="text-muted-foreground">{nr.to}</span>
+                  {nr.success ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
+                  ) : (
+                    <span className="text-xs text-destructive">{nr.error || "Failed"}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

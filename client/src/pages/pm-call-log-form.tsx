@@ -110,6 +110,8 @@ export default function PmCallLogFormPage() {
   const [notifyProduction, setNotifyProduction] = useState(false);
   const [updateProductionSchedule, setUpdateProductionSchedule] = useState(false);
   const [updateDraftingSchedule, setUpdateDraftingSchedule] = useState(false);
+  const [notificationEmails, setNotificationEmails] = useState("");
+  const [notificationPhone, setNotificationPhone] = useState("");
 
   const { data: jobs, isLoading: jobsLoading } = useQuery<{ id: string; name: string }[]>({
     queryKey: [JOBS_ROUTES.LIST],
@@ -208,6 +210,8 @@ export default function PmCallLogFormPage() {
         notifyProduction,
         updateProductionSchedule: hasLateItems ? updateProductionSchedule : false,
         updateDraftingSchedule: hasLateItems ? updateDraftingSchedule : false,
+        notificationEmails: notificationEmails || null,
+        notificationPhone: notificationPhone || null,
         levels: levelStatuses,
       });
     },
@@ -637,6 +641,48 @@ export default function PmCallLogFormPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {(notifyManager || notifyClient || notifyProduction) && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Send className="h-4 w-4" />
+                    Notification Recipients
+                  </CardTitle>
+                  <CardDescription>
+                    Enter the email addresses and/or phone numbers to send notifications to.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="notificationEmails">Email Addresses</Label>
+                    <Input
+                      id="notificationEmails"
+                      value={notificationEmails}
+                      onChange={(e) => setNotificationEmails(e.target.value)}
+                      placeholder="email@example.com, another@example.com"
+                      data-testid="input-notification-emails"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Separate multiple email addresses with commas. A detailed HTML summary will be sent.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="notificationPhone">SMS Phone Numbers</Label>
+                    <Input
+                      id="notificationPhone"
+                      value={notificationPhone}
+                      onChange={(e) => setNotificationPhone(e.target.value)}
+                      placeholder="0412 345 678"
+                      data-testid="input-notification-phone"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Australian mobile numbers. A text summary will be sent via SMS.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         );
 
@@ -780,6 +826,22 @@ export default function PmCallLogFormPage() {
                     <span className="text-sm text-muted-foreground">No actions selected</span>
                   )}
                 </div>
+                {(notificationEmails || notificationPhone) && (
+                  <div className="mt-4 pt-4 border-t space-y-2">
+                    {notificationEmails && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Email Recipients</p>
+                        <p className="text-sm font-medium" data-testid="text-review-emails">{notificationEmails}</p>
+                      </div>
+                    )}
+                    {notificationPhone && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">SMS Recipients</p>
+                        <p className="text-sm font-medium" data-testid="text-review-phone">{notificationPhone}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

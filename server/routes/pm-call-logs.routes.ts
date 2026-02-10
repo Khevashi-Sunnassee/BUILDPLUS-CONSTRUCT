@@ -14,6 +14,17 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, gte, asc, sql } from "drizzle-orm";
 import { PM_CALL_LOGS_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
+import { emailService } from "../services/email.service";
+import { twilioService } from "../services/twilio.service";
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 
 const router = Router();
 
@@ -34,6 +45,8 @@ const createCallLogSchema = z.object({
   notifyProduction: z.boolean().optional().default(false),
   updateProductionSchedule: z.boolean().optional().default(false),
   updateDraftingSchedule: z.boolean().optional().default(false),
+  notificationEmails: z.string().nullable().optional(),
+  notificationPhone: z.string().nullable().optional(),
   levels: z.array(z.object({
     levelCycleTimeId: z.string().min(1),
     level: z.string().min(1),
@@ -79,6 +92,9 @@ router.get(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Resp
         notifyProduction: pmCallLogs.notifyProduction,
         updateProductionSchedule: pmCallLogs.updateProductionSchedule,
         updateDraftingSchedule: pmCallLogs.updateDraftingSchedule,
+        notificationEmails: pmCallLogs.notificationEmails,
+        notificationPhone: pmCallLogs.notificationPhone,
+        notificationResults: pmCallLogs.notificationResults,
         createdById: pmCallLogs.createdById,
         createdByName: users.name,
         createdAt: pmCallLogs.createdAt,
@@ -121,6 +137,9 @@ router.get("/api/pm-call-logs/:id", requireAuth, async (req: Request, res: Respo
         notifyProduction: pmCallLogs.notifyProduction,
         updateProductionSchedule: pmCallLogs.updateProductionSchedule,
         updateDraftingSchedule: pmCallLogs.updateDraftingSchedule,
+        notificationEmails: pmCallLogs.notificationEmails,
+        notificationPhone: pmCallLogs.notificationPhone,
+        notificationResults: pmCallLogs.notificationResults,
         createdById: pmCallLogs.createdById,
         createdByName: users.name,
         createdAt: pmCallLogs.createdAt,
@@ -293,7 +312,161 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
       return callLog;
     });
 
-    res.status(201).json(result);
+    const shouldNotify = logData.notifyManager || logData.notifyClient || logData.notifyProduction;
+    const hasRecipients = logData.notificationEmails || logData.notificationPhone;
+
+    if (shouldNotify && hasRecipients) {
+      const notificationResults: Array<{ channel: string; to: string; success: boolean; error?: string; messageId?: string }> = [];
+
+      const [jobRecord] = await db
+        .select({ name: jobs.name })
+        .from(jobs)
+        .where(eq(jobs.id, logData.jobId));
+      const jobName = jobRecord?.name || logData.jobId;
+
+      const [callerRecord] = await db
+        .select({ name: users.name })
+        .from(users)
+        .where(eq(users.id, createdById));
+      const callerName = callerRecord?.name || "PM";
+
+      const lateLevels = levels.filter((l) => l.status === "LATE" && l.daysLate > 0);
+      const formatDateShort = (d: string | null | undefined) => {
+        if (!d) return "N/A";
+        return new Date(d).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric" });
+      };
+
+      const notifyTypes: string[] = [];
+      if (logData.notifyManager) notifyTypes.push("Manager");
+      if (logData.notifyClient) notifyTypes.push("Client");
+      if (logData.notifyProduction) notifyTypes.push("Production");
+
+      if (logData.notificationEmails) {
+        const emailAddresses = logData.notificationEmails.split(",").map((e: string) => e.trim()).filter(Boolean);
+
+        let lateSection = "";
+        if (lateLevels.length > 0) {
+          const lateRows = lateLevels.map((l) =>
+            `<tr>
+              <td style="padding:6px 12px;border:1px solid #ddd;">${l.pourLabel ? `${l.level} (${l.pourLabel})` : l.level}</td>
+              <td style="padding:6px 12px;border:1px solid #ddd;">${l.daysLate} working days</td>
+              <td style="padding:6px 12px;border:1px solid #ddd;">${formatDateShort(l.adjustedStartDate)}</td>
+              <td style="padding:6px 12px;border:1px solid #ddd;">${formatDateShort(l.adjustedEndDate)}</td>
+            </tr>`
+          ).join("");
+          lateSection = `
+            <h3 style="color:#dc2626;margin-top:20px;">Late Items Reported</h3>
+            <table style="border-collapse:collapse;width:100%;margin-top:8px;">
+              <tr style="background:#f3f4f6;">
+                <th style="padding:6px 12px;border:1px solid #ddd;text-align:left;">Level</th>
+                <th style="padding:6px 12px;border:1px solid #ddd;text-align:left;">Days Late</th>
+                <th style="padding:6px 12px;border:1px solid #ddd;text-align:left;">New Start</th>
+                <th style="padding:6px 12px;border:1px solid #ddd;text-align:left;">New End</th>
+              </tr>
+              ${lateRows}
+            </table>`;
+        }
+
+        let issuesSection = "";
+        const issueItems: string[] = [];
+        if (logData.draftingConcerns) issueItems.push(`<li><strong>Drafting Concerns:</strong> ${escapeHtml(logData.draftingConcerns)}</li>`);
+        if (logData.clientDesignChanges) issueItems.push(`<li><strong>Client Design Changes:</strong> ${escapeHtml(logData.clientDesignChanges)}</li>`);
+        if (logData.issuesReported) issueItems.push(`<li><strong>Issues Reported:</strong> ${escapeHtml(logData.issuesReported)}</li>`);
+        if (logData.installationProblems) issueItems.push(`<li><strong>Installation Problems:</strong> ${escapeHtml(logData.installationProblems)}</li>`);
+        if (issueItems.length > 0) {
+          issuesSection = `<h3 style="margin-top:20px;">Concerns & Issues</h3><ul>${issueItems.join("")}</ul>`;
+        }
+
+        let logisticsSection = "";
+        if (logData.deliveryTime || logData.nextDeliveryDate) {
+          logisticsSection = `<h3 style="margin-top:20px;">Logistics</h3><ul>`;
+          if (logData.deliveryTime) logisticsSection += `<li><strong>Delivery Time:</strong> ${escapeHtml(logData.deliveryTime)}</li>`;
+          if (logData.nextDeliveryDate) logisticsSection += `<li><strong>Next Delivery:</strong> ${formatDateShort(logData.nextDeliveryDate)}</li>`;
+          logisticsSection += `</ul>`;
+        }
+
+        const htmlBody = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+            <div style="background:#1e40af;color:white;padding:16px 24px;border-radius:8px 8px 0 0;">
+              <h2 style="margin:0;">PM Call Log — ${jobName}</h2>
+            </div>
+            <div style="padding:24px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+              <p><strong>Call Date:</strong> ${new Date(logData.callDateTime).toLocaleString("en-AU", { dateStyle: "medium", timeStyle: "short" })}</p>
+              <p><strong>Contact:</strong> ${escapeHtml(logData.contactName)}${logData.contactPhone ? ` (${escapeHtml(logData.contactPhone)})` : ""}</p>
+              <p><strong>Logged By:</strong> ${callerName}</p>
+              <p><strong>Notification Sent To:</strong> ${notifyTypes.join(", ")}</p>
+
+              ${lateSection}
+              ${issuesSection}
+              ${logisticsSection}
+
+              ${logData.notes ? `<h3 style="margin-top:20px;">Notes</h3><p>${escapeHtml(logData.notes)}</p>` : ""}
+
+              ${logData.updateProductionSchedule ? `<p style="margin-top:16px;padding:8px 12px;background:#fef3c7;border-radius:4px;"><strong>Production schedule has been updated</strong> based on reported delays.</p>` : ""}
+              ${logData.updateDraftingSchedule ? `<p style="padding:8px 12px;background:#fef3c7;border-radius:4px;"><strong>Drafting schedule has been updated</strong> based on reported delays.</p>` : ""}
+            </div>
+          </div>`;
+
+        const subject = `PM Call Log: ${jobName} — ${new Date(logData.callDateTime).toLocaleDateString("en-AU")}${lateLevels.length > 0 ? ` [${lateLevels.length} LATE]` : ""}`;
+
+        for (const email of emailAddresses) {
+          try {
+            const emailResult = await emailService.sendEmail(email, subject, htmlBody);
+            notificationResults.push({ channel: "email", to: email, success: emailResult.success, error: emailResult.error, messageId: emailResult.messageId });
+            logger.info({ to: email, success: emailResult.success }, "PM call log email notification sent");
+          } catch (err: any) {
+            notificationResults.push({ channel: "email", to: email, success: false, error: err?.message });
+            logger.error({ err, to: email }, "Failed to send PM call log email notification");
+          }
+        }
+      }
+
+      if (logData.notificationPhone) {
+        const phoneNumbers = logData.notificationPhone.split(",").map((p: string) => p.trim()).filter(Boolean);
+        const onTimeCount = levels.filter((l) => l.status === "ON_TIME").length;
+        const lateCount = lateLevels.length;
+
+        let smsBody = `PM Call Log: ${jobName}\n`;
+        smsBody += `Date: ${new Date(logData.callDateTime).toLocaleDateString("en-AU")}\n`;
+        smsBody += `Contact: ${logData.contactName}\n`;
+        smsBody += `Status: ${onTimeCount} on time, ${lateCount} late\n`;
+
+        if (lateLevels.length > 0) {
+          smsBody += `\nLate Items:\n`;
+          for (const l of lateLevels) {
+            smsBody += `- ${l.pourLabel ? `${l.level} (${l.pourLabel})` : l.level}: ${l.daysLate} days late\n`;
+          }
+        }
+
+        if (logData.issuesReported) {
+          smsBody += `\nIssues: ${logData.issuesReported.substring(0, 100)}`;
+        }
+
+        smsBody += `\n\nLogged by ${callerName}`;
+
+        for (const phone of phoneNumbers) {
+          try {
+            const smsResult = await twilioService.sendSMS(phone, smsBody);
+            notificationResults.push({ channel: "sms", to: phone, success: smsResult.success, error: smsResult.error, messageId: smsResult.messageId });
+            logger.info({ to: phone, success: smsResult.success }, "PM call log SMS notification sent");
+          } catch (err: any) {
+            notificationResults.push({ channel: "sms", to: phone, success: false, error: err?.message });
+            logger.error({ err, to: phone }, "Failed to send PM call log SMS notification");
+          }
+        }
+      }
+
+      if (notificationResults.length > 0) {
+        await db
+          .update(pmCallLogs)
+          .set({ notificationResults })
+          .where(eq(pmCallLogs.id, result.id));
+      }
+
+      res.status(201).json({ ...result, notificationResults });
+    } else {
+      res.status(201).json(result);
+    }
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create PM call log");
     res.status(500).json({ message: "Failed to create call log" });
