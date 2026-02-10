@@ -1840,6 +1840,7 @@ export const chatTopics = pgTable("chat_topics", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
+  color: text("color").default("#6366f1"),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdById: varchar("created_by_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
