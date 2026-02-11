@@ -7,8 +7,8 @@ import archiver from "archiver";
 import { PassThrough } from "stream";
 import { z } from "zod";
 import { storage, db } from "../storage";
-import { eq } from "drizzle-orm";
-import { jobMembers } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
+import { jobMembers, documents } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
 import { emailService } from "../services/email.service";
@@ -455,13 +455,70 @@ router.get("/api/documents/:id/versions", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/api/documents/check-duplicates", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const { documentNumbers } = req.body;
+    if (!documentNumbers || !Array.isArray(documentNumbers) || documentNumbers.length === 0) {
+      return res.status(400).json({ error: "documentNumbers array is required" });
+    }
+
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company context required" });
+    }
+
+    const duplicates: Record<string, { id: string; title: string; version: string; revision: string; documentNumber: string; status: string; isLatestVersion: boolean }[]> = {};
+
+    for (const docNum of documentNumbers) {
+      if (!docNum || typeof docNum !== "string") continue;
+      const trimmed = docNum.trim();
+      if (!trimmed) continue;
+
+      const result = await db.select({
+        id: documents.id,
+        title: documents.title,
+        version: documents.version,
+        revision: documents.revision,
+        documentNumber: documents.documentNumber,
+        status: documents.status,
+        isLatestVersion: documents.isLatestVersion,
+      })
+        .from(documents)
+        .where(
+          and(
+            eq(documents.companyId, companyId),
+            eq(documents.documentNumber, trimmed),
+            eq(documents.isLatestVersion, true),
+          )
+        );
+
+      if (result.length > 0) {
+        duplicates[trimmed] = result.map(r => ({
+          id: r.id,
+          title: r.title,
+          version: r.version || "1.0",
+          revision: r.revision || "A",
+          documentNumber: r.documentNumber || trimmed,
+          status: r.status,
+          isLatestVersion: r.isLatestVersion ?? true,
+        }));
+      }
+    }
+
+    res.json({ duplicates });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error checking document duplicates");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to check duplicates" });
+  }
+});
+
 router.post("/api/documents/upload", requireAuth, upload.single("file"), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential, documentNumber: manualDocNumber, revision: manualRevision } = req.body;
+    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential, documentNumber: manualDocNumber, revision: manualRevision, supersedeDocumentId } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: "Title is required" });
@@ -499,6 +556,50 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
     const companyId = req.companyId;
     if (!companyId) {
       return res.status(400).json({ error: "Company context required" });
+    }
+
+    if (supersedeDocumentId) {
+      const parentDoc = await storage.getDocument(supersedeDocumentId);
+      if (!parentDoc) {
+        return res.status(404).json({ error: "Document to supersede not found" });
+      }
+      if (parentDoc.companyId !== companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+
+      const currentVersion = parseFloat(parentDoc.version || "1.0");
+      const newVersion = String((currentVersion + 1).toFixed(1));
+
+      const newDocument = await storage.createNewVersion(supersedeDocumentId, {
+        companyId,
+        title: title || parentDoc.title,
+        description: description || parentDoc.description,
+        fileName: `${Date.now()}-${req.file.originalname}`,
+        originalName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+        storageKey: objectPath,
+        fileSha256,
+        documentNumber: parentDoc.documentNumber,
+        typeId: typeId || parentDoc.typeId,
+        disciplineId: disciplineId || parentDoc.disciplineId,
+        categoryId: categoryId || parentDoc.categoryId,
+        documentTypeStatusId: documentTypeStatusId || parentDoc.documentTypeStatusId,
+        jobId: jobId || parentDoc.jobId,
+        panelId: panelId || parentDoc.panelId,
+        supplierId: supplierId || parentDoc.supplierId,
+        purchaseOrderId: purchaseOrderId || parentDoc.purchaseOrderId,
+        taskId: taskId || parentDoc.taskId,
+        tags: tags || parentDoc.tags,
+        isConfidential: isConfidential === "true",
+        uploadedBy: req.session.userId!,
+        status: "DRAFT",
+        version: newVersion,
+        revision: manualRevision || "A",
+        isLatestVersion: true,
+      });
+
+      return res.json(newDocument);
     }
 
     const document = await storage.createDocument({
@@ -1581,6 +1682,7 @@ router.post("/api/documents/bulk-upload", requireAuth, bulkUpload.array("files",
       documentNumber: string;
       revision: string;
       version: string;
+      supersedeDocumentId?: string;
     }> = [];
 
     try {
@@ -1646,34 +1748,74 @@ router.post("/api/documents/bulk-upload", requireAuth, bulkUpload.array("files",
           documentNumber = await storage.getNextDocumentNumber(typeId);
         }
 
-        const document = await storage.createDocument({
-          companyId,
-          title: meta.title,
-          description: null,
-          fileName: `${Date.now()}-${file.originalname}`,
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          fileSize: file.size,
-          storageKey: objectPath,
-          fileSha256,
-          documentNumber,
-          revision: meta.revision || "A",
-          version: meta.version || "1.0",
-          typeId: typeId || null,
-          disciplineId: disciplineId || null,
-          categoryId: categoryId || null,
-          documentTypeStatusId: documentTypeStatusId || null,
-          jobId: jobId || null,
-          panelId: panelId || null,
-          supplierId: supplierId || null,
-          purchaseOrderId: purchaseOrderId || null,
-          taskId: taskId || null,
-          tags: tags || null,
-          isConfidential: isConfidential === "true",
-          uploadedBy: req.session.userId!,
-          status: "DRAFT",
-          isLatestVersion: true,
-        });
+        let document;
+
+        if (meta.supersedeDocumentId) {
+          const parentDoc = await storage.getDocument(meta.supersedeDocumentId);
+          if (!parentDoc || parentDoc.companyId !== companyId) {
+            throw new Error("Document to supersede not found or access denied");
+          }
+          const currentVersion = parseFloat(parentDoc.version || "1.0");
+          const newVersion = String((currentVersion + 1).toFixed(1));
+
+          document = await storage.createNewVersion(meta.supersedeDocumentId, {
+            companyId,
+            title: meta.title || parentDoc.title,
+            description: parentDoc.description,
+            fileName: `${Date.now()}-${file.originalname}`,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+            storageKey: objectPath,
+            fileSha256,
+            documentNumber: parentDoc.documentNumber,
+            typeId: typeId || parentDoc.typeId,
+            disciplineId: disciplineId || parentDoc.disciplineId,
+            categoryId: categoryId || parentDoc.categoryId,
+            documentTypeStatusId: documentTypeStatusId || parentDoc.documentTypeStatusId,
+            jobId: jobId || parentDoc.jobId,
+            panelId: panelId || parentDoc.panelId,
+            supplierId: supplierId || parentDoc.supplierId,
+            purchaseOrderId: purchaseOrderId || parentDoc.purchaseOrderId,
+            taskId: taskId || parentDoc.taskId,
+            tags: tags || parentDoc.tags,
+            isConfidential: isConfidential === "true",
+            uploadedBy: req.session.userId!,
+            status: "DRAFT",
+            version: newVersion,
+            revision: meta.revision || "A",
+            isLatestVersion: true,
+          });
+        } else {
+          document = await storage.createDocument({
+            companyId,
+            title: meta.title,
+            description: null,
+            fileName: `${Date.now()}-${file.originalname}`,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            fileSize: file.size,
+            storageKey: objectPath,
+            fileSha256,
+            documentNumber,
+            revision: meta.revision || "A",
+            version: meta.version || "1.0",
+            typeId: typeId || null,
+            disciplineId: disciplineId || null,
+            categoryId: categoryId || null,
+            documentTypeStatusId: documentTypeStatusId || null,
+            jobId: jobId || null,
+            panelId: panelId || null,
+            supplierId: supplierId || null,
+            purchaseOrderId: purchaseOrderId || null,
+            taskId: taskId || null,
+            tags: tags || null,
+            isConfidential: isConfidential === "true",
+            uploadedBy: req.session.userId!,
+            status: "DRAFT",
+            isLatestVersion: true,
+          });
+        }
 
         uploaded.push(document);
       } catch (fileError: unknown) {

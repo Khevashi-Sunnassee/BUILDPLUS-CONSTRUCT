@@ -8,16 +8,20 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Files,
   Trash2,
+  ArrowUpCircle,
+  Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
-import { queryClient, getCsrfToken } from "@/lib/queryClient";
+import { queryClient, getCsrfToken, apiRequest } from "@/lib/queryClient";
 import {
   Dialog,
   DialogContent,
@@ -60,6 +64,15 @@ interface BulkUploadDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface DuplicateInfo {
+  id: string;
+  title: string;
+  version: string;
+  revision: string;
+  documentNumber: string;
+  status: string;
+}
+
 interface FileEntry {
   file: File;
   title: string;
@@ -68,6 +81,9 @@ interface FileEntry {
   version: string;
   aiProcessed: boolean;
   aiLoading: boolean;
+  duplicateInfo?: DuplicateInfo;
+  supersedeDocumentId?: string;
+  skipUpload?: boolean;
 }
 
 export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) {
@@ -252,6 +268,10 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
         title: "AI Analysis Complete",
         description: `Extracted metadata from ${successCount}/${results.length} files`,
       });
+
+      setTimeout(() => {
+        checkForDuplicatesAfterExtract(results);
+      }, 100);
     } catch (error) {
       toast({
         title: "Error",
@@ -264,19 +284,116 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
     }
   }, [files, toast]);
 
+  const checkForDuplicatesAfterExtract = useCallback(async (results: Array<{ fileName: string; documentNumber: string; success: boolean }>) => {
+    const docNumbers = results
+      .filter((r) => r.success && r.documentNumber)
+      .map((r) => r.documentNumber.trim())
+      .filter((n) => n.length > 0);
+
+    if (docNumbers.length === 0) return;
+
+    const uniqueNumbers = [...new Set(docNumbers)];
+
+    try {
+      const response = await apiRequest("POST", DOCUMENT_ROUTES.CHECK_DUPLICATES, {
+        documentNumbers: uniqueNumbers,
+      });
+      const data = await response.json();
+      const duplicates = data.duplicates || {};
+
+      setFiles((prev) =>
+        prev.map((entry) => {
+          const trimmed = entry.documentNumber?.trim();
+          if (trimmed && duplicates[trimmed] && duplicates[trimmed].length > 0) {
+            return {
+              ...entry,
+              duplicateInfo: duplicates[trimmed][0],
+            };
+          }
+          return entry;
+        })
+      );
+
+      const dupCount = Object.keys(duplicates).length;
+      if (dupCount > 0) {
+        toast({
+          title: "Duplicates Found",
+          description: `${dupCount} document number(s) already exist. Choose to supersede or skip each.`,
+          variant: "destructive",
+        });
+      }
+    } catch {
+    }
+  }, [toast]);
+
+  const checkForDuplicates = useCallback(async () => {
+    const docNumbers = files
+      .map((f) => f.documentNumber?.trim())
+      .filter((n): n is string => !!n && n.length > 0);
+
+    if (docNumbers.length === 0) return;
+
+    const uniqueNumbers = [...new Set(docNumbers)];
+
+    try {
+      const response = await apiRequest("POST", DOCUMENT_ROUTES.CHECK_DUPLICATES, {
+        documentNumbers: uniqueNumbers,
+      });
+      const data = await response.json();
+      const duplicates = data.duplicates || {};
+
+      setFiles((prev) =>
+        prev.map((entry) => {
+          const trimmed = entry.documentNumber?.trim();
+          if (trimmed && duplicates[trimmed] && duplicates[trimmed].length > 0) {
+            const existing = duplicates[trimmed][0];
+            return {
+              ...entry,
+              duplicateInfo: existing,
+              supersedeDocumentId: undefined,
+              skipUpload: undefined,
+            };
+          }
+          return {
+            ...entry,
+            duplicateInfo: undefined,
+            supersedeDocumentId: undefined,
+            skipUpload: undefined,
+          };
+        })
+      );
+
+      const dupCount = Object.keys(duplicates).length;
+      if (dupCount > 0) {
+        toast({
+          title: "Duplicates Found",
+          description: `${dupCount} document number(s) already exist. Choose to supersede or skip each.`,
+          variant: "destructive",
+        });
+      }
+    } catch {
+    }
+  }, [files, toast]);
+
   const uploadMutation = useMutation({
     mutationFn: async () => {
+      const filesToUpload = files.filter((f) => !f.skipUpload);
+      if (filesToUpload.length === 0) {
+        throw new Error("No files to upload (all were skipped)");
+      }
+
       const formData = new FormData();
-      files.forEach((entry) => {
+      filesToUpload.forEach((entry) => {
         formData.append("files", entry.file);
       });
 
-      const metadata = files.map((entry) => ({
+      const metadata = filesToUpload.map((entry) => ({
         fileName: entry.file.name,
         title: entry.title,
         documentNumber: entry.documentNumber,
         revision: entry.revision,
         version: entry.version,
+        supersedeDocumentId: entry.supersedeDocumentId || undefined,
       }));
       formData.append("metadata", JSON.stringify(metadata));
 
@@ -404,6 +521,16 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                     AI Extract Metadata
                   </Button>
                   <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={checkForDuplicates}
+                    disabled={files.length === 0 || !files.some((f) => f.documentNumber?.trim())}
+                    data-testid="button-check-duplicates"
+                  >
+                    <AlertTriangle className="h-4 w-4 mr-2" />
+                    Check Duplicates
+                  </Button>
+                  <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setFiles([])}
@@ -416,27 +543,27 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
               </div>
 
               <div className="border rounded-md">
-                <ScrollArea className="max-h-[250px]">
+                <ScrollArea className="max-h-[300px]">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[200px]">File</TableHead>
+                        <TableHead className="w-[180px]">File</TableHead>
                         <TableHead>Title</TableHead>
                         <TableHead className="w-[140px]">Doc Number</TableHead>
-                        <TableHead className="w-[80px]">Rev</TableHead>
-                        <TableHead className="w-[80px]">Version</TableHead>
-                        <TableHead className="w-[50px]">AI</TableHead>
+                        <TableHead className="w-[70px]">Rev</TableHead>
+                        <TableHead className="w-[70px]">Ver</TableHead>
+                        <TableHead className="w-[50px]">Status</TableHead>
                         <TableHead className="w-[40px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {files.map((entry, index) => (
-                        <TableRow key={`${entry.file.name}-${index}`}>
+                        <TableRow key={`${entry.file.name}-${index}`} className={entry.skipUpload ? "opacity-50" : entry.duplicateInfo && !entry.supersedeDocumentId ? "bg-yellow-500/5" : ""}>
                           <TableCell>
                             <div className="flex items-center gap-1.5 min-w-0">
                               <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                               <div className="min-w-0">
-                                <p className="text-sm truncate max-w-[160px]" title={entry.file.name}>
+                                <p className="text-sm truncate max-w-[150px]" title={entry.file.name}>
                                   {entry.file.name}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
@@ -450,15 +577,17 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                               value={entry.title}
                               onChange={(e) => updateFileEntry(index, { title: e.target.value })}
                               className="h-8 text-sm"
+                              disabled={entry.skipUpload}
                               data-testid={`input-title-${index}`}
                             />
                           </TableCell>
                           <TableCell>
                             <Input
                               value={entry.documentNumber}
-                              onChange={(e) => updateFileEntry(index, { documentNumber: e.target.value })}
+                              onChange={(e) => updateFileEntry(index, { documentNumber: e.target.value, duplicateInfo: undefined, supersedeDocumentId: undefined, skipUpload: undefined })}
                               className="h-8 text-sm"
                               placeholder="Auto"
+                              disabled={entry.skipUpload}
                               data-testid={`input-doc-number-${index}`}
                             />
                           </TableCell>
@@ -468,6 +597,7 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                               onChange={(e) => updateFileEntry(index, { revision: e.target.value })}
                               className="h-8 text-sm"
                               placeholder="A"
+                              disabled={entry.skipUpload}
                               data-testid={`input-revision-${index}`}
                             />
                           </TableCell>
@@ -476,11 +606,58 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                               value={entry.version}
                               onChange={(e) => updateFileEntry(index, { version: e.target.value })}
                               className="h-8 text-sm"
+                              disabled={entry.skipUpload}
                               data-testid={`input-version-${index}`}
                             />
                           </TableCell>
                           <TableCell>
-                            {entry.aiLoading ? (
+                            {entry.skipUpload ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Ban className="h-4 w-4 text-muted-foreground" />
+                                </TooltipTrigger>
+                                <TooltipContent>Skipped</TooltipContent>
+                              </Tooltip>
+                            ) : entry.duplicateInfo && entry.supersedeDocumentId ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <ArrowUpCircle className="h-4 w-4 text-blue-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>Will supersede v{entry.duplicateInfo.version}{entry.duplicateInfo.revision}</TooltipContent>
+                              </Tooltip>
+                            ) : entry.duplicateInfo ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <div className="text-xs space-y-1">
+                                    <div>Duplicate: {entry.duplicateInfo.title}</div>
+                                    <div>v{entry.duplicateInfo.version}{entry.duplicateInfo.revision} ({entry.duplicateInfo.status})</div>
+                                    <div className="flex gap-1 pt-1">
+                                      <Button
+                                        size="sm"
+                                        variant="default"
+                                        className="h-6 text-xs"
+                                        onClick={() => updateFileEntry(index, { supersedeDocumentId: entry.duplicateInfo!.id })}
+                                        data-testid={`button-supersede-${index}`}
+                                      >
+                                        Supersede
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-6 text-xs"
+                                        onClick={() => updateFileEntry(index, { skipUpload: true })}
+                                        data-testid={`button-skip-${index}`}
+                                      >
+                                        Skip
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : entry.aiLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                             ) : entry.aiProcessed ? (
                               <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -504,6 +681,49 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
                   </Table>
                 </ScrollArea>
               </div>
+
+              {files.some((f) => f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload) && (
+                <div className="flex items-center gap-2 p-2 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                  <p className="text-sm text-muted-foreground">
+                    Some files have duplicate document numbers. Hover over the warning icon to choose <strong>Supersede</strong> or <strong>Skip</strong> for each.
+                  </p>
+                  <div className="flex gap-1 ml-auto flex-shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFiles((prev) =>
+                          prev.map((f) =>
+                            f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload
+                              ? { ...f, supersedeDocumentId: f.duplicateInfo!.id }
+                              : f
+                          )
+                        );
+                      }}
+                      data-testid="button-supersede-all"
+                    >
+                      Supersede All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setFiles((prev) =>
+                          prev.map((f) =>
+                            f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload
+                              ? { ...f, skipUpload: true }
+                              : f
+                          )
+                        );
+                      }}
+                      data-testid="button-skip-all-duplicates"
+                    >
+                      Skip All
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <Label className="text-sm font-medium">Shared Metadata (applied to all files)</Label>
@@ -674,11 +894,16 @@ export function BulkUploadDialog({ open, onOpenChange }: BulkUploadDialogProps) 
           </Button>
           <Button
             onClick={() => uploadMutation.mutate()}
-            disabled={uploadMutation.isPending || files.length === 0}
+            disabled={
+              uploadMutation.isPending ||
+              files.length === 0 ||
+              files.filter((f) => !f.skipUpload).length === 0 ||
+              files.some((f) => f.duplicateInfo && !f.supersedeDocumentId && !f.skipUpload)
+            }
             data-testid="button-submit-bulk-upload"
           >
             {uploadMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            Upload {files.length} Document{files.length !== 1 ? "s" : ""}
+            Upload {files.filter((f) => !f.skipUpload).length} Document{files.filter((f) => !f.skipUpload).length !== 1 ? "s" : ""}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -568,6 +568,7 @@ export const DOCUMENT_ROUTES = {
   ANALYZE_EXISTING_VERSIONS: (id: string | number) => `/api/documents/${id}/analyze-changes`,
   EXTRACT_METADATA: '/api/documents/extract-metadata',
   BULK_UPLOAD: '/api/documents/bulk-upload',
+  CHECK_DUPLICATES: '/api/documents/check-duplicates',
   
   // Panel Documents (mini register)
   PANEL_DOCUMENTS: (panelId: string) => `/api/panels/${panelId}/documents`,
