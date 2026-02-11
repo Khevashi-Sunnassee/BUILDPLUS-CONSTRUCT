@@ -271,17 +271,18 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
 
     if (existing.length === 0) return res.status(404).json({ error: "Hire booking not found" });
 
-    if (!["DRAFT", "REQUESTED"].includes(existing[0].status)) {
-      return res.status(400).json({ error: "Can only edit bookings in Draft or Requested status" });
-    }
-
     const parsed = hireBookingSchema.partial().safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
 
     const data = parsed.data;
+    const rawStatus = req.body.status;
     const updateData: Record<string, any> = { updatedAt: new Date() };
+
+    if (rawStatus && ["DRAFT", "REQUESTED", "APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CANCELLED", "CLOSED"].includes(rawStatus)) {
+      updateData.status = rawStatus;
+    }
 
     if (data.hireSource !== undefined) updateData.hireSource = data.hireSource;
     if (data.equipmentDescription !== undefined) updateData.equipmentDescription = data.equipmentDescription;
