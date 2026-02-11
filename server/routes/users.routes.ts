@@ -344,6 +344,15 @@ const updateDepartmentSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+router.get("/api/departments", requireAuth, async (req, res) => {
+  try {
+    const departments = await storage.getDepartmentsByCompany(req.companyId!);
+    res.json(departments);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch departments" });
+  }
+});
+
 router.get("/api/admin/departments", requireRole("ADMIN"), async (req, res) => {
   try {
     const departments = await storage.getDepartmentsByCompany(req.companyId!);

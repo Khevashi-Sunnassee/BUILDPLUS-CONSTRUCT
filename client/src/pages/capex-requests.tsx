@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -141,8 +142,8 @@ function CapexForm({ capex, onSave, onClose, replacementPrefill }: { capex?: Cap
   const { data: departmentsList = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: usersList = [] } = useQuery<User[]>({ queryKey: ["/api/users"] });
   const { data: approversList = [] } = useQuery<Approver[]>({ queryKey: ["/api/users/approvers", { type: "capex" }] });
-  const { data: suppliersList = [] } = useQuery<Supplier[]>({ queryKey: ["/api/suppliers"] });
-  const { data: assetsList = [] } = useQuery<Asset[]>({ queryKey: ["/api/assets"], enabled: formData.isReplacement });
+  const { data: suppliersList = [] } = useQuery<Supplier[]>({ queryKey: ["/api/procurement/suppliers/active"] });
+  const { data: assetsList = [] } = useQuery<Asset[]>({ queryKey: ["/api/admin/assets"], enabled: formData.isReplacement });
   const { data: factoriesList = [] } = useQuery<{ id: string; name: string; code: string }[]>({ queryKey: ["/api/factories"] });
 
   const saveMutation = useMutation({
@@ -941,20 +942,20 @@ export default function CapexRequestsPage() {
         ))}
       </div>
 
-      <Sheet open={createSheetOpen} onOpenChange={(open) => { setCreateSheetOpen(open); if (!open) setReplacementPrefill(null); }}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-testid="sheet-create-capex">
-          <SheetHeader>
-            <SheetTitle>{replacementPrefill ? "New CAPEX Request - Asset Replacement" : "New CAPEX Request"}</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4">
+      <Dialog open={createSheetOpen} onOpenChange={(open) => { setCreateSheetOpen(open); if (!open) setReplacementPrefill(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-create-capex">
+          <DialogHeader>
+            <DialogTitle>{replacementPrefill ? "New CAPEX Request - Asset Replacement" : "New CAPEX Request"}</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
             <CapexForm
               onSave={() => { setCreateSheetOpen(false); setReplacementPrefill(null); }}
               onClose={() => { setCreateSheetOpen(false); setReplacementPrefill(null); }}
               replacementPrefill={replacementPrefill}
             />
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       <Sheet open={!!selectedCapex} onOpenChange={(open) => !open && setSelectedCapex(null)}>
         <SheetContent className="w-full sm:max-w-2xl overflow-y-auto" data-testid="sheet-detail-capex">
@@ -969,18 +970,18 @@ export default function CapexRequestsPage() {
         </SheetContent>
       </Sheet>
 
-      <Sheet open={!!editCapex} onOpenChange={(open) => !open && setEditCapex(null)}>
-        <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-testid="sheet-edit-capex">
-          <SheetHeader>
-            <SheetTitle>Edit CAPEX Request</SheetTitle>
-          </SheetHeader>
-          <div className="mt-4">
+      <Dialog open={!!editCapex} onOpenChange={(open) => !open && setEditCapex(null)}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" data-testid="dialog-edit-capex">
+          <DialogHeader>
+            <DialogTitle>Edit CAPEX Request</DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
             {editCapex && (
               <CapexForm capex={editCapex} onSave={() => setEditCapex(null)} onClose={() => setEditCapex(null)} />
             )}
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
