@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient, apiUpload } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2, Package } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2, Package, ExternalLink } from "lucide-react";
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
 import { ItemPickerDialog } from "@/components/ItemPickerDialog";
@@ -1157,8 +1157,14 @@ export default function PurchaseOrderFormPage() {
             </div>
           )}
           {existingPO && (
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               {getStatusBadge(existingPO.status)}
+              {(existingPO as any).capexRequestId && (
+                <Badge variant="outline" className="text-xs cursor-pointer" onClick={() => navigate(`/capex-requests?open=${(existingPO as any).capexRequestId}`)} data-testid="badge-capex-header">
+                  <Package className="h-3 w-3 mr-1" />
+                  CAPEX Linked
+                </Badge>
+              )}
               <span className="text-sm text-muted-foreground">
                 Created by {existingPO.requestedBy?.name || existingPO.requestedBy?.email}
               </span>
@@ -1365,10 +1371,17 @@ export default function PurchaseOrderFormPage() {
                 {(existingPO as any)?.capexRequestId && (
                   <div>
                     <Label className="text-sm font-medium">Linked CAPEX Request</Label>
-                    <p className="mt-1">
-                      <Badge variant="outline" data-testid="badge-capex-link">CAPEX</Badge>
-                      <span className="ml-2 text-sm text-muted-foreground">{(existingPO as any).capexRequestId}</span>
-                    </p>
+                    <div className="mt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(`/capex-requests?open=${(existingPO as any).capexRequestId}`)}
+                        data-testid="button-view-capex"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                        View CAPEX Request
+                      </Button>
+                    </div>
                   </div>
                 )}
                 <div>

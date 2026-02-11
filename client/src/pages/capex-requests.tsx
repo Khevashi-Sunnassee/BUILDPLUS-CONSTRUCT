@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { useLocation } from "wouter";
+import { useState, useMemo, useEffect } from "react";
+import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -773,14 +773,29 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
 
 export default function CapexRequestsPage() {
   const { toast } = useToast();
+  const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
   const [selectedCapex, setSelectedCapex] = useState<CapexRequestWithDetails | null>(null);
   const [editCapex, setEditCapex] = useState<CapexRequestWithDetails | null>(null);
+  const [autoOpenId, setAutoOpenId] = useState<string | null>(() => {
+    const params = new URLSearchParams(searchParams);
+    return params.get("open");
+  });
 
   const { data: requests = [], isLoading } = useQuery<CapexRequestWithDetails[]>({
     queryKey: ["/api/capex-requests"],
   });
+
+  useEffect(() => {
+    if (autoOpenId && requests.length > 0 && !selectedCapex) {
+      const match = requests.find((r) => r.id === autoOpenId);
+      if (match) {
+        setSelectedCapex(match);
+        setAutoOpenId(null);
+      }
+    }
+  }, [autoOpenId, requests, selectedCapex]);
 
   const filtered = useMemo(() => {
     if (!searchQuery) return requests;
