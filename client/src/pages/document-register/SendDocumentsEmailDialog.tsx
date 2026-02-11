@@ -109,8 +109,8 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[900px] max-h-[85vh] p-0 gap-0 overflow-hidden" data-testid="dialog-send-documents-email">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="max-w-[900px] h-[85vh] p-0 gap-0 flex flex-col" data-testid="dialog-send-documents-email">
+        <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
           <DialogTitle className="flex items-center gap-2" data-testid="text-email-dialog-title">
             <Mail className="h-5 w-5" />
             Email Documents
@@ -120,7 +120,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-1 overflow-hidden" style={{ minHeight: "500px" }}>
+        <div className="flex flex-1 min-h-0">
           <div className="w-[420px] flex-shrink-0 border-r overflow-y-auto p-6 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="doc-email-to">To</Label>
