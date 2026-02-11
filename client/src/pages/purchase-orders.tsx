@@ -23,7 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Eye, Edit, Paperclip, Search, X, Mail, Send, Loader2, Printer, Trash2 } from "lucide-react";
+import { Plus, Eye, Edit, Paperclip, Search, X, Mail, Send, Loader2, Printer, Trash2, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -830,6 +830,20 @@ export default function PurchaseOrdersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPO, setDeletingPO] = useState<PurchaseOrderWithDetails | null>(null);
 
+  type SortField = "poNumber" | "supplier" | "requestedBy" | "total" | "status" | "createdAt" | "requiredByDate";
+  type SortDirection = "asc" | "desc";
+  const [sortField, setSortField] = useState<SortField>("createdAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDirection("asc");
+    }
+  };
+
   const { data: purchaseOrders = [], isLoading } = useQuery<PurchaseOrderWithDetails[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
   });
@@ -874,7 +888,7 @@ export default function PurchaseOrdersPage() {
   };
 
   const filteredOrders = useMemo(() => {
-    return purchaseOrders.filter(po => {
+    const filtered = purchaseOrders.filter(po => {
       if (statusFilter !== "ALL" && po.status !== statusFilter) return false;
       if (supplierFilter !== "all") {
         if (!po.supplierId && !po.supplierName) return false;
@@ -892,7 +906,45 @@ export default function PurchaseOrdersPage() {
       }
       return true;
     });
-  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery, capexFilter]);
+
+    const dir = sortDirection === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case "poNumber":
+          cmp = (a.poNumber || "").localeCompare(b.poNumber || "");
+          break;
+        case "supplier":
+          cmp = (a.supplier?.name || a.supplierName || "").localeCompare(b.supplier?.name || b.supplierName || "");
+          break;
+        case "requestedBy":
+          cmp = (a.requestedBy?.name || a.requestedBy?.email || "").localeCompare(b.requestedBy?.name || b.requestedBy?.email || "");
+          break;
+        case "total": {
+          const aTotal = parseFloat(String(a.total || "0"));
+          const bTotal = parseFloat(String(b.total || "0"));
+          cmp = aTotal - bTotal;
+          break;
+        }
+        case "status":
+          cmp = (a.status || "").localeCompare(b.status || "");
+          break;
+        case "createdAt": {
+          const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          cmp = aDate - bDate;
+          break;
+        }
+        case "requiredByDate": {
+          const aDate = a.requiredByDate ? new Date(a.requiredByDate).getTime() : 0;
+          const bDate = b.requiredByDate ? new Date(b.requiredByDate).getTime() : 0;
+          cmp = aDate - bDate;
+          break;
+        }
+      }
+      return cmp * dir;
+    });
+  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery, capexFilter, sortField, sortDirection]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -1053,13 +1105,35 @@ export default function PurchaseOrdersPage() {
             <Table data-testid="table-purchase-orders">
               <TableHeader>
                 <TableRow>
-                  <TableHead data-testid="th-po-number">PO Number</TableHead>
-                  <TableHead data-testid="th-supplier">Supplier</TableHead>
-                  <TableHead data-testid="th-requested-by">Requested By</TableHead>
-                  <TableHead data-testid="th-total">Total</TableHead>
-                  <TableHead data-testid="th-status">Status</TableHead>
-                  <TableHead data-testid="th-created-date">Created Date</TableHead>
-                  <TableHead data-testid="th-due-date">Due Date</TableHead>
+                  {([
+                    { field: "poNumber" as SortField, label: "PO Number", testId: "th-po-number" },
+                    { field: "supplier" as SortField, label: "Supplier", testId: "th-supplier" },
+                    { field: "requestedBy" as SortField, label: "Requested By", testId: "th-requested-by" },
+                    { field: "total" as SortField, label: "Total", testId: "th-total" },
+                    { field: "status" as SortField, label: "Status", testId: "th-status" },
+                    { field: "createdAt" as SortField, label: "Created Date", testId: "th-created-date" },
+                    { field: "requiredByDate" as SortField, label: "Due Date", testId: "th-due-date" },
+                  ]).map(col => (
+                    <TableHead
+                      key={col.field}
+                      data-testid={col.testId}
+                      className="cursor-pointer select-none"
+                      onClick={() => toggleSort(col.field)}
+                    >
+                      <div className="flex items-center gap-1">
+                        {col.label}
+                        {sortField === col.field ? (
+                          sortDirection === "asc" ? (
+                            <ArrowUp className="h-3 w-3 text-foreground" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3 text-foreground" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3 text-muted-foreground/50" />
+                        )}
+                      </div>
+                    </TableHead>
+                  ))}
                   <TableHead data-testid="th-actions">Actions</TableHead>
                 </TableRow>
               </TableHeader>
