@@ -1,8 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Clock, AlertTriangle, Pause, SkipForward, ArrowRight, CircleDot } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, Clock, AlertTriangle, Pause, SkipForward, ArrowDown, CircleDot, Printer } from "lucide-react";
 import { startOfDay, isBefore, format } from "date-fns";
 import type { ActivityStage, JobActivity } from "@shared/schema";
 
@@ -23,6 +24,16 @@ const STAGE_COLORS = [
   { bg: "bg-indigo-500", border: "border-indigo-500", light: "bg-indigo-50 dark:bg-indigo-950/30", text: "text-indigo-700 dark:text-indigo-300" },
 ];
 
+const STATUS_COLORS: Record<string, string> = {
+  done: "#22c55e",
+  skipped: "#9ca3af",
+  overdue: "#ef4444",
+  stuck: "#f87171",
+  on_hold: "#eab308",
+  in_progress: "#3b82f6",
+  not_started: "#71717a",
+};
+
 function isOverdue(activity: ActivityWithAssignees): boolean {
   if (activity.status === "DONE" || activity.status === "SKIPPED") return false;
   if (!activity.endDate) return false;
@@ -31,62 +42,42 @@ function isOverdue(activity: ActivityWithAssignees): boolean {
   return isBefore(endDate, today);
 }
 
-function getActivityColor(activity: ActivityWithAssignees) {
-  if (activity.status === "DONE") return {
-    bg: "bg-green-500 dark:bg-green-600",
-    border: "border-green-600 dark:border-green-500",
-    text: "text-white",
-    glow: "shadow-green-500/20",
-    icon: CheckCircle,
-    label: "Done",
+function getActivityColorKey(activity: ActivityWithAssignees): string {
+  if (activity.status === "DONE") return "done";
+  if (activity.status === "SKIPPED") return "skipped";
+  if (isOverdue(activity)) return "overdue";
+  if (activity.status === "STUCK") return "stuck";
+  if (activity.status === "ON_HOLD") return "on_hold";
+  if (activity.status === "IN_PROGRESS") return "in_progress";
+  return "not_started";
+}
+
+function getActivityMeta(activity: ActivityWithAssignees) {
+  const key = getActivityColorKey(activity);
+  const fill = STATUS_COLORS[key];
+  const iconMap: Record<string, typeof CheckCircle> = {
+    done: CheckCircle,
+    skipped: SkipForward,
+    overdue: AlertTriangle,
+    stuck: AlertTriangle,
+    on_hold: Pause,
+    in_progress: Clock,
+    not_started: CircleDot,
   };
-  if (activity.status === "SKIPPED") return {
-    bg: "bg-gray-400 dark:bg-gray-600",
-    border: "border-gray-500 dark:border-gray-500",
-    text: "text-white",
-    glow: "",
-    icon: SkipForward,
-    label: "Skipped",
-  };
-  if (isOverdue(activity)) return {
-    bg: "bg-red-500 dark:bg-red-600",
-    border: "border-red-600 dark:border-red-500",
-    text: "text-white",
-    glow: "shadow-red-500/30",
-    icon: AlertTriangle,
-    label: "Overdue",
-  };
-  if (activity.status === "STUCK") return {
-    bg: "bg-red-400 dark:bg-red-500",
-    border: "border-red-500 dark:border-red-400",
-    text: "text-white",
-    glow: "shadow-red-400/20",
-    icon: AlertTriangle,
-    label: "Stuck",
-  };
-  if (activity.status === "ON_HOLD") return {
-    bg: "bg-yellow-500 dark:bg-yellow-600",
-    border: "border-yellow-600 dark:border-yellow-500",
-    text: "text-white",
-    glow: "shadow-yellow-500/20",
-    icon: Pause,
-    label: "On Hold",
-  };
-  if (activity.status === "IN_PROGRESS") return {
-    bg: "bg-blue-500 dark:bg-blue-600",
-    border: "border-blue-600 dark:border-blue-500",
-    text: "text-white",
-    glow: "shadow-blue-500/30",
-    icon: Clock,
-    label: "In Progress",
+  const labelMap: Record<string, string> = {
+    done: "Done",
+    skipped: "Skipped",
+    overdue: "Overdue",
+    stuck: "Stuck",
+    on_hold: "On Hold",
+    in_progress: "In Progress",
+    not_started: "Not Started",
   };
   return {
-    bg: "bg-muted",
-    border: "border-border",
-    text: "text-muted-foreground",
-    glow: "",
-    icon: CircleDot,
-    label: "Not Started",
+    fill,
+    isLight: key === "not_started",
+    Icon: iconMap[key],
+    label: labelMap[key],
   };
 }
 
@@ -95,6 +86,62 @@ function getStageProgress(activities: ActivityWithAssignees[]) {
   const done = activities.filter(a => a.status === "DONE" || a.status === "SKIPPED").length;
   const hasOverdue = activities.some(a => isOverdue(a));
   return { done, total: activities.length, pct: Math.round((done / activities.length) * 100), hasOverdue, allDone: done === activities.length };
+}
+
+const CHEVRON_W = 160;
+const CHEVRON_H = 72;
+const POINT_W = 14;
+
+function ChevronNode({
+  activity,
+  onClick,
+}: {
+  activity: ActivityWithAssignees;
+  onClick: () => void;
+}) {
+  const { fill, isLight, label } = getActivityMeta(activity);
+  const textColor = isLight ? "currentColor" : "#fff";
+  const strokeColor = isLight ? "hsl(var(--border))" : fill;
+  const truncatedName = activity.name.length > 16 ? activity.name.slice(0, 15) + "\u2026" : activity.name;
+
+  const points = `0,0 ${CHEVRON_W - POINT_W},0 ${CHEVRON_W},${CHEVRON_H / 2} ${CHEVRON_W - POINT_W},${CHEVRON_H} 0,${CHEVRON_H} ${POINT_W},${CHEVRON_H / 2}`;
+
+  return (
+    <svg
+      width={CHEVRON_W}
+      height={CHEVRON_H}
+      viewBox={`0 0 ${CHEVRON_W} ${CHEVRON_H}`}
+      className="cursor-pointer flex-shrink-0 chevron-node focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+      onClick={onClick}
+      data-testid={`activity-node-${activity.id}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${activity.name} - ${label}${activity.estimatedDays ? `, ${activity.estimatedDays} days` : ""}${activity.endDate ? `, due ${format(new Date(activity.endDate), "dd MMM yyyy")}` : ""}`}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+    >
+      <title>{activity.name} - {label}</title>
+      <polygon
+        points={points}
+        fill={isLight ? "hsl(var(--muted))" : fill}
+        stroke={strokeColor}
+        strokeWidth="1.5"
+      />
+      <g fill={textColor}>
+        <text x={POINT_W + 6} y={18} fontSize="11" fontWeight="600" className="select-none">
+          {truncatedName}
+        </text>
+        <text x={POINT_W + 6} y={34} fontSize="9" opacity="0.85" className="select-none">
+          {label}
+          {activity.estimatedDays ? `    ${activity.estimatedDays}d` : ""}
+        </text>
+        {activity.endDate && (
+          <text x={POINT_W + 6} y={50} fontSize="9" opacity="0.7" className="select-none">
+            {format(new Date(activity.endDate), "dd MMM yyyy")}
+          </text>
+        )}
+      </g>
+    </svg>
+  );
 }
 
 interface ProgressFlowChartProps {
@@ -110,6 +157,8 @@ export function ProgressFlowChart({
   stageColorMap,
   onSelectActivity,
 }: ProgressFlowChartProps) {
+  const printRef = useRef<HTMLDivElement>(null);
+
   const parentActivities = useMemo(() => activities.filter(a => !a.parentId), [activities]);
 
   const activitiesByStage = useMemo(() => {
@@ -140,6 +189,10 @@ export function ProgressFlowChart({
     return m;
   }, [stages]);
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (parentActivities.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground" data-testid="text-no-activities">
@@ -149,126 +202,119 @@ export function ProgressFlowChart({
   }
 
   return (
-    <div className="space-y-2" data-testid="progress-flow-chart">
-      <div className="flex items-center gap-4 flex-wrap px-1 mb-4">
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 rounded-sm bg-green-500" /> Done
+    <div data-testid="progress-flow-chart">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-4 no-print">
+        <div className="flex items-center gap-4 flex-wrap px-1">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-sm bg-green-500" /> Done
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-sm bg-blue-500" /> In Progress
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-sm bg-red-500" /> Overdue / Stuck
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-sm bg-yellow-500" /> On Hold
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-sm bg-muted border border-border" /> Not Started
+          </div>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 rounded-sm bg-blue-500" /> In Progress
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 rounded-sm bg-red-500" /> Overdue / Stuck
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 rounded-sm bg-yellow-500" /> On Hold
-        </div>
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <div className="w-3 h-3 rounded-sm bg-muted border border-border" /> Not Started
-        </div>
+        <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print-progress">
+          <Printer className="h-4 w-4 mr-1" />
+          Print Landscape
+        </Button>
       </div>
 
-      {orderedStageIds.map((stageId, stageIndex) => {
-        const stage = stageMap.get(stageId);
-        const stageActivities = activitiesByStage.get(stageId) || [];
-        const colorIdx = (stageColorMap.get(stageId) ?? stageIndex) % STAGE_COLORS.length;
-        const stageColor = STAGE_COLORS[colorIdx];
-        const progress = getStageProgress(stageActivities);
-        const sortedActivities = [...stageActivities].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
-
-        return (
-          <div key={stageId} className="relative" data-testid={`stage-flow-${stageId}`}>
-            {stageIndex > 0 && (
-              <div className="flex justify-center py-1">
-                <div className="flex flex-col items-center">
-                  <div className="w-0.5 h-3 bg-border" />
-                  <ArrowRight className="h-4 w-4 text-muted-foreground rotate-90" />
-                </div>
-              </div>
-            )}
-
-            <Card data-testid={`card-stage-${stageId}`}>
-              <div className={cn("px-4 py-3 flex items-center justify-between gap-3 flex-wrap", stageColor.light, "rounded-t-md")}>
-                <div className="flex items-center gap-3">
-                  <div className={cn("flex items-center justify-center w-8 h-8 rounded-md text-white font-bold text-sm", stageColor.bg)}>
-                    {stageIndex + 1}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-sm">{stage?.name || "Ungrouped"}</h3>
-                    <p className="text-xs text-muted-foreground">{progress.done}/{progress.total} complete</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  {progress.hasOverdue && (
-                    <Badge variant="destructive" className="text-xs">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      Overdue
-                    </Badge>
-                  )}
-                  {progress.allDone && (
-                    <Badge className="bg-green-500 text-white text-xs no-default-hover-elevate">
-                      <CheckCircle className="h-3 w-3 mr-1" />
-                      Complete
-                    </Badge>
-                  )}
-                  <div className="w-24 bg-muted rounded-full h-2">
-                    <div
-                      className={cn(
-                        "h-2 rounded-full transition-all",
-                        progress.hasOverdue ? "bg-red-500" : progress.allDone ? "bg-green-500" : "bg-blue-500"
-                      )}
-                      style={{ width: `${progress.pct}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-medium text-muted-foreground w-8">{progress.pct}%</span>
-                </div>
-              </div>
-
-              <CardContent className="p-3">
-                <div className="flex items-stretch gap-2 flex-wrap">
-                  {sortedActivities.map((activity, actIdx) => {
-                    const color = getActivityColor(activity);
-                    const Icon = color.icon;
-                    return (
-                      <div key={activity.id} className="flex items-center gap-2">
-                        <button
-                          onClick={() => onSelectActivity(activity)}
-                          className={cn(
-                            "flex flex-col items-start gap-1 rounded-md px-3 py-2 min-w-[140px] max-w-[200px] transition-colors cursor-pointer",
-                            color.bg, color.text,
-                            color.glow && `shadow-md ${color.glow}`,
-                            "hover-elevate active-elevate-2"
-                          )}
-                          data-testid={`activity-node-${activity.id}`}
-                        >
-                          <div className="flex items-center gap-1.5 w-full">
-                            <Icon className="h-3.5 w-3.5 flex-shrink-0" />
-                            <span className="text-xs font-semibold truncate flex-1 text-left">{activity.name}</span>
-                          </div>
-                          <div className="flex items-center justify-between w-full gap-2">
-                            <span className="text-[10px] opacity-80">{color.label}</span>
-                            {activity.estimatedDays && (
-                              <span className="text-[10px] opacity-70">{activity.estimatedDays}d</span>
-                            )}
-                          </div>
-                          {activity.endDate && (
-                            <span className="text-[10px] opacity-70">
-                              {format(new Date(activity.endDate), "dd MMM yyyy")}
-                            </span>
-                          )}
-                        </button>
-                        {actIdx < sortedActivities.length - 1 && (
-                          <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+      <div ref={printRef} className="space-y-2 progress-print-area">
+        <div className="hidden print-only-flex items-center gap-4 flex-wrap px-1 mb-3">
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.done }} /> Done
           </div>
-        );
-      })}
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.in_progress }} /> In Progress
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.overdue }} /> Overdue / Stuck
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.on_hold }} /> On Hold
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-3 h-3 rounded-sm border" style={{ background: "#e5e7eb" }} /> Not Started
+          </div>
+        </div>
+
+        {orderedStageIds.map((stageId, stageIndex) => {
+          const stage = stageMap.get(stageId);
+          const stageActivities = activitiesByStage.get(stageId) || [];
+          const colorIdx = (stageColorMap.get(stageId) ?? stageIndex) % STAGE_COLORS.length;
+          const stageColor = STAGE_COLORS[colorIdx];
+          const progress = getStageProgress(stageActivities);
+          const sortedActivities = [...stageActivities].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+          return (
+            <div key={stageId} className="relative" data-testid={`stage-flow-${stageId}`}>
+              {stageIndex > 0 && (
+                <div className="flex justify-center py-1">
+                  <ArrowDown className="h-4 w-4 text-muted-foreground print:text-gray-500" />
+                </div>
+              )}
+
+              <Card data-testid={`card-stage-${stageId}`} className="print:border print:border-gray-300 print:shadow-none">
+                <div className={cn("px-4 py-3 flex items-center justify-between gap-3 flex-wrap", stageColor.light, "rounded-t-md print:bg-gray-50")}>
+                  <div className="flex items-center gap-3">
+                    <div className={cn("flex items-center justify-center w-8 h-8 rounded-md text-white font-bold text-sm print:text-black print:bg-gray-300", stageColor.bg)}>
+                      {stageIndex + 1}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm">{stage?.name || "Ungrouped"}</h3>
+                      <p className="text-xs text-muted-foreground">{progress.done}/{progress.total} complete</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {progress.hasOverdue && (
+                      <Badge variant="destructive" className="text-xs">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Overdue
+                      </Badge>
+                    )}
+                    {progress.allDone && (
+                      <Badge className="bg-green-500 text-white text-xs no-default-hover-elevate">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Complete
+                      </Badge>
+                    )}
+                    <div className="w-24 bg-muted rounded-full h-2 print:bg-gray-200">
+                      <div
+                        className={cn(
+                          "h-2 rounded-full transition-all",
+                          progress.hasOverdue ? "bg-red-500" : progress.allDone ? "bg-green-500" : "bg-blue-500"
+                        )}
+                        style={{ width: `${progress.pct}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground w-8">{progress.pct}%</span>
+                  </div>
+                </div>
+
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-0 flex-wrap">
+                    {sortedActivities.map((activity) => (
+                      <ChevronNode
+                        key={activity.id}
+                        activity={activity}
+                        onClick={() => onSelectActivity(activity)}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
