@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { TASKS_ROUTES } from "@shared/api-routes";
+import { TASKS_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,10 @@ import {
   EyeOff,
   FolderPlus,
   Search,
+  ChevronsUpDown,
+  ListTodo,
+  Activity,
+  Briefcase,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -60,6 +64,24 @@ interface TaskGroup {
   tasks: Task[];
 }
 
+interface JobActivity {
+  id: string;
+  jobId: string;
+  name: string;
+  status: string;
+  category: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  sortOrder: number;
+}
+
+interface SimpleJob {
+  id: string;
+  name: string;
+  jobNumber: string | null;
+  status: string;
+}
+
 const statusConfig: Record<TaskStatus, { icon: typeof Circle; label: string; color: string; bgColor: string }> = {
   NOT_STARTED: { icon: Circle, label: "Not Started", color: "text-white/40", bgColor: "bg-white/10" },
   IN_PROGRESS: { icon: Clock, label: "In Progress", color: "text-blue-400", bgColor: "bg-blue-500" },
@@ -82,8 +104,11 @@ const GROUP_COLORS = [
   "#8b5cf6", "#ec4899", "#14b8a6", "#f97316", "#06b6d4",
 ];
 
+type TabView = "tasks" | "activity";
+
 export default function MobileTasksPage() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<TabView>("tasks");
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [newTaskGroupId, setNewTaskGroupId] = useState<string | null>(null);
@@ -94,8 +119,29 @@ export default function MobileTasksPage() {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState(GROUP_COLORS[0]);
 
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const [showJobPicker, setShowJobPicker] = useState(false);
+  const [jobSearchQuery, setJobSearchQuery] = useState("");
+  const [collapsedActivities, setCollapsedActivities] = useState<Set<string>>(new Set());
+  const [activityHideDone, setActivityHideDone] = useState(true);
+  const [activitySearchQuery, setActivitySearchQuery] = useState("");
+
   const { data: groups = [], isLoading } = useQuery<TaskGroup[]>({
     queryKey: [TASKS_ROUTES.GROUPS],
+  });
+
+  const { data: jobs = [], isLoading: jobsLoading } = useQuery<SimpleJob[]>({
+    queryKey: [JOBS_ROUTES.LIST],
+    select: (data: any) => {
+      if (Array.isArray(data)) return data;
+      if (data?.jobs) return data.jobs;
+      return [];
+    },
+  });
+
+  const { data: activities = [], isLoading: activitiesLoading } = useQuery<JobActivity[]>({
+    queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(selectedJobId || ""), selectedJobId],
+    enabled: !!selectedJobId,
   });
 
   const updateTaskMutation = useMutation({
@@ -104,6 +150,11 @@ export default function MobileTasksPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+      if (selectedJobId) {
+        activities.forEach(a => {
+          queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(a.id)] });
+        });
+      }
     },
     onError: () => {
       toast({ title: "Failed to update task", variant: "destructive" });
@@ -151,6 +202,39 @@ export default function MobileTasksPage() {
     });
   };
 
+  const toggleActivity = (activityId: string) => {
+    setCollapsedActivities(prev => {
+      const next = new Set(prev);
+      if (next.has(activityId)) {
+        next.delete(activityId);
+      } else {
+        next.add(activityId);
+      }
+      return next;
+    });
+  };
+
+  const collapseAllGroups = () => {
+    const allIds = groups.map(g => g.id);
+    setCollapsedGroups(new Set(allIds));
+  };
+
+  const expandAllGroups = () => {
+    setCollapsedGroups(new Set());
+  };
+
+  const allGroupsCollapsed = groups.length > 0 && collapsedGroups.size === groups.length;
+
+  const collapseAllActivities = () => {
+    setCollapsedActivities(new Set(activities.map(a => a.id)));
+  };
+
+  const expandAllActivities = () => {
+    setCollapsedActivities(new Set());
+  };
+
+  const allActivitiesCollapsed = activities.length > 0 && collapsedActivities.size === activities.length;
+
   const cycleStatus = (task: Task) => {
     const currentIndex = statusOrder.indexOf(task.status);
     const nextIndex = (currentIndex + 1) % statusOrder.length;
@@ -167,6 +251,14 @@ export default function MobileTasksPage() {
   const totalTasks = groups.reduce((sum, g) => sum + (g.tasks?.length || 0), 0);
   const activeTasks = groups.reduce((sum, g) => sum + (g.tasks?.filter(t => t.status !== "DONE").length || 0), 0);
 
+  const selectedJob = jobs.find(j => j.id === selectedJobId);
+  const filteredJobs = jobSearchQuery
+    ? jobs.filter(j =>
+        (j.name || "").toLowerCase().includes(jobSearchQuery.toLowerCase()) ||
+        (j.jobNumber || "").toLowerCase().includes(jobSearchQuery.toLowerCase())
+      )
+    : jobs;
+
   return (
     <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
@@ -174,221 +266,199 @@ export default function MobileTasksPage() {
           <div className="flex items-center justify-between gap-2">
             <div>
               <div className="text-2xl font-bold" data-testid="text-tasks-title">Tasks</div>
-              <div className="text-sm text-white/60">
-                {activeTasks} active of {totalTasks} total
-              </div>
+              {activeTab === "tasks" && (
+                <div className="text-sm text-white/60">
+                  {activeTasks} active of {totalTasks} total
+                </div>
+              )}
+              {activeTab === "activity" && selectedJob && (
+                <div className="text-sm text-white/60">
+                  {activities.length} activities
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setHideDone(!hideDone)}
-                className={cn("rounded-full", hideDone ? "text-white/40" : "text-green-400")}
-                data-testid="button-toggle-done"
-              >
-                {hideDone ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setShowCreateGroup(true)}
-                className="rounded-full text-blue-400"
-                data-testid="button-create-group"
-              >
-                <FolderPlus className="h-5 w-5" />
-              </Button>
+              {activeTab === "tasks" && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={allGroupsCollapsed ? expandAllGroups : collapseAllGroups}
+                    className="rounded-full text-white/40"
+                    data-testid="button-collapse-all"
+                  >
+                    <ChevronsUpDown className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setHideDone(!hideDone)}
+                    className={cn("rounded-full", hideDone ? "text-white/40" : "text-green-400")}
+                    data-testid="button-toggle-done"
+                  >
+                    {hideDone ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setShowCreateGroup(true)}
+                    className="rounded-full text-blue-400"
+                    data-testid="button-create-group"
+                  >
+                    <FolderPlus className="h-5 w-5" />
+                  </Button>
+                </>
+              )}
+              {activeTab === "activity" && selectedJobId && activities.length > 0 && (
+                <>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={allActivitiesCollapsed ? expandAllActivities : collapseAllActivities}
+                    className="rounded-full text-white/40"
+                    data-testid="button-collapse-all-activities"
+                  >
+                    <ChevronsUpDown className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setActivityHideDone(!activityHideDone)}
+                    className={cn("rounded-full", activityHideDone ? "text-white/40" : "text-green-400")}
+                    data-testid="button-toggle-done-activities"
+                  >
+                    {activityHideDone ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
-          <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks..."
-              className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl"
-              data-testid="input-search-tasks"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40"
-                data-testid="button-clear-search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
+
+          <div className="flex mt-3 bg-white/5 rounded-xl p-1 border border-white/10">
+            <button
+              onClick={() => setActiveTab("tasks")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                activeTab === "tasks"
+                  ? "bg-blue-500 text-white shadow-lg"
+                  : "text-white/50"
+              )}
+              data-testid="tab-tasks"
+            >
+              <ListTodo className="h-4 w-4" />
+              Tasks
+            </button>
+            <button
+              onClick={() => setActiveTab("activity")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all",
+                activeTab === "activity"
+                  ? "bg-blue-500 text-white shadow-lg"
+                  : "text-white/50"
+              )}
+              data-testid="tab-activity-tasks"
+            >
+              <Activity className="h-4 w-4" />
+              Activity Tasks
+            </button>
           </div>
+
+          {activeTab === "tasks" && (
+            <div className="relative mt-3">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl"
+                data-testid="input-search-tasks"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40"
+                  data-testid="button-clear-search"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          )}
+
+          {activeTab === "activity" && (
+            <div className="mt-3 space-y-2">
+              <button
+                onClick={() => setShowJobPicker(true)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/20 bg-white/10"
+                data-testid="button-select-job"
+              >
+                <Briefcase className="h-5 w-5 text-blue-400 flex-shrink-0" />
+                <span className={cn("flex-1 text-left text-sm", selectedJob ? "text-white" : "text-white/40")}>
+                  {selectedJob
+                    ? `${selectedJob.jobNumber ? selectedJob.jobNumber + " - " : ""}${selectedJob.name}`
+                    : "Select a job..."}
+                </span>
+                <ChevronDown className="h-4 w-4 text-white/40" />
+              </button>
+              {selectedJobId && (
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Input
+                    value={activitySearchQuery}
+                    onChange={(e) => setActivitySearchQuery(e.target.value)}
+                    placeholder="Search activities..."
+                    className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl"
+                    data-testid="input-search-activity-tasks"
+                  />
+                  {activitySearchQuery && (
+                    <button
+                      onClick={() => setActivitySearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white/40"
+                      data-testid="button-clear-activity-search"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="space-y-2">
-                <Skeleton className="h-12 rounded-2xl bg-white/10" />
-                <Skeleton className="h-16 rounded-2xl bg-white/5" />
-                <Skeleton className="h-16 rounded-2xl bg-white/5" />
-              </div>
-            ))}
-          </div>
-        ) : groups.length === 0 ? (
-          <div className="text-center py-12">
-            <CheckCircle2 className="h-12 w-12 mx-auto text-white/30 mb-3" />
-            <p className="text-white/60">No task groups yet</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {groups.map((group) => {
-              const isCollapsed = collapsedGroups.has(group.id);
-              const allGroupTasks = group.tasks || [];
-              const q = searchQuery.toLowerCase().trim();
-              const searchFiltered = q
-                ? allGroupTasks.filter(t =>
-                    t.title.toLowerCase().includes(q) ||
-                    (t.priority && t.priority.toLowerCase().includes(q)) ||
-                    (t.consultant && t.consultant.toLowerCase().includes(q)) ||
-                    (t.projectStage && t.projectStage.toLowerCase().includes(q)) ||
-                    (t.assignees?.some(a => a.user?.name?.toLowerCase().includes(q)))
-                  )
-                : allGroupTasks;
-              const groupTasks = hideDone ? searchFiltered.filter(t => t.status !== "DONE") : searchFiltered;
-              const activeCount = allGroupTasks.filter(t => t.status !== "DONE").length;
+        {activeTab === "tasks" && (
+          <TasksListView
+            groups={groups}
+            isLoading={isLoading}
+            collapsedGroups={collapsedGroups}
+            toggleGroup={toggleGroup}
+            hideDone={hideDone}
+            searchQuery={searchQuery}
+            cycleStatus={cycleStatus}
+            setSelectedTask={setSelectedTask}
+            newTaskGroupId={newTaskGroupId}
+            setNewTaskGroupId={setNewTaskGroupId}
+            newTaskTitle={newTaskTitle}
+            setNewTaskTitle={setNewTaskTitle}
+            handleCreateTask={handleCreateTask}
+            createTaskMutation={createTaskMutation}
+          />
+        )}
 
-              if (q && groupTasks.length === 0 && !group.name.toLowerCase().includes(q)) return null;
-
-              return (
-                <div key={group.id} className="space-y-2">
-                  <button
-                    onClick={() => toggleGroup(group.id)}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5"
-                    data-testid={`group-${group.id}`}
-                  >
-                    <div 
-                      className="w-3 h-3 rounded-full flex-shrink-0" 
-                      style={{ backgroundColor: group.color || "#6b7280" }}
-                    />
-                    <span className="font-semibold flex-1 text-left text-white">{group.name}</span>
-                    <span className="text-sm text-white/60">
-                      {activeCount}/{allGroupTasks.length}
-                    </span>
-                    {isCollapsed ? (
-                      <ChevronRight className="h-5 w-5 text-white/40" />
-                    ) : (
-                      <ChevronDown className="h-5 w-5 text-white/40" />
-                    )}
-                  </button>
-
-                  {!isCollapsed && (
-                    <div className="space-y-2 ml-2">
-                      {groupTasks.map((task) => {
-                        const statusInfo = statusConfig[task.status];
-                        const StatusIcon = statusInfo.icon;
-
-                        return (
-                          <div
-                            key={task.id}
-                            className="flex items-start gap-3 p-4 rounded-2xl border border-white/10 bg-white/5"
-                            data-testid={`task-${task.id}`}
-                          >
-                            <button
-                              onClick={() => cycleStatus(task)}
-                              className="mt-0.5 flex-shrink-0"
-                              data-testid={`task-status-${task.id}`}
-                            >
-                              <StatusIcon className={cn("h-6 w-6", statusInfo.color)} />
-                            </button>
-                            
-                            <button 
-                              onClick={() => setSelectedTask(task)}
-                              className="flex-1 min-w-0 text-left"
-                            >
-                              <h3 className={cn(
-                                "font-medium text-sm leading-snug text-white",
-                                task.status === "DONE" && "line-through text-white/40"
-                              )}>
-                                {task.title}
-                              </h3>
-                              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                {task.priority && (
-                                  <Badge variant="outline" className={cn("text-xs border", priorityColors[task.priority])}>
-                                    {task.priority}
-                                  </Badge>
-                                )}
-                                {task.dueDate && (
-                                  <span className={`text-xs flex items-center gap-1 ${isBefore(new Date(task.dueDate), startOfDay(new Date())) && task.status !== "DONE" ? "text-red-500" : "text-white/50"}`}>
-                                    <Calendar className="h-3 w-3" />
-                                    {format(new Date(task.dueDate), "dd MMM")}
-                                  </span>
-                                )}
-                                {task.assignees?.length > 0 && (
-                                  <span className="text-xs text-white/50 flex items-center gap-1">
-                                    <User className="h-3 w-3" />
-                                    {task.assignees.length}
-                                  </span>
-                                )}
-                              </div>
-                            </button>
-                          </div>
-                        );
-                      })}
-
-                      {newTaskGroupId === group.id ? (
-                        <div className="flex items-center gap-2 p-3 rounded-2xl border border-white/10 bg-white/5">
-                          <Input
-                            value={newTaskTitle}
-                            onChange={(e) => setNewTaskTitle(e.target.value)}
-                            placeholder="Task name..."
-                            className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") handleCreateTask(group.id);
-                              if (e.key === "Escape") {
-                                setNewTaskGroupId(null);
-                                setNewTaskTitle("");
-                              }
-                            }}
-                            data-testid="input-new-task"
-                          />
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleCreateTask(group.id)}
-                            disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
-                            className="bg-blue-500 hover:bg-blue-600"
-                            data-testid="button-create-task"
-                          >
-                            Add
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            variant="ghost"
-                            onClick={() => {
-                              setNewTaskGroupId(null);
-                              setNewTaskTitle("");
-                            }}
-                            className="text-white/60"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setNewTaskGroupId(group.id)}
-                          className="w-full justify-start text-white/50"
-                          data-testid={`button-add-task-${group.id}`}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add task
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {activeTab === "activity" && (
+          <ActivityTasksView
+            selectedJobId={selectedJobId}
+            activities={activities}
+            activitiesLoading={activitiesLoading}
+            collapsedActivities={collapsedActivities}
+            toggleActivity={toggleActivity}
+            hideDone={activityHideDone}
+            searchQuery={activitySearchQuery}
+            cycleStatus={cycleStatus}
+            setSelectedTask={setSelectedTask}
+            updateTaskMutation={updateTaskMutation}
+          />
         )}
       </div>
 
@@ -490,7 +560,460 @@ export default function MobileTasksPage() {
         </SheetContent>
       </Sheet>
 
+      <Sheet open={showJobPicker} onOpenChange={(open) => {
+        setShowJobPicker(open);
+        if (!open) setJobSearchQuery("");
+      }}>
+        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl bg-[#0D1117] border-white/10">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-left text-white flex items-center gap-2">
+              <Briefcase className="h-4 w-4 text-blue-400" />
+              Select Job
+            </SheetTitle>
+          </SheetHeader>
+          <div className="space-y-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+              <Input
+                value={jobSearchQuery}
+                onChange={(e) => setJobSearchQuery(e.target.value)}
+                placeholder="Search jobs..."
+                className="pl-9 bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-xl"
+                autoFocus
+                data-testid="input-search-jobs"
+              />
+            </div>
+            <div className="overflow-y-auto max-h-[calc(70vh-160px)] space-y-1">
+              {jobsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-14 rounded-xl bg-white/10" />
+                  ))}
+                </div>
+              ) : filteredJobs.length === 0 ? (
+                <div className="text-center py-8 text-white/40 text-sm">
+                  No jobs found
+                </div>
+              ) : (
+                filteredJobs.map(job => (
+                  <button
+                    key={job.id}
+                    onClick={() => {
+                      setSelectedJobId(job.id);
+                      setShowJobPicker(false);
+                      setJobSearchQuery("");
+                      setCollapsedActivities(new Set());
+                    }}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl border transition-all",
+                      selectedJobId === job.id
+                        ? "border-blue-500/50 bg-blue-500/10"
+                        : "border-white/10 bg-white/5"
+                    )}
+                    data-testid={`job-option-${job.id}`}
+                  >
+                    <div className="font-medium text-sm text-white">{job.name}</div>
+                    {job.jobNumber && (
+                      <div className="text-xs text-white/50 mt-0.5">{job.jobNumber}</div>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       <MobileBottomNav />
+    </div>
+  );
+}
+
+function TasksListView({
+  groups,
+  isLoading,
+  collapsedGroups,
+  toggleGroup,
+  hideDone,
+  searchQuery,
+  cycleStatus,
+  setSelectedTask,
+  newTaskGroupId,
+  setNewTaskGroupId,
+  newTaskTitle,
+  setNewTaskTitle,
+  handleCreateTask,
+  createTaskMutation,
+}: {
+  groups: TaskGroup[];
+  isLoading: boolean;
+  collapsedGroups: Set<string>;
+  toggleGroup: (id: string) => void;
+  hideDone: boolean;
+  searchQuery: string;
+  cycleStatus: (task: Task) => void;
+  setSelectedTask: (task: Task) => void;
+  newTaskGroupId: string | null;
+  setNewTaskGroupId: (id: string | null) => void;
+  newTaskTitle: string;
+  setNewTaskTitle: (title: string) => void;
+  handleCreateTask: (groupId: string) => void;
+  createTaskMutation: any;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-12 rounded-2xl bg-white/10" />
+            <Skeleton className="h-16 rounded-2xl bg-white/5" />
+            <Skeleton className="h-16 rounded-2xl bg-white/5" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (groups.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <CheckCircle2 className="h-12 w-12 mx-auto text-white/30 mb-3" />
+        <p className="text-white/60">No task groups yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {groups.map((group) => {
+        const isCollapsed = collapsedGroups.has(group.id);
+        const allGroupTasks = group.tasks || [];
+        const q = searchQuery.toLowerCase().trim();
+        const searchFiltered = q
+          ? allGroupTasks.filter(t =>
+              t.title.toLowerCase().includes(q) ||
+              (t.priority && t.priority.toLowerCase().includes(q)) ||
+              (t.consultant && t.consultant.toLowerCase().includes(q)) ||
+              (t.projectStage && t.projectStage.toLowerCase().includes(q)) ||
+              (t.assignees?.some(a => a.user?.name?.toLowerCase().includes(q)))
+            )
+          : allGroupTasks;
+        const groupTasks = hideDone ? searchFiltered.filter(t => t.status !== "DONE") : searchFiltered;
+        const activeCount = allGroupTasks.filter(t => t.status !== "DONE").length;
+
+        if (q && groupTasks.length === 0 && !group.name.toLowerCase().includes(q)) return null;
+
+        return (
+          <div key={group.id} className="space-y-2">
+            <button
+              onClick={() => toggleGroup(group.id)}
+              className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5"
+              data-testid={`group-${group.id}`}
+            >
+              <div 
+                className="w-3 h-3 rounded-full flex-shrink-0" 
+                style={{ backgroundColor: group.color || "#6b7280" }}
+              />
+              <span className="font-semibold flex-1 text-left text-white">{group.name}</span>
+              <span className="text-sm text-white/60">
+                {activeCount}/{allGroupTasks.length}
+              </span>
+              {isCollapsed ? (
+                <ChevronRight className="h-5 w-5 text-white/40" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-white/40" />
+              )}
+            </button>
+
+            {!isCollapsed && (
+              <div className="space-y-2 ml-2">
+                {groupTasks.map((task) => (
+                  <TaskCard
+                    key={task.id}
+                    task={task}
+                    cycleStatus={cycleStatus}
+                    onSelect={() => setSelectedTask(task)}
+                  />
+                ))}
+
+                {newTaskGroupId === group.id ? (
+                  <div className="flex items-center gap-2 p-3 rounded-2xl border border-white/10 bg-white/5">
+                    <Input
+                      value={newTaskTitle}
+                      onChange={(e) => setNewTaskTitle(e.target.value)}
+                      placeholder="Task name..."
+                      className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleCreateTask(group.id);
+                        if (e.key === "Escape") {
+                          setNewTaskGroupId(null);
+                          setNewTaskTitle("");
+                        }
+                      }}
+                      data-testid="input-new-task"
+                    />
+                    <Button 
+                      size="sm" 
+                      onClick={() => handleCreateTask(group.id)}
+                      disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
+                      className="bg-blue-500 hover:bg-blue-600"
+                      data-testid="button-create-task"
+                    >
+                      Add
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="ghost"
+                      onClick={() => {
+                        setNewTaskGroupId(null);
+                        setNewTaskTitle("");
+                      }}
+                      className="text-white/60"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setNewTaskGroupId(group.id)}
+                    className="w-full justify-start text-white/50"
+                    data-testid={`button-add-task-${group.id}`}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add task
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TaskCard({
+  task,
+  cycleStatus,
+  onSelect,
+}: {
+  task: Task;
+  cycleStatus: (task: Task) => void;
+  onSelect: () => void;
+}) {
+  const statusInfo = statusConfig[task.status];
+  const StatusIcon = statusInfo.icon;
+
+  return (
+    <div
+      className="flex items-start gap-3 p-4 rounded-2xl border border-white/10 bg-white/5"
+      data-testid={`task-${task.id}`}
+    >
+      <button
+        onClick={() => cycleStatus(task)}
+        className="mt-0.5 flex-shrink-0"
+        data-testid={`task-status-${task.id}`}
+      >
+        <StatusIcon className={cn("h-6 w-6", statusInfo.color)} />
+      </button>
+      
+      <button 
+        onClick={onSelect}
+        className="flex-1 min-w-0 text-left"
+      >
+        <h3 className={cn(
+          "font-medium text-sm leading-snug text-white",
+          task.status === "DONE" && "line-through text-white/40"
+        )}>
+          {task.title}
+        </h3>
+        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+          {task.priority && (
+            <Badge variant="outline" className={cn("text-xs border", priorityColors[task.priority])}>
+              {task.priority}
+            </Badge>
+          )}
+          {task.dueDate && (
+            <span className={`text-xs flex items-center gap-1 ${isBefore(new Date(task.dueDate), startOfDay(new Date())) && task.status !== "DONE" ? "text-red-500" : "text-white/50"}`}>
+              <Calendar className="h-3 w-3" />
+              {format(new Date(task.dueDate), "dd MMM")}
+            </span>
+          )}
+          {task.assignees?.length > 0 && (
+            <span className="text-xs text-white/50 flex items-center gap-1">
+              <User className="h-3 w-3" />
+              {task.assignees.length}
+            </span>
+          )}
+        </div>
+      </button>
+    </div>
+  );
+}
+
+function ActivityTasksView({
+  selectedJobId,
+  activities,
+  activitiesLoading,
+  collapsedActivities,
+  toggleActivity,
+  hideDone,
+  searchQuery,
+  cycleStatus,
+  setSelectedTask,
+  updateTaskMutation,
+}: {
+  selectedJobId: string | null;
+  activities: JobActivity[];
+  activitiesLoading: boolean;
+  collapsedActivities: Set<string>;
+  toggleActivity: (id: string) => void;
+  hideDone: boolean;
+  searchQuery: string;
+  cycleStatus: (task: Task) => void;
+  setSelectedTask: (task: Task) => void;
+  updateTaskMutation: any;
+}) {
+  if (!selectedJobId) {
+    return (
+      <div className="text-center py-12">
+        <Briefcase className="h-12 w-12 mx-auto text-white/30 mb-3" />
+        <p className="text-white/60">Select a job to view activity tasks</p>
+      </div>
+    );
+  }
+
+  if (activitiesLoading) {
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-12 rounded-2xl bg-white/10" />
+            <Skeleton className="h-16 rounded-2xl bg-white/5" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const q = searchQuery.toLowerCase().trim();
+  const filteredActivities = q
+    ? activities.filter(a => a.name.toLowerCase().includes(q) || (a.category || "").toLowerCase().includes(q))
+    : activities;
+
+  if (filteredActivities.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <Activity className="h-12 w-12 mx-auto text-white/30 mb-3" />
+        <p className="text-white/60">
+          {q ? "No matching activities" : "No activities found for this job"}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {filteredActivities.map(activity => (
+        <ActivitySection
+          key={activity.id}
+          activity={activity}
+          isCollapsed={collapsedActivities.has(activity.id)}
+          onToggle={() => toggleActivity(activity.id)}
+          hideDone={hideDone}
+          cycleStatus={cycleStatus}
+          setSelectedTask={setSelectedTask}
+        />
+      ))}
+    </div>
+  );
+}
+
+const activityStatusColors: Record<string, string> = {
+  NOT_STARTED: "bg-white/10",
+  IN_PROGRESS: "bg-blue-500/20",
+  STUCK: "bg-red-500/20",
+  DONE: "bg-green-500/20",
+  ON_HOLD: "bg-yellow-500/20",
+  SKIPPED: "bg-white/5",
+};
+
+function ActivitySection({
+  activity,
+  isCollapsed,
+  onToggle,
+  hideDone,
+  cycleStatus,
+  setSelectedTask,
+}: {
+  activity: JobActivity;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  hideDone: boolean;
+  cycleStatus: (task: Task) => void;
+  setSelectedTask: (task: Task) => void;
+}) {
+  const { data: tasks = [], isLoading } = useQuery<Task[]>({
+    queryKey: [PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activity.id)],
+    enabled: !isCollapsed,
+  });
+
+  const visibleTasks = hideDone ? tasks.filter(t => t.status !== "DONE") : tasks;
+  const activeCount = tasks.filter(t => t.status !== "DONE").length;
+  const statusBg = activityStatusColors[activity.status] || "bg-white/10";
+
+  return (
+    <div className="space-y-2">
+      <button
+        onClick={onToggle}
+        className={cn("w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10", statusBg)}
+        data-testid={`activity-${activity.id}`}
+      >
+        <Activity className="h-4 w-4 text-blue-400 flex-shrink-0" />
+        <div className="flex-1 text-left min-w-0">
+          <span className="font-semibold text-white text-sm block truncate">{activity.name}</span>
+          {activity.category && (
+            <span className="text-xs text-white/40 block truncate">{activity.category}</span>
+          )}
+        </div>
+        {!isCollapsed && !isLoading && (
+          <span className="text-sm text-white/60 flex-shrink-0">
+            {activeCount}/{tasks.length}
+          </span>
+        )}
+        {isCollapsed ? (
+          <ChevronRight className="h-5 w-5 text-white/40 flex-shrink-0" />
+        ) : (
+          <ChevronDown className="h-5 w-5 text-white/40 flex-shrink-0" />
+        )}
+      </button>
+
+      {!isCollapsed && (
+        <div className="space-y-2 ml-2">
+          {isLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-14 rounded-2xl bg-white/5" />
+              <Skeleton className="h-14 rounded-2xl bg-white/5" />
+            </div>
+          ) : visibleTasks.length === 0 ? (
+            <div className="p-4 text-center text-white/40 text-sm rounded-2xl border border-white/10 bg-white/5">
+              {tasks.length > 0 ? "All tasks completed" : "No tasks for this activity"}
+            </div>
+          ) : (
+            visibleTasks.map(task => (
+              <TaskCard
+                key={task.id}
+                task={task}
+                cycleStatus={cycleStatus}
+                onSelect={() => setSelectedTask(task)}
+              />
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -576,93 +1099,77 @@ function TaskDetailSheet({
         </div>
       </SheetHeader>
 
-      <div className="flex-1 overflow-auto space-y-5">
+      <div className="flex-1 overflow-y-auto space-y-4">
         <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Title</label>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Title</label>
           <Input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            className="bg-white/10 border-white/20 text-white placeholder:text-white/40"
+            className="bg-white/10 border-white/20 text-white"
             data-testid="input-task-title"
           />
         </div>
 
         <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Status</label>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Status</label>
           <div className="flex flex-wrap gap-2">
             {statusOrder.map((s) => {
-              const config = statusConfig[s];
-              const isActive = status === s;
-              
+              const info = statusConfig[s];
+              const Icon = info.icon;
               return (
-                <Button
+                <button
                   key={s}
-                  variant={isActive ? "default" : "outline"}
-                  size="sm"
                   onClick={() => setStatus(s)}
                   className={cn(
-                    "flex items-center gap-2",
-                    isActive ? config.bgColor : "border-white/20 text-white/70"
+                    "flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm border transition-all",
+                    status === s
+                      ? "border-blue-500 bg-blue-500/20 text-white"
+                      : "border-white/10 bg-white/5 text-white/60"
                   )}
                   data-testid={`status-option-${s}`}
                 >
-                  <config.icon className="h-4 w-4" />
-                  {config.label}
-                </Button>
+                  <Icon className={cn("h-4 w-4", info.color)} />
+                  {info.label}
+                </button>
               );
             })}
           </div>
         </div>
 
         <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Due Date</label>
-          <div className="flex items-center gap-2">
-            <Input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="bg-white/10 border-white/20 text-white flex-1 [color-scheme:dark]"
-              data-testid="input-task-due-date"
-            />
-            {dueDate && (
-              <Button
-                size="icon"
-                variant="ghost"
-                onClick={() => setDueDate("")}
-                className="text-white/50 flex-shrink-0"
-                data-testid="button-clear-due-date"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Priority</label>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Priority</label>
           <div className="flex flex-wrap gap-2">
-            {priorityOptions.map((p) => {
-              const isActive = priority === p;
-              return (
-                <Button
-                  key={p}
-                  variant={isActive ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setPriority(isActive ? "" : p)}
-                  className={cn(
-                    isActive ? priorityColors[p] : "border-white/20 text-white/70"
-                  )}
-                  data-testid={`priority-option-${p}`}
-                >
-                  {p}
-                </Button>
-              );
-            })}
+            {priorityOptions.map((p) => (
+              <button
+                key={p}
+                onClick={() => setPriority(priority === p ? "" : p)}
+                className={cn(
+                  "px-3 py-2 rounded-xl text-sm border transition-all",
+                  priority === p
+                    ? cn("border-blue-500 bg-blue-500/20 text-white")
+                    : "border-white/10 bg-white/5 text-white/60"
+                )}
+                data-testid={`priority-option-${p}`}
+              >
+                {p}
+              </button>
+            ))}
           </div>
         </div>
 
         <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Consultant</label>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Due Date</label>
+          <Input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className="bg-white/10 border-white/20 text-white [color-scheme:dark]"
+            data-testid="input-task-due-date"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Consultant</label>
           <Input
             value={consultant}
             onChange={(e) => setConsultant(e.target.value)}
@@ -673,7 +1180,7 @@ function TaskDetailSheet({
         </div>
 
         <div>
-          <label className="text-sm font-medium text-white/60 mb-2 block">Project Stage</label>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Project Stage</label>
           <Input
             value={projectStage}
             onChange={(e) => setProjectStage(e.target.value)}
@@ -682,54 +1189,6 @@ function TaskDetailSheet({
             data-testid="input-task-project-stage"
           />
         </div>
-
-        {task.assignees?.length > 0 && (
-          <div>
-            <label className="text-sm font-medium text-white/60 mb-2 block">Assignees</label>
-            <div className="space-y-2">
-              {task.assignees.map((assignee) => (
-                <div key={assignee.id} className="flex items-center gap-2 text-sm">
-                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white">
-                    {assignee.user.name?.charAt(0) || assignee.user.email.charAt(0)}
-                  </div>
-                  <span className="text-white">{assignee.user.name || assignee.user.email}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="pt-4 border-t border-white/10 mt-4 flex gap-2">
-        {hasChanges ? (
-          <>
-            <Button 
-              variant="outline" 
-              className="flex-1 border-white/20 text-white" 
-              onClick={onClose}
-              data-testid="button-cancel-edit"
-            >
-              Cancel
-            </Button>
-            <Button 
-              className="flex-1 bg-blue-500"
-              onClick={handleSave}
-              disabled={isSaving || !title.trim()}
-              data-testid="button-save-task-bottom"
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-1" />
-              )}
-              Save Changes
-            </Button>
-          </>
-        ) : (
-          <Button variant="outline" className="w-full border-white/20 text-white" onClick={onClose} data-testid="button-close-task">
-            Close
-          </Button>
-        )}
       </div>
     </div>
   );
