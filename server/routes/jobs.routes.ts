@@ -11,6 +11,7 @@ import { JOB_PHASES, PHASE_ALLOWED_STATUSES, isValidStatusForPhase, canAdvanceTo
 import type { JobPhase, JobStatus } from "@shared/job-phases";
 import { logJobChange, logJobPhaseChange, logJobStatusChange } from "../services/job-audit.service";
 import { emailService } from "../services/email.service";
+import { getAllowedJobIds, isJobMember } from "../lib/job-membership";
 
 async function resolveUserName(req: Request): Promise<string | null> {
   if (req.session?.name) return req.session.name;
@@ -346,8 +347,19 @@ router.post("/api/customers/quick", requireAuth, async (req: Request, res: Respo
 
 // GET /api/projects - Legacy endpoint for backward compatibility
 router.get("/api/projects", requireAuth, async (req: Request, res: Response) => {
-  const jobsList = await storage.getAllJobs(req.companyId);
-  res.json(jobsList.map(j => ({ id: j.id, name: j.name, code: j.code || j.jobNumber })));
+  try {
+    let jobsList = await storage.getAllJobs(req.companyId);
+
+    const allowedIds = await getAllowedJobIds(req);
+    if (allowedIds !== null) {
+      jobsList = jobsList.filter(j => allowedIds.has(j.id));
+    }
+
+    res.json(jobsList.map(j => ({ id: j.id, name: j.name, code: j.code || j.jobNumber })));
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching projects");
+    res.status(500).json({ error: "Failed to fetch projects" });
+  }
 });
 
 router.get("/api/jobs/my-memberships", requireAuth, async (req: Request, res: Response) => {
@@ -362,14 +374,25 @@ router.get("/api/jobs/my-memberships", requireAuth, async (req: Request, res: Re
   }
 });
 
-// GET /api/jobs - Get all jobs (active only, for general use)
+// GET /api/jobs - Get all jobs (filtered by membership for non-admin/manager users)
 router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
-  const allJobs = await storage.getAllJobs(req.companyId);
-  const serialized = serializeJobsPhase(allJobs);
-  if (req.query.status === "ACTIVE") {
-    res.json(serialized.filter((j: any) => j.status === "ACTIVE"));
-  } else {
-    res.json(serialized);
+  try {
+    const allJobs = await storage.getAllJobs(req.companyId);
+    let serialized = serializeJobsPhase(allJobs);
+
+    const allowedIds = await getAllowedJobIds(req);
+    if (allowedIds !== null) {
+      serialized = serialized.filter((job: any) => allowedIds.has(job.id));
+    }
+
+    if (req.query.status === "ACTIVE") {
+      res.json(serialized.filter((j: any) => j.status === "ACTIVE"));
+    } else {
+      res.json(serialized);
+    }
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching jobs");
+    res.status(500).json({ error: "Failed to fetch jobs" });
   }
 });
 
@@ -379,6 +402,10 @@ router.get("/api/jobs/:jobId", requireAuth, async (req: Request, res: Response) 
     const job = await storage.getJob(req.params.jobId as string);
     if (!job || job.companyId !== req.companyId) {
       return res.status(404).json({ error: "Job not found" });
+    }
+    const allowed = await isJobMember(req, job.id);
+    if (!allowed) {
+      return res.status(403).json({ error: "You are not a member of this job" });
     }
     res.json(serializeJobPhase(job));
   } catch (error: unknown) {

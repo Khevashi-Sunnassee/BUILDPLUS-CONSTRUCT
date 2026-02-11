@@ -7,6 +7,7 @@ import { db } from "../db";
 import { panelAuditLogs, panelRegister, logRows, timerSessions, loadListPanels, jobs, users, PANEL_LIFECYCLE_STATUS } from "@shared/schema";
 import { eq, desc, inArray, sql, and } from "drizzle-orm";
 import { z } from "zod";
+import { getAllowedJobIds, isJobMember } from "../lib/job-membership";
 
 const router = Router();
 
@@ -22,6 +23,10 @@ router.get("/api/panels", requireAuth, async (req: Request, res: Response) => {
     if (!job || job.companyId !== companyId) {
       return res.status(404).json({ error: "Job not found" });
     }
+    const allowed = await isJobMember(req, jobId);
+    if (!allowed) {
+      return res.status(403).json({ error: "You are not a member of this job" });
+    }
     if (level) {
       const panels = await storage.getPanelsByJobAndLevel(jobId, level);
       res.json(panels);
@@ -31,7 +36,13 @@ router.get("/api/panels", requireAuth, async (req: Request, res: Response) => {
     }
   } else {
     const allPanels = await storage.getAllPanelRegisterItems();
-    const filtered = allPanels.filter(p => p.job?.companyId === companyId);
+    let filtered = allPanels.filter(p => p.job?.companyId === companyId);
+
+    const allowedIds = await getAllowedJobIds(req);
+    if (allowedIds !== null) {
+      filtered = filtered.filter(p => p.job && allowedIds.has(p.job.id));
+    }
+
     res.json(filtered);
   }
 });
@@ -42,6 +53,10 @@ router.get("/api/panels/by-job/:jobId", requireAuth, async (req: Request, res: R
   if (!job || job.companyId !== companyId) {
     return res.status(404).json({ error: "Job not found" });
   }
+  const allowed = await isJobMember(req, job.id);
+  if (!allowed) {
+    return res.status(403).json({ error: "You are not a member of this job" });
+  }
   const panels = await storage.getPanelsByJob(req.params.jobId as string);
   res.json(panels);
 });
@@ -51,7 +66,13 @@ router.get("/api/panels/ready-for-loading", requireAuth, async (req: Request, re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const panels = await storage.getPanelsReadyForLoading();
-    const filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+    let filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+
+    const allowedIds = await getAllowedJobIds(req);
+    if (allowedIds !== null) {
+      filtered = filtered.filter((p: any) => p.job && allowedIds.has(p.job.id));
+    }
+
     res.json(filtered);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panels ready for loading");
@@ -69,9 +90,21 @@ router.get("/api/panels/approved-for-production", requireAuth, async (req: Reque
       if (!job || job.companyId !== companyId) {
         return res.status(404).json({ error: "Job not found" });
       }
+      const allowed = await isJobMember(req, jobId as string);
+      if (!allowed) {
+        return res.status(403).json({ error: "You are not a member of this job" });
+      }
     }
     const panels = await storage.getPanelsApprovedForProduction(jobId as string | undefined);
-    const filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+    let filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+
+    if (!jobId) {
+      const allowedIds = await getAllowedJobIds(req);
+      if (allowedIds !== null) {
+        filtered = filtered.filter((p: any) => p.job && allowedIds.has(p.job.id));
+      }
+    }
+
     res.json(filtered);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching approved panels");
@@ -180,6 +213,8 @@ router.get("/api/panels/:id/details", requireAuth, async (req: Request, res: Res
     if (!panel) return res.status(404).json({ error: "Panel not found" });
     const job = await storage.getJob(panel.jobId);
     if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
+    const allowed = await isJobMember(req, panel.jobId);
+    if (!allowed) return res.status(403).json({ error: "You are not a member of this job" });
     res.json(panel);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panel details");
