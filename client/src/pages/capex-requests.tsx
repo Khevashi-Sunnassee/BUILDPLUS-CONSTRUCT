@@ -47,10 +47,6 @@ interface AuditEvent {
   createdAt: string;
 }
 
-interface Approver extends User {
-  capexApprovalLimit: string | null;
-}
-
 const STATUS_BADGE: Record<string, { variant: "secondary" | "default" | "destructive" | "outline"; className?: string }> = {
   DRAFT: { variant: "secondary" },
   SUBMITTED: { variant: "default" },
@@ -61,7 +57,7 @@ const STATUS_BADGE: Record<string, { variant: "secondary" | "default" | "destruc
 
 function formatCurrency(val: string | number | null | undefined): string {
   const n = parseFloat(String(val || "0"));
-  return `$${n.toLocaleString("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -141,7 +137,6 @@ function CapexForm({ capex, onSave, onClose, replacementPrefill }: { capex?: Cap
   const { data: jobsList = [] } = useQuery<Job[]>({ queryKey: ["/api/jobs"] });
   const { data: departmentsList = [] } = useQuery<Department[]>({ queryKey: ["/api/departments"] });
   const { data: usersList = [] } = useQuery<User[]>({ queryKey: ["/api/users"] });
-  const { data: approversList = [] } = useQuery<Approver[]>({ queryKey: ["/api/users/approvers", { type: "capex" }] });
   const { data: suppliersList = [] } = useQuery<Supplier[]>({ queryKey: ["/api/procurement/suppliers/active"] });
   const { data: assetsList = [] } = useQuery<Asset[]>({ queryKey: ["/api/admin/assets"], enabled: formData.isReplacement });
   const { data: factoriesList = [] } = useQuery<{ id: string; name: string; code: string }[]>({ queryKey: ["/api/factories"] });
@@ -226,11 +221,11 @@ function CapexForm({ capex, onSave, onClose, replacementPrefill }: { capex?: Cap
           <div>
             <Label>Approving Manager</Label>
             <Select value={formData.approvingManagerId} onValueChange={(v) => update("approvingManagerId", v)}>
-              <SelectTrigger data-testid="select-approving-manager"><SelectValue placeholder="Select approver" /></SelectTrigger>
+              <SelectTrigger data-testid="select-approving-manager"><SelectValue placeholder="Select approving manager" /></SelectTrigger>
               <SelectContent>
-                {(Array.isArray(approversList) ? approversList : []).map((u: any) => (
+                {(Array.isArray(usersList) ? usersList : []).map((u: any) => (
                   <SelectItem key={u.id} value={u.id}>
-                    {u.name || u.email} {u.capexApprovalLimit ? `(Limit: ${formatCurrency(u.capexApprovalLimit)})` : ""}
+                    {u.name || u.email} {u.role ? `(${u.role})` : ""}
                   </SelectItem>
                 ))}
               </SelectContent>
