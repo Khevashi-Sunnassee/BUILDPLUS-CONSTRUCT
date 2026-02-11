@@ -466,6 +466,14 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/document-register">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <DocumentRegisterPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/photo-gallery">
         <ProtectedRoute>
           <AuthenticatedLayout>
