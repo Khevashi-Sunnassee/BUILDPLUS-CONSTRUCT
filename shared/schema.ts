@@ -1670,6 +1670,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   supplierAddress: text("supplier_address"),
   requestedById: varchar("requested_by_id", { length: 36 }).notNull().references(() => users.id),
   status: poStatusEnum("status").default("DRAFT").notNull(),
+  projectName: text("project_name"),
   deliveryAddress: text("delivery_address"),
   requiredByDate: timestamp("required_by_date"),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0"),

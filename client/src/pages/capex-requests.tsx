@@ -97,7 +97,6 @@ function CapexForm({ capex, onSave, onClose }: { capex?: CapexRequestWithDetails
 
   const [formData, setFormData] = useState({
     jobId: capex?.jobId || "",
-    projectName: capex?.projectName || "",
     departmentId: capex?.departmentId || "",
     proposedAssetManagerId: capex?.proposedAssetManagerId || "",
     approvingManagerId: capex?.approvingManagerId || "",
@@ -191,10 +190,6 @@ function CapexForm({ capex, onSave, onClose }: { capex?: CapexRequestWithDetails
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div>
-            <Label>Project Name</Label>
-            <Input value={formData.projectName} onChange={(e) => update("projectName", e.target.value)} data-testid="input-project-name" />
           </div>
           <div>
             <Label>Department</Label>
@@ -597,7 +592,6 @@ function DetailView({ capex, onClose }: { capex: CapexRequestWithDetails; onClos
               <DetailSection title="General Information">
                 <DetailRow label="CAPEX Number" value={capex.capexNumber} />
                 <DetailRow label="Job" value={capex.job ? `${capex.job.jobNumber} - ${capex.job.name}` : "-"} />
-                <DetailRow label="Project Name" value={capex.projectName} />
                 <DetailRow label="Department" value={capex.department?.name} />
                 <DetailRow label="Proposed Asset Manager" value={capex.proposedAssetManager?.name || capex.proposedAssetManager?.email} />
                 <DetailRow label="Approving Manager" value={capex.approvingManager?.name || capex.approvingManager?.email} />
@@ -793,7 +787,6 @@ export default function CapexRequestsPage() {
     const q = searchQuery.toLowerCase();
     return requests.filter((r) =>
       r.equipmentTitle.toLowerCase().includes(q) ||
-      (r.projectName || "").toLowerCase().includes(q) ||
       (r.department?.name || "").toLowerCase().includes(q) ||
       (r.proposedAssetManager?.name || "").toLowerCase().includes(q) ||
       (r.capexNumber || "").toLowerCase().includes(q)
@@ -884,8 +877,8 @@ export default function CapexRequestsPage() {
                       <p className="text-sm font-medium leading-tight" data-testid={`text-title-${req.id}`}>{req.equipmentTitle}</p>
                       <StatusBadge status={req.status} />
                     </div>
-                    {req.projectName && (
-                      <p className="text-xs text-muted-foreground" data-testid={`text-project-${req.id}`}>{req.projectName}</p>
+                    {req.job && (
+                      <p className="text-xs text-muted-foreground" data-testid={`text-project-${req.id}`}>{req.job.jobNumber} - {req.job.name}</p>
                     )}
                     <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                       <span data-testid={`text-cost-${req.id}`}>{formatCurrency(req.totalEquipmentCost)}</span>

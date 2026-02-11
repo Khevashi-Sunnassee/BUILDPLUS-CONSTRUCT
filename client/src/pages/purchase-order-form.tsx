@@ -86,6 +86,7 @@ const formSchema = z.object({
   supplierEmail: z.string().email().optional().or(z.literal("")),
   supplierPhone: z.string().optional(),
   supplierAddress: z.string().optional(),
+  projectName: z.string().optional(),
   deliveryAddress: z.string().optional(),
   requiredByDate: z.date().optional().nullable(),
   notes: z.string().optional(),
@@ -177,6 +178,7 @@ export default function PurchaseOrderFormPage() {
       supplierEmail: "",
       supplierPhone: "",
       supplierAddress: "",
+      projectName: "",
       deliveryAddress: "",
       requiredByDate: isNew ? addDays(new Date(), 7) : null,
       notes: "",
@@ -198,6 +200,9 @@ export default function PurchaseOrderFormPage() {
           updates.supplierEmail = supplier.email || "";
           updates.supplierPhone = supplier.phone || "";
         }
+      }
+      if (capexData.job) {
+        updates.projectName = `${capexData.job.jobNumber} - ${capexData.job.name}`;
       }
       updates.notes = `CAPEX Request: ${capexData.capexNumber} - ${capexData.equipmentTitle}`;
       form.reset({ ...form.getValues(), ...updates });
@@ -228,6 +233,7 @@ export default function PurchaseOrderFormPage() {
         supplierEmail: existingPO.supplierEmail || "",
         supplierPhone: existingPO.supplierPhone || "",
         supplierAddress: existingPO.supplierAddress || "",
+        projectName: (existingPO as any).projectName || "",
         deliveryAddress: existingPO.deliveryAddress || "",
         requiredByDate: existingPO.requiredByDate ? new Date(existingPO.requiredByDate) : null,
         notes: existingPO.notes || "",
@@ -811,6 +817,12 @@ export default function PurchaseOrderFormPage() {
     const deliveryLines = pdf.splitTextToSize(deliveryAddress, colWidth - 10);
     pdf.text(deliveryLines, rightColX + 5, currentY + 16);
     
+    if ((existingPO as any).projectName) {
+      pdf.setTextColor(75, 85, 99);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`Project: ${(existingPO as any).projectName}`, rightColX + 5, currentY + 30);
+    }
+
     if (existingPO.requiredByDate) {
       pdf.setTextColor(239, 68, 68);
       pdf.setFont("helvetica", "bold");
@@ -1337,6 +1349,19 @@ export default function PurchaseOrderFormPage() {
               </div>
 
               <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Project Name</Label>
+                  {canEdit ? (
+                    <Input
+                      value={form.watch("projectName") || ""}
+                      onChange={(e) => form.setValue("projectName", e.target.value)}
+                      placeholder="Enter project name"
+                      data-testid="input-project-name"
+                    />
+                  ) : (
+                    <p className="mt-1">{(existingPO as any)?.projectName || "-"}</p>
+                  )}
+                </div>
                 <div>
                   <Label className="text-sm font-medium">Required By Date</Label>
                   {canEdit ? (
