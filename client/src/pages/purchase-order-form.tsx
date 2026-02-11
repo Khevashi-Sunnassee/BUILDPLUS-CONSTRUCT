@@ -1113,7 +1113,7 @@ export default function PurchaseOrderFormPage() {
     pdf.save(`${existingPO.poNumber || "PurchaseOrder"}.pdf`);
   }, [existingPO, lineItems, settings, poTermsSettings]);
 
-  const canEdit = isNew || existingPO?.status === "DRAFT" || existingPO?.status === "REJECTED";
+  const canEdit = true;
   const canApprove = existingPO?.status === "SUBMITTED" && (user?.poApprover || user?.role === "ADMIN");
   const isSubmitted = existingPO?.status === "SUBMITTED";
   const isApproved = existingPO?.status === "APPROVED";

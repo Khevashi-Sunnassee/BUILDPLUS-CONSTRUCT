@@ -184,10 +184,6 @@ router.patch("/api/purchase-orders/:id", requireAuth, requirePermission("purchas
       return res.status(403).json({ error: "You can only edit your own purchase orders" });
     }
     
-    if (order.status !== "DRAFT" && order.status !== "REJECTED") {
-      return res.status(400).json({ error: "Only draft or rejected purchase orders can be edited" });
-    }
-    
     const result = createPurchaseOrderSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
