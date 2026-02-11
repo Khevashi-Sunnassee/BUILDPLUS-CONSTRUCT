@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import {
   Package,
   Search,
@@ -24,6 +25,8 @@ import {
   Clock,
   TrendingDown,
   BarChart3,
+  RefreshCw,
+  Wrench,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ASSET_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
@@ -321,6 +324,7 @@ function SortableHeader({ label, field, currentSort, currentDir, onSort }: {
 }
 
 export default function AssetRegisterPage() {
+  const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -761,6 +765,37 @@ export default function AssetRegisterPage() {
             variant="ghost"
             onClick={(e) => {
               e.stopPropagation();
+              const params = new URLSearchParams({
+                create: "replacement",
+                assetId: asset.id,
+                assetName: asset.name || "",
+                assetTag: asset.assetTag || "",
+                assetCategory: asset.category || "",
+                assetCurrentValue: asset.currentValue || "",
+                assetLocation: asset.location || "",
+              });
+              navigate(`/capex-requests?${params.toString()}`);
+            }}
+            data-testid={`button-replace-asset-${asset.id}`}
+          >
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/admin/asset-repair/new?assetId=${asset.id}`);
+            }}
+            data-testid={`button-repair-asset-${asset.id}`}
+          >
+            <Wrench className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={(e) => {
+              e.stopPropagation();
               setDeletingAssetId(asset.id);
               setDeleteDialogOpen(true);
             }}
@@ -792,7 +827,7 @@ export default function AssetRegisterPage() {
         <SortableHeader label="Purchase Price" field="purchasePrice" currentSort={sortField} currentDir={sortDir} onSort={handleSort} />
       </TableHead>
       <TableHead className="text-right">Current Value</TableHead>
-      <TableHead className="text-right w-[80px]">Actions</TableHead>
+      <TableHead className="text-right w-[160px]">Actions</TableHead>
     </TableRow>
   );
 
