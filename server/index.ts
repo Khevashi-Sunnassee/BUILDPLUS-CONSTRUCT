@@ -31,7 +31,7 @@ app.use(helmet({
       connectSrc: ["'self'", "ws:", "wss:", "https:"],
       mediaSrc: ["'self'", "blob:"],
       objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
     },
