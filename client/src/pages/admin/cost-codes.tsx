@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -26,7 +26,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Loader2, Search, Hash, Settings2, Link2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Search, Hash, Link2, Download, Upload, FileSpreadsheet, CheckCircle2, XCircle, AlertTriangle, SkipForward } from "lucide-react";
 import type { CostCode, JobType } from "@shared/schema";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 
@@ -45,6 +45,10 @@ export default function AdminCostCodesPage() {
 
   const [selectedJobTypeId, setSelectedJobTypeId] = useState<string>("");
   const [selectedCostCodeIds, setSelectedCostCodeIds] = useState<Set<string>>(new Set());
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [importResult, setImportResult] = useState<any>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: costCodesData, isLoading: loadingCostCodes } = useQuery<CostCode[]>({
     queryKey: ["/api/cost-codes"],
@@ -118,6 +122,63 @@ export default function AdminCostCodesPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/cost-codes/import", {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Import failed" }));
+        throw new Error(err.message || "Import failed");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setImportResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/cost-codes"] });
+      if (data.summary.imported > 0) {
+        toast({ title: `Imported ${data.summary.imported} cost code${data.summary.imported !== 1 ? "s" : ""}` });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleDownloadTemplate = useCallback(async () => {
+    setIsDownloading(true);
+    try {
+      const res = await fetch("/api/cost-codes/template/download", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to download template");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "cost_codes_template.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Error", description: "Failed to download template", variant: "destructive" });
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [toast]);
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportResult(null);
+    setShowImportDialog(true);
+    importMutation.mutate(file);
+    e.target.value = "";
+  }
 
   function openCreate() {
     setEditingCode(null);
@@ -202,6 +263,24 @@ export default function AdminCostCodesPage() {
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Cost Codes</h1>
           <p className="text-sm text-muted-foreground">Manage cost codes and assign defaults to job types</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={handleDownloadTemplate} disabled={isDownloading} data-testid="button-download-template">
+            {isDownloading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+            Download Template
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending} data-testid="button-import-cost-codes">
+            {importMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+            Import
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileSelect}
+            className="hidden"
+            data-testid="input-import-file"
+          />
         </div>
       </div>
 
@@ -482,6 +561,111 @@ export default function AdminCostCodesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={showImportDialog} onOpenChange={(open) => { if (!open && !importMutation.isPending) { setShowImportDialog(false); setImportResult(null); } }}>
+        <DialogContent className="max-w-lg" data-testid="dialog-import-results">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              Import Cost Codes
+            </DialogTitle>
+            <DialogDescription>
+              {importMutation.isPending ? "Processing your file..." : "Import results"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {importMutation.isPending && (
+            <div className="flex items-center justify-center py-8 gap-3">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="text-muted-foreground">Importing cost codes...</span>
+            </div>
+          )}
+
+          {importResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Card>
+                  <CardContent className="p-3 flex items-center gap-2">
+                    <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Total Rows</div>
+                      <div className="font-semibold" data-testid="text-import-total">{importResult.summary.totalRows}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Imported</div>
+                      <div className="font-semibold text-green-600" data-testid="text-import-success">{importResult.summary.imported}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3 flex items-center gap-2">
+                    <SkipForward className="w-4 h-4 text-yellow-500" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Skipped</div>
+                      <div className="font-semibold text-yellow-600" data-testid="text-import-skipped">{importResult.summary.skipped}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-3 flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-red-500" />
+                    <div>
+                      <div className="text-xs text-muted-foreground">Errors</div>
+                      <div className="font-semibold text-red-600" data-testid="text-import-errors">{importResult.summary.errors}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {importResult.skipped?.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-1 text-muted-foreground">Skipped:</p>
+                  <div className="max-h-32 overflow-y-auto border rounded-md p-2 space-y-1">
+                    {importResult.skipped.map((s: any, i: number) => (
+                      <div key={i} className="text-xs flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs font-mono">{s.code}</Badge>
+                        <span className="text-muted-foreground">{s.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {importResult.errors?.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-1 text-red-600 flex items-center gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Errors:
+                  </p>
+                  <div className="max-h-32 overflow-y-auto border border-red-200 rounded-md p-2 space-y-1">
+                    {importResult.errors.map((e: any, i: number) => (
+                      <div key={i} className="text-xs text-red-600">
+                        Row {e.row}: {e.message}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => { setShowImportDialog(false); setImportResult(null); }}
+              disabled={importMutation.isPending}
+              data-testid="button-close-import"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

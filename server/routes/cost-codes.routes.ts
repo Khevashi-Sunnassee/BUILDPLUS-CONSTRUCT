@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import multer from "multer";
+import ExcelJS from "exceljs";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
@@ -8,6 +10,24 @@ import { costCodes, costCodeDefaults, jobCostCodes, jobTypes, jobs } from "@shar
 import { eq, and, desc, asc, sql, ilike, or, inArray } from "drizzle-orm";
 
 const router = Router();
+
+const ALLOWED_IMPORT_TYPES = [
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_IMPORT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed. Only Excel and CSV files are accepted.`));
+    }
+  },
+});
 
 const costCodeSchema = z.object({
   code: z.string().min(1, "Code is required"),
@@ -51,6 +71,247 @@ router.get("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes",
   } catch (error: any) {
     logger.error("Error fetching cost codes:", error);
     res.status(500).json({ message: "Failed to fetch cost codes" });
+  }
+});
+
+router.get("/api/cost-codes/template/download", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "LTE Performance";
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet("Cost Codes", {
+      properties: { defaultColWidth: 20 },
+    });
+
+    sheet.columns = [
+      { header: "Code", key: "code", width: 15 },
+      { header: "Name", key: "name", width: 30 },
+      { header: "Description", key: "description", width: 40 },
+      { header: "Parent Code", key: "parentCode", width: 15 },
+      { header: "Sort Order", key: "sortOrder", width: 12 },
+      { header: "Active (Y/N)", key: "isActive", width: 12 },
+    ];
+
+    const hRow = sheet.getRow(1);
+    hRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    hRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+    hRow.alignment = { horizontal: "center", vertical: "middle" };
+    hRow.height = 24;
+
+    const examples = [
+      { code: "1000", name: "Preliminaries", description: "Site setup and preliminary costs", parentCode: "", sortOrder: 1, isActive: "Y" },
+      { code: "1010", name: "Site Establishment", description: "Site fencing, amenities, signage", parentCode: "1000", sortOrder: 2, isActive: "Y" },
+      { code: "2000", name: "Concrete Works", description: "All concrete related works", parentCode: "", sortOrder: 3, isActive: "Y" },
+      { code: "2010", name: "Foundations", description: "Foundation concrete pours", parentCode: "2000", sortOrder: 4, isActive: "Y" },
+      { code: "3000", name: "Structural Steel", description: "Steel fabrication and erection", parentCode: "", sortOrder: 5, isActive: "Y" },
+    ];
+    examples.forEach((ex) => {
+      const row = sheet.addRow(ex);
+      row.font = { italic: true, color: { argb: "FF999999" } };
+    });
+
+    const instrSheet = workbook.addWorksheet("Instructions");
+    instrSheet.columns = [
+      { header: "Field", key: "field", width: 20 },
+      { header: "Required", key: "required", width: 12 },
+      { header: "Description", key: "description", width: 60 },
+    ];
+    const instrHRow = instrSheet.getRow(1);
+    instrHRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    instrHRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+
+    [
+      { field: "Code", required: "Yes", description: "Unique cost code identifier (e.g. 1000, 1010, A100). Must be unique within your company." },
+      { field: "Name", required: "Yes", description: "Cost code name/title (e.g. Preliminaries, Concrete Works)" },
+      { field: "Description", required: "No", description: "Optional description of what this cost code covers" },
+      { field: "Parent Code", required: "No", description: "Code of the parent cost code for hierarchical grouping. Must match an existing code in the import or system." },
+      { field: "Sort Order", required: "No", description: "Numeric sort order (default: 0). Lower numbers appear first." },
+      { field: "Active (Y/N)", required: "No", description: "Whether the cost code is active. Y = Yes (default), N = No" },
+    ].forEach((i) => instrSheet.addRow(i));
+
+    instrSheet.addRow({});
+    instrSheet.addRow({ field: "NOTES:", description: "Delete the example rows before importing. Only rows in the 'Cost Codes' sheet will be imported." });
+    instrSheet.addRow({ field: "", description: "Duplicate codes will be skipped (not overwritten). Existing cost codes will not be modified." });
+    instrSheet.addRow({ field: "", description: "Parent codes can reference codes within the same import file or existing codes in the system." });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=cost_codes_template.xlsx");
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    logger.error("Error generating cost code template:", error);
+    res.status(500).json({ message: "Failed to generate template" });
+  }
+});
+
+router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(file.buffer);
+
+    const sheet = workbook.getWorksheet("Cost Codes") || workbook.getWorksheet(1);
+    if (!sheet) {
+      return res.status(400).json({ message: "No worksheet found in the uploaded file" });
+    }
+
+    const firstRow = sheet.getRow(1);
+    const headerMap: Record<number, string> = {};
+    firstRow.eachCell({ includeEmpty: false }, (cell, colNum) => {
+      headerMap[colNum] = String(cell.value || "").trim().toLowerCase();
+    });
+
+    let codeCol = -1, nameCol = -1, descCol = -1, parentCol = -1, sortCol = -1, activeCol = -1;
+    for (const [colStr, h] of Object.entries(headerMap)) {
+      const col = Number(colStr);
+      if (h === "code") codeCol = col;
+      else if (h === "name") nameCol = col;
+      else if (h === "description") descCol = col;
+      else if (h.includes("parent")) parentCol = col;
+      else if (h.includes("sort")) sortCol = col;
+      else if (h.includes("active")) activeCol = col;
+    }
+
+    if (codeCol === -1 || nameCol === -1) {
+      return res.status(400).json({ message: "Required columns 'Code' and 'Name' not found in the spreadsheet header row" });
+    }
+
+    const existingCodes = await db
+      .select({ id: costCodes.id, code: costCodes.code })
+      .from(costCodes)
+      .where(eq(costCodes.companyId, companyId));
+
+    const existingCodeMap = new Map(existingCodes.map((c) => [c.code.toLowerCase(), c.id]));
+
+    interface ImportRow {
+      code: string;
+      name: string;
+      description: string | null;
+      parentCode: string | null;
+      sortOrder: number;
+      isActive: boolean;
+      rowNum: number;
+    }
+
+    const rows: ImportRow[] = [];
+    const errors: { row: number; message: string }[] = [];
+
+    sheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
+      if (rowNum === 1) return;
+
+      const code = String(row.getCell(codeCol).value || "").trim();
+      const name = String(row.getCell(nameCol).value || "").trim();
+
+      if (!code && !name) return;
+
+      if (!code) {
+        errors.push({ row: rowNum, message: "Code is required" });
+        return;
+      }
+      if (!name) {
+        errors.push({ row: rowNum, message: `Name is required for code "${code}"` });
+        return;
+      }
+
+      const description = descCol !== -1 ? String(row.getCell(descCol).value || "").trim() || null : null;
+      const parentCode = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() || null : null;
+
+      let sortOrder = 0;
+      if (sortCol !== -1) {
+        const sv = row.getCell(sortCol).value;
+        sortOrder = typeof sv === "number" ? sv : parseInt(String(sv || "0")) || 0;
+      }
+
+      let isActive = true;
+      if (activeCol !== -1) {
+        const av = String(row.getCell(activeCol).value || "").trim().toUpperCase();
+        if (av === "N" || av === "NO" || av === "FALSE" || av === "0") {
+          isActive = false;
+        }
+      }
+
+      rows.push({ code, name, description, parentCode, sortOrder, isActive, rowNum });
+    });
+
+    if (rows.length === 0) {
+      return res.status(400).json({ message: "No data rows found in the file", errors });
+    }
+
+    const importCodeMap = new Map<string, string>();
+    const imported: { code: string; name: string }[] = [];
+    const skipped: { code: string; reason: string }[] = [];
+
+    for (const row of rows) {
+      if (existingCodeMap.has(row.code.toLowerCase())) {
+        skipped.push({ code: row.code, reason: "Already exists" });
+        importCodeMap.set(row.code.toLowerCase(), existingCodeMap.get(row.code.toLowerCase())!);
+        continue;
+      }
+
+      if (importCodeMap.has(row.code.toLowerCase())) {
+        skipped.push({ code: row.code, reason: "Duplicate in import file" });
+        continue;
+      }
+
+      let parentId: string | null = null;
+      if (row.parentCode) {
+        const parentKey = row.parentCode.toLowerCase();
+        if (importCodeMap.has(parentKey)) {
+          parentId = importCodeMap.get(parentKey)!;
+        } else if (existingCodeMap.has(parentKey)) {
+          parentId = existingCodeMap.get(parentKey)!;
+        } else {
+          errors.push({ row: row.rowNum, message: `Parent code "${row.parentCode}" not found for code "${row.code}"` });
+        }
+      }
+
+      try {
+        const [inserted] = await db
+          .insert(costCodes)
+          .values({
+            companyId,
+            code: row.code,
+            name: row.name,
+            description: row.description,
+            parentId,
+            isActive: row.isActive,
+            sortOrder: row.sortOrder,
+          })
+          .returning();
+
+        importCodeMap.set(row.code.toLowerCase(), inserted.id);
+        imported.push({ code: row.code, name: row.name });
+      } catch (err: any) {
+        if (err.code === "23505") {
+          skipped.push({ code: row.code, reason: "Already exists (duplicate key)" });
+        } else {
+          errors.push({ row: row.rowNum, message: `Failed to insert "${row.code}": ${err.message}` });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      summary: {
+        totalRows: rows.length,
+        imported: imported.length,
+        skipped: skipped.length,
+        errors: errors.length,
+      },
+      imported,
+      skipped,
+      errors,
+    });
+  } catch (error: any) {
+    logger.error("Error importing cost codes:", { message: error.message, stack: error.stack });
+    res.status(500).json({ message: error.message || "Failed to import cost codes" });
   }
 });
 
