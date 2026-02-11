@@ -997,6 +997,19 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
       }
     }
 
+    if (updateData.status === "DONE") {
+      const checklists = await db.select().from(jobActivityChecklists)
+        .where(eq(jobActivityChecklists.activityId, String(req.params.id)));
+      if (checklists.length > 0) {
+        const incomplete = checklists.filter(c => !c.isCompleted);
+        if (incomplete.length > 0) {
+          return res.status(400).json({
+            error: `Cannot mark activity as Done - ${incomplete.length} checklist item(s) not completed`,
+          });
+        }
+      }
+    }
+
     if (updateData.startDate !== undefined) {
       updateData.startDate = updateData.startDate ? new Date(updateData.startDate) : null;
     }
