@@ -237,7 +237,7 @@ export default function MobileDashboard() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
         {isLoading ? (
           <div className="grid grid-cols-4 gap-2" data-testid="skeleton-stats">
             {Array.from({ length: 4 }).map((_, i) => (
