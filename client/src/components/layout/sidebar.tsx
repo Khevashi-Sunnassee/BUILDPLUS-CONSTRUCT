@@ -61,6 +61,7 @@ import {
   Wrench,
   Workflow,
   Phone,
+  Landmark,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -115,6 +116,7 @@ const adminFinanceNavItems = [
   { title: "Contract Hub", url: "/contracts", icon: Scale },
   { title: "Progress Claims", url: "/progress-claims", icon: FileText },
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
+  { title: "CAPEX Requests", url: "/capex-requests", icon: Landmark },
   { title: "Hire Bookings", url: "/hire-bookings", icon: Wrench },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
@@ -173,6 +175,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/contracts": "contract_hub",
   "/progress-claims": "progress_claims",
   "/purchase-orders": "purchase_orders",
+  "/capex-requests": "capex_requests",
   "/hire-bookings": "hire_bookings",
   "/weekly-wages": "weekly_wages",
   "/admin/asset-register": "admin_assets",

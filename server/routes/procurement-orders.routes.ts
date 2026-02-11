@@ -131,6 +131,24 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
       { ...poData, poNumber, companyId, requestedById: userId },
       lineItems || []
     );
+    if (poData.capexRequestId) {
+      try {
+        const capex = await storage.getCapexRequest(poData.capexRequestId);
+        if (capex && capex.companyId === companyId) {
+          await storage.updateCapexRequest(poData.capexRequestId, { purchaseOrderId: order.id });
+          const actor = await storage.getUser(userId!);
+          await storage.createCapexAuditEvent({
+            capexRequestId: poData.capexRequestId,
+            eventType: "po_linked",
+            actorId: userId!,
+            actorName: actor?.name || actor?.email || "",
+            metadata: { purchaseOrderId: order.id, poNumber: order.poNumber },
+          });
+        }
+      } catch (linkErr) {
+        logger.warn({ err: linkErr }, "Failed to link PO to CAPEX request");
+      }
+    }
     res.json(order);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating purchase order");

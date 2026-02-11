@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient, apiUpload } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2, Package } from "lucide-react";
 import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
 import { ItemPickerDialog } from "@/components/ItemPickerDialog";
@@ -102,6 +102,7 @@ export default function PurchaseOrderFormPage() {
   
   const isNew = params?.id === "new";
   const poId = isNew ? null : params?.id;
+  const capexId = isNew ? new URLSearchParams(window.location.search).get("capexId") : null;
 
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -116,6 +117,16 @@ export default function PurchaseOrderFormPage() {
   const [receivedItemIds, setReceivedItemIds] = useState<Set<string>>(new Set());
   const [itemPickerOpen, setItemPickerOpen] = useState(false);
   const [itemPickerLineId, setItemPickerLineId] = useState<string | null>(null);
+
+  const { data: capexData } = useQuery<any>({
+    queryKey: ["/api/capex-requests", capexId],
+    queryFn: async () => {
+      const res = await fetch(`/api/capex-requests/${capexId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch CAPEX data");
+      return res.json();
+    },
+    enabled: !!capexId,
+  });
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
@@ -176,6 +187,39 @@ export default function PurchaseOrderFormPage() {
   useUnsavedChanges(form.formState.isDirty);
 
   useEffect(() => {
+    if (capexData && isNew && !existingPO) {
+      const updates: Partial<FormValues> = {};
+      if (capexData.preferredSupplier?.id) {
+        updates.supplierId = capexData.preferredSupplier.id;
+        const supplier = suppliers.find((s: Supplier) => s.id === capexData.preferredSupplier.id);
+        if (supplier) {
+          updates.supplierName = supplier.name || "";
+          updates.supplierContact = supplier.keyContact || "";
+          updates.supplierEmail = supplier.email || "";
+          updates.supplierPhone = supplier.phone || "";
+        }
+      }
+      updates.notes = `CAPEX Request: ${capexData.capexNumber} - ${capexData.equipmentTitle}`;
+      form.reset({ ...form.getValues(), ...updates });
+      if (lineItems.length === 0) {
+        const totalCost = parseFloat(capexData.totalEquipmentCost || "0");
+        setLineItems([{
+          id: crypto.randomUUID(),
+          itemId: null,
+          itemCode: "CAPEX",
+          description: capexData.equipmentDescription || capexData.equipmentTitle || "",
+          quantity: "1",
+          unitOfMeasure: "EA",
+          unitPrice: totalCost.toString(),
+          lineTotal: totalCost.toString(),
+          jobId: capexData.jobId || null,
+          jobNumber: capexData.job?.jobNumber || "",
+        }]);
+      }
+    }
+  }, [capexData, isNew, suppliers]);
+
+  useEffect(() => {
     if (existingPO) {
       form.reset({
         supplierId: existingPO.supplierId || "",
@@ -211,6 +255,7 @@ export default function PurchaseOrderFormPage() {
       const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDERS, {
         ...data.po,
         requiredByDate: data.po.requiredByDate?.toISOString(),
+        ...(capexId ? { capexRequestId: capexId, capexDescription: capexData?.equipmentTitle || "" } : {}),
         items: data.items.map((item, index) => ({
           itemId: item.itemId === MANUAL_ENTRY_ID ? null : item.itemId,
           itemCode: item.itemCode,
@@ -226,6 +271,9 @@ export default function PurchaseOrderFormPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
+      if (capexId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/capex-requests"] });
+      }
       toast({ title: "Purchase order created successfully" });
       navigate(`/purchase-orders/${data.id}`);
     },
@@ -1090,6 +1138,12 @@ export default function PurchaseOrderFormPage() {
             </h1>
             <PageHelpButton pageHelpKey="page.purchase-order-form" />
           </div>
+          {capexData && (
+            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground" data-testid="text-capex-link-banner">
+              <Package className="h-4 w-4" />
+              Linked to CAPEX: {capexData.capexNumber} — {capexData.equipmentTitle}
+            </div>
+          )}
           {existingPO && (
             <div className="flex items-center gap-2 mt-1">
               {getStatusBadge(existingPO.status)}

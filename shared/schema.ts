@@ -23,6 +23,8 @@ export const contractStatusEnum = pgEnum("contract_status", ["AWAITING_CONTRACT"
 export const contractTypeEnum = pgEnum("contract_type", ["LUMP_SUM", "UNIT_PRICE", "TIME_AND_MATERIALS", "GMP"]);
 export const progressClaimStatusEnum = pgEnum("progress_claim_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"]);
 
+export const capexStatusEnum = pgEnum("capex_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WITHDRAWN"]);
+
 export const hireStatusEnum = pgEnum("hire_status", ["DRAFT", "REQUESTED", "APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CANCELLED", "CLOSED"]);
 export const hireRateTypeEnum = pgEnum("hire_rate_type", ["day", "week", "month", "custom"]);
 export const hireChargeRuleEnum = pgEnum("hire_charge_rule", ["calendar_days", "business_days", "minimum_days"]);
@@ -82,6 +84,8 @@ export const users = pgTable("users", {
   isActive: boolean("is_active").default(true).notNull(),
   poApprover: boolean("po_approver").default(false),
   poApprovalLimit: decimal("po_approval_limit", { precision: 12, scale: 2 }),
+  capexApprover: boolean("capex_approver").default(false),
+  capexApprovalLimit: decimal("capex_approval_limit", { precision: 12, scale: 2 }),
   mondayStartTime: text("monday_start_time").default("08:00"),
   mondayHours: decimal("monday_hours", { precision: 4, scale: 2 }).default("8"),
   tuesdayStartTime: text("tuesday_start_time").default("08:00"),
@@ -165,6 +169,7 @@ export const FUNCTION_KEYS = [
   "progress_claims",
   "purchase_orders",
   "hire_bookings",
+  "capex_requests",
   "weekly_wages",
   "admin_assets",
   "kpi_dashboard",
@@ -3772,3 +3777,91 @@ export type PmCallLog = typeof pmCallLogs.$inferSelect;
 export const insertPmCallLogLevelSchema = createInsertSchema(pmCallLogLevels).omit({ id: true, createdAt: true });
 export type InsertPmCallLogLevel = z.infer<typeof insertPmCallLogLevelSchema>;
 export type PmCallLogLevel = typeof pmCallLogLevels.$inferSelect;
+
+export const CAPEX_PURCHASE_REASONS = [
+  "Increase production efficiency",
+  "Reduce operational costs",
+  "Improve product quality",
+  "Comply with safety regulations",
+  "Expand production capacity",
+  "Replace obsolete equipment",
+  "Support new product lines",
+  "Environmental compliance",
+] as const;
+
+export const capexRequests = pgTable("capex_requests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  capexNumber: text("capex_number").notNull(),
+  status: capexStatusEnum("status").default("DRAFT").notNull(),
+  jobId: varchar("job_id", { length: 36 }).references(() => jobs.id),
+  projectName: text("project_name"),
+  departmentId: varchar("department_id", { length: 36 }).references(() => departments.id),
+  proposedAssetManagerId: varchar("proposed_asset_manager_id", { length: 36 }).references(() => users.id),
+  approvingManagerId: varchar("approving_manager_id", { length: 36 }).references(() => users.id),
+  equipmentTitle: text("equipment_title").notNull(),
+  equipmentCategory: text("equipment_category"),
+  equipmentDescription: text("equipment_description"),
+  purchaseReasons: json("purchase_reasons").$type<string[]>().default([]),
+  isReplacement: boolean("is_replacement").default(false),
+  replacementAssetId: varchar("replacement_asset_id", { length: 36 }).references(() => assets.id),
+  replacementReason: text("replacement_reason"),
+  totalEquipmentCost: decimal("total_equipment_cost", { precision: 14, scale: 2 }).default("0"),
+  transportationCost: decimal("transportation_cost", { precision: 14, scale: 2 }),
+  insuranceCost: decimal("insurance_cost", { precision: 14, scale: 2 }),
+  monthlyMaintenanceCost: decimal("monthly_maintenance_cost", { precision: 14, scale: 2 }),
+  monthlyResourceCost: decimal("monthly_resource_cost", { precision: 14, scale: 2 }),
+  additionalCosts: decimal("additional_costs", { precision: 14, scale: 2 }),
+  expectedPaybackPeriod: text("expected_payback_period"),
+  expectedResourceSavings: text("expected_resource_savings"),
+  riskAnalysis: text("risk_analysis"),
+  expectedUsefulLife: text("expected_useful_life"),
+  preferredSupplierId: varchar("preferred_supplier_id", { length: 36 }).references(() => suppliers.id),
+  alternativeSuppliers: text("alternative_suppliers"),
+  equipmentLocation: text("equipment_location"),
+  factoryId: varchar("factory_id", { length: 36 }).references(() => factories.id),
+  factoryZone: text("factory_zone"),
+  proximityToInputMaterials: text("proximity_to_input_materials"),
+  siteReadiness: text("site_readiness"),
+  newWorkflowDescription: text("new_workflow_description"),
+  safetyConsiderations: text("safety_considerations"),
+  purchaseOrderId: varchar("purchase_order_id", { length: 36 }).references(() => purchaseOrders.id),
+  requestedById: varchar("requested_by_id", { length: 36 }).notNull().references(() => users.id),
+  requestedDate: timestamp("requested_date").defaultNow().notNull(),
+  submittedAt: timestamp("submitted_at"),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectedById: varchar("rejected_by_id", { length: 36 }).references(() => users.id),
+  rejectedAt: timestamp("rejected_at"),
+  rejectionReason: text("rejection_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  capexNumberCompanyIdx: uniqueIndex("capex_requests_number_company_idx").on(table.capexNumber, table.companyId),
+  statusIdx: index("capex_requests_status_idx").on(table.status),
+  requestedByIdx: index("capex_requests_requested_by_idx").on(table.requestedById),
+  companyIdx: index("capex_requests_company_idx").on(table.companyId),
+  purchaseOrderIdx: index("capex_requests_po_idx").on(table.purchaseOrderId),
+}));
+
+export const capexAuditEvents = pgTable("capex_audit_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  capexRequestId: varchar("capex_request_id", { length: 36 }).notNull().references(() => capexRequests.id, { onDelete: "cascade" }),
+  eventType: text("event_type").notNull(),
+  actorId: varchar("actor_id", { length: 36 }).notNull().references(() => users.id),
+  actorName: text("actor_name"),
+  metadata: json("metadata").$type<Record<string, any>>(),
+  correlationId: varchar("correlation_id", { length: 36 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  capexRequestIdx: index("capex_audit_events_capex_idx").on(table.capexRequestId),
+  eventTypeIdx: index("capex_audit_events_type_idx").on(table.eventType),
+}));
+
+export const insertCapexRequestSchema = createInsertSchema(capexRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCapexRequest = z.infer<typeof insertCapexRequestSchema>;
+export type CapexRequest = typeof capexRequests.$inferSelect;
+
+export const insertCapexAuditEventSchema = createInsertSchema(capexAuditEvents).omit({ id: true, createdAt: true });
+export type InsertCapexAuditEvent = z.infer<typeof insertCapexAuditEventSchema>;
+export type CapexAuditEvent = typeof capexAuditEvents.$inferSelect;

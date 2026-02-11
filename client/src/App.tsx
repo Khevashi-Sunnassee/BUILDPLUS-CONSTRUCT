@@ -51,6 +51,7 @@ const JobProgrammePage = lazy(() => import("@/pages/job-programme"));
 const DraftingProgramPage = lazy(() => import("@/pages/drafting-program"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
 const PurchaseOrderFormPage = lazy(() => import("@/pages/purchase-order-form"));
+const CapexRequestsPage = lazy(() => import("@/pages/capex-requests"));
 const HireBookingsPage = lazy(() => import("@/pages/hire-bookings"));
 const HireBookingFormPage = lazy(() => import("@/pages/hire-booking-form"));
 const TasksPage = lazy(() => import("@/pages/tasks"));
@@ -371,6 +372,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <PurchaseOrderFormPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/capex-requests">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <CapexRequestsPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

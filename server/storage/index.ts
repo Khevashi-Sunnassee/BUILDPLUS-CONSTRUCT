@@ -16,6 +16,7 @@ import { schedulingMethods } from "./scheduling";
 import { broadcastMethods } from "./broadcast";
 import { employeeMethods } from "./employees";
 import { invitationMethods } from "./invitations";
+import { capexMethods } from "./capex";
 
 export type { IStorage } from "./types";
 export type {
@@ -438,6 +439,23 @@ export class DatabaseStorage implements IStorage {
   createEmployeeLicence = employeeMethods.createEmployeeLicence;
   updateEmployeeLicence = employeeMethods.updateEmployeeLicence;
   deleteEmployeeLicence = employeeMethods.deleteEmployeeLicence;
+
+  getAllCapexRequests = capexMethods.getAllCapexRequests;
+  getCapexRequestsByStatus = capexMethods.getCapexRequestsByStatus;
+  getCapexRequest = capexMethods.getCapexRequest;
+  getCapexRequestByPurchaseOrder = capexMethods.getCapexRequestByPurchaseOrder;
+  getPendingCapexApprovals = capexMethods.getPendingCapexApprovals;
+  createCapexRequest = capexMethods.createCapexRequest;
+  updateCapexRequest = capexMethods.updateCapexRequest;
+  submitCapexRequest = capexMethods.submitCapexRequest;
+  approveCapexRequest = capexMethods.approveCapexRequest;
+  rejectCapexRequest = capexMethods.rejectCapexRequest;
+  withdrawCapexRequest = capexMethods.withdrawCapexRequest;
+  deleteCapexRequest = capexMethods.deleteCapexRequest;
+  getNextCapexNumber = capexMethods.getNextCapexNumber;
+  createCapexAuditEvent = capexMethods.createCapexAuditEvent;
+  getCapexAuditHistory = capexMethods.getCapexAuditHistory;
+  getCapexApprovers = capexMethods.getCapexApprovers;
 }
 
 export const storage = new DatabaseStorage();
