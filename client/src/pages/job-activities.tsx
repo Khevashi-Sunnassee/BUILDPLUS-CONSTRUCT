@@ -30,7 +30,7 @@ import {
   Loader2, Filter, Search, Calendar, MessageSquare, Paperclip,
   Send, ChevronsDownUp, ChevronsUpDown, Download, AlertTriangle,
   ListChecks, BarChart3, TableProperties, Eye, EyeOff, CheckCircle,
-  RefreshCw, Link2, Printer,
+  RefreshCw, Link2, Printer, ClipboardCheck,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,8 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 
 type ActivityWithAssignees = JobActivity & {
   assignees?: Array<{ id: string; activityId: string; userId: string }>;
+  checklistTotal?: number;
+  checklistCompleted?: number;
 };
 
 const STATUS_OPTIONS = [
@@ -1114,6 +1116,21 @@ function ActivityRow({
               </button>
             )}
             <span className="font-medium" data-testid={`text-activity-name-${activity.id}`}>{activity.name}</span>
+            {(activity.checklistTotal || 0) > 0 && (
+              <Badge
+                variant={activity.checklistCompleted === activity.checklistTotal ? "default" : "secondary"}
+                className={cn(
+                  "text-[10px] px-1.5 py-0",
+                  activity.checklistCompleted === activity.checklistTotal
+                    ? "bg-green-600 text-white"
+                    : "bg-blue-600 text-white"
+                )}
+                data-testid={`badge-checklist-${activity.id}`}
+              >
+                <ClipboardCheck className="h-3 w-3 mr-0.5" />
+                {activity.checklistCompleted}/{activity.checklistTotal}
+              </Badge>
+            )}
             {overdue && (
               <AlertTriangle className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
             )}
@@ -1459,6 +1476,24 @@ function ActivitySidebar({
     enabled: !!activity,
   });
 
+  const { data: checklistItems = [] } = useQuery<any[]>({
+    queryKey: [activity ? PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLISTS(activity.id) : ""],
+    enabled: !!activity && (activity.checklistTotal || 0) > 0,
+  });
+
+  const toggleChecklistMutation = useMutation({
+    mutationFn: async (checklistId: string) => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLIST_TOGGLE(checklistId));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.ACTIVITY_CHECKLISTS(activity!.id)] });
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const postUpdateMutation = useMutation({
     mutationFn: async (content: string) => {
       return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_UPDATES(activity!.id), { content });
@@ -1550,6 +1585,11 @@ function ActivitySidebar({
             <TabsTrigger value="files" className="flex-1" data-testid="tab-files">
               Files {files && files.length > 0 && <Badge variant="secondary" className="ml-1">{files.length}</Badge>}
             </TabsTrigger>
+            {(activity.checklistTotal || 0) > 0 && (
+              <TabsTrigger value="checklist" className="flex-1" data-testid="tab-checklist">
+                Checklist <Badge variant="secondary" className="ml-1">{activity.checklistCompleted}/{activity.checklistTotal}</Badge>
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="details" className="mt-4 space-y-4">
@@ -1796,6 +1836,33 @@ function ActivitySidebar({
                 </div>
               ) : (
                 <p className="text-center text-muted-foreground text-sm py-8">No files attached</p>
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="checklist" className="mt-4">
+            <div className="space-y-2">
+              {checklistItems.length > 0 ? checklistItems.map((item: any) => (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 p-2 border rounded cursor-pointer hover-elevate"
+                  onClick={() => toggleChecklistMutation.mutate(item.id)}
+                  data-testid={`checklist-item-${item.id}`}
+                >
+                  <Checkbox
+                    checked={item.isChecked}
+                    onCheckedChange={() => toggleChecklistMutation.mutate(item.id)}
+                    data-testid={`checklist-checkbox-${item.id}`}
+                  />
+                  <span className={cn("text-sm flex-1", item.isChecked && "line-through text-muted-foreground")}>
+                    {item.label}
+                  </span>
+                  {item.checkedByName && (
+                    <span className="text-xs text-muted-foreground">{item.checkedByName}</span>
+                  )}
+                </div>
+              )) : (
+                <p className="text-center text-muted-foreground text-sm py-8">No checklist items</p>
               )}
             </div>
           </TabsContent>

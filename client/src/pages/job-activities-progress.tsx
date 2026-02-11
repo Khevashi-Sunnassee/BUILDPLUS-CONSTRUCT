@@ -3,12 +3,14 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertTriangle, Pause, SkipForward, ArrowDown, CircleDot, Printer } from "lucide-react";
+import { CheckCircle, Clock, AlertTriangle, Pause, SkipForward, ArrowDown, CircleDot, Printer, ClipboardCheck } from "lucide-react";
 import { startOfDay, isBefore, format } from "date-fns";
 import type { ActivityStage, JobActivity } from "@shared/schema";
 
 type ActivityWithAssignees = JobActivity & {
   assignees?: Array<{ id: string; activityId: string; userId: string }>;
+  checklistTotal?: number;
+  checklistCompleted?: number;
 };
 
 const STAGE_COLORS = [
@@ -32,6 +34,7 @@ const STATUS_COLORS: Record<string, string> = {
   on_hold: "#eab308",
   in_progress: "#3b82f6",
   not_started: "#71717a",
+  checklist: "#2563eb",
 };
 
 function isOverdue(activity: ActivityWithAssignees): boolean {
@@ -42,12 +45,21 @@ function isOverdue(activity: ActivityWithAssignees): boolean {
   return isBefore(endDate, today);
 }
 
+function hasChecklist(activity: ActivityWithAssignees): boolean {
+  return (activity.checklistTotal || 0) > 0;
+}
+
+function isChecklistComplete(activity: ActivityWithAssignees): boolean {
+  return hasChecklist(activity) && activity.checklistCompleted === activity.checklistTotal;
+}
+
 function getActivityColorKey(activity: ActivityWithAssignees): string {
   if (activity.status === "DONE") return "done";
   if (activity.status === "SKIPPED") return "skipped";
   if (isOverdue(activity)) return "overdue";
   if (activity.status === "STUCK") return "stuck";
   if (activity.status === "ON_HOLD") return "on_hold";
+  if (hasChecklist(activity) && !isChecklistComplete(activity)) return "checklist";
   if (activity.status === "IN_PROGRESS") return "in_progress";
   return "not_started";
 }
@@ -63,6 +75,7 @@ function getActivityMeta(activity: ActivityWithAssignees) {
     on_hold: Pause,
     in_progress: Clock,
     not_started: CircleDot,
+    checklist: ClipboardCheck,
   };
   const labelMap: Record<string, string> = {
     done: "Done",
@@ -72,6 +85,7 @@ function getActivityMeta(activity: ActivityWithAssignees) {
     on_hold: "On Hold",
     in_progress: "In Progress",
     not_started: "Not Started",
+    checklist: "Checklist",
   };
   return {
     fill,
@@ -131,8 +145,10 @@ function ChevronNode({
           {truncatedName}
         </text>
         <text x={POINT_W + 6} y={34} fontSize="9" opacity="0.85" className="select-none">
-          {label}
-          {activity.estimatedDays ? `    ${activity.estimatedDays}d` : ""}
+          {hasChecklist(activity)
+            ? `${activity.checklistCompleted}/${activity.checklistTotal} checked`
+            : label}
+          {activity.estimatedDays ? `  ${activity.estimatedDays}d` : ""}
         </text>
         {activity.endDate && (
           <text x={POINT_W + 6} y={50} fontSize="9" opacity="0.7" className="select-none">
@@ -218,6 +234,9 @@ export function ProgressFlowChart({
             <div className="w-3 h-3 rounded-sm bg-yellow-500" /> On Hold
           </div>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.checklist }} /> Checklist
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <div className="w-3 h-3 rounded-sm bg-muted border border-border" /> Not Started
           </div>
         </div>
@@ -240,6 +259,9 @@ export function ProgressFlowChart({
           </div>
           <div className="flex items-center gap-1.5 text-xs">
             <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.on_hold }} /> On Hold
+          </div>
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.checklist }} /> Checklist
           </div>
           <div className="flex items-center gap-1.5 text-xs">
             <div className="w-3 h-3 rounded-sm border" style={{ background: "#e5e7eb" }} /> Not Started

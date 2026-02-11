@@ -8,6 +8,7 @@ import {
   jobTypes, activityStages, activityConsultants,
   activityTemplates, activityTemplateSubtasks, activityTemplateChecklists,
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
+  jobActivityChecklists,
   taskGroups, tasks,
 } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
@@ -659,15 +660,34 @@ router.get("/api/jobs/:jobId/activities", requireAuth, async (req, res) => {
     const activityIds = activities.map(a => a.id);
 
     let assignees: any[] = [];
+    let checklistCounts: Array<{ activityId: string; total: number; completed: number }> = [];
     if (activityIds.length > 0) {
       assignees = await db.select().from(jobActivityAssignees)
         .where(inArray(jobActivityAssignees.activityId, activityIds));
+
+      const clRows = await db.select({
+        activityId: jobActivityChecklists.activityId,
+        total: count(),
+        completed: sql<number>`count(*) filter (where ${jobActivityChecklists.isCompleted} = true)`,
+      }).from(jobActivityChecklists)
+        .where(inArray(jobActivityChecklists.activityId, activityIds))
+        .groupBy(jobActivityChecklists.activityId);
+      checklistCounts = clRows.map(r => ({
+        activityId: r.activityId,
+        total: Number(r.total),
+        completed: Number(r.completed),
+      }));
     }
 
-    const result = activities.map(a => ({
-      ...a,
-      assignees: assignees.filter(x => x.activityId === a.id),
-    }));
+    const result = activities.map(a => {
+      const cl = checklistCounts.find(c => c.activityId === a.id);
+      return {
+        ...a,
+        assignees: assignees.filter(x => x.activityId === a.id),
+        checklistTotal: cl?.total || 0,
+        checklistCompleted: cl?.completed || 0,
+      };
+    });
 
     res.json(result);
   } catch (error: unknown) {
@@ -702,6 +722,12 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       ? await db.select().from(activityTemplateSubtasks)
           .where(inArray(activityTemplateSubtasks.templateId, templateIds))
           .orderBy(asc(activityTemplateSubtasks.sortOrder))
+      : [];
+
+    const filteredChecklists = templateIds.length > 0
+      ? await db.select().from(activityTemplateChecklists)
+          .where(inArray(activityTemplateChecklists.templateId, templateIds))
+          .orderBy(asc(activityTemplateChecklists.sortOrder))
       : [];
 
     function addWorkingDays(from: Date, days: number): Date {
@@ -835,6 +861,17 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
             createdById: req.session.userId,
           });
           subStartDate = nextWorkingDay(subEndDate);
+        }
+
+        const checklists = filteredChecklists.filter(c => c.templateId === template.id);
+        for (const cl of checklists) {
+          await tx.insert(jobActivityChecklists).values({
+            activityId: activity.id,
+            checklistTemplateId: cl.id,
+            name: cl.name,
+            sortOrder: cl.sortOrder,
+            isCompleted: false,
+          });
         }
       }
     });
@@ -1295,6 +1332,45 @@ router.delete("/api/job-activity-files/:id", requireAuth, async (req, res) => {
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting activity file");
     res.status(500).json({ error: "Failed to delete file" });
+  }
+});
+
+// ============================================================================
+// ACTIVITY CHECKLISTS
+// ============================================================================
+
+router.get("/api/job-activities/:activityId/checklists", requireAuth, async (req, res) => {
+  try {
+    const result = await db.select().from(jobActivityChecklists)
+      .where(eq(jobActivityChecklists.activityId, String(req.params.activityId)))
+      .orderBy(asc(jobActivityChecklists.sortOrder));
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching activity checklists");
+    res.status(500).json({ error: "Failed to fetch checklists" });
+  }
+});
+
+router.post("/api/job-activity-checklists/:id/toggle", requireAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const [existing] = await db.select().from(jobActivityChecklists)
+      .where(eq(jobActivityChecklists.id, id));
+    if (!existing) return res.status(404).json({ error: "Checklist item not found" });
+
+    const newCompleted = !existing.isCompleted;
+    const [updated] = await db.update(jobActivityChecklists)
+      .set({
+        isCompleted: newCompleted,
+        completedAt: newCompleted ? new Date() : null,
+        completedById: newCompleted ? req.session.userId : null,
+      })
+      .where(eq(jobActivityChecklists.id, id))
+      .returning();
+    res.json(updated);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error toggling checklist item");
+    res.status(500).json({ error: "Failed to toggle checklist item" });
   }
 });
 

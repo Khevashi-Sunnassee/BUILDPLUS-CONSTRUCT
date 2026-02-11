@@ -3691,6 +3691,21 @@ export const jobActivityFiles = pgTable("job_activity_files", {
   updateIdx: index("job_activity_files_update_idx").on(table.updateId),
 }));
 
+export const jobActivityChecklists = pgTable("job_activity_checklists", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  activityId: varchar("activity_id", { length: 36 }).notNull().references(() => jobActivities.id, { onDelete: "cascade" }),
+  checklistTemplateId: varchar("checklist_template_id", { length: 36 }).references(() => activityTemplateChecklists.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  isCompleted: boolean("is_completed").default(false).notNull(),
+  completedAt: timestamp("completed_at"),
+  completedById: varchar("completed_by_id", { length: 36 }).references(() => users.id),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  activityIdx: index("job_activity_checklists_activity_idx").on(table.activityId),
+  templateIdx: index("job_activity_checklists_template_idx").on(table.checklistTemplateId),
+}));
+
 // Project Activities Insert Schemas and Types
 export const insertJobTypeSchema = createInsertSchema(jobTypes).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertJobType = z.infer<typeof insertJobTypeSchema>;
@@ -3731,6 +3746,10 @@ export type JobActivityUpdate = typeof jobActivityUpdates.$inferSelect;
 export const insertJobActivityFileSchema = createInsertSchema(jobActivityFiles).omit({ id: true, createdAt: true });
 export type InsertJobActivityFile = z.infer<typeof insertJobActivityFileSchema>;
 export type JobActivityFile = typeof jobActivityFiles.$inferSelect;
+
+export const insertJobActivityChecklistSchema = createInsertSchema(jobActivityChecklists).omit({ id: true, createdAt: true });
+export type InsertJobActivityChecklist = z.infer<typeof insertJobActivityChecklistSchema>;
+export type JobActivityChecklist = typeof jobActivityChecklists.$inferSelect;
 
 export type ActivityStatus = "NOT_STARTED" | "IN_PROGRESS" | "STUCK" | "DONE" | "ON_HOLD" | "SKIPPED";
 
