@@ -4,7 +4,6 @@ import { useQuery } from "@tanstack/react-query";
 import { SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ThemeToggle } from "@/components/theme-toggle";
 import heroImage from "@/assets/images/hero-construction.png";
 import {
   BarChart3,
@@ -137,7 +136,6 @@ export default function LandingPage() {
               )}
             </div>
             <div className="flex items-center gap-3">
-              <ThemeToggle />
               <Button
                 variant="outline"
                 onClick={() => setLocation("/login")}

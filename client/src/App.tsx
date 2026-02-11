@@ -8,7 +8,6 @@ import { AuthProvider, useAuth } from "@/lib/auth";
 import { ThemeProvider } from "@/lib/theme";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/layout/sidebar";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { UserSettingsPopover } from "@/components/user-settings-popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -177,7 +176,6 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
             <SidebarTrigger data-testid="button-sidebar-toggle" />
             <div className="flex items-center gap-2">
               <UserSettingsPopover />
-              <ThemeToggle />
             </div>
           </header>
           <main className="flex-1 overflow-auto p-6 bg-background">
