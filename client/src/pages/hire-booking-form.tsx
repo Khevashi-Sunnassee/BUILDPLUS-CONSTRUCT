@@ -104,6 +104,7 @@ export default function HireBookingFormPage() {
   const isNew = params?.id === "new";
   const bookingId = isNew ? null : params?.id;
   const [actionDialog, setActionDialog] = useState<string | null>(null);
+  const autoPrintDone = useRef(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailTo, setEmailTo] = useState("");
   const [emailCc, setEmailCc] = useState("");
@@ -141,6 +142,16 @@ export default function HireBookingFormPage() {
   const { data: assetsList = [] } = useQuery<Asset[]>({
     queryKey: [ASSET_ROUTES.LIST],
   });
+
+  useEffect(() => {
+    if (existingBooking && !autoPrintDone.current) {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("print") === "true") {
+        autoPrintDone.current = true;
+        setTimeout(() => window.print(), 500);
+      }
+    }
+  }, [existingBooking]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),

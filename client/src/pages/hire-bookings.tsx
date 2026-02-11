@@ -12,8 +12,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Eye, Edit, Truck, X, Check, Package, ArrowRight, Lock, RotateCcw, BarChart3, AlertTriangle, DollarSign } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, X, Check, Package, ArrowRight, Lock, RotateCcw, BarChart3, AlertTriangle, DollarSign, Printer, Mail, Clock, FileText, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { HireBooking, Employee, Job, Supplier, User } from "@shared/schema";
@@ -74,6 +77,11 @@ export default function HireBookingsPage() {
   const [dateTo, setDateTo] = useState<string>("");
   const [showGraphs, setShowGraphs] = useState(false);
   const [actionDialog, setActionDialog] = useState<{ type: string; booking: HireBookingWithDetails } | null>(null);
+  const [emailDialog, setEmailDialog] = useState<HireBookingWithDetails | null>(null);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailCc, setEmailCc] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
 
   const { data: bookings = [], isLoading } = useQuery<HireBookingWithDetails[]>({
     queryKey: [HIRE_ROUTES.LIST],
@@ -110,6 +118,38 @@ export default function HireBookingsPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const sendEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!emailDialog) throw new Error("No booking selected");
+      await apiRequest("POST", HIRE_ROUTES.SEND_EMAIL(emailDialog.id), {
+        to: emailTo,
+        cc: emailCc || undefined,
+        subject: emailSubject || undefined,
+        message: emailMessage || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Email sent successfully" });
+      setEmailDialog(null);
+      setEmailTo(""); setEmailCc(""); setEmailSubject(""); setEmailMessage("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenEmail = (booking: HireBookingWithDetails) => {
+    setEmailTo(booking.supplier?.name ? "" : "");
+    setEmailSubject(`Equipment Hire Booking ${booking.bookingNumber}`);
+    setEmailMessage("");
+    setEmailCc("");
+    setEmailDialog(booking);
+  };
+
+  const handlePrint = (booking: HireBookingWithDetails) => {
+    window.open(`/hire-bookings/${booking.id}?print=true`, "_blank");
+  };
 
   const uniqueCategories = useMemo(() => {
     const cats = new Set(bookings.map(b => b.assetCategoryName).filter(Boolean));
@@ -229,12 +269,17 @@ export default function HireBookingsPage() {
   }, [bookings]);
 
   const dashboardStats = useMemo(() => {
-    const onHireStatuses = ["ON_HIRE", "PICKED_UP", "BOOKED"];
-    const onHireItems = bookings.filter(b => onHireStatuses.includes(b.status));
-    const totalDailyCost = onHireItems.reduce((sum, b) => sum + getDailyRate(b), 0);
+    const activeStatuses = ["ON_HIRE", "PICKED_UP", "BOOKED"];
+    const activeItems = bookings.filter(b => activeStatuses.includes(b.status));
+    const totalDailyCost = activeItems.reduce((sum, b) => sum + getDailyRate(b), 0);
     const overdueItems = bookings.filter(b => isOverdue(b));
+    const pendingApproval = bookings.filter(b => b.status === "REQUESTED").length;
+    const draftCount = bookings.filter(b => b.status === "DRAFT").length;
     return {
-      onHireCount: onHireItems.length,
+      totalBookings: bookings.length,
+      activeCount: activeItems.length,
+      pendingApproval,
+      draftCount,
       totalDailyCost: Math.round(totalDailyCost * 100) / 100,
       overdueCount: overdueItems.length,
     };
@@ -364,19 +409,48 @@ export default function HireBookingsPage() {
         </Tabs>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card data-testid="stat-on-hire">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <Card data-testid="stat-total-bookings">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Items On Hire</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-total-bookings-count">{dashboardStats.totalBookings}</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-drafts">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Drafts</CardTitle>
+            <Edit className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-draft-count">{dashboardStats.draftCount}</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-pending-approval">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Approval</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${dashboardStats.pendingApproval > 0 ? "text-amber-600 dark:text-amber-400" : ""}`} data-testid="text-pending-count">
+              {dashboardStats.pendingApproval}
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-active">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Active / On Hire</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-on-hire-count">{dashboardStats.onHireCount}</div>
+            <div className="text-2xl font-bold" data-testid="text-active-count">{dashboardStats.activeCount}</div>
           </CardContent>
         </Card>
         <Card data-testid="stat-daily-cost">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Cost / Day</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Cost / Day</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -387,7 +461,7 @@ export default function HireBookingsPage() {
         </Card>
         <Card data-testid="stat-overdue">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Items</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -584,6 +658,32 @@ export default function HireBookingsPage() {
                             </TooltipTrigger>
                             <TooltipContent>View / Edit</TooltipContent>
                           </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handlePrint(booking)}
+                                data-testid={`button-print-hire-${booking.id}`}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Print</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => handleOpenEmail(booking)}
+                                data-testid={`button-email-hire-${booking.id}`}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Email</TooltipContent>
+                          </Tooltip>
                           {booking.status === "DRAFT" && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -722,6 +822,68 @@ export default function HireBookingsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!emailDialog} onOpenChange={(open) => { if (!open) setEmailDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Email Hire Booking {emailDialog?.bookingNumber}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>To</Label>
+              <Input
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+                placeholder="recipient@example.com"
+                data-testid="input-list-email-to"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>CC</Label>
+              <Input
+                value={emailCc}
+                onChange={(e) => setEmailCc(e.target.value)}
+                placeholder="cc@example.com (optional)"
+                data-testid="input-list-email-cc"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                data-testid="input-list-email-subject"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Message (optional)</Label>
+              <Textarea
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                placeholder="Add a message to include in the email..."
+                rows={3}
+                data-testid="input-list-email-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailDialog(null)} data-testid="button-cancel-list-email">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => sendEmailMutation.mutate()}
+              disabled={!emailTo || sendEmailMutation.isPending}
+              data-testid="button-send-list-email"
+            >
+              {sendEmailMutation.isPending ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+              ) : (
+                <><Mail className="h-4 w-4 mr-2" /> Send Email</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
