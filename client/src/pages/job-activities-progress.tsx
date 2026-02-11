@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -223,6 +223,7 @@ interface ProgressFlowChartProps {
   stages: ActivityStage[];
   stageColorMap: Map<string, number>;
   onSelectActivity: (activity: ActivityWithAssignees) => void;
+  jobTitle?: string;
 }
 
 export function ProgressFlowChart({
@@ -230,8 +231,8 @@ export function ProgressFlowChart({
   stages,
   stageColorMap,
   onSelectActivity,
+  jobTitle,
 }: ProgressFlowChartProps) {
-  const printRef = useRef<HTMLDivElement>(null);
 
   const parentActivities = useMemo(() => activities.filter(a => !a.parentId), [activities]);
 
@@ -263,9 +264,141 @@ export function ProgressFlowChart({
     return m;
   }, [stages]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = useCallback(() => {
+    const PRINT_CHEVRON_W = 120;
+    const PRINT_CHECKLIST_W = 100;
+    const PRINT_CHEVRON_H = 54;
+    const PRINT_POINT_W = 10;
+
+    function buildChevronSvg(name: string, statusLabel: string, fill: string, isLight: boolean, days?: number | null, endDate?: string | null, w = PRINT_CHEVRON_W) {
+      const textColor = isLight ? "#333" : "#fff";
+      const strokeColor = isLight ? "#ccc" : fill;
+      const truncName = name.length > 14 ? name.slice(0, 13) + "\u2026" : name;
+      const pts = `0,0 ${w - PRINT_POINT_W},0 ${w},${PRINT_CHEVRON_H / 2} ${w - PRINT_POINT_W},${PRINT_CHEVRON_H} 0,${PRINT_CHEVRON_H} ${PRINT_POINT_W},${PRINT_CHEVRON_H / 2}`;
+      const dateLine = endDate ? `<text x="${PRINT_POINT_W + 5}" y="${40}" font-size="7" opacity="0.7" fill="${textColor}">${format(new Date(endDate), "dd MMM yyyy")}</text>` : "";
+      return `<svg width="${w}" height="${PRINT_CHEVRON_H}" viewBox="0 0 ${w} ${PRINT_CHEVRON_H}" style="flex-shrink:0;">
+        <polygon points="${pts}" fill="${isLight ? '#e5e7eb' : fill}" stroke="${strokeColor}" stroke-width="1"/>
+        <text x="${PRINT_POINT_W + 5}" y="${15}" font-size="9" font-weight="600" fill="${textColor}">${truncName}</text>
+        <text x="${PRINT_POINT_W + 5}" y="${27}" font-size="7" opacity="0.85" fill="${textColor}">${statusLabel}${days ? `  ${days}d` : ""}</text>
+        ${dateLine}
+      </svg>`;
+    }
+
+    function buildChecklistSvg(name: string, completed: number, total: number, actId: string) {
+      const allDone = completed === total && total > 0;
+      const fill = allDone ? STATUS_COLORS.done : STATUS_COLORS.checklist;
+      const truncName = name.length > 10 ? name.slice(0, 9) + "\u2026" : name;
+      const w = PRINT_CHECKLIST_W;
+      const pts = `0,0 ${w - PRINT_POINT_W},0 ${w},${PRINT_CHEVRON_H / 2} ${w - PRINT_POINT_W},${PRINT_CHEVRON_H} 0,${PRINT_CHEVRON_H} ${PRINT_POINT_W},${PRINT_CHEVRON_H / 2}`;
+      return `<svg width="${w}" height="${PRINT_CHEVRON_H}" viewBox="0 0 ${w} ${PRINT_CHEVRON_H}" style="flex-shrink:0;">
+        <defs><pattern id="p-${actId}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="6" fill="rgba(255,255,255,0.15)"/></pattern></defs>
+        <polygon points="${pts}" fill="${fill}" stroke="${fill}" stroke-width="1"/>
+        <polygon points="${pts}" fill="url(#p-${actId})"/>
+        <text x="${PRINT_POINT_W + 4}" y="${14}" font-size="7" opacity="0.85" fill="#fff">${truncName}</text>
+        <text x="${PRINT_POINT_W + 4}" y="${27}" font-size="9" font-weight="600" fill="#fff">Checklist</text>
+        <text x="${PRINT_POINT_W + 4}" y="${40}" font-size="8" opacity="0.85" fill="#fff">${completed}/${total}</text>
+      </svg>`;
+    }
+
+    let stagesHtml = "";
+    orderedStageIds.forEach((stageId, stageIndex) => {
+      const stage = stageMap.get(stageId);
+      const stageActivities = activitiesByStage.get(stageId) || [];
+      const colorIdx = (stageColorMap.get(stageId) ?? stageIndex) % STAGE_COLORS.length;
+      const progress = getStageProgress(stageActivities);
+      const sorted = [...stageActivities].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+      const stageRawColors = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#f43f5e", "#06b6d4", "#f97316", "#14b8a6", "#ec4899", "#6366f1"];
+      const stageClr = stageRawColors[colorIdx % stageRawColors.length];
+
+      let chevrons = "";
+      sorted.forEach((act) => {
+        const key = getActivityColorKey(act);
+        const fill = STATUS_COLORS[key];
+        const labelMap: Record<string, string> = { done: "Done", skipped: "Skipped", overdue: "Overdue", stuck: "Stuck", on_hold: "On Hold", in_progress: "In Progress", not_started: "Not Started", checklist: "Checklist" };
+        const label = labelMap[key] || key;
+        const isLight = key === "not_started";
+        chevrons += buildChevronSvg(act.name, label, fill, isLight, act.estimatedDays, act.endDate ? String(act.endDate) : null);
+        if ((act.checklistTotal || 0) > 0) {
+          chevrons += buildChecklistSvg(act.name, act.checklistCompleted || 0, act.checklistTotal || 0, act.id);
+        }
+      });
+
+      const arrow = stageIndex > 0 ? `<div style="text-align:center;padding:4px 0;color:#888;font-size:14px;">&#x2193;</div>` : "";
+
+      const pctBarColor = progress.hasOverdue ? "#ef4444" : progress.allDone ? "#22c55e" : "#3b82f6";
+      const statusBadge = progress.allDone
+        ? `<span style="background:#22c55e;color:#fff;padding:1px 8px;border-radius:3px;font-size:8px;font-weight:600;">Complete</span>`
+        : progress.hasOverdue
+        ? `<span style="background:#ef4444;color:#fff;padding:1px 8px;border-radius:3px;font-size:8px;font-weight:600;">Overdue</span>`
+        : "";
+
+      stagesHtml += `${arrow}
+      <div style="border:1px solid #ccc;border-radius:6px;overflow:hidden;margin-bottom:2px;">
+        <div style="background:${stageClr}15;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ddd;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="background:${stageClr};color:#fff;width:24px;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;">${stageIndex + 1}</div>
+            <div>
+              <div style="font-weight:600;font-size:11px;">${stage?.name || "Ungrouped"}</div>
+              <div style="font-size:8px;color:#888;">${progress.done}/${progress.total} complete</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${statusBadge}
+            <div style="width:80px;height:6px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+              <div style="width:${progress.pct}%;height:100%;background:${pctBarColor};border-radius:3px;"></div>
+            </div>
+            <span style="font-size:8px;color:#888;width:28px;">${progress.pct}%</span>
+          </div>
+        </div>
+        <div style="padding:8px;display:flex;flex-wrap:wrap;align-items:center;gap:0;">
+          ${chevrons}
+        </div>
+      </div>`;
+    });
+
+    const html = `<!DOCTYPE html>
+<html><head><title>Progress - ${jobTitle || "Project Activities"}</title>
+<style>
+  @page { size: landscape; margin: 8mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #333; background: white; padding: 4px; }
+  svg { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+  polygon { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+  div { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+  .header { padding: 6px 8px; border-bottom: 2px solid #333; margin-bottom: 6px; }
+  .header h1 { font-size: 14px; font-weight: 700; }
+  .header p { font-size: 9px; color: #666; margin-top: 2px; }
+  .legend { display: flex; gap: 12px; padding: 4px 8px; font-size: 8px; color: #666; margin-bottom: 6px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 3px; }
+  .legend-swatch { width: 12px; height: 6px; border-radius: 1px; print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
+  .no-print { padding: 6px 8px; text-align: right; }
+  @media print { .no-print { display: none !important; } }
+</style></head><body>
+<div class="no-print">
+  <button onclick="window.print()" style="padding:6px 16px;font-size:13px;cursor:pointer;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;">Print</button>
+</div>
+<div class="header">
+  <h1>${jobTitle || "Project Activities"} - Progress</h1>
+  <p>Generated ${format(new Date(), "dd MMM yyyy HH:mm")} | ${parentActivities.length} activities across ${orderedStageIds.length} phases</p>
+</div>
+<div class="legend">
+  <div class="legend-item"><div class="legend-swatch" style="background:${STATUS_COLORS.done};"></div>Done</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:${STATUS_COLORS.in_progress};"></div>In Progress</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:${STATUS_COLORS.overdue};"></div>Overdue / Stuck</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:${STATUS_COLORS.on_hold};"></div>On Hold</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:${STATUS_COLORS.checklist};"></div>Checklist</div>
+  <div class="legend-item"><div class="legend-swatch" style="background:#e5e7eb;border:1px solid #ccc;"></div>Not Started</div>
+</div>
+${stagesHtml}
+</body></html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+  }, [orderedStageIds, activitiesByStage, stageColorMap, stageMap, parentActivities, jobTitle]);
 
   if (parentActivities.length === 0) {
     return (
@@ -304,27 +437,7 @@ export function ProgressFlowChart({
         </Button>
       </div>
 
-      <div ref={printRef} className="space-y-2 progress-print-area">
-        <div className="hidden print-only-flex items-center gap-4 flex-wrap px-1 mb-3">
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.done }} /> Done
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.in_progress }} /> In Progress
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.overdue }} /> Overdue / Stuck
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.on_hold }} /> On Hold
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded-sm" style={{ background: STATUS_COLORS.checklist }} /> Checklist
-          </div>
-          <div className="flex items-center gap-1.5 text-xs">
-            <div className="w-3 h-3 rounded-sm border" style={{ background: "#e5e7eb" }} /> Not Started
-          </div>
-        </div>
+      <div className="space-y-2">
 
         {orderedStageIds.map((stageId, stageIndex) => {
           const stage = stageMap.get(stageId);

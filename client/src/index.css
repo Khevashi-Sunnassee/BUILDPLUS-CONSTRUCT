@@ -354,23 +354,6 @@
   .no-print {
     display: none !important;
   }
-
-  .progress-print-area {
-    width: 100% !important;
-  }
-
-  .print-only-flex {
-    display: flex !important;
-  }
-
-  .chevron-node polygon {
-    print-color-adjust: exact !important;
-    -webkit-print-color-adjust: exact !important;
-  }
-
-  .chevron-node:hover polygon {
-    filter: none;
-  }
 }
 
 @media print {
