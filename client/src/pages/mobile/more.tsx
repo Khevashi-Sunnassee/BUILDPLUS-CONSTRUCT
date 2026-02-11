@@ -15,6 +15,7 @@ import {
   Target,
   Camera,
   Phone,
+  DollarSign,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -156,6 +157,14 @@ export default function MobileMore() {
             iconBg="bg-fuchsia-500/20"
             label="Purchase Orders"
             href="/mobile/purchase-orders"
+          />
+        )}
+        {showPOs && (
+          <MenuItem
+            icon={<DollarSign className="h-5 w-5 text-emerald-400" />}
+            iconBg="bg-emerald-500/20"
+            label="CAPEX Requests"
+            href="/mobile/capex-requests"
           />
         )}
         {showWeeklyReport && (

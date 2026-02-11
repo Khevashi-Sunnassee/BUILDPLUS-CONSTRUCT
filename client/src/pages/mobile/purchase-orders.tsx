@@ -348,12 +348,15 @@ function PODetailSheet({
             </div>
 
             {po.capexRequestId && (
-              <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
-                  CAPEX
-                </Badge>
-                <span className="text-sm text-amber-300/80">Linked to CAPEX request</span>
-              </div>
+              <Link href={`/mobile/capex-requests/${po.capexRequestId}`}>
+                <button className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 w-full text-left active:scale-[0.99]" data-testid="button-view-capex">
+                  <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
+                    CAPEX
+                  </Badge>
+                  <span className="text-sm text-amber-300/80 flex-1">View CAPEX request</span>
+                  <ChevronRight className="h-4 w-4 text-amber-400/60" />
+                </button>
+              </Link>
             )}
 
             {po.deliveryAddress && (

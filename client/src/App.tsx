@@ -96,6 +96,7 @@ const MobileCreateLoadListPage = lazy(() => import("@/pages/mobile/create-load-l
 const MobileRecordDeliveryPage = lazy(() => import("@/pages/mobile/record-delivery"));
 const MobileReturnLoadPage = lazy(() => import("@/pages/mobile/return-load"));
 const MobilePurchaseOrdersPage = lazy(() => import("@/pages/mobile/purchase-orders"));
+const MobileCapexRequestsPage = lazy(() => import("@/pages/mobile/capex-requests"));
 const MobileMore = lazy(() => import("@/pages/mobile/more"));
 const MobileProfilePage = lazy(() => import("@/pages/mobile/profile"));
 const MobileWeeklyJobReportPage = lazy(() => import("@/pages/mobile/weekly-job-report"));
@@ -865,6 +866,16 @@ function Router() {
       <Route path="/mobile/purchase-orders">
         <ProtectedRoute>
           <MobilePurchaseOrdersPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/capex-requests/:id">
+        <ProtectedRoute>
+          <MobileCapexRequestsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/capex-requests">
+        <ProtectedRoute>
+          <MobileCapexRequestsPage />
         </ProtectedRoute>
       </Route>
       <Route path="/mobile/more">
