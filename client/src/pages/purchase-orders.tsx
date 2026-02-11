@@ -824,6 +824,7 @@ export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [supplierFilter, setSupplierFilter] = useState<string>("all");
+  const [capexFilter, setCapexFilter] = useState<"all" | "capex_only" | "no_capex">("all");
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [selectedPOForEmail, setSelectedPOForEmail] = useState<PurchaseOrderWithDetails | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -879,6 +880,8 @@ export default function PurchaseOrdersPage() {
         if (!po.supplierId && !po.supplierName) return false;
         if (po.supplierId !== supplierFilter) return false;
       }
+      if (capexFilter === "capex_only" && !(po as any).capexRequestId) return false;
+      if (capexFilter === "no_capex" && (po as any).capexRequestId) return false;
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
         const poNumber = po.poNumber?.toLowerCase() || "";
@@ -889,15 +892,16 @@ export default function PurchaseOrdersPage() {
       }
       return true;
     });
-  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery]);
+  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery, capexFilter]);
 
   const clearFilters = () => {
     setSearchQuery("");
     setSupplierFilter("all");
     setStatusFilter("ALL");
+    setCapexFilter("all");
   };
 
-  const hasActiveFilters = searchQuery.trim() || supplierFilter !== "all" || statusFilter !== "ALL";
+  const hasActiveFilters = searchQuery.trim() || supplierFilter !== "all" || statusFilter !== "ALL" || capexFilter !== "all";
 
   const handleOpenEmailDialog = useCallback((po: PurchaseOrderWithDetails) => {
     setSelectedPOForEmail(po);
@@ -990,6 +994,16 @@ export default function PurchaseOrdersPage() {
                     {supplier.name}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={capexFilter} onValueChange={(v) => setCapexFilter(v as "all" | "capex_only" | "no_capex")}>
+              <SelectTrigger className="w-[180px]" data-testid="select-capex-filter">
+                <SelectValue placeholder="CAPEX Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All POs</SelectItem>
+                <SelectItem value="capex_only">CAPEX Linked</SelectItem>
+                <SelectItem value="no_capex">No CAPEX</SelectItem>
               </SelectContent>
             </Select>
             {hasActiveFilters && (
