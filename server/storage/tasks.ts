@@ -17,93 +17,104 @@ import type { TaskWithDetails, TaskGroupWithTasks } from "./types";
 async function getTaskWithDetails(taskId: string): Promise<TaskWithDetails | undefined> {
   const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId));
   if (!task) return undefined;
+  const result = await batchEnrichTasks([task]);
+  return result[0];
+}
 
-  const assigneesResult = await db.select()
-    .from(taskAssignees)
-    .innerJoin(users, eq(taskAssignees.userId, users.id))
-    .where(eq(taskAssignees.taskId, taskId));
-  
-  const assignees = assigneesResult.map(r => ({
-    ...r.task_assignees,
-    user: r.users,
-  }));
+async function batchEnrichTasks(rawTasks: Task[]): Promise<TaskWithDetails[]> {
+  if (rawTasks.length === 0) return [];
+
+  const taskIds = rawTasks.map(t => t.id);
 
   const subtasksResult = await db.select().from(tasks)
-    .where(eq(tasks.parentId, taskId))
+    .where(inArray(tasks.parentId, taskIds))
     .orderBy(asc(tasks.sortOrder));
 
-  const subtasksWithDetails: TaskWithDetails[] = [];
-  for (const subtask of subtasksResult) {
-    const subtaskAssigneesResult = await db.select()
+  const allIds = [...taskIds, ...subtasksResult.map(s => s.id)];
+
+  const [assigneesResult, updatesCountResult, filesCountResult] = await Promise.all([
+    db.select()
       .from(taskAssignees)
       .innerJoin(users, eq(taskAssignees.userId, users.id))
-      .where(eq(taskAssignees.taskId, subtask.id));
-    
-    const subtaskAssignees = subtaskAssigneesResult.map(r => ({
-      ...r.task_assignees,
-      user: r.users,
+      .where(inArray(taskAssignees.taskId, allIds)),
+    db.select({ taskId: taskUpdates.taskId, count: sql<number>`count(*)` })
+      .from(taskUpdates)
+      .where(inArray(taskUpdates.taskId, allIds))
+      .groupBy(taskUpdates.taskId),
+    db.select({ taskId: taskFiles.taskId, count: sql<number>`count(*)` })
+      .from(taskFiles)
+      .where(inArray(taskFiles.taskId, allIds))
+      .groupBy(taskFiles.taskId),
+  ]);
+
+  const assigneesByTask = new Map<string, (TaskAssignee & { user: User })[]>();
+  for (const r of assigneesResult) {
+    const tid = r.task_assignees.taskId;
+    if (!assigneesByTask.has(tid)) assigneesByTask.set(tid, []);
+    assigneesByTask.get(tid)!.push({ ...r.task_assignees, user: r.users });
+  }
+
+  const updatesCountMap = new Map<string, number>();
+  for (const r of updatesCountResult) {
+    updatesCountMap.set(r.taskId, Number(r.count));
+  }
+
+  const filesCountMap = new Map<string, number>();
+  for (const r of filesCountResult) {
+    filesCountMap.set(r.taskId, Number(r.count));
+  }
+
+  const allUserIds = new Set<string>();
+  const allJobIds = new Set<string>();
+  for (const t of [...rawTasks, ...subtasksResult]) {
+    if (t.createdById) allUserIds.add(t.createdById);
+    if (t.jobId) allJobIds.add(t.jobId);
+  }
+
+  const [usersResult, jobsResult] = await Promise.all([
+    allUserIds.size > 0
+      ? db.select().from(users).where(inArray(users.id, Array.from(allUserIds)))
+      : Promise.resolve([]),
+    allJobIds.size > 0
+      ? db.select().from(jobs).where(inArray(jobs.id, Array.from(allJobIds)))
+      : Promise.resolve([]),
+  ]);
+
+  const usersMap = new Map<string, User>();
+  for (const u of usersResult) usersMap.set(u.id, u);
+
+  const jobsMap = new Map<string, Job>();
+  for (const j of jobsResult) jobsMap.set(j.id, j);
+
+  const subtasksByParent = new Map<string, Task[]>();
+  for (const s of subtasksResult) {
+    if (s.parentId) {
+      if (!subtasksByParent.has(s.parentId)) subtasksByParent.set(s.parentId, []);
+      subtasksByParent.get(s.parentId)!.push(s);
+    }
+  }
+
+  return rawTasks.map(task => {
+    const subs = (subtasksByParent.get(task.id) || []).map(subtask => ({
+      ...subtask,
+      assignees: assigneesByTask.get(subtask.id) || [],
+      subtasks: [] as TaskWithDetails[],
+      updatesCount: updatesCountMap.get(subtask.id) || 0,
+      filesCount: filesCountMap.get(subtask.id) || 0,
+      createdBy: subtask.createdById ? usersMap.get(subtask.createdById) || null : null,
+      job: subtask.jobId ? jobsMap.get(subtask.jobId) || null : null,
     }));
 
-    let subtaskJob: Job | null = null;
-    if (subtask.jobId) {
-      const [jobResult] = await db.select().from(jobs).where(eq(jobs.id, subtask.jobId));
-      subtaskJob = jobResult || null;
-    }
-
-    const [subtaskUpdatesCount] = await db.select({ count: sql<number>`count(*)` })
-      .from(taskUpdates)
-      .where(eq(taskUpdates.taskId, subtask.id));
-
-    const [subtaskFilesCount] = await db.select({ count: sql<number>`count(*)` })
-      .from(taskFiles)
-      .where(eq(taskFiles.taskId, subtask.id));
-
-    let subtaskCreatedBy: User | null = null;
-    if (subtask.createdById) {
-      const [creator] = await db.select().from(users).where(eq(users.id, subtask.createdById));
-      subtaskCreatedBy = creator || null;
-    }
-
-    subtasksWithDetails.push({
-      ...subtask,
-      assignees: subtaskAssignees,
-      subtasks: [],
-      updatesCount: Number(subtaskUpdatesCount?.count || 0),
-      filesCount: Number(subtaskFilesCount?.count || 0),
-      createdBy: subtaskCreatedBy,
-      job: subtaskJob,
-    });
-  }
-
-  const [updatesCount] = await db.select({ count: sql<number>`count(*)` })
-    .from(taskUpdates)
-    .where(eq(taskUpdates.taskId, taskId));
-
-  const [filesCount] = await db.select({ count: sql<number>`count(*)` })
-    .from(taskFiles)
-    .where(eq(taskFiles.taskId, taskId));
-
-  let createdBy: User | null = null;
-  if (task.createdById) {
-    const [creator] = await db.select().from(users).where(eq(users.id, task.createdById));
-    createdBy = creator || null;
-  }
-
-  let job: Job | null = null;
-  if (task.jobId) {
-    const [jobResult] = await db.select().from(jobs).where(eq(jobs.id, task.jobId));
-    job = jobResult || null;
-  }
-
-  return {
-    ...task,
-    assignees,
-    subtasks: subtasksWithDetails,
-    updatesCount: Number(updatesCount?.count || 0),
-    filesCount: Number(filesCount?.count || 0),
-    createdBy,
-    job,
-  };
+    return {
+      ...task,
+      assignees: assigneesByTask.get(task.id) || [],
+      subtasks: subs,
+      updatesCount: updatesCountMap.get(task.id) || 0,
+      filesCount: filesCountMap.get(task.id) || 0,
+      createdBy: task.createdById ? usersMap.get(task.createdById) || null : null,
+      job: task.jobId ? jobsMap.get(task.jobId) || null : null,
+    };
+  });
 }
 
 export const taskMethods = {
@@ -111,20 +122,27 @@ export const taskMethods = {
     const groups = await db.select().from(taskGroups)
       .where(companyId ? eq(taskGroups.companyId, companyId) : undefined)
       .orderBy(asc(taskGroups.sortOrder));
-    
+
+    if (groups.length === 0) return [];
+
+    const groupIds = groups.map(g => g.id);
+    const allTopLevelTasks = await db.select().from(tasks)
+      .where(and(inArray(tasks.groupId, groupIds), isNull(tasks.parentId)))
+      .orderBy(asc(tasks.sortOrder));
+
+    const allTasksWithDetails = await batchEnrichTasks(allTopLevelTasks);
+
+    const tasksByGroup = new Map<string, TaskWithDetails[]>();
+    for (const t of allTasksWithDetails) {
+      if (t.groupId) {
+        if (!tasksByGroup.has(t.groupId)) tasksByGroup.set(t.groupId, []);
+        tasksByGroup.get(t.groupId)!.push(t);
+      }
+    }
+
     const result: TaskGroupWithTasks[] = [];
     for (const group of groups) {
-      const groupTasks = await db.select().from(tasks)
-        .where(and(eq(tasks.groupId, group.id), sql`${tasks.parentId} IS NULL`))
-        .orderBy(asc(tasks.sortOrder));
-
-      const tasksWithDetails: TaskWithDetails[] = [];
-      for (const task of groupTasks) {
-        const taskDetails = await getTaskWithDetails(task.id);
-        if (taskDetails) {
-          tasksWithDetails.push(taskDetails);
-        }
-      }
+      const tasksWithDetails = tasksByGroup.get(group.id) || [];
 
       if (userId) {
         const filtered = tasksWithDetails.filter(task => {
@@ -149,16 +167,10 @@ export const taskMethods = {
     if (!group) return undefined;
 
     const groupTasks = await db.select().from(tasks)
-      .where(and(eq(tasks.groupId, id), sql`${tasks.parentId} IS NULL`))
+      .where(and(eq(tasks.groupId, id), isNull(tasks.parentId)))
       .orderBy(asc(tasks.sortOrder));
 
-    const tasksWithDetails: TaskWithDetails[] = [];
-    for (const task of groupTasks) {
-      const taskDetails = await getTaskWithDetails(task.id);
-      if (taskDetails) {
-        tasksWithDetails.push(taskDetails);
-      }
-    }
+    const tasksWithDetails = await batchEnrichTasks(groupTasks);
 
     return {
       ...group,
@@ -227,28 +239,14 @@ export const taskMethods = {
         ))
         .orderBy(asc(tasks.sortOrder));
 
-      const result: TaskWithDetails[] = [];
-      for (const row of activityTasks) {
-        const taskDetails = await getTaskWithDetails(row.t.id);
-        if (taskDetails) {
-          result.push(taskDetails);
-        }
-      }
-      return result;
+      return batchEnrichTasks(activityTasks.map(r => r.t));
     }
 
     const activityTasks = await db.select().from(tasks)
       .where(and(eq(tasks.jobActivityId, activityId), isNull(tasks.parentId)))
       .orderBy(asc(tasks.sortOrder));
 
-    const result: TaskWithDetails[] = [];
-    for (const task of activityTasks) {
-      const taskDetails = await getTaskWithDetails(task.id);
-      if (taskDetails) {
-        result.push(taskDetails);
-      }
-    }
-    return result;
+    return batchEnrichTasks(activityTasks);
   },
 
   async createTask(data: InsertTask): Promise<Task> {
@@ -275,15 +273,22 @@ export const taskMethods = {
   },
 
   async reorderTasks(groupId: string, taskIds: string[]): Promise<void> {
-    for (let i = 0; i < taskIds.length; i++) {
-      await db.update(tasks).set({ sortOrder: i, updatedAt: new Date() }).where(eq(tasks.id, taskIds[i]));
-    }
+    if (taskIds.length === 0) return;
+    const now = new Date();
+    const caseFragments = taskIds.map((id, i) => sql`WHEN ${id} THEN ${i}`);
+    await db.update(tasks)
+      .set({
+        sortOrder: sql`CASE id ${sql.join(caseFragments, sql` `)} END`,
+        updatedAt: now,
+      })
+      .where(inArray(tasks.id, taskIds));
   },
 
   async moveTaskToGroup(taskId: string, targetGroupId: string, targetIndex: number): Promise<Task | undefined> {
-    const task = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
-    if (!task.length) return undefined;
+    const [taskRow] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+    if (!taskRow) return undefined;
 
+    const now = new Date();
     const targetGroupTasks = await db.select()
       .from(tasks)
       .where(and(eq(tasks.groupId, targetGroupId), isNull(tasks.parentId)))
@@ -292,23 +297,34 @@ export const taskMethods = {
     await db.update(tasks).set({
       groupId: targetGroupId,
       sortOrder: targetIndex,
-      updatedAt: new Date(),
+      updatedAt: now,
     }).where(eq(tasks.id, taskId));
 
     const tasksToReorder = targetGroupTasks.filter(t => t.id !== taskId);
+    const reorderIds: string[] = [];
+    const reorderOrders: number[] = [];
     let order = 0;
     for (let i = 0; i <= tasksToReorder.length; i++) {
-      if (i === targetIndex) {
-        order++;
-      }
+      if (i === targetIndex) order++;
       if (i < tasksToReorder.length) {
-        await db.update(tasks).set({ sortOrder: order, updatedAt: new Date() }).where(eq(tasks.id, tasksToReorder[i].id));
+        reorderIds.push(tasksToReorder[i].id);
+        reorderOrders.push(order);
         order++;
       }
     }
 
-    const updated = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
-    return updated[0];
+    if (reorderIds.length > 0) {
+      const caseFragments = reorderIds.map((id, i) => sql`WHEN ${id} THEN ${reorderOrders[i]}`);
+      await db.update(tasks)
+        .set({
+          sortOrder: sql`CASE id ${sql.join(caseFragments, sql` `)} END`,
+          updatedAt: now,
+        })
+        .where(inArray(tasks.id, reorderIds));
+    }
+
+    const [updated] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1);
+    return updated;
   },
 
   async getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]> {
@@ -326,8 +342,10 @@ export const taskMethods = {
   async setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]> {
     await db.delete(taskAssignees).where(eq(taskAssignees.taskId, taskId));
     
-    for (const userId of userIds) {
-      await db.insert(taskAssignees).values({ taskId, userId }).onConflictDoNothing();
+    if (userIds.length > 0) {
+      await db.insert(taskAssignees)
+        .values(userIds.map(userId => ({ taskId, userId })))
+        .onConflictDoNothing();
     }
     
     return taskMethods.getTaskAssignees(taskId);
@@ -348,8 +366,10 @@ export const taskMethods = {
   async setTaskGroupMembers(groupId: string, userIds: string[]): Promise<(TaskGroupMember & { user: User })[]> {
     await db.delete(taskGroupMembers).where(eq(taskGroupMembers.groupId, groupId));
     
-    for (const userId of userIds) {
-      await db.insert(taskGroupMembers).values({ groupId, userId }).onConflictDoNothing();
+    if (userIds.length > 0) {
+      await db.insert(taskGroupMembers)
+        .values(userIds.map(userId => ({ groupId, userId })))
+        .onConflictDoNothing();
     }
     
     return taskMethods.getTaskGroupMembers(groupId);

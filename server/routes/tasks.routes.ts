@@ -269,11 +269,13 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
       taskData.reminderDate = taskData.reminderDate ? new Date(taskData.reminderDate) : null;
     }
     
-    const task = await storage.createTask({
-      ...taskData,
-      createdById: userId,
-    });
-    const groupMembers = await storage.getTaskGroupMembers(taskData.groupId);
+    const [task, groupMembers] = await Promise.all([
+      storage.createTask({
+        ...taskData,
+        createdById: userId,
+      }),
+      storage.getTaskGroupMembers(taskData.groupId),
+    ]);
     const memberUserIds = groupMembers.map(m => m.userId);
     const assigneeIds = new Set<string>(memberUserIds);
     if (userId) {
