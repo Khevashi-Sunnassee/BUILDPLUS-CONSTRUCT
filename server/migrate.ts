@@ -9,22 +9,30 @@ export async function runMigrations() {
     throw new Error("DATABASE_URL environment variable is not set");
   }
 
-  const migrationPool = new Pool({
-    connectionString: databaseUrl,
-    max: 1,
-    connectionTimeoutMillis: 30000,
-    statement_timeout: 120000,
-  });
+  const maxRetries = 3;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const migrationPool = new Pool({
+      connectionString: databaseUrl,
+      max: 1,
+      connectionTimeoutMillis: 30000,
+      statement_timeout: 120000,
+    });
 
-  try {
-    const db = drizzle(migrationPool);
-    logger.info("Running database migrations...");
-    await migrate(db, { migrationsFolder: "./migrations" });
-    logger.info("Database migrations completed successfully");
-  } catch (error) {
-    logger.error({ err: error }, "Database migration failed");
-    throw error;
-  } finally {
-    await migrationPool.end();
+    try {
+      const db = drizzle(migrationPool);
+      logger.info(`Running database migrations (attempt ${attempt}/${maxRetries})...`);
+      await migrate(db, { migrationsFolder: "./migrations" });
+      logger.info("Database migrations completed successfully");
+      return;
+    } catch (error: any) {
+      logger.error({ err: error, attempt }, `Database migration attempt ${attempt}/${maxRetries} failed`);
+      if (attempt >= maxRetries) {
+        throw error;
+      }
+      logger.info(`Retrying migration in 3 seconds...`);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    } finally {
+      await migrationPool.end().catch(() => {});
+    }
   }
 }

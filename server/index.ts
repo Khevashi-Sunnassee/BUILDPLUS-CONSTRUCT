@@ -189,6 +189,15 @@ app.use((req, res, next) => {
   next();
 });
 
+let dbReady = false;
+
+app.get("/", (req, res, next) => {
+  if (req.headers.accept?.includes("text/html") || !req.headers.accept) {
+    return next();
+  }
+  res.json({ status: "ok", dbReady, timestamp: new Date().toISOString() });
+});
+
 app.get("/api/admin/error-summary", (req, res) => {
   if (!req.session?.userId || (req.session as any).role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
@@ -266,11 +275,52 @@ function gracefulShutdown(signal: string) {
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
+async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await pool.query("SELECT 1");
+      logger.info(`Database connection established on attempt ${attempt}`);
+      return true;
+    } catch (err) {
+      logger.warn({ err, attempt, maxRetries }, `Database connection attempt ${attempt}/${maxRetries} failed`);
+      if (attempt < maxRetries) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  return false;
+}
+
 (async () => {
-  await runMigrations();
-  await seedDatabase();
-  await ensureSystemChecklistModules();
-  await seedHelpEntries();
+  const port = parseInt(process.env.PORT || "5000", 10);
+
+  httpServer.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      reusePort: true,
+    },
+    () => {
+      log(`serving on port ${port}`);
+    },
+  );
+
+  try {
+    const dbConnected = await waitForDatabase(5, 3000);
+    if (!dbConnected) {
+      logger.error("Could not connect to database after retries — continuing without DB");
+    } else {
+      await runMigrations();
+      await seedDatabase();
+      await ensureSystemChecklistModules();
+      await seedHelpEntries();
+      dbReady = true;
+      logger.info("Database initialization complete");
+    }
+  } catch (err) {
+    logger.error({ err }, "Database initialization failed — server will continue running");
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, req: Request, res: Response, next: NextFunction) => {
@@ -292,29 +342,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     return res.status(status).json({ message });
   });
 
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
   if (process.env.NODE_ENV === "production") {
     serveStatic(app);
   } else {
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
-
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
-  httpServer.listen(
-    {
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    },
-    () => {
-      log(`serving on port ${port}`);
-    },
-  );
 })();
