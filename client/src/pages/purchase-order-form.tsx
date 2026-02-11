@@ -721,7 +721,7 @@ export default function PurchaseOrderFormPage() {
     pdf.setTextColor(31, 41, 55);
     pdf.setFontSize(16);
     pdf.setFont("helvetica", "bold");
-    pdf.text(settings?.companyName || "BuildPlusAI", headerTextX, 12);
+    pdf.text(settings?.companyName || "LTE Performance", headerTextX, 12);
     
     // Purchase Order title
     pdf.setFontSize(20);
@@ -1266,7 +1266,7 @@ export default function PurchaseOrderFormPage() {
               )}
               <div>
                 <CardTitle className="text-xl" data-testid="text-company-name">
-                  {settings?.companyName || "BuildPlusAI"}
+                  {settings?.companyName || "LTE Performance"}
                 </CardTitle>
                 <CardDescription>Purchase Order</CardDescription>
               </div>

@@ -320,21 +320,15 @@ export function AppSidebar() {
     <Sidebar className="border-r border-sidebar-border">
       <SidebarHeader className="p-4">
         <div className="flex items-center justify-start">
-          {logoSrc ? (
-            <img 
-              src={logoSrc} 
-              alt="BuildPlusAI" 
-              className="h-[60px] w-auto max-w-full object-contain"
-              data-testid="img-sidebar-logo"
-            />
-          ) : (
-            <div className="flex items-center gap-2" data-testid="img-sidebar-logo">
-              <Building2 className="h-8 w-8 text-primary" />
-              <span className="text-lg font-bold text-foreground">
-                BuildPlus<span className="text-primary">AI</span>
-              </span>
-            </div>
-          )}
+          <div className="h-[60px] flex items-center justify-start" data-testid="img-sidebar-logo">
+            {logoSrc && (
+              <img 
+                src={logoSrc} 
+                alt="Company Logo" 
+                className="h-[60px] w-auto max-w-full object-contain"
+              />
+            )}
+          </div>
         </div>
       </SidebarHeader>
 

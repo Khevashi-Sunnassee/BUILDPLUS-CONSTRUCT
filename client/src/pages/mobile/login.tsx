@@ -19,7 +19,7 @@ export default function MobileLoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  const { data: logoData } = useQuery<{ logoBase64: string | null }>({
+  const { data: logoData, isLoading: logoLoading } = useQuery<{ logoBase64: string | null }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const logoSrc = logoData?.logoBase64 || null;
@@ -56,21 +56,15 @@ export default function MobileLoginPage() {
       <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" as any }}>
         <div className="w-full max-w-[390px] mx-auto space-y-8">
           <div className="flex flex-col items-center gap-3">
-            {logoSrc ? (
-              <img
-                src={logoSrc}
-                alt="BuildPlusAI"
-                className="h-14 object-contain"
-                data-testid="img-mobile-login-logo"
-              />
-            ) : (
-              <div className="flex items-center gap-2" data-testid="img-mobile-login-logo">
-                <Building2 className="h-10 w-10 text-primary" />
-                <span className="text-2xl font-bold text-white">
-                  BuildPlus<span className="text-primary">AI</span>
-                </span>
-              </div>
-            )}
+            <div className="h-14 flex items-center justify-center" data-testid="img-mobile-login-logo">
+              {logoSrc && (
+                <img
+                  src={logoSrc}
+                  alt="Company Logo"
+                  className="h-14 object-contain"
+                />
+              )}
+            </div>
             <h1 className="text-2xl font-bold text-white" data-testid="text-login-title">
               Performance Management
             </h1>

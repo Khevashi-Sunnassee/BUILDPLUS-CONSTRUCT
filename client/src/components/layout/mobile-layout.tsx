@@ -39,7 +39,7 @@ export function MobileLayout({ children, title, showBackButton = true }: MobileL
           </Button>
         )}
         <h1 className="text-white text-lg font-semibold flex-1">
-          {title || "BuildPlus"}
+          {title || ""}
         </h1>
         {!isOnline && (
           <div className="flex items-center gap-1 text-red-400 text-xs" data-testid="status-offline">

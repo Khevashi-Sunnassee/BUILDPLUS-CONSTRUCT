@@ -113,16 +113,9 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            {logoSrc ? (
-              <img src={logoSrc} alt="BuildPlusAI" className="h-16 mb-4" />
-            ) : (
-              <div className="flex items-center gap-2 mb-4">
-                <Building2 className="h-10 w-10 text-primary" />
-                <span className="text-2xl font-bold text-foreground">
-                  BuildPlus<span className="text-primary">AI</span>
-                </span>
-              </div>
-            )}
+            <div className="h-16 mb-4 flex items-center justify-center">
+              {logoSrc && <img src={logoSrc} alt="Company Logo" className="h-16 object-contain" />}
+            </div>
           </div>
           <Card data-testid="card-invitation-invalid">
             <CardContent className="p-8 text-center space-y-4">
@@ -144,16 +137,9 @@ export default function RegisterPage() {
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
-            {logoSrc ? (
-              <img src={logoSrc} alt="BuildPlusAI" className="h-16 mb-4" />
-            ) : (
-              <div className="flex items-center gap-2 mb-4">
-                <Building2 className="h-10 w-10 text-primary" />
-                <span className="text-2xl font-bold text-foreground">
-                  BuildPlus<span className="text-primary">AI</span>
-                </span>
-              </div>
-            )}
+            <div className="h-16 mb-4 flex items-center justify-center">
+              {logoSrc && <img src={logoSrc} alt="Company Logo" className="h-16 object-contain" />}
+            </div>
           </div>
           <Card data-testid="card-registration-success">
             <CardContent className="p-8 text-center space-y-4">
@@ -176,16 +162,9 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          {logoSrc ? (
-            <img src={logoSrc} alt="BuildPlusAI" className="h-16 mb-4" data-testid="img-register-logo" />
-          ) : (
-            <div className="flex items-center gap-2 mb-4" data-testid="img-register-logo">
-              <Building2 className="h-10 w-10 text-primary" />
-              <span className="text-2xl font-bold text-foreground">
-                BuildPlus<span className="text-primary">AI</span>
-              </span>
-            </div>
-          )}
+          <div className="h-16 mb-4 flex items-center justify-center" data-testid="img-register-logo">
+            {logoSrc && <img src={logoSrc} alt="Company Logo" className="h-16 object-contain" />}
+          </div>
           <h1 className="text-2xl font-bold text-foreground">Set Up Your Account</h1>
           <p className="text-muted-foreground mt-1">Complete your profile to get started</p>
         </div>

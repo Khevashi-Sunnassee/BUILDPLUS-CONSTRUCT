@@ -25,8 +25,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Fetch dynamic logo from settings
-  const { data: logoData } = useQuery<{ logoBase64: string | null }>({
+  const { data: logoData, isLoading: logoLoading } = useQuery<{ logoBase64: string | null }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const logoSrc = logoData?.logoBase64 || null;
@@ -63,21 +62,15 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          {logoSrc ? (
-            <img 
-              src={logoSrc} 
-              alt="BuildPlusAI" 
-              className="h-16 mb-4"
-              data-testid="img-login-logo"
-            />
-          ) : (
-            <div className="flex items-center gap-2 mb-4" data-testid="img-login-logo">
-              <Building2 className="h-10 w-10 text-primary" />
-              <span className="text-2xl font-bold text-foreground">
-                BuildPlus<span className="text-primary">AI</span>
-              </span>
-            </div>
-          )}
+          <div className="h-16 mb-4 flex items-center justify-center" data-testid="img-login-logo">
+            {logoSrc && (
+              <img 
+                src={logoSrc} 
+                alt="Company Logo" 
+                className="h-16 object-contain"
+              />
+            )}
+          </div>
           <h1 className="text-2xl font-bold text-foreground">Performance Management</h1>
           <p className="text-muted-foreground mt-1">KPI Tracking & Drafting Management</p>
         </div>

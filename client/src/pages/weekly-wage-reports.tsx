@@ -248,7 +248,7 @@ export default function WeeklyWageReportsPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || null;
-  const companyName = brandingSettings?.companyName || "BuildPlusAI";
+  const companyName = brandingSettings?.companyName || "LTE Performance";
 
   const { data: analysisData, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery<WageAnalysis>({
     queryKey: [WEEKLY_REPORTS_ROUTES.WAGE_REPORTS, selectedReport?.id, "analysis"],

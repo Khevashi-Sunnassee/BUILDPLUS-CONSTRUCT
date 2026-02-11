@@ -90,7 +90,7 @@ export default function DailyReportDetailPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || null;
-  const companyName = brandingSettings?.companyName || "BuildPlusAI";
+  const companyName = brandingSettings?.companyName || "LTE Performance";
 
   const updateRowMutation = useMutation({
     mutationFn: async ({ rowId, updates }: { rowId: string; updates: any }) => {
@@ -309,7 +309,7 @@ export default function DailyReportDetailPage() {
       
       pdf.setFontSize(8);
       pdf.setTextColor(100, 100, 100);
-      pdf.text("BuildPlusAI - Confidential", margin, pdfHeight - 4);
+      pdf.text("Confidential", margin, pdfHeight - 4);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 4, { align: "right" });
       
       pdf.save(`LTE-Daily-Report-${log.logDay}.pdf`);

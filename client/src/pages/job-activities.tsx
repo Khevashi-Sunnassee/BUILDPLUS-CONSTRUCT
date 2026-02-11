@@ -120,7 +120,7 @@ export default function JobActivitiesPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || null;
-  const companyName = brandingSettings?.companyName || "BuildPlusAI";
+  const companyName = brandingSettings?.companyName || "LTE Performance";
 
   const { data: activities, isLoading: loadingActivities } = useQuery<ActivityWithAssignees[]>({
     queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_ACTIVITIES(jobId)],
@@ -391,7 +391,7 @@ export default function JobActivitiesPage() {
       pdf.setTextColor(31, 41, 55);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text(companyName || "BuildPlusAI", headerTextX, margin + 2);
+      pdf.text(companyName || "LTE Performance", headerTextX, margin + 2);
 
       pdf.setFontSize(20);
       pdf.setTextColor(107, 114, 128);

@@ -658,7 +658,7 @@ export default function AdminSettingsPage() {
                   ) : (
                     <div className="flex flex-col items-center gap-1" data-testid="img-logo-preview">
                       <Building2 className="h-8 w-8 text-primary" />
-                      <span className="text-xs font-semibold text-gray-600">BuildPlusAI</span>
+                      <span className="text-xs font-semibold text-gray-600">LTE Performance</span>
                     </div>
                   )}
                 </div>

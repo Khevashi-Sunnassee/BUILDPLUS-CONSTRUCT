@@ -78,7 +78,7 @@ export default function LandingPage() {
   });
 
   useEffect(() => {
-    document.title = "BuildPlusAI - Construction Performance Management";
+    document.title = "LTE Performance - Construction Performance Management";
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
       metaDesc = document.createElement("meta");
@@ -87,7 +87,7 @@ export default function LandingPage() {
     }
     metaDesc.setAttribute(
       "content",
-      "BuildPlusAI is the complete platform for precast concrete production management. Track panels, manage logistics, and drive performance with AI-powered insights."
+      "The complete platform for precast concrete production management. Track panels, manage logistics, and drive performance with AI-powered insights."
     );
 
     let ogTitle = document.querySelector('meta[property="og:title"]');
@@ -96,7 +96,7 @@ export default function LandingPage() {
       ogTitle.setAttribute("property", "og:title");
       document.head.appendChild(ogTitle);
     }
-    ogTitle.setAttribute("content", "BuildPlusAI - Build Smarter. Deliver Faster.");
+    ogTitle.setAttribute("content", "LTE Performance - Build Smarter. Deliver Faster.");
 
     let ogDesc = document.querySelector('meta[property="og:description"]');
     if (!ogDesc) {
@@ -123,16 +123,9 @@ export default function LandingPage() {
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4 h-16">
-            <div className="flex items-center gap-3" data-testid="text-brand-logo">
-              {logoData?.logoBase64 ? (
-                <img src={logoData.logoBase64} alt="BuildPlusAI" className="h-8 w-auto object-contain" data-testid="img-brand-logo" />
-              ) : (
-                <>
-                  <Building2 className="h-7 w-7 text-primary" />
-                  <span className="text-lg font-bold text-foreground tracking-tight">
-                    BuildPlus<span className="text-primary">AI</span>
-                  </span>
-                </>
+            <div className="flex items-center gap-3 h-8" data-testid="text-brand-logo">
+              {logoData?.logoBase64 && (
+                <img src={logoData.logoBase64} alt="Company Logo" className="h-8 w-auto object-contain" data-testid="img-brand-logo" />
               )}
             </div>
             <div className="flex items-center gap-3">
@@ -216,7 +209,7 @@ export default function LandingPage() {
             Everything You Need to Manage Production
           </h2>
           <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto" data-testid="text-features-description">
-            From drafting schedules to delivery tracking, BuildPlusAI gives your
+            From drafting schedules to delivery tracking, our platform gives your
             team the tools to stay on time and on budget.
           </p>
         </div>
@@ -270,16 +263,9 @@ export default function LandingPage() {
       <footer className="border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2" data-testid="text-footer-brand">
-              {logoData?.logoBase64 ? (
-                <img src={logoData.logoBase64} alt="BuildPlusAI" className="h-6 w-auto object-contain" />
-              ) : (
-                <>
-                  <Building2 className="h-5 w-5 text-primary" />
-                  <span className="text-sm font-semibold text-foreground">
-                    BuildPlus<span className="text-primary">AI</span>
-                  </span>
-                </>
+            <div className="flex items-center gap-2 h-6" data-testid="text-footer-brand">
+              {logoData?.logoBase64 && (
+                <img src={logoData.logoBase64} alt="Company Logo" className="h-6 w-auto object-contain" />
               )}
             </div>
             <p className="text-sm text-muted-foreground" data-testid="text-footer-url">

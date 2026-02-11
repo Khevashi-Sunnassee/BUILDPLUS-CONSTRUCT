@@ -161,7 +161,7 @@ export default function ProductionReportDetailPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || null;
-  const companyName = brandingSettings?.companyName || "BuildPlusAI";
+  const companyName = brandingSettings?.companyName || "LTE Performance";
 
   const activeJobs = jobs?.filter(j => j.status === "ACTIVE" && isJobVisibleInDropdowns(String(j.jobPhase ?? "CONTRACTED") as any)) || [];
 

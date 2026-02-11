@@ -124,7 +124,7 @@ export default function TasksPage() {
 
   const [isExporting, setIsExporting] = useState(false);
   const reportLogo = brandingSettings?.logoBase64 || null;
-  const companyName = brandingSettings?.companyName || "BuildPlusAI";
+  const companyName = brandingSettings?.companyName || "LTE Performance";
 
   const filteredGroups = groups.map((group) => ({
     ...group,
@@ -251,7 +251,7 @@ export default function TasksPage() {
       pdf.setTextColor(31, 41, 55);
       pdf.setFontSize(16);
       pdf.setFont("helvetica", "bold");
-      pdf.text(companyName || "BuildPlusAI", headerTextX, margin + 2);
+      pdf.text(companyName || "LTE Performance", headerTextX, margin + 2);
 
       pdf.setFontSize(20);
       pdf.setTextColor(107, 114, 128);
