@@ -67,6 +67,8 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
     resolver: zodResolver(uploadFormSchema),
     defaultValues: {
       title: "",
+      documentNumber: "",
+      revision: "",
       description: "",
       typeId: "",
       disciplineId: "",
@@ -157,6 +159,8 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
     const formData = new FormData();
     formData.append("file", selectedFile);
     formData.append("title", values.title);
+    if (values.documentNumber) formData.append("documentNumber", values.documentNumber);
+    if (values.revision) formData.append("revision", values.revision);
     if (values.description) formData.append("description", values.description);
     if (values.typeId) formData.append("typeId", values.typeId);
     if (values.disciplineId) formData.append("disciplineId", values.disciplineId);
@@ -175,13 +179,13 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Upload Document</DialogTitle>
           <DialogDescription>Upload a new document to the register</DialogDescription>
         </DialogHeader>
         <Form {...uploadForm}>
-          <form onSubmit={uploadForm.handleSubmit(handleUpload)} className="space-y-4">
+          <form onSubmit={uploadForm.handleSubmit(handleUpload)} className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
             <div
               className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-primary transition-colors"
               onClick={() => fileInputRef.current?.click()}
@@ -234,6 +238,34 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
                     <FormLabel>Title *</FormLabel>
                     <FormControl>
                       <Input {...field} placeholder="Document title" data-testid="input-title" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={uploadForm.control}
+                name="documentNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Document Number</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g. DOC-001" data-testid="input-document-number" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={uploadForm.control}
+                name="revision"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Revision</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="e.g. A" data-testid="input-revision" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

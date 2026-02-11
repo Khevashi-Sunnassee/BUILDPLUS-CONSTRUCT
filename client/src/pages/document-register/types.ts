@@ -16,6 +16,8 @@ import type {
 
 export const uploadFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
+  documentNumber: z.string().optional(),
+  revision: z.string().optional(),
   description: z.string().optional(),
   typeId: z.string().optional(),
   disciplineId: z.string().optional(),

@@ -449,7 +449,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential } = req.body;
+    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential, documentNumber: manualDocNumber, revision: manualRevision } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: "Title is required" });
@@ -478,7 +478,9 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
     const fileSha256 = crypto.createHash("sha256").update(req.file.buffer).digest("hex");
     
     let documentNumber: string | undefined;
-    if (typeId) {
+    if (manualDocNumber) {
+      documentNumber = manualDocNumber;
+    } else if (typeId) {
       documentNumber = await storage.getNextDocumentNumber(typeId);
     }
 
@@ -498,6 +500,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       storageKey: objectPath,
       fileSha256,
       documentNumber,
+      ...(manualRevision ? { revision: manualRevision } : {}),
       typeId: typeId || null,
       disciplineId: disciplineId || null,
       categoryId: categoryId || null,
