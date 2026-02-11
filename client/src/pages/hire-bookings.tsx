@@ -69,7 +69,7 @@ function isOverdue(booking: HireBookingWithDetails): boolean {
 export default function HireBookingsPage() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ON_HIRE");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
   const [equipmentFilter, setEquipmentFilter] = useState<string>("ALL");
@@ -378,6 +378,9 @@ export default function HireBookingsPage() {
         </div>
         <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
           <TabsList className="flex-wrap h-auto">
+            <TabsTrigger value="ON_HIRE" data-testid="tab-status-on-hire">
+              On Hire ({statusCounts.ON_HIRE || 0})
+            </TabsTrigger>
             <TabsTrigger value="ALL" data-testid="tab-status-all">
               All ({statusCounts.ALL || 0})
             </TabsTrigger>
@@ -392,9 +395,6 @@ export default function HireBookingsPage() {
             </TabsTrigger>
             <TabsTrigger value="BOOKED" data-testid="tab-status-booked">
               Booked ({statusCounts.BOOKED || 0})
-            </TabsTrigger>
-            <TabsTrigger value="ON_HIRE" data-testid="tab-status-on-hire">
-              On Hire ({statusCounts.ON_HIRE || 0})
             </TabsTrigger>
             <TabsTrigger value="RETURNED" data-testid="tab-status-returned">
               Returned ({statusCounts.RETURNED || 0})
