@@ -126,7 +126,7 @@ export default function AssetRepairFormPage() {
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.BY_ID(assetId)] });
       toast({ title: editId ? "Repair request updated" : "Repair request created" });
-      navigate(`/admin/assets/${assetId}`);
+      navigate("/admin/asset-register");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -160,7 +160,7 @@ export default function AssetRepairFormPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate(assetId ? `/admin/assets/${assetId}` : "/admin/asset-register")}
+          onClick={() => navigate("/admin/asset-register")}
           data-testid="button-back"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -389,7 +389,7 @@ export default function AssetRepairFormPage() {
       <div className="flex justify-end gap-2">
         <Button
           variant="outline"
-          onClick={() => navigate(assetId ? `/admin/assets/${assetId}` : "/admin/asset-register")}
+          onClick={() => navigate("/admin/asset-register")}
           data-testid="button-cancel"
         >
           Cancel
