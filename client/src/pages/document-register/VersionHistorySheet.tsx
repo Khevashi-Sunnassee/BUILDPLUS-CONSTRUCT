@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Download,
   Eye,
+  Mail,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
 import type { Document, DocumentWithDetails } from "./types";
 import { statusConfig, formatDate } from "./types";
@@ -22,9 +24,10 @@ interface VersionHistorySheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   document: DocumentWithDetails | null;
+  onSendEmail?: (doc: Document) => void;
 }
 
-export function VersionHistorySheet({ open, onOpenChange, document: versionHistoryDoc }: VersionHistorySheetProps) {
+export function VersionHistorySheet({ open, onOpenChange, document: versionHistoryDoc, onSendEmail }: VersionHistorySheetProps) {
   const { data: versionHistory = [], isLoading } = useQuery<Document[]>({
     queryKey: [DOCUMENT_ROUTES.VERSIONS(versionHistoryDoc?.id || "")],
     enabled: !!versionHistoryDoc?.id && open,
@@ -88,25 +91,52 @@ export function VersionHistorySheet({ open, onOpenChange, document: versionHisto
                         )}
                       </div>
                       <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => window.open(DOCUMENT_ROUTES.VIEW(version.id), "_blank")}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            const link = document.createElement("a");
-                            link.href = DOCUMENT_ROUTES.DOWNLOAD(version.id);
-                            link.download = version.originalName;
-                            link.click();
-                          }}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => window.open(DOCUMENT_ROUTES.VIEW(version.id), "_blank")}
+                              data-testid={`button-view-version-${version.id}`}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => {
+                                const link = document.createElement("a");
+                                link.href = DOCUMENT_ROUTES.DOWNLOAD(version.id);
+                                link.download = version.originalName;
+                                link.click();
+                              }}
+                              data-testid={`button-download-version-${version.id}`}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Download</TooltipContent>
+                        </Tooltip>
+                        {onSendEmail && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => onSendEmail(version)}
+                                data-testid={`button-email-version-${version.id}`}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Send via Email</TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                     </div>
                   </CardContent>

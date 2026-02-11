@@ -79,6 +79,7 @@ export default function DocumentRegister() {
 
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [versionEmailDocs, setVersionEmailDocs] = useState<DocumentWithDetails[]>([]);
 
   const [isOverlayDialogOpen, setIsOverlayDialogOpen] = useState(false);
 
@@ -293,7 +294,10 @@ export default function DocumentRegister() {
     });
   }, []);
 
-  const selectedDocuments = useMemo(() => documents.filter((d) => selectedDocIds.has(d.id)), [documents, selectedDocIds]);
+  const selectedDocuments = useMemo(() => {
+    if (versionEmailDocs.length > 0) return versionEmailDocs;
+    return documents.filter((d) => selectedDocIds.has(d.id));
+  }, [documents, selectedDocIds, versionEmailDocs]);
 
   const handleBundleCreated = useCallback((bundle: DocumentBundle) => {
     setCreatedBundle(bundle);
@@ -302,6 +306,12 @@ export default function DocumentRegister() {
 
   const handleEmailSuccess = useCallback(() => {
     setSelectedDocIds(new Set());
+    setVersionEmailDocs([]);
+  }, []);
+
+  const handleVersionSendEmail = useCallback((doc: any) => {
+    setVersionEmailDocs([doc as DocumentWithDetails]);
+    setIsEmailDialogOpen(true);
   }, []);
 
   const renderPagination = () => {
@@ -702,6 +712,7 @@ export default function DocumentRegister() {
           open={isVersionHistoryOpen}
           onOpenChange={setIsVersionHistoryOpen}
           document={versionHistoryDoc}
+          onSendEmail={handleVersionSendEmail}
         />
       )}
 
@@ -734,7 +745,10 @@ export default function DocumentRegister() {
       {isEmailDialogOpen && (
         <SendDocumentsEmailDialog
           open={isEmailDialogOpen}
-          onOpenChange={setIsEmailDialogOpen}
+          onOpenChange={(open) => {
+            setIsEmailDialogOpen(open);
+            if (!open) setVersionEmailDocs([]);
+          }}
           selectedDocuments={selectedDocuments}
           onSuccess={handleEmailSuccess}
         />
