@@ -189,13 +189,13 @@ app.use((req, res, next) => {
   next();
 });
 
-let dbReady = false;
+let appReady = false;
 
 app.get("/", (req, res, next) => {
-  if (req.headers.accept?.includes("text/html") || !req.headers.accept) {
+  if (appReady) {
     return next();
   }
-  res.json({ status: "ok", dbReady, timestamp: new Date().toISOString() });
+  res.status(200).send("<!DOCTYPE html><html><head><title>Loading</title></head><body><p>Application is starting...</p><script>setTimeout(()=>location.reload(),3000)</script></body></html>");
 });
 
 app.get("/api/admin/error-summary", (req, res) => {
@@ -314,7 +314,6 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
       await seedDatabase();
       await ensureSystemChecklistModules();
       await seedHelpEntries();
-      dbReady = true;
       logger.info("Database initialization complete");
     }
   } catch (err) {
@@ -348,4 +347,7 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
     const { setupVite } = await import("./vite");
     await setupVite(httpServer, app);
   }
+
+  appReady = true;
+  logger.info("Application fully initialized and ready");
 })();
