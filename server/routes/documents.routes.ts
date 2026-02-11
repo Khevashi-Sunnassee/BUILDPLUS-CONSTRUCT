@@ -76,6 +76,18 @@ const upload = multer({
   },
 });
 
+const bulkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_DOCUMENT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type ${file.mimetype} not allowed`));
+    }
+  },
+});
+
 // ==================== DOCUMENT TYPES ====================
 
 router.get("/api/document-types", requireAuth, async (req, res) => {
@@ -1442,6 +1454,242 @@ Based on the file information, version numbers, and typical construction/enginee
   } catch (error: unknown) {
     logger.error({ err: error }, "Error analyzing document version changes");
     res.status(500).json({ error: "Failed to analyze document changes", summary: "" });
+  }
+});
+
+// ==================== AI FILE METADATA EXTRACTION ====================
+
+router.post("/api/documents/extract-metadata", requireAuth, bulkUpload.array("files", 50), async (req: Request, res: Response) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "No files provided" });
+    }
+
+    const results = await Promise.all(
+      files.map(async (file) => {
+        try {
+          let fileContentHint = "";
+
+          if (file.mimetype === "application/pdf") {
+            const textChunk = file.buffer.toString("utf-8", 0, Math.min(file.buffer.length, 4000));
+            const printable = textChunk.replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
+            if (printable.length > 50) {
+              fileContentHint = `\nExtracted text from PDF (partial): "${printable.substring(0, 2000)}"`;
+            }
+          } else if (
+            file.mimetype.startsWith("text/") ||
+            file.mimetype === "application/json" ||
+            file.mimetype === "application/xml" ||
+            file.mimetype === "application/rtf"
+          ) {
+            const textContent = file.buffer.toString("utf-8", 0, Math.min(file.buffer.length, 3000));
+            fileContentHint = `\nFile text content (partial): "${textContent.substring(0, 2000)}"`;
+          }
+
+          const prompt = `You are a document management assistant for a construction/precast manufacturing company. Analyze this file and extract metadata.
+
+File name: "${file.originalname}"
+File type: ${file.mimetype}
+File size: ${file.size} bytes
+${fileContentHint}
+
+Extract the following information from the file name and any available content. Use construction/engineering document naming conventions:
+
+1. **Title**: A clean, professional document title. Remove file extensions, prefixes like rev/version numbers. If the filename contains a meaningful title, use it. Otherwise generate one based on the content/filename.
+2. **Document Number**: Look for patterns like "DOC-001", "DWG-A-001", "XX-YYY-NNN", alphanumeric codes at the start of filenames, or any structured numbering. Return empty string if none found.
+3. **Revision**: Look for revision indicators like "Rev A", "R1", "RevB", "-A", "v2", etc. in the filename or content. Return empty string if none found.
+4. **Version**: A numeric version like "1.0", "2.0". Default to "1.0" if not identifiable.
+
+Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
+{"title": "...", "documentNumber": "...", "revision": "...", "version": "1.0"}`;
+
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: "You are a metadata extraction assistant. Always respond with valid JSON only, no markdown formatting or code blocks."
+              },
+              { role: "user", content: prompt }
+            ],
+            max_completion_tokens: 200,
+          });
+
+          const rawResponse = completion.choices[0]?.message?.content?.trim() || "";
+          const jsonStr = rawResponse.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            return {
+              fileName: file.originalname,
+              title: parsed.title || file.originalname.replace(/\.[^/.]+$/, ""),
+              documentNumber: parsed.documentNumber || "",
+              revision: parsed.revision || "",
+              version: parsed.version || "1.0",
+              success: true,
+            };
+          } catch {
+            return {
+              fileName: file.originalname,
+              title: file.originalname.replace(/\.[^/.]+$/, ""),
+              documentNumber: "",
+              revision: "",
+              version: "1.0",
+              success: false,
+            };
+          }
+        } catch (aiError) {
+          logger.warn({ err: aiError, fileName: file.originalname }, "AI metadata extraction failed for file");
+          return {
+            fileName: file.originalname,
+            title: file.originalname.replace(/\.[^/.]+$/, ""),
+            documentNumber: "",
+            revision: "",
+            version: "1.0",
+            success: false,
+          };
+        }
+      })
+    );
+
+    res.json({ results });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error extracting metadata from files");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to extract metadata" });
+  }
+});
+
+// ==================== BULK DOCUMENT UPLOAD ====================
+
+router.post("/api/documents/bulk-upload", requireAuth, bulkUpload.array("files", 50), async (req: Request, res: Response) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ error: "No files provided" });
+    }
+
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company context required" });
+    }
+
+    const metadataStr = req.body.metadata;
+    let fileMetadata: Array<{
+      fileName: string;
+      title: string;
+      documentNumber: string;
+      revision: string;
+      version: string;
+    }> = [];
+
+    try {
+      fileMetadata = JSON.parse(metadataStr || "[]");
+    } catch {
+      return res.status(400).json({ error: "Invalid metadata format" });
+    }
+
+    const { typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential } = req.body;
+
+    if (jobId) {
+      const user = await storage.getUser(req.session.userId!);
+      if (user && user.role !== "ADMIN" && user.role !== "MANAGER") {
+        const memberships = await db.select({ jobId: jobMembers.jobId })
+          .from(jobMembers)
+          .where(eq(jobMembers.userId, req.session.userId!));
+        const allowedJobIds = memberships.map(m => m.jobId);
+        if (!allowedJobIds.includes(jobId)) {
+          return res.status(403).json({ error: "You do not have access to the selected job" });
+        }
+      }
+    }
+
+    const uploaded: any[] = [];
+    const errors: Array<{ fileName: string; error: string }> = [];
+
+    for (const file of files) {
+      try {
+        const meta = fileMetadata.find(m => m.fileName === file.originalname) || {
+          fileName: file.originalname,
+          title: file.originalname.replace(/\.[^/.]+$/, ""),
+          documentNumber: "",
+          revision: "A",
+          version: "1.0",
+        };
+
+        if (!meta.title || meta.title.trim().length === 0) {
+          meta.title = file.originalname.replace(/\.[^/.]+$/, "");
+        }
+
+        const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+        const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+
+        const uploadResponse = await fetch(uploadURL, {
+          method: "PUT",
+          body: file.buffer,
+          headers: { "Content-Type": file.mimetype },
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error("Failed to upload file to storage");
+        }
+
+        await objectStorageService.trySetObjectEntityAclPolicy(objectPath, {
+          owner: req.session.userId!,
+          visibility: "private",
+        });
+
+        const fileSha256 = crypto.createHash("sha256").update(file.buffer).digest("hex");
+
+        let documentNumber = meta.documentNumber || undefined;
+        if (!documentNumber && typeId) {
+          documentNumber = await storage.getNextDocumentNumber(typeId);
+        }
+
+        const document = await storage.createDocument({
+          companyId,
+          title: meta.title,
+          description: null,
+          fileName: `${Date.now()}-${file.originalname}`,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          storageKey: objectPath,
+          fileSha256,
+          documentNumber,
+          revision: meta.revision || "A",
+          version: meta.version || "1.0",
+          typeId: typeId || null,
+          disciplineId: disciplineId || null,
+          categoryId: categoryId || null,
+          documentTypeStatusId: documentTypeStatusId || null,
+          jobId: jobId || null,
+          panelId: panelId || null,
+          supplierId: supplierId || null,
+          purchaseOrderId: purchaseOrderId || null,
+          taskId: taskId || null,
+          tags: tags || null,
+          isConfidential: isConfidential === "true",
+          uploadedBy: req.session.userId!,
+          status: "DRAFT",
+          isLatestVersion: true,
+        });
+
+        uploaded.push(document);
+      } catch (fileError: unknown) {
+        logger.error({ err: fileError, fileName: file.originalname }, "Error uploading file in bulk");
+        errors.push({
+          fileName: file.originalname,
+          error: fileError instanceof Error ? fileError.message : "Upload failed",
+        });
+      }
+    }
+
+    logger.info({ uploadedCount: uploaded.length, errorCount: errors.length }, "Bulk upload completed");
+    res.json({ uploaded, errors, total: files.length });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error in bulk document upload");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to process bulk upload" });
   }
 });
 

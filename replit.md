@@ -23,7 +23,7 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
 - **Financial & Logistics:** Configurable rates, cost analysis, production tracking, and a logistics system for load list creation and delivery recording.
 - **Scheduling:** Drafting and procurement scheduling linked to production slots, supporting multi-factory operations and CFMEU calendars.
 - **Communication:** A Teams-style chat system with direct messages, groups, channels, @mentions, notifications, file attachments, and message topics.
-- **Sales & Document Management:** Mobile-first pre-sales opportunity management with a sales pipeline, and a comprehensive document management system with version control, bundles, and entity linking.
+- **Sales & Document Management:** Mobile-first pre-sales opportunity management with a sales pipeline, and a comprehensive document management system with version control, bundles, entity linking, and bulk upload with AI metadata extraction (title, document number, revision, version from file content/names).
 - **Photo Gallery:** A visual gallery for images with search, filtering, grouping, full-screen viewing, multi-select with email, and download functionalities.
 - **Mobile Functionality:** QR scanner for panels and document bundles, mobile panel checklists with conditional fields, and mobile PM Call Logs.
 - **Advanced Features:** Panel consolidation, contract retention tracking with automated deductions, and visual document comparison with pixel-level overlay and AI summarization.

@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Layers,
   Mail,
+  Files,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ import { NewVersionDialog } from "./NewVersionDialog";
 import { VersionHistorySheet } from "./VersionHistorySheet";
 import { CreateBundleDialog, BundleViewDialog, BundlesListDialog } from "./BundleDialogs";
 import { VisualComparisonDialog } from "./VisualComparisonDialog";
+import { BulkUploadDialog } from "./BulkUploadDialog";
 import { DocumentTable } from "./DocumentTable";
 
 export default function DocumentRegister() {
@@ -65,6 +67,7 @@ export default function DocumentRegister() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false);
   const [selectedDocumentForVersion, setSelectedDocumentForVersion] = useState<DocumentWithDetails | null>(null);
 
@@ -417,6 +420,10 @@ export default function DocumentRegister() {
             <QrCode className="h-4 w-4 mr-2" />
             Create Bundle{selectedDocIds.size > 0 ? ` (${selectedDocIds.size})` : ""}
           </Button>
+          <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)} data-testid="button-bulk-upload">
+            <Files className="h-4 w-4 mr-2" />
+            Add Multiple
+          </Button>
           <Button onClick={() => setIsUploadOpen(true)} data-testid="button-upload-document">
             <Upload className="h-4 w-4 mr-2" />
             Upload Document
@@ -696,6 +703,13 @@ export default function DocumentRegister() {
         <UploadDocumentDialog
           open={isUploadOpen}
           onOpenChange={setIsUploadOpen}
+        />
+      )}
+
+      {isBulkUploadOpen && (
+        <BulkUploadDialog
+          open={isBulkUploadOpen}
+          onOpenChange={setIsBulkUploadOpen}
         />
       )}
 
