@@ -591,7 +591,7 @@ export default function HireBookingsPage() {
                   const overdue = isOverdue(booking);
                   const returnDate = booking.expectedReturnDate || booking.hireEndDate;
                   return (
-                    <TableRow key={booking.id} className="hover-elevate" data-testid={`row-hire-${booking.id}`}>
+                    <TableRow key={booking.id} className={`hover-elevate ${overdue ? "bg-red-500/15 dark:bg-red-500/20" : ""}`} data-testid={`row-hire-${booking.id}`}>
                       <TableCell className="font-mono font-medium" data-testid={`text-booking-number-${booking.id}`}>
                         {booking.bookingNumber}
                       </TableCell>
