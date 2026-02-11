@@ -25,6 +25,10 @@ export const progressClaimStatusEnum = pgEnum("progress_claim_status", ["DRAFT",
 
 export const capexStatusEnum = pgEnum("capex_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WITHDRAWN"]);
 
+export const tenderStatusEnum = pgEnum("tender_status", ["DRAFT", "OPEN", "UNDER_REVIEW", "APPROVED", "CLOSED", "CANCELLED"]);
+export const tenderSubmissionStatusEnum = pgEnum("tender_submission_status", ["SUBMITTED", "REVISED", "APPROVED", "REJECTED"]);
+export const boqUnitEnum = pgEnum("boq_unit", ["EA", "SQM", "M3", "LM", "M2", "M", "HR", "DAY", "TONNE", "KG", "LOT"]);
+
 export const hireStatusEnum = pgEnum("hire_status", ["DRAFT", "REQUESTED", "APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CANCELLED", "CLOSED"]);
 export const hireRateTypeEnum = pgEnum("hire_rate_type", ["day", "week", "month", "custom"]);
 export const hireChargeRuleEnum = pgEnum("hire_charge_rule", ["calendar_days", "business_days", "minimum_days"]);
@@ -194,6 +198,9 @@ export const FUNCTION_KEYS = [
   "admin_work_types",
   "admin_trailer_types",
   "admin_data_management",
+  "admin_cost_codes",
+  "tenders",
+  "budgets",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -3950,3 +3957,339 @@ export const assetRepairRequests = pgTable("asset_repair_requests", {
 export const insertAssetRepairRequestSchema = createInsertSchema(assetRepairRequests).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertAssetRepairRequest = z.infer<typeof insertAssetRepairRequestSchema>;
 export type AssetRepairRequest = typeof assetRepairRequests.$inferSelect;
+
+// ============================================================
+// BUDGET SYSTEM - Cost Codes, Tenders, Budgets, BOQ
+// ============================================================
+
+// Cost Codes - hierarchical parent/child structure
+export const costCodes = pgTable("cost_codes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  parentId: varchar("parent_id", { length: 36 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("cost_codes_company_idx").on(table.companyId),
+  parentIdx: index("cost_codes_parent_idx").on(table.parentId),
+  codeCompanyIdx: uniqueIndex("cost_codes_code_company_idx").on(table.code, table.companyId),
+}));
+
+// Default cost codes per job type
+export const costCodeDefaults = pgTable("cost_code_defaults", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobTypeId: varchar("job_type_id", { length: 36 }).notNull().references(() => jobTypes.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobTypeIdx: index("cost_code_defaults_job_type_idx").on(table.jobTypeId),
+  costCodeIdx: index("cost_code_defaults_cost_code_idx").on(table.costCodeId),
+  uniqueDefault: uniqueIndex("cost_code_defaults_unique_idx").on(table.jobTypeId, table.costCodeId),
+}));
+
+// Per-job cost codes (inherited from defaults, can be customized)
+export const jobCostCodes = pgTable("job_cost_codes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id, { onDelete: "cascade" }),
+  isDisabled: boolean("is_disabled").default(false).notNull(),
+  customName: text("custom_name"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("job_cost_codes_job_idx").on(table.jobId),
+  costCodeIdx: index("job_cost_codes_cost_code_idx").on(table.costCodeId),
+  uniqueJobCode: uniqueIndex("job_cost_codes_unique_idx").on(table.jobId, table.costCodeId),
+}));
+
+// Tenders - per job, can have multiple
+export const tenders = pgTable("tenders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  tenderNumber: text("tender_number").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: tenderStatusEnum("status").default("DRAFT").notNull(),
+  dueDate: timestamp("due_date"),
+  issuedAt: timestamp("issued_at"),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("tenders_company_idx").on(table.companyId),
+  jobIdx: index("tenders_job_idx").on(table.jobId),
+  statusIdx: index("tenders_status_idx").on(table.status),
+  tenderNumberCompanyIdx: uniqueIndex("tenders_number_company_idx").on(table.tenderNumber, table.companyId),
+}));
+
+// Tender document packages - links tenders to document bundles
+export const tenderPackages = pgTable("tender_packages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderId: varchar("tender_id", { length: 36 }).notNull().references(() => tenders.id, { onDelete: "cascade" }),
+  bundleId: varchar("bundle_id", { length: 36 }).references(() => documentBundles.id),
+  documentId: varchar("document_id", { length: 36 }).references(() => documents.id),
+  name: text("name"),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tenderIdx: index("tender_packages_tender_idx").on(table.tenderId),
+  bundleIdx: index("tender_packages_bundle_idx").on(table.bundleId),
+  documentIdx: index("tender_packages_document_idx").on(table.documentId),
+}));
+
+// Tender submissions from suppliers
+export const tenderSubmissions = pgTable("tender_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderId: varchar("tender_id", { length: 36 }).notNull().references(() => tenders.id, { onDelete: "cascade" }),
+  supplierId: varchar("supplier_id", { length: 36 }).notNull().references(() => suppliers.id),
+  status: tenderSubmissionStatusEnum("status").default("SUBMITTED").notNull(),
+  coverNote: text("cover_note"),
+  subtotal: decimal("subtotal", { precision: 14, scale: 2 }).default("0"),
+  taxAmount: decimal("tax_amount", { precision: 14, scale: 2 }).default("0"),
+  totalPrice: decimal("total_price", { precision: 14, scale: 2 }).default("0"),
+  submittedAt: timestamp("submitted_at"),
+  approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  tenderIdx: index("tender_submissions_tender_idx").on(table.tenderId),
+  supplierIdx: index("tender_submissions_supplier_idx").on(table.supplierId),
+  statusIdx: index("tender_submissions_status_idx").on(table.status),
+  companyIdx: index("tender_submissions_company_idx").on(table.companyId),
+}));
+
+// Tender submission line items linked to cost codes
+export const tenderLineItems = pgTable("tender_line_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderSubmissionId: varchar("tender_submission_id", { length: 36 }).notNull().references(() => tenderSubmissions.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).references(() => costCodes.id),
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).default("1"),
+  unit: text("unit").default("EA"),
+  unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).default("0"),
+  lineTotal: decimal("line_total", { precision: 14, scale: 2 }).default("0"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  submissionIdx: index("tender_line_items_submission_idx").on(table.tenderSubmissionId),
+  costCodeIdx: index("tender_line_items_cost_code_idx").on(table.costCodeId),
+}));
+
+// Activities on tender line items (like tasks)
+export const tenderLineActivities = pgTable("tender_line_activities", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  lineItemId: varchar("line_item_id", { length: 36 }).notNull().references(() => tenderLineItems.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").default("PENDING"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  lineItemIdx: index("tender_line_activities_line_idx").on(table.lineItemId),
+}));
+
+// Files on tender line items
+export const tenderLineFiles = pgTable("tender_line_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  lineItemId: varchar("line_item_id", { length: 36 }).notNull().references(() => tenderLineItems.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id", { length: 36 }).references(() => documents.id),
+  fileName: text("file_name"),
+  filePath: text("file_path"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  lineItemIdx: index("tender_line_files_line_idx").on(table.lineItemId),
+}));
+
+// Risks on tender line items
+export const tenderLineRisks = pgTable("tender_line_risks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  lineItemId: varchar("line_item_id", { length: 36 }).notNull().references(() => tenderLineItems.id, { onDelete: "cascade" }),
+  riskTitle: text("risk_title").notNull(),
+  description: text("description"),
+  mitigation: text("mitigation"),
+  severity: text("severity").default("MEDIUM"),
+  likelihood: text("likelihood").default("MEDIUM"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  lineItemIdx: index("tender_line_risks_line_idx").on(table.lineItemId),
+}));
+
+// Job budgets - top-level budget per job
+export const jobBudgets = pgTable("job_budgets", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  estimatedTotalBudget: decimal("estimated_total_budget", { precision: 14, scale: 2 }).default("0"),
+  profitTargetPercent: decimal("profit_target_percent", { precision: 5, scale: 2 }).default("0"),
+  customerPrice: decimal("customer_price", { precision: 14, scale: 2 }).default("0"),
+  notes: text("notes"),
+  createdById: varchar("created_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("job_budgets_company_idx").on(table.companyId),
+  jobIdx: uniqueIndex("job_budgets_job_idx").on(table.jobId),
+}));
+
+// Budget line items per cost code
+export const budgetLines = pgTable("budget_lines", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  budgetId: varchar("budget_id", { length: 36 }).notNull().references(() => jobBudgets.id, { onDelete: "cascade" }),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id),
+  estimatedBudget: decimal("estimated_budget", { precision: 14, scale: 2 }).default("0"),
+  selectedTenderSubmissionId: varchar("selected_tender_submission_id", { length: 36 }).references(() => tenderSubmissions.id),
+  selectedContractorId: varchar("selected_contractor_id", { length: 36 }).references(() => suppliers.id),
+  variationsAmount: decimal("variations_amount", { precision: 14, scale: 2 }).default("0"),
+  forecastCost: decimal("forecast_cost", { precision: 14, scale: 2 }).default("0"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  budgetIdx: index("budget_lines_budget_idx").on(table.budgetId),
+  jobIdx: index("budget_lines_job_idx").on(table.jobId),
+  costCodeIdx: index("budget_lines_cost_code_idx").on(table.costCodeId),
+  uniqueLineIdx: uniqueIndex("budget_lines_unique_idx").on(table.budgetId, table.costCodeId),
+}));
+
+// Files attached to budget lines
+export const budgetLineFiles = pgTable("budget_line_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  budgetLineId: varchar("budget_line_id", { length: 36 }).notNull().references(() => budgetLines.id, { onDelete: "cascade" }),
+  documentId: varchar("document_id", { length: 36 }).references(() => documents.id),
+  fileName: text("file_name"),
+  filePath: text("file_path"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  budgetLineIdx: index("budget_line_files_line_idx").on(table.budgetLineId),
+}));
+
+// BOQ Groups (buildings, levels, etc.) under cost subcodes
+export const boqGroups = pgTable("boq_groups", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id),
+  budgetLineId: varchar("budget_line_id", { length: 36 }).references(() => budgetLines.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("boq_groups_job_idx").on(table.jobId),
+  costCodeIdx: index("boq_groups_cost_code_idx").on(table.costCodeId),
+  budgetLineIdx: index("boq_groups_budget_line_idx").on(table.budgetLineId),
+}));
+
+// BOQ Items with quantity, unit, pricing
+export const boqItems = pgTable("boq_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id),
+  groupId: varchar("group_id", { length: 36 }).references(() => boqGroups.id, { onDelete: "cascade" }),
+  budgetLineId: varchar("budget_line_id", { length: 36 }).references(() => budgetLines.id, { onDelete: "cascade" }),
+  tenderLineItemId: varchar("tender_line_item_id", { length: 36 }).references(() => tenderLineItems.id),
+  itemId: varchar("item_id", { length: 36 }).references(() => items.id),
+  description: text("description").notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).default("0"),
+  unit: boqUnitEnum("unit").default("EA").notNull(),
+  unitPrice: decimal("unit_price", { precision: 14, scale: 2 }).default("0"),
+  lineTotal: decimal("line_total", { precision: 14, scale: 2 }).default("0"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("boq_items_job_idx").on(table.jobId),
+  costCodeIdx: index("boq_items_cost_code_idx").on(table.costCodeId),
+  groupIdx: index("boq_items_group_idx").on(table.groupId),
+  budgetLineIdx: index("boq_items_budget_line_idx").on(table.budgetLineId),
+  tenderLineIdx: index("boq_items_tender_line_idx").on(table.tenderLineItemId),
+}));
+
+// Insert schemas and types for Budget System
+export const insertCostCodeSchema = createInsertSchema(costCodes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertCostCode = z.infer<typeof insertCostCodeSchema>;
+export type CostCode = typeof costCodes.$inferSelect;
+
+export const insertCostCodeDefaultSchema = createInsertSchema(costCodeDefaults).omit({ id: true, createdAt: true });
+export type InsertCostCodeDefault = z.infer<typeof insertCostCodeDefaultSchema>;
+export type CostCodeDefault = typeof costCodeDefaults.$inferSelect;
+
+export const insertJobCostCodeSchema = createInsertSchema(jobCostCodes).omit({ id: true, createdAt: true });
+export type InsertJobCostCode = z.infer<typeof insertJobCostCodeSchema>;
+export type JobCostCode = typeof jobCostCodes.$inferSelect;
+
+export const insertTenderSchema = createInsertSchema(tenders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTender = z.infer<typeof insertTenderSchema>;
+export type Tender = typeof tenders.$inferSelect;
+
+export const insertTenderPackageSchema = createInsertSchema(tenderPackages).omit({ id: true, createdAt: true });
+export type InsertTenderPackage = z.infer<typeof insertTenderPackageSchema>;
+export type TenderPackage = typeof tenderPackages.$inferSelect;
+
+export const insertTenderSubmissionSchema = createInsertSchema(tenderSubmissions).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTenderSubmission = z.infer<typeof insertTenderSubmissionSchema>;
+export type TenderSubmission = typeof tenderSubmissions.$inferSelect;
+
+export const insertTenderLineItemSchema = createInsertSchema(tenderLineItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTenderLineItem = z.infer<typeof insertTenderLineItemSchema>;
+export type TenderLineItem = typeof tenderLineItems.$inferSelect;
+
+export const insertTenderLineActivitySchema = createInsertSchema(tenderLineActivities).omit({ id: true, createdAt: true });
+export type InsertTenderLineActivity = z.infer<typeof insertTenderLineActivitySchema>;
+export type TenderLineActivity = typeof tenderLineActivities.$inferSelect;
+
+export const insertTenderLineFileSchema = createInsertSchema(tenderLineFiles).omit({ id: true, createdAt: true });
+export type InsertTenderLineFile = z.infer<typeof insertTenderLineFileSchema>;
+export type TenderLineFile = typeof tenderLineFiles.$inferSelect;
+
+export const insertTenderLineRiskSchema = createInsertSchema(tenderLineRisks).omit({ id: true, createdAt: true });
+export type InsertTenderLineRisk = z.infer<typeof insertTenderLineRiskSchema>;
+export type TenderLineRisk = typeof tenderLineRisks.$inferSelect;
+
+export const insertJobBudgetSchema = createInsertSchema(jobBudgets).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJobBudget = z.infer<typeof insertJobBudgetSchema>;
+export type JobBudget = typeof jobBudgets.$inferSelect;
+
+export const insertBudgetLineSchema = createInsertSchema(budgetLines).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudgetLine = z.infer<typeof insertBudgetLineSchema>;
+export type BudgetLine = typeof budgetLines.$inferSelect;
+
+export const insertBudgetLineFileSchema = createInsertSchema(budgetLineFiles).omit({ id: true, createdAt: true });
+export type InsertBudgetLineFile = z.infer<typeof insertBudgetLineFileSchema>;
+export type BudgetLineFile = typeof budgetLineFiles.$inferSelect;
+
+export const insertBoqGroupSchema = createInsertSchema(boqGroups).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBoqGroup = z.infer<typeof insertBoqGroupSchema>;
+export type BoqGroup = typeof boqGroups.$inferSelect;
+
+export const insertBoqItemSchema = createInsertSchema(boqItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBoqItem = z.infer<typeof insertBoqItemSchema>;
+export type BoqItem = typeof boqItems.$inferSelect;
