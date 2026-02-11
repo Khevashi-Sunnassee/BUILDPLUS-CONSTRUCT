@@ -42,17 +42,17 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronRight,
   Loader2, Calendar, Clock, User, FileText, Layers, ListPlus, Download, Upload, Link2,
-  CheckSquare,
+  CheckSquare, Search,
 } from "lucide-react";
-import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
-import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate } from "@shared/schema";
+import { PROJECT_ACTIVITIES_ROUTES, CHECKLIST_ROUTES } from "@shared/api-routes";
+import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate, ChecklistTemplate } from "@shared/schema";
 
 import { STAGE_COLORS, getStageColor } from "@/lib/stage-colors";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
 type TemplateWithSubtasks = ActivityTemplate & {
   subtasks: Array<{ id: string; name: string; estimatedDays: number | null; sortOrder: number }>;
-  checklists: Array<{ id: string; name: string; estimatedDays: number; sortOrder: number }>;
+  checklists: Array<{ id: string; name: string; estimatedDays: number; sortOrder: number; checklistTemplateRefId?: string | null }>;
 };
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
@@ -213,16 +213,18 @@ function SortableActivity({
         <div className="ml-8 space-y-1">
           <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1">
             <CheckSquare className="h-3 w-3" />
-            Checklist
+            Linked Checklists
           </span>
           {template.checklists.map((item) => (
             <div key={item.id} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-accent/30 text-sm border border-accent/50">
               <span className="flex items-center gap-2">
-                <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
                 {item.name}
               </span>
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">{item.estimatedDays}d</span>
+                {item.checklistTemplateRefId && (
+                  <Badge variant="secondary" className="text-xs">Template</Badge>
+                )}
                 <Button
                   size="icon"
                   variant="ghost"
@@ -260,8 +262,8 @@ export default function WorkflowBuilderPage() {
 
   const [showChecklistDialog, setShowChecklistDialog] = useState(false);
   const [checklistParentId, setChecklistParentId] = useState<string>("");
-  const [checklistName, setChecklistName] = useState("");
-  const [checklistDays, setChecklistDays] = useState<number>(1);
+  const [selectedChecklistTemplateId, setSelectedChecklistTemplateId] = useState<string>("");
+  const [checklistSearch, setChecklistSearch] = useState("");
 
   const [formStageId, setFormStageId] = useState("");
   const [formCategory, setFormCategory] = useState("");
@@ -292,6 +294,16 @@ export default function WorkflowBuilderPage() {
   const { data: consultants } = useQuery<ActivityConsultant[]>({
     queryKey: [PROJECT_ACTIVITIES_ROUTES.CONSULTANTS],
   });
+
+  const { data: checklistTemplatesList = [] } = useQuery<ChecklistTemplate[]>({
+    queryKey: [CHECKLIST_ROUTES.TEMPLATES],
+  });
+
+  const filteredChecklistTemplates = useMemo(() => {
+    if (!checklistSearch.trim()) return checklistTemplatesList.filter(t => t.isActive);
+    const term = checklistSearch.toLowerCase();
+    return checklistTemplatesList.filter(t => t.isActive && t.name.toLowerCase().includes(term));
+  }, [checklistTemplatesList, checklistSearch]);
 
   const JOB_PHASES = ["OPPORTUNITY", "QUOTING", "WON_AWAITING_CONTRACT", "CONTRACTED", "LOST"];
 
@@ -410,15 +422,15 @@ export default function WorkflowBuilderPage() {
   });
 
   const createChecklistMutation = useMutation({
-    mutationFn: async ({ templateId, ...data }: { templateId: string; name: string; estimatedDays: number }) => {
+    mutationFn: async ({ templateId, ...data }: { templateId: string; name: string; estimatedDays: number; checklistTemplateRefId?: string | null }) => {
       return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.TEMPLATE_CHECKLISTS(templateId), data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
-      toast({ title: "Checklist item added" });
+      toast({ title: "Checklist template linked" });
       setShowChecklistDialog(false);
-      setChecklistName("");
-      setChecklistDays(1);
+      setSelectedChecklistTemplateId("");
+      setChecklistSearch("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -742,8 +754,8 @@ export default function WorkflowBuilderPage() {
                               onDeleteSubtask={(id) => deleteSubtaskMutation.mutate(id)}
                               onAddChecklist={(templateId) => {
                                 setChecklistParentId(templateId);
-                                setChecklistName("");
-                                setChecklistDays(1);
+                                setSelectedChecklistTemplateId("");
+                                setChecklistSearch("");
                                 setShowChecklistDialog(true);
                               }}
                               onDeleteChecklist={(id) => deleteChecklistMutation.mutate(id)}
@@ -981,61 +993,83 @@ export default function WorkflowBuilderPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showChecklistDialog} onOpenChange={(open) => { if (!open) setShowChecklistDialog(false); }}>
-        <DialogContent>
+      <Dialog open={showChecklistDialog} onOpenChange={(open) => { if (!open) { setShowChecklistDialog(false); setChecklistSearch(""); setSelectedChecklistTemplateId(""); } }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Checklist Item</DialogTitle>
-            <DialogDescription>Add a checklist item that must be completed before this activity stage is done.</DialogDescription>
+            <DialogTitle>Link Checklist Template</DialogTitle>
+            <DialogDescription>Select a checklist template to link to this activity. Templates are managed in Admin &gt; Checklist Templates.</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Checklist Item</Label>
+          <div className="space-y-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                value={checklistName}
-                onChange={(e) => setChecklistName(e.target.value)}
-                placeholder="e.g. Client sign-off received"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && checklistName.trim()) {
-                    createChecklistMutation.mutate({
-                      templateId: checklistParentId,
-                      name: checklistName.trim(),
-                      estimatedDays: checklistDays,
-                    });
-                  }
-                }}
-                data-testid="input-checklist-name"
+                value={checklistSearch}
+                onChange={(e) => setChecklistSearch(e.target.value)}
+                placeholder="Search checklist templates..."
+                className="pl-9"
+                data-testid="input-checklist-search"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Estimated Days</Label>
-              <Input
-                type="number"
-                min={1}
-                value={checklistDays}
-                onChange={(e) => setChecklistDays(parseInt(e.target.value) || 1)}
-                data-testid="input-checklist-days"
-              />
+            <div className="border rounded-md max-h-64 overflow-y-auto">
+              {filteredChecklistTemplates.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  {checklistTemplatesList.length === 0 ? "No checklist templates found. Create them in Admin > Checklist Templates." : "No templates match your search."}
+                </div>
+              ) : (
+                filteredChecklistTemplates.map((ct) => {
+                  const isAlreadyLinked = templates?.some(t => t.checklists?.some(c => c.checklistTemplateRefId === ct.id));
+                  return (
+                    <button
+                      key={ct.id}
+                      type="button"
+                      className={`w-full text-left px-3 py-2.5 border-b last:border-b-0 flex items-center justify-between gap-2 transition-colors ${
+                        selectedChecklistTemplateId === ct.id
+                          ? "bg-primary/10"
+                          : "hover-elevate"
+                      } ${isAlreadyLinked ? "opacity-50" : ""}`}
+                      onClick={() => setSelectedChecklistTemplateId(ct.id)}
+                      data-testid={`checklist-template-option-${ct.id}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{ct.name}</div>
+                        {ct.description && (
+                          <div className="text-xs text-muted-foreground truncate mt-0.5">{ct.description}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isAlreadyLinked && <Badge variant="secondary" className="text-xs">Already linked</Badge>}
+                        {selectedChecklistTemplateId === ct.id && (
+                          <CheckSquare className="h-4 w-4 text-primary" />
+                        )}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowChecklistDialog(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setShowChecklistDialog(false); setChecklistSearch(""); setSelectedChecklistTemplateId(""); }}>Cancel</Button>
             <Button
               onClick={() => {
-                if (!checklistName.trim()) {
-                  toast({ title: "Checklist item name is required", variant: "destructive" });
+                if (!selectedChecklistTemplateId) {
+                  toast({ title: "Please select a checklist template", variant: "destructive" });
                   return;
                 }
+                const selected = checklistTemplatesList.find(t => t.id === selectedChecklistTemplateId);
+                if (!selected) return;
                 createChecklistMutation.mutate({
                   templateId: checklistParentId,
-                  name: checklistName.trim(),
-                  estimatedDays: checklistDays,
+                  name: selected.name,
+                  estimatedDays: 1,
+                  checklistTemplateRefId: selected.id,
                 });
               }}
-              disabled={createChecklistMutation.isPending}
+              disabled={createChecklistMutation.isPending || !selectedChecklistTemplateId}
               data-testid="button-save-checklist"
             >
               {createChecklistMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Add Checklist Item
+              Link Template
             </Button>
           </DialogFooter>
         </DialogContent>
