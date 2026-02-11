@@ -137,6 +137,7 @@ export const PROCUREMENT_ROUTES = {
   // Suppliers
   SUPPLIERS: '/api/procurement/suppliers',
   SUPPLIERS_ACTIVE: '/api/procurement/suppliers/active',
+  SUPPLIERS_EQUIPMENT_HIRE: '/api/procurement/suppliers/equipment-hire',
   SUPPLIERS_TEMPLATE: '/api/procurement/suppliers/template',
   SUPPLIERS_IMPORT: '/api/procurement/suppliers/import',
   SUPPLIERS_EXPORT: '/api/procurement/suppliers/export',

@@ -26,6 +26,7 @@ const supplierSchema = z.object({
   paymentTerms: z.string().max(255).optional().nullable().or(z.literal("")),
   notes: z.string().max(5000).optional().nullable().or(z.literal("")),
   isActive: z.boolean().optional(),
+  isEquipmentHire: z.boolean().optional(),
 });
 
 const itemCategorySchema = z.object({
@@ -141,6 +142,18 @@ router.get("/api/procurement/suppliers/active", requireAuth, async (req, res) =>
     res.json(suppliersData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active suppliers");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
+  }
+});
+
+router.get("/api/procurement/suppliers/equipment-hire", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const suppliersData = await storage.getEquipmentHireSuppliers(companyId);
+    res.json(suppliersData);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching equipment hire suppliers");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch suppliers" });
   }
 });

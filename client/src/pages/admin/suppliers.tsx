@@ -92,6 +92,7 @@ const supplierSchema = z.object({
   paymentTerms: z.string().optional().or(z.literal("")),
   notes: z.string().optional().or(z.literal("")),
   isActive: z.boolean().default(true),
+  isEquipmentHire: z.boolean().default(false),
 });
 
 type SupplierFormData = z.infer<typeof supplierSchema>;
@@ -248,6 +249,7 @@ export default function AdminSuppliersPage() {
       paymentTerms: "",
       notes: "",
       isActive: true,
+      isEquipmentHire: false,
     },
   });
 
@@ -315,6 +317,7 @@ export default function AdminSuppliersPage() {
       paymentTerms: "",
       notes: "",
       isActive: true,
+      isEquipmentHire: false,
     });
     setDialogOpen(true);
   };
@@ -337,6 +340,7 @@ export default function AdminSuppliersPage() {
       paymentTerms: supplier.paymentTerms || "",
       notes: supplier.notes || "",
       isActive: supplier.isActive,
+      isEquipmentHire: supplier.isEquipmentHire,
     });
     setDialogOpen(true);
   };
@@ -455,9 +459,16 @@ export default function AdminSuppliersPage() {
                       {supplier.phone || "-"}
                     </TableCell>
                     <TableCell>
-                      <Badge variant={supplier.isActive ? "default" : "secondary"} data-testid={`badge-supplier-status-${supplier.id}`}>
-                        {supplier.isActive ? "Active" : "Inactive"}
-                      </Badge>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant={supplier.isActive ? "default" : "secondary"} data-testid={`badge-supplier-status-${supplier.id}`}>
+                          {supplier.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                        {supplier.isEquipmentHire && (
+                          <Badge variant="outline" data-testid={`badge-supplier-hire-${supplier.id}`}>
+                            Hire
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -735,6 +746,28 @@ export default function AdminSuppliersPage() {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         data-testid="switch-supplier-active"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="isEquipmentHire"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Equipment Hire</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        This supplier will appear in the Hire Booking form
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-supplier-equipment-hire"
                       />
                     </FormControl>
                   </FormItem>

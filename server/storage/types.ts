@@ -375,6 +375,7 @@ export interface IStorage {
 
   getAllSuppliers(): Promise<Supplier[]>;
   getActiveSuppliers(): Promise<Supplier[]>;
+  getEquipmentHireSuppliers(companyId: string): Promise<Supplier[]>;
   getSupplier(id: string): Promise<Supplier | undefined>;
   createSupplier(data: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: string, data: Partial<InsertSupplier>): Promise<Supplier | undefined>;

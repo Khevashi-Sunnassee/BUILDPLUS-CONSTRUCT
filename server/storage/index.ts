@@ -277,6 +277,7 @@ export class DatabaseStorage implements IStorage {
   deleteCustomer = procurementMethods.deleteCustomer;
   getAllSuppliers = procurementMethods.getAllSuppliers;
   getActiveSuppliers = procurementMethods.getActiveSuppliers;
+  getEquipmentHireSuppliers = procurementMethods.getEquipmentHireSuppliers;
   getSupplier = procurementMethods.getSupplier;
   createSupplier = procurementMethods.createSupplier;
   updateSupplier = procurementMethods.updateSupplier;

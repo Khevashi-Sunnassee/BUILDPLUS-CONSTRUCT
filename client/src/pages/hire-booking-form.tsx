@@ -121,7 +121,7 @@ export default function HireBookingFormPage() {
   });
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
-    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
+    queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_EQUIPMENT_HIRE],
   });
 
   const { data: jobsList = [] } = useQuery<Job[]>({

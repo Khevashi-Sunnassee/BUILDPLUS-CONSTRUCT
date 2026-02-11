@@ -101,6 +101,10 @@ export const procurementMethods = {
     return db.select().from(suppliers).where(eq(suppliers.isActive, true)).orderBy(asc(suppliers.name));
   },
 
+  async getEquipmentHireSuppliers(companyId: string): Promise<Supplier[]> {
+    return db.select().from(suppliers).where(and(eq(suppliers.companyId, companyId), eq(suppliers.isActive, true), eq(suppliers.isEquipmentHire, true))).orderBy(asc(suppliers.name));
+  },
+
   async getSupplier(id: string): Promise<Supplier | undefined> {
     const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
     return supplier;
