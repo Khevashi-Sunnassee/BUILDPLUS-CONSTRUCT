@@ -68,6 +68,7 @@ export default function HireBookingsPage() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [showGraphs, setShowGraphs] = useState(false);
   const [actionDialog, setActionDialog] = useState<{ type: string; booking: HireBookingWithDetails } | null>(null);
 
   const { data: bookings = [], isLoading } = useQuery<HireBookingWithDetails[]>({
@@ -260,7 +261,19 @@ export default function HireBookingsPage() {
       </div>
 
       {(dailyChartData.length > 0 || monthlyChartData.length > 0) && (
-        <div className="grid grid-cols-1 gap-4">
+        <div className="space-y-4">
+          <Button
+            variant={showGraphs ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowGraphs(!showGraphs)}
+            data-testid="button-toggle-graphs"
+          >
+            <BarChart3 className="h-4 w-4 mr-2" />
+            {showGraphs ? "Hide Graphs" : "View Graphs"}
+          </Button>
+
+          {showGraphs && (
+          <div className="grid grid-cols-1 gap-4">
           {dailyChartData.length > 0 && (
             <Card>
               <CardHeader className="pb-2">
@@ -330,6 +343,8 @@ export default function HireBookingsPage() {
                 </div>
               </CardContent>
             </Card>
+          )}
+        </div>
           )}
         </div>
       )}
