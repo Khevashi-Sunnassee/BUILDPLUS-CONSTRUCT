@@ -42,6 +42,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ArrowLeft, Plus, Pencil, Trash2, GripVertical, ChevronDown, ChevronRight,
   Loader2, Calendar, Clock, User, FileText, Layers, ListPlus, Download, Upload, Link2,
+  CheckSquare,
 } from "lucide-react";
 import { PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate } from "@shared/schema";
@@ -51,6 +52,7 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 
 type TemplateWithSubtasks = ActivityTemplate & {
   subtasks: Array<{ id: string; name: string; estimatedDays: number | null; sortOrder: number }>;
+  checklists: Array<{ id: string; name: string; estimatedDays: number; sortOrder: number }>;
 };
 
 const RELATIONSHIP_LABELS: Record<string, string> = {
@@ -67,6 +69,8 @@ function SortableActivity({
   onDelete,
   onAddSubtask,
   onDeleteSubtask,
+  onAddChecklist,
+  onDeleteChecklist,
   phaseColor,
 }: {
   template: TemplateWithSubtasks;
@@ -75,6 +79,8 @@ function SortableActivity({
   onDelete: (t: TemplateWithSubtasks) => void;
   onAddSubtask: (templateId: string) => void;
   onDeleteSubtask: (id: string) => void;
+  onAddChecklist: (templateId: string) => void;
+  onDeleteChecklist: (id: string) => void;
   phaseColor: (phase: string | null) => string;
 }) {
   const {
@@ -155,9 +161,19 @@ function SortableActivity({
             size="icon"
             variant="ghost"
             onClick={() => onAddSubtask(template.id)}
+            title="Add Subtask"
             data-testid={`button-add-subtask-${template.id}`}
           >
             <ListPlus className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onAddChecklist(template.id)}
+            title="Add Checklist"
+            data-testid={`button-add-checklist-${template.id}`}
+          >
+            <CheckSquare className="h-4 w-4" />
           </Button>
           <Button size="icon" variant="ghost" onClick={() => onEdit(template)} data-testid={`button-edit-template-${template.id}`}>
             <Pencil className="h-4 w-4" />
@@ -170,6 +186,7 @@ function SortableActivity({
 
       {template.subtasks && template.subtasks.length > 0 && (
         <div className="ml-8 space-y-1">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Subtasks</span>
           {template.subtasks.map((sub) => (
             <div key={sub.id} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-muted/50 text-sm">
               <span>{sub.name}</span>
@@ -183,6 +200,35 @@ function SortableActivity({
                   className="h-6 w-6"
                   onClick={() => onDeleteSubtask(sub.id)}
                   data-testid={`button-delete-subtask-${sub.id}`}
+                >
+                  <Trash2 className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {template.checklists && template.checklists.length > 0 && (
+        <div className="ml-8 space-y-1">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider flex items-center gap-1">
+            <CheckSquare className="h-3 w-3" />
+            Checklist
+          </span>
+          {template.checklists.map((item) => (
+            <div key={item.id} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-accent/30 text-sm border border-accent/50">
+              <span className="flex items-center gap-2">
+                <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />
+                {item.name}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground">{item.estimatedDays}d</span>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={() => onDeleteChecklist(item.id)}
+                  data-testid={`button-delete-checklist-${item.id}`}
                 >
                   <Trash2 className="h-3 w-3" />
                 </Button>
@@ -211,6 +257,11 @@ export default function WorkflowBuilderPage() {
   const [subtaskParentId, setSubtaskParentId] = useState<string>("");
   const [subtaskName, setSubtaskName] = useState("");
   const [subtaskDays, setSubtaskDays] = useState<number | undefined>();
+
+  const [showChecklistDialog, setShowChecklistDialog] = useState(false);
+  const [checklistParentId, setChecklistParentId] = useState<string>("");
+  const [checklistName, setChecklistName] = useState("");
+  const [checklistDays, setChecklistDays] = useState<number>(1);
 
   const [formStageId, setFormStageId] = useState("");
   const [formCategory, setFormCategory] = useState("");
@@ -355,6 +406,32 @@ export default function WorkflowBuilderPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
       toast({ title: "Subtask removed" });
+    },
+  });
+
+  const createChecklistMutation = useMutation({
+    mutationFn: async ({ templateId, ...data }: { templateId: string; name: string; estimatedDays: number }) => {
+      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.TEMPLATE_CHECKLISTS(templateId), data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
+      toast({ title: "Checklist item added" });
+      setShowChecklistDialog(false);
+      setChecklistName("");
+      setChecklistDays(1);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteChecklistMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", PROJECT_ACTIVITIES_ROUTES.TEMPLATE_CHECKLIST_BY_ID(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PROJECT_ACTIVITIES_ROUTES.TEMPLATES(jobTypeId)] });
+      toast({ title: "Checklist item removed" });
     },
   });
 
@@ -663,6 +740,13 @@ export default function WorkflowBuilderPage() {
                                 setShowSubtaskDialog(true);
                               }}
                               onDeleteSubtask={(id) => deleteSubtaskMutation.mutate(id)}
+                              onAddChecklist={(templateId) => {
+                                setChecklistParentId(templateId);
+                                setChecklistName("");
+                                setChecklistDays(1);
+                                setShowChecklistDialog(true);
+                              }}
+                              onDeleteChecklist={(id) => deleteChecklistMutation.mutate(id)}
                               phaseColor={phaseColor}
                             />
                           ))}
@@ -897,12 +981,72 @@ export default function WorkflowBuilderPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showChecklistDialog} onOpenChange={(open) => { if (!open) setShowChecklistDialog(false); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add Checklist Item</DialogTitle>
+            <DialogDescription>Add a checklist item that must be completed before this activity stage is done.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Checklist Item</Label>
+              <Input
+                value={checklistName}
+                onChange={(e) => setChecklistName(e.target.value)}
+                placeholder="e.g. Client sign-off received"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && checklistName.trim()) {
+                    createChecklistMutation.mutate({
+                      templateId: checklistParentId,
+                      name: checklistName.trim(),
+                      estimatedDays: checklistDays,
+                    });
+                  }
+                }}
+                data-testid="input-checklist-name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Estimated Days</Label>
+              <Input
+                type="number"
+                min={1}
+                value={checklistDays}
+                onChange={(e) => setChecklistDays(parseInt(e.target.value) || 1)}
+                data-testid="input-checklist-days"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowChecklistDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!checklistName.trim()) {
+                  toast({ title: "Checklist item name is required", variant: "destructive" });
+                  return;
+                }
+                createChecklistMutation.mutate({
+                  templateId: checklistParentId,
+                  name: checklistName.trim(),
+                  estimatedDays: checklistDays,
+                });
+              }}
+              disabled={createChecklistMutation.isPending}
+              data-testid="button-save-checklist"
+            >
+              {createChecklistMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Add Checklist Item
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Remove Activity</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove "{deleteConfirm?.name}" from this workflow? This will also remove any subtasks.
+              Remove "{deleteConfirm?.name}" from this workflow? This will also remove any subtasks and checklists.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

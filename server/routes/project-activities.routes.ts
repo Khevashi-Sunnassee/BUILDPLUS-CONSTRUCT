@@ -6,7 +6,7 @@ import { eq, and, asc, desc, count, sql, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import {
   jobTypes, activityStages, activityConsultants,
-  activityTemplates, activityTemplateSubtasks,
+  activityTemplates, activityTemplateSubtasks, activityTemplateChecklists,
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
   taskGroups, tasks,
 } from "@shared/schema";
@@ -386,9 +386,16 @@ router.get("/api/job-types/:jobTypeId/templates", requireAuth, async (req, res) 
           .orderBy(asc(activityTemplateSubtasks.sortOrder))
       : [];
 
+    const filteredChecklists = templateIds.length > 0
+      ? await db.select().from(activityTemplateChecklists)
+          .where(inArray(activityTemplateChecklists.templateId, templateIds))
+          .orderBy(asc(activityTemplateChecklists.sortOrder))
+      : [];
+
     const result = templates.map(t => ({
       ...t,
       subtasks: filteredSubtasks.filter(s => s.templateId === t.id),
+      checklists: filteredChecklists.filter(c => c.templateId === t.id),
     }));
 
     res.json(result);
@@ -560,6 +567,79 @@ router.delete("/api/activity-template-subtasks/:id", requireAuth, requireRole("A
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting subtask");
     res.status(500).json({ error: "Failed to delete subtask" });
+  }
+});
+
+const checklistSchema = z.object({
+  name: z.string().min(1),
+  estimatedDays: z.number().int().optional().default(1),
+  sortOrder: z.number().int().optional(),
+});
+
+router.get("/api/activity-templates/:templateId/checklists", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const templateId = String(req.params.templateId);
+    const [tmpl] = await db.select({ id: activityTemplates.id }).from(activityTemplates)
+      .where(and(eq(activityTemplates.id, templateId), eq(activityTemplates.companyId, companyId!)));
+    if (!tmpl) return res.status(404).json({ error: "Template not found" });
+
+    const result = await db.select().from(activityTemplateChecklists)
+      .where(eq(activityTemplateChecklists.templateId, templateId))
+      .orderBy(asc(activityTemplateChecklists.sortOrder));
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching template checklists");
+    res.status(500).json({ error: "Failed to fetch checklists" });
+  }
+});
+
+router.post("/api/activity-templates/:templateId/checklists", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const templateId = String(req.params.templateId);
+    const [tmpl] = await db.select({ id: activityTemplates.id }).from(activityTemplates)
+      .where(and(eq(activityTemplates.id, templateId), eq(activityTemplates.companyId, companyId!)));
+    if (!tmpl) return res.status(404).json({ error: "Template not found" });
+
+    const parsed = checklistSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+
+    const existing = await db.select({ count: count() }).from(activityTemplateChecklists)
+      .where(eq(activityTemplateChecklists.templateId, templateId));
+    const nextOrder = (existing[0]?.count ?? 0);
+
+    const [result] = await db.insert(activityTemplateChecklists).values({
+      ...parsed.data,
+      sortOrder: parsed.data.sortOrder ?? nextOrder,
+      templateId,
+    }).returning();
+    res.status(201).json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error creating checklist item");
+    res.status(500).json({ error: "Failed to create checklist item" });
+  }
+});
+
+router.delete("/api/activity-template-checklists/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const [item] = await db.select({
+      id: activityTemplateChecklists.id,
+      templateId: activityTemplateChecklists.templateId,
+    }).from(activityTemplateChecklists)
+      .where(eq(activityTemplateChecklists.id, String(req.params.id)));
+    if (!item) return res.status(404).json({ error: "Checklist item not found" });
+
+    const [tmpl] = await db.select({ id: activityTemplates.id }).from(activityTemplates)
+      .where(and(eq(activityTemplates.id, item.templateId), eq(activityTemplates.companyId, companyId!)));
+    if (!tmpl) return res.status(404).json({ error: "Not authorized" });
+
+    await db.delete(activityTemplateChecklists).where(eq(activityTemplateChecklists.id, String(req.params.id)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error deleting checklist item");
+    res.status(500).json({ error: "Failed to delete checklist item" });
   }
 });
 
