@@ -454,4 +454,28 @@ router.delete("/api/admin/cfmeu-calendars/:calendarType", requireRole("ADMIN"), 
   }
 });
 
+router.get("/api/geocode", requireAuth, async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || typeof q !== "string" || q.trim().length < 3) {
+      return res.status(400).json({ error: "Query must be at least 3 characters" });
+    }
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=au&limit=1`;
+    const response = await fetch(url, {
+      headers: { "User-Agent": "LTE-Performance-Management/1.0" },
+    });
+    if (!response.ok) {
+      return res.status(502).json({ error: "Geocoding service unavailable" });
+    }
+    const results = await response.json();
+    if (results.length === 0) {
+      return res.json({ lat: null, lon: null });
+    }
+    res.json({ lat: parseFloat(results[0].lat), lon: parseFloat(results[0].lon) });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error geocoding address");
+    res.status(500).json({ error: "Failed to geocode address" });
+  }
+});
+
 export const factoriesRouter = router;

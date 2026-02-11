@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,6 +14,7 @@ import {
   Bed,
   Calendar,
   X,
+  Search,
 } from "lucide-react";
 import { ADMIN_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -81,6 +82,9 @@ const factorySchema = z.object({
   name: z.string().min(1, "Name is required"),
   code: z.string().min(1, "Code is required").max(10, "Code must be 10 characters or less"),
   address: z.string().optional().nullable(),
+  streetAddress: z.string().optional().nullable(),
+  city: z.string().optional().nullable(),
+  postcode: z.string().optional().nullable(),
   state: z.string().optional().nullable(),
   latitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
   longitude: z.union([z.number(), z.string(), z.null()]).optional().transform(v => v === "" ? null : typeof v === "string" ? parseFloat(v) || null : v),
@@ -115,11 +119,11 @@ function LocationPicker({ onChange }: { onChange: (lat: number, lng: number) => 
   return null;
 }
 
-function MapCenterUpdater({ center }: { center: [number, number] }) {
+function MapCenterUpdater({ center, zoom }: { center: [number, number]; zoom?: number }) {
   const map = useMap();
   useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
+    map.setView(center, zoom ?? map.getZoom());
+  }, [center, zoom, map]);
   return null;
 }
 
@@ -151,6 +155,9 @@ export default function AdminFactoriesPage() {
       name: "",
       code: "",
       address: "",
+      streetAddress: "",
+      city: "",
+      postcode: "",
       state: "",
       latitude: null,
       longitude: null,
@@ -163,6 +170,41 @@ export default function AdminFactoriesPage() {
   });
 
   const inheritWorkDays = form.watch("inheritWorkDays");
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const geocodeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [mapZoom, setMapZoom] = useState(4);
+
+  const geocodeAddress = useCallback(async () => {
+    const street = form.getValues("streetAddress") || "";
+    const city = form.getValues("city") || "";
+    const postcode = form.getValues("postcode") || "";
+    const state = form.getValues("state") || "";
+    const parts = [street, city, state, postcode].filter(Boolean);
+    if (parts.length < 2) return;
+    const query = parts.join(", ") + ", Australia";
+    setIsGeocoding(true);
+    try {
+      const res = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`, { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.lat && data.lon) {
+          form.setValue("latitude", data.lat);
+          form.setValue("longitude", data.lon);
+          setMapZoom(14);
+        }
+      }
+    } catch {
+    } finally {
+      setIsGeocoding(false);
+    }
+  }, [form]);
+
+  const debouncedGeocode = useCallback(() => {
+    if (geocodeTimerRef.current) clearTimeout(geocodeTimerRef.current);
+    geocodeTimerRef.current = setTimeout(() => {
+      geocodeAddress();
+    }, 1000);
+  }, [geocodeAddress]);
 
   const bedForm = useForm<BedFormData>({
     resolver: zodResolver(bedSchema),
@@ -287,6 +329,9 @@ export default function AdminFactoriesPage() {
       name: "",
       code: "",
       address: "",
+      streetAddress: "",
+      city: "",
+      postcode: "",
       state: "",
       latitude: null,
       longitude: null,
@@ -296,15 +341,20 @@ export default function AdminFactoriesPage() {
       color: "#3B82F6",
       isActive: true,
     });
+    setMapZoom(4);
     setDialogOpen(true);
   };
 
   const openEditDialog = (factory: FactoryType) => {
     setEditingFactory(factory);
+    const f = factory as any;
     form.reset({
       name: factory.name,
       code: factory.code,
       address: factory.address || "",
+      streetAddress: f.streetAddress || "",
+      city: f.city || "",
+      postcode: f.postcode || "",
       state: factory.state || "",
       latitude: factory.latitude ? parseFloat(String(factory.latitude)) : null,
       longitude: factory.longitude ? parseFloat(String(factory.longitude)) : null,
@@ -314,14 +364,18 @@ export default function AdminFactoriesPage() {
       color: factory.color || "#3B82F6",
       isActive: factory.isActive,
     });
+    setMapZoom(factory.latitude ? 14 : 4);
     setDialogOpen(true);
   };
 
   const onSubmit = (data: FactoryFormData) => {
+    const parts = [data.streetAddress, data.city, data.state, data.postcode].filter(Boolean);
+    const composedAddress = parts.length > 0 ? parts.join(", ") : null;
+    const submitData = { ...data, address: composedAddress };
     if (editingFactory) {
-      updateFactoryMutation.mutate({ id: editingFactory.id, data });
+      updateFactoryMutation.mutate({ id: editingFactory.id, data: submitData });
     } else {
-      createFactoryMutation.mutate(data);
+      createFactoryMutation.mutate(submitData);
     }
   };
 
@@ -426,12 +480,17 @@ export default function AdminFactoriesPage() {
                         <strong>{factory.name}</strong>
                         <br />
                         <span className="text-muted-foreground">{factory.code}</span>
-                        {factory.address && (
-                          <>
-                            <br />
-                            <span className="text-xs">{factory.address}</span>
-                          </>
-                        )}
+                        {(() => {
+                          const f = factory as any;
+                          const parts = [f.streetAddress, f.city, f.state, f.postcode].filter(Boolean);
+                          const addr = parts.length > 0 ? parts.join(", ") : factory.address;
+                          return addr ? (
+                            <>
+                              <br />
+                              <span className="text-xs">{addr}</span>
+                            </>
+                          ) : null;
+                        })()}
                       </div>
                     </Popup>
                   </Marker>
@@ -592,26 +651,51 @@ export default function AdminFactoriesPage() {
 
               <FormField
                 control={form.control}
-                name="address"
+                name="streetAddress"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Address</FormLabel>
+                    <FormLabel>Street Address</FormLabel>
                     <FormControl>
-                      <Textarea {...field} value={field.value || ""} placeholder="123 Industrial Ave, Suburb VIC 3000" data-testid="input-factory-address" />
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        onChange={e => { field.onChange(e.target.value); debouncedGeocode(); }}
+                        placeholder="123 Industrial Avenue"
+                        data-testid="input-factory-street-address"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City / Suburb</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          onChange={e => { field.onChange(e.target.value); debouncedGeocode(); }}
+                          placeholder="Melbourne"
+                          data-testid="input-factory-city"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="state"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>State</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <Select onValueChange={v => { field.onChange(v); debouncedGeocode(); }} value={field.value || ""}>
                         <FormControl>
                           <SelectTrigger data-testid="select-factory-state">
                             <SelectValue placeholder="Select state" />
@@ -634,6 +718,29 @@ export default function AdminFactoriesPage() {
                 />
                 <FormField
                   control={form.control}
+                  name="postcode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Postcode</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          value={field.value || ""}
+                          onChange={e => { field.onChange(e.target.value); debouncedGeocode(); }}
+                          placeholder="3000"
+                          maxLength={4}
+                          data-testid="input-factory-postcode"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
                   name="color"
                   render={({ field }) => (
                     <FormItem>
@@ -650,58 +757,72 @@ export default function AdminFactoriesPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="latitude"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Latitude</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="any"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                          placeholder="-37.8136"
-                          data-testid="input-factory-latitude"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="longitude"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Longitude</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="any"
-                          {...field}
-                          value={field.value ?? ""}
-                          onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
-                          placeholder="144.9631"
-                          data-testid="input-factory-longitude"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+              <div className="flex items-center gap-2">
+                <div className="grid grid-cols-2 gap-4 flex-1">
+                  <FormField
+                    control={form.control}
+                    name="latitude"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Latitude</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="any"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                            placeholder="-37.8136"
+                            data-testid="input-factory-latitude"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="longitude"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Longitude</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="any"
+                            {...field}
+                            value={field.value ?? ""}
+                            onChange={e => field.onChange(e.target.value ? parseFloat(e.target.value) : null)}
+                            placeholder="144.9631"
+                            data-testid="input-factory-longitude"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="pt-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={geocodeAddress}
+                    disabled={isGeocoding}
+                    data-testid="button-geocode-address"
+                  >
+                    {isGeocoding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
 
               <Card className="p-0">
                 <CardContent className="p-2">
-                  <p className="text-xs text-muted-foreground mb-2">Click on the map to set location</p>
+                  <p className="text-xs text-muted-foreground mb-2">Click on the map to set location, or fill in the address fields above to auto-locate</p>
                   <div className="h-[200px] rounded-md overflow-hidden">
                     <MapContainer
                       center={[form.watch("latitude") || -37.8136, form.watch("longitude") || 144.9631]}
-                      zoom={form.watch("latitude") ? 10 : 4}
+                      zoom={mapZoom}
                       style={{ height: "100%", width: "100%" }}
                     >
                       <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -711,7 +832,7 @@ export default function AdminFactoriesPage() {
                           form.setValue("longitude", lng);
                         }}
                       />
-                      <MapCenterUpdater center={[form.watch("latitude") || -37.8136, form.watch("longitude") || 144.9631]} />
+                      <MapCenterUpdater center={[form.watch("latitude") || -37.8136, form.watch("longitude") || 144.9631]} zoom={mapZoom} />
                       {form.watch("latitude") && form.watch("longitude") && (
                         <Marker position={[form.watch("latitude")!, form.watch("longitude")!]} />
                       )}
@@ -864,7 +985,13 @@ export default function AdminFactoriesPage() {
               {viewingFactory?.name}
               <Badge variant="outline" className="ml-2">{viewingFactory?.code}</Badge>
             </DialogTitle>
-            <DialogDescription>{viewingFactory?.address || "No address"}</DialogDescription>
+            <DialogDescription>
+              {(() => {
+                const f = viewingFactory as any;
+                const parts = [f?.streetAddress, f?.city, f?.state, f?.postcode].filter(Boolean);
+                return parts.length > 0 ? parts.join(", ") : (viewingFactory?.address || "No address");
+              })()}
+            </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
