@@ -68,6 +68,10 @@ export default function HireBookingsPage() {
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [equipmentFilter, setEquipmentFilter] = useState<string>("ALL");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [showGraphs, setShowGraphs] = useState(false);
   const [actionDialog, setActionDialog] = useState<{ type: string; booking: HireBookingWithDetails } | null>(null);
 
@@ -109,19 +113,45 @@ export default function HireBookingsPage() {
     },
   });
 
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set(bookings.map(b => b.assetCategoryName).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [bookings]);
+
+  const uniqueEquipment = useMemo(() => {
+    const equip = new Set(bookings.map(b => b.equipmentDescription).filter(Boolean));
+    return Array.from(equip).sort();
+  }, [bookings]);
+
   const filteredBookings = useMemo(() => {
-    if (!searchQuery) return bookings;
-    const q = searchQuery.toLowerCase();
-    return bookings.filter((b) =>
-      b.bookingNumber.toLowerCase().includes(q) ||
-      b.equipmentDescription.toLowerCase().includes(q) ||
-      (b.assetCategoryName || "").toLowerCase().includes(q) ||
-      (b.supplier?.name || "").toLowerCase().includes(q) ||
-      (b.job?.jobNumber || "").toLowerCase().includes(q) ||
-      (b.job?.name || "").toLowerCase().includes(q) ||
-      (b.requestedBy ? `${b.requestedBy.firstName} ${b.requestedBy.lastName}`.toLowerCase().includes(q) : false)
-    );
-  }, [bookings, searchQuery]);
+    return bookings.filter((b) => {
+      if (categoryFilter !== "ALL" && b.assetCategoryName !== categoryFilter) return false;
+      if (equipmentFilter !== "ALL" && b.equipmentDescription !== equipmentFilter) return false;
+      if (dateFrom) {
+        const from = new Date(dateFrom);
+        const bEnd = new Date(b.expectedReturnDate || b.hireEndDate);
+        if (bEnd < from) return false;
+      }
+      if (dateTo) {
+        const to = new Date(dateTo);
+        const bStart = new Date(b.hireStartDate);
+        if (bStart > to) return false;
+      }
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const match =
+          b.bookingNumber.toLowerCase().includes(q) ||
+          b.equipmentDescription.toLowerCase().includes(q) ||
+          (b.assetCategoryName || "").toLowerCase().includes(q) ||
+          (b.supplier?.name || "").toLowerCase().includes(q) ||
+          (b.job?.jobNumber || "").toLowerCase().includes(q) ||
+          (b.job?.name || "").toLowerCase().includes(q) ||
+          (b.requestedBy ? `${b.requestedBy.firstName} ${b.requestedBy.lastName}`.toLowerCase().includes(q) : false);
+        if (!match) return false;
+      }
+      return true;
+    });
+  }, [bookings, searchQuery, categoryFilter, equipmentFilter, dateFrom, dateTo]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: bookings.length };
@@ -237,16 +267,70 @@ export default function HireBookingsPage() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search bookings..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-hire"
-          />
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search bookings..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+              data-testid="input-search-hire"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Categories</SelectItem>
+              {uniqueCategories.map(cat => (
+                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
+            <SelectTrigger className="w-[200px]" data-testid="select-equipment-filter">
+              <SelectValue placeholder="Equipment" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Equipment</SelectItem>
+              {uniqueEquipment.map(eq => (
+                <SelectItem key={eq} value={eq}>{eq}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center gap-2">
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-[150px]"
+              placeholder="From"
+              data-testid="input-date-from"
+            />
+            <span className="text-xs text-muted-foreground">to</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-[150px]"
+              placeholder="To"
+              data-testid="input-date-to"
+            />
+          </div>
+          {(categoryFilter !== "ALL" || equipmentFilter !== "ALL" || dateFrom || dateTo || searchQuery) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setCategoryFilter("ALL"); setEquipmentFilter("ALL"); setDateFrom(""); setDateTo(""); setSearchQuery(""); }}
+              data-testid="button-clear-filters"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          )}
         </div>
         <Tabs value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
           <TabsList className="flex-wrap h-auto">
