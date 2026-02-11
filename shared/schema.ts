@@ -3962,7 +3962,7 @@ export type AssetRepairRequest = typeof assetRepairRequests.$inferSelect;
 // BUDGET SYSTEM - Cost Codes, Tenders, Budgets, BOQ
 // ============================================================
 
-// Cost Codes - hierarchical parent/child structure
+// Cost Codes - Parent cost code categories
 export const costCodes = pgTable("cost_codes", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -3978,6 +3978,24 @@ export const costCodes = pgTable("cost_codes", {
   companyIdx: index("cost_codes_company_idx").on(table.companyId),
   parentIdx: index("cost_codes_parent_idx").on(table.parentId),
   codeCompanyIdx: uniqueIndex("cost_codes_code_company_idx").on(table.code, table.companyId),
+}));
+
+// Child Cost Codes - detailed sub-codes under parent categories
+export const childCostCodes = pgTable("child_cost_codes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  parentCostCodeId: varchar("parent_cost_code_id", { length: 36 }).notNull().references(() => costCodes.id, { onDelete: "cascade" }),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("child_cost_codes_company_idx").on(table.companyId),
+  parentIdx: index("child_cost_codes_parent_idx").on(table.parentCostCodeId),
+  codeCompanyIdx: uniqueIndex("child_cost_codes_code_company_idx").on(table.code, table.companyId),
 }));
 
 // Default cost codes per job type
@@ -4081,6 +4099,7 @@ export const tenderLineItems = pgTable("tender_line_items", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   tenderSubmissionId: varchar("tender_submission_id", { length: 36 }).notNull().references(() => tenderSubmissions.id, { onDelete: "cascade" }),
   costCodeId: varchar("cost_code_id", { length: 36 }).references(() => costCodes.id),
+  childCostCodeId: varchar("child_cost_code_id", { length: 36 }).references(() => childCostCodes.id),
   description: text("description").notNull(),
   quantity: decimal("quantity", { precision: 14, scale: 4 }).default("1"),
   unit: text("unit").default("EA"),
@@ -4093,6 +4112,7 @@ export const tenderLineItems = pgTable("tender_line_items", {
 }, (table) => ({
   submissionIdx: index("tender_line_items_submission_idx").on(table.tenderSubmissionId),
   costCodeIdx: index("tender_line_items_cost_code_idx").on(table.costCodeId),
+  childCostCodeIdx: index("tender_line_items_child_cost_code_idx").on(table.childCostCodeId),
 }));
 
 // Activities on tender line items (like tasks)
@@ -4159,6 +4179,7 @@ export const budgetLines = pgTable("budget_lines", {
   budgetId: varchar("budget_id", { length: 36 }).notNull().references(() => jobBudgets.id, { onDelete: "cascade" }),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
   costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id),
+  childCostCodeId: varchar("child_cost_code_id", { length: 36 }).references(() => childCostCodes.id),
   estimatedBudget: decimal("estimated_budget", { precision: 14, scale: 2 }).default("0"),
   selectedTenderSubmissionId: varchar("selected_tender_submission_id", { length: 36 }).references(() => tenderSubmissions.id),
   selectedContractorId: varchar("selected_contractor_id", { length: 36 }).references(() => suppliers.id),
@@ -4172,7 +4193,8 @@ export const budgetLines = pgTable("budget_lines", {
   budgetIdx: index("budget_lines_budget_idx").on(table.budgetId),
   jobIdx: index("budget_lines_job_idx").on(table.jobId),
   costCodeIdx: index("budget_lines_cost_code_idx").on(table.costCodeId),
-  uniqueLineIdx: uniqueIndex("budget_lines_unique_idx").on(table.budgetId, table.costCodeId),
+  childCostCodeIdx: index("budget_lines_child_cost_code_idx").on(table.childCostCodeId),
+  uniqueLineIdx: uniqueIndex("budget_lines_unique_idx").on(table.budgetId, table.costCodeId, table.childCostCodeId),
 }));
 
 // Files attached to budget lines
@@ -4194,6 +4216,7 @@ export const boqGroups = pgTable("boq_groups", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
   costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id),
+  childCostCodeId: varchar("child_cost_code_id", { length: 36 }).references(() => childCostCodes.id),
   budgetLineId: varchar("budget_line_id", { length: 36 }).references(() => budgetLines.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   description: text("description"),
@@ -4203,6 +4226,7 @@ export const boqGroups = pgTable("boq_groups", {
 }, (table) => ({
   jobIdx: index("boq_groups_job_idx").on(table.jobId),
   costCodeIdx: index("boq_groups_cost_code_idx").on(table.costCodeId),
+  childCostCodeIdx: index("boq_groups_child_cost_code_idx").on(table.childCostCodeId),
   budgetLineIdx: index("boq_groups_budget_line_idx").on(table.budgetLineId),
 }));
 
@@ -4212,6 +4236,7 @@ export const boqItems = pgTable("boq_items", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
   costCodeId: varchar("cost_code_id", { length: 36 }).notNull().references(() => costCodes.id),
+  childCostCodeId: varchar("child_cost_code_id", { length: 36 }).references(() => childCostCodes.id),
   groupId: varchar("group_id", { length: 36 }).references(() => boqGroups.id, { onDelete: "cascade" }),
   budgetLineId: varchar("budget_line_id", { length: 36 }).references(() => budgetLines.id, { onDelete: "cascade" }),
   tenderLineItemId: varchar("tender_line_item_id", { length: 36 }).references(() => tenderLineItems.id),
@@ -4228,6 +4253,7 @@ export const boqItems = pgTable("boq_items", {
 }, (table) => ({
   jobIdx: index("boq_items_job_idx").on(table.jobId),
   costCodeIdx: index("boq_items_cost_code_idx").on(table.costCodeId),
+  childCostCodeIdx: index("boq_items_child_cost_code_idx").on(table.childCostCodeId),
   groupIdx: index("boq_items_group_idx").on(table.groupId),
   budgetLineIdx: index("boq_items_budget_line_idx").on(table.budgetLineId),
   tenderLineIdx: index("boq_items_tender_line_idx").on(table.tenderLineItemId),
@@ -4237,6 +4263,10 @@ export const boqItems = pgTable("boq_items", {
 export const insertCostCodeSchema = createInsertSchema(costCodes).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertCostCode = z.infer<typeof insertCostCodeSchema>;
 export type CostCode = typeof costCodes.$inferSelect;
+
+export const insertChildCostCodeSchema = createInsertSchema(childCostCodes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertChildCostCode = z.infer<typeof insertChildCostCodeSchema>;
+export type ChildCostCode = typeof childCostCodes.$inferSelect;
 
 export const insertCostCodeDefaultSchema = createInsertSchema(costCodeDefaults).omit({ id: true, createdAt: true });
 export type InsertCostCodeDefault = z.infer<typeof insertCostCodeDefaultSchema>;

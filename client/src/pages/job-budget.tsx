@@ -32,6 +32,7 @@ import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
 
 interface BudgetLineWithDetails extends BudgetLine {
   costCode: { id: string; code: string; name: string };
+  childCostCode: { id: string; code: string; name: string } | null;
   tenderSubmission: { id: string; totalPrice: string | null; status: string } | null;
   contractor: { id: string; name: string } | null;
 }
@@ -83,6 +84,7 @@ export default function JobBudgetPage() {
   const [editNotes, setEditNotes] = useState("");
 
   const [lineCostCodeId, setLineCostCodeId] = useState("");
+  const [lineChildCostCodeId, setLineChildCostCodeId] = useState("");
   const [lineEstimatedBudget, setLineEstimatedBudget] = useState("");
   const [lineVariations, setLineVariations] = useState("");
   const [lineForecastCost, setLineForecastCost] = useState("");
@@ -117,9 +119,19 @@ export default function JobBudgetPage() {
     queryKey: ["/api/suppliers"],
   });
 
+  const { data: costCodesWithChildren = [] } = useQuery<any[]>({
+    queryKey: ["/api/cost-codes-with-children"],
+  });
+
   const activeCostCodes = useMemo(() => {
     return costCodes.filter((cc) => cc.isActive);
   }, [costCodes]);
+
+  const filteredChildCodes = useMemo(() => {
+    if (!lineCostCodeId) return [];
+    const parent = costCodesWithChildren.find((cc: any) => cc.id === lineCostCodeId);
+    return (parent?.children || []).filter((child: any) => child.isActive);
+  }, [lineCostCodeId, costCodesWithChildren]);
 
   const initBudgetMutation = useMutation({
     mutationFn: async (data: { estimatedTotalBudget?: string; profitTargetPercent?: string; customerPrice?: string; notes?: string }) => {
@@ -156,7 +168,7 @@ export default function JobBudgetPage() {
   });
 
   const createLineMutation = useMutation({
-    mutationFn: async (data: { costCodeId: string; estimatedBudget?: string; variationsAmount?: string; forecastCost?: string; notes?: string; selectedContractorId?: string }) => {
+    mutationFn: async (data: { costCodeId: string; estimatedBudget?: string; variationsAmount?: string; forecastCost?: string; notes?: string; selectedContractorId?: string; childCostCodeId?: string }) => {
       return apiRequest("POST", `/api/jobs/${jobId}/budget/lines`, data);
     },
     onSuccess: () => {
@@ -171,7 +183,7 @@ export default function JobBudgetPage() {
   });
 
   const updateLineMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; costCodeId?: string; estimatedBudget?: string; variationsAmount?: string; forecastCost?: string; notes?: string; selectedContractorId?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: string; costCodeId?: string; estimatedBudget?: string; variationsAmount?: string; forecastCost?: string; notes?: string; selectedContractorId?: string; childCostCodeId?: string }) => {
       return apiRequest("PATCH", `/api/jobs/${jobId}/budget/lines/${id}`, data);
     },
     onSuccess: () => {
@@ -208,12 +220,14 @@ export default function JobBudgetPage() {
     setLineForecastCost("");
     setLineNotes("");
     setLineContractorId("");
+    setLineChildCostCodeId("");
     setLineDialogOpen(true);
   }
 
   function openEditLine(line: BudgetLineWithDetails) {
     setEditingLine(line);
     setLineCostCodeId(line.costCodeId);
+    setLineChildCostCodeId(line.childCostCodeId || "");
     setLineEstimatedBudget(line.estimatedBudget || "");
     setLineVariations(line.variationsAmount || "");
     setLineForecastCost(line.forecastCost || "");
@@ -239,6 +253,7 @@ export default function JobBudgetPage() {
       forecastCost: lineForecastCost || undefined,
       notes: lineNotes.trim() || undefined,
       selectedContractorId: lineContractorId || undefined,
+      childCostCodeId: lineChildCostCodeId && lineChildCostCodeId !== "__none__" ? lineChildCostCodeId : undefined,
     };
     if (editingLine) {
       updateLineMutation.mutate({ id: editingLine.id, ...data });
@@ -497,10 +512,10 @@ export default function JobBudgetPage() {
                     {budgetLines.map((line) => (
                       <TableRow key={line.id} data-testid={`row-budget-line-${line.id}`}>
                         <TableCell className="font-mono font-medium" data-testid={`text-line-code-${line.id}`}>
-                          {line.costCode.code}
+                          {line.costCode.code}{line.childCostCode ? ` > ${line.childCostCode.code}` : ""}
                         </TableCell>
                         <TableCell data-testid={`text-line-name-${line.id}`}>
-                          {line.costCode.name}
+                          {line.costCode.name}{line.childCostCode ? ` > ${line.childCostCode.name}` : ""}
                         </TableCell>
                         <TableCell className="text-right font-mono" data-testid={`text-line-estimated-${line.id}`}>
                           {formatCurrency(line.estimatedBudget)}
@@ -581,7 +596,7 @@ export default function JobBudgetPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Cost Code</Label>
-              <Select value={lineCostCodeId} onValueChange={setLineCostCodeId}>
+              <Select value={lineCostCodeId} onValueChange={(val) => { setLineCostCodeId(val); setLineChildCostCodeId(""); }}>
                 <SelectTrigger data-testid="select-line-cost-code">
                   <SelectValue placeholder="Select a cost code..." />
                 </SelectTrigger>
@@ -594,6 +609,24 @@ export default function JobBudgetPage() {
                 </SelectContent>
               </Select>
             </div>
+            {filteredChildCodes.length > 0 && (
+              <div className="space-y-2">
+                <Label>Child Code (Optional)</Label>
+                <Select value={lineChildCostCodeId} onValueChange={setLineChildCostCodeId}>
+                  <SelectTrigger data-testid="select-line-child-cost-code">
+                    <SelectValue placeholder="Select a child code..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {filteredChildCodes.map((cc: any) => (
+                      <SelectItem key={cc.id} value={cc.id} data-testid={`option-child-code-${cc.id}`}>
+                        {cc.code} - {cc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="line-estimated">Estimated Budget</Label>

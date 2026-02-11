@@ -4,7 +4,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobBudgets, budgetLines, budgetLineFiles, costCodes, tenderSubmissions, suppliers, jobs } from "@shared/schema";
+import { jobBudgets, budgetLines, budgetLineFiles, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs } from "@shared/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 const router = Router();
@@ -18,6 +18,7 @@ const budgetSchema = z.object({
 
 const budgetLineSchema = z.object({
   costCodeId: z.string().min(1, "Cost code is required"),
+  childCostCodeId: z.string().nullable().optional(),
   estimatedBudget: z.string().nullable().optional(),
   selectedTenderSubmissionId: z.string().nullable().optional(),
   selectedContractorId: z.string().nullable().optional(),
@@ -49,6 +50,11 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
           code: costCodes.code,
           name: costCodes.name,
         },
+        childCostCode: {
+          id: childCostCodes.id,
+          code: childCostCodes.code,
+          name: childCostCodes.name,
+        },
         tenderSubmission: {
           id: tenderSubmissions.id,
           totalPrice: tenderSubmissions.totalPrice,
@@ -61,6 +67,7 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
       })
       .from(budgetLines)
       .innerJoin(costCodes, eq(budgetLines.costCodeId, costCodes.id))
+      .leftJoin(childCostCodes, eq(budgetLines.childCostCodeId, childCostCodes.id))
       .leftJoin(tenderSubmissions, eq(budgetLines.selectedTenderSubmissionId, tenderSubmissions.id))
       .leftJoin(suppliers, eq(budgetLines.selectedContractorId, suppliers.id))
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
@@ -69,6 +76,7 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
     const mappedLines = lines.map((row) => ({
       ...row.line,
       costCode: row.costCode,
+      childCostCode: row.childCostCode?.id ? row.childCostCode : null,
       tenderSubmission: row.tenderSubmission?.id ? row.tenderSubmission : null,
       contractor: row.contractor?.id ? row.contractor : null,
     }));
@@ -182,6 +190,11 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
           code: costCodes.code,
           name: costCodes.name,
         },
+        childCostCode: {
+          id: childCostCodes.id,
+          code: childCostCodes.code,
+          name: childCostCodes.name,
+        },
         tenderSubmission: {
           id: tenderSubmissions.id,
           totalPrice: tenderSubmissions.totalPrice,
@@ -194,6 +207,7 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
       })
       .from(budgetLines)
       .innerJoin(costCodes, eq(budgetLines.costCodeId, costCodes.id))
+      .leftJoin(childCostCodes, eq(budgetLines.childCostCodeId, childCostCodes.id))
       .leftJoin(tenderSubmissions, eq(budgetLines.selectedTenderSubmissionId, tenderSubmissions.id))
       .leftJoin(suppliers, eq(budgetLines.selectedContractorId, suppliers.id))
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
@@ -202,6 +216,7 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
     const mapped = results.map((row) => ({
       ...row.line,
       costCode: row.costCode,
+      childCostCode: row.childCostCode?.id ? row.childCostCode : null,
       tenderSubmission: row.tenderSubmission?.id ? row.tenderSubmission : null,
       contractor: row.contractor?.id ? row.contractor : null,
     }));
@@ -235,6 +250,7 @@ router.post("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("bud
         budgetId: budget.id,
         jobId,
         costCodeId: data.costCodeId,
+        childCostCodeId: data.childCostCodeId || null,
         estimatedBudget: data.estimatedBudget || "0",
         selectedTenderSubmissionId: data.selectedTenderSubmissionId || null,
         selectedContractorId: data.selectedContractorId || null,
@@ -263,6 +279,7 @@ router.patch("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission
     const updateData: Record<string, any> = { updatedAt: new Date() };
 
     if (data.costCodeId !== undefined) updateData.costCodeId = data.costCodeId;
+    if (data.childCostCodeId !== undefined) updateData.childCostCodeId = data.childCostCodeId || null;
     if (data.estimatedBudget !== undefined) updateData.estimatedBudget = data.estimatedBudget || "0";
     if (data.selectedTenderSubmissionId !== undefined) updateData.selectedTenderSubmissionId = data.selectedTenderSubmissionId || null;
     if (data.selectedContractorId !== undefined) updateData.selectedContractorId = data.selectedContractorId || null;

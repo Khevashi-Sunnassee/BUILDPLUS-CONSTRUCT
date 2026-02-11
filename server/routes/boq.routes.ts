@@ -4,13 +4,14 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { boqGroups, boqItems, costCodes, budgetLines, tenderLineItems } from "@shared/schema";
+import { boqGroups, boqItems, costCodes, childCostCodes, budgetLines, tenderLineItems } from "@shared/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 
 const router = Router();
 
 const boqGroupSchema = z.object({
   costCodeId: z.string().min(1, "Cost code is required"),
+  childCostCodeId: z.string().nullable().optional(),
   budgetLineId: z.string().nullable().optional(),
   name: z.string().min(1, "Name is required"),
   description: z.string().nullable().optional(),
@@ -19,6 +20,7 @@ const boqGroupSchema = z.object({
 
 const boqItemSchema = z.object({
   costCodeId: z.string().min(1, "Cost code is required"),
+  childCostCodeId: z.string().nullable().optional(),
   groupId: z.string().nullable().optional(),
   budgetLineId: z.string().nullable().optional(),
   tenderLineItemId: z.string().nullable().optional(),
@@ -51,15 +53,22 @@ router.get("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budget
           code: costCodes.code,
           name: costCodes.name,
         },
+        childCostCode: {
+          id: childCostCodes.id,
+          code: childCostCodes.code,
+          name: childCostCodes.name,
+        },
       })
       .from(boqGroups)
       .innerJoin(costCodes, eq(boqGroups.costCodeId, costCodes.id))
+      .leftJoin(childCostCodes, eq(boqGroups.childCostCodeId, childCostCodes.id))
       .where(and(...conditions))
       .orderBy(asc(boqGroups.sortOrder), asc(boqGroups.name));
 
     const mapped = results.map((row) => ({
       ...row.group,
       costCode: row.costCode,
+      childCostCode: row.childCostCode?.id ? row.childCostCode : null,
     }));
 
     res.json(mapped);
@@ -81,6 +90,7 @@ router.post("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budge
         companyId,
         jobId,
         costCodeId: data.costCodeId,
+        childCostCodeId: data.childCostCodeId || null,
         budgetLineId: data.budgetLineId || null,
         name: data.name,
         description: data.description || null,
@@ -169,15 +179,22 @@ router.get("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budgets
           code: costCodes.code,
           name: costCodes.name,
         },
+        childCostCode: {
+          id: childCostCodes.id,
+          code: childCostCodes.code,
+          name: childCostCodes.name,
+        },
       })
       .from(boqItems)
       .innerJoin(costCodes, eq(boqItems.costCodeId, costCodes.id))
+      .leftJoin(childCostCodes, eq(boqItems.childCostCodeId, childCostCodes.id))
       .where(and(...conditions))
       .orderBy(asc(boqItems.sortOrder), asc(boqItems.description));
 
     const mapped = results.map((row) => ({
       ...row.item,
       costCode: row.costCode,
+      childCostCode: row.childCostCode?.id ? row.childCostCode : null,
     }));
 
     res.json(mapped);
@@ -199,6 +216,7 @@ router.post("/api/jobs/:jobId/boq/items", requireAuth, requirePermission("budget
         companyId,
         jobId,
         costCodeId: data.costCodeId,
+        childCostCodeId: data.childCostCodeId || null,
         groupId: data.groupId || null,
         budgetLineId: data.budgetLineId || null,
         tenderLineItemId: data.tenderLineItemId || null,
@@ -230,6 +248,7 @@ router.patch("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("b
     const updateData: Record<string, any> = { updatedAt: new Date() };
 
     if (data.costCodeId !== undefined) updateData.costCodeId = data.costCodeId;
+    if (data.childCostCodeId !== undefined) updateData.childCostCodeId = data.childCostCodeId || null;
     if (data.groupId !== undefined) updateData.groupId = data.groupId || null;
     if (data.budgetLineId !== undefined) updateData.budgetLineId = data.budgetLineId || null;
     if (data.tenderLineItemId !== undefined) updateData.tenderLineItemId = data.tenderLineItemId || null;

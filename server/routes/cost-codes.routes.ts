@@ -6,7 +6,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { costCodes, costCodeDefaults, jobCostCodes, jobTypes, jobs } from "@shared/schema";
+import { costCodes, childCostCodes, costCodeDefaults, jobCostCodes, jobTypes, jobs } from "@shared/schema";
 import { eq, and, desc, asc, sql, ilike, or, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -37,6 +37,23 @@ const costCodeSchema = z.object({
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });
+
+const childCostCodeSchema = z.object({
+  code: z.string().min(1, "Code is required"),
+  name: z.string().min(1, "Name is required"),
+  description: z.string().nullable().optional(),
+  parentCostCodeId: z.string().min(1, "Parent cost code ID is required"),
+  isActive: z.boolean().optional(),
+  sortOrder: z.number().int().optional(),
+});
+
+function parseHeaders(sheet: ExcelJS.Worksheet): Record<number, string> {
+  const headerMap: Record<number, string> = {};
+  sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNum) => {
+    headerMap[colNum] = String(cell.value || "").trim().toLowerCase();
+  });
+  return headerMap;
+}
 
 router.get("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
   try {
@@ -74,40 +91,154 @@ router.get("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes",
   }
 });
 
+router.get("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { parentCostCodeId, search, active } = req.query;
+
+    let conditions = [eq(childCostCodes.companyId, companyId)];
+
+    if (parentCostCodeId && typeof parentCostCodeId === "string") {
+      conditions.push(eq(childCostCodes.parentCostCodeId, parentCostCodeId));
+    }
+
+    if (active === "true") {
+      conditions.push(eq(childCostCodes.isActive, true));
+    } else if (active === "false") {
+      conditions.push(eq(childCostCodes.isActive, false));
+    }
+
+    let results = await db
+      .select({
+        id: childCostCodes.id,
+        companyId: childCostCodes.companyId,
+        parentCostCodeId: childCostCodes.parentCostCodeId,
+        code: childCostCodes.code,
+        name: childCostCodes.name,
+        description: childCostCodes.description,
+        isActive: childCostCodes.isActive,
+        sortOrder: childCostCodes.sortOrder,
+        createdAt: childCostCodes.createdAt,
+        updatedAt: childCostCodes.updatedAt,
+        parentCode: costCodes.code,
+        parentName: costCodes.name,
+      })
+      .from(childCostCodes)
+      .innerJoin(costCodes, eq(childCostCodes.parentCostCodeId, costCodes.id))
+      .where(and(...conditions))
+      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+
+    if (search && typeof search === "string" && search.trim()) {
+      const s = search.trim().toLowerCase();
+      results = results.filter(
+        (cc) =>
+          cc.code.toLowerCase().includes(s) ||
+          cc.name.toLowerCase().includes(s) ||
+          (cc.description && cc.description.toLowerCase().includes(s)) ||
+          cc.parentName.toLowerCase().includes(s)
+      );
+    }
+
+    res.json(results);
+  } catch (error: any) {
+    logger.error("Error fetching child cost codes:", error);
+    res.status(500).json({ message: "Failed to fetch child cost codes" });
+  }
+});
+
+router.get("/api/cost-codes-with-children", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+
+    const parents = await db
+      .select()
+      .from(costCodes)
+      .where(and(eq(costCodes.companyId, companyId), eq(costCodes.isActive, true)))
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+
+    const children = await db
+      .select()
+      .from(childCostCodes)
+      .where(and(eq(childCostCodes.companyId, companyId), eq(childCostCodes.isActive, true)))
+      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+
+    const childMap = new Map<string, typeof children>();
+    for (const child of children) {
+      const existing = childMap.get(child.parentCostCodeId) || [];
+      existing.push(child);
+      childMap.set(child.parentCostCodeId, existing);
+    }
+
+    const result = parents.map((parent) => ({
+      ...parent,
+      children: childMap.get(parent.id) || [],
+    }));
+
+    res.json(result);
+  } catch (error: any) {
+    logger.error("Error fetching cost codes with children:", error);
+    res.status(500).json({ message: "Failed to fetch cost codes with children" });
+  }
+});
+
 router.get("/api/cost-codes/template/download", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "LTE Performance";
     workbook.created = new Date();
 
-    const sheet = workbook.addWorksheet("Cost Codes", {
+    const parentSheet = workbook.addWorksheet("PARENT CODES", {
       properties: { defaultColWidth: 20 },
     });
 
-    sheet.columns = [
-      { header: "Code", key: "code", width: 15 },
-      { header: "Name", key: "name", width: 30 },
-      { header: "Description", key: "description", width: 40 },
-      { header: "Parent Code", key: "parentCode", width: 15 },
-      { header: "Sort Order", key: "sortOrder", width: 12 },
-      { header: "Active (Y/N)", key: "isActive", width: 12 },
+    parentSheet.columns = [
+      { header: "CODE", key: "code", width: 15 },
+      { header: "IS PARENT", key: "isParent", width: 12 },
+      { header: "PARENT", key: "parent", width: 35 },
+      { header: "CHILD", key: "child", width: 40 },
     ];
 
-    const hRow = sheet.getRow(1);
-    hRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
-    hRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
-    hRow.alignment = { horizontal: "center", vertical: "middle" };
-    hRow.height = 24;
+    const phRow = parentSheet.getRow(1);
+    phRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    phRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+    phRow.alignment = { horizontal: "center", vertical: "middle" };
+    phRow.height = 24;
 
-    const examples = [
-      { code: "1000", name: "Preliminaries", description: "Site setup and preliminary costs", parentCode: "", sortOrder: 1, isActive: "Y" },
-      { code: "1010", name: "Site Establishment", description: "Site fencing, amenities, signage", parentCode: "1000", sortOrder: 2, isActive: "Y" },
-      { code: "2000", name: "Concrete Works", description: "All concrete related works", parentCode: "", sortOrder: 3, isActive: "Y" },
-      { code: "2010", name: "Foundations", description: "Foundation concrete pours", parentCode: "2000", sortOrder: 4, isActive: "Y" },
-      { code: "3000", name: "Structural Steel", description: "Steel fabrication and erection", parentCode: "", sortOrder: 5, isActive: "Y" },
+    const parentExamples = [
+      { code: "1", isParent: 1, parent: "Appliances / Sanitary Items", child: "APPLIANCES AND SANITARY ITEMS" },
+      { code: "4", isParent: 1, parent: "Blinds", child: "Window and Door Furnishings" },
+      { code: "12", isParent: 1, parent: "Civil Works", child: "CIVIL WORKS" },
     ];
-    examples.forEach((ex) => {
-      const row = sheet.addRow(ex);
+    parentExamples.forEach((ex) => {
+      const row = parentSheet.addRow(ex);
+      row.font = { italic: true, color: { argb: "FF999999" } };
+    });
+
+    const childSheet = workbook.addWorksheet("CHILD CODES", {
+      properties: { defaultColWidth: 20 },
+    });
+
+    childSheet.columns = [
+      { header: "CODE", key: "code", width: 15 },
+      { header: "PARENT", key: "parent", width: 35 },
+      { header: "CHILD", key: "child", width: 40 },
+    ];
+
+    const chRow = childSheet.getRow(1);
+    chRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    chRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
+    chRow.alignment = { horizontal: "center", vertical: "middle" };
+    chRow.height = 24;
+
+    const childExamples = [
+      { code: "1", parent: "Appliances / Sanitary Items", child: "APPLIANCES AND SANITARY ITEMS" },
+      { code: "1.5", parent: "Appliances / Sanitary Items", child: "Apartment Appliances" },
+      { code: "2", parent: "Appliances / Sanitary Items", child: "Common Area Appliances" },
+      { code: "4", parent: "Blinds", child: "Window and Door Furnishings" },
+      { code: "4.5", parent: "Blinds", child: "Blinds" },
+    ];
+    childExamples.forEach((ex) => {
+      const row = childSheet.addRow(ex);
       row.font = { italic: true, color: { argb: "FF999999" } };
     });
 
@@ -122,18 +253,21 @@ router.get("/api/cost-codes/template/download", requireAuth, requirePermission("
     instrHRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2563EB" } };
 
     [
-      { field: "Code", required: "Yes", description: "Unique cost code identifier (e.g. 1000, 1010, A100). Must be unique within your company." },
-      { field: "Name", required: "Yes", description: "Cost code name/title (e.g. Preliminaries, Concrete Works)" },
-      { field: "Description", required: "No", description: "Optional description of what this cost code covers" },
-      { field: "Parent Code", required: "No", description: "Code of the parent cost code for hierarchical grouping. Must match an existing code in the import or system." },
-      { field: "Sort Order", required: "No", description: "Numeric sort order (default: 0). Lower numbers appear first." },
-      { field: "Active (Y/N)", required: "No", description: "Whether the cost code is active. Y = Yes (default), N = No" },
+      { field: "PARENT CODES Tab", required: "", description: "" },
+      { field: "CODE", required: "Yes", description: "Unique code identifier for the parent category" },
+      { field: "IS PARENT", required: "No", description: "Set to 1 to mark as parent (always 1 for this tab)" },
+      { field: "PARENT", required: "Yes", description: "Parent category name (e.g. 'Concrete Works')" },
+      { field: "CHILD", required: "No", description: "Display name / description" },
+      { field: "", required: "", description: "" },
+      { field: "CHILD CODES Tab", required: "", description: "" },
+      { field: "CODE", required: "Yes", description: "Unique code identifier for the child item" },
+      { field: "PARENT", required: "Yes", description: "Must match a PARENT name from the Parent Codes tab" },
+      { field: "CHILD", required: "Yes", description: "Child code name / description" },
     ].forEach((i) => instrSheet.addRow(i));
 
     instrSheet.addRow({});
-    instrSheet.addRow({ field: "NOTES:", description: "Delete the example rows before importing. Only rows in the 'Cost Codes' sheet will be imported." });
-    instrSheet.addRow({ field: "", description: "Duplicate codes will be skipped (not overwritten). Existing cost codes will not be modified." });
-    instrSheet.addRow({ field: "", description: "Parent codes can reference codes within the same import file or existing codes in the system." });
+    instrSheet.addRow({ field: "NOTES:", description: "Both tabs will be imported. Parent codes are imported first, then child codes are linked by parent name." });
+    instrSheet.addRow({ field: "", description: "Duplicate codes will be skipped. The PARENT column in CHILD CODES must match the PARENT column name from PARENT CODES." });
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     res.setHeader("Content-Disposition", "attachment; filename=cost_codes_template.xlsx");
@@ -157,142 +291,198 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(file.buffer);
 
-    const sheet = workbook.getWorksheet("Cost Codes") || workbook.getWorksheet(1);
-    if (!sheet) {
-      return res.status(400).json({ message: "No worksheet found in the uploaded file" });
+    const parentSheet = workbook.getWorksheet("PARENT CODES") || workbook.getWorksheet("Parent Codes");
+    const childSheet = workbook.getWorksheet("CHILD CODES") || workbook.getWorksheet("Child Codes");
+
+    if (!parentSheet && !childSheet) {
+      const firstSheet = workbook.getWorksheet(1);
+      if (!firstSheet) {
+        return res.status(400).json({ message: "No worksheets found in the uploaded file. Expected 'PARENT CODES' and 'CHILD CODES' tabs." });
+      }
+      return res.status(400).json({ message: "Expected tabs named 'PARENT CODES' and 'CHILD CODES'. Found: " + workbook.worksheets.map(s => s.name).join(", ") });
     }
 
-    const firstRow = sheet.getRow(1);
-    const headerMap: Record<number, string> = {};
-    firstRow.eachCell({ includeEmpty: false }, (cell, colNum) => {
-      headerMap[colNum] = String(cell.value || "").trim().toLowerCase();
-    });
+    const errors: { sheet: string; row: number; message: string }[] = [];
+    const importedParents: { code: string; name: string }[] = [];
+    const skippedParents: { code: string; reason: string }[] = [];
+    const importedChildren: { code: string; name: string; parent: string }[] = [];
+    const skippedChildren: { code: string; reason: string }[] = [];
 
-    let codeCol = -1, nameCol = -1, descCol = -1, parentCol = -1, sortCol = -1, activeCol = -1;
-    for (const [colStr, h] of Object.entries(headerMap)) {
-      const col = Number(colStr);
-      if (h === "code") codeCol = col;
-      else if (h === "name") nameCol = col;
-      else if (h === "description") descCol = col;
-      else if (h.includes("parent")) parentCol = col;
-      else if (h.includes("sort")) sortCol = col;
-      else if (h.includes("active")) activeCol = col;
-    }
-
-    if (codeCol === -1 || nameCol === -1) {
-      return res.status(400).json({ message: "Required columns 'Code' and 'Name' not found in the spreadsheet header row" });
-    }
-
-    const existingCodes = await db
-      .select({ id: costCodes.id, code: costCodes.code })
+    const existingParents = await db
+      .select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
       .from(costCodes)
       .where(eq(costCodes.companyId, companyId));
 
-    const existingCodeMap = new Map(existingCodes.map((c) => [c.code.toLowerCase(), c.id]));
+    const existingParentCodeMap = new Map(existingParents.map((c) => [c.code.toLowerCase(), c.id]));
+    const parentNameToIdMap = new Map(existingParents.map((c) => [c.name.toLowerCase(), c.id]));
 
-    interface ImportRow {
-      code: string;
-      name: string;
-      description: string | null;
-      parentCode: string | null;
-      sortOrder: number;
-      isActive: boolean;
-      rowNum: number;
-    }
-
-    const rows: ImportRow[] = [];
-    const errors: { row: number; message: string }[] = [];
-
-    sheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
-      if (rowNum === 1) return;
-
-      const code = String(row.getCell(codeCol).value || "").trim();
-      const name = String(row.getCell(nameCol).value || "").trim();
-
-      if (!code && !name) return;
-
-      if (!code) {
-        errors.push({ row: rowNum, message: "Code is required" });
-        return;
-      }
-      if (!name) {
-        errors.push({ row: rowNum, message: `Name is required for code "${code}"` });
-        return;
+    if (parentSheet) {
+      const headers = parseHeaders(parentSheet);
+      let codeCol = -1, parentCol = -1, childCol = -1;
+      for (const [colStr, h] of Object.entries(headers)) {
+        const col = Number(colStr);
+        if (h === "code") codeCol = col;
+        else if (h === "parent") parentCol = col;
+        else if (h === "child") childCol = col;
       }
 
-      const description = descCol !== -1 ? String(row.getCell(descCol).value || "").trim() || null : null;
-      const parentCode = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() || null : null;
+      if (codeCol === -1) {
+        errors.push({ sheet: "PARENT CODES", row: 1, message: "Missing required 'CODE' column" });
+      } else {
+        let sortIdx = 0;
+        parentSheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
+          if (rowNum === 1) return;
 
-      let sortOrder = 0;
-      if (sortCol !== -1) {
-        const sv = row.getCell(sortCol).value;
-        sortOrder = typeof sv === "number" ? sv : parseInt(String(sv || "0")) || 0;
-      }
+          const code = String(row.getCell(codeCol).value || "").trim();
+          const parentName = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() : "";
+          const childName = childCol !== -1 ? String(row.getCell(childCol).value || "").trim() : "";
 
-      let isActive = true;
-      if (activeCol !== -1) {
-        const av = String(row.getCell(activeCol).value || "").trim().toUpperCase();
-        if (av === "N" || av === "NO" || av === "FALSE" || av === "0") {
-          isActive = false;
+          if (!code && !parentName) return;
+
+          const name = parentName || childName || code;
+
+          if (!code) {
+            errors.push({ sheet: "PARENT CODES", row: rowNum, message: "Code is required" });
+            return;
+          }
+
+          if (existingParentCodeMap.has(code.toLowerCase())) {
+            skippedParents.push({ code, reason: "Already exists" });
+            parentNameToIdMap.set(name.toLowerCase(), existingParentCodeMap.get(code.toLowerCase())!);
+            return;
+          }
+
+          try {
+            sortIdx++;
+          } catch (e) {}
+
+          (async () => {})();
+        });
+
+        const parentRows: { code: string; name: string; description: string | null; sortOrder: number; rowNum: number }[] = [];
+        parentSheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
+          if (rowNum === 1) return;
+          const code = String(row.getCell(codeCol).value || "").trim();
+          const parentName = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() : "";
+          const childName = childCol !== -1 ? String(row.getCell(childCol).value || "").trim() : "";
+          if (!code) return;
+          const name = parentName || childName || code;
+          parentRows.push({ code, name, description: childName || null, sortOrder: parentRows.length, rowNum });
+        });
+
+        for (const pRow of parentRows) {
+          if (existingParentCodeMap.has(pRow.code.toLowerCase())) {
+            skippedParents.push({ code: pRow.code, reason: "Already exists" });
+            parentNameToIdMap.set(pRow.name.toLowerCase(), existingParentCodeMap.get(pRow.code.toLowerCase())!);
+            continue;
+          }
+
+          try {
+            const [inserted] = await db
+              .insert(costCodes)
+              .values({
+                companyId,
+                code: pRow.code,
+                name: pRow.name,
+                description: pRow.description,
+                isActive: true,
+                sortOrder: pRow.sortOrder,
+              })
+              .returning();
+
+            existingParentCodeMap.set(pRow.code.toLowerCase(), inserted.id);
+            parentNameToIdMap.set(pRow.name.toLowerCase(), inserted.id);
+            importedParents.push({ code: pRow.code, name: pRow.name });
+          } catch (err: any) {
+            if (err.code === "23505") {
+              skippedParents.push({ code: pRow.code, reason: "Already exists (duplicate key)" });
+            } else {
+              errors.push({ sheet: "PARENT CODES", row: pRow.rowNum, message: `Failed to insert "${pRow.code}": ${err.message}` });
+            }
+          }
         }
       }
-
-      rows.push({ code, name, description, parentCode, sortOrder, isActive, rowNum });
-    });
-
-    if (rows.length === 0) {
-      return res.status(400).json({ message: "No data rows found in the file", errors });
     }
 
-    const importCodeMap = new Map<string, string>();
-    const imported: { code: string; name: string }[] = [];
-    const skipped: { code: string; reason: string }[] = [];
-
-    for (const row of rows) {
-      if (existingCodeMap.has(row.code.toLowerCase())) {
-        skipped.push({ code: row.code, reason: "Already exists" });
-        importCodeMap.set(row.code.toLowerCase(), existingCodeMap.get(row.code.toLowerCase())!);
-        continue;
+    if (childSheet) {
+      const headers = parseHeaders(childSheet);
+      let codeCol = -1, parentCol = -1, childCol = -1;
+      for (const [colStr, h] of Object.entries(headers)) {
+        const col = Number(colStr);
+        if (h === "code") codeCol = col;
+        else if (h === "parent") parentCol = col;
+        else if (h === "child") childCol = col;
       }
 
-      if (importCodeMap.has(row.code.toLowerCase())) {
-        skipped.push({ code: row.code, reason: "Duplicate in import file" });
-        continue;
-      }
+      if (codeCol === -1 || childCol === -1) {
+        errors.push({ sheet: "CHILD CODES", row: 1, message: "Missing required 'CODE' and/or 'CHILD' columns" });
+      } else {
+        const existingChildren = await db
+          .select({ id: childCostCodes.id, code: childCostCodes.code })
+          .from(childCostCodes)
+          .where(eq(childCostCodes.companyId, companyId));
+        const existingChildCodeMap = new Map(existingChildren.map((c) => [c.code.toLowerCase(), c.id]));
 
-      let parentId: string | null = null;
-      if (row.parentCode) {
-        const parentKey = row.parentCode.toLowerCase();
-        if (importCodeMap.has(parentKey)) {
-          parentId = importCodeMap.get(parentKey)!;
-        } else if (existingCodeMap.has(parentKey)) {
-          parentId = existingCodeMap.get(parentKey)!;
-        } else {
-          errors.push({ row: row.rowNum, message: `Parent code "${row.parentCode}" not found for code "${row.code}"` });
+        interface ChildRow {
+          code: string;
+          name: string;
+          parentName: string;
+          sortOrder: number;
+          rowNum: number;
         }
-      }
 
-      try {
-        const [inserted] = await db
-          .insert(costCodes)
-          .values({
-            companyId,
-            code: row.code,
-            name: row.name,
-            description: row.description,
-            parentId,
-            isActive: row.isActive,
-            sortOrder: row.sortOrder,
-          })
-          .returning();
+        const childRows: ChildRow[] = [];
+        childSheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
+          if (rowNum === 1) return;
+          const code = String(row.getCell(codeCol).value || "").trim();
+          const parentName = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() : "";
+          const childName = String(row.getCell(childCol).value || "").trim();
+          if (!code && !childName) return;
+          if (!code) {
+            errors.push({ sheet: "CHILD CODES", row: rowNum, message: "Code is required" });
+            return;
+          }
+          if (!childName) {
+            errors.push({ sheet: "CHILD CODES", row: rowNum, message: `Child name is required for code "${code}"` });
+            return;
+          }
+          childRows.push({ code, name: childName, parentName, sortOrder: childRows.length, rowNum });
+        });
 
-        importCodeMap.set(row.code.toLowerCase(), inserted.id);
-        imported.push({ code: row.code, name: row.name });
-      } catch (err: any) {
-        if (err.code === "23505") {
-          skipped.push({ code: row.code, reason: "Already exists (duplicate key)" });
-        } else {
-          errors.push({ row: row.rowNum, message: `Failed to insert "${row.code}": ${err.message}` });
+        for (const cRow of childRows) {
+          if (existingChildCodeMap.has(cRow.code.toLowerCase())) {
+            skippedChildren.push({ code: cRow.code, reason: "Already exists" });
+            continue;
+          }
+
+          const parentCostCodeId = parentNameToIdMap.get(cRow.parentName.toLowerCase());
+          if (!parentCostCodeId) {
+            errors.push({ sheet: "CHILD CODES", row: cRow.rowNum, message: `Parent "${cRow.parentName}" not found for child code "${cRow.code}". Make sure it matches a parent name from the PARENT CODES tab.` });
+            continue;
+          }
+
+          try {
+            const [inserted] = await db
+              .insert(childCostCodes)
+              .values({
+                companyId,
+                parentCostCodeId,
+                code: cRow.code,
+                name: cRow.name,
+                isActive: true,
+                sortOrder: cRow.sortOrder,
+              })
+              .returning();
+
+            existingChildCodeMap.set(cRow.code.toLowerCase(), inserted.id);
+            importedChildren.push({ code: cRow.code, name: cRow.name, parent: cRow.parentName });
+          } catch (err: any) {
+            if (err.code === "23505") {
+              skippedChildren.push({ code: cRow.code, reason: "Already exists (duplicate key)" });
+            } else {
+              errors.push({ sheet: "CHILD CODES", row: cRow.rowNum, message: `Failed to insert "${cRow.code}": ${err.message}` });
+            }
+          }
         }
       }
     }
@@ -300,13 +490,14 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
     res.json({
       success: true,
       summary: {
-        totalRows: rows.length,
-        imported: imported.length,
-        skipped: skipped.length,
+        parentCodes: { imported: importedParents.length, skipped: skippedParents.length },
+        childCodes: { imported: importedChildren.length, skipped: skippedChildren.length },
         errors: errors.length,
       },
-      imported,
-      skipped,
+      importedParents,
+      skippedParents,
+      importedChildren,
+      skippedChildren,
       errors,
     });
   } catch (error: any) {
@@ -446,6 +637,132 @@ router.delete("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_
   } catch (error: any) {
     logger.error("Error deleting cost code:", error);
     res.status(500).json({ message: "Failed to delete cost code" });
+  }
+});
+
+router.get("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const [result] = await db
+      .select({
+        id: childCostCodes.id,
+        companyId: childCostCodes.companyId,
+        parentCostCodeId: childCostCodes.parentCostCodeId,
+        code: childCostCodes.code,
+        name: childCostCodes.name,
+        description: childCostCodes.description,
+        isActive: childCostCodes.isActive,
+        sortOrder: childCostCodes.sortOrder,
+        createdAt: childCostCodes.createdAt,
+        updatedAt: childCostCodes.updatedAt,
+        parentCode: costCodes.code,
+        parentName: costCodes.name,
+      })
+      .from(childCostCodes)
+      .innerJoin(costCodes, eq(childCostCodes.parentCostCodeId, costCodes.id))
+      .where(and(eq(childCostCodes.id, req.params.id), eq(childCostCodes.companyId, companyId)));
+
+    if (!result) {
+      return res.status(404).json({ message: "Child cost code not found" });
+    }
+    res.json(result);
+  } catch (error: any) {
+    logger.error("Error fetching child cost code:", error);
+    res.status(500).json({ message: "Failed to fetch child cost code" });
+  }
+});
+
+router.post("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const data = childCostCodeSchema.parse(req.body);
+
+    const existing = await db
+      .select()
+      .from(childCostCodes)
+      .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)));
+
+    if (existing.length > 0) {
+      return res.status(409).json({ message: `Child cost code "${data.code}" already exists` });
+    }
+
+    const [result] = await db
+      .insert(childCostCodes)
+      .values({
+        companyId,
+        parentCostCodeId: data.parentCostCodeId,
+        code: data.code,
+        name: data.name,
+        description: data.description || null,
+        isActive: data.isActive ?? true,
+        sortOrder: data.sortOrder ?? 0,
+      })
+      .returning();
+
+    res.status(201).json(result);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    logger.error("Error creating child cost code:", error);
+    res.status(500).json({ message: "Failed to create child cost code" });
+  }
+});
+
+router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const data = childCostCodeSchema.partial().parse(req.body);
+
+    if (data.code) {
+      const existing = await db
+        .select()
+        .from(childCostCodes)
+        .where(and(eq(childCostCodes.code, data.code), eq(childCostCodes.companyId, companyId)));
+
+      if (existing.length > 0 && existing[0].id !== req.params.id) {
+        return res.status(409).json({ message: `Child cost code "${data.code}" already exists` });
+      }
+    }
+
+    const [result] = await db
+      .update(childCostCodes)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(childCostCodes.id, req.params.id), eq(childCostCodes.companyId, companyId)))
+      .returning();
+
+    if (!result) {
+      return res.status(404).json({ message: "Child cost code not found" });
+    }
+    res.json(result);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    logger.error("Error updating child cost code:", error);
+    res.status(500).json({ message: "Failed to update child cost code" });
+  }
+});
+
+router.delete("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_cost_codes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+
+    const [deleted] = await db
+      .delete(childCostCodes)
+      .where(and(eq(childCostCodes.id, req.params.id), eq(childCostCodes.companyId, companyId)))
+      .returning();
+
+    if (!deleted) {
+      return res.status(404).json({ message: "Child cost code not found" });
+    }
+    res.json({ message: "Child cost code deleted", id: deleted.id });
+  } catch (error: any) {
+    logger.error("Error deleting child cost code:", error);
+    res.status(500).json({ message: "Failed to delete child cost code" });
   }
 });
 

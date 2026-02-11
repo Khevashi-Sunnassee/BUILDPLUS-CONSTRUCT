@@ -35,10 +35,12 @@ import type { BoqGroup, BoqItem, CostCode, Job } from "@shared/schema";
 
 interface BoqGroupWithCostCode extends BoqGroup {
   costCode: { id: string; code: string; name: string };
+  childCostCode: { id: string; code: string; name: string } | null;
 }
 
 interface BoqItemWithCostCode extends BoqItem {
   costCode: { id: string; code: string; name: string };
+  childCostCode: { id: string; code: string; name: string } | null;
 }
 
 interface BoqSummary {
@@ -73,11 +75,13 @@ export default function JobBoqPage() {
 
   const [groupName, setGroupName] = useState("");
   const [groupCostCodeId, setGroupCostCodeId] = useState("");
+  const [groupChildCostCodeId, setGroupChildCostCodeId] = useState("");
   const [groupDescription, setGroupDescription] = useState("");
   const [groupSortOrder, setGroupSortOrder] = useState(0);
 
   const [itemDescription, setItemDescription] = useState("");
   const [itemCostCodeId, setItemCostCodeId] = useState("");
+  const [itemChildCostCodeId, setItemChildCostCodeId] = useState("");
   const [itemGroupId, setItemGroupId] = useState("");
   const [itemQuantity, setItemQuantity] = useState("");
   const [itemUnit, setItemUnit] = useState("EA");
@@ -138,7 +142,23 @@ export default function JobBoqPage() {
     queryKey: ["/api/cost-codes"],
   });
 
+  const { data: costCodesWithChildren = [] } = useQuery<any[]>({
+    queryKey: ["/api/cost-codes-with-children"],
+  });
+
   const activeCostCodes = useMemo(() => costCodes.filter((cc) => cc.isActive), [costCodes]);
+
+  const filteredGroupChildCodes = useMemo(() => {
+    if (!groupCostCodeId) return [];
+    const parent = costCodesWithChildren.find((cc: any) => cc.id === groupCostCodeId);
+    return (parent?.children || []).filter((child: any) => child.isActive);
+  }, [groupCostCodeId, costCodesWithChildren]);
+
+  const filteredItemChildCodes = useMemo(() => {
+    if (!itemCostCodeId) return [];
+    const parent = costCodesWithChildren.find((cc: any) => cc.id === itemCostCodeId);
+    return (parent?.children || []).filter((child: any) => child.isActive);
+  }, [itemCostCodeId, costCodesWithChildren]);
 
   const ungroupedItems = useMemo(() => allItems.filter((item) => !item.groupId), [allItems]);
   const groupedItemsMap = useMemo(() => {
@@ -160,7 +180,7 @@ export default function JobBoqPage() {
   }
 
   const createGroupMutation = useMutation({
-    mutationFn: async (data: { name: string; costCodeId: string; description?: string; sortOrder?: number }) => {
+    mutationFn: async (data: { name: string; costCodeId: string; childCostCodeId?: string; description?: string; sortOrder?: number }) => {
       return apiRequest("POST", `/api/jobs/${jobId}/boq/groups`, data);
     },
     onSuccess: () => {
@@ -174,7 +194,7 @@ export default function JobBoqPage() {
   });
 
   const updateGroupMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; name?: string; costCodeId?: string; description?: string; sortOrder?: number }) => {
+    mutationFn: async ({ id, ...data }: { id: string; name?: string; costCodeId?: string; childCostCodeId?: string; description?: string; sortOrder?: number }) => {
       return apiRequest("PATCH", `/api/jobs/${jobId}/boq/groups/${id}`, data);
     },
     onSuccess: () => {
@@ -202,7 +222,7 @@ export default function JobBoqPage() {
   });
 
   const createItemMutation = useMutation({
-    mutationFn: async (data: { description: string; costCodeId: string; groupId?: string | null; quantity?: string; unit?: string; unitPrice?: string; lineTotal?: string; notes?: string }) => {
+    mutationFn: async (data: { description: string; costCodeId: string; childCostCodeId?: string; groupId?: string | null; quantity?: string; unit?: string; unitPrice?: string; lineTotal?: string; notes?: string }) => {
       return apiRequest("POST", `/api/jobs/${jobId}/boq/items`, data);
     },
     onSuccess: () => {
@@ -216,7 +236,7 @@ export default function JobBoqPage() {
   });
 
   const updateItemMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; description?: string; costCodeId?: string; groupId?: string | null; quantity?: string; unit?: string; unitPrice?: string; lineTotal?: string; notes?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: string; description?: string; costCodeId?: string; childCostCodeId?: string; groupId?: string | null; quantity?: string; unit?: string; unitPrice?: string; lineTotal?: string; notes?: string }) => {
       return apiRequest("PATCH", `/api/jobs/${jobId}/boq/items/${id}`, data);
     },
     onSuccess: () => {
@@ -256,6 +276,7 @@ export default function JobBoqPage() {
     setEditingGroup(null);
     setGroupName("");
     setGroupCostCodeId("");
+    setGroupChildCostCodeId("");
     setGroupDescription("");
     setGroupSortOrder(0);
     setGroupDialogOpen(true);
@@ -265,6 +286,7 @@ export default function JobBoqPage() {
     setEditingGroup(group);
     setGroupName(group.name);
     setGroupCostCodeId(group.costCodeId);
+    setGroupChildCostCodeId(group.childCostCodeId || "");
     setGroupDescription(group.description || "");
     setGroupSortOrder(group.sortOrder);
     setGroupDialogOpen(true);
@@ -283,6 +305,7 @@ export default function JobBoqPage() {
     const data = {
       name: groupName.trim(),
       costCodeId: groupCostCodeId,
+      childCostCodeId: groupChildCostCodeId && groupChildCostCodeId !== "__none__" ? groupChildCostCodeId : undefined,
       description: groupDescription.trim() || undefined,
       sortOrder: groupSortOrder,
     };
@@ -298,6 +321,7 @@ export default function JobBoqPage() {
     setPresetGroupId(forGroupId || null);
     setItemDescription("");
     setItemCostCodeId("");
+    setItemChildCostCodeId("");
     setItemGroupId(forGroupId || "");
     setItemQuantity("");
     setItemUnit("EA");
@@ -311,6 +335,7 @@ export default function JobBoqPage() {
     setPresetGroupId(null);
     setItemDescription(item.description);
     setItemCostCodeId(item.costCodeId);
+    setItemChildCostCodeId(item.childCostCodeId || "");
     setItemGroupId(item.groupId || "");
     setItemQuantity(item.quantity || "");
     setItemUnit(item.unit);
@@ -333,6 +358,7 @@ export default function JobBoqPage() {
     const data = {
       description: itemDescription.trim(),
       costCodeId: itemCostCodeId,
+      childCostCodeId: itemChildCostCodeId && itemChildCostCodeId !== "__none__" ? itemChildCostCodeId : undefined,
       groupId: itemGroupId || null,
       quantity: itemQuantity || "0",
       unit: itemUnit,
@@ -473,6 +499,11 @@ export default function JobBoqPage() {
                             <Badge variant="secondary" className="text-xs" data-testid={`badge-group-cc-${group.id}`}>
                               {group.costCode.code} - {group.costCode.name}
                             </Badge>
+                            {group.childCostCode && (
+                              <Badge variant="outline" className="text-xs" data-testid={`badge-group-child-cc-${group.id}`}>
+                                {group.childCostCode.code} - {group.childCostCode.name}
+                              </Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">
                               {groupItems.length} item{groupItems.length !== 1 ? "s" : ""}
                             </span>
@@ -522,7 +553,12 @@ export default function JobBoqPage() {
                               {groupItems.map((item) => (
                                 <TableRow key={item.id} data-testid={`row-group-item-${item.id}`}>
                                   <TableCell data-testid={`text-item-desc-${item.id}`}>{item.description}</TableCell>
-                                  <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>{item.costCode.code}</TableCell>
+                                  <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>
+                                    {item.costCode.code}
+                                    {item.childCostCode && (
+                                      <span className="text-muted-foreground" data-testid={`text-item-child-cc-${item.id}`}> / {item.childCostCode.code}</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-item-qty-${item.id}`}>{item.quantity}</TableCell>
                                   <TableCell className="text-muted-foreground" data-testid={`text-item-unit-${item.id}`}>{item.unit}</TableCell>
                                   <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>{formatCurrency(item.unitPrice)}</TableCell>
@@ -590,7 +626,12 @@ export default function JobBoqPage() {
                   {(groups.length > 0 ? ungroupedItems : allItems).map((item) => (
                     <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                       <TableCell data-testid={`text-item-desc-${item.id}`}>{item.description}</TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>{item.costCode.code}</TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-item-cc-${item.id}`}>
+                        {item.costCode.code}
+                        {item.childCostCode && (
+                          <span className="text-muted-foreground" data-testid={`text-item-child-cc-${item.id}`}> / {item.childCostCode.code}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-item-qty-${item.id}`}>{item.quantity}</TableCell>
                       <TableCell className="text-muted-foreground" data-testid={`text-item-unit-${item.id}`}>{item.unit}</TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-item-price-${item.id}`}>{formatCurrency(item.unitPrice)}</TableCell>
@@ -636,7 +677,7 @@ export default function JobBoqPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="group-cost-code">Cost Code</Label>
-              <Select value={groupCostCodeId} onValueChange={setGroupCostCodeId}>
+              <Select value={groupCostCodeId} onValueChange={(v) => { setGroupCostCodeId(v); setGroupChildCostCodeId(""); }}>
                 <SelectTrigger data-testid="select-group-cost-code">
                   <SelectValue placeholder="Select cost code..." />
                 </SelectTrigger>
@@ -649,6 +690,24 @@ export default function JobBoqPage() {
                 </SelectContent>
               </Select>
             </div>
+            {filteredGroupChildCodes.length > 0 && (
+              <div className="space-y-2">
+                <Label>Child Code (Optional)</Label>
+                <Select value={groupChildCostCodeId} onValueChange={setGroupChildCostCodeId}>
+                  <SelectTrigger data-testid="select-group-child-cost-code">
+                    <SelectValue placeholder="Select a child code..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {filteredGroupChildCodes.map((cc: any) => (
+                      <SelectItem key={cc.id} value={cc.id} data-testid={`option-child-code-${cc.id}`}>
+                        {cc.code} - {cc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="group-description">Description</Label>
               <Textarea
@@ -703,7 +762,7 @@ export default function JobBoqPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="item-cost-code">Cost Code</Label>
-              <Select value={itemCostCodeId} onValueChange={setItemCostCodeId}>
+              <Select value={itemCostCodeId} onValueChange={(v) => { setItemCostCodeId(v); setItemChildCostCodeId(""); }}>
                 <SelectTrigger data-testid="select-item-cost-code">
                   <SelectValue placeholder="Select cost code..." />
                 </SelectTrigger>
@@ -716,6 +775,24 @@ export default function JobBoqPage() {
                 </SelectContent>
               </Select>
             </div>
+            {filteredItemChildCodes.length > 0 && (
+              <div className="space-y-2">
+                <Label>Child Code (Optional)</Label>
+                <Select value={itemChildCostCodeId} onValueChange={setItemChildCostCodeId}>
+                  <SelectTrigger data-testid="select-item-child-cost-code">
+                    <SelectValue placeholder="Select a child code..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {filteredItemChildCodes.map((cc: any) => (
+                      <SelectItem key={cc.id} value={cc.id} data-testid={`option-child-code-${cc.id}`}>
+                        {cc.code} - {cc.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label htmlFor="item-group">Group (optional)</Label>
               <Select value={itemGroupId || "NONE"} onValueChange={(v) => setItemGroupId(v === "NONE" ? "" : v)}>
