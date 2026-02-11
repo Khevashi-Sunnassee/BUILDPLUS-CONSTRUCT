@@ -82,6 +82,19 @@ router.get("/api/purchase-orders/my", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/api/purchase-orders/by-capex/:capexId", requireAuth, requirePermission("purchase_orders"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const allOrders = await storage.getAllPurchaseOrders(companyId);
+    const capexOrders = allOrders.filter((o: any) => o.capexRequestId === req.params.capexId);
+    res.json(capexOrders);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching purchase orders by CAPEX");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch purchase orders" });
+  }
+});
+
 router.get("/api/purchase-orders/next-number", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;

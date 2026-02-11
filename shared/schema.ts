@@ -1671,6 +1671,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   requestedById: varchar("requested_by_id", { length: 36 }).notNull().references(() => users.id),
   status: poStatusEnum("status").default("DRAFT").notNull(),
   projectName: text("project_name"),
+  capexRequestId: varchar("capex_request_id", { length: 36 }),
   deliveryAddress: text("delivery_address"),
   requiredByDate: timestamp("required_by_date"),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0"),

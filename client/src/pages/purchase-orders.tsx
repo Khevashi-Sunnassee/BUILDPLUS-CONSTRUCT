@@ -883,7 +883,9 @@ export default function PurchaseOrdersPage() {
         const query = searchQuery.toLowerCase().trim();
         const poNumber = po.poNumber?.toLowerCase() || "";
         const supplierName = (po.supplier?.name || po.supplierName || "").toLowerCase();
-        if (!poNumber.includes(query) && !supplierName.includes(query)) return false;
+        const projectName = ((po as any).projectName || "").toLowerCase();
+        const capexId = ((po as any).capexRequestId || "").toLowerCase();
+        if (!poNumber.includes(query) && !supplierName.includes(query) && !projectName.includes(query) && !capexId.includes(query)) return false;
       }
       return true;
     });
@@ -970,7 +972,7 @@ export default function PurchaseOrdersPage() {
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search PO number or supplier..."
+                placeholder="Search PO number, supplier, or project..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
@@ -1054,7 +1056,12 @@ export default function PurchaseOrdersPage() {
                       <span className="font-medium">{po.poNumber}</span>
                     </TableCell>
                     <TableCell data-testid={`cell-supplier-${po.id}`}>
-                      {getSupplierDisplay(po)}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span>{getSupplierDisplay(po)}</span>
+                        {(po as any).capexRequestId && (
+                          <Badge variant="outline" className="text-xs" data-testid={`badge-capex-${po.id}`}>CAPEX</Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell data-testid={`cell-requested-by-${po.id}`}>
                       {po.requestedBy?.name || po.requestedBy?.email || "-"}

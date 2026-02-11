@@ -1362,6 +1362,15 @@ export default function PurchaseOrderFormPage() {
                     <p className="mt-1">{(existingPO as any)?.projectName || "-"}</p>
                   )}
                 </div>
+                {(existingPO as any)?.capexRequestId && (
+                  <div>
+                    <Label className="text-sm font-medium">Linked CAPEX Request</Label>
+                    <p className="mt-1">
+                      <Badge variant="outline" data-testid="badge-capex-link">CAPEX</Badge>
+                      <span className="ml-2 text-sm text-muted-foreground">{(existingPO as any).capexRequestId}</span>
+                    </p>
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium">Required By Date</Label>
                   {canEdit ? (
