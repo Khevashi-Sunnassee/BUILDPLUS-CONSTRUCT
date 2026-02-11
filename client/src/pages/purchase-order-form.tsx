@@ -118,15 +118,24 @@ export default function PurchaseOrderFormPage() {
   const [receivedItemIds, setReceivedItemIds] = useState<Set<string>>(new Set());
   const [itemPickerOpen, setItemPickerOpen] = useState(false);
   const [itemPickerLineId, setItemPickerLineId] = useState<string | null>(null);
+  const [selectedCapexId, setSelectedCapexId] = useState<string | undefined>(capexId || undefined);
+  const [capexManuallyCleared, setCapexManuallyCleared] = useState(false);
+
+  const effectiveCapexId = capexManuallyCleared ? null : (selectedCapexId || capexId || null);
 
   const { data: capexData } = useQuery<any>({
-    queryKey: ["/api/capex-requests", capexId],
+    queryKey: ["/api/capex-requests", effectiveCapexId],
     queryFn: async () => {
-      const res = await fetch(`/api/capex-requests/${capexId}`, { credentials: "include" });
+      const res = await fetch(`/api/capex-requests/${effectiveCapexId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch CAPEX data");
       return res.json();
     },
-    enabled: !!capexId,
+    enabled: !!effectiveCapexId,
+  });
+
+  const { data: allCapexRequests = [] } = useQuery<any[]>({
+    queryKey: ["/api/capex-requests"],
+    enabled: isNew,
   });
 
   const { data: suppliers = [], isLoading: loadingSuppliers } = useQuery<Supplier[]>({
@@ -206,9 +215,10 @@ export default function PurchaseOrderFormPage() {
       }
       updates.notes = `CAPEX Request: ${capexData.capexNumber} - ${capexData.equipmentTitle}`;
       form.reset({ ...form.getValues(), ...updates });
-      if (lineItems.length === 0) {
+      const hasCapexItem = lineItems.some(item => item.itemCode === "CAPEX");
+      if (lineItems.length === 0 || !hasCapexItem) {
         const totalCost = parseFloat(capexData.totalEquipmentCost || "0");
-        setLineItems([{
+        const capexLineItem = {
           id: crypto.randomUUID(),
           itemId: null,
           itemCode: "CAPEX",
@@ -219,10 +229,15 @@ export default function PurchaseOrderFormPage() {
           lineTotal: totalCost.toString(),
           jobId: capexData.jobId || null,
           jobNumber: capexData.job?.jobNumber || "",
-        }]);
+        };
+        if (lineItems.length === 0) {
+          setLineItems([capexLineItem]);
+        } else {
+          setLineItems(prev => [capexLineItem, ...prev.filter(i => i.itemCode !== "CAPEX")]);
+        }
       }
     }
-  }, [capexData, isNew, suppliers]);
+  }, [capexData, isNew, suppliers, effectiveCapexId]);
 
   useEffect(() => {
     if (existingPO) {
@@ -261,7 +276,7 @@ export default function PurchaseOrderFormPage() {
       const response = await apiRequest("POST", PROCUREMENT_ROUTES.PURCHASE_ORDERS, {
         ...data.po,
         requiredByDate: data.po.requiredByDate?.toISOString(),
-        ...(capexId ? { capexRequestId: capexId, capexDescription: capexData?.equipmentTitle || "" } : {}),
+        ...(effectiveCapexId ? { capexRequestId: effectiveCapexId, capexDescription: capexData?.equipmentTitle || "" } : {}),
         items: data.items.map((item, index) => ({
           itemId: item.itemId === MANUAL_ENTRY_ID ? null : item.itemId,
           itemCode: item.itemCode,
@@ -277,7 +292,7 @@ export default function PurchaseOrderFormPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS] });
-      if (capexId) {
+      if (effectiveCapexId) {
         queryClient.invalidateQueries({ queryKey: ["/api/capex-requests"] });
       }
       toast({ title: "Purchase order created successfully" });
@@ -1355,20 +1370,39 @@ export default function PurchaseOrderFormPage() {
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium">Project Name</Label>
-                  {canEdit ? (
-                    <Input
-                      value={form.watch("projectName") || ""}
-                      onChange={(e) => form.setValue("projectName", e.target.value)}
-                      placeholder="Enter project name"
-                      data-testid="input-project-name"
-                    />
-                  ) : (
-                    <p className="mt-1">{(existingPO as any)?.projectName || "-"}</p>
-                  )}
-                </div>
-                {(existingPO as any)?.capexRequestId && (
+                {isNew && (
+                  <div>
+                    <Label className="text-sm font-medium">Link CAPEX Request</Label>
+                    <Select
+                      value={effectiveCapexId || "none"}
+                      onValueChange={(val) => {
+                        if (val === "none") {
+                          setSelectedCapexId(undefined);
+                          setCapexManuallyCleared(true);
+                        } else {
+                          setSelectedCapexId(val);
+                          setCapexManuallyCleared(false);
+                        }
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-capex-request">
+                        <SelectValue placeholder="None (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {allCapexRequests
+                          .filter((c: any) => c.status === "APPROVED" || c.status === "SUBMITTED")
+                          .sort((a: any, b: any) => (b.capexNumber || "").localeCompare(a.capexNumber || ""))
+                          .map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.capexNumber} — {c.equipmentTitle}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+                {!isNew && (existingPO as any)?.capexRequestId && (
                   <div>
                     <Label className="text-sm font-medium">Linked CAPEX Request</Label>
                     <div className="mt-1">
@@ -1384,6 +1418,19 @@ export default function PurchaseOrderFormPage() {
                     </div>
                   </div>
                 )}
+                <div>
+                  <Label className="text-sm font-medium">Project Name</Label>
+                  {canEdit ? (
+                    <Input
+                      value={form.watch("projectName") || ""}
+                      onChange={(e) => form.setValue("projectName", e.target.value)}
+                      placeholder="Enter project name"
+                      data-testid="input-project-name"
+                    />
+                  ) : (
+                    <p className="mt-1">{(existingPO as any)?.projectName || "-"}</p>
+                  )}
+                </div>
                 <div>
                   <Label className="text-sm font-medium">Required By Date</Label>
                   {canEdit ? (
