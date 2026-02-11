@@ -259,6 +259,7 @@ export default function AdminSuppliersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_EQUIPMENT_HIRE] });
       toast({ title: "Supplier created successfully" });
       setDialogOpen(false);
       form.reset();
@@ -274,6 +275,7 @@ export default function AdminSuppliersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS] });
+      queryClient.invalidateQueries({ queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_EQUIPMENT_HIRE] });
       toast({ title: "Supplier updated successfully" });
       setDialogOpen(false);
       setEditingSupplier(null);

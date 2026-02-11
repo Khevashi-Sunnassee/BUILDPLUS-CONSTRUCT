@@ -3,8 +3,10 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { hireBookings, employees, suppliers, jobs, assets, users, ASSET_CATEGORIES } from "@shared/schema";
+import { hireBookings, employees, suppliers, jobs, assets, users, companies, ASSET_CATEGORIES } from "@shared/schema";
 import { eq, and, desc, sql, ilike, or } from "drizzle-orm";
+import { emailService } from "../services/email.service";
+import { format } from "date-fns";
 
 const router = Router();
 
@@ -148,17 +150,48 @@ router.get("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Resp
     const id = String(req.params.id);
 
     const result = await db
-      .select()
+      .select({
+        booking: hireBookings,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+          email: suppliers.email,
+          phone: suppliers.phone,
+          keyContact: suppliers.keyContact,
+          addressLine1: suppliers.addressLine1,
+          addressLine2: suppliers.addressLine2,
+          city: suppliers.city,
+          state: suppliers.state,
+          postcode: suppliers.postcode,
+        },
+        job: {
+          id: jobs.id,
+          name: jobs.name,
+          jobNumber: jobs.jobNumber,
+        },
+        requestedBy: {
+          id: employees.id,
+          firstName: employees.firstName,
+          lastName: employees.lastName,
+          employeeNumber: employees.employeeNumber,
+        },
+      })
       .from(hireBookings)
+      .leftJoin(suppliers, eq(hireBookings.supplierId, suppliers.id))
+      .leftJoin(jobs, eq(hireBookings.jobId, jobs.id))
+      .leftJoin(employees, eq(hireBookings.requestedByUserId, employees.id))
       .where(and(eq(hireBookings.id, id), eq(hireBookings.companyId, companyId)))
       .limit(1);
 
     if (result.length === 0) return res.status(404).json({ error: "Hire booking not found" });
 
-    const booking = result[0];
+    const row = result[0];
     res.json({
-      ...booking,
-      assetCategoryName: ASSET_CATEGORIES[booking.assetCategoryIndex] || "Unknown",
+      ...row.booking,
+      assetCategoryName: ASSET_CATEGORIES[row.booking.assetCategoryIndex] || "Unknown",
+      supplier: row.supplier,
+      job: row.job,
+      requestedByEmployee: row.requestedBy,
     });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching hire booking");
@@ -411,6 +444,197 @@ router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting hire booking");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete hire booking" });
+  }
+});
+
+function buildHireBookingHtml(booking: any, supplier: any, job: any, requestedBy: any, companyName: string): string {
+  const fmtDate = (d: any) => d ? format(new Date(d), "dd/MM/yyyy") : "-";
+  const fmtCurrency = (v: any) => v ? `$${parseFloat(v).toFixed(2)}` : "-";
+  const rateLabels: Record<string, string> = { day: "Per Day", week: "Per Week", month: "Per Month", custom: "Custom" };
+  const chargeLabels: Record<string, string> = { calendar_days: "Calendar Days", business_days: "Business Days", minimum_days: "Minimum Days" };
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; color: #333; margin: 0; padding: 20px; }
+  .header { background: #1e3a5f; color: white; padding: 24px; margin: -20px -20px 20px -20px; }
+  .header h1 { margin: 0 0 4px 0; font-size: 22px; }
+  .header p { margin: 0; font-size: 14px; opacity: 0.9; }
+  .section { margin-bottom: 20px; }
+  .section-title { font-size: 14px; font-weight: bold; color: #1e3a5f; border-bottom: 2px solid #1e3a5f; padding-bottom: 4px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; }
+  table td { padding: 6px 8px; vertical-align: top; font-size: 13px; }
+  table td:first-child { font-weight: 600; color: #555; width: 180px; }
+  .status-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 11px; color: #999; }
+  @media print {
+    body { padding: 0; }
+    .header { margin: 0 0 20px 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>${companyName}</h1>
+    <p>Equipment Hire Booking - ${booking.bookingNumber}</p>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Booking Details</div>
+    <table>
+      <tr><td>Booking Number</td><td>${booking.bookingNumber}</td></tr>
+      <tr><td>Status</td><td>${booking.status.replace(/_/g, " ")}</td></tr>
+      <tr><td>Equipment Source</td><td>${booking.hireSource === "external" ? "External (Hire Company)" : "Internal"}</td></tr>
+      <tr><td>Equipment Description</td><td>${booking.equipmentDescription}</td></tr>
+      <tr><td>Asset Category</td><td>${ASSET_CATEGORIES[booking.assetCategoryIndex] || "Unknown"}</td></tr>
+      <tr><td>Quantity</td><td>${booking.quantity || 1}</td></tr>
+    </table>
+  </div>
+
+  ${supplier && supplier.id ? `
+  <div class="section">
+    <div class="section-title">Supplier / Hire Company</div>
+    <table>
+      <tr><td>Company</td><td>${supplier.name || "-"}</td></tr>
+      <tr><td>Contact</td><td>${supplier.keyContact || "-"}</td></tr>
+      <tr><td>Email</td><td>${supplier.email || "-"}</td></tr>
+      <tr><td>Phone</td><td>${supplier.phone || "-"}</td></tr>
+      ${supplier.addressLine1 ? `<tr><td>Address</td><td>${[supplier.addressLine1, supplier.addressLine2, supplier.city, supplier.state, supplier.postcode].filter(Boolean).join(", ")}</td></tr>` : ""}
+      ${booking.supplierReference ? `<tr><td>Supplier Reference</td><td>${booking.supplierReference}</td></tr>` : ""}
+    </table>
+  </div>
+  ` : ""}
+
+  <div class="section">
+    <div class="section-title">Job Details</div>
+    <table>
+      <tr><td>Job</td><td>${job ? `${job.jobNumber} - ${job.name}` : "-"}</td></tr>
+      <tr><td>Requested By</td><td>${requestedBy ? `${requestedBy.firstName} ${requestedBy.lastName}` : "-"}</td></tr>
+      ${booking.costCode ? `<tr><td>Cost Code</td><td>${booking.costCode}</td></tr>` : ""}
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Hire Period & Rates</div>
+    <table>
+      <tr><td>Start Date</td><td>${fmtDate(booking.hireStartDate)}</td></tr>
+      <tr><td>End Date</td><td>${fmtDate(booking.hireEndDate)}</td></tr>
+      ${booking.expectedReturnDate ? `<tr><td>Expected Return</td><td>${fmtDate(booking.expectedReturnDate)}</td></tr>` : ""}
+      <tr><td>Rate</td><td>${fmtCurrency(booking.rateAmount)} ${rateLabels[booking.rateType] || booking.rateType}</td></tr>
+      <tr><td>Charge Rule</td><td>${chargeLabels[booking.chargeRule] || booking.chargeRule}</td></tr>
+    </table>
+  </div>
+
+  ${booking.deliveryRequired || booking.pickupRequired ? `
+  <div class="section">
+    <div class="section-title">Logistics</div>
+    <table>
+      ${booking.deliveryRequired ? `
+        <tr><td>Delivery Required</td><td>Yes</td></tr>
+        ${booking.deliveryAddress ? `<tr><td>Delivery Address</td><td>${booking.deliveryAddress}</td></tr>` : ""}
+        ${booking.deliveryCost ? `<tr><td>Delivery Cost</td><td>${fmtCurrency(booking.deliveryCost)}</td></tr>` : ""}
+      ` : ""}
+      ${booking.pickupRequired ? `
+        <tr><td>Pickup Required</td><td>Yes</td></tr>
+        ${booking.pickupCost ? `<tr><td>Pickup Cost</td><td>${fmtCurrency(booking.pickupCost)}</td></tr>` : ""}
+      ` : ""}
+    </table>
+  </div>
+  ` : ""}
+
+  ${booking.notes ? `
+  <div class="section">
+    <div class="section-title">Notes</div>
+    <p style="font-size: 13px; white-space: pre-wrap;">${booking.notes}</p>
+  </div>
+  ` : ""}
+
+  <div class="footer">
+    Generated by ${companyName} on ${format(new Date(), "dd/MM/yyyy 'at' HH:mm")}
+  </div>
+</body>
+</html>`;
+}
+
+router.post("/api/hire-bookings/:id/send-email", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = String(req.params.id);
+
+    const emailTo = req.body.to as string;
+    const emailCc = req.body.cc as string | undefined;
+    const emailSubject = req.body.subject as string | undefined;
+    const emailMessage = req.body.message as string | undefined;
+
+    if (!emailTo) return res.status(400).json({ error: "Recipient email is required" });
+
+    const result = await db
+      .select({
+        booking: hireBookings,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+          email: suppliers.email,
+          phone: suppliers.phone,
+          keyContact: suppliers.keyContact,
+          addressLine1: suppliers.addressLine1,
+          addressLine2: suppliers.addressLine2,
+          city: suppliers.city,
+          state: suppliers.state,
+          postcode: suppliers.postcode,
+        },
+        job: {
+          id: jobs.id,
+          name: jobs.name,
+          jobNumber: jobs.jobNumber,
+        },
+        requestedBy: {
+          id: employees.id,
+          firstName: employees.firstName,
+          lastName: employees.lastName,
+          employeeNumber: employees.employeeNumber,
+        },
+      })
+      .from(hireBookings)
+      .leftJoin(suppliers, eq(hireBookings.supplierId, suppliers.id))
+      .leftJoin(jobs, eq(hireBookings.jobId, jobs.id))
+      .leftJoin(employees, eq(hireBookings.requestedByUserId, employees.id))
+      .where(and(eq(hireBookings.id, id), eq(hireBookings.companyId, companyId)))
+      .limit(1);
+
+    if (result.length === 0) return res.status(404).json({ error: "Hire booking not found" });
+
+    const row = result[0];
+    const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1);
+    const companyName = company?.name || "LTE Performance Management";
+
+    const subject = emailSubject || `Equipment Hire Booking ${row.booking.bookingNumber}`;
+    const htmlContent = buildHireBookingHtml(row.booking, row.supplier, row.job, row.requestedBy, companyName);
+
+    const introMessage = emailMessage
+      ? `<div style="font-family: Arial, sans-serif; padding: 16px; font-size: 14px; color: #333; border-bottom: 1px solid #ddd; margin-bottom: 16px;">${emailMessage.replace(/\n/g, "<br>")}</div>`
+      : "";
+
+    const fullHtml = introMessage + htmlContent;
+
+    const emailResult = await emailService.sendEmailWithAttachment({
+      to: emailTo,
+      cc: emailCc,
+      subject,
+      body: fullHtml,
+    });
+
+    if (!emailResult.success) {
+      return res.status(500).json({ error: emailResult.error || "Failed to send email" });
+    }
+
+    res.json({ success: true, messageId: emailResult.messageId });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error sending hire booking email");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to send email" });
   }
 });
 

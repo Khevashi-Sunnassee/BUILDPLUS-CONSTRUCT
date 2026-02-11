@@ -178,6 +178,7 @@ export const HIRE_ROUTES = {
   RETURN: (id: string | number) => `/api/hire-bookings/${id}/return`,
   CANCEL: (id: string | number) => `/api/hire-bookings/${id}/cancel`,
   CLOSE: (id: string | number) => `/api/hire-bookings/${id}/close`,
+  SEND_EMAIL: (id: string | number) => `/api/hire-bookings/${id}/send-email`,
 } as const;
 
 // ============================================================================

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -20,9 +20,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, CalendarIcon, Save, Send, Check, X, Truck, Package, RotateCcw, Lock, Loader2 } from "lucide-react";
+import { ArrowLeft, CalendarIcon, Save, Send, Check, X, Truck, Package, RotateCcw, Lock, Loader2, Printer, Mail } from "lucide-react";
 import type { Supplier, Job, Employee, HireBooking } from "@shared/schema";
 import { ASSET_CATEGORIES } from "@shared/schema";
 import { HIRE_ROUTES, PROCUREMENT_ROUTES, JOBS_ROUTES, EMPLOYEE_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
@@ -103,8 +104,13 @@ export default function HireBookingFormPage() {
   const isNew = params?.id === "new";
   const bookingId = isNew ? null : params?.id;
   const [actionDialog, setActionDialog] = useState<string | null>(null);
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [emailTo, setEmailTo] = useState("");
+  const [emailCc, setEmailCc] = useState("");
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailMessage, setEmailMessage] = useState("");
 
-  const { data: existingBooking, isLoading: bookingLoading } = useQuery<HireBooking & { assetCategoryName: string }>({
+  const { data: existingBooking, isLoading: bookingLoading } = useQuery<HireBooking & { assetCategoryName: string; supplier?: any; job?: any; requestedByEmployee?: any }>({
     queryKey: [HIRE_ROUTES.LIST, bookingId],
     queryFn: async () => {
       if (!bookingId) return null;
@@ -281,6 +287,43 @@ export default function HireBookingFormPage() {
     },
   });
 
+  const sendEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!bookingId) throw new Error("Save the booking first");
+      return apiRequest("POST", HIRE_ROUTES.SEND_EMAIL(bookingId), {
+        to: emailTo,
+        cc: emailCc || undefined,
+        subject: emailSubject || undefined,
+        message: emailMessage || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Email sent successfully" });
+      setEmailDialogOpen(false);
+      setEmailTo("");
+      setEmailCc("");
+      setEmailSubject("");
+      setEmailMessage("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const handleOpenEmailDialog = () => {
+    const supplierEmail = existingBooking?.supplier?.email || "";
+    const bn = existingBooking?.bookingNumber || bookingNumber;
+    setEmailTo(supplierEmail);
+    setEmailSubject(`Equipment Hire Booking ${bn}`);
+    setEmailMessage("");
+    setEmailCc("");
+    setEmailDialogOpen(true);
+  };
+
   const onSubmit = (data: FormValues) => {
     saveMutation.mutate(data);
   };
@@ -298,8 +341,8 @@ export default function HireBookingFormPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-center gap-4 flex-wrap">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto hire-booking-print-area">
+      <div className="flex items-center gap-4 flex-wrap no-print">
         <Button variant="ghost" size="icon" onClick={() => navigate("/hire-bookings")} data-testid="button-back-hire">
           <ArrowLeft className="h-4 w-4" />
         </Button>
@@ -322,7 +365,7 @@ export default function HireBookingFormPage() {
       </div>
 
       {existingBooking && !isNew && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap no-print">
           {existingBooking.status === "DRAFT" && (
             <Button onClick={() => setActionDialog("submit")} data-testid="button-submit-booking">
               <Send className="h-4 w-4 mr-2" /> Submit for Approval
@@ -363,6 +406,13 @@ export default function HireBookingFormPage() {
               <X className="h-4 w-4 mr-2" /> Cancel Booking
             </Button>
           )}
+          <Separator orientation="vertical" className="h-6 mx-1" />
+          <Button variant="outline" onClick={handlePrint} data-testid="button-print-booking">
+            <Printer className="h-4 w-4 mr-2" /> Print
+          </Button>
+          <Button variant="outline" onClick={handleOpenEmailDialog} data-testid="button-email-booking">
+            <Mail className="h-4 w-4 mr-2" /> Email
+          </Button>
         </div>
       )}
 
@@ -1000,7 +1050,7 @@ export default function HireBookingFormPage() {
           </Card>
 
           {canEdit && (
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-2 no-print">
               <Button variant="outline" type="button" onClick={() => navigate("/hire-bookings")} data-testid="button-cancel-form">
                 Cancel
               </Button>
@@ -1048,6 +1098,73 @@ export default function HireBookingFormPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Email Hire Booking</DialogTitle>
+            <DialogDescription>
+              Send booking {bookingNumber} details to the hire company or any recipient.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>To (required)</Label>
+              <Input
+                value={emailTo}
+                onChange={(e) => setEmailTo(e.target.value)}
+                placeholder="recipient@example.com"
+                data-testid="input-email-to"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>CC (optional)</Label>
+              <Input
+                value={emailCc}
+                onChange={(e) => setEmailCc(e.target.value)}
+                placeholder="cc@example.com"
+                data-testid="input-email-cc"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Subject</Label>
+              <Input
+                value={emailSubject}
+                onChange={(e) => setEmailSubject(e.target.value)}
+                placeholder="Equipment Hire Booking"
+                data-testid="input-email-subject"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Message (optional)</Label>
+              <Textarea
+                value={emailMessage}
+                onChange={(e) => setEmailMessage(e.target.value)}
+                placeholder="Additional message to include..."
+                rows={3}
+                data-testid="input-email-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)} data-testid="button-cancel-email">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => sendEmailMutation.mutate()}
+              disabled={!emailTo || sendEmailMutation.isPending}
+              data-testid="button-send-email"
+            >
+              {sendEmailMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Send Email
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
