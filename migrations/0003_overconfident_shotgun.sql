@@ -1,1 +1,1 @@
-ALTER TABLE "user_invitations" ADD COLUMN "permissions" json;
+ALTER TABLE "user_invitations" ADD COLUMN IF NOT EXISTS "permissions" json;

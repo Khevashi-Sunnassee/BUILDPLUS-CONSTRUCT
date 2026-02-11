@@ -1,1 +1,1 @@
-ALTER TABLE "customers" ADD COLUMN "website" text;
+ALTER TABLE "customers" ADD COLUMN IF NOT EXISTS "website" text;
