@@ -1,11 +1,13 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { TASKS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useDroppable } from "@dnd-kit/core";
@@ -23,6 +25,7 @@ import {
   ChevronsUpDown,
   Palette,
   Check,
+  Users,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -48,11 +51,19 @@ import { SortableTaskRow } from "./TaskRow";
 import type { Task, TaskGroup, User, Job, SortOption } from "./types";
 import {
   getTaskGridTemplate,
+  getInitials,
   DEFAULT_ITEM_COL_WIDTH,
   MIN_ITEM_COL_WIDTH,
   MAX_ITEM_COL_WIDTH,
   ITEM_COL_STORAGE_KEY,
 } from "./types";
+
+interface GroupMember {
+  id: string;
+  groupId: string;
+  userId: string;
+  user: { id: string; name: string | null; email: string };
+}
 
 const GROUP_COLOR_PALETTE = [
   "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
@@ -114,7 +125,32 @@ export function TaskGroupComponent({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sortOption, setSortOption] = useState<SortOption>("default");
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set());
+  const [showMembersPopover, setShowMembersPopover] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: groupMembers = [] } = useQuery<GroupMember[]>({
+    queryKey: [TASKS_ROUTES.GROUP_MEMBERS(group.id), group.id],
+  });
+
+  const setMembersMutation = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      return apiRequest("PUT", TASKS_ROUTES.GROUP_MEMBERS(group.id), { userIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUP_MEMBERS(group.id), group.id] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const handleToggleMember = (userId: string) => {
+    const currentIds = groupMembers.map(m => m.userId);
+    const newIds = currentIds.includes(userId)
+      ? currentIds.filter(id => id !== userId)
+      : [...currentIds, userId];
+    setMembersMutation.mutate(newIds);
+  };
 
   const [itemColWidth, setItemColWidth] = useState<number>(() => {
     const saved = localStorage.getItem(ITEM_COL_STORAGE_KEY);
@@ -308,6 +344,58 @@ export function TaskGroupComponent({
         <Badge variant="secondary" className="ml-2">
           {group.tasks.length} items
         </Badge>
+
+        <Popover open={showMembersPopover} onOpenChange={setShowMembersPopover}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 gap-1 ml-2"
+              data-testid={`btn-group-members-${group.id}`}
+            >
+              {groupMembers.length > 0 ? (
+                <div className="flex -space-x-1.5">
+                  {groupMembers.slice(0, 3).map((member) => (
+                    <Avatar key={member.id} className="h-5 w-5 border border-background">
+                      <AvatarFallback className="text-[9px]">{getInitials(member.user?.name)}</AvatarFallback>
+                    </Avatar>
+                  ))}
+                  {groupMembers.length > 3 && (
+                    <span className="text-xs text-muted-foreground ml-1">+{groupMembers.length - 3}</span>
+                  )}
+                </div>
+              ) : (
+                <Users className="h-3.5 w-3.5" />
+              )}
+              <span className="text-xs">Members</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-64 p-2 max-h-72 overflow-y-auto">
+            <div className="text-xs font-semibold text-muted-foreground mb-2 px-1">Group Members</div>
+            <div className="text-[11px] text-muted-foreground mb-2 px-1">
+              Members are auto-assigned to new tasks in this group.
+            </div>
+            {users.map((user) => {
+              const isMember = groupMembers.some(m => m.userId === user.id);
+              return (
+                <button
+                  key={user.id}
+                  className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-sm hover-elevate"
+                  onClick={() => handleToggleMember(user.id)}
+                  data-testid={`member-option-${group.id}-${user.id}`}
+                >
+                  <div className={cn("h-4 w-4 rounded-sm border flex items-center justify-center", isMember ? "bg-primary border-primary" : "border-muted-foreground/30")}>
+                    {isMember && <Check className="h-3 w-3 text-primary-foreground" />}
+                  </div>
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[9px]">{getInitials(user.name)}</AvatarFallback>
+                  </Avatar>
+                  <span className="truncate">{user.name || user.email}</span>
+                </button>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
 
         <div className="flex-1" />
 

@@ -170,6 +170,36 @@ router.delete("/api/task-groups/:id", requireAuth, requirePermission("tasks", "V
   }
 });
 
+router.get("/api/task-groups/:id/members", requireAuth, requirePermission("tasks"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const group = await storage.getTaskGroup(String(req.params.id));
+    if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
+    const members = await storage.getTaskGroupMembers(String(req.params.id));
+    res.json(members);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching task group members");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch task group members" });
+  }
+});
+
+router.put("/api/task-groups/:id/members", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const group = await storage.getTaskGroup(String(req.params.id));
+    if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task group not found" });
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds)) {
+      return res.status(400).json({ error: "userIds must be an array" });
+    }
+    const members = await storage.setTaskGroupMembers(String(req.params.id), userIds);
+    res.json(members);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error setting task group members");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to set task group members" });
+  }
+});
+
 router.post("/api/task-groups/reorder", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const companyId = req.companyId;
@@ -243,8 +273,14 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
       ...taskData,
       createdById: userId,
     });
+    const groupMembers = await storage.getTaskGroupMembers(taskData.groupId);
+    const memberUserIds = groupMembers.map(m => m.userId);
+    const assigneeIds = new Set<string>(memberUserIds);
     if (userId) {
-      await storage.setTaskAssignees(task.id, [userId]);
+      assigneeIds.add(userId);
+    }
+    if (assigneeIds.size > 0) {
+      await storage.setTaskAssignees(task.id, Array.from(assigneeIds));
     }
     const taskWithDetails = await storage.getTask(task.id);
     res.status(201).json(taskWithDetails || task);

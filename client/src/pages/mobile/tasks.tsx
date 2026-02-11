@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { TASKS_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
+import { TASKS_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,9 @@ import {
   ListTodo,
   Activity,
   Briefcase,
+  Users,
+  UserPlus,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -42,6 +45,19 @@ interface TaskAssignee {
   id: string;
   userId: string;
   user: { id: string; name: string | null; email: string };
+}
+
+interface GroupMember {
+  id: string;
+  groupId: string;
+  userId: string;
+  user: { id: string; name: string | null; email: string };
+}
+
+interface CompanyUser {
+  id: string;
+  name: string | null;
+  email: string;
 }
 
 interface Task {
@@ -660,6 +676,44 @@ function TasksListView({
   handleCreateTask: (groupId: string) => void;
   createTaskMutation: any;
 }) {
+  const { toast } = useToast();
+  const [membersGroupId, setMembersGroupId] = useState<string | null>(null);
+
+  const { data: allUsers = [] } = useQuery<CompanyUser[]>({
+    queryKey: [USER_ROUTES.LIST],
+  });
+
+  const { data: groupMembers = [] } = useQuery<GroupMember[]>({
+    queryKey: [TASKS_ROUTES.GROUP_MEMBERS(membersGroupId || ""), membersGroupId],
+    enabled: !!membersGroupId,
+  });
+
+  const setMembersMutation = useMutation({
+    mutationFn: async ({ groupId, userIds }: { groupId: string; userIds: string[] }) => {
+      return apiRequest("PUT", TASKS_ROUTES.GROUP_MEMBERS(groupId), { userIds });
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUP_MEMBERS(variables.groupId), variables.groupId] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update members", variant: "destructive" });
+    },
+  });
+
+  const handleToggleMember = (userId: string) => {
+    if (!membersGroupId) return;
+    const currentIds = groupMembers.map(m => m.userId);
+    const newIds = currentIds.includes(userId)
+      ? currentIds.filter(id => id !== userId)
+      : [...currentIds, userId];
+    setMembersMutation.mutate({ groupId: membersGroupId, userIds: newIds });
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "?";
+    return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -684,114 +738,221 @@ function TasksListView({
   }
 
   return (
-    <div className="space-y-4">
-      {groups.map((group) => {
-        const isCollapsed = collapsedGroups.has(group.id);
-        const allGroupTasks = group.tasks || [];
-        const q = searchQuery.toLowerCase().trim();
-        const searchFiltered = q
-          ? allGroupTasks.filter(t =>
-              t.title.toLowerCase().includes(q) ||
-              (t.priority && t.priority.toLowerCase().includes(q)) ||
-              (t.consultant && t.consultant.toLowerCase().includes(q)) ||
-              (t.projectStage && t.projectStage.toLowerCase().includes(q)) ||
-              (t.assignees?.some(a => a.user?.name?.toLowerCase().includes(q)))
-            )
-          : allGroupTasks;
-        const groupTasks = hideDone ? searchFiltered.filter(t => t.status !== "DONE") : searchFiltered;
-        const activeCount = allGroupTasks.filter(t => t.status !== "DONE").length;
+    <>
+      <div className="space-y-4">
+        {groups.map((group) => {
+          const isCollapsed = collapsedGroups.has(group.id);
+          const allGroupTasks = group.tasks || [];
+          const q = searchQuery.toLowerCase().trim();
+          const searchFiltered = q
+            ? allGroupTasks.filter(t =>
+                t.title.toLowerCase().includes(q) ||
+                (t.priority && t.priority.toLowerCase().includes(q)) ||
+                (t.consultant && t.consultant.toLowerCase().includes(q)) ||
+                (t.projectStage && t.projectStage.toLowerCase().includes(q)) ||
+                (t.assignees?.some(a => a.user?.name?.toLowerCase().includes(q)))
+              )
+            : allGroupTasks;
+          const groupTasks = hideDone ? searchFiltered.filter(t => t.status !== "DONE") : searchFiltered;
+          const activeCount = allGroupTasks.filter(t => t.status !== "DONE").length;
 
-        if (q && groupTasks.length === 0 && !group.name.toLowerCase().includes(q)) return null;
+          if (q && groupTasks.length === 0 && !group.name.toLowerCase().includes(q)) return null;
 
-        return (
-          <div key={group.id} className="space-y-2">
-            <button
-              onClick={() => toggleGroup(group.id)}
-              className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5"
-              data-testid={`group-${group.id}`}
-            >
-              <div 
-                className="w-3 h-3 rounded-full flex-shrink-0" 
-                style={{ backgroundColor: group.color || "#6b7280" }}
+          return (
+            <div key={group.id} className="space-y-2">
+              <GroupHeader
+                group={group}
+                isCollapsed={isCollapsed}
+                activeCount={activeCount}
+                totalCount={allGroupTasks.length}
+                onToggle={() => toggleGroup(group.id)}
+                onOpenMembers={() => setMembersGroupId(group.id)}
+                allUsers={allUsers}
               />
-              <span className="font-semibold flex-1 text-left text-white">{group.name}</span>
-              <span className="text-sm text-white/60">
-                {activeCount}/{allGroupTasks.length}
-              </span>
-              {isCollapsed ? (
-                <ChevronRight className="h-5 w-5 text-white/40" />
-              ) : (
-                <ChevronDown className="h-5 w-5 text-white/40" />
-              )}
-            </button>
 
-            {!isCollapsed && (
-              <div className="space-y-2 ml-2">
-                {groupTasks.map((task) => (
-                  <TaskCard
-                    key={task.id}
-                    task={task}
-                    cycleStatus={cycleStatus}
-                    onSelect={() => setSelectedTask(task)}
-                  />
-                ))}
+              {!isCollapsed && (
+                <div className="space-y-2 ml-2">
+                  {groupTasks.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      cycleStatus={cycleStatus}
+                      onSelect={() => setSelectedTask(task)}
+                    />
+                  ))}
 
-                {newTaskGroupId === group.id ? (
-                  <div className="flex items-center gap-2 p-3 rounded-2xl border border-white/10 bg-white/5">
-                    <Input
-                      value={newTaskTitle}
-                      onChange={(e) => setNewTaskTitle(e.target.value)}
-                      placeholder="Task name..."
-                      className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleCreateTask(group.id);
-                        if (e.key === "Escape") {
+                  {newTaskGroupId === group.id ? (
+                    <div className="flex items-center gap-2 p-3 rounded-2xl border border-white/10 bg-white/5">
+                      <Input
+                        value={newTaskTitle}
+                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                        placeholder="Task name..."
+                        className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-white/40"
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleCreateTask(group.id);
+                          if (e.key === "Escape") {
+                            setNewTaskGroupId(null);
+                            setNewTaskTitle("");
+                          }
+                        }}
+                        data-testid="input-new-task"
+                      />
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleCreateTask(group.id)}
+                        disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
+                        className="bg-blue-500 hover:bg-blue-600"
+                        data-testid="button-create-task"
+                      >
+                        Add
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="ghost"
+                        onClick={() => {
                           setNewTaskGroupId(null);
                           setNewTaskTitle("");
-                        }
-                      }}
-                      data-testid="input-new-task"
-                    />
-                    <Button 
-                      size="sm" 
-                      onClick={() => handleCreateTask(group.id)}
-                      disabled={!newTaskTitle.trim() || createTaskMutation.isPending}
-                      className="bg-blue-500 hover:bg-blue-600"
-                      data-testid="button-create-task"
-                    >
-                      Add
-                    </Button>
-                    <Button 
-                      size="sm" 
+                        }}
+                        className="text-white/60"
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
                       variant="ghost"
-                      onClick={() => {
-                        setNewTaskGroupId(null);
-                        setNewTaskTitle("");
-                      }}
-                      className="text-white/60"
+                      size="sm"
+                      onClick={() => setNewTaskGroupId(group.id)}
+                      className="w-full justify-start text-white/50"
+                      data-testid={`button-add-task-${group.id}`}
                     >
-                      Cancel
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add task
                     </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <Sheet open={!!membersGroupId} onOpenChange={(open) => { if (!open) setMembersGroupId(null); }}>
+        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl bg-[#0D1117] border-white/10">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-left text-white flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-400" />
+              Group Members
+            </SheetTitle>
+          </SheetHeader>
+          <p className="text-xs text-white/40 mb-3">Members are auto-assigned to new tasks in this group.</p>
+          <div className="overflow-y-auto max-h-[calc(70vh-140px)] space-y-1">
+            {allUsers.map((user) => {
+              const isMember = groupMembers.some(m => m.userId === user.id);
+              return (
+                <button
+                  key={user.id}
+                  onClick={() => handleToggleMember(user.id)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 transition-all"
+                  data-testid={`member-toggle-${user.id}`}
+                >
+                  <div className={cn(
+                    "h-5 w-5 rounded-md border flex items-center justify-center flex-shrink-0",
+                    isMember ? "bg-blue-500 border-blue-500" : "border-white/30"
+                  )}>
+                    {isMember && <Check className="h-3 w-3 text-white" />}
                   </div>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setNewTaskGroupId(group.id)}
-                    className="w-full justify-start text-white/50"
-                    data-testid={`button-add-task-${group.id}`}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add task
-                  </Button>
-                )}
-              </div>
-            )}
+                  <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
+                    {getInitials(user.name)}
+                  </div>
+                  <span className="text-sm text-white truncate">{user.name || user.email}</span>
+                </button>
+              );
+            })}
           </div>
-        );
-      })}
-    </div>
+        </SheetContent>
+      </Sheet>
+    </>
+  );
+}
+
+function GroupHeader({
+  group,
+  isCollapsed,
+  activeCount,
+  totalCount,
+  onToggle,
+  onOpenMembers,
+  allUsers,
+}: {
+  group: TaskGroup;
+  isCollapsed: boolean;
+  activeCount: number;
+  totalCount: number;
+  onToggle: () => void;
+  onOpenMembers: () => void;
+  allUsers: CompanyUser[];
+}) {
+  const { data: groupMembers = [] } = useQuery<GroupMember[]>({
+    queryKey: [TASKS_ROUTES.GROUP_MEMBERS(group.id), group.id],
+  });
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "?";
+    return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  };
+
+  return (
+    <button
+      onClick={onToggle}
+      className="w-full flex items-center gap-3 p-4 rounded-2xl border border-white/10 bg-white/5"
+      data-testid={`group-${group.id}`}
+    >
+      <div 
+        className="w-3 h-3 rounded-full flex-shrink-0" 
+        style={{ backgroundColor: group.color || "#6b7280" }}
+      />
+      <span className="font-semibold flex-1 text-left text-white">{group.name}</span>
+
+      {groupMembers.length > 0 && (
+        <div className="flex -space-x-1.5">
+          {groupMembers.slice(0, 3).map((member) => (
+            <div
+              key={member.id}
+              className="h-6 w-6 rounded-full bg-white/15 border border-white/20 flex items-center justify-center text-[9px] font-medium text-white"
+            >
+              {getInitials(member.user?.name)}
+            </div>
+          ))}
+          {groupMembers.length > 3 && (
+            <div className="h-6 w-6 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-[9px] text-white/60">
+              +{groupMembers.length - 3}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenMembers();
+        }}
+        className="p-1.5 rounded-lg bg-white/10 flex-shrink-0"
+        data-testid={`button-group-members-${group.id}`}
+      >
+        <Users className="h-4 w-4 text-white/60" />
+      </div>
+
+      <span className="text-sm text-white/60">
+        {activeCount}/{totalCount}
+      </span>
+      {isCollapsed ? (
+        <ChevronRight className="h-5 w-5 text-white/40" />
+      ) : (
+        <ChevronDown className="h-5 w-5 text-white/40" />
+      )}
+    </button>
   );
 }
 
@@ -1031,12 +1192,53 @@ function TaskDetailSheet({
   onSave: (data: Partial<Task>) => void;
   isSaving: boolean;
 }) {
+  const { toast } = useToast();
   const [title, setTitle] = useState(task.title);
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [dueDate, setDueDate] = useState(task.dueDate ? task.dueDate.split("T")[0] : "");
   const [priority, setPriority] = useState(task.priority || "");
   const [consultant, setConsultant] = useState(task.consultant || "");
   const [projectStage, setProjectStage] = useState(task.projectStage || "");
+  const [showAssigneePicker, setShowAssigneePicker] = useState(false);
+
+  const { data: allUsers = [] } = useQuery<CompanyUser[]>({
+    queryKey: [USER_ROUTES.LIST],
+  });
+
+  const { data: assignees = [] } = useQuery<TaskAssignee[]>({
+    queryKey: [TASKS_ROUTES.ASSIGNEES(task.id), task.id],
+  });
+
+  const setAssigneesMutation = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      return apiRequest("PUT", TASKS_ROUTES.ASSIGNEES(task.id), { userIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.ASSIGNEES(task.id), task.id] });
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: () => {
+      toast({ title: "Failed to update assignees", variant: "destructive" });
+    },
+  });
+
+  const handleToggleAssignee = (userId: string) => {
+    const currentIds = assignees.map(a => a.userId);
+    const newIds = currentIds.includes(userId)
+      ? currentIds.filter(id => id !== userId)
+      : [...currentIds, userId];
+    setAssigneesMutation.mutate(newIds);
+  };
+
+  const handleRemoveAssignee = (userId: string) => {
+    const newIds = assignees.map(a => a.userId).filter(id => id !== userId);
+    setAssigneesMutation.mutate(newIds);
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "?";
+    return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
+  };
 
   useEffect(() => {
     setTitle(task.title);
@@ -1108,6 +1310,47 @@ function TaskDetailSheet({
             className="bg-white/10 border-white/20 text-white"
             data-testid="input-task-title"
           />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-white/60 mb-1.5 block">Assigned Users</label>
+          <div className="space-y-2">
+            {assignees.length > 0 ? (
+              assignees.map((assignee) => (
+                <div
+                  key={assignee.id}
+                  className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5"
+                  data-testid={`assignee-${assignee.userId}`}
+                >
+                  <div className="h-8 w-8 rounded-full bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-xs font-medium text-blue-400 flex-shrink-0">
+                    {getInitials(assignee.user?.name)}
+                  </div>
+                  <span className="text-sm text-white flex-1 truncate">{assignee.user?.name || assignee.user?.email}</span>
+                  <button
+                    onClick={() => handleRemoveAssignee(assignee.userId)}
+                    className="p-1 rounded-lg text-white/40"
+                    data-testid={`button-remove-assignee-${assignee.userId}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-white/40 p-3 rounded-xl border border-white/10 bg-white/5 text-center">
+                No users assigned
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAssigneePicker(true)}
+              className="w-full justify-start text-blue-400 border border-dashed border-white/10 rounded-xl"
+              data-testid="button-add-assignee"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add / Remove Users
+            </Button>
+          </div>
         </div>
 
         <div>
@@ -1190,6 +1433,41 @@ function TaskDetailSheet({
           />
         </div>
       </div>
+
+      <Sheet open={showAssigneePicker} onOpenChange={setShowAssigneePicker}>
+        <SheetContent side="bottom" className="h-[70vh] rounded-t-2xl bg-[#0D1117] border-white/10">
+          <SheetHeader className="pb-4">
+            <SheetTitle className="text-left text-white flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-400" />
+              Assign Users
+            </SheetTitle>
+          </SheetHeader>
+          <div className="overflow-y-auto max-h-[calc(70vh-120px)] space-y-1">
+            {allUsers.map((user) => {
+              const isAssigned = assignees.some(a => a.userId === user.id);
+              return (
+                <button
+                  key={user.id}
+                  onClick={() => handleToggleAssignee(user.id)}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 transition-all"
+                  data-testid={`assignee-toggle-${user.id}`}
+                >
+                  <div className={cn(
+                    "h-5 w-5 rounded-md border flex items-center justify-center flex-shrink-0",
+                    isAssigned ? "bg-blue-500 border-blue-500" : "border-white/30"
+                  )}>
+                    {isAssigned && <Check className="h-3 w-3 text-white" />}
+                  </div>
+                  <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">
+                    {getInitials(user.name)}
+                  </div>
+                  <span className="text-sm text-white truncate">{user.name || user.email}</span>
+                </button>
+              );
+            })}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

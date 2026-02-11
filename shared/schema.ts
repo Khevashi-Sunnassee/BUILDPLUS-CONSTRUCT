@@ -1856,10 +1856,25 @@ export const taskFiles = pgTable("task_files", {
   updateIdx: index("task_files_update_idx").on(table.updateId),
 }));
 
+export const taskGroupMembers = pgTable("task_group_members", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  groupId: varchar("group_id", { length: 36 }).notNull().references(() => taskGroups.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  groupUserIdx: uniqueIndex("task_group_members_group_user_idx").on(table.groupId, table.userId),
+  groupIdx: index("task_group_members_group_idx").on(table.groupId),
+  userIdx: index("task_group_members_user_idx").on(table.userId),
+}));
+
 // Task Management Insert Schemas and Types
 export const insertTaskGroupSchema = createInsertSchema(taskGroups).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTaskGroup = z.infer<typeof insertTaskGroupSchema>;
 export type TaskGroup = typeof taskGroups.$inferSelect;
+
+export const insertTaskGroupMemberSchema = createInsertSchema(taskGroupMembers).omit({ id: true, createdAt: true });
+export type InsertTaskGroupMember = z.infer<typeof insertTaskGroupMemberSchema>;
+export type TaskGroupMember = typeof taskGroupMembers.$inferSelect;
 
 export const insertTaskSchema = createInsertSchema(tasks).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTask = z.infer<typeof insertTaskSchema>;

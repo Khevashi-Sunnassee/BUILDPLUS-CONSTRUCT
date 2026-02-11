@@ -27,6 +27,7 @@ import type {
   TaskGroup, InsertTaskGroup,
   Task, InsertTask,
   TaskAssignee,
+  TaskGroupMember,
   TaskUpdate, InsertTaskUpdate,
   TaskFile, InsertTaskFile,
   Company, InsertCompany,
@@ -432,6 +433,9 @@ export interface IStorage {
 
   getTaskAssignees(taskId: string): Promise<(TaskAssignee & { user: User })[]>;
   setTaskAssignees(taskId: string, userIds: string[]): Promise<(TaskAssignee & { user: User })[]>;
+
+  getTaskGroupMembers(groupId: string): Promise<(TaskGroupMember & { user: User })[]>;
+  setTaskGroupMembers(groupId: string, userIds: string[]): Promise<(TaskGroupMember & { user: User })[]>;
 
   getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User; files?: TaskFile[] })[]>;
   getTaskUpdate(id: string): Promise<TaskUpdate | undefined>;

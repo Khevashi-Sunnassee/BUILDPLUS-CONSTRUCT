@@ -2,10 +2,12 @@ import { eq, and, desc, sql, asc, inArray, isNull } from "drizzle-orm";
 import { db } from "../db";
 import {
   taskGroups, tasks, taskAssignees, taskUpdates, taskFiles, taskNotifications,
+  taskGroupMembers,
   users, jobs,
   type TaskGroup, type InsertTaskGroup,
   type Task, type InsertTask,
   type TaskAssignee,
+  type TaskGroupMember,
   type TaskUpdate, type InsertTaskUpdate,
   type TaskFile, type InsertTaskFile,
   type User, type Job,
@@ -329,6 +331,28 @@ export const taskMethods = {
     }
     
     return taskMethods.getTaskAssignees(taskId);
+  },
+
+  async getTaskGroupMembers(groupId: string): Promise<(TaskGroupMember & { user: User })[]> {
+    const result = await db.select()
+      .from(taskGroupMembers)
+      .innerJoin(users, eq(taskGroupMembers.userId, users.id))
+      .where(eq(taskGroupMembers.groupId, groupId));
+    
+    return result.map(r => ({
+      ...r.task_group_members,
+      user: r.users,
+    }));
+  },
+
+  async setTaskGroupMembers(groupId: string, userIds: string[]): Promise<(TaskGroupMember & { user: User })[]> {
+    await db.delete(taskGroupMembers).where(eq(taskGroupMembers.groupId, groupId));
+    
+    for (const userId of userIds) {
+      await db.insert(taskGroupMembers).values({ groupId, userId }).onConflictDoNothing();
+    }
+    
+    return taskMethods.getTaskGroupMembers(groupId);
   },
 
   async getTaskUpdates(taskId: string): Promise<(TaskUpdate & { user: User; files?: TaskFile[] })[]> {

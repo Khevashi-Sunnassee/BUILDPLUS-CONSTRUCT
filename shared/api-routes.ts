@@ -324,6 +324,7 @@ export const TASKS_ROUTES = {
   MOVE_TASK: (id: string | number) => `/api/tasks/${id}/move`,
   SEND_EMAIL: '/api/tasks/send-email',
   ASSIGNEE_BY_ID: (id: string | number) => `/api/task-assignees/${id}`,
+  GROUP_MEMBERS: (id: string | number) => `/api/task-groups/${id}/members`,
 } as const;
 
 // ============================================================================

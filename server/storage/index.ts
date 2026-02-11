@@ -328,6 +328,8 @@ export class DatabaseStorage implements IStorage {
   moveTaskToGroup = taskMethods.moveTaskToGroup;
   getTaskAssignees = taskMethods.getTaskAssignees;
   setTaskAssignees = taskMethods.setTaskAssignees;
+  getTaskGroupMembers = taskMethods.getTaskGroupMembers;
+  setTaskGroupMembers = taskMethods.setTaskGroupMembers;
   getTaskUpdates = taskMethods.getTaskUpdates;
   getTaskUpdate = taskMethods.getTaskUpdate;
   createTaskUpdate = taskMethods.createTaskUpdate;
