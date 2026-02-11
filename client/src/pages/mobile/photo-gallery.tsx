@@ -234,6 +234,7 @@ function PinchZoomImageViewer({ src, alt }: { src: string; alt: string }) {
             ref={imgRef}
             src={src}
             alt={alt}
+            style={{ imageOrientation: "from-image" }}
             className="max-w-full max-h-full object-contain select-none"
             onLoad={() => { setLoading(false); setImgLoaded(true); }}
             draggable={false}
@@ -610,6 +611,7 @@ export default function MobilePhotoGallery() {
                 <img
                   src={`/api/documents/${photo.id}/view`}
                   alt={photo.title}
+                  style={{ imageOrientation: "from-image" }}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />
@@ -651,6 +653,7 @@ export default function MobilePhotoGallery() {
               <img
                 src={capturedPreview}
                 alt="Captured preview"
+                style={{ imageOrientation: "from-image" }}
                 className="w-full h-full object-cover"
                 data-testid="img-photo-preview"
               />

@@ -109,6 +109,7 @@ function ThumbnailCard({
           <img
             src={thumbnailUrl}
             alt={doc.title}
+            style={{ imageOrientation: "from-image" }}
             className={`w-full h-full object-cover transition-opacity ${imgLoaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
@@ -249,6 +250,7 @@ function FullscreenViewer({
             <img
               src={viewUrl}
               alt={doc.title}
+              style={{ imageOrientation: "from-image" }}
               className="max-w-full max-h-full object-contain"
               data-testid="img-viewer-full"
             />

@@ -662,6 +662,7 @@ router.get("/api/documents/:id/thumbnail", requireAuth, async (req: Request, res
       try {
         const original = Buffer.concat(chunks);
         const resized = await sharp(original)
+          .rotate()
           .resize({ width: THUMBNAIL_WIDTH, withoutEnlargement: true })
           .jpeg({ quality: 75 })
           .toBuffer();
