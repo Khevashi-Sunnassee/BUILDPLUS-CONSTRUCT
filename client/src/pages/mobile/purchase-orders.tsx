@@ -37,6 +37,8 @@ interface PurchaseOrder {
   deliveryAddress: string | null;
   requiredByDate: string | null;
   supplierEmail?: string | null;
+  capexRequestId?: string | null;
+  projectName?: string | null;
   supplier?: {
     id: string;
     name: string;
@@ -245,7 +247,14 @@ function POCard({ po, onSelect, muted = false, formatCurrency }: { po: PurchaseO
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <h3 className="font-semibold text-sm truncate text-white">{po.poNumber}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-sm truncate text-white">{po.poNumber}</h3>
+            {po.capexRequestId && (
+              <Badge variant="outline" className="text-[10px] border-amber-500/40 text-amber-400 bg-amber-500/10 px-1.5 py-0" data-testid={`badge-capex-mobile-${po.id}`}>
+                CAPEX
+              </Badge>
+            )}
+          </div>
           {po.supplier && (
             <p className="text-xs text-white/50 truncate">{po.supplier.name}</p>
           )}
@@ -337,6 +346,15 @@ function PODetailSheet({
                 </div>
               )}
             </div>
+
+            {po.capexRequestId && (
+              <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
+                  CAPEX
+                </Badge>
+                <span className="text-sm text-amber-300/80">Linked to CAPEX request</span>
+              </div>
+            )}
 
             {po.deliveryAddress && (
               <div>
