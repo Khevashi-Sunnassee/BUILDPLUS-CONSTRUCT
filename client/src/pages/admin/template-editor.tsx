@@ -127,6 +127,7 @@ const FIELD_TYPE_CONFIG: Record<
   customer_selector: { label: "Customer Selector", icon: Users, category: "Selector", description: "Select a customer" },
   supplier_selector: { label: "Supplier Selector", icon: Building2, category: "Selector", description: "Select a supplier" },
   staff_assignment: { label: "Staff Assignment", icon: Users, category: "Selector", description: "Assign staff members" },
+  asset_selector: { label: "Asset/Equipment", icon: Building2, category: "Selector", description: "Select from asset register" },
   priority_level: { label: "Priority Level", icon: AlertCircle, category: "Selection", description: "Priority selection" },
   rating_scale: { label: "Rating Scale", icon: Star, category: "Selection", description: "1-5 star rating" },
   photo_required: { label: "Photo", icon: Camera, category: "Media", description: "Single photo upload" },
@@ -190,6 +191,9 @@ export default function TemplateEditorPage() {
   const [editingFieldOptions, setEditingFieldOptions] = useState<ChecklistFieldOption[]>([]);
   const [editingFieldDependsOn, setEditingFieldDependsOn] = useState<string>("");
   const [editingFieldDependsOnValue, setEditingFieldDependsOnValue] = useState<string>("");
+  const [editingFieldAutoPopulateFrom, setEditingFieldAutoPopulateFrom] = useState<string>("");
+  const [editingFieldAutoPopulateField, setEditingFieldAutoPopulateField] = useState<string>("");
+  const [editingFieldAutoPopulateSourceFieldId, setEditingFieldAutoPopulateSourceFieldId] = useState<string>("");
 
   const { data: template, isLoading } = useQuery<ChecklistTemplate>({
     queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(id!)],
@@ -270,6 +274,9 @@ export default function TemplateEditorPage() {
       setEditingFieldOptions(field.options || []);
       setEditingFieldDependsOn(field.dependsOn || "");
       setEditingFieldDependsOnValue(field.dependsOnValue || "");
+      setEditingFieldAutoPopulateFrom(field.autoPopulateFrom || "");
+      setEditingFieldAutoPopulateField(field.autoPopulateField || "");
+      setEditingFieldAutoPopulateSourceFieldId(field.autoPopulateSourceFieldId || "");
       fieldForm.reset({
         name: field.name,
         type: field.type,
@@ -287,6 +294,8 @@ export default function TemplateEditorPage() {
       setEditingFieldOptions([]);
       setEditingFieldDependsOn("");
       setEditingFieldDependsOnValue("");
+      setEditingFieldAutoPopulateFrom("");
+      setEditingFieldAutoPopulateField("");
       fieldForm.reset({
         name: "",
         type: "text_field",
@@ -347,6 +356,9 @@ export default function TemplateEditorPage() {
       step: data.step,
       dependsOn: editingFieldDependsOn || undefined,
       dependsOnValue: editingFieldDependsOnValue || undefined,
+      autoPopulateFrom: editingFieldAutoPopulateFrom || undefined,
+      autoPopulateField: editingFieldAutoPopulateField || undefined,
+      autoPopulateSourceFieldId: editingFieldAutoPopulateSourceFieldId || undefined,
     };
 
     setSections((prev) =>
@@ -695,6 +707,11 @@ export default function TemplateEditorPage() {
                                 {field.dependsOn && (
                                   <Badge variant="outline" className="text-xs">
                                     Conditional
+                                  </Badge>
+                                )}
+                                {field.autoPopulateFrom && (
+                                  <Badge variant="outline" className="text-xs border-green-500/30 text-green-500">
+                                    Auto-fill
                                   </Badge>
                                 )}
                               </div>
@@ -1120,6 +1137,66 @@ export default function TemplateEditorPage() {
                       );
                     })()}
                   </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3">
+                <FormLabel>Auto-Populate from Data Source</FormLabel>
+                <FormDescription className="text-xs">
+                  Automatically fill this field when an asset is selected from an Asset/Equipment selector field
+                </FormDescription>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Data Source</label>
+                    <Select value={editingFieldAutoPopulateFrom || "__none__"} onValueChange={(v) => { setEditingFieldAutoPopulateFrom(v === "__none__" ? "" : v); if (v === "__none__") { setEditingFieldAutoPopulateField(""); setEditingFieldAutoPopulateSourceFieldId(""); } }}>
+                      <SelectTrigger data-testid="select-auto-populate-source">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        <SelectItem value="asset_register">Asset Register</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {editingFieldAutoPopulateFrom === "asset_register" && (
+                    <>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Source Asset Selector</label>
+                        <Select value={editingFieldAutoPopulateSourceFieldId || "__none__"} onValueChange={(v) => setEditingFieldAutoPopulateSourceFieldId(v === "__none__" ? "" : v)}>
+                          <SelectTrigger data-testid="select-auto-populate-source-field">
+                            <SelectValue placeholder="Select asset selector" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Any Asset Selector</SelectItem>
+                            {sections.flatMap(s => s.items.filter(f => f.type === "asset_selector" && f.id !== editingField?.id).map(f => (
+                              <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                            )))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Asset Field</label>
+                        <Select value={editingFieldAutoPopulateField} onValueChange={setEditingFieldAutoPopulateField}>
+                          <SelectTrigger data-testid="select-auto-populate-field">
+                            <SelectValue placeholder="Select field" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="name">Name</SelectItem>
+                            <SelectItem value="category">Category</SelectItem>
+                            <SelectItem value="serialNumber">Serial Number</SelectItem>
+                            <SelectItem value="assetTag">Asset Tag</SelectItem>
+                            <SelectItem value="manufacturer">Manufacturer</SelectItem>
+                            <SelectItem value="model">Model</SelectItem>
+                            <SelectItem value="location">Location</SelectItem>
+                            <SelectItem value="registrationNumber">Registration Number</SelectItem>
+                            <SelectItem value="status">Status</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 

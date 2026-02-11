@@ -767,6 +767,7 @@ export const UPLOAD_ROUTES = {
 
 export const ASSET_ROUTES = {
   LIST: '/api/admin/assets',
+  LIST_SIMPLE: '/api/assets/simple',
   BY_ID: (id: string) => `/api/admin/assets/${id}`,
   CREATE: '/api/admin/assets',
   UPDATE: (id: string) => `/api/admin/assets/${id}`,

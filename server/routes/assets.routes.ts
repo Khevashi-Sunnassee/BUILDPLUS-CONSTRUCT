@@ -707,6 +707,31 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
   }
 });
 
+router.get("/api/assets/simple", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db.select({
+      id: assets.id,
+      assetTag: assets.assetTag,
+      name: assets.name,
+      category: assets.category,
+      status: assets.status,
+      serialNumber: assets.serialNumber,
+      manufacturer: assets.manufacturer,
+      model: assets.model,
+      location: assets.location,
+      registrationNumber: assets.registrationNumber,
+    }).from(assets)
+      .where(eq(assets.companyId, companyId))
+      .orderBy(assets.name);
+    res.json(result);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to fetch simple assets list");
+    res.status(500).json({ error: "Failed to fetch assets" });
+  }
+});
+
 router.get("/api/admin/assets", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

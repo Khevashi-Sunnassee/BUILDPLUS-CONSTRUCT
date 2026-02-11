@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import {
@@ -14,13 +14,29 @@ import {
   Upload,
   ChevronDown,
   ChevronUp,
+  Search,
+  Package,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { CHECKLIST_ROUTES } from "@shared/api-routes";
+import { CHECKLIST_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
 import { normalizeSections } from "@/components/checklist/normalize-sections";
 import { calculateCompletionRate, getMissingRequiredFields, isFieldVisible } from "@/components/checklist/checklist-form";
 import type { ChecklistInstance, ChecklistTemplate, ChecklistSection, ChecklistField, ChecklistFieldOption } from "@shared/schema";
+
+type SimpleAsset = {
+  id: string;
+  assetTag: string;
+  name: string;
+  category: string;
+  status: string | null;
+  serialNumber: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  location: string | null;
+  registrationNumber: string | null;
+};
 
 function compressImage(file: File, maxDimension = 1280, quality = 0.7): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -138,6 +154,29 @@ export default function MobileChecklistFillPage() {
     setHasChanges(true);
   };
 
+  const sections: ChecklistSection[] = template ? normalizeSections(template.sections) : [];
+
+  const handleAssetSelected = useCallback((asset: SimpleAsset, sourceFieldId?: string) => {
+    const updates: Record<string, unknown> = {};
+    sections.forEach((section) => {
+      section.items?.forEach((field) => {
+        if (field.autoPopulateFrom === "asset_register" && field.autoPopulateField) {
+          const matchesSource = !field.autoPopulateSourceFieldId || !sourceFieldId || field.autoPopulateSourceFieldId === sourceFieldId;
+          if (matchesSource) {
+            const assetKey = field.autoPopulateField as keyof SimpleAsset;
+            if (asset[assetKey] !== undefined) {
+              updates[field.id] = asset[assetKey] || "";
+            }
+          }
+        }
+      });
+    });
+    if (Object.keys(updates).length > 0) {
+      setResponses(prev => ({ ...prev, ...updates }));
+      setHasChanges(true);
+    }
+  }, [sections]);
+
   const handleComplete = () => {
     if (!template) return;
     const missing = getMissingRequiredFields(template, responses);
@@ -163,7 +202,6 @@ export default function MobileChecklistFillPage() {
 
   const isLoading = instanceLoading || templateLoading;
   const isCompleted = instance?.status === "completed" || instance?.status === "signed_off";
-  const sections: ChecklistSection[] = template ? normalizeSections(template.sections) : [];
 
   const { completedCount, totalRequired, progress } = (() => {
     let completed = 0;
@@ -338,6 +376,7 @@ export default function MobileChecklistFillPage() {
                             value={responses[field.id]}
                             onChange={(v) => handleFieldChange(field.id, v)}
                             disabled={isCompleted}
+                            onAssetSelected={field.type === "asset_selector" ? handleAssetSelected : undefined}
                           />
                         </div>
                       </div>
@@ -424,15 +463,131 @@ export default function MobileChecklistFillPage() {
   );
 }
 
+function MobileAssetSelectorField({ field, value, onChange, disabled, onAssetSelected }: {
+  field: ChecklistField;
+  value: unknown;
+  onChange: (value: unknown) => void;
+  disabled?: boolean;
+  onAssetSelected?: (asset: SimpleAsset, sourceFieldId?: string) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearch, setShowSearch] = useState(false);
+  const { data: assets = [], isLoading } = useQuery<SimpleAsset[]>({
+    queryKey: [ASSET_ROUTES.LIST_SIMPLE],
+  });
+
+  const selectedAsset = assets.find(a => a.id === value);
+  const q = searchQuery.toLowerCase().trim();
+  const filteredAssets = q
+    ? assets.filter(a =>
+        a.name.toLowerCase().includes(q) ||
+        a.assetTag.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q) ||
+        (a.serialNumber || "").toLowerCase().includes(q) ||
+        (a.manufacturer || "").toLowerCase().includes(q) ||
+        (a.model || "").toLowerCase().includes(q)
+      )
+    : assets;
+
+  if (selectedAsset && !showSearch) {
+    return (
+      <div data-testid={`mobile-field-asset-${field.id}`}>
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-blue-500/10 border border-blue-500/30">
+          <Package className="h-5 w-5 text-blue-400 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm text-white truncate">{selectedAsset.name}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant="outline" className="text-xs border-white/20 text-white/70">{selectedAsset.assetTag}</Badge>
+              <Badge variant="secondary" className="text-xs bg-white/10 text-white/70">{selectedAsset.category}</Badge>
+            </div>
+            {selectedAsset.serialNumber && (
+              <p className="text-xs text-white/40 mt-1">S/N: {selectedAsset.serialNumber}</p>
+            )}
+            {selectedAsset.manufacturer && (
+              <p className="text-xs text-white/40">
+                {selectedAsset.manufacturer}{selectedAsset.model ? ` ${selectedAsset.model}` : ""}
+              </p>
+            )}
+          </div>
+          {!disabled && (
+            <button
+              onClick={() => { onChange(""); setShowSearch(true); }}
+              className="p-1.5 rounded-lg bg-white/10 text-white/60"
+              data-testid={`clear-asset-${field.id}`}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2" data-testid={`mobile-field-asset-${field.id}`}>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+        <input
+          type="text"
+          placeholder="Search equipment by name, tag, serial..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          disabled={disabled}
+          className="w-full h-11 pl-9 pr-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder:text-white/30 text-sm focus:outline-none focus:border-blue-400/50 disabled:opacity-50"
+          data-testid={`search-asset-${field.id}`}
+          autoFocus={showSearch}
+        />
+      </div>
+      <div className="max-h-60 overflow-y-auto rounded-xl border border-white/10 bg-white/5">
+        {isLoading ? (
+          <div className="p-4 text-sm text-white/40 text-center">Loading equipment...</div>
+        ) : filteredAssets.length === 0 ? (
+          <div className="p-4 text-sm text-white/40 text-center">
+            {q ? "No matching equipment" : "No equipment available"}
+          </div>
+        ) : (
+          filteredAssets.map(asset => (
+            <button
+              key={asset.id}
+              onClick={() => {
+                onChange(asset.id);
+                onAssetSelected?.(asset, field.id);
+                setSearchQuery("");
+                setShowSearch(false);
+              }}
+              disabled={disabled}
+              className="w-full text-left px-3 py-2.5 border-b border-white/5 last:border-b-0 active:bg-white/10"
+              data-testid={`asset-option-${asset.id}`}
+            >
+              <p className="text-sm font-medium text-white truncate">{asset.name}</p>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <span className="text-xs text-white/50">{asset.assetTag}</span>
+                <span className="text-xs text-white/40">{asset.category}</span>
+                {asset.serialNumber && (
+                  <span className="text-xs text-white/30">S/N: {asset.serialNumber}</span>
+                )}
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface MobileFieldProps {
   field: ChecklistField;
   value: unknown;
   onChange: (value: unknown) => void;
   disabled?: boolean;
+  onAssetSelected?: (asset: SimpleAsset, sourceFieldId?: string) => void;
 }
 
-function MobileFieldRenderer({ field, value, onChange, disabled }: MobileFieldProps) {
+function MobileFieldRenderer({ field, value, onChange, disabled, onAssetSelected }: MobileFieldProps) {
   switch (field.type) {
+    case "asset_selector":
+      return <MobileAssetSelectorField field={field} value={value} onChange={onChange} disabled={disabled} onAssetSelected={onAssetSelected} />;
+
     case "text_field":
       return (
         <input

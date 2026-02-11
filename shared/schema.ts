@@ -2574,6 +2574,7 @@ export const CHECKLIST_FIELD_TYPES = {
   CUSTOMER_SELECTOR: "customer_selector",
   SUPPLIER_SELECTOR: "supplier_selector",
   STAFF_ASSIGNMENT: "staff_assignment",
+  ASSET_SELECTOR: "asset_selector",
   // Selection Fields
   PRIORITY_LEVEL: "priority_level",
   RATING_SCALE: "rating_scale",
@@ -2623,6 +2624,9 @@ export type ChecklistField = {
   step?: number | null;
   dependsOn?: string;
   dependsOnValue?: string;
+  autoPopulateFrom?: string;
+  autoPopulateField?: string;
+  autoPopulateSourceFieldId?: string;
 };
 
 export type ChecklistFieldOption = {

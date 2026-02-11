@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 import { renderField } from "./field-renderers";
+import type { SimpleAsset } from "./field-renderers";
 import { normalizeSections } from "./normalize-sections";
 import type { ChecklistTemplate, ChecklistSection, ChecklistField } from "@shared/schema";
 
@@ -41,6 +42,26 @@ export function ChecklistForm({
       [fieldId]: value,
     });
   };
+
+  const handleAssetSelected = useCallback((asset: SimpleAsset, sourceFieldId?: string) => {
+    const updates: Record<string, unknown> = {};
+    sections.forEach((section) => {
+      section.items?.forEach((field) => {
+        if (field.autoPopulateFrom === "asset_register" && field.autoPopulateField) {
+          const matchesSource = !field.autoPopulateSourceFieldId || !sourceFieldId || field.autoPopulateSourceFieldId === sourceFieldId;
+          if (matchesSource) {
+            const assetKey = field.autoPopulateField as keyof SimpleAsset;
+            if (asset[assetKey] !== undefined) {
+              updates[field.id] = asset[assetKey] || "";
+            }
+          }
+        }
+      });
+    });
+    if (Object.keys(updates).length > 0) {
+      onChange({ ...responses, ...updates });
+    }
+  }, [sections, responses, onChange]);
 
   const { completedCount, totalRequired, progress, missingRequired } = useMemo(() => {
     let completed = 0;
@@ -151,7 +172,8 @@ export function ChecklistForm({
                         field,
                         responses[field.id],
                         (value) => handleFieldChange(field.id, value),
-                        disabled
+                        disabled,
+                        field.type === "asset_selector" ? handleAssetSelected : undefined
                       )}
                     </div>
                   </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   CheckCircle,
   XCircle,
@@ -7,6 +8,7 @@ import {
   Camera,
   Upload,
   X,
+  Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,13 +25,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { ASSET_ROUTES } from "@shared/api-routes";
 import type { ChecklistField, ChecklistFieldOption } from "@shared/schema";
+
+type SimpleAsset = {
+  id: string;
+  assetTag: string;
+  name: string;
+  category: string;
+  status: string | null;
+  serialNumber: string | null;
+  manufacturer: string | null;
+  model: string | null;
+  location: string | null;
+  registrationNumber: string | null;
+};
 
 interface FieldRendererProps {
   field: ChecklistField;
   value: unknown;
   onChange: (value: unknown) => void;
   disabled?: boolean;
+  onAssetSelected?: (asset: SimpleAsset, sourceFieldId?: string) => void;
 }
 
 export function TextField({ field, value, onChange, disabled }: FieldRendererProps) {
@@ -685,6 +702,105 @@ export function SignatureField({ field, value, onChange, disabled }: FieldRender
   );
 }
 
+export function AssetSelectorField({ field, value, onChange, disabled, onAssetSelected }: FieldRendererProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const { data: assets = [], isLoading } = useQuery<SimpleAsset[]>({
+    queryKey: [ASSET_ROUTES.LIST_SIMPLE],
+  });
+
+  const selectedAsset = assets.find(a => a.id === value);
+  const q = searchQuery.toLowerCase().trim();
+  const filteredAssets = q
+    ? assets.filter(a =>
+        a.name.toLowerCase().includes(q) ||
+        a.assetTag.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q) ||
+        (a.serialNumber || "").toLowerCase().includes(q) ||
+        (a.manufacturer || "").toLowerCase().includes(q) ||
+        (a.model || "").toLowerCase().includes(q)
+      )
+    : assets;
+
+  if (selectedAsset) {
+    return (
+      <div className="space-y-2" data-testid={`field-asset-${field.id}`}>
+        <div className="flex items-center gap-2 p-3 rounded-md border bg-muted/50">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm truncate">{selectedAsset.name}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <Badge variant="outline" className="text-xs">{selectedAsset.assetTag}</Badge>
+              <Badge variant="secondary" className="text-xs">{selectedAsset.category}</Badge>
+              {selectedAsset.serialNumber && (
+                <span className="text-xs text-muted-foreground">S/N: {selectedAsset.serialNumber}</span>
+              )}
+            </div>
+          </div>
+          {!disabled && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onChange("")}
+              data-testid={`clear-asset-${field.id}`}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2" data-testid={`field-asset-${field.id}`}>
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          placeholder="Search assets by name, tag, serial..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+          disabled={disabled}
+          data-testid={`search-asset-${field.id}`}
+        />
+      </div>
+      <div className="max-h-48 overflow-y-auto border rounded-md">
+        {isLoading ? (
+          <div className="p-3 text-sm text-muted-foreground text-center">Loading assets...</div>
+        ) : filteredAssets.length === 0 ? (
+          <div className="p-3 text-sm text-muted-foreground text-center">
+            {q ? "No matching assets" : "No assets available"}
+          </div>
+        ) : (
+          filteredAssets.map(asset => (
+            <button
+              key={asset.id}
+              onClick={() => {
+                onChange(asset.id);
+                onAssetSelected?.(asset, field.id);
+                setSearchQuery("");
+              }}
+              disabled={disabled}
+              className="w-full text-left px-3 py-2 hover-elevate border-b last:border-b-0 flex items-center gap-2"
+              data-testid={`asset-option-${asset.id}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{asset.name}</p>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <span className="text-xs text-muted-foreground">{asset.assetTag}</span>
+                  <span className="text-xs text-muted-foreground">{asset.category}</span>
+                  {asset.serialNumber && (
+                    <span className="text-xs text-muted-foreground">S/N: {asset.serialNumber}</span>
+                  )}
+                </div>
+              </div>
+            </button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function SelectorField({ field, value, onChange, disabled }: FieldRendererProps) {
   return (
     <Select
@@ -704,7 +820,13 @@ export function SelectorField({ field, value, onChange, disabled }: FieldRendere
   );
 }
 
-export function renderField(field: ChecklistField, value: unknown, onChange: (value: unknown) => void, disabled?: boolean) {
+export function renderField(
+  field: ChecklistField,
+  value: unknown,
+  onChange: (value: unknown) => void,
+  disabled?: boolean,
+  onAssetSelected?: (asset: SimpleAsset, sourceFieldId?: string) => void
+) {
   const props = { field, value, onChange, disabled };
 
   switch (field.type) {
@@ -754,6 +876,8 @@ export function renderField(field: ChecklistField, value: unknown, onChange: (va
       return <ProgressBarField {...props} />;
     case "measurement_field":
       return <MeasurementField {...props} />;
+    case "asset_selector":
+      return <AssetSelectorField {...props} onAssetSelected={onAssetSelected} />;
     case "job_selector":
     case "customer_selector":
     case "supplier_selector":
@@ -763,3 +887,5 @@ export function renderField(field: ChecklistField, value: unknown, onChange: (va
       return <TextField {...props} />;
   }
 }
+
+export type { SimpleAsset };
