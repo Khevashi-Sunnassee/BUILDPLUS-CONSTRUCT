@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { format, parseISO, isBefore, startOfDay } from "date-fns";
+import { format, parseISO, isBefore, startOfDay, eachDayOfInterval, addDays, eachMonthOfInterval, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Eye, Edit, Truck, X, Check, Package, ArrowRight, Lock, RotateCcw } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, X, Check, Package, ArrowRight, Lock, RotateCcw, BarChart3 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -129,6 +130,74 @@ export default function HireBookingsPage() {
     return counts;
   }, [bookings]);
 
+  const getDailyRate = (booking: HireBookingWithDetails): number => {
+    const rate = parseFloat(booking.rateAmount || "0");
+    const qty = booking.quantity || 1;
+    switch (booking.rateType) {
+      case "week": return (rate / 7) * qty;
+      case "month": return (rate / 30) * qty;
+      default: return rate * qty;
+    }
+  };
+
+  const activeStatuses = ["APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CLOSED"];
+
+  const { dailyChartData, monthlyChartData } = useMemo(() => {
+    const activeBookings = bookings.filter(b => activeStatuses.includes(b.status));
+    if (activeBookings.length === 0) return { dailyChartData: [], monthlyChartData: [] };
+
+    const today = startOfDay(new Date());
+    const chartStart = addDays(today, -30);
+    const chartEnd = addDays(today, 60);
+
+    const days = eachDayOfInterval({ start: chartStart, end: chartEnd });
+    const dailyData = days.map(day => {
+      let totalCost = 0;
+      activeBookings.forEach(b => {
+        const bStart = startOfDay(new Date(b.hireStartDate));
+        const bEnd = startOfDay(new Date(b.expectedReturnDate || b.hireEndDate));
+        if (day >= bStart && day <= bEnd) {
+          totalCost += getDailyRate(b);
+        }
+      });
+      return {
+        date: format(day, "dd MMM"),
+        fullDate: format(day, "dd/MM/yyyy"),
+        cost: Math.round(totalCost * 100) / 100,
+      };
+    });
+
+    const allStartDates = activeBookings.map(b => new Date(b.hireStartDate));
+    const allEndDates = activeBookings.map(b => new Date(b.expectedReturnDate || b.hireEndDate));
+    const minDate = new Date(Math.min(...allStartDates.map(d => d.getTime())));
+    const maxDate = new Date(Math.max(...allEndDates.map(d => d.getTime())));
+
+    const monthStart = startOfMonth(minDate);
+    const monthEnd = endOfMonth(maxDate);
+    const months = eachMonthOfInterval({ start: monthStart, end: monthEnd });
+    const monthlyData = months.map(month => {
+      const mStart = startOfMonth(month);
+      const mEnd = endOfMonth(month);
+      let totalCost = 0;
+      activeBookings.forEach(b => {
+        const bStart = startOfDay(new Date(b.hireStartDate));
+        const bEnd = startOfDay(new Date(b.expectedReturnDate || b.hireEndDate));
+        const overlapStart = new Date(Math.max(bStart.getTime(), mStart.getTime()));
+        const overlapEnd = new Date(Math.min(bEnd.getTime(), mEnd.getTime()));
+        if (overlapStart <= overlapEnd) {
+          const daysInMonth = Math.floor((overlapEnd.getTime() - overlapStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          totalCost += getDailyRate(b) * daysInMonth;
+        }
+      });
+      return {
+        month: format(month, "MMM yyyy"),
+        cost: Math.round(totalCost * 100) / 100,
+      };
+    });
+
+    return { dailyChartData: dailyData, monthlyChartData: monthlyData };
+  }, [bookings]);
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -189,6 +258,81 @@ export default function HireBookingsPage() {
           </TabsList>
         </Tabs>
       </div>
+
+      {(dailyChartData.length > 0 || monthlyChartData.length > 0) && (
+        <div className="grid grid-cols-1 gap-4">
+          {dailyChartData.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  Daily Hire Charges
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Cost per day based on equipment on hire (last 30 days to next 60 days)</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[250px]" data-testid="chart-daily-hire">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dailyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10 }}
+                        interval={Math.max(0, Math.floor(dailyChartData.length / 15))}
+                        angle={-45}
+                        textAnchor="end"
+                        height={50}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => `$${v.toLocaleString()}`}
+                      />
+                      <RechartsTooltip
+                        formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Daily Cost"]}
+                        labelFormatter={(label, payload) => {
+                          if (payload && payload[0]) return (payload[0].payload as any).fullDate;
+                          return label;
+                        }}
+                      />
+                      <Bar dataKey="cost" fill="hsl(var(--primary))" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {monthlyChartData.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                  Monthly Hire Cost
+                </CardTitle>
+                <p className="text-xs text-muted-foreground">Total hire cost per month across all bookings</p>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[250px]" data-testid="chart-monthly-hire">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={monthlyChartData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => `$${v.toLocaleString()}`}
+                      />
+                      <RechartsTooltip
+                        formatter={(value: number) => [`$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, "Monthly Cost"]}
+                      />
+                      <Bar dataKey="cost" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
