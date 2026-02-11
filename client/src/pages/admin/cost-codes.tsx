@@ -376,6 +376,16 @@ export default function AdminCostCodesPage() {
     });
   }
 
+  function handleSelectAllDefaults() {
+    const allIds = activeCostCodes.map((cc) => cc.id);
+    const allSelected = allIds.length > 0 && allIds.every((id) => effectiveSelection.has(id));
+    if (allSelected) {
+      setSelectedCostCodeIds(new Set());
+    } else {
+      setSelectedCostCodeIds(new Set(allIds));
+    }
+  }
+
   const filteredCodes = (costCodesWithChildren || []).filter((cc) => {
     if (!searchTerm.trim()) return true;
     const s = searchTerm.toLowerCase();
@@ -631,7 +641,11 @@ export default function AdminCostCodesPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead className="w-12">
-                          <span className="sr-only">Select</span>
+                          <Checkbox
+                            checked={activeCostCodes.length > 0 && activeCostCodes.every((cc) => effectiveSelection.has(cc.id))}
+                            onCheckedChange={handleSelectAllDefaults}
+                            data-testid="checkbox-select-all-defaults"
+                          />
                         </TableHead>
                         <TableHead className="w-24">Code</TableHead>
                         <TableHead>Name</TableHead>
