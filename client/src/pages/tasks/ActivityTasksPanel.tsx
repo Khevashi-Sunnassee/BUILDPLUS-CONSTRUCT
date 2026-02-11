@@ -45,6 +45,7 @@ interface ActivityTasksPanelProps {
   activityEndDate?: string | null;
   users: User[];
   jobs: Job[];
+  currentUserId?: string;
 }
 
 export function ActivityTasksPanel({
@@ -54,6 +55,7 @@ export function ActivityTasksPanel({
   activityEndDate,
   users,
   jobs,
+  currentUserId,
 }: ActivityTasksPanelProps) {
   const { toast } = useToast();
   const [showCompleted, setShowCompleted] = useState(true);
@@ -79,7 +81,16 @@ export function ActivityTasksPanel({
       if (activityEndDate) {
         body.dueDate = new Date(activityEndDate).toISOString();
       }
-      return apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activityId), body);
+      const res = await apiRequest("POST", PROJECT_ACTIVITIES_ROUTES.ACTIVITY_TASKS(activityId), body);
+      const task = await res.json();
+      if (currentUserId && task?.id) {
+        try {
+          await apiRequest("POST", TASKS_ROUTES.ASSIGNEES(task.id), { userId: currentUserId });
+        } catch (err) {
+          console.warn("Failed to auto-assign user to task", err);
+        }
+      }
+      return task;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });

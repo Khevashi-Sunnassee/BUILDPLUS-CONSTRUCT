@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import { PROJECT_ACTIVITIES_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import type { JobType, ActivityStage, JobActivity } from "@shared/schema";
 import { format, isAfter, isBefore, startOfDay } from "date-fns";
@@ -87,6 +88,7 @@ function getRowClassName(activity: ActivityWithAssignees): string {
 
 export default function JobActivitiesPage() {
   const { toast } = useToast();
+  const { user: currentUser } = useAuth();
   const [, navigate] = useLocation();
   const [, params] = useRoute("/jobs/:jobId/activities");
   const jobId = params?.jobId || "";
@@ -320,6 +322,26 @@ export default function JobActivitiesPage() {
   const hasActivities = activities && activities.length > 0;
 
   const allParentActivities = useMemo(() => (activities || []).filter(a => !a.parentId), [activities]);
+
+  useEffect(() => {
+    if (selectedActivity && activities) {
+      const freshData = activities.find(a => a.id === selectedActivity.id);
+      if (freshData) {
+        const changed = freshData.status !== selectedActivity.status
+          || freshData.startDate !== selectedActivity.startDate
+          || freshData.endDate !== selectedActivity.endDate
+          || freshData.reminderDate !== selectedActivity.reminderDate
+          || freshData.notes !== selectedActivity.notes
+          || freshData.predecessorSortOrder !== selectedActivity.predecessorSortOrder
+          || freshData.relationship !== selectedActivity.relationship
+          || freshData.estimatedDays !== selectedActivity.estimatedDays;
+        if (changed) {
+          setSelectedActivity(freshData);
+        }
+      }
+    }
+  }, [activities]);
+
   const totalActivities = allParentActivities.length;
   const doneCount = allParentActivities.filter(a => a.status === "DONE").length;
   const overdueCount = allParentActivities.filter(a => isOverdue(a)).length;
@@ -941,6 +963,7 @@ export default function JobActivitiesPage() {
                                     users={users || []}
                                     jobs={jobsList || []}
                                     jobId={jobId}
+                                    currentUserId={currentUser?.id}
                                     expanded={expandedActivities.has(activity.id)}
                                     tasksExpanded={expandedTasks.has(activity.id)}
                                     onToggleExpanded={() => toggleActivityExpanded(activity.id)}
@@ -1029,6 +1052,7 @@ function ActivityRow({
   users,
   jobs,
   jobId,
+  currentUserId,
   expanded,
   tasksExpanded,
   onToggleExpanded,
@@ -1043,6 +1067,7 @@ function ActivityRow({
   users: any[];
   jobs: any[];
   jobId: string;
+  currentUserId?: string;
   expanded: boolean;
   tasksExpanded: boolean;
   onToggleExpanded: () => void;
@@ -1089,9 +1114,27 @@ function ActivityRow({
         </td>
         <td className="px-3 py-2 text-muted-foreground text-xs">{activity.category || "-"}</td>
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusOpt.color}`}>
-            {statusOpt.label}
-          </span>
+          <Select
+            value={activity.status}
+            onValueChange={(v) => onStatusChange(activity.id, v)}
+          >
+            <SelectTrigger className="h-7 border-0 w-auto p-0 shadow-none focus:ring-0 [&>svg]:hidden" data-testid={`inline-status-${activity.id}`}>
+              <SelectValue>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusOpt.color}`}>
+                  {statusOpt.label}
+                </span>
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_OPTIONS.map(s => (
+                <SelectItem key={s.value} value={s.value}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${s.color}`}>
+                    {s.label}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </td>
         <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
           <Input
@@ -1189,6 +1232,7 @@ function ActivityRow({
               activityEndDate={activity.endDate ? String(activity.endDate) : null}
               users={users}
               jobs={jobs}
+              currentUserId={currentUserId}
             />
           </td>
         </tr>
