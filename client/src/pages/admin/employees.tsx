@@ -437,7 +437,7 @@ export default function AdminEmployeesPage() {
                       {employee.employeeNumber}
                     </TableCell>
                     <TableCell className="font-medium" data-testid={`text-employee-name-${employee.id}`}>
-                      {employee.firstName} {employee.lastName}
+                      {employee.lastName}, {employee.firstName}
                     </TableCell>
                     <TableCell data-testid={`text-employee-email-${employee.id}`}>
                       {employee.email || "-"}
