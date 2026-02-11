@@ -1372,6 +1372,76 @@ Based on the file information and typical document workflows, provide a concise 
   }
 });
 
+router.post("/api/documents/:id/analyze-changes", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const documentId = String(req.params.id);
+    const doc = await storage.getDocument(documentId);
+
+    if (!doc) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    if (!doc.parentDocumentId) {
+      return res.status(400).json({ error: "This is the original version - no previous version to compare against" });
+    }
+
+    const parentDoc = await storage.getDocument(doc.parentDocumentId);
+    if (!parentDoc) {
+      return res.status(404).json({ error: "Parent document not found" });
+    }
+
+    let prompt = `You are analyzing a document version update in a construction/engineering document management system. Compare the new version to the original and provide a brief, professional summary of what likely changed.
+
+Original Document (Previous Version):
+- Title: ${parentDoc.title}
+- File Name: ${parentDoc.originalName}
+- File Size: ${parentDoc.fileSize || 0} bytes
+- Version: ${parentDoc.version}${parentDoc.revision || ''}
+- Status: ${parentDoc.status}
+- Type: ${parentDoc.type?.typeName || 'Unknown'}
+- Discipline: ${parentDoc.discipline?.disciplineName || 'Unknown'}
+
+New Document (Current Version):
+- Title: ${doc.title}
+- File Name: ${doc.originalName}
+- File Size: ${doc.fileSize || 0} bytes
+- Version: ${doc.version}${doc.revision || ''}
+- Status: ${doc.status}
+- Size Change: ${(doc.fileSize || 0) > (parentDoc.fileSize || 0) ? `+${(doc.fileSize || 0) - (parentDoc.fileSize || 0)}` : (doc.fileSize || 0) - (parentDoc.fileSize || 0)} bytes
+
+Based on the file information, version numbers, and typical construction/engineering document workflows, provide a concise 2-3 sentence summary of what likely changed between v${parentDoc.version}${parentDoc.revision || ''} and v${doc.version}${doc.revision || ''}. Focus on professional, construction/engineering document terminology. Consider common reasons for version updates such as design revisions, client feedback, RFI responses, specification changes, or coordination updates.`;
+
+    const mimeType = doc.mimeType || '';
+    if (mimeType === 'application/pdf' || mimeType.startsWith('image/')) {
+      prompt += `\n\nNote: This is a ${mimeType} file (likely a drawing or specification document). Consider typical changes for this document type in construction projects.`;
+    }
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a document management assistant for construction and engineering projects. Provide brief, professional summaries of document version changes. Keep responses concise (2-3 sentences) and relevant to construction/engineering workflows."
+        },
+        { role: "user", content: prompt }
+      ],
+      max_completion_tokens: 200,
+    });
+
+    const summary = completion.choices[0]?.message?.content?.trim() || "";
+
+    if (summary) {
+      await storage.updateDocument(documentId, { changeSummary: summary });
+    }
+
+    logger.info({ documentId, parentId: doc.parentDocumentId }, "AI version change analysis completed");
+    res.json({ summary });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error analyzing document version changes");
+    res.status(500).json({ error: "Failed to analyze document changes", summary: "" });
+  }
+});
+
 // ============================================================================
 // PANEL DOCUMENTS (Mini Document Register)
 // ============================================================================

@@ -565,6 +565,7 @@ export const DOCUMENT_ROUTES = {
   STATUS: (id: string | number) => `/api/documents/${id}/status`,
   NEXT_NUMBER: '/api/documents/next-number',
   ANALYZE_VERSION: '/api/documents/analyze-version',
+  ANALYZE_EXISTING_VERSIONS: (id: string | number) => `/api/documents/${id}/analyze-changes`,
   
   // Panel Documents (mini register)
   PANEL_DOCUMENTS: (panelId: string) => `/api/panels/${panelId}/documents`,

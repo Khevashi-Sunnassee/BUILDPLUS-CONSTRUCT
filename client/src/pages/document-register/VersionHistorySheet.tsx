@@ -1,8 +1,11 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Download,
   Eye,
   Mail,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +19,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useToast } from "@/hooks/use-toast";
+import { getCsrfToken, queryClient } from "@/lib/queryClient";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
 import type { Document, DocumentWithDetails } from "./types";
 import { statusConfig, formatDate } from "./types";
@@ -28,10 +33,44 @@ interface VersionHistorySheetProps {
 }
 
 export function VersionHistorySheet({ open, onOpenChange, document: versionHistoryDoc, onSendEmail }: VersionHistorySheetProps) {
+  const { toast } = useToast();
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [localSummaries, setLocalSummaries] = useState<Record<string, string>>({});
+
   const { data: versionHistory = [], isLoading } = useQuery<Document[]>({
     queryKey: [DOCUMENT_ROUTES.VERSIONS(versionHistoryDoc?.id || "")],
     enabled: !!versionHistoryDoc?.id && open,
   });
+
+  const handleAnalyzeChanges = async (versionId: string) => {
+    setAnalyzingId(versionId);
+    try {
+      const csrfToken = getCsrfToken();
+      const response = await fetch(DOCUMENT_ROUTES.ANALYZE_EXISTING_VERSIONS(versionId), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(csrfToken ? { "x-csrf-token": csrfToken } : {}),
+        },
+        credentials: "include",
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Analysis failed");
+      }
+      if (data.summary) {
+        setLocalSummaries(prev => ({ ...prev, [versionId]: data.summary }));
+        queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.VERSIONS(versionHistoryDoc?.id || "")] });
+        toast({ title: "Analysis Complete", description: "AI version comparison summary generated" });
+      }
+    } catch (error: any) {
+      toast({ title: "Analysis Failed", description: error.message || "Could not analyze document changes", variant: "destructive" });
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -42,7 +81,7 @@ export function VersionHistorySheet({ open, onOpenChange, document: versionHisto
             {versionHistoryDoc?.title}
           </SheetDescription>
         </SheetHeader>
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 space-y-4 overflow-y-auto max-h-[calc(100vh-120px)]">
           {isLoading ? (
             <div className="space-y-4" data-testid="skeleton-version-history">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -69,14 +108,18 @@ export function VersionHistorySheet({ open, onOpenChange, document: versionHisto
           ) : versionHistory.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">No version history available</p>
           ) : (
-            versionHistory.map((version, index) => {
+            versionHistory.map((version) => {
               const status = statusConfig[version.status] || statusConfig.DRAFT;
+              const summary = localSummaries[version.id] || version.changeSummary;
+              const hasParent = !!version.parentDocumentId;
+              const isAnalyzing = analyzingId === version.id;
+
               return (
                 <Card key={version.id} className={version.isLatestVersion ? "border-primary" : ""}>
                   <CardContent className="pt-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <div className="flex items-center gap-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-medium">v{version.version}{version.revision}</span>
                           {version.isLatestVersion && (
                             <Badge variant="outline" className="text-primary border-primary">Latest</Badge>
@@ -86,11 +129,35 @@ export function VersionHistorySheet({ open, onOpenChange, document: versionHisto
                         <p className="text-sm text-muted-foreground mt-1">
                           {formatDate(version.createdAt)}
                         </p>
-                        {version.changeSummary && (
-                          <p className="text-sm mt-2">{version.changeSummary}</p>
+                        {summary && (
+                          <div className="mt-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`text-change-summary-${version.id}`}>
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Sparkles className="h-3 w-3 text-primary flex-shrink-0" />
+                              <span className="text-xs font-medium text-muted-foreground">AI Version Summary</span>
+                            </div>
+                            <p className="text-sm leading-relaxed">{summary}</p>
+                          </div>
+                        )}
+                        {!summary && hasParent && !isAnalyzing && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="mt-2 text-xs text-muted-foreground"
+                            onClick={() => handleAnalyzeChanges(version.id)}
+                            data-testid={`button-analyze-changes-${version.id}`}
+                          >
+                            <Sparkles className="h-3 w-3 mr-1" />
+                            Analyze Version Changes
+                          </Button>
+                        )}
+                        {isAnalyzing && (
+                          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>Analyzing changes...</span>
+                          </div>
                         )}
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-shrink-0">
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
