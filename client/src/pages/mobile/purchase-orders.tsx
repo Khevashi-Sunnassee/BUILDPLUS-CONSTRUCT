@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -210,6 +210,7 @@ export default function MobilePurchaseOrdersPage() {
               isRejecting={rejectMutation.isPending}
               onClose={() => setSelectedPO(null)}
               onSend={handleSendPO}
+              onViewCapex={(capexId) => navigate(`/mobile/capex-requests/${capexId}`)}
               formatCurrency={formatCurrency}
             />
           )}
@@ -291,6 +292,7 @@ function PODetailSheet({
   isRejecting,
   onClose,
   onSend,
+  onViewCapex,
   formatCurrency,
 }: { 
   po: PurchaseOrder;
@@ -302,6 +304,7 @@ function PODetailSheet({
   isRejecting: boolean;
   onClose: () => void;
   onSend: (po: PurchaseOrder) => void;
+  onViewCapex: (capexId: string) => void;
   formatCurrency: (amount: string | number | null) => string;
 }) {
   const status = statusConfig[po.status] || statusConfig.DRAFT;
@@ -353,8 +356,8 @@ function PODetailSheet({
                 className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 w-full text-left active:scale-[0.99]"
                 data-testid="button-view-capex"
                 onClick={() => {
-                  setSelectedPO(null);
-                  setTimeout(() => navigate(`/mobile/capex-requests/${po.capexRequestId}`), 150);
+                  onClose();
+                  setTimeout(() => onViewCapex(po.capexRequestId!), 150);
                 }}
               >
                 <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
