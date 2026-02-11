@@ -42,6 +42,7 @@ import { format, isAfter, isBefore, startOfDay } from "date-fns";
 import { getStageColor } from "@/lib/stage-colors";
 import { ActivityTasksPanel } from "@/pages/tasks/ActivityTasksPanel";
 import { GanttChart } from "@/pages/job-activities-gantt";
+import { ProgressFlowChart } from "@/pages/job-activities-progress";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
 type ActivityWithAssignees = JobActivity & {
@@ -103,7 +104,7 @@ export default function JobActivitiesPage() {
   const [showInstantiateDialog, setShowInstantiateDialog] = useState(false);
   const [selectedJobTypeId, setSelectedJobTypeId] = useState("");
   const [showCompleted, setShowCompleted] = useState(false);
-  const [viewMode, setViewMode] = useState<"table" | "gantt">("table");
+  const [viewMode, setViewMode] = useState<"table" | "gantt" | "progress">("table");
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [printIncludeTasks, setPrintIncludeTasks] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
@@ -867,12 +868,22 @@ export default function JobActivitiesPage() {
               <Button
                 variant={viewMode === "gantt" ? "default" : "ghost"}
                 size="sm"
-                className="rounded-l-none gap-1"
+                className="rounded-none gap-1"
                 onClick={() => setViewMode("gantt")}
                 data-testid="button-view-gantt"
               >
                 <BarChart3 className="h-4 w-4" />
                 Gantt
+              </Button>
+              <Button
+                variant={viewMode === "progress" ? "default" : "ghost"}
+                size="sm"
+                className="rounded-l-none gap-1"
+                onClick={() => setViewMode("progress")}
+                data-testid="button-view-progress"
+              >
+                <ListChecks className="h-4 w-4" />
+                Progress
               </Button>
             </div>
           </div>
@@ -893,6 +904,13 @@ export default function JobActivitiesPage() {
               stageColorMap={stageColorMap}
               onSelectActivity={setSelectedActivity}
               jobTitle={job ? `${job.jobNumber || ""} - ${job.name || ""}` : "Project Activities"}
+            />
+          ) : viewMode === "progress" ? (
+            <ProgressFlowChart
+              activities={filteredActivities}
+              stages={stages || []}
+              stageColorMap={stageColorMap}
+              onSelectActivity={setSelectedActivity}
             />
           ) : (
             <div className="space-y-3">
