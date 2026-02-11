@@ -76,11 +76,9 @@ export default function HireBookingsPage() {
   const [actionDialog, setActionDialog] = useState<{ type: string; booking: HireBookingWithDetails } | null>(null);
 
   const { data: bookings = [], isLoading } = useQuery<HireBookingWithDetails[]>({
-    queryKey: [HIRE_ROUTES.LIST, statusFilter],
+    queryKey: [HIRE_ROUTES.LIST],
     queryFn: async () => {
-      const params = new URLSearchParams();
-      if (statusFilter !== "ALL") params.set("status", statusFilter);
-      const res = await fetch(`${HIRE_ROUTES.LIST}?${params.toString()}`, { credentials: "include" });
+      const res = await fetch(HIRE_ROUTES.LIST, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch hire bookings");
       return res.json();
     },
@@ -125,6 +123,7 @@ export default function HireBookingsPage() {
 
   const filteredBookings = useMemo(() => {
     return bookings.filter((b) => {
+      if (statusFilter !== "ALL" && b.status !== statusFilter) return false;
       if (categoryFilter !== "ALL" && b.assetCategoryName !== categoryFilter) return false;
       if (equipmentFilter !== "ALL" && b.equipmentDescription !== equipmentFilter) return false;
       if (dateFrom) {
@@ -151,7 +150,7 @@ export default function HireBookingsPage() {
       }
       return true;
     });
-  }, [bookings, searchQuery, categoryFilter, equipmentFilter, dateFrom, dateTo]);
+  }, [bookings, statusFilter, searchQuery, categoryFilter, equipmentFilter, dateFrom, dateTo]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: bookings.length };
@@ -337,8 +336,8 @@ export default function HireBookingsPage() {
             <TabsTrigger value="ALL" data-testid="tab-status-all">
               All ({statusCounts.ALL || 0})
             </TabsTrigger>
-            <TabsTrigger value="ON_HIRE" data-testid="tab-status-on-hire">
-              On Hire ({statusCounts.ON_HIRE || 0})
+            <TabsTrigger value="DRAFT" data-testid="tab-status-draft">
+              Draft ({statusCounts.DRAFT || 0})
             </TabsTrigger>
             <TabsTrigger value="REQUESTED" data-testid="tab-status-requested">
               Requested ({statusCounts.REQUESTED || 0})
@@ -346,11 +345,20 @@ export default function HireBookingsPage() {
             <TabsTrigger value="APPROVED" data-testid="tab-status-approved">
               Approved ({statusCounts.APPROVED || 0})
             </TabsTrigger>
-            <TabsTrigger value="DRAFT" data-testid="tab-status-draft">
-              Draft ({statusCounts.DRAFT || 0})
+            <TabsTrigger value="BOOKED" data-testid="tab-status-booked">
+              Booked ({statusCounts.BOOKED || 0})
+            </TabsTrigger>
+            <TabsTrigger value="ON_HIRE" data-testid="tab-status-on-hire">
+              On Hire ({statusCounts.ON_HIRE || 0})
             </TabsTrigger>
             <TabsTrigger value="RETURNED" data-testid="tab-status-returned">
               Returned ({statusCounts.RETURNED || 0})
+            </TabsTrigger>
+            <TabsTrigger value="CLOSED" data-testid="tab-status-closed">
+              Closed ({statusCounts.CLOSED || 0})
+            </TabsTrigger>
+            <TabsTrigger value="CANCELLED" data-testid="tab-status-cancelled">
+              Cancelled ({statusCounts.CANCELLED || 0})
             </TabsTrigger>
           </TabsList>
         </Tabs>
