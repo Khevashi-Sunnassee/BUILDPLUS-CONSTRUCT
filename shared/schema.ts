@@ -2960,15 +2960,17 @@ export type ProgressClaimItem = typeof progressClaimItems.$inferSelect;
 export type ProgressClaimStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
 export const ASSET_CATEGORIES = [
-  "Heavy Equipment", "Excavation", "Lifting", "Concrete", "Earthmoving", "Compaction",
-  "Site Preparation", "Road Construction", "Drilling", "Demolition",
-  "Molds", "Concrete Mixers", "Prestressing", "Casting", "Curing", "Finishing",
-  "Material Handling", "Quality Control", "Steam Curing Systems", "Aggregate Processing",
-  "Survey", "Planning & Design", "Environmental Testing", "Geotechnical", "Infrastructure",
-  "Utility Installation", "Landscaping", "Testing & Inspection", "Safety", "Site Security",
-  "Vehicles & Transportation", "Hand Tools & Power Tools", "IT Equipment", "Office Equipment",
-  "Workshop Equipment", "Maintenance Equipment", "Storage Systems", "Communication Equipment",
-  "Generators & Power Systems", "Furniture", "General Machinery", "Other",
+  "Aggregate Processing", "Casting", "Communication Equipment", "Compaction", "Concrete",
+  "Concrete Mixers", "Curing", "Demolition", "Drilling", "Earthmoving",
+  "Environmental Testing", "Excavation", "Finishing", "Furniture",
+  "General Machinery", "Generators & Power Systems", "Geotechnical",
+  "Hand Tools & Power Tools", "Heavy Equipment", "IT Equipment", "Infrastructure",
+  "Landscaping", "Lifting", "Maintenance Equipment", "Material Handling",
+  "Molds", "Office Equipment", "Planning & Design", "Prestressing",
+  "Quality Control", "Road Construction", "Safety", "Site Preparation",
+  "Site Security", "Steam Curing Systems", "Storage Systems", "Survey",
+  "Testing & Inspection", "Utility Installation", "Vehicles & Transportation",
+  "Workshop Equipment", "Other",
 ] as const;
 
 export type AssetCategory = typeof ASSET_CATEGORIES[number];
