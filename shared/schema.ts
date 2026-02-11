@@ -3602,6 +3602,17 @@ export const activityTemplateSubtasks = pgTable("activity_template_subtasks", {
   templateIdx: index("activity_template_subtasks_template_idx").on(table.templateId),
 }));
 
+export const activityTemplateChecklists = pgTable("activity_template_checklists", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  templateId: varchar("template_id", { length: 36 }).notNull().references(() => activityTemplates.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  estimatedDays: integer("estimated_days").default(1).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  templateIdx: index("activity_template_checklists_template_idx").on(table.templateId),
+}));
+
 export const jobActivities = pgTable("job_activities", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   jobId: varchar("job_id", { length: 36 }).notNull().references(() => jobs.id, { onDelete: "cascade" }),
@@ -3697,6 +3708,10 @@ export type ActivityTemplate = typeof activityTemplates.$inferSelect;
 export const insertActivityTemplateSubtaskSchema = createInsertSchema(activityTemplateSubtasks).omit({ id: true, createdAt: true });
 export type InsertActivityTemplateSubtask = z.infer<typeof insertActivityTemplateSubtaskSchema>;
 export type ActivityTemplateSubtask = typeof activityTemplateSubtasks.$inferSelect;
+
+export const insertActivityTemplateChecklistSchema = createInsertSchema(activityTemplateChecklists).omit({ id: true, createdAt: true });
+export type InsertActivityTemplateChecklist = z.infer<typeof insertActivityTemplateChecklistSchema>;
+export type ActivityTemplateChecklist = typeof activityTemplateChecklists.$inferSelect;
 
 export const insertJobActivitySchema = createInsertSchema(jobActivities).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertJobActivity = z.infer<typeof insertJobActivitySchema>;
