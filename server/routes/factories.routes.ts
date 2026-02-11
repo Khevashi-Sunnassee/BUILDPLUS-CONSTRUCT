@@ -198,7 +198,14 @@ router.post("/api/admin/factories", requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const parsed = insertFactorySchema.parse({ ...req.body, companyId });
+    const body = { ...req.body, companyId };
+    if (body.latitude !== undefined && body.latitude !== null) {
+      body.latitude = String(body.latitude);
+    }
+    if (body.longitude !== undefined && body.longitude !== null) {
+      body.longitude = String(body.longitude);
+    }
+    const parsed = insertFactorySchema.parse(body);
     const [created] = await db.insert(factories).values(parsed).returning();
     res.json(created);
   } catch (error: unknown) {
@@ -212,8 +219,15 @@ router.patch("/api/admin/factories/:id", requireRole("ADMIN"), async (req, res) 
     const companyId = req.companyId;
     const { beds, ...factoryData } = req.body;
     const factoryId = String(req.params.id);
+    if (factoryData.latitude !== undefined && factoryData.latitude !== null) {
+      factoryData.latitude = String(factoryData.latitude);
+    }
+    if (factoryData.longitude !== undefined && factoryData.longitude !== null) {
+      factoryData.longitude = String(factoryData.longitude);
+    }
     const parsed = insertFactorySchema.partial().safeParse(factoryData);
     if (!parsed.success) {
+      logger.error({ details: parsed.error.flatten() }, "Factory update validation failed");
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
     const [updated] = await db.update(factories)

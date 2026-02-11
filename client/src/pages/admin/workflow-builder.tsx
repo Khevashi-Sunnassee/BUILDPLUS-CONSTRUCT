@@ -158,22 +158,22 @@ function SortableActivity({
         </div>
         <div className="flex items-center gap-1">
           <Button
-            size="icon"
-            variant="ghost"
+            size="sm"
+            variant="outline"
             onClick={() => onAddSubtask(template.id)}
-            title="Add Subtask"
             data-testid={`button-add-subtask-${template.id}`}
           >
-            <ListPlus className="h-4 w-4" />
+            <ListPlus className="h-4 w-4 mr-1" />
+            Subtask
           </Button>
           <Button
-            size="icon"
-            variant="ghost"
+            size="sm"
+            variant="outline"
             onClick={() => onAddChecklist(template.id)}
-            title="Add Checklist"
             data-testid={`button-add-checklist-${template.id}`}
           >
-            <CheckSquare className="h-4 w-4" />
+            <CheckSquare className="h-4 w-4 mr-1" />
+            Checklist
           </Button>
           <Button size="icon" variant="ghost" onClick={() => onEdit(template)} data-testid={`button-edit-template-${template.id}`}>
             <Pencil className="h-4 w-4" />
