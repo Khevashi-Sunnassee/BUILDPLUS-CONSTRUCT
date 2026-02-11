@@ -2973,7 +2973,7 @@ export const ASSET_CATEGORIES = [
 
 export type AssetCategory = typeof ASSET_CATEGORIES[number];
 
-export const ASSET_STATUSES = ["active", "disposed", "sold", "stolen", "lost"] as const;
+export const ASSET_STATUSES = ["active", "awaiting_service", "in_service", "disposed", "sold", "stolen", "lost"] as const;
 export type AssetStatus = typeof ASSET_STATUSES[number];
 
 export const ASSET_CONDITIONS = ["new", "excellent", "good", "fair", "poor"] as const;

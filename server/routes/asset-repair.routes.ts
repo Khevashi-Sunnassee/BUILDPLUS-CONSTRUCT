@@ -158,6 +158,13 @@ router.post("/api/asset-repair-requests", requireAuth, async (req, res) => {
       estimatedCost: parsed.estimatedCost ? String(parsed.estimatedCost) : null,
     }).returning();
 
+    await db.update(assets)
+      .set({ status: "awaiting_service" })
+      .where(and(
+        eq(assets.id, parsed.assetId),
+        eq(assets.companyId, companyId)
+      ));
+
     res.status(201).json(created);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating repair request");
@@ -194,6 +201,34 @@ router.put("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
       .returning();
 
     if (!updated) return res.status(404).json({ error: "Repair request not found" });
+
+    if (parsed.status) {
+      let newAssetStatus: string | null = null;
+      if (parsed.status === "IN_PROGRESS") {
+        newAssetStatus = "in_service";
+      } else if (parsed.status === "COMPLETED" || parsed.status === "CANCELLED") {
+        const openRequests = await db.select({ id: assetRepairRequests.id })
+          .from(assetRepairRequests)
+          .where(and(
+            eq(assetRepairRequests.assetId, updated.assetId),
+            eq(assetRepairRequests.companyId, companyId),
+            sql`${assetRepairRequests.status} NOT IN ('COMPLETED', 'CANCELLED')`,
+            sql`${assetRepairRequests.id} != ${updated.id}`
+          ))
+          .limit(1);
+        if (openRequests.length === 0) {
+          newAssetStatus = "active";
+        }
+      } else if (parsed.status === "SUBMITTED") {
+        newAssetStatus = "awaiting_service";
+      }
+      if (newAssetStatus) {
+        await db.update(assets)
+          .set({ status: newAssetStatus })
+          .where(and(eq(assets.id, updated.assetId), eq(assets.companyId, companyId)));
+      }
+    }
+
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating repair request");

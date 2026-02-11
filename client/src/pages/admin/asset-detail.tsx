@@ -84,17 +84,23 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
   if (!status) return <span>-</span>;
   const colorMap: Record<string, string> = {
     active: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+    awaiting_service: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+    in_service: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
     disposed: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
     sold: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
     stolen: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
     lost: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  };
+  const labelMap: Record<string, string> = {
+    awaiting_service: "Awaiting Service",
+    in_service: "In Service",
   };
   return (
     <Badge
       data-testid="badge-asset-status"
       className={`capitalize ${colorMap[status] || ""}`}
     >
-      {status}
+      {labelMap[status] || status}
     </Badge>
   );
 }

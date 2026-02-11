@@ -123,6 +123,8 @@ export default function AssetRepairFormPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.REPAIR_REQUESTS] });
       queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.REPAIR_REQUESTS_BY_ASSET(assetId)] });
+      queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.LIST] });
+      queryClient.invalidateQueries({ queryKey: [ASSET_ROUTES.BY_ID(assetId)] });
       toast({ title: editId ? "Repair request updated" : "Repair request created" });
       navigate(`/admin/assets/${assetId}`);
     },
@@ -167,16 +169,23 @@ export default function AssetRepairFormPage() {
           <h1 className="text-2xl font-bold" data-testid="text-page-title">
             {editId ? "Edit Repair Request" : "New Service / Repair Request"}
           </h1>
-          {!editId && repairNumber && (
-            <Badge variant="outline" className="mt-1" data-testid="badge-repair-number">
-              {repairNumber.repairNumber}
-            </Badge>
+          {asset && (
+            <p className="text-sm text-muted-foreground mt-1" data-testid="text-asset-subtitle">
+              {asset.name} {asset.assetTag ? `(${asset.assetTag})` : ""}
+            </p>
           )}
-          {editId && existingRepair?.repairNumber && (
-            <Badge variant="outline" className="mt-1" data-testid="badge-repair-number">
-              {existingRepair.repairNumber}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            {!editId && repairNumber && (
+              <Badge variant="outline" data-testid="badge-repair-number">
+                {repairNumber.repairNumber}
+              </Badge>
+            )}
+            {editId && existingRepair?.repairNumber && (
+              <Badge variant="outline" data-testid="badge-repair-number">
+                {existingRepair.repairNumber}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
 
