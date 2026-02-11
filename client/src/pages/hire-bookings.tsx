@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Plus, Search, Eye, Edit, Truck, X, Check, Package, ArrowRight, Lock, RotateCcw, BarChart3 } from "lucide-react";
+import { Plus, Search, Eye, Edit, Truck, X, Check, Package, ArrowRight, Lock, RotateCcw, BarChart3, AlertTriangle, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -199,6 +199,18 @@ export default function HireBookingsPage() {
     return { dailyChartData: dailyData, monthlyChartData: monthlyData };
   }, [bookings]);
 
+  const dashboardStats = useMemo(() => {
+    const onHireStatuses = ["ON_HIRE", "PICKED_UP", "BOOKED"];
+    const onHireItems = bookings.filter(b => onHireStatuses.includes(b.status));
+    const totalDailyCost = onHireItems.reduce((sum, b) => sum + getDailyRate(b), 0);
+    const overdueItems = bookings.filter(b => isOverdue(b));
+    return {
+      onHireCount: onHireItems.length,
+      totalDailyCost: Math.round(totalDailyCost * 100) / 100,
+      overdueCount: overdueItems.length,
+    };
+  }, [bookings]);
+
   if (isLoading) {
     return (
       <div className="p-6 space-y-4">
@@ -258,6 +270,40 @@ export default function HireBookingsPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card data-testid="stat-on-hire">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Items On Hire</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-on-hire-count">{dashboardStats.onHireCount}</div>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-daily-cost">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Cost / Day</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold" data-testid="text-daily-cost">
+              ${dashboardStats.totalDailyCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card data-testid="stat-overdue">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Overdue Items</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${dashboardStats.overdueCount > 0 ? "text-destructive" : ""}`} data-testid="text-overdue-count">
+              {dashboardStats.overdueCount}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {(dailyChartData.length > 0 || monthlyChartData.length > 0) && (
