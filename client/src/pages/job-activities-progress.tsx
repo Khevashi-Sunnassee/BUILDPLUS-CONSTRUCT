@@ -59,7 +59,6 @@ function getActivityColorKey(activity: ActivityWithAssignees): string {
   if (isOverdue(activity)) return "overdue";
   if (activity.status === "STUCK") return "stuck";
   if (activity.status === "ON_HOLD") return "on_hold";
-  if (hasChecklist(activity) && !isChecklistComplete(activity)) return "checklist";
   if (activity.status === "IN_PROGRESS") return "in_progress";
   return "not_started";
 }
@@ -146,9 +145,7 @@ function ChevronNode({
           {truncatedName}
         </text>
         <text x={POINT_W + 6} y={34} fontSize="9" opacity="0.85" className="select-none">
-          {hasChecklist(activity)
-            ? `${activity.checklistCompleted}/${activity.checklistTotal} checked`
-            : label}
+          {label}
           {activity.estimatedDays ? `  ${activity.estimatedDays}d` : ""}
         </text>
         {activity.endDate && (
@@ -385,11 +382,18 @@ export function ProgressFlowChart({
                 <CardContent className="p-3">
                   <div className="flex items-center gap-0 flex-wrap">
                     {sortedActivities.map((activity) => (
-                      <ChevronNode
-                        key={activity.id}
-                        activity={activity}
-                        onClick={() => onSelectActivity(activity)}
-                      />
+                      <span key={activity.id} className="contents">
+                        <ChevronNode
+                          activity={activity}
+                          onClick={() => onSelectActivity(activity)}
+                        />
+                        {hasChecklist(activity) && (
+                          <ChecklistChevronNode
+                            activity={activity}
+                            onClick={() => onSelectActivity(activity)}
+                          />
+                        )}
+                      </span>
                     ))}
                   </div>
                 </CardContent>
