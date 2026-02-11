@@ -935,7 +935,9 @@ chatRouter.post("/messages", requireAuth, requireChatPermission, async (req, res
           conversationId,
           messageId,
         });
-      } catch (e) {}
+      } catch (e) {
+        logger.warn({ err: e, mentionedUserId, conversationId }, "Failed to create mention notification");
+      }
     }
 
     const members = await db

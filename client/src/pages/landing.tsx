@@ -269,7 +269,7 @@ export default function LandingPage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground" data-testid="text-footer-url">
-              www.buildplusai.com
+              LTE Performance
             </p>
           </div>
         </div>

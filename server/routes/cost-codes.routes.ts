@@ -86,7 +86,7 @@ router.get("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes",
 
     res.json(results);
   } catch (error: any) {
-    logger.error("Error fetching cost codes:", error);
+    logger.error({ err: error }, "Error fetching cost codes");
     res.status(500).json({ message: "Failed to fetch cost codes" });
   }
 });
@@ -141,7 +141,7 @@ router.get("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_c
 
     res.json(results);
   } catch (error: any) {
-    logger.error("Error fetching child cost codes:", error);
+    logger.error({ err: error }, "Error fetching child cost codes");
     res.status(500).json({ message: "Failed to fetch child cost codes" });
   }
 });
@@ -176,7 +176,7 @@ router.get("/api/cost-codes-with-children", requireAuth, async (req: Request, re
 
     res.json(result);
   } catch (error: any) {
-    logger.error("Error fetching cost codes with children:", error);
+    logger.error({ err: error }, "Error fetching cost codes with children");
     res.status(500).json({ message: "Failed to fetch cost codes with children" });
   }
 });
@@ -274,7 +274,7 @@ router.get("/api/cost-codes/template/download", requireAuth, requirePermission("
     await workbook.xlsx.write(res);
     res.end();
   } catch (error: any) {
-    logger.error("Error generating cost code template:", error);
+    logger.error({ err: error }, "Error generating cost code template");
     res.status(500).json({ message: "Failed to generate template" });
   }
 });
@@ -352,11 +352,7 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
             return;
           }
 
-          try {
-            sortIdx++;
-          } catch (e) {}
-
-          (async () => {})();
+          sortIdx++;
         });
 
         const parentRows: { code: string; name: string; description: string | null; sortOrder: number; rowNum: number }[] = [];
@@ -501,7 +497,7 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
       errors,
     });
   } catch (error: any) {
-    logger.error("Error importing cost codes:", { message: error.message, stack: error.stack });
+    logger.error({ err: error }, "Error importing cost codes");
     res.status(500).json({ message: error.message || "Failed to import cost codes" });
   }
 });
@@ -519,7 +515,7 @@ router.get("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_cod
     }
     res.json(result);
   } catch (error: any) {
-    logger.error("Error fetching cost code:", error);
+    logger.error({ err: error }, "Error fetching cost code");
     res.status(500).json({ message: "Failed to fetch cost code" });
   }
 });
@@ -556,7 +552,7 @@ router.post("/api/cost-codes", requireAuth, requirePermission("admin_cost_codes"
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error creating cost code:", error);
+    logger.error({ err: error }, "Error creating cost code");
     res.status(500).json({ message: "Failed to create cost code" });
   }
 });
@@ -594,7 +590,7 @@ router.patch("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_c
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error updating cost code:", error);
+    logger.error({ err: error }, "Error updating cost code");
     res.status(500).json({ message: "Failed to update cost code" });
   }
 });
@@ -635,7 +631,7 @@ router.delete("/api/cost-codes/:id", requireAuth, requirePermission("admin_cost_
     }
     res.json({ message: "Cost code deleted", id: deleted.id });
   } catch (error: any) {
-    logger.error("Error deleting cost code:", error);
+    logger.error({ err: error }, "Error deleting cost code");
     res.status(500).json({ message: "Failed to delete cost code" });
   }
 });
@@ -667,7 +663,7 @@ router.get("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_co
     }
     res.json(result);
   } catch (error: any) {
-    logger.error("Error fetching child cost code:", error);
+    logger.error({ err: error }, "Error fetching child cost code");
     res.status(500).json({ message: "Failed to fetch child cost code" });
   }
 });
@@ -704,7 +700,7 @@ router.post("/api/child-cost-codes", requireAuth, requirePermission("admin_cost_
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error creating child cost code:", error);
+    logger.error({ err: error }, "Error creating child cost code");
     res.status(500).json({ message: "Failed to create child cost code" });
   }
 });
@@ -742,7 +738,7 @@ router.patch("/api/child-cost-codes/:id", requireAuth, requirePermission("admin_
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error updating child cost code:", error);
+    logger.error({ err: error }, "Error updating child cost code");
     res.status(500).json({ message: "Failed to update child cost code" });
   }
 });
@@ -761,7 +757,7 @@ router.delete("/api/child-cost-codes/:id", requireAuth, requirePermission("admin
     }
     res.json({ message: "Child cost code deleted", id: deleted.id });
   } catch (error: any) {
-    logger.error("Error deleting child cost code:", error);
+    logger.error({ err: error }, "Error deleting child cost code");
     res.status(500).json({ message: "Failed to delete child cost code" });
   }
 });
@@ -786,7 +782,7 @@ router.get("/api/cost-code-defaults/:jobTypeId", requireAuth, requirePermission(
 
     res.json(results);
   } catch (error: any) {
-    logger.error("Error fetching cost code defaults:", error);
+    logger.error({ err: error }, "Error fetching cost code defaults");
     res.status(500).json({ message: "Failed to fetch cost code defaults" });
   }
 });
@@ -831,7 +827,7 @@ router.post("/api/cost-code-defaults", requireAuth, requirePermission("admin_cos
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error saving cost code defaults:", error);
+    logger.error({ err: error }, "Error saving cost code defaults");
     res.status(500).json({ message: "Failed to save cost code defaults" });
   }
 });
@@ -860,7 +856,7 @@ router.get("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res:
 
     res.json(results);
   } catch (error: any) {
-    logger.error("Error fetching job cost codes:", error);
+    logger.error({ err: error }, "Error fetching job cost codes");
     res.status(500).json({ message: "Failed to fetch job cost codes" });
   }
 });
@@ -931,7 +927,7 @@ router.post("/api/jobs/:jobId/cost-codes/inherit", requireAuth, async (req: Requ
 
     res.json({ inherited: newCodes.length, total: results.length, costCodes: results });
   } catch (error: any) {
-    logger.error("Error inheriting cost codes:", error);
+    logger.error({ err: error }, "Error inheriting cost codes");
     res.status(500).json({ message: "Failed to inherit cost codes" });
   }
 });
@@ -971,7 +967,7 @@ router.post("/api/jobs/:jobId/cost-codes", requireAuth, async (req: Request, res
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error adding job cost code:", error);
+    logger.error({ err: error }, "Error adding job cost code");
     res.status(500).json({ message: "Failed to add job cost code" });
   }
 });
@@ -999,7 +995,7 @@ router.patch("/api/jobs/:jobId/cost-codes/:id", requireAuth, async (req: Request
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
-    logger.error("Error updating job cost code:", error);
+    logger.error({ err: error }, "Error updating job cost code");
     res.status(500).json({ message: "Failed to update job cost code" });
   }
 });
@@ -1018,7 +1014,7 @@ router.delete("/api/jobs/:jobId/cost-codes/:id", requireAuth, async (req: Reques
     }
     res.json({ message: "Job cost code removed", id: deleted.id });
   } catch (error: any) {
-    logger.error("Error removing job cost code:", error);
+    logger.error({ err: error }, "Error removing job cost code");
     res.status(500).json({ message: "Failed to remove job cost code" });
   }
 });
