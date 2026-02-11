@@ -62,6 +62,7 @@ import {
   Workflow,
   Phone,
   Landmark,
+  Hash,
 } from "lucide-react";
 import type { UserPermission } from "@shared/schema";
 import {
@@ -118,6 +119,7 @@ const adminFinanceNavItems = [
   { title: "Purchase Orders", url: "/purchase-orders", icon: ShoppingCart },
   { title: "CAPEX Requests", url: "/capex-requests", icon: Landmark },
   { title: "Hire Bookings", url: "/hire-bookings", icon: Wrench },
+  { title: "Tenders", url: "/tenders", icon: ClipboardList },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
 ];
@@ -143,6 +145,7 @@ const adminNavItems = [
   { title: "User Permissions", url: "/admin/user-permissions", icon: Shield },
   { title: "Item Categories", url: "/admin/item-categories", icon: Tag },
   { title: "Job Types & Workflows", url: "/admin/job-types", icon: Workflow },
+  { title: "Cost Codes", url: "/admin/cost-codes", icon: Hash },
   { title: "Data Management", url: "/admin/data-management", icon: Database },
   { title: "Help Management", url: "/admin/help", icon: BookOpen },
 ];
@@ -177,6 +180,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/purchase-orders": "purchase_orders",
   "/capex-requests": "capex_requests",
   "/hire-bookings": "hire_bookings",
+  "/tenders": "tenders",
   "/weekly-wages": "weekly_wages",
   "/admin/asset-register": "admin_assets",
   "/kpi-dashboard": "kpi_dashboard",
@@ -195,6 +199,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/admin/users": "admin_users",
   "/admin/user-permissions": "admin_user_permissions",
   "/admin/job-types": "admin_job_types",
+  "/admin/cost-codes": "admin_cost_codes",
   "/admin/data-management": "admin_data_management",
   "/admin/help": "admin_settings",
   "/admin/customers": "admin_customers",

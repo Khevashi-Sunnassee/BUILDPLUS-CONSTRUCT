@@ -27,6 +27,8 @@ import {
   FileUp,
   Clock,
   CalendarRange,
+  Wallet,
+  ListChecks,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1189,6 +1191,24 @@ export default function AdminJobsPage() {
                             data-testid={`button-programme-${job.id}`}
                           >
                             <CalendarRange className="h-4 w-4 text-purple-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/jobs/${job.id}/budget`)}
+                            title="Job Budget"
+                            data-testid={`button-budget-${job.id}`}
+                          >
+                            <Wallet className="h-4 w-4 text-emerald-600" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => navigate(`/jobs/${job.id}/boq`)}
+                            title="Bill of Quantities"
+                            data-testid={`button-boq-${job.id}`}
+                          >
+                            <ListChecks className="h-4 w-4 text-cyan-600" />
                           </Button>
                           <Button
                             variant="ghost"

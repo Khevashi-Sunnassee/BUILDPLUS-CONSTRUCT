@@ -79,6 +79,10 @@ const ProgressClaimsPage = lazy(() => import("@/pages/progress-claims"));
 const ProgressClaimFormPage = lazy(() => import("@/pages/progress-claim-form"));
 const RetentionReportPage = lazy(() => import("@/pages/retention-report"));
 const AdminJobTypesPage = lazy(() => import("@/pages/admin/job-types"));
+const AdminCostCodesPage = lazy(() => import("@/pages/admin/cost-codes"));
+const TenderCenterPage = lazy(() => import("@/pages/tender-center"));
+const JobBudgetPage = lazy(() => import("@/pages/job-budget"));
+const JobBoqPage = lazy(() => import("@/pages/job-boq"));
 const WorkflowBuilderPage = lazy(() => import("@/pages/admin/workflow-builder"));
 const JobActivitiesPage = lazy(() => import("@/pages/job-activities"));
 
@@ -400,6 +404,30 @@ function Router() {
         </ProtectedRoute>
       </Route>
 
+      <Route path="/tenders">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <TenderCenterPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/jobs/:id/budget">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <JobBudgetPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/jobs/:id/boq">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <JobBoqPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
       <Route path="/pm-call-logs">
         <ProtectedRoute>
           <AuthenticatedLayout>
@@ -652,6 +680,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AdminJobTypesPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/cost-codes">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AdminCostCodesPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
