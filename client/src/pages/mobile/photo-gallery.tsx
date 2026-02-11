@@ -609,9 +609,8 @@ export default function MobilePhotoGallery() {
                 data-testid={`photo-thumb-${photo.id}`}
               >
                 <img
-                  src={`/api/documents/${photo.id}/view`}
+                  src={`/api/documents/${photo.id}/thumbnail`}
                   alt={photo.title}
-                  style={{ imageOrientation: "from-image" }}
                   className="w-full h-full object-cover"
                   loading="lazy"
                 />

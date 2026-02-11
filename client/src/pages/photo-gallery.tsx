@@ -109,7 +109,6 @@ function ThumbnailCard({
           <img
             src={thumbnailUrl}
             alt={doc.title}
-            style={{ imageOrientation: "from-image" }}
             className={`w-full h-full object-cover transition-opacity ${imgLoaded ? "opacity-100" : "opacity-0"}`}
             onLoad={() => setImgLoaded(true)}
             onError={() => setImgError(true)}
