@@ -456,11 +456,11 @@ export default function AdminFactoriesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[400px] rounded-md overflow-hidden">
+            <div className="h-[400px] rounded-md overflow-hidden relative" style={{ zIndex: 0 }}>
               <MapContainer
                 center={mapCenter}
                 zoom={5}
-                style={{ height: "100%", width: "100%" }}
+                style={{ height: "100%", width: "100%", zIndex: 0 }}
                 scrollWheelZoom={true}
               >
                 <TileLayer
