@@ -298,14 +298,14 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
     if (data.hireEndDate !== undefined) updateData.hireEndDate = new Date(data.hireEndDate);
     if (data.expectedReturnDate !== undefined) updateData.expectedReturnDate = data.expectedReturnDate ? new Date(data.expectedReturnDate) : null;
     if (data.rateType !== undefined) updateData.rateType = data.rateType;
-    if (data.rateAmount !== undefined) updateData.rateAmount = data.rateAmount;
+    if (data.rateAmount !== undefined) updateData.rateAmount = data.rateAmount || null;
     if (data.chargeRule !== undefined) updateData.chargeRule = data.chargeRule;
     if (data.quantity !== undefined) updateData.quantity = data.quantity;
     if (data.deliveryRequired !== undefined) updateData.deliveryRequired = data.deliveryRequired;
     if (data.deliveryAddress !== undefined) updateData.deliveryAddress = data.deliveryAddress;
-    if (data.deliveryCost !== undefined) updateData.deliveryCost = data.deliveryCost;
+    if (data.deliveryCost !== undefined) updateData.deliveryCost = data.deliveryCost || null;
     if (data.pickupRequired !== undefined) updateData.pickupRequired = data.pickupRequired;
-    if (data.pickupCost !== undefined) updateData.pickupCost = data.pickupCost;
+    if (data.pickupCost !== undefined) updateData.pickupCost = data.pickupCost || null;
     if (data.supplierReference !== undefined) updateData.supplierReference = data.supplierReference;
     if (data.notes !== undefined) updateData.notes = data.notes;
 
