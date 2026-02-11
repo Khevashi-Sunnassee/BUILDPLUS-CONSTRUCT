@@ -191,11 +191,17 @@ app.use((req, res, next) => {
 
 let appReady = false;
 
-app.get("/", (req, res, next) => {
+app.use((req, res, next) => {
   if (appReady) {
     return next();
   }
-  res.status(200).send("<!DOCTYPE html><html><head><title>Loading</title></head><body><p>Application is starting...</p><script>setTimeout(()=>location.reload(),3000)</script></body></html>");
+  if (req.path === "/api/health") {
+    return next();
+  }
+  if (req.path.startsWith("/api/")) {
+    return res.status(503).json({ message: "Application is starting, please wait..." });
+  }
+  res.status(200).send(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1"><title>LTE Performance - Loading</title><style>body{margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0}div{text-align:center}h2{margin-bottom:8px}p{opacity:0.7;font-size:14px}.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,0.1);border-top:3px solid #3b82f6;border-radius:50%;margin:0 auto 16px;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}</style></head><body><div><div class="spinner"></div><h2>LTE Performance</h2><p>Application is starting up...</p></div><script>setTimeout(()=>location.reload(),3000)</script></body></html>`);
 });
 
 app.get("/api/admin/error-summary", (req, res) => {
