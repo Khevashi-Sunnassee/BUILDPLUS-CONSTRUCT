@@ -870,37 +870,47 @@ export default function ChatPage() {
                   convs: filteredConversations.filter(c => c.topicId === topic.id),
                 }));
 
-                const renderConvItem = (conv: Conversation) => (
+                const renderConvItem = (conv: Conversation) => {
+                  const hasUnread = (conv.unreadCount ?? 0) > 0;
+                  return (
                   <DraggableConversation key={conv.id} conv={conv} isDragging={draggingConvId === conv.id}>
                     <div className="group flex items-start" data-testid={`conversation-row-${conv.id}`}>
                       <button
                         onClick={() => handleSelectConversation(conv.id)}
                         className={cn(
-                          "flex-1 flex items-start gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
-                          selectedConversationId === conv.id && "bg-accent"
+                          "flex-1 flex items-center gap-3 p-3 rounded-md text-left hover-elevate transition-colors overflow-hidden",
+                          selectedConversationId === conv.id && "bg-accent",
+                          hasUnread && "bg-accent/30"
                         )}
                         data-testid={`conversation-${conv.id}`}
                       >
-                        <div className="mt-0.5 text-muted-foreground shrink-0">
+                        <div className="relative text-muted-foreground shrink-0">
                           {getConversationIcon(conv)}
+                          {hasUnread && (
+                            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-destructive" />
+                            </span>
+                          )}
                         </div>
                         <div className="flex-1 min-w-0 overflow-hidden">
-                          <div className="font-medium truncate text-sm">
+                          <div className={cn("truncate text-sm", hasUnread ? "font-semibold" : "font-medium")}>
                             {getConversationDisplayName(conv)}
                           </div>
                           {conv.lastMessage && (
-                            <div className="text-xs text-muted-foreground truncate">
+                            <div className={cn("text-xs truncate", hasUnread ? "text-foreground/70 font-medium" : "text-muted-foreground")}>
                               {conv.lastMessage.body}
                             </div>
                           )}
                         </div>
                         <div className="flex flex-col items-end gap-1 shrink-0">
-                          <Badge variant="outline" className="text-xs">
-                            {conv.type}
-                          </Badge>
-                          {(conv.unreadCount ?? 0) > 0 && (
-                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[18px] h-[18px] flex items-center justify-center" data-testid={`badge-unread-${conv.id}`}>
+                          {hasUnread ? (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0 min-w-[20px] h-[20px] flex items-center justify-center rounded-full" data-testid={`badge-unread-${conv.id}`}>
                               {(conv.unreadCount ?? 0) > 99 ? "99+" : conv.unreadCount}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {conv.type}
                             </Badge>
                           )}
                         </div>
@@ -940,7 +950,8 @@ export default function ChatPage() {
                       )}
                     </div>
                   </DraggableConversation>
-                );
+                  );
+                };
 
                 return (
                   <>
