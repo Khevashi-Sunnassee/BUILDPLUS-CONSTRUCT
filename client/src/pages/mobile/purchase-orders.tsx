@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -65,6 +65,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 export default function MobilePurchaseOrdersPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [selectedPO, setSelectedPO] = useState<PurchaseOrder | null>(null);
   const [sendingPO, setSendingPO] = useState<PurchaseOrder | null>(null);
 
@@ -348,15 +349,20 @@ function PODetailSheet({
             </div>
 
             {po.capexRequestId && (
-              <Link href={`/mobile/capex-requests/${po.capexRequestId}`}>
-                <button className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 w-full text-left active:scale-[0.99]" data-testid="button-view-capex">
-                  <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
-                    CAPEX
-                  </Badge>
-                  <span className="text-sm text-amber-300/80 flex-1">View CAPEX request</span>
-                  <ChevronRight className="h-4 w-4 text-amber-400/60" />
-                </button>
-              </Link>
+              <button
+                className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 w-full text-left active:scale-[0.99]"
+                data-testid="button-view-capex"
+                onClick={() => {
+                  setSelectedPO(null);
+                  setTimeout(() => navigate(`/mobile/capex-requests/${po.capexRequestId}`), 150);
+                }}
+              >
+                <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-400 bg-amber-500/10" data-testid="badge-capex-detail">
+                  CAPEX
+                </Badge>
+                <span className="text-sm text-amber-300/80 flex-1">View CAPEX request</span>
+                <ChevronRight className="h-4 w-4 text-amber-400/60" />
+              </button>
             )}
 
             {po.deliveryAddress && (
