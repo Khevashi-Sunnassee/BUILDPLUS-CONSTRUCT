@@ -104,6 +104,7 @@ export default function HireBookingFormPage() {
   const isNew = params?.id === "new";
   const bookingId = isNew ? null : params?.id;
   const [actionDialog, setActionDialog] = useState<string | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const autoPrintDone = useRef(false);
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailTo, setEmailTo] = useState("");
@@ -190,6 +191,7 @@ export default function HireBookingFormPage() {
 
   useEffect(() => {
     if (existingBooking && !isNew) {
+      setSelectedStatus(existingBooking.status);
       form.reset({
         hireSource: existingBooking.hireSource || "external",
         equipmentDescription: existingBooking.equipmentDescription || "",
@@ -243,7 +245,7 @@ export default function HireBookingFormPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      const payload = {
+      const payload: Record<string, any> = {
         ...data,
         hireStartDate: data.hireStartDate.toISOString(),
         hireEndDate: data.hireEndDate.toISOString(),
@@ -251,6 +253,10 @@ export default function HireBookingFormPage() {
         assetId: data.hireSource === "internal" ? data.assetId : null,
         supplierId: data.hireSource === "external" ? data.supplierId : null,
       };
+
+      if (!isNew && selectedStatus) {
+        payload.status = selectedStatus;
+      }
 
       if (isNew) {
         return apiRequest("POST", HIRE_ROUTES.LIST, payload);
@@ -260,6 +266,9 @@ export default function HireBookingFormPage() {
     },
     onSuccess: async (response) => {
       queryClient.invalidateQueries({ queryKey: [HIRE_ROUTES.LIST] });
+      if (bookingId) {
+        queryClient.invalidateQueries({ queryKey: [HIRE_ROUTES.LIST, bookingId] });
+      }
       toast({ title: isNew ? "Hire booking created" : "Hire booking updated" });
       if (isNew) {
         const data = await response.json();
@@ -339,7 +348,7 @@ export default function HireBookingFormPage() {
     saveMutation.mutate(data);
   };
 
-  const canEdit = isNew || (existingBooking && ["DRAFT", "REQUESTED"].includes(existingBooking.status));
+  const canEdit = true;
   const bookingNumber = existingBooking?.bookingNumber || nextNumber?.bookingNumber || "HIRE-######";
 
   if (!isNew && bookingLoading) {
@@ -436,6 +445,21 @@ export default function HireBookingFormPage() {
             <CardContent className="space-y-6">
               <div className="flex items-center gap-4 flex-wrap">
                 <div className="font-mono text-lg font-bold" data-testid="text-booking-number">{bookingNumber}</div>
+                {existingBooking && !isNew && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm text-muted-foreground">Status:</Label>
+                    <Select value={selectedStatus || existingBooking.status} onValueChange={setSelectedStatus}>
+                      <SelectTrigger className="w-[180px]" data-testid="select-booking-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value} data-testid={`status-option-${value}`}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

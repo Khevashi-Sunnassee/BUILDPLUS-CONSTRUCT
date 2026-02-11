@@ -567,7 +567,6 @@ export default function HireBookingsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Booking #</TableHead>
-                <TableHead>Source</TableHead>
                 <TableHead>Equipment</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Job</TableHead>
@@ -583,7 +582,7 @@ export default function HireBookingsPage() {
             <TableBody>
               {filteredBookings.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                     {searchQuery ? "No bookings match your search" : "No hire bookings found. Create your first booking."}
                   </TableCell>
                 </TableRow>
@@ -595,11 +594,6 @@ export default function HireBookingsPage() {
                     <TableRow key={booking.id} className="hover-elevate" data-testid={`row-hire-${booking.id}`}>
                       <TableCell className="font-mono font-medium" data-testid={`text-booking-number-${booking.id}`}>
                         {booking.bookingNumber}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={booking.hireSource === "internal" ? "default" : "secondary"} data-testid={`badge-source-${booking.id}`}>
-                          {booking.hireSource === "internal" ? "Internal" : "External"}
-                        </Badge>
                       </TableCell>
                       <TableCell className="max-w-[200px] truncate" data-testid={`text-equipment-${booking.id}`}>
                         {booking.equipmentDescription}
@@ -639,9 +633,16 @@ export default function HireBookingsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm" data-testid={`text-requested-by-${booking.id}`}>
-                        {booking.requestedBy
-                          ? `${booking.requestedBy.firstName} ${booking.requestedBy.lastName}`
-                          : "-"}
+                        {booking.requestedBy ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-default font-medium">
+                                {booking.requestedBy.firstName.charAt(0)}{booking.requestedBy.lastName.charAt(0)}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent>{booking.requestedBy.firstName} {booking.requestedBy.lastName}</TooltipContent>
+                          </Tooltip>
+                        ) : "-"}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
