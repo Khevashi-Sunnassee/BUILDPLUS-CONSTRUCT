@@ -65,6 +65,7 @@ const AdminCompaniesPage = lazy(() => import("@/pages/admin/companies"));
 const AdminChecklistTemplatesPage = lazy(() => import("@/pages/admin/checklist-templates"));
 const AssetRegisterPage = lazy(() => import("@/pages/admin/asset-register"));
 const AssetDetailPage = lazy(() => import("@/pages/admin/asset-detail"));
+const AssetRepairFormPage = lazy(() => import("@/pages/admin/asset-repair-form"));
 const TemplateEditorPage = lazy(() => import("@/pages/admin/template-editor"));
 const DataManagementPage = lazy(() => import("@/pages/admin/data-management"));
 const AdminItemCategoriesPage = lazy(() => import("@/pages/admin/item-categories"));
@@ -628,6 +629,14 @@ function Router() {
         <ProtectedRoute requiredRole={["ADMIN"]}>
           <AuthenticatedLayout>
             <AssetDetailPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/admin/asset-repair/new">
+        <ProtectedRoute requiredRole={["ADMIN"]}>
+          <AuthenticatedLayout>
+            <AssetRepairFormPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

@@ -4,7 +4,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import DOMPurify from "dompurify";
 import { ASSET_ROUTES } from "@shared/api-routes";
-import type { Asset, AssetMaintenance, AssetTransfer } from "@shared/schema";
+import type { Asset, AssetMaintenance, AssetTransfer, AssetRepairRequest } from "@shared/schema";
 import {
   ASSET_CATEGORIES,
   ASSET_STATUSES,
@@ -61,6 +61,8 @@ import {
   Plus,
   Loader2,
   ImageIcon,
+  RefreshCw,
+  Wrench,
 } from "lucide-react";
 
 const formatCurrency = (value: string | number | null | undefined) => {
@@ -148,6 +150,16 @@ export default function AssetDetailPage() {
     queryFn: async () => {
       const res = await fetch(ASSET_ROUTES.TRANSFERS(id!), { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch transfers");
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
+  const { data: repairRequests = [], isLoading: repairsLoading } = useQuery<any[]>({
+    queryKey: [ASSET_ROUTES.REPAIR_REQUESTS_BY_ASSET(id!), id],
+    queryFn: async () => {
+      const res = await fetch(ASSET_ROUTES.REPAIR_REQUESTS_BY_ASSET(id!), { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch repair requests");
       return res.json();
     },
     enabled: !!id,
@@ -406,6 +418,33 @@ export default function AssetDetailPage() {
             )}
             Generate AI Analysis
           </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              const params = new URLSearchParams({
+                create: "replacement",
+                assetId: id!,
+                assetName: asset.name || "",
+                assetTag: asset.assetTag || "",
+                assetCategory: asset.category || "",
+                assetCurrentValue: asset.currentValue || "",
+                assetLocation: asset.location || "",
+              });
+              navigate(`/capex-requests?${params.toString()}`);
+            }}
+            data-testid="button-replace-asset"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Replace
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate(`/admin/asset-repair/new?assetId=${id}`)}
+            data-testid="button-repair-asset"
+          >
+            <Wrench className="mr-2 h-4 w-4" />
+            Service / Repair
+          </Button>
         </div>
       </div>
 
@@ -418,6 +457,7 @@ export default function AssetDetailPage() {
           <TabsTrigger value="insurance" data-testid="tab-insurance">Insurance</TabsTrigger>
           <TabsTrigger value="maintenance" data-testid="tab-maintenance">Maintenance</TabsTrigger>
           <TabsTrigger value="transfers" data-testid="tab-transfers">Transfers</TabsTrigger>
+          <TabsTrigger value="repairs" data-testid="tab-repairs">Repairs</TabsTrigger>
           <TabsTrigger value="ai" data-testid="tab-ai">AI Summary</TabsTrigger>
         </TabsList>
 
@@ -717,6 +757,99 @@ export default function AssetDetailPage() {
                         <TableCell>{displayValue(t.toAssignee)}</TableCell>
                         <TableCell>{displayValue(t.reason)}</TableCell>
                         <TableCell>{displayValue(t.transferredBy)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="repairs">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle>Repair / Service History</CardTitle>
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/admin/asset-repair/new?assetId=${id}`)}
+                data-testid="button-new-repair"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                New Request
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {repairsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-full" />
+                  <Skeleton className="h-8 w-full" />
+                </div>
+              ) : repairRequests.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                  <Wrench className="h-12 w-12 mb-2" />
+                  <p>No repair or service requests for this asset.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Repair #</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Requested</TableHead>
+                      <TableHead>Est. Cost</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {repairRequests.map((r: any) => (
+                      <TableRow key={r.id} data-testid={`row-repair-${r.id}`}>
+                        <TableCell className="font-mono text-sm" data-testid={`text-repair-number-${r.id}`}>
+                          {r.repairNumber}
+                        </TableCell>
+                        <TableCell data-testid={`text-repair-title-${r.id}`}>{r.title}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={
+                              r.priority === "URGENT" ? "border-red-500 text-red-700 dark:text-red-400" :
+                              r.priority === "HIGH" ? "border-orange-500 text-orange-700 dark:text-orange-400" :
+                              r.priority === "MEDIUM" ? "border-yellow-500 text-yellow-700 dark:text-yellow-400" :
+                              "border-muted-foreground"
+                            }
+                            data-testid={`badge-priority-${r.id}`}
+                          >
+                            {r.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={r.status === "COMPLETED" ? "default" : "outline"}
+                            data-testid={`badge-status-${r.id}`}
+                          >
+                            {r.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {r.requestedDate ? new Date(r.requestedDate).toLocaleDateString() : "-"}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {r.estimatedCost
+                            ? new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" }).format(Number(r.estimatedCost))
+                            : "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/admin/asset-repair/new?assetId=${id}&editId=${r.id}`)}
+                            data-testid={`button-edit-repair-${r.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

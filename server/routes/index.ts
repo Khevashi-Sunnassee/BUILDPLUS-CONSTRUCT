@@ -42,6 +42,7 @@ import { contractsRouter } from "./contracts.routes";
 import { progressClaimsRouter } from "./progress-claims.routes";
 import { eotClaimsRouter } from "./eot-claims.routes";
 import { assetsRouter } from "./assets.routes";
+import assetRepairRouter from "./asset-repair.routes";
 import { helpRouter } from "./help.routes";
 import { dataManagementRouter } from "./data-management.routes";
 import { employeeRouter } from "./employee.routes";
@@ -156,6 +157,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(eotClaimsRouter);
   
   app.use(assetsRouter);
+  app.use(assetRepairRouter);
   app.use(helpRouter);
   app.use(dataManagementRouter);
   app.use(employeeRouter);

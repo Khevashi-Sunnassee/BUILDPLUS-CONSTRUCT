@@ -92,7 +92,16 @@ function CollapsibleSection({ title, icon: Icon, defaultOpen = false, children }
   );
 }
 
-function CapexForm({ capex, onSave, onClose }: { capex?: CapexRequestWithDetails | null; onSave: () => void; onClose: () => void }) {
+interface ReplacementPrefill {
+  assetId: string;
+  assetName: string;
+  assetTag: string;
+  assetCategory: string;
+  assetCurrentValue: string;
+  assetLocation: string;
+}
+
+function CapexForm({ capex, onSave, onClose, replacementPrefill }: { capex?: CapexRequestWithDetails | null; onSave: () => void; onClose: () => void; replacementPrefill?: ReplacementPrefill | null }) {
   const { toast } = useToast();
 
   const [formData, setFormData] = useState({
@@ -100,12 +109,12 @@ function CapexForm({ capex, onSave, onClose }: { capex?: CapexRequestWithDetails
     departmentId: capex?.departmentId || "",
     proposedAssetManagerId: capex?.proposedAssetManagerId || "",
     approvingManagerId: capex?.approvingManagerId || "",
-    equipmentTitle: capex?.equipmentTitle || "",
-    equipmentCategory: capex?.equipmentCategory || "",
+    equipmentTitle: capex?.equipmentTitle || (replacementPrefill ? `Replacement for ${replacementPrefill.assetName} (${replacementPrefill.assetTag})` : ""),
+    equipmentCategory: capex?.equipmentCategory || replacementPrefill?.assetCategory || "",
     equipmentDescription: capex?.equipmentDescription || "",
-    purchaseReasons: (capex?.purchaseReasons as string[]) || [],
-    isReplacement: capex?.isReplacement || false,
-    replacementAssetId: capex?.replacementAssetId || "",
+    purchaseReasons: (capex?.purchaseReasons as string[]) || (replacementPrefill ? ["replacement"] : []),
+    isReplacement: capex?.isReplacement || !!replacementPrefill,
+    replacementAssetId: capex?.replacementAssetId || replacementPrefill?.assetId || "",
     replacementReason: capex?.replacementReason || "",
     totalEquipmentCost: capex?.totalEquipmentCost || "",
     transportationCost: capex?.transportationCost || "",
@@ -119,7 +128,7 @@ function CapexForm({ capex, onSave, onClose }: { capex?: CapexRequestWithDetails
     expectedUsefulLife: capex?.expectedUsefulLife || "",
     preferredSupplierId: capex?.preferredSupplierId || "",
     alternativeSuppliers: capex?.alternativeSuppliers || "",
-    equipmentLocation: capex?.equipmentLocation || "",
+    equipmentLocation: capex?.equipmentLocation || replacementPrefill?.assetLocation || "",
     factoryId: capex?.factoryId || "",
     factoryZone: capex?.factoryZone || "",
     proximityToInputMaterials: capex?.proximityToInputMaterials || "",
@@ -778,10 +787,26 @@ export default function CapexRequestsPage() {
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
   const [selectedCapex, setSelectedCapex] = useState<CapexRequestWithDetails | null>(null);
   const [editCapex, setEditCapex] = useState<CapexRequestWithDetails | null>(null);
+  const [replacementPrefill, setReplacementPrefill] = useState<ReplacementPrefill | null>(null);
   const [autoOpenId, setAutoOpenId] = useState<string | null>(() => {
     const params = new URLSearchParams(searchParams);
     return params.get("open");
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (params.get("create") === "replacement" && params.get("assetId")) {
+      setReplacementPrefill({
+        assetId: params.get("assetId")!,
+        assetName: params.get("assetName") || "",
+        assetTag: params.get("assetTag") || "",
+        assetCategory: params.get("assetCategory") || "",
+        assetCurrentValue: params.get("assetCurrentValue") || "",
+        assetLocation: params.get("assetLocation") || "",
+      });
+      setCreateSheetOpen(true);
+    }
+  }, []);
 
   const { data: requests = [], isLoading } = useQuery<CapexRequestWithDetails[]>({
     queryKey: ["/api/capex-requests"],
@@ -916,13 +941,17 @@ export default function CapexRequestsPage() {
         ))}
       </div>
 
-      <Sheet open={createSheetOpen} onOpenChange={setCreateSheetOpen}>
+      <Sheet open={createSheetOpen} onOpenChange={(open) => { setCreateSheetOpen(open); if (!open) setReplacementPrefill(null); }}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto" data-testid="sheet-create-capex">
           <SheetHeader>
-            <SheetTitle>New CAPEX Request</SheetTitle>
+            <SheetTitle>{replacementPrefill ? "New CAPEX Request - Asset Replacement" : "New CAPEX Request"}</SheetTitle>
           </SheetHeader>
           <div className="mt-4">
-            <CapexForm onSave={() => setCreateSheetOpen(false)} onClose={() => setCreateSheetOpen(false)} />
+            <CapexForm
+              onSave={() => { setCreateSheetOpen(false); setReplacementPrefill(null); }}
+              onClose={() => { setCreateSheetOpen(false); setReplacementPrefill(null); }}
+              replacementPrefill={replacementPrefill}
+            />
           </div>
         </SheetContent>
       </Sheet>

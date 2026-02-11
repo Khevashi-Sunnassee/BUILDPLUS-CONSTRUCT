@@ -772,6 +772,10 @@ export const ASSET_ROUTES = {
   MAINTENANCE_BY_ID: (assetId: string, id: string) => `/api/admin/assets/${assetId}/maintenance/${id}`,
   TRANSFERS: (id: string) => `/api/admin/assets/${id}/transfers`,
   TRANSFER_BY_ID: (assetId: string, id: string) => `/api/admin/assets/${assetId}/transfers/${id}`,
+  REPAIR_REQUESTS: '/api/asset-repair-requests',
+  REPAIR_REQUEST_BY_ID: (id: string) => `/api/asset-repair-requests/${id}`,
+  REPAIR_REQUESTS_BY_ASSET: (assetId: string) => `/api/admin/assets/${assetId}/repair-requests`,
+  NEXT_REPAIR_NUMBER: '/api/asset-repair-requests/next-number',
 } as const;
 export type AssetRoutes = typeof ASSET_ROUTES;
 export type HelpRoutes = typeof HELP_ROUTES;

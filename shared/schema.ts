@@ -3867,3 +3867,42 @@ export type CapexRequest = typeof capexRequests.$inferSelect;
 export const insertCapexAuditEventSchema = createInsertSchema(capexAuditEvents).omit({ id: true, createdAt: true });
 export type InsertCapexAuditEvent = z.infer<typeof insertCapexAuditEventSchema>;
 export type CapexAuditEvent = typeof capexAuditEvents.$inferSelect;
+
+export const repairStatusEnum = pgEnum("repair_status", ["DRAFT", "SUBMITTED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
+export const repairPriorityEnum = pgEnum("repair_priority", ["LOW", "MEDIUM", "HIGH", "URGENT"]);
+
+export const assetRepairRequests = pgTable("asset_repair_requests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  assetId: varchar("asset_id", { length: 36 }).notNull().references(() => assets.id),
+  repairNumber: text("repair_number").notNull(),
+  title: text("title").notNull(),
+  issueDescription: text("issue_description").notNull(),
+  repairDetails: text("repair_details"),
+  priority: repairPriorityEnum("priority").default("MEDIUM").notNull(),
+  status: repairStatusEnum("status").default("DRAFT").notNull(),
+  requestedById: varchar("requested_by_id", { length: 36 }).notNull().references(() => users.id),
+  requestedDate: timestamp("requested_date").defaultNow().notNull(),
+  desiredServiceDate: text("desired_service_date"),
+  vendorId: varchar("vendor_id", { length: 36 }).references(() => suppliers.id),
+  vendorNotes: text("vendor_notes"),
+  estimatedCost: decimal("estimated_cost", { precision: 14, scale: 2 }),
+  actualCost: decimal("actual_cost", { precision: 14, scale: 2 }),
+  assetLocation: text("asset_location"),
+  assetConditionBefore: text("asset_condition_before"),
+  assetConditionAfter: text("asset_condition_after"),
+  completedAt: timestamp("completed_at"),
+  completedById: varchar("completed_by_id", { length: 36 }).references(() => users.id),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("repair_requests_company_idx").on(table.companyId),
+  assetIdx: index("repair_requests_asset_idx").on(table.assetId),
+  statusIdx: index("repair_requests_status_idx").on(table.status),
+  repairNumberCompanyIdx: uniqueIndex("repair_requests_number_company_idx").on(table.repairNumber, table.companyId),
+}));
+
+export const insertAssetRepairRequestSchema = createInsertSchema(assetRepairRequests).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertAssetRepairRequest = z.infer<typeof insertAssetRepairRequestSchema>;
+export type AssetRepairRequest = typeof assetRepairRequests.$inferSelect;
