@@ -3608,12 +3608,14 @@ export const activityTemplateSubtasks = pgTable("activity_template_subtasks", {
 export const activityTemplateChecklists = pgTable("activity_template_checklists", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   templateId: varchar("template_id", { length: 36 }).notNull().references(() => activityTemplates.id, { onDelete: "cascade" }),
+  checklistTemplateRefId: varchar("checklist_template_ref_id", { length: 36 }).references(() => checklistTemplates.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   estimatedDays: integer("estimated_days").default(1).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   templateIdx: index("activity_template_checklists_template_idx").on(table.templateId),
+  checklistRefIdx: index("activity_template_checklists_checklist_ref_idx").on(table.checklistTemplateRefId),
 }));
 
 export const jobActivities = pgTable("job_activities", {
@@ -3695,6 +3697,7 @@ export const jobActivityChecklists = pgTable("job_activity_checklists", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   activityId: varchar("activity_id", { length: 36 }).notNull().references(() => jobActivities.id, { onDelete: "cascade" }),
   checklistTemplateId: varchar("checklist_template_id", { length: 36 }).references(() => activityTemplateChecklists.id, { onDelete: "set null" }),
+  checklistTemplateRefId: varchar("checklist_template_ref_id", { length: 36 }).references(() => checklistTemplates.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   isCompleted: boolean("is_completed").default(false).notNull(),
   completedAt: timestamp("completed_at"),
@@ -3704,6 +3707,7 @@ export const jobActivityChecklists = pgTable("job_activity_checklists", {
 }, (table) => ({
   activityIdx: index("job_activity_checklists_activity_idx").on(table.activityId),
   templateIdx: index("job_activity_checklists_template_idx").on(table.checklistTemplateId),
+  checklistRefIdx: index("job_activity_checklists_checklist_ref_idx").on(table.checklistTemplateRefId),
 }));
 
 // Project Activities Insert Schemas and Types

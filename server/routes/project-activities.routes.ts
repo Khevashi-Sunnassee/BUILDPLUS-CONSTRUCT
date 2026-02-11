@@ -575,6 +575,7 @@ const checklistSchema = z.object({
   name: z.string().min(1),
   estimatedDays: z.number().int().optional().default(1),
   sortOrder: z.number().int().optional(),
+  checklistTemplateRefId: z.string().nullable().optional(),
 });
 
 router.get("/api/activity-templates/:templateId/checklists", requireAuth, async (req, res) => {
@@ -868,6 +869,7 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
           await tx.insert(jobActivityChecklists).values({
             activityId: activity.id,
             checklistTemplateId: cl.id,
+            checklistTemplateRefId: cl.checklistTemplateRefId || null,
             name: cl.name,
             sortOrder: cl.sortOrder,
             isCompleted: false,
