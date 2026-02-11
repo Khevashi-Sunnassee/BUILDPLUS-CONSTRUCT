@@ -18,6 +18,13 @@ import {
   Camera,
   Upload,
   CheckCircle,
+  Info,
+  Calendar,
+  Tag,
+  FileText,
+  User,
+  FolderOpen,
+  Hash,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,11 +80,18 @@ interface Photo {
   status: string;
   version: string;
   revision: string;
+  tags: string | null;
   createdAt: string;
   typeId: string | null;
   jobId: string | null;
   conversationId: string | null;
   messageId: string | null;
+  uploadedBy: string | null;
+  job?: { id: number; jobNumber: string; name: string } | null;
+  type?: { id: string; typeName: string; prefix: string; color: string | null } | null;
+  category?: { id: string; name: string } | null;
+  discipline?: { id: string; name: string } | null;
+  uploadedByUser?: { id: string; firstName: string; lastName: string } | null;
 }
 
 interface DocumentType {
@@ -268,6 +282,7 @@ export default function MobilePhotoGallery() {
   const [excludeChat, setExcludeChat] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null);
   const [viewingPhoto, setViewingPhoto] = useState(false);
+  const [showPhotoInfo, setShowPhotoInfo] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -398,29 +413,186 @@ export default function MobilePhotoGallery() {
   };
 
   if (viewingPhoto && selectedPhoto) {
+    const photoJob = selectedPhoto.job || (selectedPhoto.jobId ? jobs.find(j => String(j.id) === selectedPhoto.jobId) : null);
+    const photoType = selectedPhoto.type || (selectedPhoto.typeId ? docTypes.find(t => t.id === selectedPhoto.typeId) : null);
+    const tagsList = selectedPhoto.tags ? selectedPhoto.tags.split(",").map(t => t.trim()).filter(Boolean) : [];
+    const subjectLabel = tagsList.length > 0 ? PHOTO_SUBJECTS.find(s => s.value === tagsList[0])?.label || tagsList[0] : null;
+    const uploadDate = new Date(selectedPhoto.createdAt).toLocaleDateString("en-AU", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+
     return (
       <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
         <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="px-4 py-4 flex items-center gap-3">
             <button
-              onClick={() => { setViewingPhoto(false); setSelectedPhoto(null); }}
+              onClick={() => { setViewingPhoto(false); setSelectedPhoto(null); setShowPhotoInfo(false); }}
               className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 active:scale-[0.99]"
               data-testid="button-back-from-photo-view"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <div className="flex-1 min-w-0">
-              <div className="text-base font-semibold truncate">{selectedPhoto.title}</div>
+              <div className="text-base font-semibold truncate" data-testid="text-photo-title">{selectedPhoto.title}</div>
               <div className="text-xs text-white/60">{formatFileSize(selectedPhoto.fileSize)}</div>
             </div>
+            <button
+              onClick={() => setShowPhotoInfo(!showPhotoInfo)}
+              className={`flex h-9 w-9 items-center justify-center rounded-xl active:scale-[0.99] ${showPhotoInfo ? "bg-blue-500/30 text-blue-400" : "bg-white/10 text-white/80"}`}
+              data-testid="button-toggle-photo-info"
+            >
+              <Info className="h-5 w-5" />
+            </button>
           </div>
         </div>
 
         <div className="flex-1 overflow-hidden flex flex-col relative">
-          <PinchZoomImageViewer
-            src={`/api/documents/${selectedPhoto.id}/view`}
-            alt={selectedPhoto.title}
-          />
+          {showPhotoInfo ? (
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4" data-testid="photo-info-panel">
+              <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+                <div className="aspect-video relative bg-black/30">
+                  <img
+                    src={`/api/documents/${selectedPhoto.id}/view`}
+                    alt={selectedPhoto.title}
+                    style={{ imageOrientation: "from-image" }}
+                    className="w-full h-full object-contain"
+                    data-testid="img-info-preview"
+                  />
+                </div>
+              </div>
+
+              {photoJob && (
+                <div className="rounded-xl bg-white/5 border border-white/10 p-4" data-testid="info-job-section">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Briefcase className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                    <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Job</span>
+                  </div>
+                  <div className="text-sm font-medium" data-testid="text-photo-job">{photoJob.jobNumber} - {photoJob.name}</div>
+                </div>
+              )}
+
+              {selectedPhoto.description && (
+                <div className="rounded-xl bg-white/5 border border-white/10 p-4" data-testid="info-description-section">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                    <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Description</span>
+                  </div>
+                  <div className="text-sm text-white/80" data-testid="text-photo-description">{selectedPhoto.description}</div>
+                </div>
+              )}
+
+              <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-3" data-testid="info-details-section">
+                <div className="flex items-center gap-2 mb-1">
+                  <Info className="h-4 w-4 text-blue-400 flex-shrink-0" />
+                  <span className="text-xs font-medium text-white/50 uppercase tracking-wider">Details</span>
+                </div>
+
+                {subjectLabel && (
+                  <div className="flex items-start gap-3">
+                    <Tag className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Subject</div>
+                      <div className="text-sm" data-testid="text-photo-subject">{subjectLabel}</div>
+                    </div>
+                  </div>
+                )}
+
+                {photoType && (
+                  <div className="flex items-start gap-3">
+                    <FolderOpen className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Document Type</div>
+                      <div className="text-sm" data-testid="text-photo-type">{photoType.typeName}</div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPhoto.category && (
+                  <div className="flex items-start gap-3">
+                    <FolderOpen className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Category</div>
+                      <div className="text-sm" data-testid="text-photo-category">{selectedPhoto.category.name}</div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPhoto.discipline && (
+                  <div className="flex items-start gap-3">
+                    <FolderOpen className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Discipline</div>
+                      <div className="text-sm" data-testid="text-photo-discipline">{selectedPhoto.discipline.name}</div>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPhoto.documentNumber && (
+                  <div className="flex items-start gap-3">
+                    <Hash className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Document Number</div>
+                      <div className="text-sm" data-testid="text-photo-doc-number">{selectedPhoto.documentNumber}</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-3">
+                  <Calendar className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs text-white/50">Uploaded</div>
+                    <div className="text-sm" data-testid="text-photo-date">{uploadDate}</div>
+                  </div>
+                </div>
+
+                {selectedPhoto.uploadedByUser && (
+                  <div className="flex items-start gap-3">
+                    <User className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Uploaded By</div>
+                      <div className="text-sm" data-testid="text-photo-uploaded-by">{selectedPhoto.uploadedByUser.firstName} {selectedPhoto.uploadedByUser.lastName}</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-start gap-3">
+                  <FileText className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <div className="text-xs text-white/50">File</div>
+                    <div className="text-sm text-white/70" data-testid="text-photo-filename">{selectedPhoto.originalName}</div>
+                    <div className="text-xs text-white/40">{formatFileSize(selectedPhoto.fileSize)} &middot; v{selectedPhoto.version} rev {selectedPhoto.revision}</div>
+                  </div>
+                </div>
+
+                {selectedPhoto.status && (
+                  <div className="flex items-start gap-3">
+                    <CheckCircle className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Status</div>
+                      <div className="text-sm" data-testid="text-photo-status">{selectedPhoto.status}</div>
+                    </div>
+                  </div>
+                )}
+
+                {tagsList.length > 1 && (
+                  <div className="flex items-start gap-3">
+                    <Tag className="h-4 w-4 text-white/40 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <div className="text-xs text-white/50">Tags</div>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {tagsList.map((tag, i) => (
+                          <span key={i} className="px-2 py-0.5 rounded-full bg-white/10 text-xs text-white/70" data-testid={`tag-${i}`}>{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <PinchZoomImageViewer
+              src={`/api/documents/${selectedPhoto.id}/view`}
+              alt={selectedPhoto.title}
+            />
+          )}
         </div>
 
         <div className="flex-shrink-0 border-t border-white/10 bg-[#0D1117] px-4 py-3" style={{ paddingBottom: 'env(safe-area-inset-bottom, 12px)' }}>
