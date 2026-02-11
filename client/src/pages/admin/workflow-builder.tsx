@@ -45,7 +45,7 @@ import {
   CheckSquare, Search,
 } from "lucide-react";
 import { PROJECT_ACTIVITIES_ROUTES, CHECKLIST_ROUTES } from "@shared/api-routes";
-import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate, ChecklistTemplate } from "@shared/schema";
+import type { JobType, ActivityStage, ActivityConsultant, ActivityTemplate, ChecklistTemplate, EntityType } from "@shared/schema";
 
 import { STAGE_COLORS, getStageColor } from "@/lib/stage-colors";
 import { PageHelpButton } from "@/components/help/page-help-button";
@@ -299,11 +299,32 @@ export default function WorkflowBuilderPage() {
     queryKey: [CHECKLIST_ROUTES.TEMPLATES],
   });
 
-  const filteredChecklistTemplates = useMemo(() => {
-    if (!checklistSearch.trim()) return checklistTemplatesList.filter(t => t.isActive);
-    const term = checklistSearch.toLowerCase();
-    return checklistTemplatesList.filter(t => t.isActive && t.name.toLowerCase().includes(term));
-  }, [checklistTemplatesList, checklistSearch]);
+  const { data: entityTypesList = [] } = useQuery<EntityType[]>({
+    queryKey: [CHECKLIST_ROUTES.ENTITY_TYPES],
+  });
+
+  const groupedChecklistTemplates = useMemo(() => {
+    const active = checklistTemplatesList.filter(t => t.isActive);
+    const term = checklistSearch.trim().toLowerCase();
+    const filtered = term ? active.filter(t => t.name.toLowerCase().includes(term)) : active;
+
+    const entityMap = new Map(entityTypesList.map(et => [et.id, et.name]));
+    const groups: Record<string, ChecklistTemplate[]> = {};
+
+    filtered.forEach(t => {
+      const groupName = t.entityTypeId ? (entityMap.get(t.entityTypeId) || "Other") : "Uncategorised";
+      if (!groups[groupName]) groups[groupName] = [];
+      groups[groupName].push(t);
+    });
+
+    Object.values(groups).forEach(arr => arr.sort((a, b) => a.name.localeCompare(b.name)));
+
+    return Object.entries(groups).sort(([a], [b]) => {
+      if (a === "Uncategorised") return 1;
+      if (b === "Uncategorised") return -1;
+      return a.localeCompare(b);
+    });
+  }, [checklistTemplatesList, entityTypesList, checklistSearch]);
 
   const JOB_PHASES = ["OPPORTUNITY", "QUOTING", "WON_AWAITING_CONTRACT", "CONTRACTED", "LOST"];
 
@@ -1010,41 +1031,46 @@ export default function WorkflowBuilderPage() {
                 data-testid="input-checklist-search"
               />
             </div>
-            <div className="border rounded-md max-h-64 overflow-y-auto">
-              {filteredChecklistTemplates.length === 0 ? (
+            <div className="border rounded-md max-h-72 overflow-y-auto">
+              {groupedChecklistTemplates.length === 0 ? (
                 <div className="p-4 text-center text-sm text-muted-foreground">
                   {checklistTemplatesList.length === 0 ? "No checklist templates found. Create them in Admin > Checklist Templates." : "No templates match your search."}
                 </div>
               ) : (
-                filteredChecklistTemplates.map((ct) => {
-                  const isAlreadyLinked = templates?.some(t => t.checklists?.some(c => c.checklistTemplateRefId === ct.id));
-                  return (
-                    <button
-                      key={ct.id}
-                      type="button"
-                      className={`w-full text-left px-3 py-2.5 border-b last:border-b-0 flex items-center justify-between gap-2 transition-colors ${
-                        selectedChecklistTemplateId === ct.id
-                          ? "bg-primary/10"
-                          : "hover-elevate"
-                      } ${isAlreadyLinked ? "opacity-50" : ""}`}
-                      onClick={() => setSelectedChecklistTemplateId(ct.id)}
-                      data-testid={`checklist-template-option-${ct.id}`}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-sm truncate">{ct.name}</div>
-                        {ct.description && (
-                          <div className="text-xs text-muted-foreground truncate mt-0.5">{ct.description}</div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        {isAlreadyLinked && <Badge variant="secondary" className="text-xs">Already linked</Badge>}
-                        {selectedChecklistTemplateId === ct.id && (
-                          <CheckSquare className="h-4 w-4 text-primary" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
+                groupedChecklistTemplates.map(([groupName, groupTemplates]) => (
+                  <div key={groupName}>
+                    <div className="sticky top-0 z-10 px-3 py-1.5 bg-muted border-b">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{groupName}</span>
+                      <span className="text-xs text-muted-foreground ml-1.5">({groupTemplates.length})</span>
+                    </div>
+                    {groupTemplates.map((ct) => {
+                      const isAlreadyLinked = templates?.some(t => t.checklists?.some(c => c.checklistTemplateRefId === ct.id));
+                      return (
+                        <button
+                          key={ct.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 border-b last:border-b-0 flex items-center justify-between gap-2 transition-colors ${
+                            selectedChecklistTemplateId === ct.id
+                              ? "bg-primary/10"
+                              : "hover-elevate"
+                          } ${isAlreadyLinked ? "opacity-50" : ""}`}
+                          onClick={() => setSelectedChecklistTemplateId(ct.id)}
+                          data-testid={`checklist-template-option-${ct.id}`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm truncate">{ct.name}</div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isAlreadyLinked && <Badge variant="secondary" className="text-xs">Linked</Badge>}
+                            {selectedChecklistTemplateId === ct.id && (
+                              <CheckSquare className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))
               )}
             </div>
           </div>
