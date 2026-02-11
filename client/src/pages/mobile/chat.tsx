@@ -157,6 +157,9 @@ export default function MobileChatPage() {
   const [editingTopicName, setEditingTopicName] = useState("");
   const [colorPickerTopicId, setColorPickerTopicId] = useState<string | null>(null);
   const [showTopicAssign, setShowTopicAssign] = useState<string | null>(null);
+  const [showManageMembers, setShowManageMembers] = useState(false);
+  const [addMemberSearch, setAddMemberSearch] = useState("");
+  const [addingMemberIds, setAddingMemberIds] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -170,7 +173,7 @@ export default function MobileChatPage() {
 
   const { data: allUsers = [] } = useQuery<User[]>({
     queryKey: [USER_ROUTES.LIST],
-    enabled: showNewConversation,
+    enabled: showNewConversation || showManageMembers,
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
@@ -205,6 +208,30 @@ export default function MobileChatPage() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to create conversation", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addMembersMutation = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      setAddingMemberIds(prev => new Set([...prev, ...userIds]));
+      return apiRequest("POST", CHAT_ROUTES.MEMBERS(selectedConversationId!), { userIds });
+    },
+    onSuccess: (_data: unknown, userIds: string[]) => {
+      setAddingMemberIds(prev => {
+        const next = new Set(prev);
+        userIds.forEach(id => next.delete(id));
+        return next;
+      });
+      queryClient.invalidateQueries({ queryKey: [CHAT_ROUTES.CONVERSATIONS] });
+      toast({ title: "Member added" });
+    },
+    onError: (error: any, userIds: string[]) => {
+      setAddingMemberIds(prev => {
+        const next = new Set(prev);
+        userIds.forEach(id => next.delete(id));
+        return next;
+      });
+      toast({ title: "Failed to add member", description: error.message, variant: "destructive" });
     },
   });
 
@@ -510,6 +537,17 @@ export default function MobileChatPage() {
           <h1 className="text-white text-lg font-semibold flex-1 truncate">
             {convName}
           </h1>
+          {selectedConversation.type !== "DM" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => { setShowManageMembers(true); setAddMemberSearch(""); }}
+              className="text-white/60"
+              data-testid="button-manage-members"
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+          )}
           {topics.length > 0 && (
             <Button
               variant="ghost"
@@ -654,6 +692,94 @@ export default function MobileChatPage() {
                   {selectedConversation.topicId === topic.id && <Check className="h-4 w-4 shrink-0" />}
                 </button>
               ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+
+        <Sheet open={showManageMembers} onOpenChange={setShowManageMembers}>
+          <SheetContent side="bottom" className="bg-[#0D1117] border-white/10 text-white rounded-t-2xl max-h-[70vh] p-0 flex flex-col">
+            <SheetHeader className="px-4 pt-4 pb-3 border-b border-white/10 flex-shrink-0">
+              <SheetTitle className="text-white text-lg">Members</SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 overflow-y-auto">
+              <div className="px-4 pt-3 pb-2">
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Current Members ({selectedConversation.members?.length || 0})</p>
+                <div className="space-y-1">
+                  {selectedConversation.members?.map(m => (
+                    <div key={m.user?.id || Math.random()} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" data-testid={`member-${m.user?.id}`}>
+                      <Avatar className="h-8 w-8">
+                        <AvatarFallback className="bg-purple-500/20 text-purple-400 text-xs">
+                          {getInitials(m.user?.name || m.user?.email || "?")}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">{m.user?.name || m.user?.email || "Unknown"}</p>
+                        {m.user?.name && <p className="text-xs text-white/40 truncate">{m.user.email}</p>}
+                      </div>
+                      {String(m.user?.id) === String(currentUser?.id) && (
+                        <Badge variant="outline" className="text-[10px] border-white/20 text-white/50">You</Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="px-4 pt-2 pb-4 border-t border-white/10">
+                <p className="text-xs text-white/40 uppercase tracking-wider mb-2">Add Members</p>
+                <div className="relative mb-3">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+                  <Input
+                    value={addMemberSearch}
+                    onChange={(e) => setAddMemberSearch(e.target.value)}
+                    placeholder="Search users..."
+                    className="pl-9 bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                    data-testid="input-add-member-search"
+                  />
+                </div>
+                <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                  {(() => {
+                    const available = allUsers.filter(u => {
+                      if (String(u.id) === String(currentUser?.id)) return false;
+                      if (selectedConversation.members?.some(m => String(m.user?.id) === String(u.id))) return false;
+                      if (addingMemberIds.has(String(u.id))) return false;
+                      if (addMemberSearch) {
+                        const s = addMemberSearch.toLowerCase();
+                        return (u.name?.toLowerCase().includes(s) || u.email.toLowerCase().includes(s));
+                      }
+                      return true;
+                    });
+                    if (available.length === 0) {
+                      return (
+                        <p className="text-center text-sm text-white/40 py-4">
+                          {addMemberSearch ? "No matching users" : "All users are already members"}
+                        </p>
+                      );
+                    }
+                    return available.map(user => (
+                      <div key={user.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl" data-testid={`add-member-${user.id}`}>
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="bg-blue-500/20 text-blue-400 text-xs">
+                            {getInitials(user.name || user.email)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white truncate">{user.name || user.email}</p>
+                          {user.name && <p className="text-xs text-white/40 truncate">{user.email}</p>}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addMembersMutation.mutate([String(user.id)])}
+                          disabled={addingMemberIds.has(String(user.id))}
+                          className="border-white/20 text-white bg-white/5"
+                          data-testid={`button-add-member-${user.id}`}
+                        >
+                          {addingMemberIds.has(String(user.id)) ? <Loader2 className="h-3 w-3 animate-spin" /> : "Add"}
+                        </Button>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
