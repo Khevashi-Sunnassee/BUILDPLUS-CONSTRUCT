@@ -104,6 +104,7 @@ function getStageProgress(activities: ActivityWithAssignees[]) {
 
 const CHEVRON_W = 160;
 const CHEVRON_H = 72;
+const CHECKLIST_CHEVRON_W = 130;
 const POINT_W = 14;
 
 function ChevronNode({
@@ -155,6 +156,66 @@ function ChevronNode({
             {format(new Date(activity.endDate), "dd MMM yyyy")}
           </text>
         )}
+      </g>
+    </svg>
+  );
+}
+
+function ChecklistChevronNode({
+  activity,
+  onClick,
+}: {
+  activity: ActivityWithAssignees;
+  onClick: () => void;
+}) {
+  const completed = activity.checklistCompleted || 0;
+  const total = activity.checklistTotal || 0;
+  const allDone = completed === total && total > 0;
+  const fill = allDone ? STATUS_COLORS.done : STATUS_COLORS.checklist;
+  const label = `${completed}/${total} Complete`;
+  const truncatedName = activity.name.length > 12 ? activity.name.slice(0, 11) + "\u2026" : activity.name;
+
+  const points = `0,0 ${CHECKLIST_CHEVRON_W - POINT_W},0 ${CHECKLIST_CHEVRON_W},${CHEVRON_H / 2} ${CHECKLIST_CHEVRON_W - POINT_W},${CHEVRON_H} 0,${CHEVRON_H} ${POINT_W},${CHEVRON_H / 2}`;
+
+  return (
+    <svg
+      width={CHECKLIST_CHEVRON_W}
+      height={CHEVRON_H}
+      viewBox={`0 0 ${CHECKLIST_CHEVRON_W} ${CHEVRON_H}`}
+      className="cursor-pointer flex-shrink-0 chevron-node focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+      onClick={onClick}
+      data-testid={`checklist-node-${activity.id}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`Checklist for ${activity.name} - ${label}`}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
+    >
+      <title>Checklist: {activity.name} - {label}</title>
+      <defs>
+        <pattern id={`diag-${activity.id}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="2" height="6" fill="rgba(255,255,255,0.15)" />
+        </pattern>
+      </defs>
+      <polygon
+        points={points}
+        fill={fill}
+        stroke={fill}
+        strokeWidth="1.5"
+      />
+      <polygon
+        points={points}
+        fill={`url(#diag-${activity.id})`}
+      />
+      <g fill="#fff">
+        <text x={POINT_W + 4} y={17} fontSize="9" opacity="0.85" className="select-none">
+          {truncatedName}
+        </text>
+        <text x={POINT_W + 4} y={33} fontSize="11" fontWeight="600" className="select-none">
+          Checklist
+        </text>
+        <text x={POINT_W + 4} y={49} fontSize="10" opacity="0.85" className="select-none">
+          {label}
+        </text>
       </g>
     </svg>
   );
