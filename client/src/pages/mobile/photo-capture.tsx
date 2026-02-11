@@ -18,6 +18,8 @@ import {
   CheckCircle,
   Briefcase,
   Ruler,
+  Globe,
+  Lock,
 } from "lucide-react";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 
@@ -49,6 +51,7 @@ export default function MobilePhotoCaptue() {
   const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
   const [jobSearch, setJobSearch] = useState("");
   const [showJobPicker, setShowJobPicker] = useState(false);
 
@@ -108,6 +111,7 @@ export default function MobilePhotoCaptue() {
       formData.append("file", selectedFile);
       formData.append("title", title.trim());
       formData.append("jobId", selectedJobId);
+      formData.append("isPublic", String(isPublic));
       if (selectedDisciplineId) {
         formData.append("disciplineId", selectedDisciplineId);
       }
@@ -144,6 +148,7 @@ export default function MobilePhotoCaptue() {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setTitle("");
+    setIsPublic(false);
     setUploadSuccess(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -400,6 +405,44 @@ export default function MobilePhotoCaptue() {
                     {selectedDiscipline.shortForm ? ` (${selectedDiscipline.shortForm})` : ""}
                   </div>
                 )}
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-white/60 flex items-center gap-1">
+                    {isPublic ? <Globe className="h-3 w-3" /> : <Lock className="h-3 w-3" />}
+                    Visibility
+                  </label>
+                  <div className="flex rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setIsPublic(false)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+                        !isPublic
+                          ? "bg-blue-500 text-white"
+                          : "text-white/50"
+                      }`}
+                      data-testid="button-visibility-private"
+                    >
+                      <Lock className="h-4 w-4" />
+                      Private
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPublic(true)}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors ${
+                        isPublic
+                          ? "bg-green-500 text-white"
+                          : "text-white/50"
+                      }`}
+                      data-testid="button-visibility-public"
+                    >
+                      <Globe className="h-4 w-4" />
+                      Public
+                    </button>
+                  </div>
+                  <p className="text-xs text-white/40">
+                    {isPublic ? "Visible to all team members and external users" : "Only visible to team members with access"}
+                  </p>
+                </div>
 
                 <div className="pt-2">
                   <Button

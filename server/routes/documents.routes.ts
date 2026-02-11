@@ -518,7 +518,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       return res.status(400).json({ error: "No file provided" });
     }
 
-    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential, documentNumber: manualDocNumber, revision: manualRevision, supersedeDocumentId } = req.body;
+    const { title, description, typeId, disciplineId, categoryId, documentTypeStatusId, jobId, panelId, supplierId, purchaseOrderId, taskId, tags, isConfidential, isPublic, documentNumber: manualDocNumber, revision: manualRevision, supersedeDocumentId } = req.body;
 
     if (!title) {
       return res.status(400).json({ error: "Title is required" });
@@ -625,6 +625,7 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       taskId: taskId || null,
       tags: tags || null,
       isConfidential: isConfidential === "true",
+      isPublic: isPublic === "true",
       uploadedBy: req.session.userId!,
       status: "DRAFT",
       version: "1.0",
