@@ -66,6 +66,7 @@ interface LineItem {
   unitOfMeasure: string;
   unitPrice: string;
   lineTotal: string;
+  costCodeId: string | null;
   jobId: string | null;
   jobNumber?: string;
 }
@@ -91,8 +92,6 @@ const formSchema = z.object({
   requiredByDate: z.date().optional().nullable(),
   notes: z.string().optional(),
   internalNotes: z.string().optional(),
-  costCodeId: z.string().optional().nullable(),
-  childCostCodeId: z.string().optional().nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -156,9 +155,17 @@ export default function PurchaseOrderFormPage() {
     queryKey: [JOBS_ROUTES.LIST],
   });
 
-  const { data: costCodesWithChildren = [] } = useQuery<any[]>({
-    queryKey: ["/api/cost-codes-with-children"],
+  const { data: costCodes = [] } = useQuery<{ id: string; code: string; name: string; isActive: boolean }[]>({
+    queryKey: ["/api/cost-codes"],
   });
+
+  const costCodeMap = useMemo(() => {
+    const map = new Map<string, { code: string; name: string }>();
+    for (const cc of costCodes) {
+      map.set(cc.id, { code: cc.code, name: cc.name });
+    }
+    return map;
+  }, [costCodes]);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -174,22 +181,8 @@ export default function PurchaseOrderFormPage() {
       requiredByDate: isNew ? addDays(new Date(), 7) : null,
       notes: "",
       internalNotes: "",
-      costCodeId: null,
-      childCostCodeId: null,
     },
   });
-
-  const selectedCostCodeId = form.watch("costCodeId");
-
-  const filteredChildCodes = useMemo(() => {
-    if (!selectedCostCodeId) return [];
-    const parent = costCodesWithChildren.find((cc: any) => cc.id === selectedCostCodeId);
-    return (parent?.children || []).filter((child: any) => child.isActive);
-  }, [selectedCostCodeId, costCodesWithChildren]);
-
-  const activeCostCodes = useMemo(() => {
-    return costCodesWithChildren.filter((cc: any) => cc.isActive);
-  }, [costCodesWithChildren]);
 
   const filteredJobs = useMemo(() => {
     if (!jobSearchTerm.trim()) return jobs;
@@ -251,6 +244,7 @@ export default function PurchaseOrderFormPage() {
           unitOfMeasure: "EA",
           unitPrice: totalCost.toString(),
           lineTotal: totalCost.toString(),
+          costCodeId: null,
           jobId: capexData.jobId || null,
           jobNumber: capexData.job?.jobNumber || "",
         };
@@ -277,8 +271,6 @@ export default function PurchaseOrderFormPage() {
         requiredByDate: existingPO.requiredByDate ? new Date(existingPO.requiredByDate) : null,
         notes: existingPO.notes || "",
         internalNotes: existingPO.internalNotes || "",
-        costCodeId: existingPO.costCodeId || null,
-        childCostCodeId: existingPO.childCostCodeId || null,
       });
       
       const mappedItems: LineItem[] = existingPO.items.map((item, index) => ({
@@ -290,6 +282,7 @@ export default function PurchaseOrderFormPage() {
         unitOfMeasure: item.unitOfMeasure || "EA",
         unitPrice: item.unitPrice?.toString() || "0",
         lineTotal: item.lineTotal?.toString() || "0",
+        costCodeId: (item as any).costCodeId || null,
         jobId: (item as any).jobId || null,
         jobNumber: (item as any).jobNumber || "",
       }));
@@ -311,6 +304,7 @@ export default function PurchaseOrderFormPage() {
           unitOfMeasure: item.unitOfMeasure,
           unitPrice: parseFloat(item.unitPrice) || 0,
           lineTotal: parseFloat(item.lineTotal) || 0,
+          costCodeId: item.costCodeId || null,
           sortOrder: index,
         })),
       });
@@ -342,6 +336,7 @@ export default function PurchaseOrderFormPage() {
           unitOfMeasure: item.unitOfMeasure,
           unitPrice: parseFloat(item.unitPrice) || 0,
           lineTotal: parseFloat(item.lineTotal) || 0,
+          costCodeId: item.costCodeId || null,
           sortOrder: index,
         })),
       });
@@ -563,6 +558,7 @@ export default function PurchaseOrderFormPage() {
       unitOfMeasure: "EA",
       unitPrice: "0.00",
       lineTotal: "0.00",
+      costCodeId: null,
       jobId: null,
       jobNumber: "",
     };
@@ -597,7 +593,7 @@ export default function PurchaseOrderFormPage() {
     setLineItems(prev => prev.filter(item => item.id !== id));
   }, []);
 
-  const updateLineItem = useCallback((id: string, field: keyof LineItem, value: string) => {
+  const updateLineItem = useCallback((id: string, field: keyof LineItem, value: string | null) => {
     setLineItems(prev => prev.map(item => {
       if (item.id !== id) return item;
       
@@ -633,6 +629,14 @@ export default function PurchaseOrderFormPage() {
     const selectedItem = items.find(i => i.id === itemId);
     if (!selectedItem) return;
 
+    let defaultCostCodeId: string | null = null;
+    if (selectedItem.categoryId) {
+      const category = itemCategories.find(c => c.id === selectedItem.categoryId);
+      if (category?.defaultCostCodeId) {
+        defaultCostCodeId = category.defaultCostCodeId;
+      }
+    }
+
     setLineItems(prev => prev.map(line => {
       if (line.id !== lineId) return line;
       const qty = parseFloat(line.quantity) || 1;
@@ -645,16 +649,10 @@ export default function PurchaseOrderFormPage() {
         unitOfMeasure: selectedItem.unitOfMeasure || "EA",
         unitPrice: price.toFixed(2),
         lineTotal: (qty * price).toFixed(2),
+        costCodeId: defaultCostCodeId,
       };
     }));
-
-    if (!form.getValues("costCodeId") && selectedItem.categoryId) {
-      const category = itemCategories.find(c => c.id === selectedItem.categoryId);
-      if (category?.defaultCostCodeId) {
-        form.setValue("costCodeId", category.defaultCostCodeId);
-      }
-    }
-  }, [items, itemCategories, form]);
+  }, [items, itemCategories]);
 
   const openItemPicker = useCallback((lineId: string) => {
     setItemPickerLineId(lineId);
@@ -1465,70 +1463,6 @@ export default function PurchaseOrderFormPage() {
                   )}
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Cost Code</Label>
-                  {canEdit ? (
-                    <Select
-                      value={form.watch("costCodeId") || ""}
-                      onValueChange={(value) => {
-                        form.setValue("costCodeId", value === "__none__" ? null : value || null);
-                        form.setValue("childCostCodeId", null);
-                      }}
-                    >
-                      <SelectTrigger data-testid="select-cost-code">
-                        <SelectValue placeholder="Select cost code (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {activeCostCodes.map((cc: any) => (
-                          <SelectItem key={cc.id} value={cc.id}>
-                            {cc.code} — {cc.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <p className="mt-1">
-                      {(() => {
-                        const cc = costCodesWithChildren.find((c: any) => c.id === existingPO?.costCodeId);
-                        return cc ? `${cc.code} — ${cc.name}` : "-";
-                      })()}
-                    </p>
-                  )}
-                </div>
-                {(form.watch("costCodeId") || existingPO?.childCostCodeId) && filteredChildCodes.length > 0 && (
-                  <div>
-                    <Label className="text-sm font-medium">Child Cost Code</Label>
-                    {canEdit ? (
-                      <Select
-                        value={form.watch("childCostCodeId") || ""}
-                        onValueChange={(value) => {
-                          form.setValue("childCostCodeId", value === "__none__" ? null : value || null);
-                        }}
-                      >
-                        <SelectTrigger data-testid="select-child-cost-code">
-                          <SelectValue placeholder="Select child cost code (optional)" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">None</SelectItem>
-                          {filteredChildCodes.map((child: any) => (
-                            <SelectItem key={child.id} value={child.id}>
-                              {child.code} — {child.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <p className="mt-1">
-                        {(() => {
-                          const parent = costCodesWithChildren.find((c: any) => c.id === existingPO?.costCodeId);
-                          const child = parent?.children?.find((c: any) => c.id === existingPO?.childCostCodeId);
-                          return child ? `${child.code} — ${child.name}` : "-";
-                        })()}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <div>
                   <Label className="text-sm font-medium">Required By Date</Label>
                   {canEdit ? (
                     <>
@@ -1624,6 +1558,7 @@ export default function PurchaseOrderFormPage() {
                     <TableHead>Item</TableHead>
                     <TableHead className="w-[100px]">Job</TableHead>
                     <TableHead>Description</TableHead>
+                    <TableHead className="w-[140px]">Cost Code</TableHead>
                     <TableHead className="w-[70px] text-right">Qty</TableHead>
                     <TableHead className="w-[70px]">Unit</TableHead>
                     <TableHead className="w-[100px] text-right">Unit Price</TableHead>
@@ -1635,7 +1570,7 @@ export default function PurchaseOrderFormPage() {
                   {lineItems.length === 0 ? (
                     <TableRow>
                       <TableCell 
-                        colSpan={(canEdit ? 8 : 7) + (receivingMode ? 1 : 0)} 
+                        colSpan={(canEdit ? 9 : 8) + (receivingMode ? 1 : 0)} 
                         className="text-center py-8 text-muted-foreground"
                         data-testid="text-no-items"
                       >
@@ -1729,6 +1664,33 @@ export default function PurchaseOrderFormPage() {
                             />
                           ) : (
                             <span className="text-sm break-words">{line.description}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="p-1">
+                          {canEdit ? (
+                            <Select
+                              value={line.costCodeId || "_none"}
+                              onValueChange={(val) => updateLineItem(line.id, "costCodeId", val === "_none" ? null : val)}
+                            >
+                              <SelectTrigger className="h-9" data-testid={`select-cost-code-${index}`}>
+                                <SelectValue placeholder="None" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="_none">None</SelectItem>
+                                {costCodes.filter(cc => cc.isActive).map((cc) => (
+                                  <SelectItem key={cc.id} value={cc.id}>
+                                    {cc.code} - {cc.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-sm">
+                              {line.costCodeId ? (() => {
+                                const cc = costCodeMap.get(line.costCodeId);
+                                return cc ? `${cc.code} - ${cc.name}` : "-";
+                              })() : "-"}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="p-1">
