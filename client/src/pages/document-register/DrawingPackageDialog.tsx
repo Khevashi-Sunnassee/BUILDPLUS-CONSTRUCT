@@ -125,16 +125,16 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      const csrfToken = await getCsrfToken();
+      const csrfToken = getCsrfToken();
       const res = await fetch(DOCUMENT_ROUTES.DRAWING_PACKAGE_ANALYZE, {
         method: "POST",
-        headers: { "x-csrf-token": csrfToken },
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Analysis failed");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || "Analysis failed");
       }
       return res.json();
     },
@@ -194,16 +194,16 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
         categoryId: resolveId(p.categoryId, globalCategoryId),
       }))));
 
-      const csrfToken = await getCsrfToken();
+      const csrfToken = getCsrfToken();
       const res = await fetch(DOCUMENT_ROUTES.DRAWING_PACKAGE_REGISTER, {
         method: "POST",
-        headers: { "x-csrf-token": csrfToken },
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Registration failed");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || err.message || "Registration failed");
       }
       return res.json();
     },
