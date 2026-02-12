@@ -36,6 +36,7 @@ const itemCategorySchema = z.object({
   code: z.string().max(50).optional(),
   description: z.string().max(1000).optional().nullable(),
   defaultCostCodeId: z.string().max(36).optional().nullable(),
+  categoryType: z.enum(["supply", "trade"]).optional().default("supply"),
   isActive: z.boolean().optional(),
 });
 

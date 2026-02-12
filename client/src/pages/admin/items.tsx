@@ -103,6 +103,7 @@ type ItemFormData = z.infer<typeof itemSchema>;
 const categorySchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  categoryType: z.enum(["supply", "trade"]).default("supply"),
   isActive: z.boolean().default(true),
 });
 
@@ -394,6 +395,7 @@ export default function AdminItemsPage() {
     defaultValues: {
       name: "",
       description: "",
+      categoryType: "supply",
       isActive: true,
     },
   });
@@ -452,6 +454,7 @@ export default function AdminItemsPage() {
     categoryForm.reset({
       name: "",
       description: "",
+      categoryType: "supply",
       isActive: true,
     });
     setCategoryDialogOpen(true);
@@ -462,6 +465,7 @@ export default function AdminItemsPage() {
     categoryForm.reset({
       name: category.name,
       description: category.description || "",
+      categoryType: (category as any).categoryType || "supply",
       isActive: category.isActive,
     });
     setCategoryDialogOpen(true);
@@ -690,6 +694,7 @@ export default function AdminItemsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Type</TableHead>
                       <TableHead>Description</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -700,6 +705,11 @@ export default function AdminItemsPage() {
                       <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
                         <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
                           {category.name}
+                        </TableCell>
+                        <TableCell data-testid={`text-category-type-${category.id}`}>
+                          <Badge variant="outline" data-testid={`badge-category-type-${category.id}`}>
+                            {(category as any).categoryType === "trade" ? "Trade Item" : "Supply Item"}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
                           {category.description || "-"}
@@ -946,6 +956,32 @@ export default function AdminItemsPage() {
                       />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={categoryForm.control}
+                name="categoryType"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Category Type</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        {field.value === "trade" ? "Trade Item - labour/subcontract work" : "Supply Item - materials/equipment"}
+                      </p>
+                    </div>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${field.value === "supply" ? "font-medium" : "text-muted-foreground"}`}>Supply</span>
+                        <Switch
+                          checked={field.value === "trade"}
+                          onCheckedChange={(checked) => field.onChange(checked ? "trade" : "supply")}
+                          data-testid="switch-category-type"
+                        />
+                        <span className={`text-sm ${field.value === "trade" ? "font-medium" : "text-muted-foreground"}`}>Trade</span>
+                      </div>
+                    </FormControl>
                   </FormItem>
                 )}
               />

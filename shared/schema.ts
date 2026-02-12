@@ -1635,6 +1635,7 @@ export const itemCategories = pgTable("item_categories", {
   name: text("name").notNull(),
   description: text("description"),
   defaultCostCodeId: varchar("default_cost_code_id", { length: 36 }),
+  categoryType: text("category_type").default("supply").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1642,6 +1643,7 @@ export const itemCategories = pgTable("item_categories", {
   nameCompanyIdx: uniqueIndex("item_categories_name_company_idx").on(table.name, table.companyId),
   companyIdx: index("item_categories_company_idx").on(table.companyId),
   defaultCostCodeIdx: index("item_categories_default_cost_code_idx").on(table.defaultCostCodeId),
+  categoryTypeIdx: index("item_categories_category_type_idx").on(table.categoryType),
 }));
 
 export const items = pgTable("items", {
