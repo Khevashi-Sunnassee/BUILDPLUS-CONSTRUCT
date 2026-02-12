@@ -105,6 +105,9 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
   const [isDragging, setIsDragging] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const { data: docTypes } = useQuery<any[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES],
@@ -272,6 +275,27 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
     const file = e.dataTransfer.files?.[0];
     if (file) validateAndSetFile(file);
   };
+
+  const handlePanStart = (e: React.MouseEvent) => {
+    if (previewZoom <= 1) return;
+    setIsPanning(true);
+    setPanStart({ x: e.clientX, y: e.clientY });
+    e.preventDefault();
+  };
+
+  const handlePanMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning || !previewContainerRef.current) return;
+    const container = previewContainerRef.current;
+    const dx = panStart.x - e.clientX;
+    const dy = panStart.y - e.clientY;
+    container.scrollLeft += dx;
+    container.scrollTop += dy;
+    setPanStart({ x: e.clientX, y: e.clientY });
+  }, [isPanning, panStart]);
+
+  const handlePanEnd = useCallback(() => {
+    setIsPanning(false);
+  }, []);
 
   const handleAnalyze = () => {
     if (selectedFile) analyzeMutation.mutate(selectedFile);
@@ -780,16 +804,24 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                           </Button>
                         </div>
                       </div>
-                      <div className="flex-1 overflow-auto bg-muted/10 flex items-start justify-center p-4">
+                      <div 
+                        ref={previewContainerRef}
+                        className="flex-1 overflow-auto bg-muted/10 p-4"
+                        style={{ cursor: previewZoom > 1 ? (isPanning ? "grabbing" : "grab") : "default" }}
+                        onMouseDown={handlePanStart}
+                        onMouseMove={handlePanMove}
+                        onMouseUp={handlePanEnd}
+                        onMouseLeave={handlePanEnd}
+                      >
                         {currentPage.thumbnail ? (
                           <img
                             src={`data:image/png;base64,${currentPage.thumbnail}`}
                             alt={`Page ${currentPage.pageNumber} preview`}
-                            className="border shadow-sm bg-white"
+                            className="border shadow-sm bg-white mx-auto"
+                            draggable={false}
                             style={{
-                              transform: `scale(${previewZoom})`,
-                              transformOrigin: "top center",
-                              maxWidth: "100%",
+                              width: `${previewZoom * 100}%`,
+                              maxWidth: "none",
                             }}
                             data-testid="img-page-preview"
                           />
