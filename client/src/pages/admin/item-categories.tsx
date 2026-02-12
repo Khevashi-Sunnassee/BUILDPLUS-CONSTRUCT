@@ -38,6 +38,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -58,9 +65,17 @@ import {
 import type { ItemCategory } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 
+interface CostCode {
+  id: string;
+  code: string;
+  name: string;
+  isActive: boolean;
+}
+
 const itemCategorySchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
+  defaultCostCodeId: z.string().optional().nullable(),
   isActive: z.boolean().default(true),
 });
 
@@ -77,11 +92,23 @@ export default function AdminItemCategoriesPage() {
     queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES],
   });
 
+  const { data: costCodes } = useQuery<CostCode[]>({
+    queryKey: ["/api/cost-codes"],
+  });
+
+  const costCodeMap = new Map<string, CostCode>();
+  if (costCodes) {
+    for (const cc of costCodes) {
+      costCodeMap.set(cc.id, cc);
+    }
+  }
+
   const form = useForm<ItemCategoryFormData>({
     resolver: zodResolver(itemCategorySchema),
     defaultValues: {
       name: "",
       description: "",
+      defaultCostCodeId: null,
       isActive: true,
     },
   });
@@ -96,7 +123,7 @@ export default function AdminItemCategoriesPage() {
       setDialogOpen(false);
       form.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to create category", description: error.message, variant: "destructive" });
     },
   });
@@ -112,7 +139,7 @@ export default function AdminItemCategoriesPage() {
       setEditingCategory(null);
       form.reset();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to update category", description: error.message, variant: "destructive" });
     },
   });
@@ -127,7 +154,7 @@ export default function AdminItemCategoriesPage() {
       setDeleteDialogOpen(false);
       setDeletingCategoryId(null);
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({ title: "Failed to delete category", description: error.message, variant: "destructive" });
     },
   });
@@ -137,6 +164,7 @@ export default function AdminItemCategoriesPage() {
     form.reset({
       name: "",
       description: "",
+      defaultCostCodeId: null,
       isActive: true,
     });
     setDialogOpen(true);
@@ -147,6 +175,7 @@ export default function AdminItemCategoriesPage() {
     form.reset({
       name: category.name,
       description: category.description || "",
+      defaultCostCodeId: category.defaultCostCodeId || null,
       isActive: category.isActive,
     });
     setDialogOpen(true);
@@ -171,7 +200,7 @@ export default function AdminItemCategoriesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight" data-testid="text-item-categories-title">Item Categories</h1>
@@ -202,49 +231,60 @@ export default function AdminItemCategoriesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Default Cost Code</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {categories.map((category) => (
-                  <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
-                    <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
-                      {category.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
-                      {category.description || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
-                        {category.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEditDialog(category)}
-                          data-testid={`button-edit-category-${category.id}`}
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setDeletingCategoryId(category.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                          data-testid={`button-delete-category-${category.id}`}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {categories.map((category) => {
+                  const cc = category.defaultCostCodeId ? costCodeMap.get(category.defaultCostCodeId) : null;
+                  return (
+                    <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
+                      <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
+                        {category.name}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
+                        {category.description || "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-category-cost-code-${category.id}`}>
+                        {cc ? (
+                          <span className="text-sm">{cc.code} - {cc.name}</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
+                          {category.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditDialog(category)}
+                            data-testid={`button-edit-category-${category.id}`}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setDeletingCategoryId(category.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            data-testid={`button-delete-category-${category.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           ) : (
@@ -294,6 +334,35 @@ export default function AdminItemCategoriesPage() {
                         data-testid="input-category-description"
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="defaultCostCodeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Cost Code</FormLabel>
+                    <Select
+                      value={field.value || "_none"}
+                      onValueChange={(val) => field.onChange(val === "_none" ? null : val)}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-category-cost-code">
+                          <SelectValue placeholder="Select a default cost code" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="_none">None</SelectItem>
+                        {costCodes?.filter(cc => cc.isActive).map((cc) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            {cc.code} - {cc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -355,7 +424,7 @@ export default function AdminItemCategoriesPage() {
             <AlertDialogCancel data-testid="button-cancel-delete-category">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingCategoryId && deleteMutation.mutate(deletingCategoryId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground"
               data-testid="button-confirm-delete-category"
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}

@@ -1630,12 +1630,14 @@ export const itemCategories = pgTable("item_categories", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
+  defaultCostCodeId: varchar("default_cost_code_id", { length: 36 }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   nameCompanyIdx: uniqueIndex("item_categories_name_company_idx").on(table.name, table.companyId),
   companyIdx: index("item_categories_company_idx").on(table.companyId),
+  defaultCostCodeIdx: index("item_categories_default_cost_code_idx").on(table.defaultCostCodeId),
 }));
 
 export const items = pgTable("items", {

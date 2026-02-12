@@ -33,6 +33,7 @@ const itemCategorySchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
   code: z.string().max(50).optional(),
   description: z.string().max(1000).optional().nullable(),
+  defaultCostCodeId: z.string().max(36).optional().nullable(),
   isActive: z.boolean().optional(),
 });
 
