@@ -4,7 +4,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -634,10 +634,31 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
       lineItems: lineItemsBySubmission[row.submission.id] || [],
     }));
 
+    const packages = await db
+      .select({
+        pkg: tenderPackages,
+        document: {
+          id: documents.id,
+          title: documents.title,
+          documentNumber: documents.documentNumber,
+          fileName: documents.fileName,
+        },
+      })
+      .from(tenderPackages)
+      .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
+      .orderBy(asc(tenderPackages.sortOrder));
+
+    const mappedPackages = packages.map(p => ({
+      ...p.pkg,
+      document: p.document,
+    }));
+
     res.json({
       tender,
       budgetLines: mappedLines,
       submissions: mappedSubmissions,
+      documents: mappedPackages,
     });
   } catch (error: any) {
     logger.error("Error fetching tender sheet:", error);
@@ -753,6 +774,80 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert
     }
     logger.error("Error upserting tender lines:", error);
     res.status(500).json({ message: "Failed to update tender lines" });
+  }
+});
+
+router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { tenderId, jobId } = req.params;
+
+    const [tender] = await db
+      .select({ id: tenders.id })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)));
+
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found" });
+    }
+
+    const schema = z.object({
+      documentId: z.string().optional(),
+      name: z.string().min(1, "Name is required"),
+      description: z.string().optional(),
+    });
+
+    const data = schema.parse(req.body);
+
+    const maxOrder = await db
+      .select({ max: sql<number>`coalesce(max(${tenderPackages.sortOrder}), -1)` })
+      .from(tenderPackages)
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)));
+
+    const [pkg] = await db.insert(tenderPackages).values({
+      companyId,
+      tenderId,
+      documentId: data.documentId || null,
+      name: data.name,
+      description: data.description || null,
+      sortOrder: (maxOrder[0]?.max ?? -1) + 1,
+    }).returning();
+
+    res.json(pkg);
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    logger.error("Error adding tender document:", error);
+    res.status(500).json({ message: "Failed to add tender document" });
+  }
+});
+
+router.delete("/api/jobs/:jobId/tenders/:tenderId/documents/:packageId", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { tenderId, jobId, packageId } = req.params;
+
+    const [tender] = await db
+      .select({ id: tenders.id })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)));
+
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found" });
+    }
+
+    await db.delete(tenderPackages)
+      .where(and(
+        eq(tenderPackages.id, packageId),
+        eq(tenderPackages.tenderId, tenderId),
+        eq(tenderPackages.companyId, companyId),
+      ));
+
+    res.json({ message: "Document removed from tender" });
+  } catch (error: any) {
+    logger.error("Error removing tender document:", error);
+    res.status(500).json({ message: "Failed to remove tender document" });
   }
 });
 
