@@ -15,6 +15,8 @@ import {
   Circle,
   ZoomIn,
   ZoomOut,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
 
@@ -103,6 +104,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
   const [activePage, setActivePage] = useState<number>(1);
   const [isDragging, setIsDragging] = useState(false);
   const [previewZoom, setPreviewZoom] = useState(1);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   const { data: docTypes } = useQuery<any[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES],
@@ -306,12 +308,22 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[92vh] flex flex-col" data-testid="dialog-drawing-package">
+      <DialogContent className={`flex flex-col ${isMaximized ? "max-w-[100vw] w-[100vw] max-h-[100vh] h-[100vh] rounded-none" : "max-w-[95vw] w-[1400px] max-h-[92vh]"}`} data-testid="dialog-drawing-package">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Drawing Package Processor
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2">
+              <Layers className="h-5 w-5" />
+              Drawing Package Processor
+            </DialogTitle>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsMaximized((v) => !v)}
+              data-testid="button-maximize-dialog"
+            >
+              {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            </Button>
+          </div>
           <DialogDescription>
             Upload a multi-page PDF to extract, review, and register individual drawings
           </DialogDescription>
@@ -419,7 +431,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
 
           {step === "review" && analysisResult && (
             <div className="flex gap-4 h-full">
-              <div className="w-[320px] flex-shrink-0 flex flex-col h-full border rounded-md">
+              <div className="w-[320px] flex-shrink-0 flex flex-col h-full border rounded-md overflow-hidden">
                 <div className="p-3 border-b bg-muted/30">
                   <h3 className="text-sm font-semibold mb-2">Global Defaults</h3>
                   <div className="space-y-2">
@@ -451,7 +463,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                         <SelectContent>
                           <SelectItem value="__none__">No type</SelectItem>
                           {(docTypes || []).map((t: any) => (
-                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                            <SelectItem key={t.id} value={t.id}>{t.typeName}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -465,7 +477,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                         <SelectContent>
                           <SelectItem value="__none__">No discipline</SelectItem>
                           {(disciplines || []).map((d: any) => (
-                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                            <SelectItem key={d.id} value={d.id}>{d.disciplineName}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -483,7 +495,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                       data-testid="button-deselect-all">None</Button>
                   </div>
                 </div>
-                <ScrollArea className="flex-1">
+                <div className="flex-1 min-h-0 overflow-y-auto">
                   <div className="p-1">
                     {pages.map((page) => (
                       <div
@@ -531,7 +543,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                </div>
               </div>
 
               <div className="flex-1 flex flex-col h-full min-w-0">
@@ -659,7 +671,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                               <SelectItem value="__inherit__">Inherit global default</SelectItem>
                               <SelectItem value="__none__">No type</SelectItem>
                               {(docTypes || []).map((t: any) => (
-                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                                <SelectItem key={t.id} value={t.id}>{t.typeName}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
@@ -679,7 +691,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                               <SelectItem value="__inherit__">Inherit global default</SelectItem>
                               <SelectItem value="__none__">No discipline</SelectItem>
                               {(disciplines || []).map((d: any) => (
-                                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                                <SelectItem key={d.id} value={d.id}>{d.disciplineName}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
