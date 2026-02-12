@@ -82,6 +82,7 @@ const AdminJobTypesPage = lazy(() => import("@/pages/admin/job-types"));
 const AdminCostCodesPage = lazy(() => import("@/pages/admin/cost-codes"));
 const TenderCenterPage = lazy(() => import("@/pages/tender-center"));
 const JobBudgetPage = lazy(() => import("@/pages/job-budget"));
+const JobTendersPage = lazy(() => import("@/pages/job-tenders"));
 const JobBoqPage = lazy(() => import("@/pages/job-boq"));
 const WorkflowBuilderPage = lazy(() => import("@/pages/admin/workflow-builder"));
 const JobActivitiesPage = lazy(() => import("@/pages/job-activities"));
@@ -416,6 +417,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <JobBudgetPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/jobs/:id/tenders">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <JobTendersPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>

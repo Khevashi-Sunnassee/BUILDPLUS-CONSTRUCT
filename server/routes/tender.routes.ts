@@ -4,8 +4,8 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes } from "@shared/schema";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets } from "@shared/schema";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -479,6 +479,280 @@ router.delete("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id",
   } catch (error: any) {
     logger.error("Error deleting tender line item:", error);
     res.status(500).json({ message: "Failed to delete tender line item" });
+  }
+});
+
+router.get("/api/jobs/:jobId/tenders", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const jobId = req.params.jobId;
+
+    const results = await db
+      .select({
+        tender: tenders,
+        createdBy: {
+          id: users.id,
+          name: users.name,
+        },
+      })
+      .from(tenders)
+      .leftJoin(users, eq(tenders.createdById, users.id))
+      .where(and(eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)))
+      .orderBy(desc(tenders.createdAt));
+
+    const tenderIds = results.map(r => r.tender.id);
+    let submissionsByTender: Record<string, any[]> = {};
+
+    if (tenderIds.length > 0) {
+      const allSubmissions = await db
+        .select({
+          submission: tenderSubmissions,
+          supplier: {
+            id: suppliers.id,
+            name: suppliers.name,
+          },
+        })
+        .from(tenderSubmissions)
+        .leftJoin(suppliers, eq(tenderSubmissions.supplierId, suppliers.id))
+        .where(and(
+          inArray(tenderSubmissions.tenderId, tenderIds),
+          eq(tenderSubmissions.companyId, companyId),
+        ))
+        .orderBy(desc(tenderSubmissions.createdAt));
+
+      for (const row of allSubmissions) {
+        const tid = row.submission.tenderId;
+        if (!submissionsByTender[tid]) submissionsByTender[tid] = [];
+        submissionsByTender[tid].push({
+          ...row.submission,
+          supplier: row.supplier,
+        });
+      }
+    }
+
+    const mapped = results.map((row) => ({
+      ...row.tender,
+      createdBy: row.createdBy,
+      submissions: submissionsByTender[row.tender.id] || [],
+      submissionCount: (submissionsByTender[row.tender.id] || []).length,
+    }));
+
+    res.json(mapped);
+  } catch (error: any) {
+    logger.error("Error fetching job tenders:", error);
+    res.status(500).json({ message: "Failed to fetch job tenders" });
+  }
+});
+
+router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const jobId = req.params.jobId;
+    const tenderId = req.params.tenderId;
+
+    const [tender] = await db
+      .select()
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)));
+
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found" });
+    }
+
+    const [budget] = await db
+      .select()
+      .from(jobBudgets)
+      .where(and(eq(jobBudgets.jobId, jobId), eq(jobBudgets.companyId, companyId)));
+
+    if (!budget) {
+      return res.json({ tender, budgetLines: [], submissions: [], lineItems: {} });
+    }
+
+    const lines = await db
+      .select({
+        line: budgetLines,
+        costCode: {
+          id: costCodes.id,
+          code: costCodes.code,
+          name: costCodes.name,
+        },
+        childCostCode: {
+          id: childCostCodes.id,
+          code: childCostCodes.code,
+          name: childCostCodes.name,
+        },
+      })
+      .from(budgetLines)
+      .innerJoin(costCodes, eq(budgetLines.costCodeId, costCodes.id))
+      .leftJoin(childCostCodes, eq(budgetLines.childCostCodeId, childCostCodes.id))
+      .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
+      .orderBy(asc(budgetLines.sortOrder));
+
+    const submissions = await db
+      .select({
+        submission: tenderSubmissions,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+        },
+      })
+      .from(tenderSubmissions)
+      .leftJoin(suppliers, eq(tenderSubmissions.supplierId, suppliers.id))
+      .where(and(eq(tenderSubmissions.tenderId, tenderId), eq(tenderSubmissions.companyId, companyId)))
+      .orderBy(desc(tenderSubmissions.createdAt));
+
+    const submissionIds = submissions.map(s => s.submission.id);
+    let lineItemsBySubmission: Record<string, any[]> = {};
+
+    if (submissionIds.length > 0) {
+      const allLineItems = await db
+        .select()
+        .from(tenderLineItems)
+        .where(and(
+          inArray(tenderLineItems.tenderSubmissionId, submissionIds),
+          eq(tenderLineItems.companyId, companyId),
+        ))
+        .orderBy(asc(tenderLineItems.sortOrder));
+
+      for (const item of allLineItems) {
+        if (!lineItemsBySubmission[item.tenderSubmissionId]) {
+          lineItemsBySubmission[item.tenderSubmissionId] = [];
+        }
+        lineItemsBySubmission[item.tenderSubmissionId].push(item);
+      }
+    }
+
+    const mappedLines = lines.map((row) => ({
+      ...row.line,
+      costCode: row.costCode,
+      childCostCode: row.childCostCode?.id ? row.childCostCode : null,
+    }));
+
+    const mappedSubmissions = submissions.map((row) => ({
+      ...row.submission,
+      supplier: row.supplier,
+      lineItems: lineItemsBySubmission[row.submission.id] || [],
+    }));
+
+    res.json({
+      tender,
+      budgetLines: mappedLines,
+      submissions: mappedSubmissions,
+    });
+  } catch (error: any) {
+    logger.error("Error fetching tender sheet:", error);
+    res.status(500).json({ message: "Failed to fetch tender sheet" });
+  }
+});
+
+router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert-lines", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { submissionId, tenderId } = req.params;
+
+    const [tender] = await db
+      .select({ id: tenders.id })
+      .from(tenders)
+      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found" });
+    }
+
+    const [submission] = await db
+      .select({ id: tenderSubmissions.id })
+      .from(tenderSubmissions)
+      .where(and(
+        eq(tenderSubmissions.id, submissionId),
+        eq(tenderSubmissions.tenderId, tenderId),
+        eq(tenderSubmissions.companyId, companyId),
+      ));
+
+    if (!submission) {
+      return res.status(404).json({ message: "Submission not found" });
+    }
+
+    const schema = z.object({
+      lines: z.array(z.object({
+        costCodeId: z.string(),
+        childCostCodeId: z.string().nullable().optional(),
+        amount: z.string(),
+      })),
+    });
+
+    const { lines } = schema.parse(req.body);
+
+    const existingItems = await db
+      .select()
+      .from(tenderLineItems)
+      .where(and(
+        eq(tenderLineItems.tenderSubmissionId, submissionId),
+        eq(tenderLineItems.companyId, companyId),
+      ));
+
+    const existingMap = new Map<string, typeof existingItems[0]>();
+    for (const item of existingItems) {
+      const key = `${item.costCodeId || ""}:${item.childCostCodeId || ""}`;
+      existingMap.set(key, item);
+    }
+
+    for (const line of lines) {
+      const amount = parseFloat(line.amount) || 0;
+      const key = `${line.costCodeId}:${line.childCostCodeId || ""}`;
+      const existing = existingMap.get(key);
+
+      if (amount === 0 && existing) {
+        await db.delete(tenderLineItems).where(eq(tenderLineItems.id, existing.id));
+      } else if (amount !== 0 && existing) {
+        await db.update(tenderLineItems)
+          .set({
+            lineTotal: String(amount),
+            unitPrice: String(amount),
+            updatedAt: new Date(),
+          })
+          .where(eq(tenderLineItems.id, existing.id));
+      } else if (amount !== 0) {
+        await db.insert(tenderLineItems).values({
+          companyId,
+          tenderSubmissionId: submissionId,
+          costCodeId: line.costCodeId,
+          childCostCodeId: line.childCostCodeId || null,
+          description: "Tender amount",
+          quantity: "1",
+          unit: "EA",
+          unitPrice: String(amount),
+          lineTotal: String(amount),
+        });
+      }
+    }
+
+    const totalResult = await db
+      .select({ total: sql<string>`coalesce(sum(cast(${tenderLineItems.lineTotal} as numeric)), 0)::text` })
+      .from(tenderLineItems)
+      .where(and(
+        eq(tenderLineItems.tenderSubmissionId, submissionId),
+        eq(tenderLineItems.companyId, companyId),
+      ));
+    const totalPrice = totalResult[0]?.total || "0";
+
+    await db.update(tenderSubmissions)
+      .set({
+        totalPrice,
+        subtotal: totalPrice,
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(tenderSubmissions.id, submissionId),
+        eq(tenderSubmissions.companyId, companyId),
+      ));
+
+    res.json({ message: "Lines updated", totalPrice: String(totalPrice) });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    logger.error("Error upserting tender lines:", error);
+    res.status(500).json({ message: "Failed to update tender lines" });
   }
 });
 

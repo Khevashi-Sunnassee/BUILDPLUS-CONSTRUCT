@@ -1,6 +1,6 @@
 import { useState, useMemo, Fragment, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useRoute, Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,7 +27,7 @@ import {
 import {
   Plus, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
   Receipt, Target, Settings2, ListPlus, ChevronDown, ChevronRight, X,
-  MessageSquare, Paperclip, ClipboardList,
+  MessageSquare, Paperclip, ClipboardList, FileText,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
@@ -447,6 +447,12 @@ export default function JobBudgetPage() {
         </div>
         {budgetExists && (
           <div className="flex items-center gap-2 flex-wrap">
+            <Link href={`/jobs/${jobId}/tenders`}>
+              <Button variant="outline" data-testid="button-tender-sheets">
+                <FileText className="h-4 w-4 mr-2" />
+                Tender Sheets
+              </Button>
+            </Link>
             <Button variant="outline" onClick={openBudgetEdit} data-testid="button-edit-budget">
               <Settings2 className="h-4 w-4 mr-2" />
               Edit Budget
