@@ -3603,6 +3603,8 @@ export const hireBookings = pgTable("hire_bookings", {
   approvedByUserId: varchar("approved_by_user_id", { length: 36 }).references(() => users.id),
   approvedAt: timestamp("approved_at"),
   supplierReference: text("supplier_reference"),
+  hireLocation: text("hire_location"),
+  hireLocationFactoryId: varchar("hire_location_factory_id", { length: 36 }).references(() => factories.id),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

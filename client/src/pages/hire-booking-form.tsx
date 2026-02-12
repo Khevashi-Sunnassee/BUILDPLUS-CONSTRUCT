@@ -23,10 +23,21 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { ArrowLeft, CalendarIcon, Save, Send, Check, X, Truck, Package, RotateCcw, Lock, Loader2, Printer, Mail } from "lucide-react";
+import { ArrowLeft, CalendarIcon, Save, Send, Check, X, Truck, Package, RotateCcw, Lock, Loader2, Printer, Mail, MapPin } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { Supplier, Job, Employee, HireBooking } from "@shared/schema";
 import { ASSET_CATEGORIES } from "@shared/schema";
-import { HIRE_ROUTES, PROCUREMENT_ROUTES, JOBS_ROUTES, EMPLOYEE_ROUTES, ASSET_ROUTES } from "@shared/api-routes";
+import { HIRE_ROUTES, PROCUREMENT_ROUTES, JOBS_ROUTES, EMPLOYEE_ROUTES, ASSET_ROUTES, FACTORIES_ROUTES } from "@shared/api-routes";
+
+interface Factory {
+  id: string;
+  name: string;
+  code: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  isActive: boolean;
+}
 
 interface Asset {
   id: string;
@@ -61,6 +72,9 @@ const formSchema = z.object({
   pickupRequired: z.boolean(),
   pickupCost: z.string().nullable().optional(),
   supplierReference: z.string().nullable().optional(),
+  hireLocationMode: z.enum(["manual", "factory"]),
+  hireLocation: z.string().nullable().optional(),
+  hireLocationFactoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 }).refine((data) => {
   if (data.hireSource === "external" && !data.supplierId) return false;
@@ -180,6 +194,9 @@ export default function HireBookingFormPage() {
       pickupRequired: false,
       pickupCost: "",
       supplierReference: "",
+      hireLocationMode: "manual",
+      hireLocation: "",
+      hireLocationFactoryId: null,
       notes: "",
     },
   });
@@ -188,6 +205,13 @@ export default function HireBookingFormPage() {
   const deliveryRequired = form.watch("deliveryRequired");
   const pickupRequired = form.watch("pickupRequired");
   const selectedAssetId = form.watch("assetId");
+  const hireLocationMode = form.watch("hireLocationMode");
+
+  const { data: factoriesList = [] } = useQuery<Factory[]>({
+    queryKey: [FACTORIES_ROUTES.LIST],
+  });
+
+  const activeFactories = useMemo(() => factoriesList.filter(f => f.isActive), [factoriesList]);
 
   useEffect(() => {
     if (existingBooking && !isNew) {
@@ -216,6 +240,9 @@ export default function HireBookingFormPage() {
         pickupRequired: existingBooking.pickupRequired || false,
         pickupCost: existingBooking.pickupCost || "",
         supplierReference: existingBooking.supplierReference || "",
+        hireLocationMode: existingBooking.hireLocationFactoryId ? "factory" : "manual",
+        hireLocation: existingBooking.hireLocation || "",
+        hireLocationFactoryId: existingBooking.hireLocationFactoryId || null,
         notes: existingBooking.notes || "",
       });
     }
@@ -245,6 +272,10 @@ export default function HireBookingFormPage() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: FormValues) => {
+      const resolvedLocation = data.hireLocationMode === "factory" && data.hireLocationFactoryId
+        ? activeFactories.find(f => f.id === data.hireLocationFactoryId)?.name || data.hireLocation || null
+        : data.hireLocation || null;
+
       const payload: Record<string, any> = {
         ...data,
         hireStartDate: data.hireStartDate.toISOString(),
@@ -252,7 +283,10 @@ export default function HireBookingFormPage() {
         expectedReturnDate: data.expectedReturnDate?.toISOString() || null,
         assetId: data.hireSource === "internal" ? data.assetId : null,
         supplierId: data.hireSource === "external" ? data.supplierId : null,
+        hireLocation: resolvedLocation,
+        hireLocationFactoryId: data.hireLocationMode === "factory" ? (data.hireLocationFactoryId || null) : null,
       };
+      delete payload.hireLocationMode;
 
       if (!isNew && selectedStatus) {
         payload.status = selectedStatus;
@@ -937,6 +971,97 @@ export default function HireBookingFormPage() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <div className="space-y-3">
+                <FormLabel className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Hire Location
+                </FormLabel>
+                <FormField
+                  control={form.control}
+                  name="hireLocationMode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <RadioGroup
+                          value={field.value}
+                          onValueChange={(v) => {
+                            field.onChange(v);
+                            if (v === "manual") {
+                              form.setValue("hireLocationFactoryId", null);
+                            } else {
+                              form.setValue("hireLocation", "");
+                            }
+                          }}
+                          className="flex items-center gap-4"
+                          data-testid="radio-hire-location-mode"
+                        >
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="manual" id="loc-manual" data-testid="radio-location-manual" />
+                            <Label htmlFor="loc-manual" className="cursor-pointer font-normal">Manual Entry</Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="factory" id="loc-factory" data-testid="radio-location-factory" />
+                            <Label htmlFor="loc-factory" className="cursor-pointer font-normal">Select Factory</Label>
+                          </div>
+                        </RadioGroup>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                {hireLocationMode === "manual" && (
+                  <FormField
+                    control={form.control}
+                    name="hireLocation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            value={field.value || ""}
+                            placeholder="Enter hire location address..."
+                            disabled={!canEdit}
+                            data-testid="input-hire-location"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {hireLocationMode === "factory" && (
+                  <FormField
+                    control={form.control}
+                    name="hireLocationFactoryId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <Select
+                          value={field.value || ""}
+                          onValueChange={field.onChange}
+                          disabled={!canEdit}
+                        >
+                          <FormControl>
+                            <SelectTrigger data-testid="select-hire-location-factory">
+                              <SelectValue placeholder="Select a factory..." />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {activeFactories.map((factory) => (
+                              <SelectItem key={factory.id} value={factory.id}>
+                                {factory.code} - {factory.name}
+                                {factory.city ? ` (${factory.city}, ${factory.state || ""})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
               </div>
             </CardContent>
           </Card>

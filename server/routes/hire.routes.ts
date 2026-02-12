@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { hireBookings, employees, suppliers, jobs, assets, users, companies, ASSET_CATEGORIES } from "@shared/schema";
+import { hireBookings, employees, suppliers, jobs, assets, users, companies, factories, ASSET_CATEGORIES } from "@shared/schema";
 import { eq, and, desc, sql, ilike, or } from "drizzle-orm";
 import { emailService } from "../services/email.service";
 import { format } from "date-fns";
@@ -34,6 +34,8 @@ const hireBookingSchema = z.object({
   pickupRequired: z.boolean().optional(),
   pickupCost: z.string().nullable().optional(),
   supplierReference: z.string().nullable().optional(),
+  hireLocation: z.string().nullable().optional(),
+  hireLocationFactoryId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -218,6 +220,22 @@ router.post("/api/hire-bookings", requireAuth, async (req: Request, res: Respons
       return res.status(400).json({ error: "Asset selection is required for internal hire" });
     }
 
+    let resolvedLocation = data.hireLocation || null;
+    let resolvedFactoryId = data.hireLocationFactoryId || null;
+
+    if (resolvedFactoryId) {
+      const [factory] = await db.select({ id: factories.id, name: factories.name })
+        .from(factories)
+        .where(and(eq(factories.id, resolvedFactoryId), eq(factories.companyId, companyId)))
+        .limit(1);
+      if (!factory) {
+        return res.status(400).json({ error: "Selected factory not found" });
+      }
+      resolvedLocation = factory.name;
+    } else {
+      resolvedFactoryId = null;
+    }
+
     const bookingNumber = await getNextBookingNumber(companyId);
 
     const [booking] = await db.insert(hireBookings).values({
@@ -246,6 +264,8 @@ router.post("/api/hire-bookings", requireAuth, async (req: Request, res: Respons
       pickupRequired: data.pickupRequired || false,
       pickupCost: data.pickupCost || null,
       supplierReference: data.supplierReference || null,
+      hireLocation: resolvedLocation,
+      hireLocationFactoryId: resolvedFactoryId,
       notes: data.notes || null,
       status: "DRAFT",
     }).returning();
@@ -307,6 +327,27 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
     if (data.pickupRequired !== undefined) updateData.pickupRequired = data.pickupRequired;
     if (data.pickupCost !== undefined) updateData.pickupCost = data.pickupCost || null;
     if (data.supplierReference !== undefined) updateData.supplierReference = data.supplierReference;
+    if (data.hireLocationFactoryId !== undefined) {
+      if (data.hireLocationFactoryId) {
+        const [factory] = await db.select({ id: factories.id, name: factories.name })
+          .from(factories)
+          .where(and(eq(factories.id, data.hireLocationFactoryId), eq(factories.companyId, companyId)))
+          .limit(1);
+        if (!factory) {
+          return res.status(400).json({ error: "Selected factory not found" });
+        }
+        updateData.hireLocationFactoryId = factory.id;
+        updateData.hireLocation = factory.name;
+      } else {
+        updateData.hireLocationFactoryId = null;
+        if (data.hireLocation !== undefined) {
+          updateData.hireLocation = data.hireLocation || null;
+        }
+      }
+    } else if (data.hireLocation !== undefined) {
+      updateData.hireLocation = data.hireLocation || null;
+      updateData.hireLocationFactoryId = null;
+    }
     if (data.notes !== undefined) updateData.notes = data.notes;
 
     const [updated] = await db
