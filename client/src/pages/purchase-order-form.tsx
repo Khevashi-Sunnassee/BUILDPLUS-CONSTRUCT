@@ -156,6 +156,25 @@ export default function PurchaseOrderFormPage() {
     queryKey: ["/api/cost-codes-with-children"],
   });
 
+  const form = useForm<FormValues>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      supplierId: "",
+      supplierName: "",
+      supplierContact: "",
+      supplierEmail: "",
+      supplierPhone: "",
+      supplierAddress: "",
+      projectName: "",
+      deliveryAddress: "",
+      requiredByDate: isNew ? addDays(new Date(), 7) : null,
+      notes: "",
+      internalNotes: "",
+      costCodeId: null,
+      childCostCodeId: null,
+    },
+  });
+
   const selectedCostCodeId = form.watch("costCodeId");
 
   const filteredChildCodes = useMemo(() => {
@@ -194,25 +213,6 @@ export default function PurchaseOrderFormPage() {
   const { data: attachments = [], isLoading: loadingAttachments } = useQuery<AttachmentWithUser[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS, poId, "attachments"],
     enabled: !!poId,
-  });
-
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      supplierId: "",
-      supplierName: "",
-      supplierContact: "",
-      supplierEmail: "",
-      supplierPhone: "",
-      supplierAddress: "",
-      projectName: "",
-      deliveryAddress: "",
-      requiredByDate: isNew ? addDays(new Date(), 7) : null,
-      notes: "",
-      internalNotes: "",
-      costCodeId: null,
-      childCostCodeId: null,
-    },
   });
 
   useUnsavedChanges(form.formState.isDirty);

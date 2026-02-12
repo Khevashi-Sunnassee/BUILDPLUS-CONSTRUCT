@@ -89,6 +89,53 @@ function CollapsibleSection({ title, icon: Icon, defaultOpen = false, children }
   );
 }
 
+function CurrencyInput({ value, onChange, ...props }: { value: string; onChange: (val: string) => void; [key: string]: any }) {
+  const [focused, setFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    if (!focused) {
+      setDisplayValue(value);
+    }
+  }, [value, focused]);
+
+  const formatDisplay = (raw: string) => {
+    const num = parseFloat(raw);
+    if (isNaN(num) || raw === "") return "";
+    return new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+  };
+
+  return (
+    <div className="relative">
+      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+      <Input
+        {...props}
+        className="pl-7"
+        type={focused ? "number" : "text"}
+        step={focused ? "0.01" : undefined}
+        value={focused ? displayValue : formatDisplay(value)}
+        onFocus={() => {
+          setFocused(true);
+          setDisplayValue(value);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          if (displayValue) {
+            const num = parseFloat(displayValue);
+            if (!isNaN(num)) {
+              onChange(num.toString());
+            }
+          }
+        }}
+        onChange={(e) => {
+          setDisplayValue(e.target.value);
+          onChange(e.target.value);
+        }}
+      />
+    </div>
+  );
+}
+
 interface ReplacementPrefill {
   assetId: string;
   assetName: string;
@@ -310,27 +357,27 @@ function CapexForm({ capex, onSave, onClose, replacementPrefill }: { capex?: Cap
         <div className="space-y-3">
           <div>
             <Label>Total Equipment Cost (AUD) *</Label>
-            <Input type="number" step="0.01" value={formData.totalEquipmentCost} onChange={(e) => update("totalEquipmentCost", e.target.value)} data-testid="input-total-cost" />
+            <CurrencyInput value={formData.totalEquipmentCost} onChange={(val) => update("totalEquipmentCost", val)} data-testid="input-total-cost" />
           </div>
           <div>
             <Label>Transportation Cost (AUD)</Label>
-            <Input type="number" step="0.01" value={formData.transportationCost} onChange={(e) => update("transportationCost", e.target.value)} data-testid="input-transportation-cost" />
+            <CurrencyInput value={formData.transportationCost} onChange={(val) => update("transportationCost", val)} data-testid="input-transportation-cost" />
           </div>
           <div>
             <Label>Insurance Cost (AUD)</Label>
-            <Input type="number" step="0.01" value={formData.insuranceCost} onChange={(e) => update("insuranceCost", e.target.value)} data-testid="input-insurance-cost" />
+            <CurrencyInput value={formData.insuranceCost} onChange={(val) => update("insuranceCost", val)} data-testid="input-insurance-cost" />
           </div>
           <div>
             <Label>Monthly Maintenance Cost (AUD)</Label>
-            <Input type="number" step="0.01" value={formData.monthlyMaintenanceCost} onChange={(e) => update("monthlyMaintenanceCost", e.target.value)} data-testid="input-maintenance-cost" />
+            <CurrencyInput value={formData.monthlyMaintenanceCost} onChange={(val) => update("monthlyMaintenanceCost", val)} data-testid="input-maintenance-cost" />
           </div>
           <div>
             <Label>Monthly Resource Cost (AUD)</Label>
-            <Input type="number" step="0.01" value={formData.monthlyResourceCost} onChange={(e) => update("monthlyResourceCost", e.target.value)} data-testid="input-resource-cost" />
+            <CurrencyInput value={formData.monthlyResourceCost} onChange={(val) => update("monthlyResourceCost", val)} data-testid="input-resource-cost" />
           </div>
           <div>
             <Label>Additional Costs (AUD)</Label>
-            <Input type="number" step="0.01" value={formData.additionalCosts} onChange={(e) => update("additionalCosts", e.target.value)} data-testid="input-additional-costs" />
+            <CurrencyInput value={formData.additionalCosts} onChange={(val) => update("additionalCosts", val)} data-testid="input-additional-costs" />
           </div>
         </div>
       </CollapsibleSection>
