@@ -308,7 +308,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className={`flex flex-col ${isMaximized ? "max-w-[100vw] w-[100vw] max-h-[100vh] h-[100vh] rounded-none" : "max-w-[95vw] w-[1400px] max-h-[92vh]"}`} data-testid="dialog-drawing-package">
+      <DialogContent className={`!grid-rows-none flex flex-col ${isMaximized ? "max-w-[100vw] w-[100vw] h-[100vh] rounded-none" : "max-w-[95vw] w-[1400px] h-[92vh]"}`} data-testid="dialog-drawing-package">
         <DialogHeader>
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="flex items-center gap-2">
