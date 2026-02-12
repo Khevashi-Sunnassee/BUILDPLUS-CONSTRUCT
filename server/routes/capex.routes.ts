@@ -63,7 +63,7 @@ router.get("/api/capex-requests", requireAuth, requirePermission("capex_requests
     const level = req.permissionLevel;
     if (level === "VIEW_OWN" || level === "VIEW_AND_UPDATE_OWN") {
       const userId = req.session.userId;
-      requests = requests.filter((r: any) => r.requestedById === userId);
+      requests = requests.filter((r) => r.requestedById === userId);
     }
     res.json(requests);
   } catch (error: unknown) {

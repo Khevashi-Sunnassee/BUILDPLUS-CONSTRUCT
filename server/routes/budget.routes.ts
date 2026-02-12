@@ -149,7 +149,7 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
     }));
 
     res.json({ ...budget, lines: mappedLines });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching budget:", error);
     res.status(500).json({ message: "Failed to fetch budget" });
   }
@@ -194,7 +194,7 @@ router.post("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets",
       .returning();
 
     res.status(201).json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
@@ -209,7 +209,7 @@ router.patch("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets"
     const jobId = req.params.jobId;
     const data = budgetSchema.partial().parse(req.body);
 
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.estimatedTotalBudget !== undefined) updateData.estimatedTotalBudget = data.estimatedTotalBudget || "0";
     if (data.profitTargetPercent !== undefined) updateData.profitTargetPercent = data.profitTargetPercent || "0";
@@ -226,7 +226,7 @@ router.patch("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets"
       return res.status(404).json({ message: "Budget not found" });
     }
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
@@ -346,7 +346,7 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching budget lines:", error);
     res.status(500).json({ message: "Failed to fetch budget lines" });
   }
@@ -386,7 +386,7 @@ router.post("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("bud
       .returning();
 
     res.status(201).json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
@@ -400,7 +400,7 @@ router.patch("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission
     const companyId = req.session.companyId!;
     const data = budgetLineSchema.partial().parse(req.body);
 
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.costCodeId !== undefined) updateData.costCodeId = data.costCodeId;
     if (data.childCostCodeId !== undefined) updateData.childCostCodeId = data.childCostCodeId || null;
@@ -422,7 +422,7 @@ router.patch("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermission
       return res.status(404).json({ message: "Budget line not found" });
     }
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
     }
@@ -444,7 +444,7 @@ router.delete("/api/jobs/:jobId/budget/lines/:id", requireAuth, requirePermissio
       return res.status(404).json({ message: "Budget line not found" });
     }
     res.json({ message: "Budget line deleted", id: deleted.id });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error deleting budget line:", error);
     res.status(500).json({ message: "Failed to delete budget line" });
   }
@@ -509,7 +509,7 @@ router.get("/api/jobs/:jobId/budget/summary", requireAuth, requirePermission("bu
       profitTargetPercent: budget.profitTargetPercent || "0",
       profitMargin,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching budget summary:", error);
     res.status(500).json({ message: "Failed to fetch budget summary" });
   }
@@ -566,29 +566,31 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
         return res.status(400).json({ message: "No default cost codes are configured for this job type. Go to Admin > Cost Codes to set up defaults for this job type." });
       }
 
-      await db.insert(jobCostCodes).values(
-        defaults.map((d, idx) => ({
-          companyId,
-          jobId,
-          costCodeId: d.costCodeId,
-          sortOrder: idx,
-        }))
-      );
-      inherited = defaults.length;
+      await db.transaction(async (tx) => {
+        await tx.insert(jobCostCodes).values(
+          defaults.map((d, idx) => ({
+            companyId,
+            jobId,
+            costCodeId: d.costCodeId,
+            sortOrder: idx,
+          }))
+        );
+        inherited = defaults.length;
 
-      jobCostCodeRows = await db
-        .select({
-          costCodeId: jobCostCodes.costCodeId,
-          costCode: costCodes.code,
-          costCodeName: costCodes.name,
-          isActive: costCodes.isActive,
-          isDisabled: jobCostCodes.isDisabled,
-          sortOrder: jobCostCodes.sortOrder,
-        })
-        .from(jobCostCodes)
-        .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
-        .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
-        .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+        jobCostCodeRows = await tx
+          .select({
+            costCodeId: jobCostCodes.costCodeId,
+            costCode: costCodes.code,
+            costCodeName: costCodes.name,
+            isActive: costCodes.isActive,
+            isDisabled: jobCostCodes.isDisabled,
+            sortOrder: jobCostCodes.sortOrder,
+          })
+          .from(jobCostCodes)
+          .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
+          .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
+          .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+      });
     }
 
     const activeCostCodes = jobCostCodeRows.filter(cc => cc.isActive && !cc.isDisabled);
@@ -622,7 +624,7 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
 
     const existingKey = new Set(existingLines.map(l => `${l.costCodeId}|${l.childCostCodeId || ""}`));
 
-    const insertValues: any[] = [];
+    const insertValues: Record<string, unknown>[] = [];
     let sortIdx = existingLines.length;
 
     for (const parentCC of activeCostCodes) {
@@ -675,7 +677,7 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
       inherited,
       message: `Created ${insertValues.length} budget line(s) from cost codes.${inheritedMsg}`,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error creating budget lines from cost codes:", error);
     res.status(500).json({ message: "Failed to create budget lines from cost codes" });
   }
@@ -720,7 +722,7 @@ router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("
     }));
 
     res.json(updatesWithFiles);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching budget line updates:", error);
     res.status(500).json({ message: "Failed to fetch updates" });
   }
@@ -738,7 +740,7 @@ router.post("/api/budget-lines/:lineId/updates", requireAuth, requirePermission(
       .returning();
 
     res.status(201).json(update);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error creating budget line update:", error);
     res.status(500).json({ message: "Failed to create update" });
   }
@@ -748,7 +750,7 @@ router.delete("/api/budget-line-updates/:id", requireAuth, requirePermission("bu
   try {
     await db.delete(budgetLineUpdates).where(eq(budgetLineUpdates.id, req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error deleting budget line update:", error);
     res.status(500).json({ message: "Failed to delete update" });
   }
@@ -784,7 +786,7 @@ router.get("/api/budget-lines/:lineId/files", requireAuth, requirePermission("bu
       .orderBy(desc(budgetLineFiles.createdAt));
 
     res.json(files);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching budget line files:", error);
     res.status(500).json({ message: "Failed to fetch files" });
   }
@@ -815,7 +817,7 @@ router.post("/api/budget-lines/:lineId/files", requireAuth, requirePermission("b
       .returning();
 
     res.status(201).json(created);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error uploading budget line file:", error);
     res.status(500).json({ message: "Failed to upload file" });
   }
@@ -825,7 +827,7 @@ router.delete("/api/budget-line-files/:id", requireAuth, requirePermission("budg
   try {
     await db.delete(budgetLineFiles).where(eq(budgetLineFiles.id, req.params.id));
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error deleting budget line file:", error);
     res.status(500).json({ message: "Failed to delete file" });
   }
@@ -857,7 +859,7 @@ router.get("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requireP
       .orderBy(asc(budgetLineDetailItems.sortOrder), asc(budgetLineDetailItems.createdAt));
 
     res.json(items);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching budget line detail items:", error);
     res.status(500).json({ message: "Failed to fetch detail items" });
   }
@@ -893,7 +895,7 @@ router.post("/api/budget-lines/:budgetLineId/detail-items", requireAuth, require
     await recalcLockedBudget(budgetLineId, companyId);
 
     res.json(newItem);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error creating budget line detail item:", error);
     res.status(500).json({ message: "Failed to create detail item" });
   }
@@ -932,7 +934,7 @@ router.patch("/api/budget-line-detail-items/:id", requireAuth, requirePermission
     await recalcLockedBudget(existing.budgetLineId, companyId);
 
     res.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error updating budget line detail item:", error);
     res.status(500).json({ message: "Failed to update detail item" });
   }
@@ -954,7 +956,7 @@ router.delete("/api/budget-line-detail-items/:id", requireAuth, requirePermissio
     await recalcLockedBudget(existing.budgetLineId, companyId);
 
     res.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error deleting budget line detail item:", error);
     res.status(500).json({ message: "Failed to delete detail item" });
   }
@@ -981,7 +983,7 @@ router.patch("/api/budget-lines/:budgetLineId/toggle-lock", requireAuth, require
     }
 
     res.json({ success: true, locked: !!locked });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error toggling budget lock:", error);
     res.status(500).json({ message: "Failed to toggle lock" });
   }

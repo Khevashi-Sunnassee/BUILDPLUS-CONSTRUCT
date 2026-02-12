@@ -585,6 +585,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            aria-label={user.isActive ? "Deactivate user" : "Activate user"}
                             onClick={() => toggleUserMutation.mutate({
                               id: user.id,
                               isActive: !user.isActive
@@ -600,6 +601,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            aria-label="Work hours"
                             onClick={() => openWorkHoursDialog(user)}
                             title="Work Hours"
                             data-testid={`button-work-hours-${user.id}`}
@@ -609,6 +611,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            aria-label="Edit user"
                             onClick={() => openEditUser(user)}
                             data-testid={`button-edit-${user.id}`}
                           >
@@ -617,6 +620,7 @@ export default function AdminUsersPage() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            aria-label="Delete user"
                             onClick={() => {
                               setDeletingUserId(user.id);
                               setDeleteDialogOpen(true);

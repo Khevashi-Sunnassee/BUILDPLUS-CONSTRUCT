@@ -4,6 +4,7 @@ import { db } from "../db";
 import { helpEntries, helpEntryVersions, helpFeedback } from "@shared/schema";
 import { eq, and, or, ilike, sql, desc, asc } from "drizzle-orm";
 import { z } from "zod";
+import logger from "../lib/logger";
 
 const helpFeedbackSchema = z.object({
   helpEntryId: z.string().nullable().optional(),
@@ -46,7 +47,7 @@ router.get("/api/help", requireAuth, async (req: Request, res: Response) => {
     }
     res.json(entry);
   } catch (error: unknown) {
-    console.error("Error fetching help entry:", error);
+    logger.error({ err: error }, "Error fetching help entry");
     res.status(500).json({ error: "Failed to fetch help entry" });
   }
 });
@@ -90,7 +91,7 @@ router.get("/api/help/search", requireAuth, async (req: Request, res: Response) 
 
     res.json(results);
   } catch (error: unknown) {
-    console.error("Error searching help:", error);
+    logger.error({ err: error }, "Error searching help");
     res.status(500).json({ error: "Failed to search help entries" });
   }
 });
@@ -142,7 +143,7 @@ router.post("/api/help/feedback", requireAuth, async (req: Request, res: Respons
       .returning();
     res.json(feedback);
   } catch (error: unknown) {
-    console.error("Error saving help feedback:", error);
+    logger.error({ err: error }, "Error saving help feedback");
     res.status(500).json({ error: "Failed to save feedback" });
   }
 });
@@ -189,11 +190,11 @@ router.post("/api/help/admin", requireAuth, requireRole("ADMIN"), async (req: Re
         rank: rank || 0,
         createdBy: req.session.userId || null,
         updatedBy: req.session.userId || null,
-      } as any)
+      } as Record<string, unknown>)
       .returning();
     res.json(entry);
   } catch (error: unknown) {
-    console.error("Error creating help entry:", error);
+    logger.error({ err: error }, "Error creating help entry");
     res.status(500).json({ error: "Failed to create help entry" });
   }
 });
@@ -210,7 +211,7 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
       helpEntryId: existing.id,
       key: existing.key,
       version: existing.version,
-      snapshot: existing as any,
+      snapshot: existing as Record<string, unknown>,
       createdBy: req.session.userId || null,
     });
 
@@ -236,12 +237,12 @@ router.put("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (req:
         version: existing.version + 1,
         updatedBy: req.session.userId || null,
         updatedAt: new Date(),
-      } as any)
+      } as Record<string, unknown>)
       .where(eq(helpEntries.id, id))
       .returning();
     res.json(updated);
   } catch (error: unknown) {
-    console.error("Error updating help entry:", error);
+    logger.error({ err: error }, "Error updating help entry");
     res.status(500).json({ error: "Failed to update help entry" });
   }
 });
@@ -251,7 +252,7 @@ router.delete("/api/help/admin/:id", requireAuth, requireRole("ADMIN"), async (r
     const id = String(req.params.id);
     const [updated] = await db
       .update(helpEntries)
-      .set({ status: "ARCHIVED", updatedBy: req.session.userId || null, updatedAt: new Date() } as any)
+      .set({ status: "ARCHIVED", updatedBy: req.session.userId || null, updatedAt: new Date() } as Record<string, unknown>)
       .where(eq(helpEntries.id, id))
       .returning();
     if (!updated) {

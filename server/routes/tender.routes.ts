@@ -26,19 +26,19 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   CANCELLED: ["DRAFT"],
 };
 
-async function verifyTenderOwnership(companyId: string, tenderId: string, dbInstance?: any): Promise<boolean> {
+async function verifyTenderOwnership(companyId: string, tenderId: string, dbInstance?: typeof db): Promise<boolean> {
   const q = dbInstance || db;
   const [t] = await q.select({ id: tenders.id }).from(tenders).where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
   return !!t;
 }
 
-async function verifySubmissionOwnership(companyId: string, tenderId: string, submissionId: string, dbInstance?: any): Promise<boolean> {
+async function verifySubmissionOwnership(companyId: string, tenderId: string, submissionId: string, dbInstance?: typeof db): Promise<boolean> {
   const q = dbInstance || db;
   const [s] = await q.select({ id: tenderSubmissions.id }).from(tenderSubmissions).where(and(eq(tenderSubmissions.id, submissionId), eq(tenderSubmissions.tenderId, tenderId), eq(tenderSubmissions.companyId, companyId)));
   return !!s;
 }
 
-async function verifyTenderEditable(companyId: string, tenderId: string, dbInstance?: any): Promise<{ editable: boolean; tender: any | null }> {
+async function verifyTenderEditable(companyId: string, tenderId: string, dbInstance?: typeof db): Promise<{ editable: boolean; tender: Record<string, unknown> | null }> {
   const q = dbInstance || db;
   const [t] = await q.select({ id: tenders.id, status: tenders.status }).from(tenders).where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
   if (!t) return { editable: false, tender: null };
@@ -78,7 +78,7 @@ const lineItemSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
-async function getNextTenderNumber(companyId: string, tx?: any): Promise<string> {
+async function getNextTenderNumber(companyId: string, tx?: typeof db): Promise<string> {
   const queryDb = tx || db;
   const result = await queryDb
     .select({ tenderNumber: tenders.tenderNumber })
@@ -164,7 +164,7 @@ router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), as
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tenders:", error);
     res.status(500).json({ message: "Failed to fetch tenders", code: "INTERNAL_ERROR" });
   }
@@ -218,7 +218,7 @@ router.get("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW")
       createdBy: row.createdBy,
       members: members.map(m => ({ ...m.member, supplier: m.supplier })),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tender:", error);
     res.status(500).json({ message: "Failed to fetch tender", code: "INTERNAL_ERROR" });
   }
@@ -234,7 +234,7 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
 
     const maxRetries = 3;
     let attempt = 0;
-    let result: any = null;
+    let result: Record<string, unknown> | null = null;
 
     while (attempt < maxRetries) {
       attempt++;
@@ -325,8 +325,8 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
           return tender;
         });
         break;
-      } catch (txError: any) {
-        if (txError.code === "23505" && txError.constraint === "tenders_number_company_idx" && attempt < maxRetries) {
+      } catch (txError: unknown) {
+        if ((txError as { code?: string; constraint?: string }).code === "23505" && (txError as { code?: string; constraint?: string }).constraint === "tenders_number_company_idx" && attempt < maxRetries) {
           logger.warn(`Tender number collision on attempt ${attempt}, retrying...`);
           continue;
         }
@@ -335,7 +335,7 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
     }
 
     res.status(201).json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -361,7 +361,7 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
       }
     }
 
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.jobId !== undefined) updateData.jobId = data.jobId;
     if (data.title !== undefined) updateData.title = data.title;
@@ -373,43 +373,52 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
     if (data.bundleId !== undefined) updateData.bundleId = data.bundleId || null;
     if (data.notes !== undefined) updateData.notes = data.notes || null;
 
-    const [result] = await db
-      .update(tenders)
-      .set(updateData)
-      .where(and(eq(tenders.id, req.params.id), eq(tenders.companyId, companyId)))
-      .returning();
+    const memberIds: string[] | undefined = Array.isArray(req.body.memberIds) ? req.body.memberIds : undefined;
+
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(tenders)
+        .set(updateData)
+        .where(and(eq(tenders.id, req.params.id), eq(tenders.companyId, companyId)))
+        .returning();
+
+      if (!updated) {
+        return null;
+      }
+
+      if (memberIds !== undefined) {
+        await tx.delete(tenderMembers).where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
+
+        if (memberIds.length > 0) {
+          const validSuppliers = await tx.select({ id: suppliers.id })
+            .from(suppliers)
+            .where(and(
+              inArray(suppliers.id, memberIds),
+              eq(suppliers.companyId, companyId)
+            ));
+          const validSupplierIds = validSuppliers.map(s => s.id);
+
+          for (const supplierId of validSupplierIds) {
+            await tx.insert(tenderMembers).values({
+              companyId,
+              tenderId: req.params.id,
+              supplierId,
+              status: "PENDING",
+              invitedAt: new Date(),
+            });
+          }
+        }
+      }
+
+      return updated;
+    });
 
     if (!result) {
       return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
 
-    const memberIds: string[] | undefined = Array.isArray(req.body.memberIds) ? req.body.memberIds : undefined;
-    if (memberIds !== undefined) {
-      await db.delete(tenderMembers).where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
-
-      if (memberIds.length > 0) {
-        const validSuppliers = await db.select({ id: suppliers.id })
-          .from(suppliers)
-          .where(and(
-            inArray(suppliers.id, memberIds),
-            eq(suppliers.companyId, companyId)
-          ));
-        const validSupplierIds = validSuppliers.map(s => s.id);
-
-        for (const supplierId of validSupplierIds) {
-          await db.insert(tenderMembers).values({
-            companyId,
-            tenderId: req.params.id,
-            supplierId,
-            status: "PENDING",
-            invitedAt: new Date(),
-          });
-        }
-      }
-    }
-
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -442,7 +451,7 @@ router.delete("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIE
       return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
     res.json({ message: "Tender deleted", id: deleted.id });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error deleting tender:", error);
     res.status(500).json({ message: "Failed to delete tender", code: "INTERNAL_ERROR" });
   }
@@ -483,7 +492,7 @@ router.get("/api/tenders/:tenderId/submissions", requireAuth, requirePermission(
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tender submissions:", error);
     res.status(500).json({ message: "Failed to fetch tender submissions", code: "INTERNAL_ERROR" });
   }
@@ -524,7 +533,7 @@ router.post("/api/tenders/:tenderId/submissions", requireAuth, requirePermission
       .returning();
 
     res.status(201).json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -544,7 +553,7 @@ router.patch("/api/tenders/:tenderId/submissions/:id", requireAuth, requirePermi
 
     const data = submissionSchema.partial().parse(req.body);
 
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.supplierId !== undefined) updateData.supplierId = data.supplierId;
     if (data.coverNote !== undefined) updateData.coverNote = data.coverNote || null;
@@ -564,7 +573,7 @@ router.patch("/api/tenders/:tenderId/submissions/:id", requireAuth, requirePermi
       return res.status(404).json({ message: "Tender submission not found", code: "NOT_FOUND" });
     }
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -598,7 +607,7 @@ router.post("/api/tenders/:tenderId/submissions/:id/approve", requireAuth, requi
       return res.status(404).json({ message: "Tender submission not found", code: "NOT_FOUND" });
     }
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error approving tender submission:", error);
     res.status(500).json({ message: "Failed to approve tender submission", code: "INTERNAL_ERROR" });
   }
@@ -634,7 +643,7 @@ router.get("/api/tenders/:tenderId/submissions/:submissionId/line-items", requir
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tender line items:", error);
     res.status(500).json({ message: "Failed to fetch tender line items", code: "INTERNAL_ERROR" });
   }
@@ -688,7 +697,7 @@ router.post("/api/tenders/:tenderId/submissions/:submissionId/line-items", requi
     });
 
     res.status(201).json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -717,7 +726,7 @@ router.patch("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id", 
 
     const data = lineItemSchema.partial().parse(req.body);
 
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
     if (data.costCodeId !== undefined) updateData.costCodeId = data.costCodeId || null;
     if (data.description !== undefined) updateData.description = data.description;
@@ -751,7 +760,7 @@ router.patch("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id", 
       return res.status(404).json({ message: "Tender line item not found", code: "NOT_FOUND" });
     }
     res.json(result);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -800,7 +809,7 @@ router.delete("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id",
       return res.status(404).json({ message: "Tender line item not found", code: "NOT_FOUND" });
     }
     res.json({ message: "Tender line item deleted", id: result.id });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error deleting tender line item:", error);
     res.status(500).json({ message: "Failed to delete tender line item", code: "INTERNAL_ERROR" });
   }
@@ -864,7 +873,7 @@ router.get("/api/jobs/:jobId/tenders", requireAuth, requirePermission("tenders",
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching job tenders:", error);
     res.status(500).json({ message: "Failed to fetch job tenders", code: "INTERNAL_ERROR" });
   }
@@ -1016,7 +1025,7 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
       submissions: mappedSubmissions,
       documents: mappedPackages,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tender sheet:", error);
     res.status(500).json({ message: "Failed to fetch tender sheet", code: "INTERNAL_ERROR" });
   }
@@ -1128,7 +1137,7 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert
     });
 
     res.json({ message: "Lines updated", totalPrice: finalTotalPrice });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -1202,7 +1211,7 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
     }).returning();
 
     res.json(pkg);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
@@ -1234,7 +1243,7 @@ router.delete("/api/jobs/:jobId/tenders/:tenderId/documents/:packageId", require
       ));
 
     res.json({ message: "Document removed from tender" });
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error removing tender document:", error);
     res.status(500).json({ message: "Failed to remove tender document", code: "INTERNAL_ERROR" });
   }
@@ -1268,7 +1277,7 @@ router.get("/api/tenders/:id/members", requireAuth, requirePermission("tenders",
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tender members:", error);
     res.status(500).json({ message: "Failed to fetch tender members", code: "INTERNAL_ERROR" });
   }
@@ -1310,7 +1319,7 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
     }));
 
     res.json(mapped);
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Error fetching tender packages:", error);
     res.status(500).json({ message: "Failed to fetch tender packages", code: "INTERNAL_ERROR" });
   }
@@ -1463,14 +1472,14 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
 
         sent++;
         results.push({ memberId: row.member.id, supplierName: row.supplier?.name || null, status: "sent" });
-      } catch (emailError: any) {
+      } catch (emailError: unknown) {
         failed++;
-        results.push({ memberId: row.member.id, supplierName: row.supplier?.name || null, status: "failed", error: emailError.message || "Send failed" });
+        results.push({ memberId: row.member.id, supplierName: row.supplier?.name || null, status: "failed", error: emailError instanceof Error ? emailError.message : "Send failed" });
       }
     }
 
     res.json({ sent, failed, results, bundlesIncluded: bundlesWithQr.length });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }

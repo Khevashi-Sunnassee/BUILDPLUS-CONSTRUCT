@@ -278,7 +278,7 @@ router.patch("/api/hire-bookings/:id", requireAuth, async (req: Request, res: Re
 
     const data = parsed.data;
     const rawStatus = req.body.status;
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
     if (rawStatus && ["DRAFT", "REQUESTED", "APPROVED", "BOOKED", "PICKED_UP", "ON_HIRE", "RETURNED", "CANCELLED", "CLOSED"].includes(rawStatus)) {
       updateData.status = rawStatus;
@@ -338,7 +338,7 @@ async function transitionStatus(
   req: Request,
   res: Response,
   targetStatus: string,
-  extraUpdates?: Record<string, any>
+  extraUpdates?: Record<string, unknown>
 ) {
   try {
     const companyId = req.companyId;
@@ -363,7 +363,7 @@ async function transitionStatus(
       });
     }
 
-    const updateData: Record<string, any> = {
+    const updateData: Record<string, unknown> = {
       status: targetStatus,
       updatedAt: new Date(),
       ...extraUpdates,
@@ -448,9 +448,9 @@ router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async
   }
 });
 
-function buildHireBookingHtml(booking: any, supplier: any, job: any, requestedBy: any, companyName: string): string {
-  const fmtDate = (d: any) => d ? format(new Date(d), "dd/MM/yyyy") : "-";
-  const fmtCurrency = (v: any) => v ? `$${parseFloat(v).toFixed(2)}` : "-";
+function buildHireBookingHtml(booking: Record<string, string | number | boolean | null | undefined>, supplier: Record<string, string | number | boolean | null | undefined> | null, job: Record<string, string | number | boolean | null | undefined> | null, requestedBy: Record<string, string | number | boolean | null | undefined> | null, companyName: string): string {
+  const fmtDate = (d: string | Date | null | undefined) => d ? format(new Date(d as string | Date), "dd/MM/yyyy") : "-";
+  const fmtCurrency = (v: string | number | null | undefined) => v ? `$${parseFloat(String(v)).toFixed(2)}` : "-";
   const rateLabels: Record<string, string> = { day: "Per Day", week: "Per Week", month: "Per Month", custom: "Custom" };
   const chargeLabels: Record<string, string> = { calendar_days: "Calendar Days", business_days: "Business Days", minimum_days: "Minimum Days" };
 
@@ -486,10 +486,10 @@ function buildHireBookingHtml(booking: any, supplier: any, job: any, requestedBy
     <div class="section-title">Booking Details</div>
     <table>
       <tr><td>Booking Number</td><td>${booking.bookingNumber}</td></tr>
-      <tr><td>Status</td><td>${booking.status.replace(/_/g, " ")}</td></tr>
+      <tr><td>Status</td><td>${String(booking.status || "").replace(/_/g, " ")}</td></tr>
       <tr><td>Equipment Source</td><td>${booking.hireSource === "external" ? "External (Hire Company)" : "Internal"}</td></tr>
       <tr><td>Equipment Description</td><td>${booking.equipmentDescription}</td></tr>
-      <tr><td>Asset Category</td><td>${ASSET_CATEGORIES[booking.assetCategoryIndex] || "Unknown"}</td></tr>
+      <tr><td>Asset Category</td><td>${ASSET_CATEGORIES[Number(booking.assetCategoryIndex)] || "Unknown"}</td></tr>
       <tr><td>Quantity</td><td>${booking.quantity || 1}</td></tr>
     </table>
   </div>
@@ -520,11 +520,11 @@ function buildHireBookingHtml(booking: any, supplier: any, job: any, requestedBy
   <div class="section">
     <div class="section-title">Hire Period & Rates</div>
     <table>
-      <tr><td>Start Date</td><td>${fmtDate(booking.hireStartDate)}</td></tr>
-      <tr><td>End Date</td><td>${fmtDate(booking.hireEndDate)}</td></tr>
-      ${booking.expectedReturnDate ? `<tr><td>Expected Return</td><td>${fmtDate(booking.expectedReturnDate)}</td></tr>` : ""}
-      <tr><td>Rate</td><td>${fmtCurrency(booking.rateAmount)} ${rateLabels[booking.rateType] || booking.rateType}</td></tr>
-      <tr><td>Charge Rule</td><td>${chargeLabels[booking.chargeRule] || booking.chargeRule}</td></tr>
+      <tr><td>Start Date</td><td>${fmtDate(booking.hireStartDate as string | null)}</td></tr>
+      <tr><td>End Date</td><td>${fmtDate(booking.hireEndDate as string | null)}</td></tr>
+      ${booking.expectedReturnDate ? `<tr><td>Expected Return</td><td>${fmtDate(booking.expectedReturnDate as string | null)}</td></tr>` : ""}
+      <tr><td>Rate</td><td>${fmtCurrency(booking.rateAmount as string | number | null)} ${rateLabels[String(booking.rateType)] || booking.rateType}</td></tr>
+      <tr><td>Charge Rule</td><td>${chargeLabels[String(booking.chargeRule)] || booking.chargeRule}</td></tr>
     </table>
   </div>
 

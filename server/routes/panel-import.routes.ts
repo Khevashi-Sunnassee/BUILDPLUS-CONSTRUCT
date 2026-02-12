@@ -70,9 +70,9 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
     }
     
     const validatedRows: Array<{
-      row: any;
+      row: Record<string, unknown>;
       rowNumber: number;
-      resolvedJob: any;
+      resolvedJob: Record<string, unknown> | null;
       panelType: string;
     }> = [];
     const errors: string[] = [];
@@ -340,8 +340,8 @@ router.post("/api/jobs/:jobId/import-estimate",
       });
       const panelTypesList = panelTypeConfigs.map(pt => `${pt.name} (${pt.code})`).join(", ");
       
-      const results: any[] = [];
-      const panelsToImport: any[] = [];
+      const results: { sheetName: string; takeoffCategory?: string; created: number; duplicates: number; skipped: number; errors: string[] }[] = [];
+      const panelsToImport: Record<string, unknown>[] = [];
       const existingPanelSourceIds = await storage.getExistingPanelSourceIds(String(jobId));
       
       const headerMapping: Record<string, string> = {
@@ -507,7 +507,7 @@ router.post("/api/jobs/:jobId/import-estimate",
         sheetResult.takeoffCategory = category;
         
         const sheet = workbook.getWorksheet(sheetName)!;
-        const data: any[][] = [];
+        const data: unknown[][] = [];
         sheet.eachRow({ includeEmpty: true }, (row, _rowNumber) => {
           const rowValues = row.values as unknown[];
           data.push(rowValues.slice(1));
@@ -521,7 +521,7 @@ router.post("/api/jobs/:jobId/import-estimate",
           const row = data[i];
           if (!row || row.length < 5) continue;
           
-          const normalizedCells = row.map((cell: any) => 
+          const normalizedCells = row.map((cell) => 
             String(cell || "").toLowerCase().replace(/[()#²³]/g, "").trim()
           );
           
@@ -699,7 +699,7 @@ router.post("/api/jobs/:jobId/import-estimate",
           const firstCell = String(row[0] || "").toLowerCase();
           if (["total", "subtotal", "summary"].some(t => firstCell.includes(t))) continue;
           
-          const nonEmptyCells = row.filter((c: any) => c !== null && c !== undefined && c !== "").length;
+          const nonEmptyCells = row.filter((c) => c !== null && c !== undefined && c !== "").length;
           if (!panelMark && nonEmptyCells < 3) continue;
           
           if (!panelMark) {
@@ -707,7 +707,7 @@ router.post("/api/jobs/:jobId/import-estimate",
             continue;
           }
           
-          const rowData: Record<string, any> = {};
+          const rowData: Record<string, unknown> = {};
           Object.entries(colMapping).forEach(([colIdx, field]) => {
             rowData[field] = row[Number(colIdx)];
           });
@@ -940,8 +940,8 @@ router.post("/api/jobs/:jobId/import-estimate",
         for (const panelId of importResult.importedIds) {
           logPanelChange(panelId, "Panel imported from estimate", req.session.userId, { changedFields: { source: "estimate_import" }, newLifecycleStatus: 0 });
         }
-      } catch (err: any) {
-        importErrors.push(err.message);
+      } catch (err: unknown) {
+        importErrors.push(err instanceof Error ? err.message : String(err));
       }
       
       const totals = {

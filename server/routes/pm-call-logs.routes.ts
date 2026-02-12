@@ -414,7 +414,7 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
             const emailResult = await emailService.sendEmail(email, subject, htmlBody);
             notificationResults.push({ channel: "email", to: email, success: emailResult.success, error: emailResult.error, messageId: emailResult.messageId });
             logger.info({ to: email, success: emailResult.success }, "PM call log email notification sent");
-          } catch (err: any) {
+          } catch (err: unknown) {
             notificationResults.push({ channel: "email", to: email, success: false, error: err?.message });
             logger.error({ err, to: email }, "Failed to send PM call log email notification");
           }
@@ -450,7 +450,7 @@ router.post(PM_CALL_LOGS_ROUTES.LIST, requireAuth, async (req: Request, res: Res
             const smsResult = await twilioService.sendSMS(phone, smsBody);
             notificationResults.push({ channel: "sms", to: phone, success: smsResult.success, error: smsResult.error, messageId: smsResult.messageId });
             logger.info({ to: phone, success: smsResult.success }, "PM call log SMS notification sent");
-          } catch (err: any) {
+          } catch (err: unknown) {
             notificationResults.push({ channel: "sms", to: phone, success: false, error: err?.message });
             logger.error({ err, to: phone }, "Failed to send PM call log SMS notification");
           }

@@ -1040,7 +1040,7 @@ router.patch("/api/documents/:id", requireAuth, async (req, res) => {
 router.patch("/api/documents/:id/status", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const { status, approvedBy } = req.body;
-    const updateData: any = { status };
+    const updateData: Record<string, unknown> = { status };
     
     if (status === "APPROVED") {
       updateData.approvedBy = req.session.userId;
@@ -1258,7 +1258,7 @@ function getClientIp(req: Request): string {
 
 // Helper to validate bundle access and log failed attempts
 async function validateBundleAccess(
-  bundle: any, 
+  bundle: { id: string; allowGuestAccess: boolean; expiresAt: string | Date | null } | null | undefined, 
   req: Request, 
   res: Response, 
   accessType: string
@@ -1719,7 +1719,7 @@ router.post("/api/documents/bulk-upload", requireAuth, bulkUpload.array("files",
       }
     }
 
-    const uploaded: any[] = [];
+    const uploaded: Record<string, unknown>[] = [];
     const errors: Array<{ fileName: string; error: string }> = [];
 
     for (const file of files) {

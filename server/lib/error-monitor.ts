@@ -88,4 +88,5 @@ class ErrorMonitor {
   }
 }
 
+export { ErrorMonitor };
 export const errorMonitor = new ErrorMonitor();

@@ -9,7 +9,7 @@ import { emailService } from "../services/email.service";
 
 const router = Router();
 
-async function isAdminOrManager(req: any): Promise<boolean> {
+async function isAdminOrManager(req: Request): Promise<boolean> {
   const userId = req.session?.userId;
   if (!userId) return false;
   const user = await storage.getUser(userId);
@@ -253,7 +253,7 @@ router.post("/api/tasks", requireAuth, requirePermission("tasks", "VIEW_AND_UPDA
     }
     
     const userId = req.session.userId;
-    const taskData = { ...parsed.data } as any;
+    const taskData = { ...parsed.data } as Record<string, unknown>;
     
     // Verify task group belongs to company
     const group = await storage.getTaskGroup(taskData.groupId);
@@ -311,7 +311,7 @@ router.patch("/api/tasks/:id", requireAuth, requirePermission("tasks", "VIEW_AND
     if (!adminManager && req.session.userId && !canAccessTask(existingTask, req.session.userId)) {
       return res.status(403).json({ error: "Access denied" });
     }
-    const updateData = { ...parsed.data } as any;
+    const updateData = { ...parsed.data } as Record<string, unknown>;
     if (updateData.dueDate !== undefined) {
       updateData.dueDate = updateData.dueDate ? new Date(updateData.dueDate) : null;
     }

@@ -24,7 +24,7 @@ router.post("/login", async (req, res) => {
     req.session.companyId = user.companyId;
     req.session.name = user.name ?? undefined;
     res.json({ user: { ...user, passwordHash: undefined } });
-  } catch (error) {
+  } catch (error: unknown) {
     res.status(500).json({ error: "Internal server error" });
   }
 });

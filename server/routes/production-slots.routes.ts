@@ -108,7 +108,7 @@ router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"),
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { newDate, reason, clientConfirmed, cascadeToLater } = result.data as any;
+    const { newDate, reason, clientConfirmed, cascadeToLater } = result.data;
     const changedById = req.session.userId!;
     
     const slot = await storage.adjustProductionSlot(String(req.params.id), {

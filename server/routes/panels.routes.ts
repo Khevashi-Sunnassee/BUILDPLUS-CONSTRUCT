@@ -66,11 +66,11 @@ router.get("/api/panels/ready-for-loading", requireAuth, async (req: Request, re
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const panels = await storage.getPanelsReadyForLoading();
-    let filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+    let filtered = panels.filter((p) => p.job?.companyId === companyId);
 
     const allowedIds = await getAllowedJobIds(req);
     if (allowedIds !== null) {
-      filtered = filtered.filter((p: any) => p.job && allowedIds.has(p.job.id));
+      filtered = filtered.filter((p) => p.job && allowedIds.has(p.job.id));
     }
 
     res.json(filtered);
@@ -96,12 +96,12 @@ router.get("/api/panels/approved-for-production", requireAuth, async (req: Reque
       }
     }
     const panels = await storage.getPanelsApprovedForProduction(jobId as string | undefined);
-    let filtered = panels.filter((p: any) => p.job?.companyId === companyId);
+    let filtered = panels.filter((p) => p.job?.companyId === companyId);
 
     if (!jobId) {
       const allowedIds = await getAllowedJobIds(req);
       if (allowedIds !== null) {
-        filtered = filtered.filter((p: any) => p.job && allowedIds.has(p.job.id));
+        filtered = filtered.filter((p) => p.job && allowedIds.has(p.job.id));
       }
     }
 
@@ -287,10 +287,10 @@ router.put("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, r
   const job = await storage.getJob(existing.jobId);
   if (!job || job.companyId !== companyId) return res.status(404).json({ error: "Panel not found" });
   const panel = await storage.updatePanelRegisterItem(req.params.id as string, validationResult.data);
-  const diff: Record<string, any> = {};
+  const diff: Record<string, unknown> = {};
   for (const key of Object.keys(validationResult.data)) {
-    if ((validationResult.data as any)[key] !== (existing as Record<string, unknown>)[key]) {
-      diff[key] = (validationResult.data as any)[key];
+    if ((validationResult.data as Record<string, unknown>)[key] !== (existing as Record<string, unknown>)[key]) {
+      diff[key] = (validationResult.data as Record<string, unknown>)[key];
     }
   }
   logPanelChange(panel!.id, "Panel updated", req.session.userId, { changedFields: diff });

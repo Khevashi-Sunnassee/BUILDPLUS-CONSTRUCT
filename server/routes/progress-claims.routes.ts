@@ -282,7 +282,7 @@ router.get("/api/progress-claims/retention-report", requireAuth, async (req: Req
       }
     }
 
-    const jobGroups: Record<string, any> = {};
+    const jobGroups: Record<string, { jobId: string; jobNumber: string; jobName: string; contractValue: string; retentionRate: number; retentionCapPct: number; retentionCapAmount: string; totalRetentionHeld: string; remainingRetention?: string; claims: Array<Record<string, unknown>> }> = {};
     for (const claim of allClaims) {
       if (!jobGroups[claim.jobId]) {
         const ci = contractMap[claim.jobId] || { retentionRate: 10, retentionCapPct: 5, contractValue: 0, retentionCapAmount: 0 };
@@ -576,10 +576,10 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
       }).returning();
 
       if (claimItems && claimItems.length > 0) {
-        const validItems = claimItems.filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
+        const validItems = claimItems.filter((item: Record<string, unknown>) => safeParseFinancial(item.percentComplete, 0) > 0);
         if (validItems.length > 0) {
           await tx.insert(progressClaimItems).values(
-            validItems.map((item: any) => {
+            validItems.map((item: Record<string, unknown>) => {
               const revenue = safeParseFinancial(item.panelRevenue, 0);
               const pct = safeParseFinancial(item.percentComplete, 0);
               const lineTotal = (revenue * pct / 100).toFixed(2);
@@ -596,7 +596,7 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
           );
         }
 
-        const subtotal = validItems.reduce((sum: number, item: any) => {
+        const subtotal = validItems.reduce((sum: number, item: Record<string, unknown>) => {
           const revenue = safeParseFinancial(item.panelRevenue, 0);
           const pct = safeParseFinancial(item.percentComplete, 0);
           return sum + (revenue * pct / 100);
@@ -644,8 +644,8 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
     const { items: claimItems, version: clientVersion, ...claimData } = req.body;
 
     if (claimItems !== undefined) {
-      const validItems = (claimItems || []).filter((item: any) => safeParseFinancial(item.percentComplete, 0) > 0);
-      const subtotal = validItems.reduce((sum: number, item: any) => {
+      const validItems = (claimItems || []).filter((item: Record<string, unknown>) => safeParseFinancial(item.percentComplete, 0) > 0);
+      const subtotal = validItems.reduce((sum: number, item: Record<string, unknown>) => {
         const revenue = safeParseFinancial(item.panelRevenue, 0);
         const pct = safeParseFinancial(item.percentComplete, 0);
         return sum + (revenue * pct / 100);
@@ -675,7 +675,7 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
 
         if (validItems.length > 0) {
           await tx.insert(progressClaimItems).values(
-            validItems.map((item: any) => {
+            validItems.map((item: Record<string, unknown>) => {
               const revenue = safeParseFinancial(item.panelRevenue, 0);
               const pct = safeParseFinancial(item.percentComplete, 0);
               const lineTotal = (revenue * pct / 100).toFixed(2);

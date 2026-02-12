@@ -182,7 +182,7 @@ router.put("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
 
     const parsed = updateRepairSchema.parse(req.body);
 
-    const updateData: Record<string, any> = { ...parsed, updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { ...parsed, updatedAt: new Date() };
     if (parsed.vendorId !== undefined) updateData.vendorId = parsed.vendorId || null;
     if (parsed.estimatedCost !== undefined) updateData.estimatedCost = parsed.estimatedCost ? String(parsed.estimatedCost) : null;
     if (parsed.actualCost !== undefined) updateData.actualCost = parsed.actualCost ? String(parsed.actualCost) : null;

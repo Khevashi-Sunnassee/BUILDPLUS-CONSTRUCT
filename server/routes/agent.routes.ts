@@ -77,7 +77,7 @@ router.post("/ingest", async (req, res) => {
     }
 
     res.json({ ok: true, count: createdOrUpdated.length });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Agent ingest error");
     res.status(500).json({ error: "Internal server error" });
   }

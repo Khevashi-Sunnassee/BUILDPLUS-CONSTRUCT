@@ -195,7 +195,7 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
       return res.status(400).json({ error: "Validation failed", details: parseResult.error.errors });
     }
     const validated = parseResult.data;
-    const updateData: Record<string, any> = { ...validated };
+    const updateData: Record<string, unknown> = { ...validated };
     delete updateData.companyId;
     if (updateData.password === "" || updateData.password === undefined) {
       delete updateData.password;
@@ -259,7 +259,7 @@ router.put("/api/admin/users/:id/work-hours", requireRole("ADMIN"), async (req, 
     const validatedData = parseResult.data;
     const user = await storage.updateUser(req.params.id as string, validatedData);
     res.json({ ...user, passwordHash: undefined });
-  } catch (error) {
+  } catch (error: unknown) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: "Invalid work hours data", details: error.errors });
     }

@@ -418,7 +418,7 @@ router.post("/api/manual-entry", requireAuth, async (req, res) => {
     }
 
     res.json({ ok: true, dailyLogId: dailyLog.id, newPanelCreated: createNewPanel && newPanelMark ? true : false });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Manual entry error");
     res.status(500).json({ error: "Failed to create time entry" });
   }

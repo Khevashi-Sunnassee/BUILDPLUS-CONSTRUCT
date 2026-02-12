@@ -246,7 +246,7 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
         const cell = row.getCell(c);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (!val) continue;
         const headerStr = String(val).toLowerCase().trim();
@@ -279,7 +279,7 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
 
     for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
-      const rowData: Record<string, any> = {};
+      const rowData: Record<string, string> = {};
       let hasData = false;
 
       for (const [colStr, key] of Object.entries(columnMap)) {
@@ -287,7 +287,7 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
         const cell = row.getCell(col);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (val !== null && val !== undefined && String(val).trim() !== "") {
           rowData[key] = String(val).trim();
@@ -301,7 +301,7 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
       const key = name.toLowerCase().trim();
 
       try {
-        const updateData: Record<string, any> = {};
+        const updateData: Record<string, unknown> = {};
         if (rowData.keyContact) updateData.keyContact = rowData.keyContact;
         if (rowData.email) updateData.email = rowData.email;
         if (rowData.phone) updateData.phone = rowData.phone;
@@ -325,10 +325,10 @@ router.post("/api/procurement/suppliers/import", requireRole("ADMIN", "MANAGER")
 
         const existing = supplierByName[key];
         if (existing) {
-          const fieldsToUpdate: Record<string, any> = {};
+          const fieldsToUpdate: Record<string, unknown> = {};
           let hasChanges = false;
           for (const [field, value] of Object.entries(updateData)) {
-            const currentVal = (existing as any)[field];
+            const currentVal = (existing as Record<string, unknown>)[field];
             if (!currentVal && value) {
               fieldsToUpdate[field] = value;
               hasChanges = true;
@@ -643,7 +643,7 @@ router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (re
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const item = await storage.createItem({ ...parsed.data, companyId, name: parsed.data.description } as any);
+    const item = await storage.createItem({ ...parsed.data, companyId, name: parsed.data.description });
     res.json(item);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating item");
@@ -694,7 +694,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(req.file.buffer);
     const sheet = workbook.worksheets[0];
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
     const headerRow = sheet.getRow(1);
     const headers: string[] = [];
     headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -702,7 +702,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
     });
     sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
       if (rowNumber === 1) return;
-      const rowObj: any = {};
+      const rowObj: Record<string, unknown> = {};
       row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
         if (headers[colNumber]) {
           rowObj[headers[colNumber]] = cell.value;
@@ -727,7 +727,7 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
     const categoryTypeMap = new Map<string, string>();
 
     for (const row of rows) {
-      const categoryName = row["Category"] || row["category"] || "";
+      const categoryName = String(row["Category"] || row["category"] || "");
       const categoryType = String(row["Category Type"] || row["category_type"] || row["CategoryType"] || "").toLowerCase().trim();
       
       if (categoryName) {
@@ -746,10 +746,10 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
         } else {
           const existingCatId = categoryMap.get(categoryName.toLowerCase())!;
           const existingCat = categories.find(c => c.id === existingCatId);
-          if (existingCat && categoryType && (existingCat as any).categoryType !== resolvedType) {
+          if (existingCat && categoryType && (existingCat as { categoryType?: string }).categoryType !== resolvedType) {
             try {
-              await storage.updateItemCategory(existingCatId, { categoryType: resolvedType } as any);
-            } catch (error) {
+              await storage.updateItemCategory(existingCatId, { categoryType: resolvedType });
+            } catch (error: unknown) {
               logger.error({ err: error }, `Error updating category type for ${categoryName}`);
             }
           }
@@ -764,26 +764,26 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
           companyId,
           isActive: true,
           categoryType: catInfo.categoryType,
-        } as any);
+        });
         categoryMap.set(catInfo.name.toLowerCase(), newCat.id);
-      } catch (error) {
+      } catch (error: unknown) {
         logger.error({ err: error }, `Error creating category ${catInfo.name}`);
       }
     }
 
     for (const row of rows) {
-      const productId = row["Product Id"] || row["product_id"] || row["ProductId"] || "";
-      const description = row["Product Description"] || row["Description"] || row["description"] || row["Name"] || row["name"] || "";
-      const categoryName = row["Category"] || row["category"] || "";
+      const productId = String(row["Product Id"] || row["product_id"] || row["ProductId"] || "");
+      const description = String(row["Product Description"] || row["Description"] || row["description"] || row["Name"] || row["name"] || "");
+      const categoryName = String(row["Category"] || row["category"] || "");
       const categoryType = String(row["Category Type"] || row["category_type"] || row["CategoryType"] || "").toLowerCase().trim();
       const constructionStageName = String(row["Construction Stage"] || row["construction_stage"] || row["ConstructionStage"] || "").trim();
-      const unitPrice = parseFloat(row["Avg Unit Price Aud"] || row["Unit Price"] || row["unit_price"] || "0") || null;
-      const hsCode = row["Hs Code Guess"] || row["HS Code"] || row["hs_code"] || "";
-      const adRisk = row["Ad Risk"] || row["AD Risk"] || row["ad_risk"] || "";
-      const adReferenceUrl = row["Ad Reference Url"] || row["ad_reference_url"] || "";
-      const complianceNotes = row["Compliance Notes"] || row["compliance_notes"] || "";
-      const supplierShortlist = row["Supplier Shortlist"] || row["supplier_shortlist"] || "";
-      const sources = row["Sources"] || row["sources"] || "";
+      const unitPrice = parseFloat(String(row["Avg Unit Price Aud"] || row["Unit Price"] || row["unit_price"] || "0")) || null;
+      const hsCode = String(row["Hs Code Guess"] || row["HS Code"] || row["hs_code"] || "");
+      const adRisk = String(row["Ad Risk"] || row["AD Risk"] || row["ad_risk"] || "");
+      const adReferenceUrl = String(row["Ad Reference Url"] || row["ad_reference_url"] || "");
+      const complianceNotes = String(row["Compliance Notes"] || row["compliance_notes"] || "");
+      const supplierShortlist = String(row["Supplier Shortlist"] || row["supplier_shortlist"] || "");
+      const sources = String(row["Sources"] || row["sources"] || "");
 
       if (!description) continue;
 

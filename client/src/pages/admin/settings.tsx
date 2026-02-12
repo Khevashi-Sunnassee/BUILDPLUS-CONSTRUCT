@@ -779,6 +779,7 @@ export default function AdminSettingsPage() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label="Edit department"
                         onClick={() => openDeptDialog(dept)}
                         data-testid={`button-edit-dept-${dept.id}`}
                       >
@@ -787,6 +788,7 @@ export default function AdminSettingsPage() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label="Delete department"
                         onClick={() => { setDeletingDept(dept); setShowDeleteDeptDialog(true); }}
                         data-testid={`button-delete-dept-${dept.id}`}
                       >

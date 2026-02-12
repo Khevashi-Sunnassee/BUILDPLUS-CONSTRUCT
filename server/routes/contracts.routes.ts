@@ -157,7 +157,7 @@ router.post("/api/contracts", requireAuth, async (req: Request, res: Response) =
       return res.status(409).json({ error: "Contract already exists for this job" });
     }
 
-    const [contract] = await db.insert(contracts).values(data as any).returning();
+    const [contract] = await db.insert(contracts).values(data as Record<string, unknown>).returning();
     res.status(201).json(contract);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating contract");
@@ -193,7 +193,7 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
 
       const [contractResult] = await tx
         .update(contracts)
-        .set(updateData as any)
+        .set(updateData as Record<string, unknown>)
         .where(whereClause!)
         .returning();
 
@@ -213,7 +213,7 @@ router.patch("/api/contracts/:id", requireAuth, async (req: Request, res: Respon
 
     res.json(updated);
   } catch (error: unknown) {
-    if (error instanceof Error && (error as any).statusCode === 409) {
+    if (error instanceof Error && (error as unknown as Record<string, unknown>).statusCode === 409) {
       return res.status(409).json({ error: error.message });
     }
     logger.error({ err: error }, "Error updating contract");

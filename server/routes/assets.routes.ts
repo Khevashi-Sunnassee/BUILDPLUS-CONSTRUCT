@@ -334,7 +334,7 @@ async function aiCategorizeBatch(items: { index: number; name: string; descripti
         for (const [key, val] of Object.entries(parsed)) {
           const idx = parseInt(key);
           const cat = String(val);
-          if (ASSET_CATEGORIES.includes(cat as any)) {
+          if (ASSET_CATEGORIES.includes(cat as typeof ASSET_CATEGORIES[number])) {
             results[idx] = cat;
           }
         }
@@ -350,7 +350,7 @@ async function aiCategorizeBatch(items: { index: number; name: string; descripti
   }
 }
 
-function parseExcelDate(value: any): string | null {
+function parseExcelDate(value: unknown): string | null {
   if (!value) return null;
   if (value instanceof Date) {
     return value.toISOString().split("T")[0];
@@ -374,7 +374,7 @@ function parseExcelDate(value: any): string | null {
   return null;
 }
 
-function parseNumber(value: any): number | null {
+function parseNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number") return value;
   const cleaned = String(value).replace(/[,$\s]/g, "");
@@ -458,7 +458,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         const cell = row.getCell(c);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (!val) continue;
         const headerStr = String(val).toLowerCase().trim();
@@ -483,7 +483,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
         const cell = row1.getCell(c);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (val) allHeaders.push(String(val).trim());
       }
@@ -493,23 +493,23 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
 
     logger.info({ headerRowIndex, columnMap, sheetName: sheet.name }, "Asset import column mapping");
 
-    const imported: any[] = [];
+    const imported: Record<string, unknown>[] = [];
     const errors: string[] = [];
     let rowNum = 0;
 
-    const parsedRows: { rowNum: number; name: string; rowData: Record<string, any>; manualCategory: string | null; rawCategory: string | null }[] = [];
+    const parsedRows: { rowNum: number; name: string; rowData: Record<string, unknown>; manualCategory: string | null; rawCategory: string | null }[] = [];
 
     for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
-      const rowData: Record<string, any> = {};
+      const rowData: Record<string, unknown> = {};
       let hasData = false;
 
       for (const [colStr, key] of Object.entries(columnMap)) {
         const col = parseInt(colStr);
         const cell = row.getCell(col);
         let val = cell.value;
-        if (val && typeof val === "object" && "result" in val) val = (val as any).result;
-        if (val && typeof val === "object" && "richText" in val) val = (val as any).richText.map((t: any) => t.text).join("");
+        if (val && typeof val === "object" && "result" in val) val = (val as unknown as Record<string, unknown>).result as typeof val;
+        if (val && typeof val === "object" && "richText" in val) val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         if (val !== null && val !== undefined && val !== "") {
           hasData = true;
           rowData[key] = val;
@@ -527,7 +527,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
 
       let manualCategory: string | null = null;
       const rawCat = rowData.category ? String(rowData.category).trim() : null;
-      if (rawCat && ASSET_CATEGORIES.includes(rawCat as any)) {
+      if (rawCat && ASSET_CATEGORIES.includes(rawCat as typeof ASSET_CATEGORIES[number])) {
         manualCategory = rawCat;
       } else if (rawCat) {
         const mapped = mapCategoryFromSpreadsheet(rawCat);
@@ -539,7 +539,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
           const mapped = mapCategoryFromSpreadsheet(descVal);
           if (mapped !== "Other") {
             manualCategory = mapped;
-          } else if (ASSET_CATEGORIES.includes(descVal as any)) {
+          } else if (ASSET_CATEGORIES.includes(descVal as typeof ASSET_CATEGORIES[number])) {
             manualCategory = descVal;
           }
         }
@@ -592,7 +592,7 @@ router.post("/api/admin/assets/import", requireRole("ADMIN"), upload.single("fil
 
       try {
         const assetTag = await generateAssetTag(companyId);
-        const insertData: any = {
+        const insertData: Record<string, unknown> = {
           companyId,
           assetTag,
           name,
@@ -1000,7 +1000,7 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
       transferredBy: req.session?.userId || null,
     }).returning();
 
-    const updateFields: any = {};
+    const updateFields: Record<string, unknown> = {};
     if (parsed.data.toLocation) updateFields.location = parsed.data.toLocation;
     if (parsed.data.toDepartment) updateFields.department = parsed.data.toDepartment;
     if (parsed.data.toAssignee) updateFields.assignedTo = parsed.data.toAssignee;

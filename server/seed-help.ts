@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { helpEntries } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import logger from "./lib/logger";
 
 interface HelpSeed {
   key: string;
@@ -2572,7 +2573,7 @@ Split a level into multiple pours when production needs to be staged:
 ];
 
 export async function seedHelpEntries() {
-  console.log("[Help] Checking for existing help entries...");
+  logger.info("[Help] Checking for existing help entries...");
 
   for (const entry of pageHelp) {
     const [existing] = await db
@@ -2608,5 +2609,5 @@ export async function seedHelpEntries() {
   }
 
   const [count] = await db.select({ count: helpEntries.id }).from(helpEntries);
-  console.log(`[Help] Help entries seeded. Total entries in database: checked.`);
+  logger.info("[Help] Help entries seeded. Total entries in database: checked.");
 }

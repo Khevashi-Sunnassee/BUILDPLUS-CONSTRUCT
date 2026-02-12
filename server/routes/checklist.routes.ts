@@ -38,7 +38,7 @@ router.get("/api/checklist/entity-types", requireAuth, async (req: Request, res:
       .orderBy(entityTypes.sortOrder);
 
     res.json(types);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch entity types");
     res.status(500).json({ error: "Failed to fetch entity types" });
   }
@@ -58,7 +58,7 @@ router.post("/api/checklist/entity-types", requireAuth, requireRole("ADMIN"), as
 
     const [created] = await db.insert(entityTypes).values(validation.data).returning();
     res.status(201).json(created);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create entity type");
     res.status(500).json({ error: "Failed to create entity type" });
   }
@@ -88,7 +88,7 @@ router.put("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN"),
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update entity type");
     res.status(500).json({ error: "Failed to update entity type" });
   }
@@ -120,7 +120,7 @@ router.delete("/api/checklist/entity-types/:id", requireAuth, requireRole("ADMIN
       .returning();
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to delete entity type");
     res.status(500).json({ error: "Failed to delete entity type" });
   }
@@ -146,7 +146,7 @@ router.get("/api/checklist/entity-subtypes", requireAuth, async (req: Request, r
       .orderBy(entitySubtypes.sortOrder);
 
     res.json(subtypes);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch entity subtypes");
     res.status(500).json({ error: "Failed to fetch entity subtypes" });
   }
@@ -171,7 +171,7 @@ router.get("/api/checklist/entity-types/:entityTypeId/subtypes", requireAuth, as
       .orderBy(entitySubtypes.sortOrder);
 
     res.json(subtypes);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch entity subtypes by type");
     res.status(500).json({ error: "Failed to fetch entity subtypes" });
   }
@@ -191,7 +191,7 @@ router.post("/api/checklist/entity-subtypes", requireAuth, requireRole("ADMIN"),
 
     const [created] = await db.insert(entitySubtypes).values(validation.data).returning();
     res.status(201).json(created);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create entity subtype");
     res.status(500).json({ error: "Failed to create entity subtype" });
   }
@@ -221,7 +221,7 @@ router.put("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("ADMIN
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update entity subtype");
     res.status(500).json({ error: "Failed to update entity subtype" });
   }
@@ -246,7 +246,7 @@ router.delete("/api/checklist/entity-subtypes/:id", requireAuth, requireRole("AD
     }
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to delete entity subtype");
     res.status(500).json({ error: "Failed to delete entity subtype" });
   }
@@ -272,7 +272,7 @@ router.get("/api/checklist/templates", requireAuth, async (req: Request, res: Re
       .orderBy(desc(checklistTemplates.createdAt));
 
     res.json(templates);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch templates");
     res.status(500).json({ error: "Failed to fetch templates" });
   }
@@ -299,7 +299,7 @@ router.get("/api/checklist/templates/by-type/:entityTypeId/:entitySubtypeId", re
       .orderBy(checklistTemplates.name);
 
     res.json(templates);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch templates by checklist type and subtype");
     res.status(500).json({ error: "Failed to fetch templates" });
   }
@@ -324,7 +324,7 @@ router.get("/api/checklist/templates/by-type/:entityTypeId", requireAuth, async 
       .orderBy(checklistTemplates.name);
 
     res.json(templates);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch templates by checklist type");
     res.status(500).json({ error: "Failed to fetch templates" });
   }
@@ -351,7 +351,7 @@ router.get("/api/checklist/templates/:id", requireAuth, async (req: Request, res
     }
 
     res.json(template);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch template");
     res.status(500).json({ error: "Failed to fetch template" });
   }
@@ -382,7 +382,7 @@ router.post("/api/checklist/templates", requireAuth, requireRole("ADMIN", "MANAG
 
     const [created] = await db.insert(checklistTemplates).values(validation.data).returning();
     res.status(201).json(created);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create template");
     res.status(500).json({ error: "Failed to create template" });
   }
@@ -416,7 +416,7 @@ router.put("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN", "MA
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update template");
     res.status(500).json({ error: "Failed to update template" });
   }
@@ -450,7 +450,7 @@ router.post("/api/checklist/templates/:id/duplicate", requireAuth, requireRole("
       .returning();
 
     res.status(201).json(duplicated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to duplicate template");
     res.status(500).json({ error: "Failed to duplicate template" });
   }
@@ -482,7 +482,7 @@ router.delete("/api/checklist/templates/:id", requireAuth, requireRole("ADMIN"),
       .returning();
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to delete template");
     res.status(500).json({ error: "Failed to delete template" });
   }
@@ -524,7 +524,7 @@ router.get("/api/checklist/instances", requireAuth, async (req: Request, res: Re
       .limit(safeLimit);
 
     res.json(instances);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch instances");
     res.status(500).json({ error: "Failed to fetch instances" });
   }
@@ -551,7 +551,7 @@ router.get("/api/checklist/instances/:id", requireAuth, async (req: Request, res
     }
 
     res.json(instance);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch instance");
     res.status(500).json({ error: "Failed to fetch instance" });
   }
@@ -577,7 +577,7 @@ router.get("/api/checklist/templates/:templateId/instances", requireAuth, async 
       .limit(safeLimit);
 
     res.json(instances);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch instances by template");
     res.status(500).json({ error: "Failed to fetch instances" });
   }
@@ -603,7 +603,7 @@ router.get("/api/checklist/jobs/:jobId/instances", requireAuth, async (req: Requ
       .limit(safeLimit);
 
     res.json(instances);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch instances by job");
     res.status(500).json({ error: "Failed to fetch instances" });
   }
@@ -629,7 +629,7 @@ router.get("/api/checklist/panels/:panelId/instances", requireAuth, async (req: 
       .limit(safeLimit);
 
     res.json(instances);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch instances by panel");
     res.status(500).json({ error: "Failed to fetch instances" });
   }
@@ -682,7 +682,7 @@ router.post("/api/checklist/instances/from-asset", requireAuth, async (req: Requ
       .returning();
 
     res.status(201).json(created);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create service checklist from asset");
     res.status(500).json({ error: "Failed to create service checklist" });
   }
@@ -712,7 +712,7 @@ router.post("/api/checklist/instances", requireAuth, async (req: Request, res: R
       .returning();
 
     res.status(201).json(created);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create instance");
     res.status(500).json({ error: "Failed to create instance" });
   }
@@ -751,7 +751,7 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update instance");
     res.status(500).json({ error: "Failed to update instance" });
   }
@@ -782,7 +782,7 @@ router.patch("/api/checklist/instances/:id/complete", requireAuth, async (req: R
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to complete instance");
     res.status(500).json({ error: "Failed to complete instance" });
   }
@@ -815,7 +815,7 @@ router.patch("/api/checklist/instances/:id/sign-off", requireAuth, requireRole("
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to sign off instance");
     res.status(500).json({ error: "Failed to sign off instance" });
   }
@@ -840,7 +840,7 @@ router.delete("/api/checklist/instances/:id", requireAuth, requireRole("ADMIN"),
     }
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to delete instance");
     res.status(500).json({ error: "Failed to delete instance" });
   }
@@ -879,7 +879,7 @@ router.get("/api/checklist/reports/summary", requireAuth, async (req: Request, r
     };
 
     res.json(summary);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch report summary");
     res.status(500).json({ error: "Failed to fetch report summary" });
   }
@@ -951,7 +951,7 @@ async function processWorkOrderTriggers(
         }
       }
     }
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to process work order triggers");
   }
 }
@@ -977,7 +977,7 @@ router.get("/api/checklist/instances/:instanceId/work-orders", requireAuth, asyn
       .orderBy(desc(checklistWorkOrders.createdAt));
 
     res.json(orders);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch work orders");
     res.status(500).json({ error: "Failed to fetch work orders" });
   }
@@ -996,7 +996,7 @@ router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: 
       .orderBy(desc(checklistWorkOrders.createdAt));
 
     res.json(orders);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to fetch all work orders");
     res.status(500).json({ error: "Failed to fetch work orders" });
   }
@@ -1038,7 +1038,7 @@ router.patch("/api/checklist/work-orders/:id", requireAuth, async (req: Request,
     }
 
     res.json(updated);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Failed to update work order");
     res.status(500).json({ error: "Failed to update work order" });
   }

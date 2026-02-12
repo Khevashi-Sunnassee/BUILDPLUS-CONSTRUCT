@@ -3,6 +3,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import cookieParser from "cookie-parser";
 import { csrfTokenGenerator, csrfProtection } from "../middleware/csrf";
+import logger from "../lib/logger";
 
 import { authRouter } from "./auth.routes";
 import { usersRouter } from "./users.routes";
@@ -87,7 +88,7 @@ export async function setupRoutes(app: Express): Promise<void> {
         tableName: "session",
         pruneSessionInterval: 60 * 15,
         errorLog: (err: Error) => {
-          console.error("Session store error:", err.message);
+          logger.error({ err }, "Session store error");
         },
       }),
       secret: sessionSecret,

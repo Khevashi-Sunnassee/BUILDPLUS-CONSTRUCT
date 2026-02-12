@@ -211,7 +211,7 @@ router.get("/api/reports/logistics", requireAuth, async (req, res) => {
     const byDate = new Map<string, { 
       panelCount: number; 
       loadListCount: number;
-      deliveries: any[];
+      deliveries: (typeof completedLoadLists[number]["deliveryRecord"])[];
     }>();
     
     for (const loadList of completedLoadLists) {

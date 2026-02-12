@@ -326,8 +326,8 @@ router.post("/api/production-schedule/add-panels", requireAuth, requirePermissio
           status: "PENDING",
         });
         created.push(panelId);
-      } catch (err: any) {
-        errors.push(`Failed to add panel ${panelId}: ${err.message}`);
+      } catch (err: unknown) {
+        errors.push(`Failed to add panel ${panelId}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 

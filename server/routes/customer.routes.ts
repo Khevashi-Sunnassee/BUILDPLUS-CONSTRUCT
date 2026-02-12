@@ -205,7 +205,7 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
         const cell = row.getCell(c);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (!val) continue;
         const headerStr = String(val).toLowerCase().trim();
@@ -238,7 +238,7 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
 
     for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
-      const rowData: Record<string, any> = {};
+      const rowData: Record<string, string> = {};
       let hasData = false;
 
       for (const [colStr, key] of Object.entries(columnMap)) {
@@ -246,7 +246,7 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
         const cell = row.getCell(col);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (val !== null && val !== undefined && String(val).trim() !== "") {
           rowData[key] = String(val).trim();
@@ -256,11 +256,11 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
 
       if (!hasData || !rowData.name) continue;
 
-      const name = rowData.name;
+      const name = String(rowData.name);
       const nameKey = name.toLowerCase().trim();
 
       try {
-        const updateData: Record<string, any> = {};
+        const updateData: Record<string, unknown> = {};
         if (rowData.keyContact) updateData.keyContact = rowData.keyContact;
         if (rowData.email) updateData.email = rowData.email;
         if (rowData.phone) updateData.phone = rowData.phone;
@@ -284,10 +284,10 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
 
         const existing = customerByName[nameKey];
         if (existing) {
-          const fieldsToUpdate: Record<string, any> = {};
+          const fieldsToUpdate: Record<string, unknown> = {};
           let hasChanges = false;
           for (const [field, value] of Object.entries(updateData)) {
-            const currentVal = (existing as any)[field];
+            const currentVal = (existing as Record<string, unknown>)[field];
             if (!currentVal && value) {
               fieldsToUpdate[field] = value;
               hasChanges = true;
@@ -305,7 +305,7 @@ router.post("/api/customers/import", requireRole("ADMIN", "MANAGER"), upload.sin
             companyId,
             name,
             ...updateData,
-            isActive: updateData.isActive !== undefined ? updateData.isActive : true,
+            isActive: updateData.isActive !== undefined ? Boolean(updateData.isActive) : true,
           });
           customerByName[nameKey] = newCustomer;
           created.push(name);

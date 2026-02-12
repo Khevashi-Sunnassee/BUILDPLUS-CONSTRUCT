@@ -660,7 +660,7 @@ router.get("/api/jobs/:jobId/activities", requireAuth, async (req, res) => {
 
     const activityIds = activities.map(a => a.id);
 
-    let assignees: any[] = [];
+    let assignees: Record<string, unknown>[] = [];
     let checklistCounts: Array<{ activityId: string; total: number; completed: number }> = [];
     if (activityIds.length > 0) {
       assignees = await db.select().from(jobActivityAssignees)
@@ -774,7 +774,7 @@ router.post("/api/jobs/:jobId/activities/instantiate", requireAuth, requireRole(
       return result;
     }
 
-    const createdActivities: any[] = [];
+    const createdActivities: Record<string, unknown>[] = [];
     const projectStart = ensureWorkingDay(new Date(startDate));
 
     const resolvedDates = new Map<number, { start: Date; end: Date }>();
@@ -979,12 +979,12 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
       .where(and(eq(jobActivities.id, String(req.params.id)), eq(jobActivities.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Activity not found" });
 
-    const updateData: any = { ...parsed.data, updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
 
     if (updateData.predecessorSortOrder !== undefined) {
       if (updateData.predecessorSortOrder === null) {
         updateData.relationship = null;
-      } else if (updateData.predecessorSortOrder >= existing.sortOrder) {
+      } else if (Number(updateData.predecessorSortOrder) >= existing.sortOrder) {
         return res.status(400).json({ error: "Predecessor must have a lower sort order than the current activity" });
       }
     }
@@ -1020,11 +1020,11 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
       updateData.reminderDate = updateData.reminderDate ? new Date(updateData.reminderDate) : null;
     }
 
-    const changedFields: Record<string, { from: any; to: any }> = {};
+    const changedFields: Record<string, { from: unknown; to: unknown }> = {};
     const trackFields = ["status", "startDate", "endDate", "estimatedDays", "predecessorSortOrder", "relationship", "name", "consultantName", "deliverable", "notes", "category", "jobPhase", "reminderDate"];
     for (const field of trackFields) {
       if (updateData[field] !== undefined) {
-        const oldVal = (existing as any)[field];
+        const oldVal = (existing as Record<string, unknown>)[field];
         const newVal = updateData[field];
         const oldStr = oldVal instanceof Date ? oldVal.toISOString() : String(oldVal ?? "");
         const newStr = newVal instanceof Date ? newVal.toISOString() : String(newVal ?? "");
@@ -1438,7 +1438,7 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
     ];
 
     await db.transaction(async (tx) => {
-      const createdStages: any[] = [];
+      const createdStages: { id: string; stageNumber: number; [key: string]: unknown }[] = [];
       for (let i = 0; i < stagesData.length; i++) {
         const [s] = await tx.insert(activityStages).values({
           ...stagesData[i],
@@ -1458,7 +1458,7 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
         createdConsultants[consultantsData[i]] = c.id;
       }
 
-      const createdJobTypes: any[] = [];
+      const createdJobTypes: Record<string, unknown>[] = [];
       for (let i = 0; i < jobTypesData.length; i++) {
         const [jt] = await tx.insert(jobTypes).values({
           ...jobTypesData[i],
@@ -1470,7 +1470,7 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
 
       const stageMap: Record<number, string> = {};
       for (const s of createdStages) {
-        stageMap[s.stageNumber] = s.id;
+        stageMap[Number(s.stageNumber)] = s.id;
       }
 
       const activitiesData = [
@@ -1523,7 +1523,7 @@ router.post("/api/activity-seed", requireAuth, requireRole("ADMIN"), async (req,
         { stage: 10, phase: "CONTRACTED", cat: "Stabilisation", name: "Achieve target occupancy and stable operations", days: 14, consultant: "Asset Manager", deliverable: "Stabilised asset" },
       ];
 
-      const devJobType = createdJobTypes.find((jt: any) => jt.name === "Development to Construction");
+      const devJobType = createdJobTypes.find((jt) => jt.name === "Development to Construction");
       if (devJobType) {
         for (let i = 0; i < activitiesData.length; i++) {
           const a = activitiesData[i];
@@ -1681,19 +1681,19 @@ router.post("/api/job-types/:jobTypeId/templates/import", requireAuth, requireRo
       if (val === null || val === undefined) return "";
       if (typeof val === "string") return val.trim();
       if (typeof val === "number" || typeof val === "boolean") return String(val);
-      if (typeof val === "object" && "richText" in (val as any)) {
-        return ((val as any).richText || []).map((r: any) => r.text || "").join("").trim();
+      if (typeof val === "object" && val !== null && "richText" in val) {
+        return ((val as {richText: {text: string}[]}).richText || []).map((r) => r.text || "").join("").trim();
       }
-      if (typeof val === "object" && "text" in (val as any)) {
-        return String((val as any).text || "").trim();
+      if (typeof val === "object" && val !== null && "text" in val) {
+        return String((val as Record<string, unknown>).text || "").trim();
       }
-      if (typeof val === "object" && "result" in (val as any)) {
-        return String((val as any).result || "").trim();
+      if (typeof val === "object" && val !== null && "result" in val) {
+        return String((val as Record<string, unknown>).result || "").trim();
       }
       return String(val).trim();
     }
 
-    const rows: any[] = [];
+    const rows: Record<string, unknown>[] = [];
     const errors: string[] = [];
 
     sheet.eachRow((row, rowNumber) => {
@@ -1856,7 +1856,7 @@ router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermiss
       await db.update(jobActivities).set({ taskGroupId: groupId }).where(eq(jobActivities.id, activityId));
     }
 
-    const taskData: any = {
+    const taskData: Record<string, unknown> = {
       groupId,
       jobActivityId: activityId,
       jobId: activity.jobId,

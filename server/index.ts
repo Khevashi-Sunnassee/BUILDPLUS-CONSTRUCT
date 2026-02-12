@@ -14,6 +14,10 @@ import { runMigrations } from "./migrate";
 import logger from "./lib/logger";
 import { errorMonitor } from "./lib/error-monitor";
 import { pool } from "./db";
+import { getAllCacheStats } from "./lib/cache";
+import { getAllCircuitStats } from "./lib/circuit-breaker";
+import { getAllQueueStats } from "./lib/job-queue";
+import { requestMetrics, getEventLoopLag } from "./lib/metrics";
 
 const app = express();
 
@@ -128,7 +132,7 @@ app.use(express.urlencoded({ extended: false, limit: "10mb" }));
 // Request-ID middleware for tracing
 app.use((req, res, next) => {
   const requestId = crypto.randomUUID();
-  (req as any).requestId = requestId;
+  (req as unknown as Record<string, unknown>).requestId = requestId;
   res.setHeader("X-Request-Id", requestId);
   next();
 });
@@ -165,7 +169,7 @@ export function log(message: string, source = "express") {
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
-  let capturedJsonResponse: Record<string, any> | undefined = undefined;
+  let capturedJsonResponse: Record<string, unknown> | undefined = undefined;
 
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
@@ -183,6 +187,8 @@ app.use((req, res, next) => {
       }
 
       log(logLine);
+
+      requestMetrics.record(req.method, path, duration, res.statusCode);
     }
   });
 
@@ -205,14 +211,14 @@ app.use((req, res, next) => {
 });
 
 app.get("/api/admin/error-summary", (req, res) => {
-  if (!req.session?.userId || (req.session as any).role !== "ADMIN") {
+  if (!req.session?.userId || (req.session as unknown as Record<string, unknown>).role !== "ADMIN") {
     return res.status(403).json({ error: "Admin access required" });
   }
   res.json(errorMonitor.getSummary());
 });
 
 app.get("/api/health", (req, res) => {
-  const isAdmin = (req as any).session?.role === "ADMIN";
+  const isAdmin = (req.session as unknown as Record<string, unknown>)?.role === "ADMIN";
 
   pool.query("SELECT 1")
     .then(() => {
@@ -228,6 +234,17 @@ app.get("/api/health", (req, res) => {
           idleCount: pool.idleCount,
           waitingCount: pool.waitingCount,
         };
+        response.cache = getAllCacheStats();
+        response.circuitBreakers = getAllCircuitStats();
+        response.queues = getAllQueueStats();
+        response.system = {
+          nodeVersion: process.version,
+          processUptime: Math.round(process.uptime()),
+          eventLoopLagMs: getEventLoopLag(),
+          platform: process.platform,
+          arch: process.arch,
+          pid: process.pid,
+        };
       }
       res.json(response);
     })
@@ -239,6 +256,13 @@ app.get("/api/health", (req, res) => {
         timestamp: new Date().toISOString(),
       });
     });
+});
+
+app.get("/api/admin/metrics", (req, res) => {
+  if (!req.session?.userId || (req.session as unknown as Record<string, unknown>).role !== "ADMIN") {
+    return res.status(403).json({ error: "Admin access required" });
+  }
+  res.json(requestMetrics.getSummary());
 });
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -328,7 +352,7 @@ async function waitForDatabase(maxRetries = 5, delayMs = 3000): Promise<boolean>
 
   await registerRoutes(httpServer, app);
 
-  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+  app.use((err: Error & { status?: number; statusCode?: number }, req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 

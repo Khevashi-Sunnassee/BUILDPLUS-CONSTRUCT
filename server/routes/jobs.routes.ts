@@ -25,12 +25,12 @@ async function resolveUserName(req: Request): Promise<string | null> {
   return null;
 }
 
-function serializeJobPhase(job: any): any {
+function serializeJobPhase(job: Record<string, unknown>): Record<string, unknown> {
   if (!job) return job;
   return { ...job, jobPhase: intToPhase(job.jobPhase ?? 0) };
 }
 
-function serializeJobsPhase(jobsList: any[]): any[] {
+function serializeJobsPhase(jobsList: Record<string, unknown>[]): Record<string, unknown>[] {
   return jobsList.map(serializeJobPhase);
 }
 
@@ -167,7 +167,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       return res.status(400).json({ error: `Status "${status}" is not valid for stage "${stage}"` });
     }
 
-    const data: any = {
+    const data: Record<string, unknown> = {
       companyId: req.companyId,
       jobNumber: nextNum,
       name: parsed.data.name,
@@ -259,7 +259,7 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
     }
 
     const { statusNote, ...rest } = parsed.data;
-    const updateData: any = { ...rest };
+    const updateData: Record<string, unknown> = { ...rest };
     if (updateData.estimatedStartDate) {
       updateData.estimatedStartDate = new Date(updateData.estimatedStartDate);
     }
@@ -337,7 +337,7 @@ router.post("/api/customers/quick", requireAuth, async (req: Request, res: Respo
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const customer = await storage.createCustomer({ ...parsed.data, companyId: req.companyId } as any);
+    const customer = await storage.createCustomer({ ...parsed.data, companyId: req.companyId } as Record<string, unknown>);
     res.json(customer);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating quick customer");
@@ -382,11 +382,11 @@ router.get("/api/jobs", requireAuth, async (req: Request, res: Response) => {
 
     const allowedIds = await getAllowedJobIds(req);
     if (allowedIds !== null) {
-      serialized = serialized.filter((job: any) => allowedIds.has(job.id));
+      serialized = serialized.filter((job) => allowedIds.has(job.id));
     }
 
     if (req.query.status === "ACTIVE") {
-      res.json(serialized.filter((j: any) => j.status === "ACTIVE"));
+      res.json(serialized.filter((j) => j.status === "ACTIVE"));
     } else {
       res.json(serialized);
     }
@@ -533,7 +533,7 @@ router.get("/api/admin/jobs", requireAuth, async (req: Request, res: Response) =
       .where(eq(jobMembers.userId, user.id));
     const allowedJobIds = new Set(memberships.map(m => m.jobId));
     
-    res.json(serialized.filter((job: any) => allowedJobIds.has(job.id)));
+    res.json(serialized.filter((job) => allowedJobIds.has(job.id)));
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching jobs");
     res.status(500).json({ error: "Failed to fetch jobs" });
@@ -621,7 +621,7 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     if (existing && existing.companyId === req.companyId) {
       return res.status(400).json({ error: "Job with this number already exists" });
     }
-    const data = { ...parsed.data, companyId: req.companyId } as any;
+    const data = { ...parsed.data, companyId: req.companyId } as Record<string, unknown>;
     if (typeof data.productionStartDate === 'string' && data.productionStartDate.trim() !== '') {
       data.productionStartDate = new Date(data.productionStartDate);
     } else if (!data.productionStartDate || data.productionStartDate === '') {
@@ -636,18 +636,18 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     }
     const globalSettings = await storage.getGlobalSettings();
     if (data.procurementDaysInAdvance !== undefined && data.procurementDaysInAdvance !== null) {
-      const val = parseInt(data.procurementDaysInAdvance, 10);
+      const val = parseInt(String(data.procurementDaysInAdvance), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "procurementDaysInAdvance must be a positive number" });
       }
-      const ifcDays = data.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14;
+      const ifcDays = Number(data.daysInAdvance ?? globalSettings?.ifcDaysInAdvance ?? 14);
       if (val >= ifcDays) {
         return res.status(400).json({ error: `procurementDaysInAdvance must be less than IFC days in advance (${ifcDays})` });
       }
       data.procurementDaysInAdvance = val;
     }
     if (data.procurementTimeDays !== undefined && data.procurementTimeDays !== null) {
-      const val = parseInt(data.procurementTimeDays, 10);
+      const val = parseInt(String(data.procurementTimeDays), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "procurementTimeDays must be a positive number" });
       }
@@ -667,7 +667,7 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     const userName = await resolveUserName(req);
     logJobChange(job.id, "JOB_CREATED", req.session?.userId || null, userName, {
       newPhase: jobPhaseStr,
-      newStatus: data.status,
+      newStatus: data.status as string | undefined,
     });
 
     res.json(serializeJobPhase(job));
@@ -693,21 +693,21 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       }
     }
     if (data.daysToAchieveIfc !== undefined && data.daysToAchieveIfc !== null) {
-      const val = parseInt(data.daysToAchieveIfc, 10);
+      const val = parseInt(String(data.daysToAchieveIfc), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "daysToAchieveIfc must be a positive number" });
       }
       data.daysToAchieveIfc = val;
     }
     if (data.productionWindowDays !== undefined && data.productionWindowDays !== null) {
-      const val = parseInt(data.productionWindowDays, 10);
+      const val = parseInt(String(data.productionWindowDays), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "productionWindowDays must be a positive number" });
       }
       data.productionWindowDays = val;
     }
     if (data.productionDaysInAdvance !== undefined && data.productionDaysInAdvance !== null) {
-      const val = parseInt(data.productionDaysInAdvance, 10);
+      const val = parseInt(String(data.productionDaysInAdvance), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "productionDaysInAdvance must be a positive number" });
       }
@@ -716,7 +716,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
     const globalSettings = await storage.getGlobalSettings();
     
     if (data.daysInAdvance !== undefined && data.daysInAdvance !== null) {
-      const newIfcDays = parseInt(data.daysInAdvance, 10);
+      const newIfcDays = parseInt(String(data.daysInAdvance), 10);
       const effectiveProcurementDays = data.procurementDaysInAdvance ?? existingJob?.procurementDaysInAdvance ?? globalSettings?.procurementDaysInAdvance ?? 7;
       if (!isNaN(newIfcDays) && newIfcDays <= effectiveProcurementDays) {
         return res.status(400).json({ error: `daysInAdvance must be greater than procurementDaysInAdvance (${effectiveProcurementDays})` });
@@ -724,7 +724,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
     }
     
     if (data.procurementDaysInAdvance !== undefined && data.procurementDaysInAdvance !== null) {
-      const val = parseInt(data.procurementDaysInAdvance, 10);
+      const val = parseInt(String(data.procurementDaysInAdvance), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "procurementDaysInAdvance must be a positive number" });
       }
@@ -735,7 +735,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       data.procurementDaysInAdvance = val;
     }
     if (data.procurementTimeDays !== undefined && data.procurementTimeDays !== null) {
-      const val = parseInt(data.procurementTimeDays, 10);
+      const val = parseInt(String(data.procurementTimeDays), 10);
       if (isNaN(val) || val < 1) {
         return res.status(400).json({ error: "procurementTimeDays must be a positive number" });
       }
@@ -761,7 +761,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       data.jobPhase = deserializePhase(data.jobPhase);
     }
 
-    const changedFields: Record<string, any> = {};
+    const changedFields: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(data)) {
       if ((existingJob as Record<string, unknown>)[key] !== val) {
         changedFields[key] = { from: (existingJob as Record<string, unknown>)[key], to: val };
@@ -1029,7 +1029,7 @@ router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MAN
       return res.status(400).json({ error: "Invalid update data", details: parseResult.error.format() });
     }
 
-    const updateData: Record<string, any> = { updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (parseResult.data.cycleDays !== undefined) updateData.cycleDays = parseResult.data.cycleDays;
     if (parseResult.data.predecessorSequenceOrder !== undefined) {
       updateData.predecessorSequenceOrder = parseResult.data.predecessorSequenceOrder;
@@ -1061,11 +1061,11 @@ router.patch("/api/admin/jobs/:id/programme/:entryId", requireRole("ADMIN", "MAN
     }
 
     if (existing) {
-      const changedFields: Record<string, { from: any; to: any }> = {};
+      const changedFields: Record<string, { from: unknown; to: unknown }> = {};
       const trackKeys = ["cycleDays", "predecessorSequenceOrder", "relationship", "manualStartDate", "manualEndDate", "notes"];
       for (const key of trackKeys) {
         if (updateData[key] !== undefined) {
-          const oldVal = (existing as any)[key];
+          const oldVal = (existing as Record<string, unknown>)[key];
           const newVal = updateData[key];
           const oldStr = oldVal instanceof Date ? oldVal.toISOString() : String(oldVal ?? "");
           const newStr = newVal instanceof Date ? newVal.toISOString() : String(newVal ?? "");
@@ -1424,7 +1424,7 @@ router.put("/api/admin/jobs/:id/phase-status", requireAuth, async (req: Request,
         });
       }
 
-      const updateData: any = { jobPhase: deserializePhase(targetPhase), updatedAt: new Date() };
+      const updateData: Record<string, unknown> = { jobPhase: deserializePhase(targetPhase), updatedAt: new Date() };
       if (targetStatus) {
         updateData.status = targetStatus;
       }

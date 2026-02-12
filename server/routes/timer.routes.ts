@@ -50,7 +50,7 @@ async function recordTimerEvent(
       elapsedMsAtEvent,
       notes: notes || null,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, `Failed to record timer event: ${eventType}`);
   }
 }
@@ -93,7 +93,7 @@ router.get("/api/timer-sessions", requireAuth, async (req, res) => {
       .limit(50);
 
     res.json(sessions);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching timer sessions");
     res.status(500).json({ error: "Failed to fetch timer sessions" });
   }
@@ -176,7 +176,7 @@ router.get("/api/timer-sessions/active", requireAuth, async (req, res) => {
     }
 
     res.json(activeSession);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active timer session");
     res.status(500).json({ error: "Failed to fetch active timer session" });
   }
@@ -190,7 +190,7 @@ router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { jobId, panelRegisterId, workTypeId, app, dailyLogId } = result.data as any;
+    const { jobId, panelRegisterId, workTypeId, app, dailyLogId } = result.data;
 
     // Check if there's already an active or paused session
     const [existingSession] = await db
@@ -241,7 +241,7 @@ router.post("/api/timer-sessions/start", requireAuth, async (req, res) => {
 
     logger.info(`Timer session started: ${newSession.id} for user: ${userId}`);
     res.json(newSession);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error starting timer session");
     res.status(500).json({ error: "Failed to start timer session" });
   }
@@ -298,7 +298,7 @@ router.post("/api/timer-sessions/:id/pause", requireAuth, async (req, res) => {
 
     logger.info(`Timer session paused: ${sessionId}, totalElapsedMs: ${newTotalElapsed}`);
     res.json(updatedSession);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error pausing timer session");
     res.status(500).json({ error: "Failed to pause timer session" });
   }
@@ -352,7 +352,7 @@ router.post("/api/timer-sessions/:id/resume", requireAuth, async (req, res) => {
 
     logger.info(`Timer session resumed: ${sessionId}`);
     res.json(updatedSession);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error resuming timer session");
     res.status(500).json({ error: "Failed to resume timer session" });
   }
@@ -367,7 +367,7 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = result.data as any;
+    const { jobId, panelRegisterId, workTypeId, app, notes, panelMark, drawingCode } = result.data;
 
     const [session] = await db
       .select()
@@ -503,7 +503,7 @@ router.post("/api/timer-sessions/:id/stop", requireAuth, async (req, res) => {
     logger.info(`Timer session stopped: ${sessionId}, logRowId: ${logRow.id}, durationMinutes: ${durationMinutes}`);
 
     res.json({ session: updatedSession, logRow });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error stopping timer session");
     res.status(500).json({ error: "Failed to stop timer session" });
   }
@@ -563,7 +563,7 @@ router.post("/api/timer-sessions/cancel-stale", requireAuth, async (req, res) =>
     }
 
     res.json({ cancelledCount });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error cancelling stale timer sessions");
     res.status(500).json({ error: "Failed to cancel stale timer sessions" });
   }
@@ -620,7 +620,7 @@ router.post("/api/timer-sessions/:id/cancel", requireAuth, async (req, res) => {
 
     logger.info(`Timer session cancelled: ${sessionId}`);
     res.json(updatedSession);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error cancelling timer session");
     res.status(500).json({ error: "Failed to cancel timer session" });
   }
@@ -635,7 +635,7 @@ router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { jobId, panelRegisterId, workTypeId, app, notes } = result.data as any;
+    const { jobId, panelRegisterId, workTypeId, app, notes } = result.data;
 
     const [session] = await db
       .select()
@@ -664,7 +664,7 @@ router.patch("/api/timer-sessions/:id", requireAuth, async (req, res) => {
       .returning();
 
     res.json(updatedSession);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error updating timer session");
     res.status(500).json({ error: "Failed to update timer session" });
   }
@@ -711,7 +711,7 @@ router.get("/api/timer-sessions/panel/:panelId", requireAuth, async (req, res) =
       sessionCount: sessions.length,
       sessions,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching panel timer history");
     res.status(500).json({ error: "Failed to fetch panel timer history" });
   }

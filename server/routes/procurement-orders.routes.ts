@@ -61,7 +61,7 @@ router.get("/api/purchase-orders", requireAuth, requirePermission("purchase_orde
     const level = req.permissionLevel;
     if (level === "VIEW_OWN" || level === "VIEW_AND_UPDATE_OWN") {
       const userId = req.session.userId;
-      orders = orders.filter((o: any) => o.requestedById === userId);
+      orders = orders.filter((o) => o.requestedById === userId);
     }
     res.json(orders);
   } catch (error: unknown) {
@@ -87,7 +87,7 @@ router.get("/api/purchase-orders/by-capex/:capexId", requireAuth, requirePermiss
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
     const allOrders = await storage.getAllPurchaseOrders(companyId);
-    const capexOrders = allOrders.filter((o: any) => o.capexRequestId === req.params.capexId);
+    const capexOrders = allOrders.filter((o) => o.capexRequestId === req.params.capexId);
     res.json(capexOrders);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching purchase orders by CAPEX");
@@ -132,13 +132,13 @@ router.post("/api/purchase-orders", requireAuth, async (req, res) => {
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { items: lineItems, ...poData } = result.data as any;
+    const { items: lineItems, ...poData } = result.data;
     const poNumber = await storage.getNextPONumber(companyId);
     if (poData.supplierId === "") {
-      poData.supplierId = null;
+      (poData as Record<string, unknown>).supplierId = null;
     }
     if (poData.requiredByDate && typeof poData.requiredByDate === "string") {
-      poData.requiredByDate = new Date(poData.requiredByDate);
+      (poData as Record<string, unknown>).requiredByDate = new Date(poData.requiredByDate);
     }
     const order = await storage.createPurchaseOrder(
       { ...poData, poNumber, companyId, requestedById: userId },
@@ -188,14 +188,15 @@ router.patch("/api/purchase-orders/:id", requireAuth, requirePermission("purchas
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { items: lineItems, ...poData } = result.data as any;
-    if (poData.requiredByDate && typeof poData.requiredByDate === "string") {
-      poData.requiredByDate = new Date(poData.requiredByDate);
+    const { items: lineItems, ...poData } = result.data;
+    const mutablePoData = poData as Record<string, unknown>;
+    if (mutablePoData.requiredByDate && typeof mutablePoData.requiredByDate === "string") {
+      mutablePoData.requiredByDate = new Date(mutablePoData.requiredByDate);
     }
-    if (poData.supplierId === "") {
-      poData.supplierId = null;
+    if (mutablePoData.supplierId === "") {
+      mutablePoData.supplierId = null;
     }
-    const updated = await storage.updatePurchaseOrder(String(req.params.id), poData, lineItems);
+    const updated = await storage.updatePurchaseOrder(String(req.params.id), mutablePoData, lineItems);
     res.json(updated);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating purchase order");
@@ -354,29 +355,31 @@ router.post("/api/purchase-orders/:id/receive", requireAuth, async (req, res) =>
       }
     }
 
-    for (const item of allItems) {
-      const shouldBeReceived = receivedItemIds.includes(item.id);
-      if (item.received !== shouldBeReceived) {
-        await db.update(purchaseOrderItems)
-          .set({ received: shouldBeReceived, updatedAt: new Date() })
-          .where(eq(purchaseOrderItems.id, item.id));
+    await db.transaction(async (tx) => {
+      for (const item of allItems) {
+        const shouldBeReceived = receivedItemIds.includes(item.id);
+        if (item.received !== shouldBeReceived) {
+          await tx.update(purchaseOrderItems)
+            .set({ received: shouldBeReceived, updatedAt: new Date() })
+            .where(eq(purchaseOrderItems.id, item.id));
+        }
       }
-    }
 
-    const receivedCount = receivedItemIds.length;
-    const totalCount = allItems.length;
-    let newStatus: string;
-    if (receivedCount === 0) {
-      newStatus = "APPROVED";
-    } else if (receivedCount >= totalCount) {
-      newStatus = "RECEIVED";
-    } else {
-      newStatus = "RECEIVED_IN_PART";
-    }
+      const receivedCount = receivedItemIds.length;
+      const totalCount = allItems.length;
+      let newStatus: string;
+      if (receivedCount === 0) {
+        newStatus = "APPROVED";
+      } else if (receivedCount >= totalCount) {
+        newStatus = "RECEIVED";
+      } else {
+        newStatus = "RECEIVED_IN_PART";
+      }
 
-    await db.update(purchaseOrders)
-      .set({ status: newStatus as typeof purchaseOrders.status.enumValues[number], updatedAt: new Date() })
-      .where(eq(purchaseOrders.id, String(req.params.id)));
+      await tx.update(purchaseOrders)
+        .set({ status: newStatus as typeof purchaseOrders.status.enumValues[number], updatedAt: new Date() })
+        .where(eq(purchaseOrders.id, String(req.params.id)));
+    });
 
     const updated = await storage.getPurchaseOrder(String(req.params.id));
     res.json(updated);

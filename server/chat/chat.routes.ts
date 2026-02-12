@@ -200,8 +200,8 @@ chatRouter.get("/conversations", requireAuth, requireChatPermission, async (req,
     });
 
     res.json(results);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -249,7 +249,7 @@ chatRouter.get("/messages", requireAuth, requireChatPermission, async (req, res)
       : [];
     const mentionUserMap = new Map(mentionUsers.map(u => [u.id, u]));
 
-    const mentionsByMsg = new Map<string, any[]>();
+    const mentionsByMsg = new Map<string, Record<string, unknown>[]>();
     for (const m of allMentions) {
       const list = mentionsByMsg.get(m.messageId) || [];
       list.push({ ...m, user: mentionUserMap.get(m.mentionedUserId) || null });
@@ -264,8 +264,8 @@ chatRouter.get("/messages", requireAuth, requireChatPermission, async (req, res)
     }));
 
     res.json({ items: messagesWithSender.reverse(), nextCursor: null });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -313,7 +313,7 @@ chatRouter.get("/conversations/:conversationId/messages", requireAuth, requireCh
       : [];
     const mentionUserMap = new Map(mentionUsers.map(u => [u.id, u]));
 
-    const mentionsByMsg = new Map<string, any[]>();
+    const mentionsByMsg = new Map<string, Record<string, unknown>[]>();
     for (const m of allMentions) {
       const list = mentionsByMsg.get(m.messageId) || [];
       list.push({ ...m, user: mentionUserMap.get(m.mentionedUserId) || null });
@@ -328,8 +328,8 @@ chatRouter.get("/conversations/:conversationId/messages", requireAuth, requireCh
     }));
 
     res.json(messagesWithSender.reverse());
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -428,7 +428,7 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
       .from(users).where(eq(users.id, userId)).limit(1);
     const attachments = await db.select().from(chatMessageAttachments).where(eq(chatMessageAttachments.messageId, messageId));
     const mentions = await db.select().from(chatMessageMentions).where(eq(chatMessageMentions.messageId, messageId));
-    let mentionsWithUsers: any[] = [];
+    let mentionsWithUsers: Record<string, unknown>[] = [];
     if (mentions.length > 0) {
       const mentionUserIds = [...new Set(mentions.map(m => m.mentionedUserId))];
       const mentionUsersList = await db.select({ id: users.id, name: users.name, email: users.email })
@@ -438,8 +438,8 @@ chatRouter.post("/conversations/:conversationId/messages", requireAuth, requireC
     }
 
     res.json({ ...msgRows[0], sender: senderRows[0] || null, attachments, mentions: mentionsWithUsers });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -483,9 +483,9 @@ chatRouter.post("/upload", requireAuth, requireChatPermission, chatUpload.single
       sizeBytes: req.file.size,
       documentId: registeredDoc.id,
     });
-  } catch (e: any) {
+  } catch (e: unknown) {
     logger.error({ err: e }, "Failed to upload chat file");
-    res.status(400).json({ error: e.message || String(e) });
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -512,8 +512,8 @@ chatRouter.get("/mentions", requireAuth, requireChatPermission, async (req, res)
       .slice(0, 10);
 
     res.json(filtered);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -522,8 +522,8 @@ chatRouter.get("/settings", requireAuth, requireChatPermission, async (req, res)
     const userId = req.session.userId!;
     const rows = await db.select().from(userChatSettings).where(eq(userChatSettings.userId, userId)).limit(1);
     res.json(rows[0] || { userId, popupEnabled: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -548,8 +548,8 @@ chatRouter.post("/settings/popup", requireAuth, requireChatPermission, async (re
     }
 
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -596,8 +596,8 @@ chatRouter.post("/conversations", requireAuth, requireChatPermission, async (req
 
     const conv = await db.select().from(conversations).where(eq(conversations.id, convId)).limit(1);
     res.json(conv[0]);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -696,8 +696,8 @@ chatRouter.get("/panels/:panelId/conversation", requireAuth, requireChatPermissi
     const membersWithUsers = members.map(m => ({ ...m, user: memberUserMap2.get(m.userId) || null }));
     
     res.json({ ...conv[0], members: membersWithUsers });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -747,8 +747,8 @@ chatRouter.post("/panels/counts", requireAuth, requireChatPermission, async (req
     }
 
     res.json(result);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -773,8 +773,8 @@ chatRouter.delete("/conversations/:conversationId", requireAuth, requireChatPerm
 
     await db.delete(conversations).where(eq(conversations.id, conversationId));
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -808,8 +808,8 @@ chatRouter.delete("/conversations/:conversationId/messages/:messageId", requireA
 
     await db.delete(chatMessages).where(eq(chatMessages.id, messageId));
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -873,8 +873,8 @@ chatRouter.patch("/conversations/:conversationId/messages/:messageId", requireAu
       sender: senderRows[0] || null, 
       attachments 
     });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -965,8 +965,8 @@ chatRouter.post("/messages", requireAuth, requireChatPermission, async (req, res
       .from(users).where(eq(users.id, userId)).limit(1);
 
     res.json({ ...message[0], sender: senderRows[0], attachments });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -978,8 +978,8 @@ chatRouter.get("/users", requireAuth, requireChatPermission, async (_req, res) =
       email: users.email,
     }).from(users).where(eq(users.isActive, true));
     res.json(allUsers);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -991,8 +991,8 @@ chatRouter.get("/jobs", requireAuth, requireChatPermission, async (_req, res) =>
       name: jobs.name,
     }).from(jobs).where(eq(jobs.status, "ACTIVE"));
     res.json(allJobs);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1007,8 +1007,8 @@ chatRouter.get("/panels", requireAuth, requireChatPermission, async (req, res) =
       level: panelRegister.level,
     }).from(panelRegister).where(eq(panelRegister.jobId, jobId)).limit(100);
     res.json(panels);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1040,8 +1040,8 @@ chatRouter.post("/mark-read", requireAuth, requireChatPermission, async (req, re
       );
 
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1058,8 +1058,8 @@ chatRouter.get("/unread-counts", requireAuth, requireChatPermission, async (req,
     const mentions = unreadNotifs.filter(n => n.type === "MENTION").length;
 
     res.json({ unread, mentions });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1099,8 +1099,8 @@ chatRouter.get("/total-unread", requireAuth, requireChatPermission, async (req, 
 
     const totalUnread = Number(unreadResults[0]?.count || 0);
     res.json({ totalUnread });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1129,8 +1129,8 @@ chatRouter.post("/conversations/:conversationId/members", requireAuth, requireCh
     }
 
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1141,8 +1141,8 @@ chatRouter.get("/topics", requireAuth, requireChatPermission, async (req, res) =
       .where(eq(chatTopics.companyId, companyId))
       .orderBy(asc(chatTopics.sortOrder), asc(chatTopics.createdAt));
     res.json(topics);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1177,8 +1177,8 @@ chatRouter.post("/topics", requireAuth, requireChatPermission, async (req, res) 
     }).returning();
 
     res.json(topic);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1188,7 +1188,7 @@ chatRouter.patch("/topics/:topicId", requireAuth, requireChatPermission, async (
     const topicId = String(req.params.topicId);
     const schema = z.object({ name: z.string().min(1).max(100).optional(), color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional() }).refine(d => d.name || d.color, { message: "name or color required" });
     const data = schema.parse(req.body);
-    const setData: Record<string, any> = {};
+    const setData: Record<string, unknown> = {};
     if (data.name) setData.name = data.name;
     if (data.color) setData.color = data.color;
 
@@ -1199,8 +1199,8 @@ chatRouter.patch("/topics/:topicId", requireAuth, requireChatPermission, async (
 
     if (!updated) return res.status(404).json({ error: "Topic not found" });
     res.json(updated);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1217,8 +1217,8 @@ chatRouter.delete("/topics/:topicId", requireAuth, requireChatPermission, async 
       .where(and(eq(chatTopics.id, topicId), eq(chatTopics.companyId, companyId)));
 
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1237,8 +1237,8 @@ chatRouter.post("/topics/reorder", requireAuth, requireChatPermission, async (re
     });
 
     res.json({ ok: true });
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });
 
@@ -1258,7 +1258,7 @@ chatRouter.patch("/conversations/:conversationId/topic", requireAuth, requireCha
 
     if (!updated) return res.status(404).json({ error: "Conversation not found" });
     res.json(updated);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message || String(e) });
+  } catch (e: unknown) {
+    res.status(400).json({ error: e instanceof Error ? e.message : String(e) });
   }
 });

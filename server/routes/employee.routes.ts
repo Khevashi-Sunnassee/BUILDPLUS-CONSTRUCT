@@ -314,7 +314,7 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
         const cell = row.getCell(c);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (!val) continue;
         const headerStr = String(val).toLowerCase().trim();
@@ -350,7 +350,7 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
 
     for (let r = headerRowIndex + 1; r <= sheet.rowCount; r++) {
       const row = sheet.getRow(r);
-      const rowData: Record<string, any> = {};
+      const rowData: Record<string, string> = {};
       let hasData = false;
 
       for (const [colStr, key] of Object.entries(columnMap)) {
@@ -358,7 +358,7 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
         const cell = row.getCell(col);
         let val = cell.value;
         if (val && typeof val === "object" && "richText" in val) {
-          val = (val as any).richText.map((t: any) => t.text).join("");
+          val = (val as {richText: {text: string}[]}).richText.map((t) => t.text).join("");
         }
         if (val !== null && val !== undefined && String(val).trim() !== "") {
           rowData[key] = String(val).trim();
@@ -384,7 +384,7 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
       const displayName = `${lastName}, ${firstName}`.trim();
 
       try {
-        const updateData: Record<string, any> = {};
+        const updateData: Record<string, unknown> = {};
         if (middleName) updateData.middleName = middleName;
         if (rowData.preferredName) updateData.preferredName = rowData.preferredName;
         if (rowData.dateOfBirth) updateData.dateOfBirth = parseDateOfBirth(rowData.dateOfBirth);
@@ -408,10 +408,10 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
         const existing = employeeByName[nameKey];
 
         if (existing) {
-          const fieldsToUpdate: Record<string, any> = {};
+          const fieldsToUpdate: Record<string, unknown> = {};
           let hasChanges = false;
           for (const [field, value] of Object.entries(updateData)) {
-            const currentVal = (existing as any)[field];
+            const currentVal = (existing as Record<string, unknown>)[field];
             if (!currentVal && value) {
               fieldsToUpdate[field] = value;
               hasChanges = true;
@@ -437,7 +437,7 @@ router.post("/api/employees/import", requireRole("ADMIN", "MANAGER"), upload.sin
             firstName,
             lastName,
             ...updateData,
-            isActive: updateData.isActive !== undefined ? updateData.isActive : true,
+            isActive: updateData.isActive !== undefined ? Boolean(updateData.isActive) : true,
           });
           employeeByName[nameKey] = newEmployee;
           created.push(displayName);

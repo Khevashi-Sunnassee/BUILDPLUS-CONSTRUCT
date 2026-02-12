@@ -139,9 +139,9 @@ router.post("/api/onboarding/templates", requireAuth, requireRole("ADMIN", "MANA
     }
     const [created] = await db.insert(onboardingTemplates).values(parsed.data).returning();
 
-    let createdTasks: any[] = [];
+    let createdTasks: Record<string, unknown>[] = [];
     if (Array.isArray(tasks) && tasks.length > 0) {
-      const taskInserts = tasks.map((task: any, index: number) => ({
+      const taskInserts = tasks.map((task: Record<string, unknown>, index: number) => ({
         ...task,
         templateId: created.id,
         sortOrder: task.sortOrder ?? index,
@@ -388,7 +388,7 @@ router.post("/api/employees/:employeeId/onboardings", requireAuth, requireRole("
 
     const [created] = await db.insert(employeeOnboardings).values(parsed.data).returning();
 
-    let createdTasks: any[] = [];
+    let createdTasks: Record<string, unknown>[] = [];
     if (templateId) {
       const templateTasks = await db
         .select()
@@ -542,7 +542,7 @@ router.patch("/api/employees/:employeeId/onboardings/:onboardingId/tasks/:taskId
       return res.status(400).json({ error: "Validation failed", details: parsed.error.errors });
     }
 
-    const updateData: Record<string, any> = { ...parsed.data, updatedAt: new Date() };
+    const updateData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
     if (parsed.data.status === "complete") {
       updateData.completedAt = new Date();
       updateData.completedBy = req.session.userId;

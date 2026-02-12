@@ -64,7 +64,7 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { panelId, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, ...entryFields } = result.data as any;
+    const { panelId, loadWidth, loadHeight, panelThickness, panelVolume, panelMass, ...entryFields } = result.data;
     if (panelId) {
       const panel = await storage.getPanelById(panelId);
       if (!panel) {
@@ -107,7 +107,7 @@ router.put("/api/production-entries/:id", requireAuth, requirePermission("produc
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
-    const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, status, ...entryFields } = result.data as any;
+    const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, status, ...entryFields } = result.data;
     
     if (panelId) {
       const panelUpdates: Record<string, unknown> = {};
@@ -335,8 +335,8 @@ router.post("/api/production-slots/:slotId/assign-panels", requireAuth, requireP
         advancePanelLifecycleIfLower(assignment.panelId, PANEL_LIFECYCLE_STATUS.IN_PRODUCTION, "Assigned to production slot", req.session.userId, { productionDate: assignment.productionDate });
         
         results.created++;
-      } catch (err: any) {
-        results.errors.push(`Failed to assign panel: ${err.message}`);
+      } catch (err: unknown) {
+        results.errors.push(`Failed to assign panel: ${err instanceof Error ? err.message : String(err)}`);
         results.skipped++;
       }
     }

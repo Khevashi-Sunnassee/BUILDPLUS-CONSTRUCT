@@ -1085,13 +1085,14 @@ export default function DailyReportsPage() {
                                   <TableCell>
                                     <div className="flex items-center gap-1">
                                       <Link href={`/daily-reports/${log.id}`}>
-                                        <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
+                                        <Button variant="ghost" size="icon" aria-label="View report" data-testid={`button-view-${log.id}`}>
                                           <ChevronRight className="h-4 w-4" />
                                         </Button>
                                       </Link>
                                       <Button
                                         variant="ghost"
                                         size="icon"
+                                        aria-label="Delete report"
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setDeletingLogId(log.id);
@@ -1210,13 +1211,14 @@ export default function DailyReportsPage() {
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <Link href={`/daily-reports/${log.id}`}>
-                              <Button variant="ghost" size="icon" data-testid={`button-view-${log.id}`}>
+                              <Button variant="ghost" size="icon" aria-label="View report" data-testid={`button-view-${log.id}`}>
                                 <ChevronRight className="h-4 w-4" />
                               </Button>
                             </Link>
                             <Button
                               variant="ghost"
                               size="icon"
+                              aria-label="Delete report"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setDeletingLogId(log.id);

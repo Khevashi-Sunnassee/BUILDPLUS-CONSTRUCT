@@ -120,12 +120,12 @@ router.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (
     const result = costComponentsBodySchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const { components } = result.data;
-    const total = components.reduce((sum: number, c: any) => sum + (parseFloat(String(c.percentageOfRevenue)) || 0), 0);
+    const total = components.reduce((sum: number, c) => sum + (parseFloat(String(c.percentageOfRevenue)) || 0), 0);
     if (total > 100) {
       return res.status(400).json({ error: "Total percentage cannot exceed 100%" });
     }
     const inserted = await storage.replaceCostComponents(req.params.id as string, 
-      components.map((c: any, i: number) => ({
+      components.map((c, i: number) => ({
         panelTypeId: req.params.id as string,
         name: c.name,
         percentageOfRevenue: String(c.percentageOfRevenue),

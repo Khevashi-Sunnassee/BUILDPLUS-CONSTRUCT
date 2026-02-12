@@ -56,7 +56,7 @@ router.patch("/api/admin/devices/:id", requireRole("ADMIN"), async (req, res) =>
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
   }
-  const device = await storage.updateDevice(req.params.id as string, parsed.data as any);
+  const device = await storage.updateDevice(req.params.id as string, parsed.data as Record<string, unknown>);
   res.json(device);
 });
 
@@ -508,219 +508,222 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
     }
     
     const selected = new Set(categories);
-    const deletedCounts: Record<string, number> = {};
-    
-    if (selected.has("drafting_program")) {
-      const result = await db.delete(draftingProgram);
-      deletedCounts.drafting_program = result.rowCount || 0;
-    }
-    
-    if (selected.has("logistics")) {
-      await db.delete(deliveryRecords);
-      await db.delete(loadListPanels);
-      const result = await db.delete(loadLists);
-      deletedCounts.logistics = result.rowCount || 0;
-    }
-    
-    if (selected.has("daily_logs")) {
-      await db.delete(approvalEvents);
-      await db.delete(logRows);
-      const result = await db.delete(dailyLogs);
-      deletedCounts.daily_logs = result.rowCount || 0;
-    }
-    
-    if (selected.has("weekly_wages")) {
-      const result = await db.delete(weeklyWageReports);
-      deletedCounts.weekly_wages = result.rowCount || 0;
-    }
-    
-    if (selected.has("purchase_orders")) {
-      await db.delete(purchaseOrderAttachments);
-      await db.delete(purchaseOrderItems);
-      const result = await db.delete(purchaseOrders);
-      deletedCounts.purchase_orders = result.rowCount || 0;
-    }
-    
-    if (selected.has("chats")) {
-      await db.delete(chatNotifications);
-      await db.delete(chatMessageMentions);
-      await db.delete(chatMessageReactions);
-      await db.delete(chatMessageAttachments);
-      await db.delete(chatMessages);
-      await db.delete(conversationMembers);
-      const result = await db.delete(conversations);
-      deletedCounts.chats = result.rowCount || 0;
-      await db.delete(userChatSettings);
-    }
-    
-    if (selected.has("tasks")) {
-      await db.delete(taskNotifications);
-      await db.delete(taskFiles);
-      await db.delete(taskUpdates);
-      await db.delete(taskAssignees);
-      await db.delete(tasks);
-      const result = await db.delete(taskGroups);
-      deletedCounts.tasks = result.rowCount || 0;
-    }
-    
-    if (selected.has("panels")) {
-      await db.update(conversations).set({ panelId: null }).where(isNotNull(conversations.panelId));
-      await db.update(logRows).set({ panelRegisterId: null }).where(isNotNull(logRows.panelRegisterId));
-      await db.delete(productionEntries);
-      const result = await db.delete(panelRegister);
-      deletedCounts.panels = result.rowCount || 0;
-    }
-    
-    if (selected.has("production_slots")) {
-      await db.update(draftingProgram).set({ productionSlotId: null }).where(isNotNull(draftingProgram.productionSlotId));
-      await db.delete(productionSlotAdjustments);
-      const result = await db.delete(productionSlots);
-      deletedCounts.production_slots = result.rowCount || 0;
-    }
-    
-    if (selected.has("suppliers")) {
-      await db.delete(items);
-      await db.delete(itemCategories);
-      const result = await db.delete(suppliers);
-      deletedCounts.suppliers = result.rowCount || 0;
-    }
-    
-    if (selected.has("jobs")) {
-      await db.update(conversations).set({ jobId: null }).where(isNotNull(conversations.jobId));
-      await db.update(logRows).set({ jobId: null }).where(isNotNull(logRows.jobId));
-      await db.delete(weeklyJobReportSchedules);
-      await db.delete(weeklyJobReports);
-      await db.delete(productionDays);
-      await db.delete(jobPanelRates);
-      await db.delete(mappingRules);
-      await db.delete(jobLevelCycleTimes);
-      const result = await db.delete(jobs);
-      deletedCounts.jobs = result.rowCount || 0;
-    }
-    
-    if (selected.has("assets")) {
-      await db.delete(assetMaintenanceRecords);
-      await db.delete(assetTransfers);
-      const result = await db.delete(assets);
-      deletedCounts.assets = result.rowCount || 0;
-    }
-    
-    if (selected.has("contracts")) {
-      const result = await db.delete(contracts);
-      deletedCounts.contracts = result.rowCount || 0;
-    }
-    
-    if (selected.has("documents")) {
-      if (!selected.has("contracts")) {
-        const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(isNotNull(contracts.aiSourceDocumentId));
-        if (Number(contractDocRef.count) > 0) {
-          return res.status(400).json({ error: "Cannot delete Documents while Contracts reference them. Select Contracts for deletion first." });
-        }
-      }
-      await db.delete(documentBundleItems);
-      const result = await db.delete(documents);
-      deletedCounts.documents = result.rowCount || 0;
-    }
-    
-    if (selected.has("progress_claims")) {
-      await db.delete(progressClaimItems);
-      const result = await db.delete(progressClaims);
-      deletedCounts.progress_claims = result.rowCount || 0;
-    }
-    
-    if (selected.has("broadcast_templates")) {
-      await db.delete(broadcastMessages);
-      const result = await db.delete(broadcastTemplates);
-      deletedCounts.broadcast_templates = result.rowCount || 0;
-    }
-    
-    if (selected.has("job_activities")) {
-      await db.delete(jobActivityFiles);
-      await db.delete(jobActivityUpdates);
-      await db.delete(jobActivityAssignees);
-      await db.update(tasks).set({ jobActivityId: null }).where(isNotNull(tasks.jobActivityId));
-      const result = await db.delete(jobActivities);
-      deletedCounts.job_activities = result.rowCount || 0;
-    }
-    
-    if (selected.has("activity_templates")) {
-      await db.delete(activityTemplateSubtasks);
-      const result = await db.delete(activityTemplates);
-      deletedCounts.activity_templates = result.rowCount || 0;
-    }
-    
     const delCompanyId = req.companyId;
-    
-    if (selected.has("boq")) {
-      if (delCompanyId) {
-        await db.delete(boqItems).where(eq(boqItems.companyId, delCompanyId));
-        const result = await db.delete(boqGroups).where(eq(boqGroups.companyId, delCompanyId));
-        deletedCounts.boq = result.rowCount || 0;
+
+    if (selected.has("documents") && !selected.has("contracts")) {
+      const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(isNotNull(contracts.aiSourceDocumentId));
+      if (Number(contractDocRef.count) > 0) {
+        return res.status(400).json({ error: "Cannot delete Documents while Contracts reference them. Select Contracts for deletion first." });
       }
     }
-    
-    if (selected.has("budgets")) {
-      if (delCompanyId) {
-        if (!selected.has("boq")) {
-          await db.update(boqGroups).set({ budgetLineId: null }).where(and(eq(boqGroups.companyId, delCompanyId), isNotNull(boqGroups.budgetLineId)));
-          await db.update(boqItems).set({ budgetLineId: null }).where(and(eq(boqItems.companyId, delCompanyId), isNotNull(boqItems.budgetLineId)));
+
+    const deletedCounts: Record<string, number> = {};
+
+    await db.transaction(async (tx) => {
+      if (selected.has("drafting_program")) {
+        const result = await tx.delete(draftingProgram);
+        deletedCounts.drafting_program = result.rowCount || 0;
+      }
+      
+      if (selected.has("logistics")) {
+        await tx.delete(deliveryRecords);
+        await tx.delete(loadListPanels);
+        const result = await tx.delete(loadLists);
+        deletedCounts.logistics = result.rowCount || 0;
+      }
+      
+      if (selected.has("daily_logs")) {
+        await tx.delete(approvalEvents);
+        await tx.delete(logRows);
+        const result = await tx.delete(dailyLogs);
+        deletedCounts.daily_logs = result.rowCount || 0;
+      }
+      
+      if (selected.has("weekly_wages")) {
+        const result = await tx.delete(weeklyWageReports);
+        deletedCounts.weekly_wages = result.rowCount || 0;
+      }
+      
+      if (selected.has("purchase_orders")) {
+        await tx.delete(purchaseOrderAttachments);
+        await tx.delete(purchaseOrderItems);
+        const result = await tx.delete(purchaseOrders);
+        deletedCounts.purchase_orders = result.rowCount || 0;
+      }
+      
+      if (selected.has("chats")) {
+        await tx.delete(chatNotifications);
+        await tx.delete(chatMessageMentions);
+        await tx.delete(chatMessageReactions);
+        await tx.delete(chatMessageAttachments);
+        await tx.delete(chatMessages);
+        await tx.delete(conversationMembers);
+        const result = await tx.delete(conversations);
+        deletedCounts.chats = result.rowCount || 0;
+        await tx.delete(userChatSettings);
+      }
+      
+      if (selected.has("tasks")) {
+        await tx.delete(taskNotifications);
+        await tx.delete(taskFiles);
+        await tx.delete(taskUpdates);
+        await tx.delete(taskAssignees);
+        await tx.delete(tasks);
+        const result = await tx.delete(taskGroups);
+        deletedCounts.tasks = result.rowCount || 0;
+      }
+      
+      if (selected.has("panels")) {
+        await tx.update(conversations).set({ panelId: null }).where(isNotNull(conversations.panelId));
+        await tx.update(logRows).set({ panelRegisterId: null }).where(isNotNull(logRows.panelRegisterId));
+        await tx.delete(productionEntries);
+        const result = await tx.delete(panelRegister);
+        deletedCounts.panels = result.rowCount || 0;
+      }
+      
+      if (selected.has("production_slots")) {
+        await tx.update(draftingProgram).set({ productionSlotId: null }).where(isNotNull(draftingProgram.productionSlotId));
+        await tx.delete(productionSlotAdjustments);
+        const result = await tx.delete(productionSlots);
+        deletedCounts.production_slots = result.rowCount || 0;
+      }
+      
+      if (selected.has("suppliers")) {
+        await tx.delete(items);
+        await tx.delete(itemCategories);
+        const result = await tx.delete(suppliers);
+        deletedCounts.suppliers = result.rowCount || 0;
+      }
+      
+      if (selected.has("jobs")) {
+        await tx.update(conversations).set({ jobId: null }).where(isNotNull(conversations.jobId));
+        await tx.update(logRows).set({ jobId: null }).where(isNotNull(logRows.jobId));
+        await tx.delete(weeklyJobReportSchedules);
+        await tx.delete(weeklyJobReports);
+        await tx.delete(productionDays);
+        await tx.delete(jobPanelRates);
+        await tx.delete(mappingRules);
+        await tx.delete(jobLevelCycleTimes);
+        const result = await tx.delete(jobs);
+        deletedCounts.jobs = result.rowCount || 0;
+      }
+      
+      if (selected.has("assets")) {
+        await tx.delete(assetMaintenanceRecords);
+        await tx.delete(assetTransfers);
+        const result = await tx.delete(assets);
+        deletedCounts.assets = result.rowCount || 0;
+      }
+      
+      if (selected.has("contracts")) {
+        const result = await tx.delete(contracts);
+        deletedCounts.contracts = result.rowCount || 0;
+      }
+      
+      if (selected.has("documents")) {
+        await tx.delete(documentBundleItems);
+        const result = await tx.delete(documents);
+        deletedCounts.documents = result.rowCount || 0;
+      }
+      
+      if (selected.has("progress_claims")) {
+        await tx.delete(progressClaimItems);
+        const result = await tx.delete(progressClaims);
+        deletedCounts.progress_claims = result.rowCount || 0;
+      }
+      
+      if (selected.has("broadcast_templates")) {
+        await tx.delete(broadcastMessages);
+        const result = await tx.delete(broadcastTemplates);
+        deletedCounts.broadcast_templates = result.rowCount || 0;
+      }
+      
+      if (selected.has("job_activities")) {
+        await tx.delete(jobActivityFiles);
+        await tx.delete(jobActivityUpdates);
+        await tx.delete(jobActivityAssignees);
+        await tx.update(tasks).set({ jobActivityId: null }).where(isNotNull(tasks.jobActivityId));
+        const result = await tx.delete(jobActivities);
+        deletedCounts.job_activities = result.rowCount || 0;
+      }
+      
+      if (selected.has("activity_templates")) {
+        await tx.delete(activityTemplateSubtasks);
+        const result = await tx.delete(activityTemplates);
+        deletedCounts.activity_templates = result.rowCount || 0;
+      }
+      
+      if (selected.has("boq")) {
+        if (delCompanyId) {
+          await tx.delete(boqItems).where(eq(boqItems.companyId, delCompanyId));
+          const result = await tx.delete(boqGroups).where(eq(boqGroups.companyId, delCompanyId));
+          deletedCounts.boq = result.rowCount || 0;
         }
-        const companyBudgetIds = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(eq(jobBudgets.companyId, delCompanyId))).map(r => r.id);
-        if (companyBudgetIds.length > 0) {
-          const companyBudgetLineIds = (await db.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIds))).map(r => r.id);
-          if (companyBudgetLineIds.length > 0) {
-            await db.delete(budgetLineFiles).where(inArray(budgetLineFiles.budgetLineId, companyBudgetLineIds));
+      }
+      
+      if (selected.has("budgets")) {
+        if (delCompanyId) {
+          if (!selected.has("boq")) {
+            await tx.update(boqGroups).set({ budgetLineId: null }).where(and(eq(boqGroups.companyId, delCompanyId), isNotNull(boqGroups.budgetLineId)));
+            await tx.update(boqItems).set({ budgetLineId: null }).where(and(eq(boqItems.companyId, delCompanyId), isNotNull(boqItems.budgetLineId)));
           }
-          await db.delete(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIds));
-        }
-        const result = await db.delete(jobBudgets).where(eq(jobBudgets.companyId, delCompanyId));
-        deletedCounts.budgets = result.rowCount || 0;
-      }
-    }
-    
-    if (selected.has("tenders")) {
-      if (delCompanyId) {
-        if (!selected.has("budgets")) {
-          await db.update(budgetLines).set({ selectedTenderSubmissionId: null }).where(and(eq(budgetLines.companyId, delCompanyId), isNotNull(budgetLines.selectedTenderSubmissionId)));
-        }
-        if (!selected.has("boq")) {
-          await db.update(boqItems).set({ tenderLineItemId: null }).where(and(eq(boqItems.companyId, delCompanyId), isNotNull(boqItems.tenderLineItemId)));
-        }
-        const companyTenderIds = (await db.select({ id: tenders.id }).from(tenders).where(eq(tenders.companyId, delCompanyId))).map(r => r.id);
-        if (companyTenderIds.length > 0) {
-          const companySubIds = (await db.select({ id: tenderSubmissions.id }).from(tenderSubmissions).where(inArray(tenderSubmissions.tenderId, companyTenderIds))).map(r => r.id);
-          if (companySubIds.length > 0) {
-            const companyLineItemIds = (await db.select({ id: tenderLineItems.id }).from(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, companySubIds))).map(r => r.id);
-            if (companyLineItemIds.length > 0) {
-              await db.delete(tenderLineRisks).where(inArray(tenderLineRisks.lineItemId, companyLineItemIds));
-              await db.delete(tenderLineFiles).where(inArray(tenderLineFiles.lineItemId, companyLineItemIds));
-              await db.delete(tenderLineActivities).where(inArray(tenderLineActivities.lineItemId, companyLineItemIds));
+          const companyBudgetIds = (await tx.select({ id: jobBudgets.id }).from(jobBudgets).where(eq(jobBudgets.companyId, delCompanyId))).map(r => r.id);
+          if (companyBudgetIds.length > 0) {
+            const companyBudgetLineIds = (await tx.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIds))).map(r => r.id);
+            if (companyBudgetLineIds.length > 0) {
+              await tx.delete(budgetLineFiles).where(inArray(budgetLineFiles.budgetLineId, companyBudgetLineIds));
             }
-            await db.delete(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, companySubIds));
-            await db.delete(tenderSubmissions).where(inArray(tenderSubmissions.tenderId, companyTenderIds));
+            await tx.delete(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIds));
           }
-          await db.delete(tenderPackages).where(inArray(tenderPackages.tenderId, companyTenderIds));
+          const result = await tx.delete(jobBudgets).where(eq(jobBudgets.companyId, delCompanyId));
+          deletedCounts.budgets = result.rowCount || 0;
         }
-        const result = await db.delete(tenders).where(eq(tenders.companyId, delCompanyId));
-        deletedCounts.tenders = result.rowCount || 0;
       }
-    }
-    
-    if (selected.has("cost_codes")) {
-      if (delCompanyId) {
-        const companyCCIds = (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, delCompanyId))).map(r => r.id);
-        if (companyCCIds.length > 0) {
-          if (!selected.has("tenders")) {
-            await db.update(tenderLineItems).set({ costCodeId: null }).where(and(eq(tenderLineItems.companyId, delCompanyId), isNotNull(tenderLineItems.costCodeId)));
+      
+      if (selected.has("tenders")) {
+        if (delCompanyId) {
+          if (!selected.has("budgets")) {
+            await tx.update(budgetLines).set({ selectedTenderSubmissionId: null }).where(and(eq(budgetLines.companyId, delCompanyId), isNotNull(budgetLines.selectedTenderSubmissionId)));
           }
-          await db.delete(jobCostCodes).where(inArray(jobCostCodes.costCodeId, companyCCIds));
-          await db.delete(costCodeDefaults).where(inArray(costCodeDefaults.costCodeId, companyCCIds));
-          await db.delete(childCostCodes).where(inArray(childCostCodes.parentCostCodeId, companyCCIds));
+          if (!selected.has("boq")) {
+            await tx.update(boqItems).set({ tenderLineItemId: null }).where(and(eq(boqItems.companyId, delCompanyId), isNotNull(boqItems.tenderLineItemId)));
+          }
+          const companyTenderIds = (await tx.select({ id: tenders.id }).from(tenders).where(eq(tenders.companyId, delCompanyId))).map(r => r.id);
+          if (companyTenderIds.length > 0) {
+            const companySubIds = (await tx.select({ id: tenderSubmissions.id }).from(tenderSubmissions).where(inArray(tenderSubmissions.tenderId, companyTenderIds))).map(r => r.id);
+            if (companySubIds.length > 0) {
+              const companyLineItemIds = (await tx.select({ id: tenderLineItems.id }).from(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, companySubIds))).map(r => r.id);
+              if (companyLineItemIds.length > 0) {
+                await tx.delete(tenderLineRisks).where(inArray(tenderLineRisks.lineItemId, companyLineItemIds));
+                await tx.delete(tenderLineFiles).where(inArray(tenderLineFiles.lineItemId, companyLineItemIds));
+                await tx.delete(tenderLineActivities).where(inArray(tenderLineActivities.lineItemId, companyLineItemIds));
+              }
+              await tx.delete(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, companySubIds));
+              await tx.delete(tenderSubmissions).where(inArray(tenderSubmissions.tenderId, companyTenderIds));
+            }
+            await tx.delete(tenderPackages).where(inArray(tenderPackages.tenderId, companyTenderIds));
+          }
+          const result = await tx.delete(tenders).where(eq(tenders.companyId, delCompanyId));
+          deletedCounts.tenders = result.rowCount || 0;
         }
-        const result = await db.delete(costCodes).where(eq(costCodes.companyId, delCompanyId));
-        deletedCounts.cost_codes = result.rowCount || 0;
       }
-    }
+      
+      if (selected.has("cost_codes")) {
+        if (delCompanyId) {
+          const companyCCIds = (await tx.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, delCompanyId))).map(r => r.id);
+          if (companyCCIds.length > 0) {
+            if (!selected.has("tenders")) {
+              await tx.update(tenderLineItems).set({ costCodeId: null }).where(and(eq(tenderLineItems.companyId, delCompanyId), isNotNull(tenderLineItems.costCodeId)));
+            }
+            await tx.delete(jobCostCodes).where(inArray(jobCostCodes.costCodeId, companyCCIds));
+            await tx.delete(costCodeDefaults).where(inArray(costCodeDefaults.costCodeId, companyCCIds));
+            await tx.delete(childCostCodes).where(inArray(childCostCodes.parentCostCodeId, companyCCIds));
+          }
+          const result = await tx.delete(costCodes).where(eq(costCodes.companyId, delCompanyId));
+          deletedCounts.cost_codes = result.rowCount || 0;
+        }
+      }
+    });
     
     res.json({ 
       success: true,
