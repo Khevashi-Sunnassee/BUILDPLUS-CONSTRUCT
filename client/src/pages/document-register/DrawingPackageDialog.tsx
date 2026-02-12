@@ -95,6 +95,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
   const [pages, setPages] = useState<AnalyzedPage[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string>("");
   const [editingPage, setEditingPage] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   const analyzeMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -193,15 +194,37 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
     onOpenChange(false);
   }, [onOpenChange]);
 
+  const validateAndSetFile = (file: File) => {
+    if (file.type !== "application/pdf") {
+      toast({ title: "Invalid File", description: "Please select a PDF file", variant: "destructive" });
+      return;
+    }
+    setSelectedFile(file);
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.type !== "application/pdf") {
-        toast({ title: "Invalid File", description: "Please select a PDF file", variant: "destructive" });
-        return;
-      }
-      setSelectedFile(file);
-    }
+    if (file) validateAndSetFile(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) validateAndSetFile(file);
   };
 
   const handleAnalyze = () => {
@@ -282,8 +305,16 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
               <Card>
                 <CardContent className="pt-6">
                   <div
-                    className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover-elevate transition-colors"
+                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+                      isDragging
+                        ? "border-primary bg-primary/5"
+                        : "hover-elevate"
+                    }`}
                     onClick={() => fileInputRef.current?.click()}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                     data-testid="dropzone-drawing-package"
                   >
                     <input
@@ -294,9 +325,13 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                       onChange={handleFileSelect}
                       data-testid="input-drawing-package-file"
                     />
-                    <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                     <p className="text-lg font-medium mb-1">
-                      {selectedFile ? selectedFile.name : "Click to select a PDF file"}
+                      {isDragging
+                        ? "Drop your PDF here"
+                        : selectedFile
+                        ? selectedFile.name
+                        : "Drag & drop a PDF file here, or click to browse"}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {selectedFile
