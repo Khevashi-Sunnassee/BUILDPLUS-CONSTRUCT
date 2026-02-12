@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -118,6 +118,55 @@ function TenderStatusBadge({ status }: { status: string }) {
     default:
       return <Badge variant="secondary">{status}</Badge>;
   }
+}
+
+function TenderCurrencyInput({ value, onChange, ...props }: { value: string; onChange: (val: string) => void; [key: string]: any }) {
+  const [focused, setFocused] = useState(false);
+  const [displayValue, setDisplayValue] = useState(value);
+
+  useEffect(() => {
+    if (!focused) {
+      setDisplayValue(value);
+    }
+  }, [value, focused]);
+
+  const formatDisplay = (raw: string) => {
+    const num = parseFloat(raw);
+    if (isNaN(num) || raw === "" || num === 0) return "";
+    return new Intl.NumberFormat("en-AU", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+  };
+
+  return (
+    <div className="relative">
+      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
+      <Input
+        {...props}
+        className="pl-5 text-right font-mono h-8 w-full"
+        type={focused ? "number" : "text"}
+        step={focused ? "0.01" : undefined}
+        min={focused ? "0" : undefined}
+        value={focused ? displayValue : formatDisplay(value)}
+        placeholder="0.00"
+        onFocus={() => {
+          setFocused(true);
+          setDisplayValue(value);
+        }}
+        onBlur={() => {
+          setFocused(false);
+          if (displayValue) {
+            const num = parseFloat(displayValue);
+            if (!isNaN(num)) {
+              onChange(num.toString());
+            }
+          }
+        }}
+        onChange={(e) => {
+          setDisplayValue(e.target.value);
+          onChange(e.target.value);
+        }}
+      />
+    </div>
+  );
 }
 
 export default function JobTendersPage() {
@@ -724,14 +773,9 @@ export default function JobTendersPage() {
                                   {formatCurrency(line.estimatedBudget)}
                                 </TableCell>
                                 <TableCell className="text-right p-1">
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="0.00"
+                                  <TenderCurrencyInput
                                     value={amount}
-                                    onChange={(e) => setLineAmount(line.costCodeId, line.childCostCodeId, e.target.value)}
-                                    className="text-right font-mono h-8 w-full"
+                                    onChange={(val) => setLineAmount(line.costCodeId, line.childCostCodeId, val)}
                                     data-testid={`input-tender-amount-${line.id}`}
                                   />
                                 </TableCell>
