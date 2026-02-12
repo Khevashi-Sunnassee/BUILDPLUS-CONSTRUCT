@@ -2282,6 +2282,101 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
 
     const analysisResult = JSON.parse(result);
 
+    const aiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+    if (aiApiKey && analysisResult.pages && analysisResult.pages.length > 0) {
+      logger.info({ pageCount: analysisResult.pages.length }, "Starting OpenAI vision analysis for drawing metadata");
+
+      const aiClient = new OpenAI({
+        apiKey: aiApiKey,
+        baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+      });
+
+      const analyzePageWithAI = async (page: any): Promise<any> => {
+        if (!page.thumbnail) return page;
+        try {
+          const completion = await aiClient.chat.completions.create({
+            model: "gpt-4o",
+            max_tokens: 500,
+            messages: [
+              {
+                role: "system",
+                content: `You are an expert construction drawing analyst. Extract metadata from the title block of this engineering/architectural drawing page. Return ONLY valid JSON with these fields:
+{
+  "drawingNumber": "the unique drawing/sheet number identifier (e.g. S-101, AR-200, DWG-001, 12345-STR-001)",
+  "title": "the drawing title or description",
+  "revision": "revision letter or number (e.g. A, B, C, P1, P2, 01)",
+  "scale": "drawing scale (e.g. 1:100, 1:50, NTS)",
+  "projectName": "project or job name",
+  "projectNumber": "project or job number",
+  "discipline": "discipline like Architecture, Structural, Mechanical, Electrical, Civil, Hydraulic",
+  "client": "client or employer name",
+  "date": "date shown on drawing",
+  "level": "floor or level number if shown"
+}
+CRITICAL RULES:
+- drawingNumber is the UNIQUE IDENTIFIER for this drawing sheet, often found labeled as "Drawing No", "Dwg No", "Sheet No", or similar in the title block. It typically contains a mix of letters, numbers, and dashes (e.g. S-101, AR-200, DWG-001, 12345-STR-001).
+- drawingNumber is NEVER the scale (like 1:100), NEVER the revision (like A, B, Rev C), NEVER just a page number (like 1, 2, 3), and NEVER a date.
+- If you cannot confidently identify the drawing number, set it to "".
+- Leave any field as empty string "" if not clearly visible or identifiable.`
+              },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Extract the drawing metadata from this engineering drawing page. Focus on the title block area (usually bottom-right corner) to find the drawing number, title, revision, and other metadata." },
+                  { type: "image_url", image_url: { url: `data:image/png;base64,${page.thumbnail}`, detail: "high" } },
+                ],
+              },
+            ],
+          });
+
+          const aiText = completion.choices[0]?.message?.content || "";
+          const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            let aiData: any;
+            try {
+              aiData = JSON.parse(jsonMatch[0]);
+            } catch (parseErr) {
+              logger.warn({ pageNumber: page.pageNumber, rawResponse: aiText.substring(0, 200) }, "Failed to parse AI JSON response");
+              return page;
+            }
+
+            if (aiData.drawingNumber && /^[0-9:]+$/.test(aiData.drawingNumber.replace(/\s/g, ""))) {
+              logger.warn({ pageNumber: page.pageNumber, suspectedScale: aiData.drawingNumber }, "AI returned what looks like a scale, not a drawing number - discarding");
+              aiData.drawingNumber = "";
+            }
+
+            logger.info({ pageNumber: page.pageNumber, aiDrawingNumber: aiData.drawingNumber, regexDrawingNumber: page.drawingNumber }, "AI vs regex drawing number comparison");
+
+            if (aiData.drawingNumber && aiData.drawingNumber.trim()) page.drawingNumber = aiData.drawingNumber.trim();
+            if (aiData.title && aiData.title.trim()) page.title = aiData.title.trim();
+            if (aiData.revision && aiData.revision.trim()) page.revision = aiData.revision.trim();
+            if (aiData.scale && aiData.scale.trim()) page.scale = aiData.scale.trim();
+            if (aiData.projectName && aiData.projectName.trim()) page.projectName = aiData.projectName.trim();
+            if (aiData.projectNumber && aiData.projectNumber.trim()) page.projectNumber = aiData.projectNumber.trim();
+            if (aiData.discipline && aiData.discipline.trim()) page.discipline = aiData.discipline.trim();
+            if (aiData.client && aiData.client.trim()) page.client = aiData.client.trim();
+            if (aiData.date && aiData.date.trim()) page.date = aiData.date.trim();
+            if (aiData.level && aiData.level.trim()) page.level = aiData.level.trim();
+          }
+        } catch (aiErr: any) {
+          logger.warn({ pageNumber: page.pageNumber, error: aiErr.message }, "OpenAI vision analysis failed for page, using regex fallback");
+        }
+        return page;
+      };
+
+      const CONCURRENCY = 3;
+      const pages = analysisResult.pages;
+      for (let i = 0; i < pages.length; i += CONCURRENCY) {
+        const batch = pages.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(batch.map(analyzePageWithAI));
+        for (let j = 0; j < results.length; j++) {
+          pages[i + j] = results[j];
+        }
+      }
+      analysisResult.pages = pages;
+      logger.info("OpenAI vision analysis complete for all pages");
+    }
+
     const allJobs = await storage.getAllJobs(req.companyId!);
     const jobs = allJobs;
     let matchedJobId: string | null = null;
