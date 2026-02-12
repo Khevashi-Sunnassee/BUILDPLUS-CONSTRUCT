@@ -1,10 +1,11 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ChevronsUpDown, ChevronsDownUp, ChevronDown, ChevronRight } from "lucide-react";
 import { renderField } from "./field-renderers";
 import type { SimpleAsset } from "./field-renderers";
 import { normalizeSections } from "./normalize-sections";
@@ -35,6 +36,25 @@ export function ChecklistForm({
   showProgress = true,
 }: ChecklistFormProps) {
   const sections: ChecklistSection[] = normalizeSections(template.sections);
+
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(sectionId)) {
+        next.delete(sectionId);
+      } else {
+        next.add(sectionId);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => setCollapsedSections(new Set());
+  const collapseAll = () => setCollapsedSections(new Set(sections.map(s => s.id)));
+
+  const allExpanded = collapsedSections.size === 0;
 
   const handleFieldChange = (fieldId: string, value: unknown) => {
     onChange({
@@ -124,71 +144,115 @@ export function ChecklistForm({
         </Card>
       )}
 
-      {sections.map((section, sectionIndex) => (
+      {sections.length > 1 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={allExpanded ? collapseAll : expandAll}
+            data-testid="button-toggle-all-sections"
+          >
+            {allExpanded ? (
+              <>
+                <ChevronsDownUp className="h-4 w-4 mr-2" />
+                Collapse All
+              </>
+            ) : (
+              <>
+                <ChevronsUpDown className="h-4 w-4 mr-2" />
+                Expand All
+              </>
+            )}
+          </Button>
+        </div>
+      )}
+
+      {sections.map((section, sectionIndex) => {
+        const isCollapsed = collapsedSections.has(section.id);
+        return (
         <Card key={section.id} data-testid={`checklist-section-${section.id}`}>
-          <CardHeader className="pb-3">
+          <CardHeader
+            className="pb-3 cursor-pointer select-none hover-elevate"
+            onClick={() => toggleSection(section.id)}
+            data-testid={`button-toggle-section-${section.id}`}
+          >
             <div className="flex items-center justify-between gap-2">
-              <div>
-                <CardTitle className="text-lg">
-                  {sectionIndex + 1}. {section.name}
-                </CardTitle>
-                {section.description && (
-                  <CardDescription className="mt-1">{section.description}</CardDescription>
+              <div className="flex items-center gap-2">
+                {isCollapsed ? (
+                  <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                )}
+                <div>
+                  <CardTitle className="text-lg">
+                    {sectionIndex + 1}. {section.name}
+                  </CardTitle>
+                  {section.description && !isCollapsed && (
+                    <CardDescription className="mt-1">{section.description}</CardDescription>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                {isCollapsed && (
+                  <Badge variant="secondary">{section.items?.length || 0} fields</Badge>
+                )}
+                {section.allowRepeats && (
+                  <Badge variant="outline">Repeatable</Badge>
                 )}
               </div>
-              {section.allowRepeats && (
-                <Badge variant="outline">Repeatable</Badge>
-              )}
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              {section.items?.map((field: ChecklistField, fieldIndex: number) => {
-                const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
-                if (!isFieldVisible(extField, responses)) return null;
-                return (
-                <div key={field.id} data-testid={`checklist-field-${field.id}`}>
-                  {fieldIndex > 0 && <Separator className="mb-6" />}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm font-medium">
-                        {field.name}
-                        {field.required && <span className="text-red-500 ml-1">*</span>}
-                      </label>
-                      {field.photoRequired && (
-                        <Badge variant="secondary" className="text-xs">Photo Required</Badge>
+          {!isCollapsed && (
+            <CardContent>
+              <div className="space-y-6">
+                {section.items?.map((field: ChecklistField, fieldIndex: number) => {
+                  const extField = field as typeof field & { dependsOn?: string; dependsOnValue?: string };
+                  if (!isFieldVisible(extField, responses)) return null;
+                  return (
+                  <div key={field.id} data-testid={`checklist-field-${field.id}`}>
+                    {fieldIndex > 0 && <Separator className="mb-6" />}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium">
+                          {field.name}
+                          {field.required && <span className="text-red-500 ml-1">*</span>}
+                        </label>
+                        {field.photoRequired && (
+                          <Badge variant="secondary" className="text-xs">Photo Required</Badge>
+                        )}
+                      </div>
+                      {field.description && (
+                        <p className="text-sm text-muted-foreground">{field.description}</p>
                       )}
-                    </div>
-                    {field.description && (
-                      <p className="text-sm text-muted-foreground">{field.description}</p>
-                    )}
-                    {field.instructions && (
-                      <Alert className="py-2">
-                        <AlertDescription className="text-xs">{field.instructions}</AlertDescription>
-                      </Alert>
-                    )}
-                    <div className="pt-1">
-                      {renderField(
-                        field,
-                        responses[field.id],
-                        (value) => handleFieldChange(field.id, value),
-                        disabled,
-                        field.type === "asset_selector" ? handleAssetSelected : undefined
+                      {field.instructions && (
+                        <Alert className="py-2">
+                          <AlertDescription className="text-xs">{field.instructions}</AlertDescription>
+                        </Alert>
                       )}
+                      <div className="pt-1">
+                        {renderField(
+                          field,
+                          responses[field.id],
+                          (value) => handleFieldChange(field.id, value),
+                          disabled,
+                          field.type === "asset_selector" ? handleAssetSelected : undefined
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-                );
-              })}
-              {(!section.items || section.items.length === 0) && (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  No fields in this section
-                </p>
-              )}
-            </div>
-          </CardContent>
+                  );
+                })}
+                {(!section.items || section.items.length === 0) && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    No fields in this section
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          )}
         </Card>
-      ))}
+        );
+      })}
     </div>
   );
 }
