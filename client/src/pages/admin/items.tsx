@@ -151,6 +151,7 @@ function CategoryPanel({
 
   const categoryName = group.category?.name || "Uncategorized";
   const categoryId = group.category?.id || "uncategorized";
+  const categoryType = (group.category as any)?.categoryType || "supply";
 
   return (
     <Collapsible open={isOpen} onOpenChange={onToggle}>
@@ -167,6 +168,15 @@ function CategoryPanel({
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />
               )}
               <span className="font-medium">{categoryName}</span>
+              <Badge
+                variant="outline"
+                className={categoryType === "trade"
+                  ? "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                  : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400"}
+                data-testid={`badge-category-panel-type-${categoryId}`}
+              >
+                {categoryType === "trade" ? "Trade" : "Supply"}
+              </Badge>
               <Badge variant="secondary" className="text-xs">
                 {group.items.length} item{group.items.length !== 1 ? "s" : ""}
               </Badge>
@@ -182,7 +192,8 @@ function CategoryPanel({
                 <TableHead>Supplier</TableHead>
                 <TableHead className="text-right w-28">Unit Price</TableHead>
                 <TableHead className="text-right w-20">Min Qty</TableHead>
-                <TableHead className="w-24">Type</TableHead>
+                <TableHead className="w-28">Category Type</TableHead>
+                <TableHead className="w-24">Source</TableHead>
                 <TableHead className="w-24">Status</TableHead>
                 <TableHead className="text-right w-20">Actions</TableHead>
               </TableRow>
@@ -204,6 +215,17 @@ function CategoryPanel({
                   </TableCell>
                   <TableCell className="text-right" data-testid={`text-item-minqty-${item.id}`}>
                     {item.minOrderQty || 1}
+                  </TableCell>
+                  <TableCell data-testid={`text-item-cattype-${item.id}`}>
+                    <Badge
+                      variant="outline"
+                      className={categoryType === "trade"
+                        ? "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                        : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400"}
+                      data-testid={`badge-item-cattype-${item.id}`}
+                    >
+                      {categoryType === "trade" ? "Trade Item" : "Supply Item"}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <Badge variant={item.itemType === "imported" ? "outline" : "secondary"} data-testid={`badge-item-type-${item.id}`}>
@@ -707,7 +729,13 @@ export default function AdminItemsPage() {
                           {category.name}
                         </TableCell>
                         <TableCell data-testid={`text-category-type-${category.id}`}>
-                          <Badge variant="outline" data-testid={`badge-category-type-${category.id}`}>
+                          <Badge
+                            variant="outline"
+                            className={(category as any).categoryType === "trade"
+                              ? "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-400"
+                              : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400"}
+                            data-testid={`badge-category-type-${category.id}`}
+                          >
                             {(category as any).categoryType === "trade" ? "Trade Item" : "Supply Item"}
                           </Badge>
                         </TableCell>
