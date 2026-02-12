@@ -735,14 +735,28 @@ export default function PurchaseOrderFormPage() {
     };
     
     let headerTextX = margin;
-    const logoHeight = 20;
+    const maxLogoHeight = 20;
+    const maxLogoWidth = 40;
     
     if (settings?.logoBase64) {
       try {
         const compressedLogo = await compressLogoForPdf(settings.logoBase64);
         const fmt = compressedLogo.includes("image/jpeg") ? "JPEG" : "PNG";
-        pdf.addImage(compressedLogo, fmt, margin, 5, 25, logoHeight);
-        headerTextX = margin + 30;
+        const dims = await new Promise<{w: number; h: number}>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+          img.onerror = () => resolve({ w: maxLogoWidth, h: maxLogoHeight });
+          img.src = compressedLogo;
+        });
+        const aspect = dims.w / dims.h;
+        let logoW = maxLogoHeight * aspect;
+        let logoH = maxLogoHeight;
+        if (logoW > maxLogoWidth) {
+          logoW = maxLogoWidth;
+          logoH = maxLogoWidth / aspect;
+        }
+        pdf.addImage(compressedLogo, fmt, margin, 5, logoW, logoH);
+        headerTextX = margin + logoW + 5;
       } catch (e) {
         // skip logo
       }
@@ -885,7 +899,7 @@ export default function PurchaseOrderFormPage() {
     currentY += 8;
     
     // Table header
-    const tableColWidths = [15, 25, 70, 18, 18, 22, 22]; // #, Code, Description, Qty, UoM, Unit Price, Total
+    const tableColWidths = [12, 22, 60, 18, 18, 25, 25];
     const tableHeaders = ["#", "Code", "Description", "Qty", "UoM", "Unit $", "Total $"];
     
     // Helper function to draw table headers
@@ -1291,7 +1305,7 @@ export default function PurchaseOrderFormPage() {
                 <img 
                   src={settings.logoBase64} 
                   alt="Company Logo" 
-                  className="h-16 w-auto"
+                  className="h-16 w-auto object-contain"
                   data-testid="img-company-logo"
                 />
               )}
@@ -1550,8 +1564,8 @@ export default function PurchaseOrderFormPage() {
               )}
             </div>
 
-            <div className="border rounded-lg overflow-hidden">
-              <Table className="table-fixed w-full" data-testid="table-line-items">
+            <div className="border rounded-lg overflow-x-auto">
+              <Table className="w-full min-w-[800px]" data-testid="table-line-items">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     {receivingMode && <TableHead className="w-[50px]">Received</TableHead>}

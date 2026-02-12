@@ -32,13 +32,30 @@ export function generatePurchaseOrderPdf(
   };
 
   let headerTextX = margin;
-  const logoHeight = 20;
+  const maxLogoHeight = 20;
+  const maxLogoWidth = 40;
 
   if (settings?.logoBase64) {
     try {
       const fmt = settings.logoBase64.includes("image/jpeg") ? "JPEG" : "PNG";
-      pdf.addImage(settings.logoBase64, fmt, margin, 5, 25, logoHeight);
-      headerTextX = margin + 30;
+      let logoW = maxLogoWidth;
+      let logoH = maxLogoHeight;
+      try {
+        const imgProps = pdf.getImageProperties(settings.logoBase64);
+        if (imgProps.width && imgProps.height) {
+          const aspect = imgProps.width / imgProps.height;
+          logoW = maxLogoHeight * aspect;
+          logoH = maxLogoHeight;
+          if (logoW > maxLogoWidth) {
+            logoW = maxLogoWidth;
+            logoH = maxLogoWidth / aspect;
+          }
+        }
+      } catch (_dimErr) {
+        // fallback to max dimensions
+      }
+      pdf.addImage(settings.logoBase64, fmt, margin, 5, logoW, logoH);
+      headerTextX = margin + logoW + 5;
     } catch (_e) {
       // skip logo
     }
@@ -143,7 +160,7 @@ export function generatePurchaseOrderPdf(
   pdf.text("ORDER ITEMS", margin, currentY);
   currentY += 8;
 
-  const tableColWidths = [15, 25, 70, 18, 18, 22, 22];
+  const tableColWidths = [12, 22, 60, 18, 18, 25, 25];
   const tableHeaders = ["#", "Code", "Description", "Qty", "UoM", "Unit $", "Total $"];
 
   const drawTableHeaders = () => {

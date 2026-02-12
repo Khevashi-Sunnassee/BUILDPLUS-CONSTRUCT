@@ -180,14 +180,28 @@ async function generatePoPdf(
   };
 
   let headerTextX = margin;
-  const logoHeight = 20;
+  const maxLogoHeight = 20;
+  const maxLogoWidth = 40;
   const logoToUse = compressedLogo || settings?.logoBase64;
 
   if (logoToUse) {
     try {
       const fmt = logoToUse.includes("image/jpeg") ? "JPEG" : "PNG";
-      pdf.addImage(logoToUse, fmt, margin, 5, 25, logoHeight);
-      headerTextX = margin + 30;
+      const dims = await new Promise<{w: number; h: number}>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.onerror = () => resolve({ w: maxLogoWidth, h: maxLogoHeight });
+        img.src = logoToUse;
+      });
+      const aspect = dims.w / dims.h;
+      let logoW = maxLogoHeight * aspect;
+      let logoH = maxLogoHeight;
+      if (logoW > maxLogoWidth) {
+        logoW = maxLogoWidth;
+        logoH = maxLogoWidth / aspect;
+      }
+      pdf.addImage(logoToUse, fmt, margin, 5, logoW, logoH);
+      headerTextX = margin + logoW + 5;
     } catch (e) {
       // skip logo
     }
@@ -295,7 +309,7 @@ async function generatePoPdf(
   pdf.text("ORDER ITEMS", margin, currentY);
   currentY += 8;
 
-  const tableColWidths = [15, 25, 70, 18, 18, 22, 22];
+  const tableColWidths = [12, 22, 60, 18, 18, 25, 25];
   const tableHeaders = ["#", "Code", "Description", "Qty", "UoM", "Unit $", "Total $"];
 
   const drawTableHeaders = () => {
