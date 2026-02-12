@@ -1,0 +1,112 @@
+Drawing Package Processor — Complete Summary
+What It Does
+Takes a multi-page PDF (a "drawing package" containing many architectural/construction drawings bundled together) and:
+
+Splits it into individual single-page PDF files — one per drawing
+Reads and extracts metadata from each page using text analysis (drawing numbers, project name, revision, scale, etc.)
+Matches drawings to a Job in your system automatically (or asks the user to pick)
+Checks for revision conflicts — if an older version of the same drawing already exists
+Registers each drawing as a separate document in the Advanced Document Register
+Optionally runs OpenAI comparison between old and new revisions to summarize what changed
+Technology Used
+Python (PyMuPDF/fitz) — opens the PDF and extracts text + splits pages
+Node.js (child_process spawn) — calls the Python scripts from the TypeScript backend
+PostgreSQL — stores the document records
+OpenAI — optional AI comparison between old and new drawing revisions
+The 7-Phase Process
+Phase	What Happens
+1. Read File	Validates the uploaded PDF exists on disk, checks file size
+2. Analyze Package	Runs Python script to open PDF, loop through every page, extract text, and pull out metadata using regex patterns
+3. Job Matching	Tries to automatically match the project name to an existing Job. If multiple matches, asks the user to pick. Uses a scoring system (exact match = 100 points, partial = 50, word-by-word = 20)
+4. Extract Drawings	Runs Python script to split: opens the PDF, creates a NEW PDF for each page using fitz.open() + insert_pdf(from_page=X, to_page=X), saves each as drawing_1.pdf, drawing_2.pdf, etc. to a temp folder
+5. Revision Check	Looks in the database for existing documents with the same drawing number. Compares revision codes (P1 vs P2, Rev A vs Rev B). Recommends: supersede, keep both, or skip
+6. Register Documents	Copies each individual PDF from temp to uploads/documents/, creates a database record with all the metadata, tags, and custom fields. If superseding, marks old version as superseded + isLatestVersion: false
+7. Cleanup	Deletes the temp files
+The Core Python Script for Splitting (the key piece you need)
+This is the actual code that splits a multi-page PDF into individual files:
+
+import fitz  # PyMuPDF
+import os
+import json
+def extract_individual_drawings(pdf_path, output_dir):
+    doc = fitz.open(pdf_path)
+    extracted_files = []
+    
+    os.makedirs(output_dir, exist_ok=True)
+    
+    for page_num in range(len(doc)):
+        # Create a new PDF with just this one page
+        new_doc = fitz.open()
+        new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+        
+        filename = f"drawing_{page_num + 1}.pdf"
+        filepath = os.path.join(output_dir, filename)
+        
+        new_doc.save(filepath)
+        new_doc.close()
+        
+        extracted_files.append({
+            'filename': filename,
+            'filepath': filepath,
+            'pageNumber': page_num + 1
+        })
+    
+    doc.close()
+    print(json.dumps(extracted_files))
+The key lines:
+
+fitz.open() — creates a brand new empty PDF
+new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num) — copies exactly one page from the original into the new PDF
+new_doc.save(filepath) — saves it as an individual file
+The Metadata Extraction Script (reads each page's text)
+For each page, it uses regex patterns to extract:
+
+Field	How it's found
+Drawing Number	Patterns like MHT_ARCH_10101, XXX-YYY-12345
+Project Name	"Client:" field first, then "Project:", "Job:", "Site:" fields, then company name patterns (GROUP, PROPERTY, DEVELOPMENT)
+Drawing Title	"GENERAL ARRANGEMENT LEVEL 3", "FLOOR PLAN", "ELEVATION", "SECTION", "DETAIL", "SITE PLAN", "ROOF PLAN"
+Revision	P6, Rev A, Revision B
+Scale	1:100, Scale: 1:50
+Project Number	"Project No: 1234", "Job No: 5678"
+Discipline	Derived from drawing number: ARCH=Architecture, STRUC=Structural, MECH=Mechanical, ELEC=Electrical, CIVIL=Civil
+Level	"LEVEL 3", "L3", "FLOOR 2"
+Client	"Client:" field
+Date	Date patterns like 12/05/2024, 12.05.2024
+Revision Conflict Handling
+When a drawing with the same number already exists:
+
+Scenario	What happens
+Same revision (P6 = P6)	Recommends "skip" (already have it)
+Newer revision (P6 → P7)	Recommends "supersede" (replace old with new)
+Older revision (P7 → P6)	Recommends "keep both"
+Different sequence (P6 vs Rev A)	Recommends "keep both" (safety first)
+When superseding:
+
+Old document gets isLatestVersion: false and status: 'superseded'
+New document gets isLatestVersion: true
+Optional OpenAI comparison generates a change summary between the two versions
+How Each Document Gets Saved
+Each extracted drawing is saved with:
+
+File: Copied to uploads/documents/ as {drawingNumber}_{timestamp}.pdf
+Database record: title, filename, category='drawings', discipline, jobId, revision, version='1.0'
+Tags: Rev P6, Scale 1:100, Level 3, Project 1234, drawing number
+Custom fields JSON: drawingNumber, projectName, revision, scale, level, client, date, pageNumber, totalPages, extractedFromPackage: true
+AI fields (if superseding): changeSummary, comparedDocumentId, changeAnalysisDate
+Node.js Side (How Python is Called)
+const pythonProcess = spawn('python3', ['-c', pythonScript, packageFilePath, tempDir], {
+    timeout: 120000  // 2 minute timeout
+});
+pythonProcess.stdout.on('data', (data) => { output += data.toString(); });
+pythonProcess.on('close', (code) => {
+    const extractedFiles = JSON.parse(output);
+});
+The Python scripts are embedded as inline strings and passed to python3 -c. The output is JSON printed to stdout.
+
+Dependencies Needed
+What	Package
+Python	PyMuPDF (pip install PyMuPDF, imported as fitz)
+Node.js	child_process (built-in), fs, path
+Optional	OpenAI API for AI revision comparison
+Key File
+server/services/drawingPackageProcessor.ts — 1,141 lines, contains everything (the TypeScript processor class plus the inline Python scripts)
