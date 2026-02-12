@@ -103,6 +103,7 @@ const supplierSchema = z.object({
   defaultCostCodeId: z.string().optional().nullable().or(z.literal("")),
   isActive: z.boolean().default(true),
   isEquipmentHire: z.boolean().default(false),
+  availableForTender: z.boolean().default(false),
 });
 
 type SupplierFormData = z.infer<typeof supplierSchema>;
@@ -292,6 +293,7 @@ export default function AdminSuppliersPage() {
       defaultCostCodeId: "",
       isActive: true,
       isEquipmentHire: false,
+      availableForTender: false,
     },
   });
 
@@ -363,6 +365,7 @@ export default function AdminSuppliersPage() {
       defaultCostCodeId: "",
       isActive: true,
       isEquipmentHire: false,
+      availableForTender: false,
     });
     setDialogOpen(true);
   };
@@ -387,6 +390,7 @@ export default function AdminSuppliersPage() {
       defaultCostCodeId: supplier.defaultCostCodeId || "",
       isActive: supplier.isActive,
       isEquipmentHire: supplier.isEquipmentHire,
+      availableForTender: supplier.availableForTender,
     });
     setDialogOpen(true);
   };
@@ -557,6 +561,11 @@ export default function AdminSuppliersPage() {
                         <Badge variant={supplier.isActive ? "default" : "secondary"} data-testid={`badge-supplier-status-${supplier.id}`}>
                           {supplier.isActive ? "Active" : "Inactive"}
                         </Badge>
+                        {supplier.availableForTender && (
+                          <Badge variant="outline" data-testid={`badge-supplier-tender-${supplier.id}`}>
+                            Tender
+                          </Badge>
+                        )}
                         {supplier.isEquipmentHire && (
                           <Badge variant="outline" data-testid={`badge-supplier-hire-${supplier.id}`}>
                             Hire
@@ -869,6 +878,28 @@ export default function AdminSuppliersPage() {
                         checked={field.value}
                         onCheckedChange={field.onChange}
                         data-testid="switch-supplier-active"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="availableForTender"
+                render={({ field }) => (
+                  <FormItem className="flex items-center justify-between rounded-lg border p-3">
+                    <div className="space-y-0.5">
+                      <FormLabel>Available for Tender</FormLabel>
+                      <p className="text-sm text-muted-foreground">
+                        This supplier will appear in the Tender Center members list
+                      </p>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        data-testid="switch-supplier-available-tender"
                       />
                     </FormControl>
                   </FormItem>

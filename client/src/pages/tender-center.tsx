@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Eye, Pencil, Trash2, Loader2, Search, FileText, ChevronDown, ChevronRight,
-  DollarSign, Users, Send, Mail, Package, X,
+  DollarSign, Users, Send, Mail, Package, X, Info,
 } from "lucide-react";
 import type { Tender, TenderSubmission, TenderMember, Job, DocumentBundle } from "@shared/schema";
 
@@ -67,6 +67,7 @@ interface SubmissionWithDetails extends TenderSubmission {
 interface SupplierOption {
   id: string;
   name: string;
+  availableForTender: boolean;
 }
 
 interface LineItemData {
@@ -199,7 +200,7 @@ export default function TenderCenterPage() {
   });
 
   const { data: suppliers = [] } = useQuery<SupplierOption[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/procurement/suppliers"],
   });
 
   const { data: bundles = [] } = useQuery<BundleOption[]>({
@@ -725,13 +726,19 @@ export default function TenderCenterPage() {
                 <p className="text-sm text-muted-foreground">
                   Select suppliers to invite as tender members. You can send invitations after saving.
                 </p>
-                {suppliers.length === 0 ? (
+                <div className="flex items-start gap-2 rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-700 dark:text-blue-300" data-testid="text-tender-members-note">
+                    Only suppliers marked as "Available for Tender" are shown here. To add more suppliers to this list, enable the "Available for Tender" toggle on the Suppliers page under Admin.
+                  </p>
+                </div>
+                {suppliers.filter(s => s.availableForTender).length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm" data-testid="text-no-suppliers">
-                    No suppliers available. Add suppliers in the admin section first.
+                    No suppliers are marked as available for tender. Enable "Available for Tender" on the Suppliers page to add them here.
                   </div>
                 ) : (
                   <div className="border rounded-md max-h-[350px] overflow-y-auto">
-                    {suppliers.map((supplier) => (
+                    {suppliers.filter(s => s.availableForTender).map((supplier) => (
                       <div
                         key={supplier.id}
                         className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0 hover-elevate"
@@ -761,7 +768,7 @@ export default function TenderCenterPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setFormMemberIds(suppliers.map(s => s.id))}
+                      onClick={() => setFormMemberIds(suppliers.filter(s => s.availableForTender).map(s => s.id))}
                       data-testid="button-select-all-members"
                     >
                       Select All
