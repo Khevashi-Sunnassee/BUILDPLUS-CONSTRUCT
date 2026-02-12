@@ -52,6 +52,7 @@ import { CHECKLIST_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { isJobVisibleInDropdowns } from "@shared/job-phases";
 import { format } from "date-fns";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: React.ElementType }> = {
   draft: { label: "Draft", variant: "secondary", icon: FileText },
@@ -64,6 +65,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: "default" | "secon
 const STATUS_ORDER = ["in_progress", "draft", "completed", "signed_off", "cancelled"];
 
 export default function ChecklistsPage() {
+  useDocumentTitle("Checklists");
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");

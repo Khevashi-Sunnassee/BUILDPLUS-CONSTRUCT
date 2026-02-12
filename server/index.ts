@@ -41,8 +41,8 @@ app.use(helmet({
 
 app.set("trust proxy", 1);
 
-const sessionKeyGenerator = (req: Request): string => {
-  const sessionId = (req as any).session?.id;
+const sessionKeyGenerator = (req: Request & { session?: { id?: string } }): string => {
+  const sessionId = req.session?.id;
   if (sessionId) return `session:${sessionId}`;
   const forwarded = req.headers["x-forwarded-for"];
   const ip = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.ip;

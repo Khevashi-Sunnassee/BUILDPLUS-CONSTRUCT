@@ -198,7 +198,7 @@ function ReoScheduleBuilderDialog({
               ) : pdfUrl ? (
                 <iframe
                   src={pdfUrl}
-                  className="w-full h-full border-0 bg-white rounded-md"
+                  className="w-full h-full border-0 bg-background rounded-md"
                   style={{ transform: `scale(${pdfZoom / 100})`, transformOrigin: 'top left', width: `${10000 / pdfZoom}%`, height: `${10000 / pdfZoom}%` }}
                   title="IFC Drawing PDF"
                   data-testid="pdf-viewer-iframe"

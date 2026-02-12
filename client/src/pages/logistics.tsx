@@ -34,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   Form,
   FormControl,
@@ -174,6 +175,7 @@ type LoadListFormData = z.infer<typeof loadListSchema>;
 type DeliveryFormData = z.infer<typeof deliverySchema>;
 
 export default function LogisticsPage() {
+  useDocumentTitle("Logistics");
   const { toast } = useToast();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);

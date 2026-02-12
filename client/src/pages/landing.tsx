@@ -17,6 +17,7 @@ import {
   Users,
   Clock,
 } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const features = [
   {
@@ -71,6 +72,7 @@ const stats = [
 ];
 
 export default function LandingPage() {
+  useDocumentTitle("Welcome");
   const [, setLocation] = useLocation();
 
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
@@ -141,7 +143,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section className="relative pt-16 overflow-hidden">
+      <section className="relative pt-16 overflow-hidden" role="main">
         <div className="absolute inset-0 mt-16">
           <img
             src={heroImage}

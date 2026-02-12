@@ -371,6 +371,7 @@ export function AppSidebar() {
                             className="transition-colors cursor-pointer"
                             onClick={() => setProjectActivitiesOpen(true)}
                             data-testid="nav-project-activities"
+                            aria-label="View job activities"
                           >
                             <Workflow className="h-4 w-4" />
                             <span>Job Activities</span>

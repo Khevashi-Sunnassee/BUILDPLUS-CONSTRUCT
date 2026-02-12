@@ -56,7 +56,7 @@ async function calculateRetention(
 
   const retentionCapAmount = contractValue > 0 ? contractValue * retentionCapPct / 100 : Infinity;
 
-  let conditions: any[] = [
+  let conditions = [
     eq(progressClaims.companyId, companyId),
     eq(progressClaims.jobId, jobId),
     inArray(progressClaims.status, ["APPROVED", "SUBMITTED", "DRAFT"]),

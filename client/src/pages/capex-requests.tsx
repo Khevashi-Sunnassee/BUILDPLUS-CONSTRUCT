@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { ASSET_CATEGORIES, CAPEX_PURCHASE_REASONS } from "@shared/schema";
 import type { CapexRequest, User, Job, Department, Supplier, Asset } from "@shared/schema";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface CapexRequestWithDetails extends CapexRequest {
   requestedBy: User;
@@ -824,6 +825,7 @@ function DetailRow({ label, value }: { label: string; value?: string | null }) {
 }
 
 export default function CapexRequestsPage() {
+  useDocumentTitle("CAPEX Requests");
   const { toast } = useToast();
   const searchParams = useSearch();
   const [searchQuery, setSearchQuery] = useState("");

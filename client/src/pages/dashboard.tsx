@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Link, useLocation } from "wouter";
 import { format } from "date-fns";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface ChatConversation {
   id: string;
@@ -95,6 +96,7 @@ interface TaskNotification {
 }
 
 export default function DashboardPage() {
+  useDocumentTitle("Dashboard");
   const { user } = useAuth();
   const [, navigate] = useLocation();
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { format, isBefore, startOfDay } from "date-fns";
 import { TASKS_ROUTES, USER_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ import type { Task, TaskGroup, User, Job } from "./types";
 import { STATUS_CONFIG } from "./types";
 
 export default function TasksPage() {
+  useDocumentTitle("Tasks");
   const { toast } = useToast();
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showNewGroupInput, setShowNewGroupInput] = useState(false);

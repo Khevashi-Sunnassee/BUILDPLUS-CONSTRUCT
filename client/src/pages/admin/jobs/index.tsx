@@ -112,8 +112,10 @@ import {
   DaysInAdvanceConfirmDialog,
   QuickAddCustomerDialog,
 } from "./JobConfirmationDialogs";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function AdminJobsPage() {
+  useDocumentTitle("Jobs");
   const { toast } = useToast();
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -312,7 +314,7 @@ export default function AdminJobsPage() {
           const parsed = JSON.parse(jsonMatch[0]);
           msg = parsed.error || parsed.message || msg;
         }
-      } catch {}
+      } catch (error) { /* non-critical error parsing - use fallback message */ }
       toast({ title: "Failed to create job", description: msg, variant: "destructive" });
     },
   });
@@ -356,7 +358,7 @@ export default function AdminJobsPage() {
           const parsed = JSON.parse(jsonMatch[0]);
           msg = parsed.error || parsed.message || msg;
         }
-      } catch {}
+      } catch (error) { /* non-critical error parsing - use fallback message */ }
       toast({ title: "Failed to update job", description: msg, variant: "destructive" });
     },
   });

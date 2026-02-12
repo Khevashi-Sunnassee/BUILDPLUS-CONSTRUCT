@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { format } from "date-fns";
@@ -201,6 +202,7 @@ function DroppableTopicZone({ topicId, isDragging, children }: { topicId: string
 }
 
 export default function ChatPage() {
+  useDocumentTitle("Chat");
   const { toast } = useToast();
   const { user: currentUser } = useAuth();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);

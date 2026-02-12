@@ -77,7 +77,7 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
         return res.status(400).json({ error: "Panel document status must be 'Approved for Production'. Current status: " + (panel.documentStatus || "DRAFT") + ". Please update the document status in the Drafting Register first." });
       }
       
-      const panelUpdates: any = {};
+      const panelUpdates: Record<string, unknown> = {};
       if (loadWidth !== undefined) panelUpdates.loadWidth = loadWidth;
       if (loadHeight !== undefined) panelUpdates.loadHeight = loadHeight;
       if (panelThickness !== undefined) panelUpdates.panelThickness = panelThickness;
@@ -110,7 +110,7 @@ router.put("/api/production-entries/:id", requireAuth, requirePermission("produc
     const { loadWidth, loadHeight, panelThickness, panelVolume, panelMass, panelId, status, ...entryFields } = result.data as any;
     
     if (panelId) {
-      const panelUpdates: any = {};
+      const panelUpdates: Record<string, unknown> = {};
       if (loadWidth !== undefined) panelUpdates.loadWidth = loadWidth;
       if (loadHeight !== undefined) panelUpdates.loadHeight = loadHeight;
       if (panelThickness !== undefined) panelUpdates.panelThickness = panelThickness;

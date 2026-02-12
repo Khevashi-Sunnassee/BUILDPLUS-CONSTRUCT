@@ -17,6 +17,7 @@ import LandingPage from "@/pages/landing";
 import LoginPage from "@/pages/login";
 import { HelpProvider } from "@/components/help/help-provider";
 import { HelpDrawer } from "@/components/help/help-drawer";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const DailyReportsPage = lazy(() => import("@/pages/daily-reports"));
@@ -178,7 +179,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
           <header className="flex items-center justify-between gap-2 px-4 py-3 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <SidebarTrigger data-testid="button-sidebar-toggle" aria-label="Toggle sidebar navigation" />
             <div className="flex items-center gap-2">
               <UserSettingsPopover />
             </div>
@@ -1008,19 +1009,21 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <AuthProvider>
-          <TooltipProvider>
-            <HelpProvider>
-              <Router />
-              <HelpDrawer />
-              <Toaster />
-            </HelpProvider>
-          </TooltipProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <TooltipProvider>
+              <HelpProvider>
+                <Router />
+                <HelpDrawer />
+                <Toaster />
+              </HelpProvider>
+            </TooltipProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

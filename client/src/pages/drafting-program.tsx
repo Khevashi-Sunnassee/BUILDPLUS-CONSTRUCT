@@ -219,7 +219,7 @@ export default function DraftingProgramPage() {
       ON_HOLD: "destructive",
     };
     const colors: Record<string, string> = {
-      NOT_SCHEDULED: "text-gray-500",
+      NOT_SCHEDULED: "text-muted-foreground",
       SCHEDULED: "text-blue-600",
       IN_PROGRESS: "bg-amber-500",
       COMPLETED: "text-green-600",

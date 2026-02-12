@@ -114,7 +114,7 @@ export default function MobileQrScanner() {
           await scannerRef.current.stop();
         }
         scannerRef.current.clear();
-      } catch (e) {}
+      } catch (e) { console.error("QR processing error:", e); }
       scannerRef.current = null;
     }
     setScanning(false);
@@ -171,7 +171,7 @@ export default function MobileQrScanner() {
             scannerRef.current.stop();
           }
           scannerRef.current.clear();
-        } catch (e) {}
+        } catch (e) { console.error("QR processing error:", e); }
         scannerRef.current = null;
       }
     };

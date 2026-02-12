@@ -28,6 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -144,6 +145,7 @@ function getTypeColor(index: number) {
 }
 
 export default function AdminChecklistTemplatesPage() {
+  useDocumentTitle("Checklist Templates");
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("templates");
   const [searchQuery, setSearchQuery] = useState("");

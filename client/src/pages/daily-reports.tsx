@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { format, subDays, startOfWeek, endOfWeek } from "date-fns";
 import {
   Calendar,
@@ -128,6 +129,7 @@ const getRemainingHours = (log: DailyLogSummary): number => {
 };
 
 export default function DailyReportsPage() {
+  useDocumentTitle("Daily Reports");
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();

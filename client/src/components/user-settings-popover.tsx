@@ -103,6 +103,7 @@ export function UserSettingsPopover() {
           size="icon" 
           data-testid="button-user-settings"
           className="relative"
+          aria-label="User settings"
         >
           <Settings2 className="h-5 w-5" />
           {!allSelected && (

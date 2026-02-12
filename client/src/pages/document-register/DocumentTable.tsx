@@ -102,7 +102,7 @@ function getFileTypeIcon(mimeType: string | null | undefined, originalName: stri
     mime.includes("xml") ||
     ["txt", "json", "xml", "html", "css", "js", "ts"].includes(ext)
   ) {
-    return { Icon: FileCode, color: "text-gray-500", label: "Text" };
+    return { Icon: FileCode, color: "text-muted-foreground", label: "Text" };
   }
   return { Icon: File, color: "text-muted-foreground", label: "File" };
 }

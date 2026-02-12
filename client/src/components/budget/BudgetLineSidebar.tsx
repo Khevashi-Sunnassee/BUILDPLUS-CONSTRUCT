@@ -312,7 +312,9 @@ export function BudgetLineSidebar({
         queryClient.invalidateQueries({ queryKey: [`/api/budget-lines/${line?.id}/updates`] });
       }
       setPastedImages([]);
-    } catch (error) {}
+    } catch (error) {
+      console.error("Failed to process budget line:", error);
+    }
   };
 
   const getFileIcon = (mimeType: string | null) => {

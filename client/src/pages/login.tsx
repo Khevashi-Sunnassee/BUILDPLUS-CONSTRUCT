@@ -14,10 +14,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  useDocumentTitle("Login");
   const [, setLocation] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();

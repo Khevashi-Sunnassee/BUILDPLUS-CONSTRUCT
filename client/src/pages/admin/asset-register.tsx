@@ -51,6 +51,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   Form,
   FormControl,
@@ -340,6 +341,7 @@ function SortableHeader({ label, field, currentSort, currentDir, onSort }: {
 }
 
 export default function AssetRegisterPage() {
+  useDocumentTitle("Asset Register");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");

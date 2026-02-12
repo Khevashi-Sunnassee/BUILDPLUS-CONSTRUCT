@@ -103,7 +103,7 @@ export function SendTasksEmailDialog({
           const parsed = JSON.parse(jsonMatch[1]);
           errorMsg = parsed.error || errorMsg;
         }
-      } catch {}
+      } catch (error) { console.error("Failed to send task email:", error); }
       toast({ title: "Failed to send email", description: errorMsg, variant: "destructive" });
     },
   });

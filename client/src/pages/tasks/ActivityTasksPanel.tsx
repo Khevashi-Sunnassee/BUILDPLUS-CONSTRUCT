@@ -569,7 +569,7 @@ function ActivityTaskRow({
             data-testid={`select-status-${task.id}`}
           >
             <div
-              className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", STATUS_CONFIG[task.status as TaskStatus]?.bgClass || "bg-gray-500")}
+              className={cn("inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-semibold text-white", STATUS_CONFIG[task.status as TaskStatus]?.bgClass || "bg-muted-foreground")}
             >
               {STATUS_CONFIG[task.status as TaskStatus]?.label || task.status}
             </div>

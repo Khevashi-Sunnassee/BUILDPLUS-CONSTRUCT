@@ -602,7 +602,7 @@ export function BundlesListDialog({ open, onOpenChange }: BundlesListDialogProps
           </DialogHeader>
           {selectedBundleForQR && (
             <div className="flex flex-col items-center gap-4 py-4">
-              <div className="bg-white p-4 rounded-lg">
+              <div className="bg-background p-4 rounded-md">
                 <QRCodeSVG
                   value={`${window.location.origin}/bundle/${selectedBundleForQR.qrCodeId}`}
                   size={250}

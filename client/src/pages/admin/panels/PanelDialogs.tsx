@@ -332,7 +332,7 @@ export function QrCodeDialog({ open, onOpenChange, qrCodePanel, qrCodeRef }: QrC
             </div>
             <div 
               ref={qrCodeRef}
-              className="bg-white p-4 rounded-lg shadow-sm"
+              className="bg-background p-4 rounded-md"
               data-testid="qr-code-container"
             >
               <QRCodeSVG

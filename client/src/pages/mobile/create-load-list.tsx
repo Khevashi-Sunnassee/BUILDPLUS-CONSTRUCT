@@ -166,7 +166,7 @@ export default function MobileCreateLoadListPage() {
             scannerRef.current.stop();
           }
           scannerRef.current.clear();
-        } catch (e) {}
+        } catch (e) { console.error("Scanner processing error:", e); }
         scannerRef.current = null;
       }
     };

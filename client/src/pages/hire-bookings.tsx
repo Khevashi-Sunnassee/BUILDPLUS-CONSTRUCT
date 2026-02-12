@@ -23,6 +23,7 @@ import type { HireBooking, Employee, Job, Supplier, User } from "@shared/schema"
 import { ASSET_CATEGORIES } from "@shared/schema";
 import { HIRE_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface HireBookingWithDetails extends HireBooking {
   assetCategoryName: string;
@@ -67,6 +68,7 @@ function isOverdue(booking: HireBookingWithDetails): boolean {
 }
 
 export default function HireBookingsPage() {
+  useDocumentTitle("Hire Bookings");
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ON_HIRE");

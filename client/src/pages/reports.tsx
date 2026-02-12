@@ -55,6 +55,7 @@ import {
 } from "recharts";
 import { REPORTS_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface SheetData {
   sheetNumber: string;
@@ -128,6 +129,7 @@ const COLORS = [
 ];
 
 export default function ReportsPage() {
+  useDocumentTitle("Reports");
   const [period, setPeriod] = useState("week");
   const [activeTab, setActiveTab] = useState("overview");
   const [isExporting, setIsExporting] = useState(false);

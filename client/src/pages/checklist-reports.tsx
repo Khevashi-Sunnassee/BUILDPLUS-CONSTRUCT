@@ -339,7 +339,7 @@ export default function ChecklistReportsPage() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-gray-400" />
+                  <div className="h-3 w-3 rounded-full bg-muted-foreground" />
                   <span className="text-sm">Draft</span>
                 </div>
                 <span className="text-sm font-medium">{summary?.byStatus.draft || 0}</span>

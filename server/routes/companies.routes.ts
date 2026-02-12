@@ -66,7 +66,7 @@ router.put("/api/admin/companies/:id", requireRole("ADMIN"), async (req: Request
       return res.status(400).json({ error: result.error.format() });
     }
     const data = result.data;
-    const updateData: any = { ...data };
+    const updateData: Record<string, unknown> = { ...data };
     if (data.code) {
       updateData.code = data.code.toUpperCase();
     }

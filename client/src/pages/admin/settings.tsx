@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { GlobalSettings, Department } from "@shared/schema";
 import { ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const settingsSchema = z.object({
   tz: z.string().min(1, "Timezone is required"),
@@ -53,6 +54,7 @@ const settingsSchema = z.object({
 type SettingsFormData = z.infer<typeof settingsSchema>;
 
 export default function AdminSettingsPage() {
+  useDocumentTitle("Settings");
   const { toast } = useToast();
   const logoInputRef = useRef<HTMLInputElement>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -651,7 +653,7 @@ export default function AdminSettingsPage() {
             <Label>Company Logo</Label>
             <div className="flex items-center gap-6">
               <div className="flex-shrink-0">
-                <div className="w-24 h-24 rounded-lg border bg-white flex items-center justify-center overflow-hidden">
+                <div className="w-24 h-24 rounded-lg border bg-background flex items-center justify-center overflow-hidden">
                   {(logoPreview || settings?.logoBase64) ? (
                     <img 
                       src={logoPreview || settings?.logoBase64 || ""} 
@@ -662,7 +664,7 @@ export default function AdminSettingsPage() {
                   ) : (
                     <div className="flex flex-col items-center gap-1" data-testid="img-logo-preview">
                       <Building2 className="h-8 w-8 text-primary" />
-                      <span className="text-xs font-semibold text-gray-600">LTE Performance</span>
+                      <span className="text-xs font-semibold text-muted-foreground">LTE Performance</span>
                     </div>
                   )}
                 </div>

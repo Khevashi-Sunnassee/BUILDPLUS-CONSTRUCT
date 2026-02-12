@@ -83,6 +83,7 @@ import {
 import type { Item, ItemCategory, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 const itemSchema = z.object({
   code: z.string().optional(),
@@ -283,6 +284,7 @@ function CategoryPanel({
 }
 
 export default function AdminItemsPage() {
+  useDocumentTitle("Items");
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("categories");
   const [dialogOpen, setDialogOpen] = useState(false);

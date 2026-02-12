@@ -52,8 +52,10 @@ import { VisualComparisonDialog } from "./VisualComparisonDialog";
 import { BulkUploadDialog } from "./BulkUploadDialog";
 import { DocumentTable } from "./DocumentTable";
 import { BundleGridView } from "./BundleGridView";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 export default function DocumentRegister() {
+  useDocumentTitle("Document Register");
   const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");

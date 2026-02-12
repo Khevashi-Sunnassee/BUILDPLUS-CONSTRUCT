@@ -52,7 +52,7 @@ interface PanelDetails {
 
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-yellow-500",
-  NOT_STARTED: "bg-gray-500",
+  NOT_STARTED: "bg-muted-foreground",
   BOOKED: "bg-blue-500",
   IN_PROGRESS: "bg-orange-500",
   COMPLETED: "bg-green-500",
@@ -101,7 +101,7 @@ export default function PanelDetailsPage() {
           </p>
         </div>
         <Badge 
-          className={`${STATUS_COLORS[panel.status] || "bg-gray-500"} text-white text-sm px-3 py-1`}
+          className={`${STATUS_COLORS[panel.status] || "bg-muted-foreground"} text-white text-sm px-3 py-1`}
           data-testid="badge-status"
         >
           {panel.status.replace(/_/g, " ")}

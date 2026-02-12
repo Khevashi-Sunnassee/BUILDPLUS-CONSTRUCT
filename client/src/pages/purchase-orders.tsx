@@ -28,6 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import type { PurchaseOrder, PurchaseOrderItem, User, Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 
@@ -833,6 +834,7 @@ function formatCurrency(value: string | number | null | undefined): string {
 }
 
 export default function PurchaseOrdersPage() {
+  useDocumentTitle("Purchase Orders");
   const { toast } = useToast();
   const [, navigate] = useLocation();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");

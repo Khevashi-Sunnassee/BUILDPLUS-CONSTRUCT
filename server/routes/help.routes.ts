@@ -54,7 +54,7 @@ router.get("/api/help", requireAuth, async (req: Request, res: Response) => {
 router.get("/api/help/search", requireAuth, async (req: Request, res: Response) => {
   try {
     const { query, category, scope, route, limit = "50" } = req.query as Record<string, string>;
-    const conditions: any[] = [eq(helpEntries.status, "PUBLISHED")];
+    const conditions = [eq(helpEntries.status, "PUBLISHED")];
 
     if (category) {
       conditions.push(eq(helpEntries.category, category));
@@ -69,15 +69,16 @@ router.get("/api/help/search", requireAuth, async (req: Request, res: Response) 
     let results;
     if (query && typeof query === "string" && query.trim()) {
       const searchTerm = `%${query.trim()}%`;
-      conditions.push(
-        or(
-          ilike(helpEntries.key, searchTerm),
-          ilike(helpEntries.title, searchTerm),
-          ilike(helpEntries.shortText, searchTerm),
-          ilike(helpEntries.bodyMd, searchTerm),
-          sql`${searchTerm} ILIKE ANY(${helpEntries.keywords})`
-        )
+      const searchCondition = or(
+        ilike(helpEntries.key, searchTerm),
+        ilike(helpEntries.title, searchTerm),
+        ilike(helpEntries.shortText, searchTerm),
+        ilike(helpEntries.bodyMd, searchTerm),
+        sql`${searchTerm} ILIKE ANY(${helpEntries.keywords})`
       );
+      if (searchCondition) {
+        conditions.push(searchCondition);
+      }
     }
 
     results = await db

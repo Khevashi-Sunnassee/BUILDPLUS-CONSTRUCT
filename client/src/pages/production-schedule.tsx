@@ -17,6 +17,7 @@ import { Calendar, Check, ChevronDown, ChevronRight, Search, Plus, ClipboardList
 import { format, parseISO, addDays } from "date-fns";
 import type { Job } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface PanelStats {
   draft: number;
@@ -57,6 +58,7 @@ interface ScheduledProductionDay {
 type GroupBy = "none" | "job" | "date";
 
 export default function ProductionSchedulePage() {
+  useDocumentTitle("Production Schedule");
   const { toast } = useToast();
   
   const [jobFilter, setJobFilter] = useState<string>("all");

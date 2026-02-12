@@ -28,6 +28,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import {
   BarChart,
   Bar,
@@ -216,6 +217,7 @@ const WORK_TYPE_COLORS: Record<string, string> = {
 };
 
 export default function KPIDashboardPage() {
+  useDocumentTitle("KPI Dashboard");
   const [periodType, setPeriodType] = useState("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
@@ -443,7 +445,7 @@ export default function KPIDashboardPage() {
       const logoWidth = 24; // 2:1 aspect ratio for typical logo
       try {
         if (reportLogo) pdf.addImage(reportLogo, "PNG", margin, 6, logoWidth, logoHeight);
-      } catch (e) {}
+      } catch (e) { console.error("KPI data processing error:", e); }
       
       // Report title
       pdf.setTextColor(0, 0, 0);
@@ -961,7 +963,7 @@ export default function KPIDashboardPage() {
                   <CardTitle className="text-sm">Unassigned</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl font-bold text-gray-500" data-testid="text-unassigned-hours">
+                  <div className="text-xl font-bold text-muted-foreground" data-testid="text-unassigned-hours">
                     {draftingData?.totals?.unassignedHours?.toFixed(1) || "0"} hrs
                   </div>
                   <p className="text-xs text-muted-foreground">Not categorized</p>

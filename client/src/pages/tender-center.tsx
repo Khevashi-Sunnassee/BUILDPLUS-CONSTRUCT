@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -137,6 +138,7 @@ function formatCurrency(value: string | null | undefined): string {
 }
 
 export default function TenderCenterPage() {
+  useDocumentTitle("Tender Center");
   const { toast } = useToast();
   const [jobFilter, setJobFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");

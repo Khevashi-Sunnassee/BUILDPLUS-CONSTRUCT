@@ -34,6 +34,7 @@ import {
   Type,
 } from "lucide-react";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 interface ContractHubItem {
   jobId: string;
@@ -291,6 +292,7 @@ function POTermsDialog({ open, onOpenChange }: POTermsDialogProps) {
 }
 
 export default function ContractHubPage() {
+  useDocumentTitle("Contracts");
   const [, navigate] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");

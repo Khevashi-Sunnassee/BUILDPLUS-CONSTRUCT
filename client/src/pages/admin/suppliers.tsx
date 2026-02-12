@@ -28,6 +28,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import {
@@ -135,6 +136,7 @@ interface ImportResult {
 }
 
 export default function AdminSuppliersPage() {
+  useDocumentTitle("Suppliers");
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);

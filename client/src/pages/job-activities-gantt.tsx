@@ -635,7 +635,7 @@ export function GanttChart({
 
       <div className="flex items-center gap-4 px-3 py-1.5 bg-muted/30 border-t text-[10px] text-muted-foreground flex-wrap flex-shrink-0">
         <span className="flex items-center gap-1">
-          <span className="w-3 h-1.5 rounded-sm bg-gray-400 opacity-40 inline-block" /> Not Started
+          <span className="w-3 h-1.5 rounded-sm bg-muted-foreground opacity-40 inline-block" /> Not Started
         </span>
         <span className="flex items-center gap-1">
           <span className="w-3 h-1.5 rounded-sm bg-blue-500 opacity-85 inline-block" /> In Progress

@@ -94,7 +94,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
           const parsed = JSON.parse(jsonMatch[1]);
           errorMsg = parsed.error || errorMsg;
         }
-      } catch {}
+      } catch (error) { console.error("Failed to send document email:", error); }
       toast({ title: "Failed to send email", description: errorMsg, variant: "destructive" });
     },
   });

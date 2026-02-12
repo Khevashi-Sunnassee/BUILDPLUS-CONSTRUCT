@@ -10,7 +10,7 @@ const router = Router();
 router.get("/api/drafting-program", requireAuth, requirePermission("production_report", "VIEW"), async (req, res) => {
   try {
     const { jobId, status, assignedToId, dateFrom, dateTo } = req.query;
-    const filters: any = {};
+    const filters: Record<string, unknown> = {};
     if (jobId) filters.jobId = jobId as string;
     if (status) filters.status = status as string;
     if (assignedToId) filters.assignedToId = assignedToId as string;
@@ -126,9 +126,9 @@ router.patch("/api/drafting-program/:id", requireAuth, requirePermission("produc
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.errors.map(e => e.message).join(", ") });
     }
-    const updateData: any = { ...parsed.data };
+    const updateData: Record<string, unknown> = { ...parsed.data };
     if (updateData.completedAt) {
-      updateData.completedAt = new Date(updateData.completedAt);
+      updateData.completedAt = new Date(updateData.completedAt as string | number | Date);
     }
     const updated = await storage.updateDraftingProgram(String(req.params.id), updateData);
     if (!updated) return res.status(404).json({ error: "Drafting program entry not found" });

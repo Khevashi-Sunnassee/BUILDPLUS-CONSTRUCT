@@ -45,6 +45,7 @@ import { DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { useAuth } from "@/lib/auth";
 import { ShieldAlert } from "lucide-react";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -261,6 +262,7 @@ function FullscreenViewer({
 }
 
 export default function PhotoGallery() {
+  useDocumentTitle("Photo Gallery");
   const { user } = useAuth();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");

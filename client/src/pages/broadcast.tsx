@@ -76,6 +76,7 @@ import type { BroadcastTemplate, BroadcastMessage, BroadcastMessageWithDetails, 
 import type { User } from "@shared/schema";
 import { BROADCAST_ROUTES, USER_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { useDocumentTitle } from "@/hooks/use-document-title";
 
 type ChannelStatus = { sms: boolean; whatsapp: boolean; email: boolean };
 type CustomContact = { name: string; phone: string; email: string };
@@ -1401,6 +1402,7 @@ function HistoryTab() {
 }
 
 export default function BroadcastPage() {
+  useDocumentTitle("Broadcast");
   const [activeTab, setActiveTab] = useState("send");
 
   return (
