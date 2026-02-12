@@ -1615,6 +1615,7 @@ export const suppliers = pgTable("suppliers", {
   country: text("country").default("Australia"),
   paymentTerms: text("payment_terms"),
   notes: text("notes"),
+  defaultCostCodeId: varchar("default_cost_code_id", { length: 36 }),
   isActive: boolean("is_active").default(true).notNull(),
   isEquipmentHire: boolean("is_equipment_hire").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1623,6 +1624,7 @@ export const suppliers = pgTable("suppliers", {
   nameIdx: index("suppliers_name_idx").on(table.name),
   abnIdx: index("suppliers_abn_idx").on(table.abn),
   companyIdx: index("suppliers_company_idx").on(table.companyId),
+  defaultCostCodeIdx: index("suppliers_default_cost_code_idx").on(table.defaultCostCodeId),
 }));
 
 export const itemCategories = pgTable("item_categories", {

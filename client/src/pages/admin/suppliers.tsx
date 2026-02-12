@@ -21,6 +21,7 @@ import {
   ArrowUpDown,
   Search,
   X,
+  Tag,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,6 +77,14 @@ import type { Supplier } from "@shared/schema";
 import { PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 
+interface CostCode {
+  id: string;
+  code: string;
+  name: string;
+  parentId: string | null;
+  isActive: boolean;
+}
+
 const supplierSchema = z.object({
   name: z.string().min(1, "Name is required"),
   keyContact: z.string().optional().or(z.literal("")),
@@ -91,6 +100,7 @@ const supplierSchema = z.object({
   country: z.string().optional().or(z.literal("")),
   paymentTerms: z.string().optional().or(z.literal("")),
   notes: z.string().optional().or(z.literal("")),
+  defaultCostCodeId: z.string().optional().nullable().or(z.literal("")),
   isActive: z.boolean().default(true),
   isEquipmentHire: z.boolean().default(false),
 });
@@ -134,6 +144,7 @@ export default function AdminSuppliersPage() {
   const [sortColumn, setSortColumn] = useState<string>("name");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
+  const [costCodeFilter, setCostCodeFilter] = useState<string>("");
 
   const toggleSort = useCallback((column: string) => {
     if (sortColumn === column) {
@@ -153,18 +164,41 @@ export default function AdminSuppliersPage() {
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS],
   });
 
+  const { data: costCodes = [] } = useQuery<CostCode[]>({
+    queryKey: ["/api/cost-codes"],
+  });
+
+  const parentCostCodes = useMemo(() => costCodes.filter(cc => !cc.parentId), [costCodes]);
+
+  const costCodeMap = useMemo(() => {
+    const map: Record<string, CostCode> = {};
+    for (const cc of parentCostCodes) {
+      map[cc.id] = cc;
+    }
+    return map;
+  }, [parentCostCodes]);
+
   const suppliers = useMemo(() => {
     if (!suppliersRaw) return undefined;
     let filtered = suppliersRaw;
+    if (costCodeFilter) {
+      if (costCodeFilter === "__none__") {
+        filtered = filtered.filter(s => !s.defaultCostCodeId);
+      } else {
+        filtered = filtered.filter(s => s.defaultCostCodeId === costCodeFilter);
+      }
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = suppliersRaw.filter(s =>
+      filtered = filtered.filter(s =>
         (s.name || "").toLowerCase().includes(q) ||
         (s.keyContact || "").toLowerCase().includes(q) ||
         (s.email || "").toLowerCase().includes(q) ||
         (s.phone || "").toLowerCase().includes(q) ||
         (s.abn || "").toLowerCase().includes(q) ||
-        (s.city || "").toLowerCase().includes(q)
+        (s.city || "").toLowerCase().includes(q) ||
+        (s.defaultCostCodeId && costCodeMap[s.defaultCostCodeId] &&
+          (`${costCodeMap[s.defaultCostCodeId].code} ${costCodeMap[s.defaultCostCodeId].name}`).toLowerCase().includes(q))
       );
     }
     return [...filtered].sort((a, b) => {
@@ -176,13 +210,20 @@ export default function AdminSuppliersPage() {
         case "email": aVal = a.email || ""; bVal = b.email || ""; break;
         case "phone": aVal = a.phone || ""; bVal = b.phone || ""; break;
         case "abn": aVal = a.abn || ""; bVal = b.abn || ""; break;
+        case "costCode": {
+          const aCc = a.defaultCostCodeId ? costCodeMap[a.defaultCostCodeId] : null;
+          const bCc = b.defaultCostCodeId ? costCodeMap[b.defaultCostCodeId] : null;
+          aVal = aCc ? `${aCc.code} ${aCc.name}` : "";
+          bVal = bCc ? `${bCc.code} ${bCc.name}` : "";
+          break;
+        }
         case "status": aVal = a.isActive ? "Active" : "Inactive"; bVal = b.isActive ? "Active" : "Inactive"; break;
         default: aVal = a.name || ""; bVal = b.name || "";
       }
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [suppliersRaw, sortColumn, sortDirection, searchQuery]);
+  }, [suppliersRaw, sortColumn, sortDirection, searchQuery, costCodeFilter, costCodeMap]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -248,6 +289,7 @@ export default function AdminSuppliersPage() {
       country: "Australia",
       paymentTerms: "",
       notes: "",
+      defaultCostCodeId: "",
       isActive: true,
       isEquipmentHire: false,
     },
@@ -318,6 +360,7 @@ export default function AdminSuppliersPage() {
       country: "Australia",
       paymentTerms: "",
       notes: "",
+      defaultCostCodeId: "",
       isActive: true,
       isEquipmentHire: false,
     });
@@ -341,6 +384,7 @@ export default function AdminSuppliersPage() {
       country: supplier.country || "Australia",
       paymentTerms: supplier.paymentTerms || "",
       notes: supplier.notes || "",
+      defaultCostCodeId: supplier.defaultCostCodeId || "",
       isActive: supplier.isActive,
       isEquipmentHire: supplier.isEquipmentHire,
     });
@@ -348,10 +392,14 @@ export default function AdminSuppliersPage() {
   };
 
   const onSubmit = (data: SupplierFormData) => {
+    const payload = {
+      ...data,
+      defaultCostCodeId: data.defaultCostCodeId || null,
+    };
     if (editingSupplier) {
-      updateSupplierMutation.mutate({ id: editingSupplier.id, data });
+      updateSupplierMutation.mutate({ id: editingSupplier.id, data: payload });
     } else {
-      createSupplierMutation.mutate(data);
+      createSupplierMutation.mutate(payload);
     }
   };
 
@@ -390,24 +438,56 @@ export default function AdminSuppliersPage() {
         </div>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search suppliers..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 pr-9"
-          data-testid="input-search-suppliers"
-        />
-        {searchQuery && (
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative max-w-sm flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search suppliers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-9"
+            data-testid="input-search-suppliers"
+          />
+          {searchQuery && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+              onClick={() => setSearchQuery("")}
+              data-testid="button-clear-search-suppliers"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+        <div className="w-[250px]">
+          <Select value={costCodeFilter || "all"} onValueChange={(v) => setCostCodeFilter(v === "all" ? "" : v)}>
+            <SelectTrigger data-testid="select-filter-cost-code">
+              <div className="flex items-center gap-2">
+                <Tag className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="Filter by cost code..." />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cost Codes</SelectItem>
+              <SelectItem value="__none__">No Cost Code</SelectItem>
+              {parentCostCodes.filter(cc => cc.isActive).map((cc) => (
+                <SelectItem key={cc.id} value={cc.id}>
+                  {cc.code} - {cc.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {costCodeFilter && (
           <Button
             variant="ghost"
-            size="icon"
-            className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-            onClick={() => setSearchQuery("")}
-            data-testid="button-clear-search-suppliers"
+            size="sm"
+            onClick={() => setCostCodeFilter("")}
+            data-testid="button-clear-cost-code-filter"
           >
-            <X className="h-3 w-3" />
+            <X className="h-3 w-3 mr-1" />
+            Clear Filter
           </Button>
         )}
       </div>
@@ -439,6 +519,9 @@ export default function AdminSuppliersPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("phone")} data-testid="sort-supplier-phone">
                     <span className="flex items-center">Phone<SortIcon column="phone" /></span>
                   </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("costCode")} data-testid="sort-supplier-cost-code">
+                    <span className="flex items-center">Cost Code<SortIcon column="costCode" /></span>
+                  </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-supplier-status">
                     <span className="flex items-center">Status<SortIcon column="status" /></span>
                   </TableHead>
@@ -459,6 +542,15 @@ export default function AdminSuppliersPage() {
                     </TableCell>
                     <TableCell data-testid={`text-supplier-phone-${supplier.id}`}>
                       {supplier.phone || "-"}
+                    </TableCell>
+                    <TableCell data-testid={`text-supplier-cost-code-${supplier.id}`}>
+                      {supplier.defaultCostCodeId && costCodeMap[supplier.defaultCostCodeId] ? (
+                        <Badge variant="outline" className="text-xs font-normal">
+                          {costCodeMap[supplier.defaultCostCodeId].code} - {costCodeMap[supplier.defaultCostCodeId].name}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 flex-wrap">
@@ -590,6 +682,35 @@ export default function AdminSuppliersPage() {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="defaultCostCodeId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Cost Code (Parent)</FormLabel>
+                    <Select
+                      onValueChange={(v) => field.onChange(v === "__none__" ? null : v)}
+                      value={field.value || "__none__"}
+                    >
+                      <FormControl>
+                        <SelectTrigger data-testid="select-supplier-cost-code">
+                          <SelectValue placeholder="Select cost code..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="__none__">No cost code</SelectItem>
+                        {parentCostCodes.filter(cc => cc.isActive).map((cc) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            {cc.code} - {cc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               <div className="grid grid-cols-2 gap-4">
                 <FormField

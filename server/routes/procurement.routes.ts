@@ -25,6 +25,7 @@ const supplierSchema = z.object({
   country: z.string().max(100).optional().nullable().or(z.literal("")),
   paymentTerms: z.string().max(255).optional().nullable().or(z.literal("")),
   notes: z.string().max(5000).optional().nullable().or(z.literal("")),
+  defaultCostCodeId: z.string().max(36).optional().nullable().or(z.literal("")),
   isActive: z.boolean().optional(),
   isEquipmentHire: z.boolean().optional(),
 });
