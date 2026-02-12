@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Pencil, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
-  Receipt, Target, Settings2,
+  Receipt, Target, Settings2, ListPlus,
 } from "lucide-react";
 import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
 
@@ -212,6 +212,21 @@ export default function JobBudgetPage() {
     },
   });
 
+  const createFromCostCodesMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", `/api/jobs/${jobId}/budget/lines/create-from-cost-codes`);
+    },
+    onSuccess: async (res: Response) => {
+      const data = await res.json();
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "lines"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "summary"] });
+      toast({ title: data.message || `Created ${data.created} budget line(s)` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   function openCreateLine() {
     setEditingLine(null);
     setLineCostCodeId("");
@@ -332,6 +347,19 @@ export default function JobBudgetPage() {
             <Button variant="outline" onClick={openBudgetEdit} data-testid="button-edit-budget">
               <Settings2 className="h-4 w-4 mr-2" />
               Edit Budget
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => createFromCostCodesMutation.mutate()}
+              disabled={createFromCostCodesMutation.isPending}
+              data-testid="button-create-from-cost-codes"
+            >
+              {createFromCostCodesMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <ListPlus className="h-4 w-4 mr-2" />
+              )}
+              Create from Cost Codes
             </Button>
             <Button onClick={openCreateLine} data-testid="button-add-line">
               <Plus className="h-4 w-4 mr-2" />

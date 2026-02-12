@@ -4,8 +4,8 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobBudgets, budgetLines, budgetLineFiles, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs } from "@shared/schema";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { jobBudgets, budgetLines, budgetLineFiles, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs, jobCostCodes } from "@shared/schema";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 const router = Router();
 
@@ -388,6 +388,77 @@ router.get("/api/jobs/:jobId/budget/summary", requireAuth, requirePermission("bu
   } catch (error: any) {
     logger.error("Error fetching budget summary:", error);
     res.status(500).json({ message: "Failed to fetch budget summary" });
+  }
+});
+
+router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const jobId = req.params.jobId;
+
+    const [budget] = await db
+      .select({ id: jobBudgets.id })
+      .from(jobBudgets)
+      .where(and(eq(jobBudgets.jobId, jobId), eq(jobBudgets.companyId, companyId)));
+
+    if (!budget) {
+      return res.status(404).json({ message: "Budget not found for this job. Create a budget first." });
+    }
+
+    const jobCostCodeRows = await db
+      .select({
+        costCodeId: jobCostCodes.costCodeId,
+        costCode: costCodes.code,
+        costCodeName: costCodes.name,
+        isActive: costCodes.isActive,
+        isDisabled: jobCostCodes.isDisabled,
+        sortOrder: jobCostCodes.sortOrder,
+      })
+      .from(jobCostCodes)
+      .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
+      .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
+      .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
+
+    if (jobCostCodeRows.length === 0) {
+      return res.status(400).json({ message: "No cost codes assigned to this job. Assign cost codes to the job's type first, then inherit them." });
+    }
+
+    const existingLines = await db
+      .select({ costCodeId: budgetLines.costCodeId })
+      .from(budgetLines)
+      .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)));
+
+    const existingCostCodeIds = new Set(existingLines.map(l => l.costCodeId));
+
+    const newCostCodes = jobCostCodeRows.filter(
+      cc => cc.isActive && !cc.isDisabled && !existingCostCodeIds.has(cc.costCodeId)
+    );
+
+    if (newCostCodes.length === 0) {
+      return res.json({ created: 0, skipped: jobCostCodeRows.length, message: "All cost codes already have budget lines or are inactive/disabled." });
+    }
+
+    const insertValues = newCostCodes.map((cc, idx) => ({
+      companyId,
+      budgetId: budget.id,
+      jobId,
+      costCodeId: cc.costCodeId,
+      estimatedBudget: "0",
+      variationsAmount: "0",
+      forecastCost: "0",
+      sortOrder: existingLines.length + idx,
+    }));
+
+    await db.insert(budgetLines).values(insertValues);
+
+    res.json({
+      created: newCostCodes.length,
+      skipped: jobCostCodeRows.length - newCostCodes.length,
+      message: `Created ${newCostCodes.length} budget line(s) from cost codes.`,
+    });
+  } catch (error: any) {
+    logger.error("Error creating budget lines from cost codes:", error);
+    res.status(500).json({ message: "Failed to create budget lines from cost codes" });
   }
 });
 
