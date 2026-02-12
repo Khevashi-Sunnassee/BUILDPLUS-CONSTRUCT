@@ -95,6 +95,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { PageHelpButton } from "@/components/help/page-help-button";
+import { ChecklistForm, calculateCompletionRate, getMissingRequiredFields } from "@/components/checklist/checklist-form";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CHECKLIST_ROUTES } from "@shared/api-routes";
+import type { ChecklistInstance, ChecklistTemplate } from "@shared/schema";
+import { Save, Send, CheckCircle } from "lucide-react";
 
 const formatCurrency = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return "-";
@@ -384,6 +389,22 @@ export default function AssetRegisterPage() {
   });
 
   const [serviceChecklistAssetId, setServiceChecklistAssetId] = useState<string | null>(null);
+  const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
+  const [serviceInstanceId, setServiceInstanceId] = useState<string | null>(null);
+  const [serviceResponses, setServiceResponses] = useState<Record<string, unknown>>({});
+  const [serviceHasChanges, setServiceHasChanges] = useState(false);
+  const [serviceCompleteDialogOpen, setServiceCompleteDialogOpen] = useState(false);
+
+  const { data: serviceInstance } = useQuery<ChecklistInstance>({
+    queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!)],
+    enabled: !!serviceInstanceId && serviceDialogOpen,
+  });
+
+  const { data: serviceTemplate } = useQuery<ChecklistTemplate>({
+    queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(serviceInstance?.templateId || "")],
+    enabled: !!serviceInstance?.templateId && serviceDialogOpen,
+  });
+
   const serviceChecklistMutation = useMutation({
     mutationFn: async (asset: Asset) => {
       const res = await apiRequest("POST", "/api/checklist/instances/from-asset", {
@@ -399,13 +420,72 @@ export default function AssetRegisterPage() {
     onSuccess: (data: any) => {
       toast({ title: "Service checklist created" });
       setServiceChecklistAssetId(null);
-      navigate(`/checklists/${data.id}`);
+      setServiceInstanceId(data.id);
+      setServiceResponses(data.responses || {});
+      setServiceHasChanges(false);
+      setServiceDialogOpen(true);
     },
     onError: (error: any) => {
       toast({ title: "Failed to create service checklist", description: error.message, variant: "destructive" });
       setServiceChecklistAssetId(null);
     },
   });
+
+  const saveServiceMutation = useMutation({
+    mutationFn: async () => {
+      const completionRate = serviceTemplate ? calculateCompletionRate(serviceTemplate, serviceResponses) : 0;
+      return apiRequest("PUT", CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!), {
+        responses: serviceResponses,
+        completionRate: completionRate.toFixed(2),
+        status: serviceInstance?.status === "draft" ? "in_progress" : serviceInstance?.status,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!)] });
+      setServiceHasChanges(false);
+      toast({ title: "Saved", description: "Your progress has been saved" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save progress", variant: "destructive" });
+    },
+  });
+
+  const completeServiceMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("PUT", CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!), {
+        responses: serviceResponses,
+        completionRate: "100",
+      });
+      return apiRequest("PATCH", CHECKLIST_ROUTES.INSTANCE_COMPLETE(serviceInstanceId!));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!)] });
+      setServiceHasChanges(false);
+      setServiceCompleteDialogOpen(false);
+      toast({ title: "Completed", description: "Service checklist has been completed" });
+      setServiceDialogOpen(false);
+      setServiceInstanceId(null);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to complete checklist", variant: "destructive" });
+    },
+  });
+
+  const handleServiceComplete = () => {
+    if (!serviceTemplate) return;
+    const missing = getMissingRequiredFields(serviceTemplate, serviceResponses);
+    if (missing.length > 0) {
+      toast({
+        title: "Missing Required Fields",
+        description: `Please complete: ${missing.slice(0, 3).join(", ")}${missing.length > 3 ? ` and ${missing.length - 3} more` : ""}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setServiceCompleteDialogOpen(true);
+  };
 
   const filteredRepairRequests = useMemo(() => {
     if (serviceStatusFilter === "all") return allRepairRequests;
@@ -2294,6 +2374,117 @@ export default function AssetRegisterPage() {
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={serviceDialogOpen} onOpenChange={(open) => {
+        if (!open && serviceHasChanges) {
+          if (confirm("You have unsaved changes. Close anyway?")) {
+            setServiceDialogOpen(false);
+            setServiceInstanceId(null);
+          }
+        } else {
+          setServiceDialogOpen(open);
+          if (!open) setServiceInstanceId(null);
+        }
+      }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col" data-testid="dialog-service-checklist">
+          <DialogHeader className="flex-shrink-0">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <DialogTitle>{serviceTemplate?.name || "Service Checklist"}</DialogTitle>
+                <DialogDescription>{serviceTemplate?.description || "Complete the equipment maintenance checklist"}</DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                {serviceHasChanges && (
+                  <Badge variant="outline">Unsaved Changes</Badge>
+                )}
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto min-h-0 pr-1">
+            {serviceInstance?.status === "completed" || serviceInstance?.status === "signed_off" ? (
+              <Alert className="mb-4">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  This checklist has been completed and can no longer be edited.
+                  {serviceInstance.completedAt && (
+                    <span className="ml-1">
+                      Completed on {new Date(serviceInstance.completedAt).toLocaleDateString()}
+                    </span>
+                  )}
+                </AlertDescription>
+              </Alert>
+            ) : null}
+            {serviceTemplate ? (
+              <ChecklistForm
+                template={serviceTemplate}
+                responses={serviceResponses}
+                onChange={(newResponses) => {
+                  setServiceResponses(newResponses);
+                  setServiceHasChanges(true);
+                }}
+                disabled={serviceInstance?.status === "completed" || serviceInstance?.status === "signed_off"}
+                showProgress={serviceInstance?.status !== "completed" && serviceInstance?.status !== "signed_off"}
+              />
+            ) : (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+          {serviceInstance?.status !== "completed" && serviceInstance?.status !== "signed_off" && serviceTemplate && (
+            <DialogFooter className="flex-shrink-0 gap-2">
+              <Button
+                variant="outline"
+                onClick={() => saveServiceMutation.mutate()}
+                disabled={!serviceHasChanges || saveServiceMutation.isPending}
+                data-testid="button-save-service-checklist"
+              >
+                {saveServiceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Progress
+              </Button>
+              <Button
+                onClick={handleServiceComplete}
+                disabled={completeServiceMutation.isPending}
+                data-testid="button-complete-service-checklist"
+              >
+                {completeServiceMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4 mr-2" />
+                )}
+                Complete
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={serviceCompleteDialogOpen} onOpenChange={setServiceCompleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Complete Service Checklist?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Once completed, this checklist cannot be edited. Make sure all fields are filled correctly.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-service-complete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => completeServiceMutation.mutate()}
+              data-testid="button-confirm-service-complete"
+            >
+              {completeServiceMutation.isPending && (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              )}
+              Complete Checklist
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
