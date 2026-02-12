@@ -1,11 +1,17 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import multer from "multer";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobBudgets, budgetLines, budgetLineFiles, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs, jobCostCodes, costCodeDefaults } from "@shared/schema";
+import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
 
 const router = Router();
 
@@ -73,12 +79,47 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
       .orderBy(asc(budgetLines.sortOrder));
 
+    const lineIds = lines.map(l => l.line.id);
+
+    let updatesCounts: Record<string, number> = {};
+    let filesCounts: Record<string, number> = {};
+
+    if (lineIds.length > 0) {
+      const updatesCountRows = await db
+        .select({
+          budgetLineId: budgetLineUpdates.budgetLineId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(budgetLineUpdates)
+        .where(inArray(budgetLineUpdates.budgetLineId, lineIds))
+        .groupBy(budgetLineUpdates.budgetLineId);
+
+      for (const row of updatesCountRows) {
+        updatesCounts[row.budgetLineId] = row.count;
+      }
+
+      const filesCountRows = await db
+        .select({
+          budgetLineId: budgetLineFiles.budgetLineId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(budgetLineFiles)
+        .where(inArray(budgetLineFiles.budgetLineId, lineIds))
+        .groupBy(budgetLineFiles.budgetLineId);
+
+      for (const row of filesCountRows) {
+        filesCounts[row.budgetLineId] = row.count;
+      }
+    }
+
     const mappedLines = lines.map((row) => ({
       ...row.line,
       costCode: row.costCode,
       childCostCode: row.childCostCode?.id ? row.childCostCode : null,
       tenderSubmission: row.tenderSubmission?.id ? row.tenderSubmission : null,
       contractor: row.contractor?.id ? row.contractor : null,
+      updatesCount: updatesCounts[row.line.id] || 0,
+      filesCount: filesCounts[row.line.id] || 0,
     }));
 
     res.json({ ...budget, lines: mappedLines });
@@ -554,6 +595,156 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
   } catch (error: any) {
     logger.error("Error creating budget lines from cost codes:", error);
     res.status(500).json({ message: "Failed to create budget lines from cost codes" });
+  }
+});
+
+// ============================================================================
+// Budget Line Updates (Comments)
+// ============================================================================
+
+router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const lineId = req.params.lineId;
+    const updates = await db
+      .select({
+        id: budgetLineUpdates.id,
+        budgetLineId: budgetLineUpdates.budgetLineId,
+        userId: budgetLineUpdates.userId,
+        content: budgetLineUpdates.content,
+        createdAt: budgetLineUpdates.createdAt,
+        user: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(budgetLineUpdates)
+      .innerJoin(users, eq(budgetLineUpdates.userId, users.id))
+      .where(eq(budgetLineUpdates.budgetLineId, lineId))
+      .orderBy(desc(budgetLineUpdates.createdAt));
+
+    const filesForUpdates = await db
+      .select()
+      .from(budgetLineFiles)
+      .where(and(
+        eq(budgetLineFiles.budgetLineId, lineId),
+        sql`${budgetLineFiles.updateId} IS NOT NULL`
+      ));
+
+    const updatesWithFiles = updates.map(u => ({
+      ...u,
+      files: filesForUpdates.filter(f => f.updateId === u.id),
+    }));
+
+    res.json(updatesWithFiles);
+  } catch (error: any) {
+    logger.error("Error fetching budget line updates:", error);
+    res.status(500).json({ message: "Failed to fetch updates" });
+  }
+});
+
+router.post("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const lineId = req.params.lineId;
+    const userId = req.session.userId!;
+    const { content } = z.object({ content: z.string().min(1) }).parse(req.body);
+
+    const [update] = await db
+      .insert(budgetLineUpdates)
+      .values({ budgetLineId: lineId, userId, content })
+      .returning();
+
+    res.status(201).json(update);
+  } catch (error: any) {
+    logger.error("Error creating budget line update:", error);
+    res.status(500).json({ message: "Failed to create update" });
+  }
+});
+
+router.delete("/api/budget-line-updates/:id", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    await db.delete(budgetLineUpdates).where(eq(budgetLineUpdates.id, req.params.id));
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error("Error deleting budget line update:", error);
+    res.status(500).json({ message: "Failed to delete update" });
+  }
+});
+
+// ============================================================================
+// Budget Line Files
+// ============================================================================
+
+router.get("/api/budget-lines/:lineId/files", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const lineId = req.params.lineId;
+    const files = await db
+      .select({
+        id: budgetLineFiles.id,
+        budgetLineId: budgetLineFiles.budgetLineId,
+        updateId: budgetLineFiles.updateId,
+        fileName: budgetLineFiles.fileName,
+        fileUrl: budgetLineFiles.fileUrl,
+        fileSize: budgetLineFiles.fileSize,
+        mimeType: budgetLineFiles.mimeType,
+        uploadedById: budgetLineFiles.uploadedById,
+        createdAt: budgetLineFiles.createdAt,
+        uploadedBy: {
+          id: users.id,
+          name: users.name,
+          email: users.email,
+        },
+      })
+      .from(budgetLineFiles)
+      .leftJoin(users, eq(budgetLineFiles.uploadedById, users.id))
+      .where(eq(budgetLineFiles.budgetLineId, lineId))
+      .orderBy(desc(budgetLineFiles.createdAt));
+
+    res.json(files);
+  } catch (error: any) {
+    logger.error("Error fetching budget line files:", error);
+    res.status(500).json({ message: "Failed to fetch files" });
+  }
+});
+
+router.post("/api/budget-lines/:lineId/files", requireAuth, requirePermission("budgets", "VIEW"), upload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const lineId = req.params.lineId;
+    const userId = req.session.userId!;
+    const file = req.file;
+    if (!file) return res.status(400).json({ message: "No file uploaded" });
+
+    const base64 = file.buffer.toString("base64");
+    const dataUrl = `data:${file.mimetype};base64,${base64}`;
+    const updateId = req.body.updateId || null;
+
+    const [created] = await db
+      .insert(budgetLineFiles)
+      .values({
+        budgetLineId: lineId,
+        updateId,
+        fileName: file.originalname,
+        fileUrl: dataUrl,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        uploadedById: userId,
+      })
+      .returning();
+
+    res.status(201).json(created);
+  } catch (error: any) {
+    logger.error("Error uploading budget line file:", error);
+    res.status(500).json({ message: "Failed to upload file" });
+  }
+});
+
+router.delete("/api/budget-line-files/:id", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    await db.delete(budgetLineFiles).where(eq(budgetLineFiles.id, req.params.id));
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error("Error deleting budget line file:", error);
+    res.status(500).json({ message: "Failed to delete file" });
   }
 });
 

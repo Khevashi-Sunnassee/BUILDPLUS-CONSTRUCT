@@ -4223,13 +4223,18 @@ export const budgetLines = pgTable("budget_lines", {
 export const budgetLineFiles = pgTable("budget_line_files", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   budgetLineId: varchar("budget_line_id", { length: 36 }).notNull().references(() => budgetLines.id, { onDelete: "cascade" }),
+  updateId: varchar("update_id", { length: 36 }),
   documentId: varchar("document_id", { length: 36 }).references(() => documents.id),
   fileName: text("file_name"),
   filePath: text("file_path"),
+  fileUrl: text("file_url"),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
   uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   budgetLineIdx: index("budget_line_files_line_idx").on(table.budgetLineId),
+  updateIdx: index("budget_line_files_update_idx").on(table.updateId),
 }));
 
 // BOQ Groups (buildings, levels, etc.) under cost subcodes
@@ -4333,6 +4338,21 @@ export type JobBudget = typeof jobBudgets.$inferSelect;
 export const insertBudgetLineSchema = createInsertSchema(budgetLines).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertBudgetLine = z.infer<typeof insertBudgetLineSchema>;
 export type BudgetLine = typeof budgetLines.$inferSelect;
+
+export const budgetLineUpdates = pgTable("budget_line_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  budgetLineId: varchar("budget_line_id", { length: 36 }).notNull().references(() => budgetLines.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  budgetLineIdx: index("budget_line_updates_line_idx").on(table.budgetLineId),
+  createdAtIdx: index("budget_line_updates_created_at_idx").on(table.createdAt),
+}));
+
+export const insertBudgetLineUpdateSchema = createInsertSchema(budgetLineUpdates).omit({ id: true, createdAt: true });
+export type InsertBudgetLineUpdate = z.infer<typeof insertBudgetLineUpdateSchema>;
+export type BudgetLineUpdate = typeof budgetLineUpdates.$inferSelect;
 
 export const insertBudgetLineFileSchema = createInsertSchema(budgetLineFiles).omit({ id: true, createdAt: true });
 export type InsertBudgetLineFile = z.infer<typeof insertBudgetLineFileSchema>;

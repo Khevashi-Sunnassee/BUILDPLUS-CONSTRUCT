@@ -27,14 +27,19 @@ import {
 import {
   Plus, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
   Receipt, Target, Settings2, ListPlus, ChevronDown, ChevronRight, X,
+  MessageSquare, Paperclip,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
+import { BudgetLineSidebar } from "@/components/budget/BudgetLineSidebar";
 
 interface BudgetLineWithDetails extends BudgetLine {
   costCode: { id: string; code: string; name: string };
   childCostCode: { id: string; code: string; name: string } | null;
   tenderSubmission: { id: string; totalPrice: string | null; status: string } | null;
   contractor: { id: string; name: string } | null;
+  updatesCount: number;
+  filesCount: number;
 }
 
 interface BudgetWithLines extends JobBudget {
@@ -90,6 +95,8 @@ export default function JobBudgetPage() {
   const [lineForecastCost, setLineForecastCost] = useState("");
   const [lineNotes, setLineNotes] = useState("");
   const [lineContractorId, setLineContractorId] = useState("");
+  const [sidebarLine, setSidebarLine] = useState<BudgetLineWithDetails | null>(null);
+  const [sidebarTab, setSidebarTab] = useState<"updates" | "files">("updates");
 
   const { data: job, isLoading: loadingJob } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
@@ -620,11 +627,12 @@ export default function JobBudgetPage() {
                       <TableHead className="w-10"></TableHead>
                       <TableHead className="w-28">Code</TableHead>
                       <TableHead>Name</TableHead>
+                      <TableHead className="w-16 text-center"></TableHead>
                       <TableHead className="text-right w-36">Estimated Budget</TableHead>
                       <TableHead className="text-right w-36">Variations</TableHead>
                       <TableHead className="text-right w-36">Forecast Cost</TableHead>
                       <TableHead className="hidden lg:table-cell w-48">Notes</TableHead>
-                      <TableHead className="w-24 text-right">Actions</TableHead>
+                      <TableHead className="w-16 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -650,6 +658,7 @@ export default function JobBudgetPage() {
                             <TableCell className="font-bold" data-testid={`text-parent-name-${group.parentCostCodeId}`}>
                               {group.parentName}
                             </TableCell>
+                            <TableCell />
                             <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-estimated-${group.parentCostCodeId}`}>
                               {formatCurrency(group.totalEstimated)}
                             </TableCell>
@@ -674,6 +683,50 @@ export default function JobBudgetPage() {
                                 </TableCell>
                                 <TableCell className="text-sm" data-testid={`text-line-name-${line.id}`}>
                                   {line.childCostCode ? line.childCostCode.name : line.costCode.name}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="relative">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => { e.stopPropagation(); setSidebarLine(line); setSidebarTab("updates"); }}
+                                            data-testid={`btn-line-updates-${line.id}`}
+                                          >
+                                            <MessageSquare className="h-4 w-4" />
+                                          </Button>
+                                          {line.updatesCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] rounded-full h-4 w-4 flex items-center justify-center pointer-events-none">
+                                              {line.updatesCount}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Updates ({line.updatesCount})</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <div className="relative">
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={(e) => { e.stopPropagation(); setSidebarLine(line); setSidebarTab("files"); }}
+                                            data-testid={`btn-line-files-${line.id}`}
+                                          >
+                                            <Paperclip className="h-4 w-4" />
+                                          </Button>
+                                          {line.filesCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] rounded-full h-4 w-4 flex items-center justify-center pointer-events-none">
+                                              {line.filesCount}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Files ({line.filesCount})</TooltipContent>
+                                    </Tooltip>
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-right p-1">
                                   {isEditing ? (
@@ -781,6 +834,7 @@ export default function JobBudgetPage() {
                       <TableRow className="bg-muted/50 font-medium" data-testid="row-budget-totals">
                         <TableCell />
                         <TableCell colSpan={2} className="font-bold">Totals</TableCell>
+                        <TableCell />
                         <TableCell className="text-right font-mono font-bold" data-testid="text-totals-estimated">
                           {formatCurrency(summary.totalEstimatedBudget)}
                         </TableCell>
@@ -1008,6 +1062,19 @@ export default function JobBudgetPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {jobId && (
+        <BudgetLineSidebar
+          line={sidebarLine ? {
+            id: sidebarLine.id,
+            costCode: sidebarLine.costCode,
+            childCostCode: sidebarLine.childCostCode,
+          } : null}
+          jobId={jobId}
+          onClose={() => setSidebarLine(null)}
+          initialTab={sidebarTab}
+        />
+      )}
     </div>
   );
 }
