@@ -2084,4 +2084,423 @@ router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, a
   }
 });
 
+// ============================================================================
+// Drawing Package Processor
+// ============================================================================
+
+const drawingPackageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === "application/pdf") cb(null, true);
+    else cb(new Error("Only PDF files are supported for drawing packages"));
+  },
+});
+
+router.post("/api/documents/drawing-package/analyze", requireAuth, drawingPackageUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: "No PDF file provided" });
+    }
+
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const { spawn } = await import("child_process");
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "drawing-pkg-"));
+    const inputPath = path.join(tempDir, "input.pdf");
+    fs.writeFileSync(inputPath, file.buffer);
+
+    const pythonScript = `
+import fitz
+import json
+import re
+import sys
+import os
+
+pdf_path = sys.argv[1]
+doc = fitz.open(pdf_path)
+pages = []
+
+def extract_field(text, patterns, default=""):
+    for p in patterns:
+        m = re.search(p, text, re.IGNORECASE)
+        if m:
+            return m.group(1).strip()
+    return default
+
+for i in range(len(doc)):
+    page = doc[i]
+    text = page.get_text("text")
+    
+    drawing_number = extract_field(text, [
+        r'(?:DWG|DRAWING)\\s*(?:NO|NUMBER|#|NUM)[.:\\s]*([A-Z0-9][A-Z0-9\\-_./]+)',
+        r'([A-Z]{2,6}[\\-_][A-Z]{2,6}[\\-_]\\d{3,6})',
+        r'([A-Z]{2,}[\\-_]\\d{4,})',
+        r'(?:^|\\n)([A-Z0-9]{2,}[\\-][A-Z0-9]{2,}[\\-][A-Z0-9]+)',
+    ])
+    
+    title = extract_field(text, [
+        r'(?:TITLE|DESCRIPTION)[:\\s]+([A-Z][A-Z\\s\\-0-9]+(?:PLAN|VIEW|SECTION|ELEVATION|DETAIL|ARRANGEMENT|LAYOUT|SCHEDULE))',
+        r'((?:GENERAL\\s+ARRANGEMENT|FLOOR\\s+PLAN|SITE\\s+PLAN|ROOF\\s+PLAN|ELEVATION|SECTION|DETAIL|LAYOUT)[\\sA-Z0-9\\-]*)',
+    ])
+    
+    revision = extract_field(text, [
+        r'(?:REV|REVISION)[\\s.:\\-]*([A-Z0-9]{1,4})',
+        r'\\b(P\\d{1,3})\\b',
+        r'\\b(Rev\\s*[A-Z0-9]{1,3})\\b',
+    ])
+    
+    scale = extract_field(text, [
+        r'(?:SCALE)[:\\s]*(1\\s*:\\s*\\d+)',
+        r'(1\\s*:\\s*\\d{2,4})',
+    ])
+    
+    project_name = extract_field(text, [
+        r'(?:CLIENT|EMPLOYER)[:\\s]+([A-Za-z][A-Za-z\\s&.,]+)',
+        r'(?:PROJECT|JOB|SITE)[:\\s]+([A-Za-z][A-Za-z\\s&.,0-9]+)',
+    ])
+    
+    project_number = extract_field(text, [
+        r'(?:PROJECT|JOB)\\s*(?:NO|NUMBER|#|NUM)[.:\\s]*(\\d{3,}[A-Z0-9\\-]*)',
+    ])
+    
+    discipline = ""
+    if drawing_number:
+        dn_upper = drawing_number.upper()
+        if "ARCH" in dn_upper: discipline = "Architecture"
+        elif "STRUC" in dn_upper or "STR" in dn_upper: discipline = "Structural"
+        elif "MECH" in dn_upper or "MEC" in dn_upper: discipline = "Mechanical"
+        elif "ELEC" in dn_upper or "ELE" in dn_upper: discipline = "Electrical"
+        elif "CIVIL" in dn_upper or "CIV" in dn_upper: discipline = "Civil"
+        elif "PLUMB" in dn_upper or "HYD" in dn_upper: discipline = "Hydraulic"
+    
+    level = extract_field(text, [
+        r'(?:LEVEL|LVL|FLOOR)\\s*(\\d+)',
+        r'\\bL(\\d{1,2})\\b',
+    ])
+    
+    client = extract_field(text, [
+        r'(?:CLIENT|EMPLOYER)[:\\s]+([A-Za-z][A-Za-z\\s&.,]+)',
+    ])
+    
+    date = extract_field(text, [
+        r'(?:DATE|DATED)[:\\s]*(\\d{1,2}[/.]\\d{1,2}[/.]\\d{2,4})',
+        r'(\\d{1,2}[/.]\\d{1,2}[/.]\\d{4})',
+    ])
+    
+    pages.append({
+        "pageNumber": i + 1,
+        "drawingNumber": drawing_number,
+        "title": title if title else f"Page {i+1}",
+        "revision": revision,
+        "scale": scale,
+        "projectName": project_name,
+        "projectNumber": project_number,
+        "discipline": discipline,
+        "level": level,
+        "client": client,
+        "date": date,
+        "textPreview": text[:300].replace("\\n", " ").strip(),
+    })
+
+doc.close()
+print(json.dumps({"totalPages": len(pages), "pages": pages}))
+`;
+
+    const result: string = await new Promise((resolve, reject) => {
+      let output = "";
+      let errorOutput = "";
+      const proc = spawn("python3", ["-c", pythonScript, inputPath], { timeout: 120000 });
+      proc.stdout.on("data", (data: Buffer) => { output += data.toString(); });
+      proc.stderr.on("data", (data: Buffer) => { errorOutput += data.toString(); });
+      proc.on("close", (code: number | null) => {
+        if (code === 0) resolve(output);
+        else reject(new Error(`Python process exited with code ${code}: ${errorOutput}`));
+      });
+      proc.on("error", (err: Error) => reject(err));
+    });
+
+    const analysisResult = JSON.parse(result);
+
+    const allJobs = await storage.getAllJobs(req.companyId!);
+    const jobs = allJobs;
+    let matchedJobId: string | null = null;
+    let matchedJobName: string | null = null;
+    const projectName = analysisResult.pages[0]?.projectName || "";
+    const projectNumber = analysisResult.pages[0]?.projectNumber || "";
+
+    if (projectName || projectNumber) {
+      let bestScore = 0;
+      for (const job of jobs) {
+        let score = 0;
+        const jobName = (job.name || "").toLowerCase();
+        const jobNum = (job.jobNumber || "").toLowerCase();
+        const pName = projectName.toLowerCase();
+        const pNum = projectNumber.toLowerCase();
+
+        if (pNum && jobNum && jobNum === pNum) score += 100;
+        if (pName && jobName && jobName === pName) score += 100;
+        if (pName && jobName && jobName.includes(pName)) score += 50;
+        if (pName && jobName) {
+          const words = pName.split(/\s+/).filter((w: string) => w.length > 2);
+          const matches = words.filter((w: string) => jobName.includes(w)).length;
+          score += matches * 20;
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          matchedJobId = job.id;
+          matchedJobName = `${job.jobNumber} - ${job.name}`;
+        }
+      }
+      if (bestScore < 30) {
+        matchedJobId = null;
+        matchedJobName = null;
+      }
+    }
+
+    const drawingNumbers = analysisResult.pages
+      .map((p: any) => p.drawingNumber)
+      .filter((n: string) => n);
+
+    let existingDocuments: any[] = [];
+    if (drawingNumbers.length > 0) {
+      const docsResult = await storage.getDocuments({ limit: 10000 });
+      existingDocuments = docsResult.documents.filter((d: any) =>
+        d.companyId === req.companyId && d.documentNumber && drawingNumbers.includes(d.documentNumber)
+      );
+    }
+
+    const pagesWithConflicts = analysisResult.pages.map((page: any) => {
+      const existing = existingDocuments.filter(
+        (d: any) => d.documentNumber === page.drawingNumber
+      );
+      let conflictAction = "none";
+      let conflictDocument: any = null;
+
+      if (existing.length > 0) {
+        const latestExisting = existing.sort(
+          (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )[0];
+        conflictDocument = {
+          id: latestExisting.id,
+          title: latestExisting.title,
+          revision: latestExisting.revision || "",
+          version: latestExisting.version || "1.0",
+        };
+
+        const newRev = (page.revision || "").toUpperCase();
+        const oldRev = (latestExisting.revision || "").toUpperCase();
+
+        if (newRev === oldRev) {
+          conflictAction = "skip";
+        } else if (compareRevisions(newRev, oldRev) > 0) {
+          conflictAction = "supersede";
+        } else {
+          conflictAction = "keep_both";
+        }
+      }
+
+      return { ...page, conflictAction, conflictDocument };
+    });
+
+    try { fs.unlinkSync(inputPath); fs.rmdirSync(tempDir); } catch {}
+
+    res.json({
+      totalPages: analysisResult.totalPages,
+      pages: pagesWithConflicts,
+      matchedJob: matchedJobId ? { id: matchedJobId, name: matchedJobName } : null,
+      jobs: jobs.map((j: any) => ({ id: j.id, name: `${j.jobNumber} - ${j.name}` })),
+      originalFileName: file.originalname,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error analyzing drawing package");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to analyze drawing package" });
+  }
+});
+
+function compareRevisions(a: string, b: string): number {
+  if (!a && !b) return 0;
+  if (!a) return -1;
+  if (!b) return 1;
+  const pMatch = (s: string) => s.match(/^P(\d+)$/i);
+  const pA = pMatch(a);
+  const pB = pMatch(b);
+  if (pA && pB) return parseInt(pA[1]) - parseInt(pB[1]);
+  const revMatch = (s: string) => s.match(/^(?:REV\s*)?([A-Z])$/i);
+  const rA = revMatch(a);
+  const rB = revMatch(b);
+  if (rA && rB) return rA[1].charCodeAt(0) - rB[1].charCodeAt(0);
+  return a.localeCompare(b);
+}
+
+router.post("/api/documents/drawing-package/register", requireAuth, drawingPackageUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: "No PDF file provided" });
+    }
+
+    const drawingsData = JSON.parse(req.body.drawings || "[]");
+    const jobId = req.body.jobId || null;
+
+    if (!drawingsData.length) {
+      return res.status(400).json({ error: "No drawings to register" });
+    }
+
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const { spawn } = await import("child_process");
+
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "drawing-split-"));
+    const inputPath = path.join(tempDir, "input.pdf");
+    fs.writeFileSync(inputPath, file.buffer);
+
+    const splitScript = `
+import fitz
+import os
+import json
+import sys
+
+pdf_path = sys.argv[1]
+output_dir = sys.argv[2]
+doc = fitz.open(pdf_path)
+extracted = []
+
+os.makedirs(output_dir, exist_ok=True)
+
+for page_num in range(len(doc)):
+    new_doc = fitz.open()
+    new_doc.insert_pdf(doc, from_page=page_num, to_page=page_num)
+    filename = f"drawing_{page_num + 1}.pdf"
+    filepath = os.path.join(output_dir, filename)
+    new_doc.save(filepath)
+    new_doc.close()
+    extracted.append({"filename": filename, "filepath": filepath, "pageNumber": page_num + 1})
+
+doc.close()
+print(json.dumps(extracted))
+`;
+
+    const outputDir = path.join(tempDir, "pages");
+    const splitResult: string = await new Promise((resolve, reject) => {
+      let output = "";
+      let errorOutput = "";
+      const proc = spawn("python3", ["-c", splitScript, inputPath, outputDir], { timeout: 120000 });
+      proc.stdout.on("data", (data: Buffer) => { output += data.toString(); });
+      proc.stderr.on("data", (data: Buffer) => { errorOutput += data.toString(); });
+      proc.on("close", (code: number | null) => {
+        if (code === 0) resolve(output);
+        else reject(new Error(`Split failed: ${errorOutput}`));
+      });
+      proc.on("error", (err: Error) => reject(err));
+    });
+
+    const extractedFiles: Array<{ filename: string; filepath: string; pageNumber: number }> = JSON.parse(splitResult);
+
+    const results: any[] = [];
+
+    for (const drawing of drawingsData) {
+      if (drawing.action === "skip") {
+        results.push({ pageNumber: drawing.pageNumber, status: "skipped", drawingNumber: drawing.drawingNumber });
+        continue;
+      }
+
+      const pageFile = extractedFiles.find((f) => f.pageNumber === drawing.pageNumber);
+      if (!pageFile) {
+        results.push({ pageNumber: drawing.pageNumber, status: "error", error: "Page file not found" });
+        continue;
+      }
+
+      try {
+        const fileBuffer = fs.readFileSync(pageFile.filepath);
+        const timestamp = Date.now();
+        const safeDrawingNum = (drawing.drawingNumber || `page_${drawing.pageNumber}`).replace(/[^a-zA-Z0-9_\-]/g, "_");
+        const storedFileName = `${safeDrawingNum}_${timestamp}.pdf`;
+
+        const storagePath = `documents/${storedFileName}`;
+        await objectStorageService.uploadFile(storagePath, fileBuffer, "application/pdf");
+
+        const tags: string[] = [];
+        if (drawing.revision) tags.push(`Rev ${drawing.revision}`);
+        if (drawing.scale) tags.push(`Scale ${drawing.scale}`);
+        if (drawing.level) tags.push(`Level ${drawing.level}`);
+        if (drawing.drawingNumber) tags.push(drawing.drawingNumber);
+
+        let supersedeDocId: string | null = null;
+        if (drawing.action === "supersede" && drawing.conflictDocumentId) {
+          supersedeDocId = drawing.conflictDocumentId;
+          await storage.updateDocument(supersedeDocId, {
+            status: "SUPERSEDED",
+            isLatestVersion: false,
+          });
+        }
+
+        const doc = await storage.createDocument({
+          companyId: req.companyId!,
+          title: drawing.title || `Drawing ${drawing.pageNumber}`,
+          documentNumber: drawing.drawingNumber || null,
+          revision: drawing.revision || "A",
+          version: supersedeDocId ? "2.0" : "1.0",
+          fileName: storedFileName,
+          originalName: `${drawing.drawingNumber || `page_${drawing.pageNumber}`}.pdf`,
+          storageKey: storagePath,
+          fileSize: fileBuffer.length,
+          mimeType: "application/pdf",
+          status: "DRAFT",
+          isLatestVersion: true,
+          jobId: jobId || null,
+          tags: tags.join(", "),
+          uploadedBy: req.session.userId!,
+          typeId: drawing.typeId || null,
+          disciplineId: drawing.disciplineId || null,
+          categoryId: drawing.categoryId || null,
+        });
+
+        results.push({
+          pageNumber: drawing.pageNumber,
+          status: "registered",
+          documentId: doc.id,
+          drawingNumber: drawing.drawingNumber,
+          title: drawing.title,
+        });
+      } catch (err: any) {
+        logger.error({ err, pageNumber: drawing.pageNumber }, "Error registering drawing page");
+        results.push({ pageNumber: drawing.pageNumber, status: "error", error: err.message });
+      }
+    }
+
+    try {
+      const cleanupFiles = (dir: string) => {
+        if (fs.existsSync(dir)) {
+          for (const f of fs.readdirSync(dir)) {
+            const fp = path.join(dir, f);
+            if (fs.statSync(fp).isDirectory()) cleanupFiles(fp);
+            else fs.unlinkSync(fp);
+          }
+          fs.rmdirSync(dir);
+        }
+      };
+      cleanupFiles(tempDir);
+    } catch {}
+
+    const registered = results.filter((r) => r.status === "registered").length;
+    const skipped = results.filter((r) => r.status === "skipped").length;
+    const errors = results.filter((r) => r.status === "error").length;
+
+    res.json({
+      success: true,
+      summary: { total: drawingsData.length, registered, skipped, errors },
+      results,
+    });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error registering drawing package");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to register drawing package" });
+  }
+});
+
 export default router;

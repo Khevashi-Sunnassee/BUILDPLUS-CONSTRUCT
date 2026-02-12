@@ -119,7 +119,17 @@ router.get("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => {
   try {
     await storage.expireOldInvitations();
     const invitations = await storage.getInvitationsByCompany(req.companyId!);
-    res.json(invitations);
+    const enriched = await Promise.all(
+      invitations.map(async (inv) => {
+        let invitedByName = "Unknown";
+        try {
+          const inviter = await storage.getUser(inv.invitedBy);
+          if (inviter) invitedByName = inviter.name || inviter.email;
+        } catch {}
+        return { ...inv, invitedByName };
+      })
+    );
+    res.json(enriched);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching invitations");
     res.status(500).json({ error: "Failed to fetch invitations" });

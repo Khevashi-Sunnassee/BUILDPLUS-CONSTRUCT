@@ -159,8 +159,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen overflow-y-auto bg-background p-4 py-8">
-      <div className="w-full max-w-md mx-auto">
+    <div className="fixed inset-0 overflow-y-auto bg-background">
+      <div className="w-full max-w-md mx-auto p-4 py-8">
         <div className="flex flex-col items-center mb-8">
           <div className="h-16 mb-4 flex items-center justify-center" data-testid="img-register-logo">
             {logoSrc && <img src={logoSrc} alt="Company Logo" className="h-16 object-contain" />}

@@ -76,12 +76,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
-import type { User as UserType, Role, Department } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { User as UserType, Role, Department, UserInvitation } from "@shared/schema";
 import { FUNCTION_KEYS } from "@shared/schema";
 import type { PermissionLevel } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil, X } from "lucide-react";
 
 const INVITE_FUNCTION_LABELS: Record<string, string> = {
   tasks: "Tasks",
@@ -243,6 +244,46 @@ export default function AdminUsersPage() {
 
   const activeDepartments = departmentsList.filter((d) => d.isActive);
   const activeFactories = factories.filter((f) => f.isActive);
+
+  type InvitationWithInviter = UserInvitation & { invitedByName: string };
+  const { data: invitations = [], isLoading: invitationsLoading } = useQuery<InvitationWithInviter[]>({
+    queryKey: [INVITATION_ROUTES.ADMIN_LIST],
+  });
+
+  const cancelInvitationMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("POST", INVITATION_ROUTES.ADMIN_CANCEL(id));
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [INVITATION_ROUTES.ADMIN_LIST] });
+      toast({ title: "Invitation cancelled" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const [resendingId, setResendingId] = useState<string | null>(null);
+
+  const resendInvitationMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", INVITATION_ROUTES.ADMIN_CREATE, {
+        email,
+        role: "USER",
+        userType: "EMPLOYEE",
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [INVITATION_ROUTES.ADMIN_LIST] });
+      toast({ title: "Invitation resent" });
+      setResendingId(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setResendingId(null);
+    },
+  });
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(editUserSchema),
@@ -524,6 +565,22 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      <Tabs defaultValue="users">
+        <TabsList>
+          <TabsTrigger value="users" data-testid="tab-users">
+            <Users className="h-4 w-4 mr-1.5" />
+            Users
+          </TabsTrigger>
+          <TabsTrigger value="invitations" data-testid="tab-invitations">
+            <Mail className="h-4 w-4 mr-1.5" />
+            Invitations
+            {invitations.filter(i => i.status === "PENDING").length > 0 && (
+              <Badge variant="secondary" className="ml-1.5">{invitations.filter(i => i.status === "PENDING").length}</Badge>
+            )}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users">
       <Card>
         <CardContent className="pt-6">
           {users && users.length > 0 ? (
@@ -650,6 +707,116 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="invitations">
+          <Card>
+            <CardContent className="pt-6">
+              {invitationsLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : invitations.length > 0 ? (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Invited By</TableHead>
+                        <TableHead>Sent</TableHead>
+                        <TableHead>Expires</TableHead>
+                        <TableHead className="w-20"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {invitations.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((inv) => {
+                        const isExpired = inv.status === "PENDING" && new Date(inv.expiresAt) < new Date();
+                        const displayStatus = isExpired ? "EXPIRED" : inv.status;
+                        return (
+                          <TableRow key={inv.id} data-testid={`row-invitation-${inv.id}`}>
+                            <TableCell>
+                              <div className="flex items-center gap-1.5">
+                                <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                <span className="font-medium">{inv.email}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>{getRoleBadge(inv.role as Role)}</TableCell>
+                            <TableCell>
+                              <Badge variant={inv.userType === "EMPLOYEE" ? "default" : "outline"}>
+                                {inv.userType === "EMPLOYEE" ? "Employee" : "External"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge
+                                variant={
+                                  displayStatus === "ACCEPTED" ? "default" :
+                                  displayStatus === "PENDING" ? "outline" :
+                                  "secondary"
+                                }
+                                data-testid={`badge-status-${inv.id}`}
+                              >
+                                {displayStatus === "ACCEPTED" ? "Accepted" :
+                                 displayStatus === "PENDING" ? "Pending" :
+                                 displayStatus === "EXPIRED" ? "Expired" :
+                                 "Cancelled"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {inv.invitedByName}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {format(new Date(inv.createdAt), "dd/MM/yyyy HH:mm")}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {format(new Date(inv.expiresAt), "dd/MM/yyyy")}
+                              {inv.acceptedAt && (
+                                <div className="text-xs text-green-600">
+                                  Accepted {format(new Date(inv.acceptedAt), "dd/MM/yyyy")}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {inv.status === "PENDING" && !isExpired && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => cancelInvitationMutation.mutate(inv.id)}
+                                  disabled={cancelInvitationMutation.isPending}
+                                  title="Cancel invitation"
+                                  data-testid={`button-cancel-invitation-${inv.id}`}
+                                >
+                                  <X className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <Mail className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-medium">No invitations yet</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Invite users to join your organization
+                  </p>
+                  <Button className="mt-4" onClick={() => setInviteDialogOpen(true)}>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Invite User
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">

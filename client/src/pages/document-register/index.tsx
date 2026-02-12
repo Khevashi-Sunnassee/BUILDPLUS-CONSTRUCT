@@ -50,6 +50,7 @@ import { VersionHistorySheet } from "./VersionHistorySheet";
 import { CreateBundleDialog, BundleViewDialog } from "./BundleDialogs";
 import { VisualComparisonDialog } from "./VisualComparisonDialog";
 import { BulkUploadDialog } from "./BulkUploadDialog";
+import { DrawingPackageDialog } from "./DrawingPackageDialog";
 import { DocumentTable } from "./DocumentTable";
 import { BundleGridView } from "./BundleGridView";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -71,6 +72,7 @@ export default function DocumentRegister() {
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [isDrawingPackageOpen, setIsDrawingPackageOpen] = useState(false);
   const [isVersionDialogOpen, setIsVersionDialogOpen] = useState(false);
   const [selectedDocumentForVersion, setSelectedDocumentForVersion] = useState<DocumentWithDetails | null>(null);
 
@@ -423,6 +425,10 @@ export default function DocumentRegister() {
             <QrCode className="h-4 w-4 mr-2" />
             Create Bundle{selectedDocIds.size > 0 ? ` (${selectedDocIds.size})` : ""}
           </Button>
+          <Button variant="outline" onClick={() => setIsDrawingPackageOpen(true)} data-testid="button-drawing-package">
+            <Layers className="h-4 w-4 mr-2" />
+            Drawing Package
+          </Button>
           <Button variant="outline" onClick={() => setIsBulkUploadOpen(true)} data-testid="button-bulk-upload">
             <Files className="h-4 w-4 mr-2" />
             Add Multiple
@@ -719,6 +725,12 @@ export default function DocumentRegister() {
         <BulkUploadDialog
           open={isBulkUploadOpen}
           onOpenChange={setIsBulkUploadOpen}
+        />
+      )}
+      {isDrawingPackageOpen && (
+        <DrawingPackageDialog
+          open={isDrawingPackageOpen}
+          onOpenChange={setIsDrawingPackageOpen}
         />
       )}
 
