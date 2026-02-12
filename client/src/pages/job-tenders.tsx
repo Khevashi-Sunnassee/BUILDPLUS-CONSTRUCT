@@ -154,7 +154,7 @@ export default function JobTendersPage() {
   });
 
   const { data: suppliers = [] } = useQuery<SupplierOption[]>({
-    queryKey: ["/api/suppliers"],
+    queryKey: ["/api/procurement/suppliers/active"],
   });
 
   const { data: allDocuments = [] } = useQuery<{ id: string; title: string | null; documentNumber: string | null; fileName: string | null }[]>({
