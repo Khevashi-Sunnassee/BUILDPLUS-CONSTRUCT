@@ -689,15 +689,22 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
           documentNumber: documents.documentNumber,
           fileName: documents.fileName,
         },
+        bundle: {
+          id: documentBundles.id,
+          bundleName: documentBundles.bundleName,
+          description: documentBundles.description,
+        },
       })
       .from(tenderPackages)
       .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
+      .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
       .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
       .orderBy(asc(tenderPackages.sortOrder));
 
     const mappedPackages = packages.map(p => ({
       ...p.pkg,
-      document: p.document,
+      document: p.document?.id ? p.document : null,
+      bundle: p.bundle?.id ? p.bundle : null,
     }));
 
     res.json({
@@ -838,12 +845,32 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
     }
 
     const schema = z.object({
-      documentId: z.string().optional(),
-      name: z.string().min(1, "Name is required"),
-      description: z.string().optional(),
+      bundleId: z.string().min(1, "Bundle is required"),
     });
 
     const data = schema.parse(req.body);
+
+    const [bundle] = await db
+      .select({ id: documentBundles.id, bundleName: documentBundles.bundleName })
+      .from(documentBundles)
+      .where(and(eq(documentBundles.id, data.bundleId), eq(documentBundles.companyId, companyId)));
+
+    if (!bundle) {
+      return res.status(404).json({ message: "Document bundle not found" });
+    }
+
+    const existing = await db
+      .select({ id: tenderPackages.id })
+      .from(tenderPackages)
+      .where(and(
+        eq(tenderPackages.tenderId, tenderId),
+        eq(tenderPackages.bundleId, data.bundleId),
+        eq(tenderPackages.companyId, companyId),
+      ));
+
+    if (existing.length > 0) {
+      return res.status(400).json({ message: "This bundle is already attached to this tender" });
+    }
 
     const maxOrder = await db
       .select({ max: sql<number>`coalesce(max(${tenderPackages.sortOrder}), -1)` })
@@ -853,9 +880,8 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
     const [pkg] = await db.insert(tenderPackages).values({
       companyId,
       tenderId,
-      documentId: data.documentId || null,
-      name: data.name,
-      description: data.description || null,
+      bundleId: data.bundleId,
+      name: bundle.bundleName,
       sortOrder: (maxOrder[0]?.max ?? -1) + 1,
     }).returning();
 

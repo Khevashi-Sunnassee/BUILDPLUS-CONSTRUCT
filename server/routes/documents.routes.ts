@@ -7,8 +7,8 @@ import archiver from "archiver";
 import { PassThrough } from "stream";
 import { z } from "zod";
 import { storage, db } from "../storage";
-import { eq, and } from "drizzle-orm";
-import { jobMembers, documents } from "@shared/schema";
+import { eq, and, desc } from "drizzle-orm";
+import { jobMembers, documents, documentBundles } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
 import { emailService } from "../services/email.service";
@@ -1071,6 +1071,16 @@ router.delete("/api/documents/:id", requireRole("ADMIN", "MANAGER"), async (req,
 
 router.get("/api/document-bundles", requireAuth, async (req, res) => {
   try {
+    const jobId = req.query.jobId as string | undefined;
+    if (jobId) {
+      const companyId = req.session.companyId!;
+      const bundles = await db
+        .select()
+        .from(documentBundles)
+        .where(and(eq(documentBundles.jobId, jobId), eq(documentBundles.companyId, companyId)))
+        .orderBy(desc(documentBundles.createdAt));
+      return res.json(bundles);
+    }
     const bundles = await storage.getAllDocumentBundles();
     res.json(bundles);
   } catch (error: unknown) {

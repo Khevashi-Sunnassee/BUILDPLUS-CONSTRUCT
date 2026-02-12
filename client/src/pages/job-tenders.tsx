@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -178,7 +178,7 @@ export default function JobTendersPage() {
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [createTenderOpen, setCreateTenderOpen] = useState(false);
   const [addSubmissionOpen, setAddSubmissionOpen] = useState(false);
-  const [addDocumentOpen, setAddDocumentOpen] = useState(false);
+  const [addBundleOpen, setAddBundleOpen] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [lineAmounts, setLineAmounts] = useState<Record<string, string>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -190,9 +190,7 @@ export default function JobTendersPage() {
   const [formNotes, setFormNotes] = useState("");
   const [formSupplierId, setFormSupplierId] = useState("");
   const [formSubCoverNote, setFormSubCoverNote] = useState("");
-  const [formDocName, setFormDocName] = useState("");
-  const [formDocDescription, setFormDocDescription] = useState("");
-  const [formDocumentId, setFormDocumentId] = useState("");
+  const [selectedBundleId, setSelectedBundleId] = useState("");
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [docSearchTerm, setDocSearchTerm] = useState("");
 
@@ -220,6 +218,16 @@ export default function JobTendersPage() {
     enabled: !!jobId,
   });
   const jobDocuments = jobDocumentsResult?.documents || [];
+
+  const { data: jobBundles = [] } = useQuery<{ id: string; bundleName: string; description: string | null; createdAt: string }[]>({
+    queryKey: ["/api/document-bundles", { jobId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/document-bundles?jobId=${jobId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch bundles");
+      return res.json();
+    },
+    enabled: !!jobId,
+  });
 
   const { data: sheetData, isLoading: loadingSheet } = useQuery<TenderSheetData>({
     queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`],
@@ -354,17 +362,15 @@ export default function JobTendersPage() {
     },
   });
 
-  const addDocumentMutation = useMutation({
-    mutationFn: async (data: { name: string; description?: string; documentId?: string }) => {
+  const addBundleMutation = useMutation({
+    mutationFn: async (data: { bundleId: string }) => {
       return apiRequest("POST", `/api/jobs/${jobId}/tenders/${selectedTenderId}/documents`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`] });
-      toast({ title: "Document added to tender" });
-      setAddDocumentOpen(false);
-      setFormDocName("");
-      setFormDocDescription("");
-      setFormDocumentId("");
+      toast({ title: "Document bundle attached to tender" });
+      setAddBundleOpen(false);
+      setSelectedBundleId("");
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -574,27 +580,27 @@ export default function JobTendersPage() {
               <div className="flex items-center justify-between gap-2 mb-2">
                 <Label className="flex items-center gap-1">
                   <Paperclip className="h-3 w-3" />
-                  Tender Documents ({sheetData.documents?.length || 0})
+                  Tender Document Bundles ({sheetData.documents?.length || 0})
                 </Label>
-                <Button variant="outline" size="sm" onClick={() => setAddDocumentOpen(true)} data-testid="button-add-document">
+                <Button variant="outline" size="sm" onClick={() => setAddBundleOpen(true)} data-testid="button-add-bundle">
                   <Plus className="h-3 w-3 mr-1" />
-                  Add Document
+                  Attach Bundle
                 </Button>
               </div>
               {sheetData.documents && sheetData.documents.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {sheetData.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-1" data-testid={`badge-document-${doc.id}`}>
+                  {sheetData.documents.map((doc: any) => (
+                    <div key={doc.id} className="flex items-center gap-1" data-testid={`badge-bundle-${doc.id}`}>
                       <Badge variant="secondary" className="gap-1">
-                        <FileText className="h-3 w-3" />
-                        {doc.name || doc.document?.title || "Untitled"}
+                        <Paperclip className="h-3 w-3" />
+                        {doc.bundle?.bundleName || doc.name || "Untitled Bundle"}
                       </Badge>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
                         onClick={() => setDeleteDocId(doc.id)}
-                        data-testid={`button-remove-doc-${doc.id}`}
+                        data-testid={`button-remove-bundle-${doc.id}`}
                       >
                         <X className="h-3 w-3" />
                       </Button>
@@ -602,8 +608,8 @@ export default function JobTendersPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground" data-testid="text-no-documents">
-                  No documents attached to this tender yet.
+                <p className="text-sm text-muted-foreground" data-testid="text-no-bundles">
+                  No document bundles attached to this tender yet.
                 </p>
               )}
             </div>
@@ -1013,72 +1019,49 @@ export default function JobTendersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addDocumentOpen} onOpenChange={setAddDocumentOpen}>
+      <Dialog open={addBundleOpen} onOpenChange={setAddBundleOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Tender Document</DialogTitle>
-            <DialogDescription>Attach a reference document to this tender (e.g. specifications, drawings, scope). You can link an existing document or add a named reference.</DialogDescription>
+            <DialogTitle>Attach Document Bundle</DialogTitle>
+            <DialogDescription>Select a document bundle from this job to attach to the tender.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {jobDocuments.length > 0 && (
-              <div>
-                <Label>Link Existing Document (optional)</Label>
-                <Select value={formDocumentId} onValueChange={(val) => {
-                  setFormDocumentId(val);
-                  if (val && !formDocName.trim()) {
-                    const doc = jobDocuments.find((d: any) => d.id === val);
-                    if (doc) setFormDocName(doc.title || doc.fileName || "");
-                  }
-                }}>
-                  <SelectTrigger data-testid="select-existing-document">
-                    <SelectValue placeholder="Select from existing documents..." />
+            <div>
+              <Label>Document Bundle</Label>
+              {jobBundles.length > 0 ? (
+                <Select value={selectedBundleId} onValueChange={setSelectedBundleId}>
+                  <SelectTrigger data-testid="select-bundle">
+                    <SelectValue placeholder="Select a document bundle..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {jobDocuments.map((doc: any) => (
-                      <SelectItem key={doc.id} value={doc.id}>
-                        {doc.documentNumber ? `${doc.documentNumber} - ` : ""}{doc.title || doc.fileName || "Untitled"}
-                      </SelectItem>
-                    ))}
+                    {jobBundles
+                      .filter(b => !sheetData?.documents?.some((d: any) => d.bundleId === b.id))
+                      .map((bundle) => (
+                        <SelectItem key={bundle.id} value={bundle.id}>
+                          {bundle.bundleName}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
-              </div>
-            )}
-            <div>
-              <Label>Document Name</Label>
-              <Input
-                value={formDocName}
-                onChange={(e) => setFormDocName(e.target.value)}
-                placeholder="e.g. Structural Drawings Rev C"
-                data-testid="input-document-name"
-              />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea
-                value={formDocDescription}
-                onChange={(e) => setFormDocDescription(e.target.value)}
-                placeholder="Optional description..."
-                className="resize-none"
-                data-testid="input-document-description"
-              />
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">
+                  No document bundles found for this job. Create a bundle first when creating a new tender, or from the Documents section.
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setAddDocumentOpen(false); setFormDocumentId(""); }}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setAddBundleOpen(false); setSelectedBundleId(""); }}>Cancel</Button>
             <Button
               onClick={() => {
-                if (!formDocName.trim()) return;
-                addDocumentMutation.mutate({
-                  name: formDocName.trim(),
-                  description: formDocDescription.trim() || undefined,
-                  documentId: formDocumentId || undefined,
-                });
+                if (!selectedBundleId) return;
+                addBundleMutation.mutate({ bundleId: selectedBundleId });
               }}
-              disabled={addDocumentMutation.isPending || !formDocName.trim()}
-              data-testid="button-submit-document"
+              disabled={addBundleMutation.isPending || !selectedBundleId}
+              data-testid="button-submit-bundle"
             >
-              {addDocumentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Add Document
+              {addBundleMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Attach Bundle
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1109,9 +1092,9 @@ export default function JobTendersPage() {
       <AlertDialog open={!!deleteDocId} onOpenChange={(open) => !open && setDeleteDocId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove Document?</AlertDialogTitle>
+            <AlertDialogTitle>Remove Bundle?</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove this document reference from the tender. The original document will not be deleted.
+              Remove this document bundle from the tender. The bundle and its documents will not be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
