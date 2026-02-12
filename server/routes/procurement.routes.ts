@@ -558,6 +558,8 @@ router.get("/api/procurement/items/template", requireAuth, async (_req, res) => 
       { header: "Product Id", key: "productId", width: 18 },
       { header: "Product Description", key: "description", width: 40 },
       { header: "Category", key: "category", width: 20 },
+      { header: "Category Type", key: "categoryType", width: 16 },
+      { header: "Construction Stage", key: "constructionStage", width: 20 },
       { header: "Unit Price", key: "unitPrice", width: 15 },
       { header: "HS Code", key: "hsCode", width: 15 },
       { header: "AD Risk", key: "adRisk", width: 12 },
@@ -574,10 +576,15 @@ router.get("/api/procurement/items/template", requireAuth, async (_req, res) => 
     headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
     headerRow.alignment = { vertical: "middle", wrapText: true };
 
+    sheet.getCell("D1").note = "Enter 'Supply' or 'Trade'. Defaults to Supply if left blank.";
+    sheet.getCell("E1").note = "Required for Trade items. Valid stages: Prelims, Structure, Framing, Lock-up, Fitout, Final Fit Off, External Works, Other";
+
     sheet.addRow({
       productId: "ITEM-001",
       description: "Steel Reinforcement Bar 12mm",
       category: "Steel",
+      categoryType: "Supply",
+      constructionStage: "",
       unitPrice: 45.50,
       hsCode: "7214.20",
       adRisk: "Low",
@@ -590,6 +597,8 @@ router.get("/api/procurement/items/template", requireAuth, async (_req, res) => 
       productId: "ITEM-002",
       description: "Concrete 40MPa Ready Mix",
       category: "Concrete",
+      categoryType: "Trade",
+      constructionStage: "Structure",
       unitPrice: 280.00,
       hsCode: "",
       adRisk: "",
@@ -709,25 +718,56 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
     const categories = await storage.getAllItemCategories(companyId);
     const categoryMap = new Map(categories.map(c => [c.name.toLowerCase(), c.id]));
 
+    const stages = await db.select().from(constructionStages).orderBy(constructionStages.sortOrder);
+    const stageMap = new Map(stages.map(s => [s.name.toLowerCase(), s.id]));
+
     const itemsToImport: InsertItem[] = [];
-    const categoriesToCreate: string[] = [];
+    const categoriesToCreate: { name: string; categoryType: string }[] = [];
+
+    const categoryTypeMap = new Map<string, string>();
 
     for (const row of rows) {
       const categoryName = row["Category"] || row["category"] || "";
+      const categoryType = String(row["Category Type"] || row["category_type"] || row["CategoryType"] || "").toLowerCase().trim();
       
-      if (categoryName && !categoryMap.has(categoryName.toLowerCase())) {
-        if (!categoriesToCreate.includes(categoryName)) {
-          categoriesToCreate.push(categoryName);
+      if (categoryName) {
+        const resolvedType = categoryType === "trade" ? "trade" : "supply";
+        if (!categoryTypeMap.has(categoryName.toLowerCase())) {
+          categoryTypeMap.set(categoryName.toLowerCase(), resolvedType);
+        }
+        
+        if (!categoryMap.has(categoryName.toLowerCase())) {
+          if (!categoriesToCreate.find(c => c.name.toLowerCase() === categoryName.toLowerCase())) {
+            categoriesToCreate.push({
+              name: categoryName,
+              categoryType: resolvedType,
+            });
+          }
+        } else {
+          const existingCatId = categoryMap.get(categoryName.toLowerCase())!;
+          const existingCat = categories.find(c => c.id === existingCatId);
+          if (existingCat && categoryType && (existingCat as any).categoryType !== resolvedType) {
+            try {
+              await storage.updateItemCategory(existingCatId, { categoryType: resolvedType } as any);
+            } catch (error) {
+              logger.error({ err: error }, `Error updating category type for ${categoryName}`);
+            }
+          }
         }
       }
     }
 
-    for (const catName of categoriesToCreate) {
+    for (const catInfo of categoriesToCreate) {
       try {
-        const newCat = await storage.createItemCategory({ name: catName, companyId, isActive: true });
-        categoryMap.set(catName.toLowerCase(), newCat.id);
+        const newCat = await storage.createItemCategory({
+          name: catInfo.name,
+          companyId,
+          isActive: true,
+          categoryType: catInfo.categoryType,
+        } as any);
+        categoryMap.set(catInfo.name.toLowerCase(), newCat.id);
       } catch (error) {
-        logger.error({ err: error }, `Error creating category ${catName}`);
+        logger.error({ err: error }, `Error creating category ${catInfo.name}`);
       }
     }
 
@@ -735,6 +775,8 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
       const productId = row["Product Id"] || row["product_id"] || row["ProductId"] || "";
       const description = row["Product Description"] || row["Description"] || row["description"] || row["Name"] || row["name"] || "";
       const categoryName = row["Category"] || row["category"] || "";
+      const categoryType = String(row["Category Type"] || row["category_type"] || row["CategoryType"] || "").toLowerCase().trim();
+      const constructionStageName = String(row["Construction Stage"] || row["construction_stage"] || row["ConstructionStage"] || "").trim();
       const unitPrice = parseFloat(row["Avg Unit Price Aud"] || row["Unit Price"] || row["unit_price"] || "0") || null;
       const hsCode = row["Hs Code Guess"] || row["HS Code"] || row["hs_code"] || "";
       const adRisk = row["Ad Risk"] || row["AD Risk"] || row["ad_risk"] || "";
@@ -747,11 +789,17 @@ router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), up
 
       const categoryId = categoryName ? categoryMap.get(categoryName.toLowerCase()) || null : null;
 
+      let constructionStageId: string | null = null;
+      if (constructionStageName) {
+        constructionStageId = stageMap.get(constructionStageName.toLowerCase()) || null;
+      }
+
       itemsToImport.push({
         code: productId,
         name: description,
         description: description,
         categoryId,
+        constructionStageId,
         unitPrice: unitPrice?.toString() || null,
         hsCode,
         adRisk,
