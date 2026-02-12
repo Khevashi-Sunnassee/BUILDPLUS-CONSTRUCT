@@ -76,8 +76,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
-import type { Employee, EmployeeEmployment, EmployeeDocument, EmployeeLicence, EmployeeOnboarding, EmployeeOnboardingTask, OnboardingTemplate } from "@shared/schema";
-import { EMPLOYEE_ROUTES, ONBOARDING_ROUTES } from "@shared/api-routes";
+import type { Employee, EmployeeEmployment, EmployeeDocument, EmployeeLicence, EmployeeOnboarding, EmployeeOnboardingTask, OnboardingTemplate, Department } from "@shared/schema";
+import { EMPLOYEE_ROUTES, ONBOARDING_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
 
 const AUSTRALIAN_STATES = [
   { value: "VIC", label: "Victoria" },
@@ -123,6 +123,7 @@ const employmentSchema = z.object({
   positionTitle: z.string().optional(),
   jobTitle: z.string().optional(),
   department: z.string().optional(),
+  departmentId: z.string().nullable().optional(),
   workLocation: z.string().optional(),
   workState: z.string().optional(),
   startDate: z.string().min(1, "Start date is required"),
@@ -205,6 +206,7 @@ const defaultEmploymentValues: EmploymentFormData = {
   positionTitle: "",
   jobTitle: "",
   department: "",
+  departmentId: null,
   workLocation: "",
   workState: "",
   startDate: "",
@@ -323,6 +325,11 @@ export default function EmployeeDetailPage() {
     queryKey: ['/api/onboarding/templates'],
     enabled: !!id,
   });
+
+  const { data: departmentsList = [] } = useQuery<Department[]>({
+    queryKey: [ADMIN_ROUTES.DEPARTMENTS],
+  });
+  const activeDepartments = departmentsList.filter((d) => d.isActive);
 
   const editForm = useForm<EmployeeEditFormData>({
     resolver: zodResolver(employeeEditSchema),
@@ -588,6 +595,7 @@ export default function EmployeeDetailPage() {
       positionTitle: emp.positionTitle || "",
       jobTitle: emp.jobTitle || "",
       department: emp.department || "",
+      departmentId: emp.departmentId || null,
       workLocation: emp.workLocation || "",
       workState: emp.workState || "",
       startDate: emp.startDate,
@@ -1442,10 +1450,22 @@ export default function EmployeeDetailPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={employmentForm.control} name="department" render={({ field }) => (
+                <FormField control={employmentForm.control} name="departmentId" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Department</FormLabel>
-                    <FormControl><Input {...field} data-testid="input-employment-department" /></FormControl>
+                    <Select onValueChange={(v) => field.onChange(v === "none" ? null : v)} value={field.value || "none"}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-employment-department">
+                          <SelectValue placeholder="Select department" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">No department</SelectItem>
+                        {activeDepartments.slice().sort((a, b) => a.name.localeCompare(b.name)).map((dept) => (
+                          <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )} />

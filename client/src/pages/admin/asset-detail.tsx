@@ -3,8 +3,8 @@ import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import DOMPurify from "dompurify";
-import { ASSET_ROUTES } from "@shared/api-routes";
-import type { Asset, AssetMaintenance, AssetTransfer, AssetRepairRequest } from "@shared/schema";
+import { ASSET_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
+import type { Asset, AssetMaintenance, AssetTransfer, AssetRepairRequest, Department } from "@shared/schema";
 import {
   ASSET_CATEGORIES,
   ASSET_STATUSES,
@@ -166,6 +166,11 @@ export default function AssetDetailPage() {
     enabled: !!id,
   });
 
+  const { data: departmentsList = [] } = useQuery<Department[]>({
+    queryKey: [ADMIN_ROUTES.DEPARTMENTS],
+  });
+  const activeDepartments = departmentsList.filter((d) => d.isActive);
+
   const { data: repairRequests = [], isLoading: repairsLoading } = useQuery<any[]>({
     queryKey: [ASSET_ROUTES.REPAIR_REQUESTS_BY_ASSET(id!), id],
     queryFn: async () => {
@@ -300,6 +305,7 @@ export default function AssetDetailPage() {
       condition: asset.condition || "",
       location: asset.location || "",
       department: asset.department || "",
+      departmentId: (asset as any).departmentId || null,
       assignedTo: asset.assignedTo || "",
       fundingMethod: asset.fundingMethod || "",
       quantity: asset.quantity ?? 1,
@@ -1044,11 +1050,17 @@ export default function AssetDetailPage() {
             </div>
             <div className="space-y-2">
               <Label>Department</Label>
-              <Input
-                value={basicForm.department || ""}
-                onChange={(e) => setBasicForm({ ...basicForm, department: e.target.value })}
-                data-testid="input-edit-department"
-              />
+              <Select value={basicForm.departmentId || "none"} onValueChange={(v) => setBasicForm({ ...basicForm, departmentId: v === "none" ? null : v })}>
+                <SelectTrigger data-testid="select-edit-department">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No department</SelectItem>
+                  {activeDepartments.slice().sort((a, b) => a.name.localeCompare(b.name)).map((dept) => (
+                    <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Assigned To</Label>
@@ -1653,19 +1665,31 @@ export default function AssetDetailPage() {
             </div>
             <div className="space-y-2">
               <Label>From Department</Label>
-              <Input
-                value={transferForm.fromDepartment || ""}
-                onChange={(e) => setTransferForm({ ...transferForm, fromDepartment: e.target.value })}
-                data-testid="input-transfer-from-dept"
-              />
+              <Select value={transferForm.fromDepartment || "none"} onValueChange={(v) => setTransferForm({ ...transferForm, fromDepartment: v === "none" ? "" : v })}>
+                <SelectTrigger data-testid="select-transfer-from-dept">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No department</SelectItem>
+                  {activeDepartments.slice().sort((a, b) => a.name.localeCompare(b.name)).map((dept) => (
+                    <SelectItem key={dept.id} value={dept.name}>{dept.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>To Department</Label>
-              <Input
-                value={transferForm.toDepartment || ""}
-                onChange={(e) => setTransferForm({ ...transferForm, toDepartment: e.target.value })}
-                data-testid="input-transfer-to-dept"
-              />
+              <Select value={transferForm.toDepartment || "none"} onValueChange={(v) => setTransferForm({ ...transferForm, toDepartment: v === "none" ? "" : v })}>
+                <SelectTrigger data-testid="select-transfer-to-dept">
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No department</SelectItem>
+                  {activeDepartments.slice().sort((a, b) => a.name.localeCompare(b.name)).map((dept) => (
+                    <SelectItem key={dept.id} value={dept.name}>{dept.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>From Assignee</Label>

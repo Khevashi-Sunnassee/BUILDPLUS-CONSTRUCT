@@ -34,8 +34,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { ASSET_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
-import type { Asset } from "@shared/schema";
+import { ASSET_ROUTES, PROCUREMENT_ROUTES, ADMIN_ROUTES } from "@shared/api-routes";
+import type { Asset, Department } from "@shared/schema";
 import {
   ASSET_CATEGORIES,
   ASSET_STATUSES,
@@ -146,6 +146,7 @@ const assetFormSchema = z.object({
   condition: z.string().optional(),
   location: z.string().optional(),
   department: z.string().optional(),
+  departmentId: z.string().nullable().optional(),
   assignedTo: z.string().optional(),
   fundingMethod: z.string().optional(),
   remarks: z.string().optional(),
@@ -209,6 +210,7 @@ const defaultFormValues: AssetFormData = {
   condition: "good",
   location: "",
   department: "",
+  departmentId: null,
   assignedTo: "",
   fundingMethod: "purchased",
   remarks: "",
@@ -536,6 +538,11 @@ export default function AssetRegisterPage() {
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
   });
 
+  const { data: departmentsList = [] } = useQuery<Department[]>({
+    queryKey: [ADMIN_ROUTES.DEPARTMENTS],
+  });
+  const activeDepartments = departmentsList.filter((d) => d.isActive);
+
   const form = useForm<AssetFormData>({
     resolver: zodResolver(assetFormSchema),
     defaultValues: { ...defaultFormValues },
@@ -757,6 +764,7 @@ export default function AssetRegisterPage() {
       condition: asset.condition || "good",
       location: asset.location || "",
       department: asset.department || "",
+      departmentId: (asset as any).departmentId || null,
       assignedTo: asset.assignedTo || "",
       fundingMethod: asset.fundingMethod || "purchased",
       remarks: asset.remarks || "",
@@ -1737,13 +1745,23 @@ export default function AssetRegisterPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="department"
+                    name="departmentId"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Department</FormLabel>
-                        <FormControl>
-                          <Input {...field} data-testid="input-asset-department" />
-                        </FormControl>
+                        <Select onValueChange={(v) => field.onChange(v === "none" ? null : v)} value={field.value || "none"}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-asset-department">
+                              <SelectValue placeholder="Select department" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="none">No department</SelectItem>
+                            {activeDepartments.slice().sort((a, b) => a.name.localeCompare(b.name)).map((dept) => (
+                              <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}

@@ -5,6 +5,9 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
+import { db } from "../db";
+import { departments } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 const router = Router();
 
@@ -42,6 +45,7 @@ const employmentSchema = z.object({
   positionTitle: z.string().max(255).optional().nullable(),
   jobTitle: z.string().max(255).optional().nullable(),
   department: z.string().max(255).optional().nullable(),
+  departmentId: z.string().max(36).optional().nullable(),
   reportingManagerId: z.string().max(36).optional().nullable(),
   workLocation: z.string().max(255).optional().nullable(),
   workState: z.string().max(10).optional().nullable(),
@@ -554,7 +558,18 @@ router.post("/api/employees/:employeeId/employments", requireRole("ADMIN", "MANA
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const employment = await storage.createEmployeeEmployment(parsed.data);
+    const createData = { ...parsed.data } as Record<string, unknown>;
+    if (createData.departmentId) {
+      const [dept] = await db.select({ id: departments.id, name: departments.name })
+        .from(departments)
+        .where(and(eq(departments.id, createData.departmentId as string), eq(departments.companyId, companyId)))
+        .limit(1);
+      if (!dept) return res.status(400).json({ error: "Selected department not found" });
+      createData.department = dept.name;
+    } else {
+      createData.departmentId = null;
+    }
+    const employment = await storage.createEmployeeEmployment(createData as any);
     res.json(employment);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to create employment";
@@ -574,7 +589,23 @@ router.patch("/api/employees/:employeeId/employments/:id", requireRole("ADMIN", 
     if (!parsed.success) {
       return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const employment = await storage.updateEmployeeEmployment(String(req.params.id), parsed.data);
+    const updateData = { ...parsed.data } as Record<string, unknown>;
+    if (updateData.departmentId !== undefined) {
+      if (updateData.departmentId) {
+        const [dept] = await db.select({ id: departments.id, name: departments.name })
+          .from(departments)
+          .where(and(eq(departments.id, updateData.departmentId as string), eq(departments.companyId, companyId!)))
+          .limit(1);
+        if (!dept) return res.status(400).json({ error: "Selected department not found" });
+        updateData.department = dept.name;
+      } else {
+        updateData.departmentId = null;
+        if (updateData.department === undefined) {
+          updateData.department = null;
+        }
+      }
+    }
+    const employment = await storage.updateEmployeeEmployment(String(req.params.id), updateData as any);
     res.json(employment);
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update employment";

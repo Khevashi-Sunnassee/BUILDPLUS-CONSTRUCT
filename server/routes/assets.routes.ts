@@ -1,7 +1,7 @@
 import { Router, Request, Response } from "express";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { db } from "../db";
-import { assets, assetMaintenanceRecords, assetTransfers, suppliers, ASSET_CATEGORIES, ASSET_STATUSES, ASSET_CONDITIONS, ASSET_FUNDING_METHODS } from "@shared/schema";
+import { assets, assetMaintenanceRecords, assetTransfers, suppliers, departments, ASSET_CATEGORIES, ASSET_STATUSES, ASSET_CONDITIONS, ASSET_FUNDING_METHODS } from "@shared/schema";
 import { eq, and, sql, desc, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -19,6 +19,7 @@ const createAssetSchema = z.object({
   condition: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
   department: z.string().optional().nullable(),
+  departmentId: z.string().optional().nullable(),
   assignedTo: z.string().optional().nullable(),
   fundingMethod: z.string().optional().nullable(),
   purchasePrice: z.any().optional().nullable(),
@@ -800,13 +801,23 @@ router.post("/api/admin/assets", requireRole("ADMIN"), async (req: Request, res:
       return res.status(400).json({ error: "Validation failed", issues: parsed.error.issues });
     }
     const assetTag = await generateAssetTag(companyId);
-    const data = {
+    const data: Record<string, unknown> = {
       ...parsed.data,
       companyId,
       assetTag,
       createdBy: req.session?.userId || null,
     };
-    const [created] = await db.insert(assets).values(data).returning();
+    if (data.departmentId) {
+      const [dept] = await db.select({ id: departments.id, name: departments.name })
+        .from(departments)
+        .where(and(eq(departments.id, data.departmentId as string), eq(departments.companyId, companyId)))
+        .limit(1);
+      if (!dept) return res.status(400).json({ error: "Selected department not found" });
+      data.department = dept.name;
+    } else {
+      data.departmentId = null;
+    }
+    const [created] = await db.insert(assets).values(data as any).returning();
     res.status(201).json(created);
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to create asset");
@@ -827,8 +838,21 @@ router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request,
       return res.status(400).json({ error: "Validation failed", issues: parsed.error.issues });
     }
     const { id: _id, companyId: _cid, assetTag: _tag, createdAt: _ca, ...safeData } = parsed.data as Record<string, unknown>;
+    if (safeData.departmentId !== undefined) {
+      if (safeData.departmentId) {
+        const [dept] = await db.select({ id: departments.id, name: departments.name })
+          .from(departments)
+          .where(and(eq(departments.id, safeData.departmentId as string), eq(departments.companyId, companyId)))
+          .limit(1);
+        if (!dept) return res.status(400).json({ error: "Selected department not found" });
+        safeData.department = dept.name;
+      } else {
+        safeData.departmentId = null;
+        if (safeData.department === undefined) safeData.department = null;
+      }
+    }
     const [updated] = await db.update(assets)
-      .set({ ...safeData, updatedAt: new Date() })
+      .set({ ...safeData, updatedAt: new Date() } as any)
       .where(eq(assets.id, String(req.params.id)))
       .returning();
     res.json(updated);
