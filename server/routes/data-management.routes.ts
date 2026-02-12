@@ -37,6 +37,22 @@ import {
   jobTypes,
   hireBookings,
   tasks,
+  costCodes,
+  childCostCodes,
+  costCodeDefaults,
+  jobCostCodes,
+  tenders,
+  tenderPackages,
+  tenderSubmissions,
+  tenderLineItems,
+  tenderLineActivities,
+  tenderLineFiles,
+  tenderLineRisks,
+  jobBudgets,
+  budgetLines,
+  budgetLineFiles,
+  boqGroups,
+  boqItems,
 } from "@shared/schema";
 import { inArray, notInArray } from "drizzle-orm";
 
@@ -1236,5 +1252,179 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
     });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to perform bulk delete" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/cost-codes", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: costCodes.id,
+        code: costCodes.code,
+        name: costCodes.name,
+        description: costCodes.description,
+        isActive: costCodes.isActive,
+        createdAt: costCodes.createdAt,
+      })
+      .from(costCodes)
+      .where(eq(costCodes.companyId, companyId))
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch cost codes" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/cost-codes/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { id } = req.params;
+    const [existing] = await db.select({ id: costCodes.id }).from(costCodes).where(and(eq(costCodes.id, id), eq(costCodes.companyId, companyId)));
+    if (!existing) return res.status(404).json({ error: "Cost code not found" });
+    await db.delete(childCostCodes).where(eq(childCostCodes.parentCostCodeId, id));
+    await db.delete(costCodeDefaults).where(eq(costCodeDefaults.costCodeId, id));
+    await db.delete(jobCostCodes).where(eq(jobCostCodes.costCodeId, id));
+    await db.delete(costCodes).where(and(eq(costCodes.id, id), eq(costCodes.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete cost code" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/tenders", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: tenders.id,
+        tenderNumber: tenders.tenderNumber,
+        title: tenders.title,
+        status: tenders.status,
+        jobId: tenders.jobId,
+        jobName: jobs.name,
+        createdAt: tenders.createdAt,
+      })
+      .from(tenders)
+      .leftJoin(jobs, eq(tenders.jobId, jobs.id))
+      .where(eq(tenders.companyId, companyId))
+      .orderBy(desc(tenders.createdAt));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch tenders" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/tenders/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { id } = req.params;
+    const [existing] = await db.select({ id: tenders.id }).from(tenders).where(and(eq(tenders.id, id), eq(tenders.companyId, companyId)));
+    if (!existing) return res.status(404).json({ error: "Tender not found" });
+    const subs = await db.select({ id: tenderSubmissions.id }).from(tenderSubmissions).where(eq(tenderSubmissions.tenderId, id));
+    const subIds = subs.map(s => s.id);
+    if (subIds.length > 0) {
+      const lineItems = await db.select({ id: tenderLineItems.id }).from(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, subIds));
+      const lineItemIds = lineItems.map(li => li.id);
+      if (lineItemIds.length > 0) {
+        await db.delete(tenderLineRisks).where(inArray(tenderLineRisks.lineItemId, lineItemIds));
+        await db.delete(tenderLineFiles).where(inArray(tenderLineFiles.lineItemId, lineItemIds));
+        await db.delete(tenderLineActivities).where(inArray(tenderLineActivities.lineItemId, lineItemIds));
+        await db.delete(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, subIds));
+      }
+      await db.delete(tenderSubmissions).where(eq(tenderSubmissions.tenderId, id));
+    }
+    await db.delete(tenderPackages).where(eq(tenderPackages.tenderId, id));
+    await db.delete(tenders).where(and(eq(tenders.id, id), eq(tenders.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete tender" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/budgets", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: jobBudgets.id,
+        jobId: jobBudgets.jobId,
+        jobName: jobs.name,
+        estimatedTotalBudget: jobBudgets.estimatedTotalBudget,
+        customerPrice: jobBudgets.customerPrice,
+        createdAt: jobBudgets.createdAt,
+      })
+      .from(jobBudgets)
+      .leftJoin(jobs, eq(jobBudgets.jobId, jobs.id))
+      .where(eq(jobBudgets.companyId, companyId))
+      .orderBy(desc(jobBudgets.createdAt));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch budgets" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/budgets/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { id } = req.params;
+    const [existing] = await db.select({ id: jobBudgets.id }).from(jobBudgets).where(and(eq(jobBudgets.id, id), eq(jobBudgets.companyId, companyId)));
+    if (!existing) return res.status(404).json({ error: "Budget not found" });
+    const lines = await db.select({ id: budgetLines.id }).from(budgetLines).where(eq(budgetLines.budgetId, id));
+    const lineIds = lines.map(l => l.id);
+    if (lineIds.length > 0) {
+      await db.delete(budgetLineFiles).where(inArray(budgetLineFiles.budgetLineId, lineIds));
+    }
+    await db.delete(budgetLines).where(eq(budgetLines.budgetId, id));
+    await db.delete(jobBudgets).where(and(eq(jobBudgets.id, id), eq(jobBudgets.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete budget" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/boq-groups", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: boqGroups.id,
+        name: boqGroups.name,
+        description: boqGroups.description,
+        jobId: boqGroups.jobId,
+        jobName: jobs.name,
+        costCodeName: costCodes.name,
+        createdAt: boqGroups.createdAt,
+      })
+      .from(boqGroups)
+      .leftJoin(jobs, eq(boqGroups.jobId, jobs.id))
+      .leftJoin(costCodes, eq(boqGroups.costCodeId, costCodes.id))
+      .where(eq(boqGroups.companyId, companyId))
+      .orderBy(desc(boqGroups.createdAt));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch BOQ groups" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/boq-groups/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { id } = req.params;
+    const [existing] = await db.select({ id: boqGroups.id }).from(boqGroups).where(and(eq(boqGroups.id, id), eq(boqGroups.companyId, companyId)));
+    if (!existing) return res.status(404).json({ error: "BOQ group not found" });
+    await db.delete(boqItems).where(eq(boqItems.groupId, id));
+    await db.delete(boqGroups).where(and(eq(boqGroups.id, id), eq(boqGroups.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete BOQ group" });
   }
 });

@@ -268,6 +268,57 @@ const ENTITY_TABS: EntityTabConfig[] = [
     ],
     getRowName: (r: any) => r.name || `Consultant ${r.id}`,
   },
+  {
+    key: "cost-codes",
+    label: "Cost Codes",
+    entityType: "cost-codes",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_COST_CODES,
+    columns: [
+      { key: "code", label: "Code" },
+      { key: "name", label: "Name" },
+      { key: "description", label: "Description", render: (r: any) => r.description || "-" },
+      { key: "isActive", label: "Status", render: (r: any) => <Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Inactive"}</Badge> },
+    ],
+    getRowName: (r: any) => `${r.code} - ${r.name}`,
+  },
+  {
+    key: "tenders",
+    label: "Tenders",
+    entityType: "tenders",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_TENDERS,
+    columns: [
+      { key: "tenderNumber", label: "Tender #" },
+      { key: "title", label: "Title" },
+      { key: "jobName", label: "Job", render: (r: any) => r.jobName || "-" },
+      { key: "status", label: "Status", render: (r: any) => <Badge variant="secondary">{r.status}</Badge> },
+    ],
+    getRowName: (r: any) => r.tenderNumber || r.title || `Tender ${r.id}`,
+  },
+  {
+    key: "budgets",
+    label: "Budgets",
+    entityType: "budgets",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_BUDGETS,
+    columns: [
+      { key: "jobName", label: "Job", render: (r: any) => r.jobName || "-" },
+      { key: "estimatedTotalBudget", label: "Estimated Total", render: (r: any) => r.estimatedTotalBudget ? `$${Number(r.estimatedTotalBudget).toLocaleString()}` : "-" },
+      { key: "customerPrice", label: "Customer Price", render: (r: any) => r.customerPrice ? `$${Number(r.customerPrice).toLocaleString()}` : "-" },
+    ],
+    getRowName: (r: any) => r.jobName ? `Budget for ${r.jobName}` : `Budget ${r.id}`,
+  },
+  {
+    key: "boq-groups",
+    label: "BOQ Groups",
+    entityType: "boq-groups",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_BOQ_GROUPS,
+    columns: [
+      { key: "name", label: "Name" },
+      { key: "jobName", label: "Job", render: (r: any) => r.jobName || "-" },
+      { key: "costCodeName", label: "Cost Code", render: (r: any) => r.costCodeName || "-" },
+      { key: "description", label: "Description", render: (r: any) => r.description || "-" },
+    ],
+    getRowName: (r: any) => r.name || `BOQ Group ${r.id}`,
+  },
 ];
 
 function EntityTable({

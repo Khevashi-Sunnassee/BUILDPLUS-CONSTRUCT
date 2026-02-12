@@ -19,8 +19,12 @@ import {
   broadcastTemplates, broadcastMessages,
   activityTemplates, activityTemplateSubtasks,
   jobActivities, jobActivityAssignees, jobActivityUpdates, jobActivityFiles,
+  costCodes, childCostCodes, costCodeDefaults, jobCostCodes,
+  tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks,
+  jobBudgets, budgetLines, budgetLineFiles,
+  boqGroups, boqItems,
 } from "@shared/schema";
-import { sql, isNotNull } from "drizzle-orm";
+import { sql, isNotNull, eq, and, inArray } from "drizzle-orm";
 import logger from "../lib/logger";
 
 const router = Router();
@@ -149,6 +153,10 @@ const dataDeletionCategories = [
   "broadcast_templates",
   "activity_templates",
   "job_activities",
+  "cost_codes",
+  "tenders",
+  "budgets",
+  "boq",
 ] as const;
 
 type DeletionCategory = typeof dataDeletionCategories[number];
@@ -210,6 +218,26 @@ router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, 
     
     const [jobActivityCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivities);
     counts.job_activities = Number(jobActivityCount.count);
+    
+    const companyId = req.companyId;
+    
+    const costCodeWhere = companyId ? eq(costCodes.companyId, companyId) : undefined;
+    const [costCodeCount] = await db.select({ count: sql<number>`count(*)` }).from(costCodes).where(costCodeWhere);
+    counts.cost_codes = Number(costCodeCount.count);
+    
+    const tenderWhere = companyId ? eq(tenders.companyId, companyId) : undefined;
+    const [tenderCount] = await db.select({ count: sql<number>`count(*)` }).from(tenders).where(tenderWhere);
+    counts.tenders = Number(tenderCount.count);
+    
+    const budgetWhere = companyId ? eq(jobBudgets.companyId, companyId) : undefined;
+    const [budgetCount] = await db.select({ count: sql<number>`count(*)` }).from(jobBudgets).where(budgetWhere);
+    counts.budgets = Number(budgetCount.count);
+    
+    const boqWhere = companyId ? eq(boqGroups.companyId, companyId) : undefined;
+    const boqItemWhere = companyId ? eq(boqItems.companyId, companyId) : undefined;
+    const [boqGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(boqWhere);
+    const [boqItemCount] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(boqItemWhere);
+    counts.boq = Number(boqGroupCount.count) + Number(boqItemCount.count);
     
     res.json(counts);
   } catch (error: unknown) {
@@ -364,6 +392,99 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       const totalRelated = Number(assigneeCount.count) + Number(updateCount.count) + Number(fileCount.count);
       if (totalRelated > 0) {
         warnings.push(`${totalRelated} activity assignee(s), update(s), and file(s) will also be deleted.`);
+      }
+    }
+    
+    const cid = req.companyId;
+    
+    if (selected.has("cost_codes")) {
+      if (!selected.has("budgets")) {
+        const [budgetLineRef] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(cid ? eq(budgetLines.companyId, cid) : undefined);
+        if (Number(budgetLineRef.count) > 0) {
+          errors.push("Cannot delete Cost Codes while Budget Lines reference them. Select Budgets for deletion first.");
+        }
+      }
+      if (!selected.has("boq")) {
+        const [boqRef] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(cid ? eq(boqGroups.companyId, cid) : undefined);
+        if (Number(boqRef.count) > 0) {
+          errors.push("Cannot delete Cost Codes while BOQ Groups reference them. Select Bill of Quantities for deletion first.");
+        }
+      }
+      if (!selected.has("tenders")) {
+        const [tenderLineRef] = await db.select({ count: sql<number>`count(*)` }).from(tenderLineItems).where(cid ? eq(tenderLineItems.companyId, cid) : undefined);
+        if (Number(tenderLineRef.count) > 0) {
+          warnings.push("Tender line items reference cost codes. Those references will be cleared.");
+        }
+      }
+      const companyCostCodeIds = cid
+        ? (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, cid))).map(r => r.id)
+        : [];
+      if (companyCostCodeIds.length > 0) {
+        const [childCount] = await db.select({ count: sql<number>`count(*)` }).from(childCostCodes).where(inArray(childCostCodes.parentCostCodeId, companyCostCodeIds));
+        const [defaultCount] = await db.select({ count: sql<number>`count(*)` }).from(costCodeDefaults).where(inArray(costCodeDefaults.costCodeId, companyCostCodeIds));
+        const [jobCodeCount] = await db.select({ count: sql<number>`count(*)` }).from(jobCostCodes).where(inArray(jobCostCodes.costCodeId, companyCostCodeIds));
+        const totalRelated = Number(childCount.count) + Number(defaultCount.count) + Number(jobCodeCount.count);
+        if (totalRelated > 0) {
+          warnings.push(`${totalRelated} child cost code(s), job type default(s), and job cost code(s) will also be deleted.`);
+        }
+      }
+    }
+    
+    if (selected.has("tenders")) {
+      if (!selected.has("budgets")) {
+        const [budgetTenderRef] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(
+          cid ? and(eq(budgetLines.companyId, cid), isNotNull(budgetLines.selectedTenderSubmissionId)) : isNotNull(budgetLines.selectedTenderSubmissionId)
+        );
+        if (Number(budgetTenderRef.count) > 0) {
+          warnings.push("Budget lines reference tender submissions. Those references will be cleared.");
+        }
+      }
+      if (!selected.has("boq")) {
+        const [boqTenderRef] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(
+          cid ? and(eq(boqItems.companyId, cid), isNotNull(boqItems.tenderLineItemId)) : isNotNull(boqItems.tenderLineItemId)
+        );
+        if (Number(boqTenderRef.count) > 0) {
+          warnings.push("BOQ items reference tender line items. Those references will be cleared.");
+        }
+      }
+      const [submissionCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderSubmissions).where(cid ? eq(tenderSubmissions.companyId, cid) : undefined);
+      const [lineItemCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderLineItems).where(cid ? eq(tenderLineItems.companyId, cid) : undefined);
+      const [packageCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderPackages).where(cid ? eq(tenderPackages.companyId, cid) : undefined);
+      const totalRelated = Number(submissionCount.count) + Number(lineItemCount.count) + Number(packageCount.count);
+      if (totalRelated > 0) {
+        warnings.push(`${totalRelated} tender submission(s), line item(s), and package(s) will also be deleted.`);
+      }
+    }
+    
+    if (selected.has("budgets")) {
+      if (!selected.has("boq")) {
+        const [boqBudgetRef] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(
+          cid ? and(eq(boqGroups.companyId, cid), isNotNull(boqGroups.budgetLineId)) : isNotNull(boqGroups.budgetLineId)
+        );
+        if (Number(boqBudgetRef.count) > 0) {
+          warnings.push("BOQ groups reference budget lines. Those references will be cleared.");
+        }
+      }
+      const [budgetLineCount] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(cid ? eq(budgetLines.companyId, cid) : undefined);
+      const companyBudgetIdsForFiles = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(cid ? eq(jobBudgets.companyId, cid) : undefined)).map(r => r.id);
+      const companyBudgetLineIdsForFiles = companyBudgetIdsForFiles.length > 0
+        ? (await db.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIdsForFiles))).map(r => r.id)
+        : [];
+      const [budgetFileCount] = companyBudgetLineIdsForFiles.length > 0
+        ? await db.select({ count: sql<number>`count(*)` }).from(budgetLineFiles).where(inArray(budgetLineFiles.budgetLineId, companyBudgetLineIdsForFiles))
+        : [{ count: 0 }];
+      const totalRelated = Number(budgetLineCount.count) + Number(budgetFileCount.count);
+      if (totalRelated > 0) {
+        warnings.push(`${totalRelated} budget line(s) and file(s) will also be deleted.`);
+      }
+    }
+    
+    if (selected.has("boq")) {
+      const [boqItemCountVal] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(cid ? eq(boqItems.companyId, cid) : undefined);
+      const [boqGroupCountVal] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(cid ? eq(boqGroups.companyId, cid) : undefined);
+      const totalRelated = Number(boqItemCountVal.count) + Number(boqGroupCountVal.count);
+      if (totalRelated > 0) {
+        warnings.push(`${totalRelated} BOQ group(s) and item(s) will be permanently deleted.`);
       }
     }
     
@@ -526,6 +647,79 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       await db.delete(activityTemplateSubtasks);
       const result = await db.delete(activityTemplates);
       deletedCounts.activity_templates = result.rowCount || 0;
+    }
+    
+    const delCompanyId = req.companyId;
+    
+    if (selected.has("boq")) {
+      if (delCompanyId) {
+        await db.delete(boqItems).where(eq(boqItems.companyId, delCompanyId));
+        const result = await db.delete(boqGroups).where(eq(boqGroups.companyId, delCompanyId));
+        deletedCounts.boq = result.rowCount || 0;
+      }
+    }
+    
+    if (selected.has("budgets")) {
+      if (delCompanyId) {
+        if (!selected.has("boq")) {
+          await db.update(boqGroups).set({ budgetLineId: null }).where(and(eq(boqGroups.companyId, delCompanyId), isNotNull(boqGroups.budgetLineId)));
+          await db.update(boqItems).set({ budgetLineId: null }).where(and(eq(boqItems.companyId, delCompanyId), isNotNull(boqItems.budgetLineId)));
+        }
+        const companyBudgetIds = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(eq(jobBudgets.companyId, delCompanyId))).map(r => r.id);
+        if (companyBudgetIds.length > 0) {
+          const companyBudgetLineIds = (await db.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIds))).map(r => r.id);
+          if (companyBudgetLineIds.length > 0) {
+            await db.delete(budgetLineFiles).where(inArray(budgetLineFiles.budgetLineId, companyBudgetLineIds));
+          }
+          await db.delete(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIds));
+        }
+        const result = await db.delete(jobBudgets).where(eq(jobBudgets.companyId, delCompanyId));
+        deletedCounts.budgets = result.rowCount || 0;
+      }
+    }
+    
+    if (selected.has("tenders")) {
+      if (delCompanyId) {
+        if (!selected.has("budgets")) {
+          await db.update(budgetLines).set({ selectedTenderSubmissionId: null }).where(and(eq(budgetLines.companyId, delCompanyId), isNotNull(budgetLines.selectedTenderSubmissionId)));
+        }
+        if (!selected.has("boq")) {
+          await db.update(boqItems).set({ tenderLineItemId: null }).where(and(eq(boqItems.companyId, delCompanyId), isNotNull(boqItems.tenderLineItemId)));
+        }
+        const companyTenderIds = (await db.select({ id: tenders.id }).from(tenders).where(eq(tenders.companyId, delCompanyId))).map(r => r.id);
+        if (companyTenderIds.length > 0) {
+          const companySubIds = (await db.select({ id: tenderSubmissions.id }).from(tenderSubmissions).where(inArray(tenderSubmissions.tenderId, companyTenderIds))).map(r => r.id);
+          if (companySubIds.length > 0) {
+            const companyLineItemIds = (await db.select({ id: tenderLineItems.id }).from(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, companySubIds))).map(r => r.id);
+            if (companyLineItemIds.length > 0) {
+              await db.delete(tenderLineRisks).where(inArray(tenderLineRisks.lineItemId, companyLineItemIds));
+              await db.delete(tenderLineFiles).where(inArray(tenderLineFiles.lineItemId, companyLineItemIds));
+              await db.delete(tenderLineActivities).where(inArray(tenderLineActivities.lineItemId, companyLineItemIds));
+            }
+            await db.delete(tenderLineItems).where(inArray(tenderLineItems.tenderSubmissionId, companySubIds));
+            await db.delete(tenderSubmissions).where(inArray(tenderSubmissions.tenderId, companyTenderIds));
+          }
+          await db.delete(tenderPackages).where(inArray(tenderPackages.tenderId, companyTenderIds));
+        }
+        const result = await db.delete(tenders).where(eq(tenders.companyId, delCompanyId));
+        deletedCounts.tenders = result.rowCount || 0;
+      }
+    }
+    
+    if (selected.has("cost_codes")) {
+      if (delCompanyId) {
+        const companyCCIds = (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, delCompanyId))).map(r => r.id);
+        if (companyCCIds.length > 0) {
+          if (!selected.has("tenders")) {
+            await db.update(tenderLineItems).set({ costCodeId: null }).where(and(eq(tenderLineItems.companyId, delCompanyId), isNotNull(tenderLineItems.costCodeId)));
+          }
+          await db.delete(jobCostCodes).where(inArray(jobCostCodes.costCodeId, companyCCIds));
+          await db.delete(costCodeDefaults).where(inArray(costCodeDefaults.costCodeId, companyCCIds));
+          await db.delete(childCostCodes).where(inArray(childCostCodes.parentCostCodeId, companyCCIds));
+        }
+        const result = await db.delete(costCodes).where(eq(costCodes.companyId, delCompanyId));
+        deletedCounts.cost_codes = result.rowCount || 0;
+      }
     }
     
     res.json({ 
