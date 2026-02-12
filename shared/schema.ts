@@ -1618,6 +1618,7 @@ export const suppliers = pgTable("suppliers", {
   defaultCostCodeId: varchar("default_cost_code_id", { length: 36 }),
   isActive: boolean("is_active").default(true).notNull(),
   isEquipmentHire: boolean("is_equipment_hire").default(false).notNull(),
+  availableForTender: boolean("available_for_tender").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1625,6 +1626,7 @@ export const suppliers = pgTable("suppliers", {
   abnIdx: index("suppliers_abn_idx").on(table.abn),
   companyIdx: index("suppliers_company_idx").on(table.companyId),
   defaultCostCodeIdx: index("suppliers_default_cost_code_idx").on(table.defaultCostCodeId),
+  availableForTenderIdx: index("suppliers_available_for_tender_idx").on(table.availableForTender),
 }));
 
 export const itemCategories = pgTable("item_categories", {

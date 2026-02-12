@@ -28,6 +28,7 @@ const supplierSchema = z.object({
   defaultCostCodeId: z.string().max(36).optional().nullable().or(z.literal("")),
   isActive: z.boolean().optional(),
   isEquipmentHire: z.boolean().optional(),
+  availableForTender: z.boolean().optional(),
 });
 
 const itemCategorySchema = z.object({
