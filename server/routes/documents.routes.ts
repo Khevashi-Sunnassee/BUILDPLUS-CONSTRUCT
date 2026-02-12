@@ -2364,7 +2364,7 @@ CRITICAL RULES:
         return page;
       };
 
-      const CONCURRENCY = 3;
+      const CONCURRENCY = 5;
       const pages = analysisResult.pages;
       for (let i = 0; i < pages.length; i += CONCURRENCY) {
         const batch = pages.slice(i, i + CONCURRENCY);

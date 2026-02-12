@@ -126,12 +126,16 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
       const formData = new FormData();
       formData.append("file", file);
       const csrfToken = getCsrfToken();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000);
       const res = await fetch(DOCUMENT_ROUTES.DRAWING_PACKAGE_ANALYZE, {
         method: "POST",
         headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || err.message || "Analysis failed");
@@ -917,7 +921,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                 {analyzeMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Analyzing...
+                    AI Analyzing (may take 1-2 min)...
                   </>
                 ) : (
                   <>
