@@ -269,6 +269,15 @@ export default function JobTendersPage() {
     setHasUnsavedChanges(false);
   }
 
+  useEffect(() => {
+    if (!hasUnsavedChanges && selectedSubmissionId && sheetData) {
+      const sub = sheetData.submissions.find(s => s.id === selectedSubmissionId);
+      if (sub) {
+        loadLineAmountsForSubmission(sub);
+      }
+    }
+  }, [sheetData, selectedSubmissionId]);
+
   function selectTender(tenderId: string) {
     setSelectedTenderId(tenderId);
     setSelectedSubmissionId(null);
