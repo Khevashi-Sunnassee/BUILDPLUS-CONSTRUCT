@@ -47,10 +47,26 @@ const childCostCodeSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
+function getCellText(cell: ExcelJS.Cell): string {
+  const val = cell.value;
+  if (val === null || val === undefined) return "";
+  if (typeof val === "string") return val.trim();
+  if (typeof val === "number" || typeof val === "boolean") return String(val).trim();
+  if (typeof val === "object") {
+    if ("richText" in val && Array.isArray((val as any).richText)) {
+      return (val as any).richText.map((rt: any) => rt.text || "").join("").trim();
+    }
+    if ("text" in val) return String((val as any).text || "").trim();
+    if ("result" in val) return String((val as any).result || "").trim();
+    if ("hyperlink" in val && "text" in val) return String((val as any).text || "").trim();
+  }
+  return String(val).trim();
+}
+
 function parseHeaders(sheet: ExcelJS.Worksheet): Record<number, string> {
   const headerMap: Record<number, string> = {};
   sheet.getRow(1).eachCell({ includeEmpty: false }, (cell, colNum) => {
-    headerMap[colNum] = String(cell.value || "").trim().toLowerCase();
+    headerMap[colNum] = getCellText(cell).toLowerCase();
   });
   return headerMap;
 }
@@ -333,9 +349,9 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
         parentSheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
           if (rowNum === 1) return;
 
-          const code = String(row.getCell(codeCol).value || "").trim();
-          const parentName = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() : "";
-          const childName = childCol !== -1 ? String(row.getCell(childCol).value || "").trim() : "";
+          const code = getCellText(row.getCell(codeCol));
+          const parentName = parentCol !== -1 ? getCellText(row.getCell(parentCol)) : "";
+          const childName = childCol !== -1 ? getCellText(row.getCell(childCol)) : "";
 
           if (!code && !parentName) return;
 
@@ -358,9 +374,9 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
         const parentRows: { code: string; name: string; description: string | null; sortOrder: number; rowNum: number }[] = [];
         parentSheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
           if (rowNum === 1) return;
-          const code = String(row.getCell(codeCol).value || "").trim();
-          const parentName = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() : "";
-          const childName = childCol !== -1 ? String(row.getCell(childCol).value || "").trim() : "";
+          const code = getCellText(row.getCell(codeCol));
+          const parentName = parentCol !== -1 ? getCellText(row.getCell(parentCol)) : "";
+          const childName = childCol !== -1 ? getCellText(row.getCell(childCol)) : "";
           if (!code) return;
           const name = parentName || childName || code;
           parentRows.push({ code, name, description: childName || null, sortOrder: parentRows.length, rowNum });
@@ -430,9 +446,9 @@ router.post("/api/cost-codes/import", requireAuth, requirePermission("admin_cost
         const childRows: ChildRow[] = [];
         childSheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
           if (rowNum === 1) return;
-          const code = String(row.getCell(codeCol).value || "").trim();
-          const parentName = parentCol !== -1 ? String(row.getCell(parentCol).value || "").trim() : "";
-          const childName = String(row.getCell(childCol).value || "").trim();
+          const code = getCellText(row.getCell(codeCol));
+          const parentName = parentCol !== -1 ? getCellText(row.getCell(parentCol)) : "";
+          const childName = getCellText(row.getCell(childCol));
           if (!code && !childName) return;
           if (!code) {
             errors.push({ sheet: "CHILD CODES", row: rowNum, message: "Code is required" });
