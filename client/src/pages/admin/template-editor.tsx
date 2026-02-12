@@ -39,6 +39,8 @@ import {
   X,
   Ruler,
   BarChart3,
+  ChevronsUpDown,
+  ChevronsDownUp,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -202,7 +204,9 @@ export default function TemplateEditorPage() {
 
   useEffect(() => {
     if (template?.sections && !hasChanges) {
-      setSections(normalizeSections(template.sections));
+      const normalized = normalizeSections(template.sections);
+      setSections(normalized);
+      setExpandedSections(normalized.map(s => s.id));
     }
   }, [template, hasChanges]);
 
@@ -579,12 +583,40 @@ export default function TemplateEditorPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <h2 className="text-lg font-medium">Sections</h2>
-            <Button onClick={() => handleOpenSectionDialog()} data-testid="button-add-section">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Section
-            </Button>
+            <div className="flex items-center gap-2">
+              {sections.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (expandedSections.length === sections.length) {
+                      setExpandedSections([]);
+                    } else {
+                      setExpandedSections(sections.map(s => s.id));
+                    }
+                  }}
+                  data-testid="button-toggle-all-sections"
+                >
+                  {expandedSections.length === sections.length ? (
+                    <>
+                      <ChevronsDownUp className="h-4 w-4 mr-2" />
+                      Collapse All
+                    </>
+                  ) : (
+                    <>
+                      <ChevronsUpDown className="h-4 w-4 mr-2" />
+                      Expand All
+                    </>
+                  )}
+                </Button>
+              )}
+              <Button onClick={() => handleOpenSectionDialog()} data-testid="button-add-section">
+                <Plus className="h-4 w-4 mr-2" />
+                Add Section
+              </Button>
+            </div>
           </div>
 
           {sections.length === 0 ? (
