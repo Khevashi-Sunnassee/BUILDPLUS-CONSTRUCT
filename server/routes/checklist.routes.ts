@@ -633,6 +633,59 @@ router.get("/api/checklist/panels/:panelId/instances", requireAuth, async (req: 
   }
 });
 
+router.post("/api/checklist/instances/from-asset", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const { assetId, assetName, assetTag, assetCategory, assetLocation, serialNumber } = req.body;
+    if (!assetId) {
+      return res.status(400).json({ error: "Asset ID is required" });
+    }
+
+    const [template] = await db.select().from(checklistTemplates)
+      .where(and(
+        eq(checklistTemplates.companyId, companyId!),
+        eq(checklistTemplates.name, "Equipment Maintenance Log"),
+        eq(checklistTemplates.isSystem, true),
+        eq(checklistTemplates.isActive, true)
+      ));
+
+    if (!template) {
+      return res.status(404).json({ error: "Equipment Maintenance Log template not found. Please contact your administrator." });
+    }
+
+    const responses: Record<string, unknown> = {};
+    if (assetName) responses["mf-1"] = assetName;
+    if (assetTag) responses["mf-2a"] = assetTag;
+    if (assetCategory) responses["mf-2b"] = assetCategory;
+    if (assetLocation) responses["mf-2c"] = assetLocation;
+    if (serialNumber) responses["mf-3"] = serialNumber;
+
+    const instanceNumber = `SVC-${Date.now()}`;
+
+    const [created] = await db.insert(checklistInstances)
+      .values({
+        companyId,
+        templateId: template.id,
+        instanceNumber,
+        status: "draft",
+        responses,
+        location: assetLocation || null,
+        entityTypeId: template.entityTypeId,
+        entitySubtypeId: template.entitySubtypeId,
+      })
+      .returning();
+
+    res.status(201).json(created);
+  } catch (error) {
+    logger.error({ err: error }, "Failed to create service checklist from asset");
+    res.status(500).json({ error: "Failed to create service checklist" });
+  }
+});
+
 router.post("/api/checklist/instances", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.companyId;

@@ -782,9 +782,14 @@ export default function AdminChecklistTemplatesPage() {
                 {template.description || "No description"}
               </CardDescription>
             </div>
-            <Badge variant={template.isActive ? "default" : "secondary"} className="shrink-0">
-              {template.isActive ? "Active" : "Inactive"}
-            </Badge>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {template.isSystem && (
+                <Badge variant="outline" className="text-xs">System</Badge>
+              )}
+              <Badge variant={template.isActive ? "default" : "secondary"}>
+                {template.isActive ? "Active" : "Inactive"}
+              </Badge>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-0">
@@ -835,17 +840,19 @@ export default function AdminChecklistTemplatesPage() {
               <Copy className="h-3.5 w-3.5 mr-1.5" />
               Duplicate
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setDeletingTemplateId(template.id);
-                setDeleteTemplateDialogOpen(true);
-              }}
-              data-testid={`button-delete-template-${template.id}`}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
+            {!template.isSystem && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setDeletingTemplateId(template.id);
+                  setDeleteTemplateDialogOpen(true);
+                }}
+                data-testid={`button-delete-template-${template.id}`}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>

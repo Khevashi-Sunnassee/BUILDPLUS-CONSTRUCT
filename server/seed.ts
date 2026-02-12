@@ -464,9 +464,87 @@ const POST_POUR_SECTIONS = [
   },
 ];
 
+const EQUIPMENT_MAINTENANCE_SECTIONS = [
+  {
+    id: "sec-maint-1",
+    name: "Asset & Service Details",
+    order: 0,
+    description: "Equipment identification and service information",
+    allowRepeats: false,
+    items: [
+      { id: "mf-1", name: "Asset Name", type: "text_field", required: true, placeholder: "Auto-populated from asset register", description: "Name of the equipment being serviced" },
+      { id: "mf-2a", name: "Asset Tag", type: "text_field", required: false, placeholder: "Asset tag number", description: "Asset tag / identifier" },
+      { id: "mf-2b", name: "Asset Category", type: "text_field", required: false, placeholder: "e.g., Crane, Forklift, Generator", description: "Equipment category" },
+      { id: "mf-2c", name: "Asset Location", type: "text_field", required: false, placeholder: "Current location of the asset", description: "Where the asset is currently located" },
+      { id: "mf-3", name: "Serial Number", type: "text_field", required: false, placeholder: "Enter equipment serial number" },
+      { id: "mf-4", name: "Service Date & Time", type: "datetime_field", required: true, description: "When is/was the service performed?" },
+      { id: "mf-5", name: "Assigned Technician", type: "staff_assignment", required: false, description: "Who performed or will perform the maintenance?" },
+      { id: "mf-6", name: "Service Priority", type: "priority_level", required: true, description: "How urgent is this service request?" },
+      { id: "mf-6a", name: "Service Type", type: "dropdown", required: true, options: [{ text: "Scheduled Service", value: "scheduled" }, { text: "Breakdown Repair", value: "breakdown" }, { text: "Preventive Maintenance", value: "preventive" }, { text: "Safety Inspection", value: "safety_inspection" }, { text: "Warranty Claim", value: "warranty" }, { text: "Other", value: "other" }], description: "Type of service being performed" },
+      { id: "mf-6b", name: "Issue Description", type: "textarea", required: true, placeholder: "Describe the fault, issue, or reason for service request", description: "Detailed description of the problem or service required" },
+    ],
+  },
+  {
+    id: "sec-maint-1b",
+    name: "Pre-Service Photos",
+    order: 1,
+    description: "Photographic evidence of the equipment condition before service",
+    allowRepeats: false,
+    items: [
+      { id: "mf-photos-before", name: "Before Service Photos", type: "multi_photo", required: false, description: "Take multiple photos showing the current condition and any visible damage or issues" },
+    ],
+  },
+  {
+    id: "sec-maint-2",
+    name: "Inspection & Checks",
+    order: 2,
+    description: "Systematic equipment inspection checklist",
+    allowRepeats: false,
+    items: [
+      { id: "mf-7", name: "Structural Integrity", type: "inspection_check", required: false, description: "Check for cracks, corrosion, or structural damage" },
+      { id: "mf-8", name: "Hydraulic System", type: "condition_option", required: false, description: "Condition of hydraulic lines and fluid levels" },
+      { id: "mf-9", name: "Electrical System", type: "pass_fail_flag", required: false, description: "Electrical connections, wiring, and controls" },
+      { id: "mf-10", name: "Safety Devices", type: "yes_no_na", required: false, description: "Are all safety devices operational?" },
+      { id: "mf-11", name: "Lubrication Points Serviced", type: "checkbox", required: false, options: [{ text: "Main Bearing", value: "main_bearing" }, { text: "Gearbox", value: "gearbox" }, { text: "Pivot Points", value: "pivot_points" }, { text: "Track/Wheels", value: "track_wheels" }, { text: "Wire Rope", value: "wire_rope" }] },
+      { id: "mf-12", name: "Operating Hours", type: "number_field", required: false, min: 0, placeholder: "Current hour meter reading" },
+      { id: "mf-13", name: "Overall Equipment Rating", type: "rating_scale", required: false, min: 1, max: 5, description: "Rate overall equipment condition 1-5" },
+    ],
+  },
+  {
+    id: "sec-maint-3",
+    name: "Parts & Costs",
+    order: 3,
+    description: "Track replacement parts and service costs",
+    allowRepeats: true,
+    items: [
+      { id: "mf-14", name: "Parts Supplier", type: "supplier_selector", required: false, description: "Select parts supplier" },
+      { id: "mf-15", name: "Parts Description", type: "textarea", required: false, placeholder: "Describe replacement parts used" },
+      { id: "mf-16", name: "Parts Cost", type: "amount_field", required: false, description: "Total cost of replacement parts" },
+      { id: "mf-17", name: "Labour Cost", type: "amount_field", required: false, description: "Total labour cost for maintenance" },
+    ],
+  },
+  {
+    id: "sec-maint-4",
+    name: "Post-Service & Sign-off",
+    order: 4,
+    description: "Post-service documentation, photos, and sign-off",
+    allowRepeats: false,
+    items: [
+      { id: "mf-photos-after", name: "After Service Photos", type: "multi_photo", required: false, description: "Take multiple photos of equipment after service/repair is completed" },
+      { id: "mf-20", name: "Service Report", type: "file_upload", required: false, description: "Upload the maintenance service report document" },
+      { id: "mf-work-summary", name: "Work Performed Summary", type: "textarea", required: false, placeholder: "Summarise the work that was performed", description: "Summary of all work completed during service" },
+      { id: "mf-21", name: "Recommended Next Service", type: "date_field", required: false, description: "Recommended date for next scheduled service" },
+      { id: "mf-22", name: "Work Complete Percentage", type: "percentage_field", required: false, min: 0, max: 100, description: "How much of the planned maintenance was completed?" },
+      { id: "mf-23", name: "Return to Service Approved", type: "pass_fail_flag", required: true, description: "Is the equipment approved for return to service?" },
+      { id: "mf-24", name: "Technician Signature", type: "signature_field", required: true, description: "Technician sign-off confirming work completed" },
+    ],
+  },
+];
+
 export const SYSTEM_MODULES = [
   { code: "PANELS", name: "Panels", description: "Panel quality inspection module", icon: "Layers", color: "#3B82F6" },
   { code: "DOCUMENTS", name: "Documents", description: "Document management module", icon: "FileText", color: "#8B5CF6" },
+  { code: "EQUIPMENT", name: "Equipment", description: "Equipment maintenance module", icon: "Wrench", color: "#F59E0B" },
 ] as const;
 
 export async function ensureSystemChecklistModules() {
@@ -500,6 +578,51 @@ export async function ensureSystemChecklistModules() {
           logger.info(`Created system module: ${mod.name} for company ${company.id}`);
         } else {
           entityTypeId = existing[0].id;
+        }
+
+        if (mod.code === "EQUIPMENT") {
+          const existingNonSystemTemplates = await db.select().from(checklistTemplates)
+            .where(and(
+              eq(checklistTemplates.companyId, company.id),
+              eq(checklistTemplates.entityTypeId, entityTypeId),
+              eq(checklistTemplates.name, "Equipment Maintenance Log"),
+              eq(checklistTemplates.isSystem, false)
+            ));
+
+          if (existingNonSystemTemplates.length > 0) {
+            for (const tmpl of existingNonSystemTemplates) {
+              await db.update(checklistTemplates)
+                .set({
+                  isSystem: true,
+                  sections: EQUIPMENT_MAINTENANCE_SECTIONS as any,
+                  description: "Standard service and repair checklist for equipment maintenance. Used for logging service requests, inspections, parts tracking, and sign-off from the Asset Register.",
+                })
+                .where(eq(checklistTemplates.id, tmpl.id));
+              logger.info(`Upgraded existing Equipment Maintenance Log template ${tmpl.id} to system template for company ${company.id}`);
+            }
+          }
+
+          const existingEquipTemplates = await db.select().from(checklistTemplates)
+            .where(and(
+              eq(checklistTemplates.companyId, company.id),
+              eq(checklistTemplates.entityTypeId, entityTypeId),
+              eq(checklistTemplates.isSystem, true)
+            ));
+
+          const equipTemplateNames = existingEquipTemplates.map(t => t.name);
+
+          if (!equipTemplateNames.includes("Equipment Maintenance Log")) {
+            await db.insert(checklistTemplates).values({
+              companyId: company.id,
+              name: "Equipment Maintenance Log",
+              description: "Standard service and repair checklist for equipment maintenance. Used for logging service requests, inspections, parts tracking, and sign-off from the Asset Register.",
+              entityTypeId,
+              sections: EQUIPMENT_MAINTENANCE_SECTIONS as any,
+              isSystem: true,
+              isActive: true,
+            });
+            logger.info(`Created Equipment Maintenance Log template for company ${company.id}`);
+          }
         }
 
         if (mod.code === "PANELS") {

@@ -248,6 +248,28 @@ export default function AssetDetailPage() {
     },
   });
 
+  const serviceRequestMutation = useMutation({
+    mutationFn: async () => {
+      if (!asset) throw new Error("Asset not loaded");
+      const res = await apiRequest("POST", "/api/checklist/instances/from-asset", {
+        assetId: id,
+        assetName: asset.name || "",
+        assetTag: asset.assetTag || "",
+        assetCategory: asset.category || "",
+        assetLocation: asset.location || "",
+        serialNumber: asset.serialNumber || "",
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Service checklist created" });
+      navigate(`/checklists/${data.id}`);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create service checklist", description: error.message, variant: "destructive" });
+    },
+  });
+
   const addTransferMutation = useMutation({
     mutationFn: async (data: Record<string, any>) => {
       return apiRequest("POST", ASSET_ROUTES.TRANSFERS(id!), data);
@@ -445,10 +467,15 @@ export default function AssetDetailPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => navigate(`/admin/asset-repair/new?assetId=${id}`)}
+            onClick={() => serviceRequestMutation.mutate()}
+            disabled={serviceRequestMutation.isPending}
             data-testid="button-repair-asset"
           >
-            <Wrench className="mr-2 h-4 w-4" />
+            {serviceRequestMutation.isPending ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Wrench className="mr-2 h-4 w-4" />
+            )}
             Service / Repair
           </Button>
         </div>
