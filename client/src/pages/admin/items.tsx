@@ -712,7 +712,7 @@ export default function AdminItemsPage() {
             </CardHeader>
             <CardContent>
               {allCategories && allCategories.length > 0 ? (
-                <div className="space-y-6">
+                <div className="space-y-3">
                   {[
                     { type: "supply", label: "Supply Items", colorClass: "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400" },
                     { type: "trade", label: "Trade Items", colorClass: "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-400" },
@@ -720,66 +720,88 @@ export default function AdminItemsPage() {
                     const grouped = allCategories.filter((c) => ((c as any).categoryType || "supply") === type);
                     if (grouped.length === 0) return null;
                     return (
-                      <div key={type}>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge variant="outline" className={colorClass} data-testid={`badge-group-${type}`}>
-                            {label}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {grouped.length} categor{grouped.length !== 1 ? "ies" : "y"}
-                          </span>
+                      <Collapsible key={type} defaultOpen>
+                        <div className="border rounded-lg overflow-hidden">
+                          <CollapsibleTrigger asChild>
+                            <button
+                              className="w-full flex items-center justify-between p-3 bg-muted/50 hover-elevate text-left"
+                              data-testid={`category-type-header-${type}`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform [[data-state=closed]_&]:-rotate-90" />
+                                <Badge variant="outline" className={colorClass} data-testid={`badge-group-${type}`}>
+                                  {label}
+                                </Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  {grouped.length} categor{grouped.length !== 1 ? "ies" : "y"}
+                                </Badge>
+                              </div>
+                            </button>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Name</TableHead>
+                                  <TableHead>Type</TableHead>
+                                  <TableHead>Description</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead className="text-right">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {grouped.map((category) => (
+                                  <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
+                                    <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
+                                      {category.name}
+                                    </TableCell>
+                                    <TableCell data-testid={`text-category-type-${category.id}`}>
+                                      <Badge
+                                        variant="outline"
+                                        className={colorClass}
+                                        data-testid={`badge-category-type-${category.id}`}
+                                      >
+                                        {type === "trade" ? "Trade Item" : "Supply Item"}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
+                                      {category.description || "-"}
+                                    </TableCell>
+                                    <TableCell>
+                                      <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
+                                        {category.isActive ? "Active" : "Inactive"}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                      <div className="flex items-center justify-end gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => openEditCategoryDialog(category)}
+                                          data-testid={`button-edit-category-${category.id}`}
+                                        >
+                                          <Edit2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => {
+                                            setDeletingCategoryId(category.id);
+                                            setCategoryDeleteDialogOpen(true);
+                                          }}
+                                          data-testid={`button-delete-category-${category.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
+                          </CollapsibleContent>
                         </div>
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>Description</TableHead>
-                              <TableHead>Status</TableHead>
-                              <TableHead className="text-right">Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {grouped.map((category) => (
-                              <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
-                                <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
-                                  {category.name}
-                                </TableCell>
-                                <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
-                                  {category.description || "-"}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
-                                    {category.isActive ? "Active" : "Inactive"}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => openEditCategoryDialog(category)}
-                                      data-testid={`button-edit-category-${category.id}`}
-                                    >
-                                      <Edit2 className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => {
-                                        setDeletingCategoryId(category.id);
-                                        setCategoryDeleteDialogOpen(true);
-                                      }}
-                                      data-testid={`button-delete-category-${category.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
+                      </Collapsible>
                     );
                   })}
                 </div>
