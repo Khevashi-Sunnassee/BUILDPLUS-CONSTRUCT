@@ -47,10 +47,11 @@ import { SendDocumentsEmailDialog } from "./SendDocumentsEmailDialog";
 import { UploadDocumentDialog } from "./UploadDocumentDialog";
 import { NewVersionDialog } from "./NewVersionDialog";
 import { VersionHistorySheet } from "./VersionHistorySheet";
-import { CreateBundleDialog, BundleViewDialog, BundlesListDialog } from "./BundleDialogs";
+import { CreateBundleDialog, BundleViewDialog } from "./BundleDialogs";
 import { VisualComparisonDialog } from "./VisualComparisonDialog";
 import { BulkUploadDialog } from "./BulkUploadDialog";
 import { DocumentTable } from "./DocumentTable";
+import { BundleGridView } from "./BundleGridView";
 
 export default function DocumentRegister() {
   const { user } = useAuth();
@@ -78,7 +79,7 @@ export default function DocumentRegister() {
   const [selectedDocsForBundle, setSelectedDocsForBundle] = useState<string[]>([]);
   const [createdBundle, setCreatedBundle] = useState<DocumentBundle | null>(null);
   const [isBundleViewOpen, setIsBundleViewOpen] = useState(false);
-  const [isBundlesListOpen, setIsBundlesListOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"documents" | "bundles">("documents");
 
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
@@ -375,12 +376,12 @@ export default function DocumentRegister() {
             Filters
           </Button>
           <Button
-            variant="outline"
-            onClick={() => setIsBundlesListOpen(true)}
+            variant={viewMode === "bundles" ? "default" : "outline"}
+            onClick={() => setViewMode(viewMode === "bundles" ? "documents" : "bundles")}
             data-testid="button-view-bundles"
           >
             <Package className="h-4 w-4 mr-2" />
-            View Bundles
+            {viewMode === "bundles" ? "View Documents" : "View Bundles"}
           </Button>
           <Button
             variant="outline"
@@ -433,6 +434,10 @@ export default function DocumentRegister() {
 
       <Card>
         <CardContent className="pt-6">
+          {viewMode === "bundles" ? (
+            <BundleGridView />
+          ) : (
+          <>
           <div className="flex gap-2 items-center mb-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -696,6 +701,8 @@ export default function DocumentRegister() {
               {renderPagination()}
             </>
           )}
+          </>
+          )}
         </CardContent>
       </Card>
 
@@ -746,13 +753,6 @@ export default function DocumentRegister() {
           open={isBundleViewOpen}
           onOpenChange={setIsBundleViewOpen}
           bundle={createdBundle}
-        />
-      )}
-
-      {isBundlesListOpen && (
-        <BundlesListDialog
-          open={isBundlesListOpen}
-          onOpenChange={setIsBundlesListOpen}
         />
       )}
 
