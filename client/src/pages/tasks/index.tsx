@@ -451,7 +451,7 @@ export default function TasksPage() {
         pdf.text(`Page ${i} of ${totalPages}`, pageWidth - margin, pageHeight - 8, { align: "right" });
       }
 
-      pdf.save(`LTE-Tasks-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      pdf.save(`BuildPlus-Tasks-${format(new Date(), "yyyy-MM-dd")}.pdf`);
       toast({ title: "PDF exported successfully" });
     } catch (error) {
       console.error("Error generating PDF:", error);

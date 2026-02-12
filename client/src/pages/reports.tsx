@@ -318,8 +318,8 @@ export default function ReportsPage() {
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
       const fileName = activeTab === "logistics" 
-        ? `LTE-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`
-        : `LTE-Analytics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+        ? `BuildPlus-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`
+        : `BuildPlus-Analytics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`;
       pdf.save(fileName);
     } catch (error) {
       console.error("Error generating PDF:", error);
@@ -984,8 +984,8 @@ export default function ReportsPage() {
                         <div className="flex items-center gap-3">
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[0] }} />
                           <div>
-                            <p className="font-medium">Depot to LTE</p>
-                            <p className="text-xs text-muted-foreground">Leave depot → Arrive LTE</p>
+                            <p className="font-medium">Depot to Factory</p>
+                            <p className="text-xs text-muted-foreground">Leave depot → Arrive Factory</p>
                           </div>
                         </div>
                         <div className="text-right">

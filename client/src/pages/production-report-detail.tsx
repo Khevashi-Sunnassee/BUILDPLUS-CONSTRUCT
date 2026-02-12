@@ -543,7 +543,7 @@ export default function ProductionReportDetailPage() {
       pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
-      pdf.save(`LTE-Production-Report-${selectedDate}.pdf`);
+      pdf.save(`BuildPlus-Production-Report-${selectedDate}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {

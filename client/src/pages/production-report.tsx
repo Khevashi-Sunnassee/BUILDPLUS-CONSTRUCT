@@ -416,7 +416,7 @@ export default function ProductionReportPage() {
       pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
-      pdf.save(`LTE-Production-Reports-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      pdf.save(`BuildPlus-Production-Reports-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {

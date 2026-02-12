@@ -312,7 +312,7 @@ export default function DailyReportDetailPage() {
       pdf.text("Confidential", margin, pdfHeight - 4);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 4, { align: "right" });
       
-      pdf.save(`LTE-Daily-Report-${log.logDay}.pdf`);
+      pdf.save(`BuildPlus-Daily-Report-${log.logDay}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {

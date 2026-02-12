@@ -734,7 +734,7 @@ export default function LogisticsPage() {
       pdf.text(`${companyName} - Confidential`, margin, pdfHeight - 5);
       pdf.text("Page 1 of 1", pdfWidth - margin, pdfHeight - 5, { align: "right" });
       
-      pdf.save(`LTE-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`);
+      pdf.save(`BuildPlus-Logistics-Report-${format(new Date(), "yyyy-MM-dd")}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {
@@ -1497,12 +1497,12 @@ export default function LogisticsPage() {
                     </div>
                   </div>
 
-                  {/* Depot to LTE - Collapsible */}
+                  {/* Depot to Factory - Collapsible */}
                   <Collapsible defaultOpen className="border rounded-md">
                     <CollapsibleTrigger className="w-full p-3 flex items-center justify-between hover-elevate rounded-t-md">
                       <h4 className="font-medium text-sm flex items-center gap-2">
                         <Clock className="h-4 w-4" />
-                        Depot to LTE
+                        Depot to Factory
                       </h4>
                       <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
                     </CollapsibleTrigger>
@@ -1525,7 +1525,7 @@ export default function LogisticsPage() {
                           name="arriveLteTime"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Arrive LTE (time)</FormLabel>
+                              <FormLabel>Arrive Factory (time)</FormLabel>
                               <FormControl>
                                 <Input type="time" {...field} data-testid="input-arrive-lte" />
                               </FormControl>

@@ -43,7 +43,7 @@ export default function DownloadsPage() {
           <PageHelpButton pageHelpKey="page.downloads" />
         </div>
         <p className="text-muted-foreground">
-          Download and configure the LTE Time Tracking tools for your workstation
+          Download and configure the BuildPlus Ai Time Tracking tools for your workstation
         </p>
       </div>
 
