@@ -2191,11 +2191,27 @@ for i in range(len(doc)):
         r'(\\d{1,2}[/.]\\d{1,2}[/.]\\d{4})',
     ])
     
+    version = extract_field(text, [
+        r'(?:VERSION|VER)[.:\\s]*(\\d+\\.?\\d*)',
+        r'\\bV(\\d+\\.?\\d*)\\b',
+    ])
+    if not version:
+        version = "1.0"
+
+    thumbnail = ""
+    try:
+        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+        import base64
+        thumbnail = base64.b64encode(pix.tobytes("png")).decode("ascii")
+    except:
+        pass
+
     pages.append({
         "pageNumber": i + 1,
         "drawingNumber": drawing_number,
         "title": title if title else f"Page {i+1}",
         "revision": revision,
+        "version": version,
         "scale": scale,
         "projectName": project_name,
         "projectNumber": project_number,
@@ -2204,6 +2220,7 @@ for i in range(len(doc)):
         "client": client,
         "date": date,
         "textPreview": text[:300].replace("\\n", " ").strip(),
+        "thumbnail": thumbnail,
     })
 
 doc.close()
@@ -2345,7 +2362,7 @@ router.post("/api/documents/drawing-package/register", requireAuth, drawingPacka
     }
 
     const drawingsData = JSON.parse(req.body.drawings || "[]");
-    const jobId = req.body.jobId || null;
+    const globalJobId = req.body.jobId || null;
 
     if (!drawingsData.length) {
       return res.status(400).json({ error: "No drawings to register" });
@@ -2445,7 +2462,7 @@ print(json.dumps(extracted))
           title: drawing.title || `Drawing ${drawing.pageNumber}`,
           documentNumber: drawing.drawingNumber || null,
           revision: drawing.revision || "A",
-          version: supersedeDocId ? "2.0" : "1.0",
+          version: supersedeDocId ? "2.0" : (drawing.version || "1.0"),
           fileName: storedFileName,
           originalName: `${drawing.drawingNumber || `page_${drawing.pageNumber}`}.pdf`,
           storageKey: storagePath,
@@ -2453,7 +2470,7 @@ print(json.dumps(extracted))
           mimeType: "application/pdf",
           status: "DRAFT",
           isLatestVersion: true,
-          jobId: jobId || null,
+          jobId: drawing.jobId || globalJobId || null,
           tags: tags.join(", "),
           uploadedBy: req.session.userId!,
           typeId: drawing.typeId || null,

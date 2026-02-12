@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import {
   FileText,
   Upload,
@@ -9,14 +9,16 @@ import {
   Check,
   ChevronRight,
   ChevronLeft,
-  Pencil,
-  SkipForward,
-  Replace,
-  Copy,
   Layers,
+  Eye,
+  CheckCircle2,
+  Circle,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
@@ -36,15 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
 
@@ -53,6 +48,7 @@ interface AnalyzedPage {
   drawingNumber: string;
   title: string;
   revision: string;
+  version: string;
   scale: string;
   projectName: string;
   projectNumber: string;
@@ -60,6 +56,8 @@ interface AnalyzedPage {
   level: string;
   client: string;
   date: string;
+  thumbnail: string;
+  textPreview: string;
   conflictAction: string;
   conflictDocument: {
     id: string;
@@ -69,6 +67,11 @@ interface AnalyzedPage {
   } | null;
   selected: boolean;
   action: string;
+  confirmed: boolean;
+  jobId: string;
+  typeId: string;
+  disciplineId: string;
+  categoryId: string;
 }
 
 interface AnalysisResult {
@@ -84,7 +87,7 @@ interface DrawingPackageDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type WizardStep = "upload" | "review" | "configure" | "confirm";
+type WizardStep = "upload" | "review" | "confirm";
 
 export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialogProps) {
   const { toast } = useToast();
@@ -93,9 +96,28 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [pages, setPages] = useState<AnalyzedPage[]>([]);
-  const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [editingPage, setEditingPage] = useState<number | null>(null);
+  const [globalJobId, setGlobalJobId] = useState<string>("");
+  const [globalTypeId, setGlobalTypeId] = useState<string>("");
+  const [globalDisciplineId, setGlobalDisciplineId] = useState<string>("");
+  const [globalCategoryId, setGlobalCategoryId] = useState<string>("");
+  const [activePage, setActivePage] = useState<number>(1);
   const [isDragging, setIsDragging] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(1);
+
+  const { data: docTypes } = useQuery<any[]>({
+    queryKey: [DOCUMENT_ROUTES.TYPES],
+    enabled: open && step !== "upload",
+  });
+
+  const { data: disciplines } = useQuery<any[]>({
+    queryKey: [DOCUMENT_ROUTES.DISCIPLINES],
+    enabled: open && step !== "upload",
+  });
+
+  const { data: categories } = useQuery<any[]>({
+    queryKey: [DOCUMENT_ROUTES.CATEGORIES],
+    enabled: open && step !== "upload",
+  });
 
   const analyzeMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -120,11 +142,18 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
         ...p,
         selected: p.conflictAction !== "skip",
         action: p.conflictAction === "none" ? "register" : p.conflictAction,
+        confirmed: false,
+        jobId: "",
+        typeId: "",
+        disciplineId: "",
+        categoryId: "",
+        version: p.version || "1.0",
       }));
       setPages(pagesWithSelection);
       if (data.matchedJob?.id) {
-        setSelectedJobId(data.matchedJob.id);
+        setGlobalJobId(data.matchedJob.id);
       }
+      setActivePage(1);
       setStep("review");
     },
     onError: (error: Error) => {
@@ -140,12 +169,15 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
 
       const formData = new FormData();
       formData.append("file", selectedFile);
-      formData.append("jobId", selectedJobId || "");
+      const toId = (v: string) => (!v || v === "__none__" || v === "__inherit__") ? null : v;
+      const resolveId = (pageVal: string, globalVal: string) => toId(pageVal) ?? toId(globalVal);
+      formData.append("jobId", toId(globalJobId) || "");
       formData.append("drawings", JSON.stringify(selectedPages.map((p) => ({
         pageNumber: p.pageNumber,
         drawingNumber: p.drawingNumber,
         title: p.title,
         revision: p.revision,
+        version: p.version,
         scale: p.scale,
         projectName: p.projectName,
         discipline: p.discipline,
@@ -154,6 +186,10 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
         date: p.date,
         action: p.action,
         conflictDocumentId: p.conflictDocument?.id || null,
+        jobId: resolveId(p.jobId, globalJobId),
+        typeId: resolveId(p.typeId, globalTypeId),
+        disciplineId: resolveId(p.disciplineId, globalDisciplineId),
+        categoryId: resolveId(p.categoryId, globalCategoryId),
       }))));
 
       const csrfToken = await getCsrfToken();
@@ -189,8 +225,12 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
     setSelectedFile(null);
     setAnalysisResult(null);
     setPages([]);
-    setSelectedJobId("");
-    setEditingPage(null);
+    setGlobalJobId("");
+    setGlobalTypeId("");
+    setGlobalDisciplineId("");
+    setGlobalCategoryId("");
+    setActivePage(1);
+    setPreviewZoom(1);
     onOpenChange(false);
   }, [onOpenChange]);
 
@@ -228,9 +268,13 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
   };
 
   const handleAnalyze = () => {
-    if (selectedFile) {
-      analyzeMutation.mutate(selectedFile);
-    }
+    if (selectedFile) analyzeMutation.mutate(selectedFile);
+  };
+
+  const updatePageField = (pageNum: number, field: string, value: string | boolean) => {
+    setPages((prev) =>
+      prev.map((p) => (p.pageNumber === pageNum ? { ...p, [field]: value } : p))
+    );
   };
 
   const togglePageSelection = (pageNum: number) => {
@@ -239,43 +283,41 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
     );
   };
 
-  const toggleAllPages = (selected: boolean) => {
-    setPages((prev) => prev.map((p) => ({ ...p, selected })));
-  };
-
-  const updatePageField = (pageNum: number, field: string, value: string) => {
+  const confirmPage = (pageNum: number) => {
     setPages((prev) =>
-      prev.map((p) => (p.pageNumber === pageNum ? { ...p, [field]: value } : p))
+      prev.map((p) => (p.pageNumber === pageNum ? { ...p, confirmed: true } : p))
     );
+    const nextUnconfirmed = pages.find((p) => p.pageNumber > pageNum && p.selected && !p.confirmed);
+    if (nextUnconfirmed) setActivePage(nextUnconfirmed.pageNumber);
   };
 
+  const currentPage = pages.find((p) => p.pageNumber === activePage);
   const selectedCount = pages.filter((p) => p.selected).length;
+  const confirmedCount = pages.filter((p) => p.selected && p.confirmed).length;
   const conflictCount = pages.filter((p) => p.conflictDocument).length;
 
+  const steps: WizardStep[] = ["upload", "review", "confirm"];
   const stepLabels: Record<WizardStep, string> = {
     upload: "Upload PDF",
-    review: "Review Drawings",
-    configure: "Configure",
-    confirm: "Confirm",
+    review: "Review & Edit",
+    confirm: "Confirm & Register",
   };
-
-  const steps: WizardStep[] = ["upload", "review", "configure", "confirm"];
   const currentStepIndex = steps.indexOf(step);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col" data-testid="dialog-drawing-package">
+      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[92vh] flex flex-col" data-testid="dialog-drawing-package">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Layers className="h-5 w-5" />
             Drawing Package Processor
           </DialogTitle>
           <DialogDescription>
-            Upload a multi-page PDF to extract and register individual drawings
+            Upload a multi-page PDF to extract, review, and register individual drawings
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex items-center gap-1 mb-4" data-testid="wizard-steps">
+        <div className="flex items-center gap-1 mb-2" data-testid="wizard-steps">
           {steps.map((s, i) => (
             <div key={s} className="flex items-center gap-1">
               <div
@@ -297,18 +339,28 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
               {i < steps.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground" />}
             </div>
           ))}
+          {step === "review" && (
+            <div className="ml-auto flex items-center gap-2">
+              <Badge variant="secondary">{selectedCount} selected</Badge>
+              <Badge variant="secondary">{confirmedCount}/{selectedCount} confirmed</Badge>
+              {conflictCount > 0 && (
+                <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {conflictCount} conflicts
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto min-h-0">
+        <div className="flex-1 overflow-hidden min-h-0">
           {step === "upload" && (
-            <div className="space-y-4 p-1">
-              <Card>
-                <CardContent className="pt-6">
+            <div className="space-y-4 p-1 h-full">
+              <Card className="h-full">
+                <CardContent className="pt-6 h-full flex flex-col justify-center">
                   <div
-                    className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-                      isDragging
-                        ? "border-primary bg-primary/5"
-                        : "hover-elevate"
+                    className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+                      isDragging ? "border-primary bg-primary/5" : "hover-elevate"
                     }`}
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={handleDragOver}
@@ -325,7 +377,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                       onChange={handleFileSelect}
                       data-testid="input-drawing-package-file"
                     />
-                    <Upload className={`h-12 w-12 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                    <Upload className={`h-16 w-16 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
                     <p className="text-lg font-medium mb-1">
                       {isDragging
                         ? "Drop your PDF here"
@@ -353,7 +405,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                       <Button
                         size="icon"
                         variant="ghost"
-                        onClick={() => setSelectedFile(null)}
+                        onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
                         data-testid="button-remove-file"
                       >
                         <X className="h-4 w-4" />
@@ -366,299 +418,456 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
           )}
 
           {step === "review" && analysisResult && (
-            <div className="space-y-4 p-1">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3">
-                  <Badge variant="secondary">{analysisResult.totalPages} pages</Badge>
-                  <Badge variant="secondary">{selectedCount} selected</Badge>
-                  {conflictCount > 0 && (
-                    <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-                      <AlertTriangle className="h-3 w-3 mr-1" />
-                      {conflictCount} conflicts
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => toggleAllPages(true)} data-testid="button-select-all">
-                    Select All
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => toggleAllPages(false)} data-testid="button-deselect-all">
-                    Deselect All
-                  </Button>
-                </div>
-              </div>
-
-              {analysisResult.matchedJob && (
-                <Card className="border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-                  <CardContent className="pt-4 pb-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Check className="h-4 w-4 text-green-600" />
-                      <span className="font-medium">Matched Job:</span>
-                      <span>{analysisResult.matchedJob.name}</span>
+            <div className="flex gap-4 h-full">
+              <div className="w-[320px] flex-shrink-0 flex flex-col h-full border rounded-md">
+                <div className="p-3 border-b bg-muted/30">
+                  <h3 className="text-sm font-semibold mb-2">Global Defaults</h3>
+                  <div className="space-y-2">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Job</Label>
+                      <Select value={globalJobId} onValueChange={setGlobalJobId}>
+                        <SelectTrigger className="text-xs" data-testid="select-global-job">
+                          <SelectValue placeholder="Select job..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">No job</SelectItem>
+                          {(analysisResult.jobs || []).map((j) => (
+                            <SelectItem key={j.id} value={j.id}>{j.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {analysisResult.matchedJob && globalJobId === analysisResult.matchedJob.id && (
+                        <p className="text-[10px] text-green-600 mt-0.5 flex items-center gap-0.5">
+                          <Check className="h-2.5 w-2.5" /> Auto-matched
+                        </p>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              <div className="rounded-md border overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          checked={pages.every((p) => p.selected)}
-                          onCheckedChange={(checked) => toggleAllPages(!!checked)}
-                          data-testid="checkbox-select-all-drawings"
-                        />
-                      </TableHead>
-                      <TableHead className="w-12">Page</TableHead>
-                      <TableHead>Drawing No.</TableHead>
-                      <TableHead>Title</TableHead>
-                      <TableHead className="w-16">Rev</TableHead>
-                      <TableHead className="w-24">Discipline</TableHead>
-                      <TableHead className="w-32">Status</TableHead>
-                      <TableHead className="w-10" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Document Type</Label>
+                      <Select value={globalTypeId} onValueChange={setGlobalTypeId}>
+                        <SelectTrigger className="text-xs" data-testid="select-global-type">
+                          <SelectValue placeholder="Select type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">No type</SelectItem>
+                          {(docTypes || []).map((t: any) => (
+                            <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Discipline</Label>
+                      <Select value={globalDisciplineId} onValueChange={setGlobalDisciplineId}>
+                        <SelectTrigger className="text-xs" data-testid="select-global-discipline">
+                          <SelectValue placeholder="Select discipline..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">No discipline</SelectItem>
+                          {(disciplines || []).map((d: any) => (
+                            <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-2 border-b bg-muted/20 flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium">Pages ({pages.length})</span>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm"
+                      onClick={() => setPages(p => p.map(pg => ({ ...pg, selected: true })))}
+                      data-testid="button-select-all">All</Button>
+                    <Button variant="ghost" size="sm"
+                      onClick={() => setPages(p => p.map(pg => ({ ...pg, selected: false })))}
+                      data-testid="button-deselect-all">None</Button>
+                  </div>
+                </div>
+                <ScrollArea className="flex-1">
+                  <div className="p-1">
                     {pages.map((page) => (
-                      <TableRow
+                      <div
                         key={page.pageNumber}
-                        className={!page.selected ? "opacity-50" : ""}
-                        data-testid={`row-drawing-${page.pageNumber}`}
+                        className={`flex items-center gap-2 p-2 rounded-md cursor-pointer mb-0.5 transition-colors ${
+                          activePage === page.pageNumber
+                            ? "bg-primary/10 border border-primary/30"
+                            : "hover-elevate"
+                        } ${!page.selected ? "opacity-40" : ""}`}
+                        onClick={() => setActivePage(page.pageNumber)}
+                        data-testid={`page-item-${page.pageNumber}`}
                       >
-                        <TableCell>
-                          <Checkbox
-                            checked={page.selected}
-                            onCheckedChange={() => togglePageSelection(page.pageNumber)}
-                            data-testid={`checkbox-drawing-${page.pageNumber}`}
-                          />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{page.pageNumber}</TableCell>
-                        <TableCell>
-                          {editingPage === page.pageNumber ? (
-                            <Input
-                              value={page.drawingNumber}
-                              onChange={(e) => updatePageField(page.pageNumber, "drawingNumber", e.target.value)}
-                              className="h-8"
-                              data-testid={`input-drawing-number-${page.pageNumber}`}
+                        <Checkbox
+                          checked={page.selected}
+                          onCheckedChange={() => togglePageSelection(page.pageNumber)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="flex-shrink-0"
+                          data-testid={`checkbox-page-${page.pageNumber}`}
+                        />
+                        {page.thumbnail && (
+                          <div className="w-10 h-10 rounded overflow-hidden border flex-shrink-0 bg-white">
+                            <img
+                              src={`data:image/png;base64,${page.thumbnail}`}
+                              alt={`Page ${page.pageNumber}`}
+                              className="w-full h-full object-contain"
                             />
-                          ) : (
-                            <span className="font-mono text-sm">{page.drawingNumber || "-"}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editingPage === page.pageNumber ? (
-                            <Input
-                              value={page.title}
-                              onChange={(e) => updatePageField(page.pageNumber, "title", e.target.value)}
-                              className="h-8"
-                              data-testid={`input-title-${page.pageNumber}`}
-                            />
-                          ) : (
-                            <span className="text-sm">{page.title || "-"}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {editingPage === page.pageNumber ? (
-                            <Input
-                              value={page.revision}
-                              onChange={(e) => updatePageField(page.pageNumber, "revision", e.target.value)}
-                              className="h-8 w-14"
-                              data-testid={`input-revision-${page.pageNumber}`}
-                            />
-                          ) : (
-                            <span className="font-mono text-sm">{page.revision || "-"}</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-sm text-muted-foreground">{page.discipline || "-"}</span>
-                        </TableCell>
-                        <TableCell>
-                          {page.conflictDocument ? (
-                            <div className="space-y-1">
-                              <Badge
-                                variant="outline"
-                                className={
-                                  page.action === "supersede"
-                                    ? "text-blue-600 border-blue-300 bg-blue-50 dark:bg-blue-950/30"
-                                    : page.action === "skip"
-                                    ? "text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30"
-                                    : "text-green-600 border-green-300 bg-green-50 dark:bg-green-950/30"
-                                }
-                              >
-                                {page.action === "supersede" && <Replace className="h-3 w-3 mr-1" />}
-                                {page.action === "skip" && <SkipForward className="h-3 w-3 mr-1" />}
-                                {page.action === "keep_both" && <Copy className="h-3 w-3 mr-1" />}
-                                {page.action}
-                              </Badge>
-                              <p className="text-xs text-muted-foreground truncate max-w-[120px]">
-                                vs Rev {page.conflictDocument.revision}
-                              </p>
-                            </div>
-                          ) : (
-                            <Badge variant="secondary" className="text-xs">New</Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => setEditingPage(editingPage === page.pageNumber ? null : page.pageNumber)}
-                            data-testid={`button-edit-drawing-${page.pageNumber}`}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          )}
-
-          {step === "configure" && (
-            <div className="space-y-6 p-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Job Assignment</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Select value={selectedJobId} onValueChange={setSelectedJobId}>
-                    <SelectTrigger data-testid="select-job">
-                      <SelectValue placeholder="Select a job (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(analysisResult?.jobs || []).map((job: any) => (
-                        <SelectItem key={job.id} value={job.id}>
-                          {job.jobNumber ? `${job.jobNumber} - ${job.name}` : job.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {analysisResult?.matchedJob && selectedJobId === analysisResult.matchedJob.id && (
-                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                      <Check className="h-3 w-3 text-green-600" />
-                      Auto-matched from drawing metadata
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {conflictCount > 0 && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      Conflict Resolution ({conflictCount})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {pages
-                      .filter((p) => p.conflictDocument)
-                      .map((page) => (
-                        <div
-                          key={page.pageNumber}
-                          className="flex items-center justify-between gap-4 p-3 rounded-md bg-muted flex-wrap"
-                          data-testid={`conflict-row-${page.pageNumber}`}
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{page.drawingNumber}</p>
-                            <p className="text-xs text-muted-foreground">
-                              New Rev {page.revision} vs Existing Rev {page.conflictDocument?.revision}
-                            </p>
                           </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-medium truncate">
+                              {page.drawingNumber || `Page ${page.pageNumber}`}
+                            </span>
+                            {page.confirmed && (
+                              <CheckCircle2 className="h-3 w-3 text-green-600 flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {page.title || "Untitled"} {page.revision ? `Rev ${page.revision}` : ""}
+                          </p>
+                        </div>
+                        {page.conflictDocument && (
+                          <AlertTriangle className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              <div className="flex-1 flex flex-col h-full min-w-0">
+                {currentPage ? (
+                  <div className="flex gap-4 h-full">
+                    <div className="w-[340px] flex-shrink-0 flex flex-col h-full overflow-y-auto border rounded-md">
+                      <div className="p-3 border-b bg-muted/30 flex items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold">
+                          Page {currentPage.pageNumber} Details
+                        </h3>
+                        {currentPage.confirmed ? (
+                          <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400">
+                            <CheckCircle2 className="h-3 w-3 mr-1" /> Confirmed
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline">
+                            <Circle className="h-3 w-3 mr-1" /> Pending
+                          </Badge>
+                        )}
+                      </div>
+
+                      <div className="p-3 space-y-3 flex-1">
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Drawing Number</Label>
+                          <Input
+                            value={currentPage.drawingNumber}
+                            onChange={(e) => updatePageField(currentPage.pageNumber, "drawingNumber", e.target.value)}
+                            className="text-sm font-mono"
+                            data-testid="input-drawing-number"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Title</Label>
+                          <Input
+                            value={currentPage.title}
+                            onChange={(e) => updatePageField(currentPage.pageNumber, "title", e.target.value)}
+                            className="text-sm"
+                            data-testid="input-title"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Revision</Label>
+                            <Input
+                              value={currentPage.revision}
+                              onChange={(e) => updatePageField(currentPage.pageNumber, "revision", e.target.value)}
+                              className="text-sm font-mono"
+                              data-testid="input-revision"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Version</Label>
+                            <Input
+                              value={currentPage.version}
+                              onChange={(e) => updatePageField(currentPage.pageNumber, "version", e.target.value)}
+                              className="text-sm font-mono"
+                              data-testid="input-version"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Scale</Label>
+                            <Input
+                              value={currentPage.scale}
+                              onChange={(e) => updatePageField(currentPage.pageNumber, "scale", e.target.value)}
+                              className="text-sm"
+                              data-testid="input-scale"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs text-muted-foreground">Level</Label>
+                            <Input
+                              value={currentPage.level}
+                              onChange={(e) => updatePageField(currentPage.pageNumber, "level", e.target.value)}
+                              className="text-sm"
+                              data-testid="input-level"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">Date</Label>
+                          <Input
+                            value={currentPage.date}
+                            onChange={(e) => updatePageField(currentPage.pageNumber, "date", e.target.value)}
+                            className="text-sm"
+                            data-testid="input-date"
+                          />
+                        </div>
+
+                        <Separator />
+
+                        <div>
+                          <Label className="text-xs text-muted-foreground">
+                            Job {currentPage.jobId ? "" : <span className="text-[10px] opacity-60">(inherits global)</span>}
+                          </Label>
                           <Select
-                            value={page.action}
-                            onValueChange={(val) => updatePageField(page.pageNumber, "action", val)}
+                            value={currentPage.jobId || "__inherit__"}
+                            onValueChange={(v) => updatePageField(currentPage.pageNumber, "jobId", v === "__inherit__" ? "" : v)}
                           >
-                            <SelectTrigger className="w-[140px]" data-testid={`select-action-${page.pageNumber}`}>
-                              <SelectValue />
+                            <SelectTrigger className="text-xs" data-testid="select-page-job">
+                              <SelectValue placeholder="Inherit from global" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="supersede">Supersede</SelectItem>
-                              <SelectItem value="skip">Skip</SelectItem>
-                              <SelectItem value="keep_both">Keep Both</SelectItem>
+                              <SelectItem value="__inherit__">Inherit global default</SelectItem>
+                              <SelectItem value="__none__">No job</SelectItem>
+                              {(analysisResult?.jobs || []).map((j) => (
+                                <SelectItem key={j.id} value={j.id}>{j.name}</SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
-                      ))}
-                  </CardContent>
-                </Card>
-              )}
+                        <div>
+                          <Label className="text-xs text-muted-foreground">
+                            Document Type {currentPage.typeId ? "" : <span className="text-[10px] opacity-60">(inherits global)</span>}
+                          </Label>
+                          <Select
+                            value={currentPage.typeId || "__inherit__"}
+                            onValueChange={(v) => updatePageField(currentPage.pageNumber, "typeId", v === "__inherit__" ? "" : v)}
+                          >
+                            <SelectTrigger className="text-xs" data-testid="select-page-type">
+                              <SelectValue placeholder="Inherit from global" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__inherit__">Inherit global default</SelectItem>
+                              <SelectItem value="__none__">No type</SelectItem>
+                              {(docTypes || []).map((t: any) => (
+                                <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label className="text-xs text-muted-foreground">
+                            Discipline {currentPage.disciplineId ? "" : <span className="text-[10px] opacity-60">(inherits global)</span>}
+                          </Label>
+                          <Select
+                            value={currentPage.disciplineId || "__inherit__"}
+                            onValueChange={(v) => updatePageField(currentPage.pageNumber, "disciplineId", v === "__inherit__" ? "" : v)}
+                          >
+                            <SelectTrigger className="text-xs" data-testid="select-page-discipline">
+                              <SelectValue placeholder="Inherit from global" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__inherit__">Inherit global default</SelectItem>
+                              <SelectItem value="__none__">No discipline</SelectItem>
+                              {(disciplines || []).map((d: any) => (
+                                <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {currentPage.conflictDocument && (
+                          <>
+                            <Separator />
+                            <div>
+                              <Label className="text-xs text-amber-600 flex items-center gap-1 mb-1">
+                                <AlertTriangle className="h-3 w-3" /> Conflict Detected
+                              </Label>
+                              <p className="text-xs text-muted-foreground mb-2">
+                                Existing: "{currentPage.conflictDocument.title}" Rev {currentPage.conflictDocument.revision}
+                              </p>
+                              <Select
+                                value={currentPage.action}
+                                onValueChange={(v) => updatePageField(currentPage.pageNumber, "action", v)}
+                              >
+                                <SelectTrigger className="text-xs" data-testid="select-conflict-action">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="supersede">
+                                    Supersede existing
+                                  </SelectItem>
+                                  <SelectItem value="skip">Skip this page</SelectItem>
+                                  <SelectItem value="keep_both">Keep both versions</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="p-3 border-t">
+                        <Button
+                          className="w-full"
+                          onClick={() => confirmPage(currentPage.pageNumber)}
+                          disabled={!currentPage.selected}
+                          data-testid="button-confirm-page"
+                        >
+                          {currentPage.confirmed ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Re-confirm Page {currentPage.pageNumber}
+                            </>
+                          ) : (
+                            <>
+                              <Check className="h-4 w-4 mr-1" />
+                              Confirm Page {currentPage.pageNumber}
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 flex flex-col h-full border rounded-md min-w-0">
+                      <div className="p-2 border-b bg-muted/30 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm font-medium">Page Preview</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button size="icon" variant="ghost" 
+                            onClick={() => setPreviewZoom(z => Math.max(0.5, z - 0.25))}
+                            data-testid="button-zoom-out">
+                            <ZoomOut className="h-3.5 w-3.5" />
+                          </Button>
+                          <span className="text-xs text-muted-foreground w-10 text-center">
+                            {Math.round(previewZoom * 100)}%
+                          </span>
+                          <Button size="icon" variant="ghost" 
+                            onClick={() => setPreviewZoom(z => Math.min(3, z + 0.25))}
+                            data-testid="button-zoom-in">
+                            <ZoomIn className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button size="icon" variant="ghost" 
+                            onClick={() => setPreviewZoom(1)}
+                            data-testid="button-zoom-reset">
+                            <span className="text-[10px]">1:1</span>
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex-1 overflow-auto bg-muted/10 flex items-start justify-center p-4">
+                        {currentPage.thumbnail ? (
+                          <img
+                            src={`data:image/png;base64,${currentPage.thumbnail}`}
+                            alt={`Page ${currentPage.pageNumber} preview`}
+                            className="border shadow-sm bg-white"
+                            style={{
+                              transform: `scale(${previewZoom})`,
+                              transformOrigin: "top center",
+                              maxWidth: "100%",
+                            }}
+                            data-testid="img-page-preview"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                            <FileText className="h-16 w-16 mb-4" />
+                            <p className="text-sm">Preview not available</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>Select a page from the list to view details</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
           {step === "confirm" && (
-            <div className="space-y-4 p-1">
+            <div className="overflow-y-auto h-full p-1 space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-2 gap-4">
+                <CardContent className="pt-4 space-y-3">
+                  <h3 className="text-sm font-semibold">Registration Summary</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">Source File</p>
-                      <p className="text-sm font-medium">{selectedFile?.name}</p>
+                      <p className="text-xs text-muted-foreground">Source File</p>
+                      <p className="text-sm font-medium truncate">{selectedFile?.name}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Drawings to Register</p>
+                      <p className="text-xs text-muted-foreground">Drawings to Register</p>
                       <p className="text-sm font-medium">{selectedCount} of {pages.length}</p>
                     </div>
-                    {selectedJobId && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Confirmed</p>
+                      <p className="text-sm font-medium">{confirmedCount} of {selectedCount}</p>
+                    </div>
+                    {globalJobId && globalJobId !== "__none__" && (
                       <div>
-                        <p className="text-sm text-muted-foreground">Target Job</p>
-                        <p className="text-sm font-medium">
-                          {(analysisResult?.jobs || []).find((j: any) => j.id === selectedJobId)?.name || selectedJobId}
+                        <p className="text-xs text-muted-foreground">Default Job</p>
+                        <p className="text-sm font-medium truncate">
+                          {analysisResult?.jobs.find((j) => j.id === globalJobId)?.name || globalJobId}
                         </p>
                       </div>
                     )}
-                    {conflictCount > 0 && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Conflicts</p>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <Badge variant="secondary">
-                            {pages.filter((p) => p.action === "supersede").length} supersede
-                          </Badge>
-                          <Badge variant="secondary">
-                            {pages.filter((p) => p.action === "skip" && p.conflictDocument).length} skip
-                          </Badge>
-                          <Badge variant="secondary">
-                            {pages.filter((p) => p.action === "keep_both").length} keep both
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
                   </div>
-                  <Separator />
-                  <div className="rounded-md border overflow-auto max-h-[200px]">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Drawing No.</TableHead>
-                          <TableHead>Title</TableHead>
-                          <TableHead>Rev</TableHead>
-                          <TableHead>Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {pages
-                          .filter((p) => p.selected)
-                          .map((page) => (
-                            <TableRow key={page.pageNumber} data-testid={`confirm-row-${page.pageNumber}`}>
-                              <TableCell className="font-mono text-sm">{page.drawingNumber || "-"}</TableCell>
-                              <TableCell className="text-sm">{page.title || "-"}</TableCell>
-                              <TableCell className="font-mono text-sm">{page.revision || "-"}</TableCell>
-                              <TableCell>
-                                <Badge variant="secondary">
-                                  {page.conflictDocument ? page.action : "register"}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </Table>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="pt-4">
+                  <div className="rounded-md border overflow-auto max-h-[40vh]">
+                    <div className="grid grid-cols-[2.5rem_1fr_1fr_3.5rem_3.5rem_5rem_5rem_4rem] bg-muted/50 sticky top-0 z-10 border-b text-xs font-medium">
+                      <div className="p-2">Pg</div>
+                      <div className="p-2">Drawing No.</div>
+                      <div className="p-2">Title</div>
+                      <div className="p-2">Rev</div>
+                      <div className="p-2">Ver</div>
+                      <div className="p-2">Job</div>
+                      <div className="p-2">Status</div>
+                      <div className="p-2">Action</div>
+                    </div>
+                    {pages.filter((p) => p.selected).map((page) => {
+                      const effectiveJobId = page.jobId || globalJobId;
+                      const jobName = effectiveJobId && effectiveJobId !== "__none__"
+                        ? analysisResult?.jobs.find((j) => j.id === effectiveJobId)?.name || ""
+                        : "";
+                      return (
+                        <div key={page.pageNumber} className="grid grid-cols-[2.5rem_1fr_1fr_3.5rem_3.5rem_5rem_5rem_4rem] border-b text-sm items-center" data-testid={`confirm-row-${page.pageNumber}`}>
+                          <div className="p-2 text-muted-foreground">{page.pageNumber}</div>
+                          <div className="p-2 font-mono truncate">{page.drawingNumber || "-"}</div>
+                          <div className="p-2 truncate">{page.title || "-"}</div>
+                          <div className="p-2 font-mono">{page.revision || "-"}</div>
+                          <div className="p-2 font-mono">{page.version || "1.0"}</div>
+                          <div className="p-2 truncate text-xs">{jobName || "-"}</div>
+                          <div className="p-2">
+                            {page.confirmed ? (
+                              <Badge variant="secondary" className="text-green-700 bg-green-100 dark:bg-green-900/30 dark:text-green-400 text-[10px]">
+                                Confirmed
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px]">Pending</Badge>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {page.conflictDocument ? page.action : "register"}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -666,12 +875,15 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
           )}
         </div>
 
-        <DialogFooter className="flex items-center justify-between gap-2 pt-4 border-t flex-wrap">
+        <DialogFooter className="flex items-center justify-between gap-2 pt-3 border-t flex-wrap">
           <div className="flex items-center gap-2">
             {step !== "upload" && (
               <Button
                 variant="outline"
-                onClick={() => setStep(steps[currentStepIndex - 1])}
+                onClick={() => {
+                  if (step === "confirm") setStep("review");
+                  else setStep("upload");
+                }}
                 disabled={analyzeMutation.isPending || registerMutation.isPending}
                 data-testid="button-back"
               >
@@ -705,16 +917,10 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
             )}
             {step === "review" && (
               <Button
-                onClick={() => setStep("configure")}
+                onClick={() => setStep("confirm")}
                 disabled={selectedCount === 0}
-                data-testid="button-next-configure"
+                data-testid="button-next-confirm"
               >
-                Configure
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            )}
-            {step === "configure" && (
-              <Button onClick={() => setStep("confirm")} data-testid="button-next-confirm">
                 Review & Confirm
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
