@@ -1722,6 +1722,7 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   unitOfMeasure: text("unit_of_measure").default("EA"),
   unitPrice: decimal("unit_price", { precision: 12, scale: 2 }).notNull(),
   lineTotal: decimal("line_total", { precision: 12, scale: 2 }).notNull(),
+  costCodeId: varchar("cost_code_id", { length: 36 }),
   sortOrder: integer("sort_order").default(0),
   received: boolean("received").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1730,6 +1731,7 @@ export const purchaseOrderItems = pgTable("purchase_order_items", {
   poIdx: index("purchase_order_items_po_idx").on(table.purchaseOrderId),
   itemIdx: index("purchase_order_items_item_idx").on(table.itemId),
   sortOrderIdx: index("purchase_order_items_sort_order_idx").on(table.sortOrder),
+  costCodeIdx: index("purchase_order_items_cost_code_idx").on(table.costCodeId),
 }));
 
 export const purchaseOrderAttachments = pgTable("purchase_order_attachments", {
