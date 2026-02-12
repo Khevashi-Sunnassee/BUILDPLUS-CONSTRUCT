@@ -4,7 +4,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobBudgets, budgetLines, budgetLineFiles, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs, jobCostCodes } from "@shared/schema";
+import { jobBudgets, budgetLines, budgetLineFiles, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs, jobCostCodes, costCodeDefaults } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -405,7 +405,7 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
       return res.status(404).json({ message: "Budget not found for this job. Create a budget first." });
     }
 
-    const jobCostCodeRows = await db
+    let jobCostCodeRows = await db
       .select({
         costCodeId: jobCostCodes.costCodeId,
         costCode: costCodes.code,
@@ -419,8 +419,52 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
       .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
       .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
 
+    let inherited = 0;
     if (jobCostCodeRows.length === 0) {
-      return res.status(400).json({ message: "No cost codes assigned to this job. Assign cost codes to the job's type first, then inherit them." });
+      const [job] = await db
+        .select({ id: jobs.id, jobTypeId: jobs.jobTypeId })
+        .from(jobs)
+        .where(and(eq(jobs.id, jobId), eq(jobs.companyId, companyId)));
+
+      if (!job) {
+        return res.status(404).json({ message: "Job not found." });
+      }
+      if (!job.jobTypeId) {
+        return res.status(400).json({ message: "This job has no job type assigned. Set a job type first so cost codes can be determined." });
+      }
+
+      const defaults = await db
+        .select({ costCodeId: costCodeDefaults.costCodeId })
+        .from(costCodeDefaults)
+        .where(and(eq(costCodeDefaults.jobTypeId, job.jobTypeId), eq(costCodeDefaults.companyId, companyId)));
+
+      if (defaults.length === 0) {
+        return res.status(400).json({ message: "No default cost codes are configured for this job type. Go to Admin > Cost Codes to set up defaults for this job type." });
+      }
+
+      await db.insert(jobCostCodes).values(
+        defaults.map((d, idx) => ({
+          companyId,
+          jobId,
+          costCodeId: d.costCodeId,
+          sortOrder: idx,
+        }))
+      );
+      inherited = defaults.length;
+
+      jobCostCodeRows = await db
+        .select({
+          costCodeId: jobCostCodes.costCodeId,
+          costCode: costCodes.code,
+          costCodeName: costCodes.name,
+          isActive: costCodes.isActive,
+          isDisabled: jobCostCodes.isDisabled,
+          sortOrder: jobCostCodes.sortOrder,
+        })
+        .from(jobCostCodes)
+        .innerJoin(costCodes, eq(jobCostCodes.costCodeId, costCodes.id))
+        .where(and(eq(jobCostCodes.jobId, jobId), eq(jobCostCodes.companyId, companyId)))
+        .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
     }
 
     const existingLines = await db
@@ -451,10 +495,12 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
 
     await db.insert(budgetLines).values(insertValues);
 
+    const inheritedMsg = inherited > 0 ? ` (${inherited} cost code(s) inherited from job type)` : "";
     res.json({
       created: newCostCodes.length,
+      inherited,
       skipped: jobCostCodeRows.length - newCostCodes.length,
-      message: `Created ${newCostCodes.length} budget line(s) from cost codes.`,
+      message: `Created ${newCostCodes.length} budget line(s) from cost codes.${inheritedMsg}`,
     });
   } catch (error: any) {
     logger.error("Error creating budget lines from cost codes:", error);
