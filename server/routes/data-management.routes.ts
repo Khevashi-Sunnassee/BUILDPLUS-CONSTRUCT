@@ -1239,6 +1239,30 @@ dataManagementRouter.delete("/api/admin/data-management/:entityType/bulk-delete"
         deletedCount = safeIds.length;
         break;
       }
+      case "child-cost-codes": {
+        const [total] = await db.select({ count: count() }).from(childCostCodes).where(eq(childCostCodes.companyId, companyId));
+        totalCount = total.count;
+        const protectedChildIds: string[] = [];
+        const allChildCodes = await db.select({ id: childCostCodes.id }).from(childCostCodes).where(eq(childCostCodes.companyId, companyId));
+        for (const cc of allChildCodes) {
+          const [t] = await db.select({ count: count() }).from(tenderLineItems).where(eq(tenderLineItems.childCostCodeId, cc.id));
+          const [b] = await db.select({ count: count() }).from(budgetLines).where(eq(budgetLines.childCostCodeId, cc.id));
+          const [bg] = await db.select({ count: count() }).from(boqGroups).where(eq(boqGroups.childCostCodeId, cc.id));
+          const [bi] = await db.select({ count: count() }).from(boqItems).where(eq(boqItems.childCostCodeId, cc.id));
+          const [po] = await db.select({ count: count() }).from(purchaseOrders).where(eq(purchaseOrders.childCostCodeId, cc.id));
+          if (t.count > 0 || b.count > 0 || bg.count > 0 || bi.count > 0 || po.count > 0) {
+            protectedChildIds.push(cc.id);
+          }
+        }
+        protectedCount = protectedChildIds.length;
+        protectedReason = "referenced by tender line items, budget lines, BOQ groups/items, or purchase orders";
+        const safeIds = allChildCodes.filter(c => !protectedChildIds.includes(c.id)).map(c => c.id);
+        if (safeIds.length > 0) {
+          await db.delete(childCostCodes).where(inArray(childCostCodes.id, safeIds));
+        }
+        deletedCount = safeIds.length;
+        break;
+      }
       default:
         return res.status(400).json({ error: `Unknown entity type: ${entityType}` });
     }
@@ -1291,6 +1315,71 @@ dataManagementRouter.delete("/api/admin/data-management/cost-codes/:id", require
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete cost code" });
+  }
+});
+
+dataManagementRouter.get("/api/admin/data-management/child-cost-codes", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const result = await db
+      .select({
+        id: childCostCodes.id,
+        code: childCostCodes.code,
+        name: childCostCodes.name,
+        description: childCostCodes.description,
+        isActive: childCostCodes.isActive,
+        parentCode: costCodes.code,
+        parentName: costCodes.name,
+        createdAt: childCostCodes.createdAt,
+      })
+      .from(childCostCodes)
+      .leftJoin(costCodes, eq(childCostCodes.parentCostCodeId, costCodes.id))
+      .where(eq(childCostCodes.companyId, companyId))
+      .orderBy(asc(costCodes.code), asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+    res.json(result);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch child cost codes" });
+  }
+});
+
+dataManagementRouter.delete("/api/admin/data-management/child-cost-codes/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const { id } = req.params;
+    const [existing] = await db.select({ id: childCostCodes.id }).from(childCostCodes).where(and(eq(childCostCodes.id, id), eq(childCostCodes.companyId, companyId)));
+    if (!existing) return res.status(404).json({ error: "Child cost code not found" });
+
+    const [tenderRef] = await db.select({ count: count() }).from(tenderLineItems).where(eq(tenderLineItems.childCostCodeId, id));
+    if (tenderRef.count > 0) {
+      return res.status(400).json({ error: `Cannot delete: this sub-code is referenced by ${tenderRef.count} tender line item(s). Remove those references first.` });
+    }
+
+    const [budgetRef] = await db.select({ count: count() }).from(budgetLines).where(eq(budgetLines.childCostCodeId, id));
+    if (budgetRef.count > 0) {
+      return res.status(400).json({ error: `Cannot delete: this sub-code is referenced by ${budgetRef.count} budget line(s). Remove those references first.` });
+    }
+
+    const [boqGroupRef] = await db.select({ count: count() }).from(boqGroups).where(eq(boqGroups.childCostCodeId, id));
+    if (boqGroupRef.count > 0) {
+      return res.status(400).json({ error: `Cannot delete: this sub-code is referenced by ${boqGroupRef.count} BOQ group(s). Remove those references first.` });
+    }
+
+    const [boqItemRef] = await db.select({ count: count() }).from(boqItems).where(eq(boqItems.childCostCodeId, id));
+    if (boqItemRef.count > 0) {
+      return res.status(400).json({ error: `Cannot delete: this sub-code is referenced by ${boqItemRef.count} BOQ item(s). Remove those references first.` });
+    }
+
+    const [poRef] = await db.select({ count: count() }).from(purchaseOrders).where(eq(purchaseOrders.childCostCodeId, id));
+    if (poRef.count > 0) {
+      return res.status(400).json({ error: `Cannot delete: this sub-code is referenced by ${poRef.count} purchase order(s). Remove those references first.` });
+    }
+
+    await db.delete(childCostCodes).where(and(eq(childCostCodes.id, id), eq(childCostCodes.companyId, companyId)));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete child cost code" });
   }
 });
 

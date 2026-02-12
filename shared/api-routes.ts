@@ -487,6 +487,8 @@ export const ADMIN_ROUTES = {
   DATA_MGMT_ACTIVITY_CONSULTANT_DELETE: (id: string) => `/api/admin/data-management/activity-consultants/${id}`,
   DATA_MGMT_COST_CODES: '/api/admin/data-management/cost-codes',
   DATA_MGMT_COST_CODE_DELETE: (id: string) => `/api/admin/data-management/cost-codes/${id}`,
+  DATA_MGMT_CHILD_COST_CODES: '/api/admin/data-management/child-cost-codes',
+  DATA_MGMT_CHILD_COST_CODE_DELETE: (id: string) => `/api/admin/data-management/child-cost-codes/${id}`,
   DATA_MGMT_TENDERS: '/api/admin/data-management/tenders',
   DATA_MGMT_TENDER_DELETE: (id: string) => `/api/admin/data-management/tenders/${id}`,
   DATA_MGMT_BUDGETS: '/api/admin/data-management/budgets',

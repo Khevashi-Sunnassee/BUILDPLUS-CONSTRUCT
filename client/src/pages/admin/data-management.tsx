@@ -282,6 +282,20 @@ const ENTITY_TABS: EntityTabConfig[] = [
     getRowName: (r: any) => `${r.code} - ${r.name}`,
   },
   {
+    key: "child-cost-codes",
+    label: "Child Cost Codes",
+    entityType: "child-cost-codes",
+    queryKey: ADMIN_ROUTES.DATA_MGMT_CHILD_COST_CODES,
+    columns: [
+      { key: "code", label: "Code" },
+      { key: "name", label: "Name" },
+      { key: "parentCode", label: "Parent Code", render: (r: any) => r.parentCode ? `${r.parentCode} - ${r.parentName}` : "-" },
+      { key: "description", label: "Description", render: (r: any) => r.description || "-" },
+      { key: "isActive", label: "Status", render: (r: any) => <Badge variant={r.isActive ? "default" : "secondary"}>{r.isActive ? "Active" : "Inactive"}</Badge> },
+    ],
+    getRowName: (r: any) => `${r.code} - ${r.name}`,
+  },
+  {
     key: "tenders",
     label: "Tenders",
     entityType: "tenders",
