@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Pencil, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
-  Receipt, Target, Settings2, ListPlus,
+  Receipt, Target, Settings2, ListPlus, ChevronDown, ChevronRight, Save, X,
 } from "lucide-react";
 import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
 
@@ -123,6 +123,9 @@ export default function JobBudgetPage() {
     queryKey: ["/api/cost-codes-with-children"],
   });
 
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [editingCells, setEditingCells] = useState<Record<string, { estimatedBudget: string; variationsAmount: string; forecastCost: string; notes: string }>>({});
+
   const activeCostCodes = useMemo(() => {
     return costCodes.filter((cc) => cc.isActive);
   }, [costCodes]);
@@ -132,6 +135,90 @@ export default function JobBudgetPage() {
     const parent = costCodesWithChildren.find((cc: any) => cc.id === lineCostCodeId);
     return (parent?.children || []).filter((child: any) => child.isActive);
   }, [lineCostCodeId, costCodesWithChildren]);
+
+  interface GroupedBudget {
+    parentCostCodeId: string;
+    parentCode: string;
+    parentName: string;
+    lines: BudgetLineWithDetails[];
+    totalEstimated: number;
+    totalVariations: number;
+    totalForecast: number;
+  }
+
+  const groupedBudgetLines = useMemo((): GroupedBudget[] => {
+    const groups = new Map<string, GroupedBudget>();
+    for (const line of budgetLines) {
+      const pid = line.costCodeId;
+      if (!groups.has(pid)) {
+        groups.set(pid, {
+          parentCostCodeId: pid,
+          parentCode: line.costCode.code,
+          parentName: line.costCode.name,
+          lines: [],
+          totalEstimated: 0,
+          totalVariations: 0,
+          totalForecast: 0,
+        });
+      }
+      const group = groups.get(pid)!;
+      group.lines.push(line);
+      group.totalEstimated += parseFloat(line.estimatedBudget || "0");
+      group.totalVariations += parseFloat(line.variationsAmount || "0");
+      group.totalForecast += parseFloat(line.forecastCost || "0");
+    }
+    return Array.from(groups.values()).sort((a, b) => a.parentCode.localeCompare(b.parentCode));
+  }, [budgetLines]);
+
+  function toggleGroup(parentId: string) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(parentId)) next.delete(parentId);
+      else next.add(parentId);
+      return next;
+    });
+  }
+
+  function startInlineEdit(line: BudgetLineWithDetails) {
+    setEditingCells(prev => ({
+      ...prev,
+      [line.id]: {
+        estimatedBudget: line.estimatedBudget || "0",
+        variationsAmount: line.variationsAmount || "0",
+        forecastCost: line.forecastCost || "0",
+        notes: line.notes || "",
+      },
+    }));
+  }
+
+  function cancelInlineEdit(lineId: string) {
+    setEditingCells(prev => {
+      const next = { ...prev };
+      delete next[lineId];
+      return next;
+    });
+  }
+
+  function updateInlineField(lineId: string, field: string, value: string) {
+    setEditingCells(prev => ({
+      ...prev,
+      [lineId]: { ...prev[lineId], [field]: value },
+    }));
+  }
+
+  function saveInlineEdit(lineId: string) {
+    const data = editingCells[lineId];
+    if (!data) return;
+    updateLineMutation.mutate({
+      id: lineId,
+      estimatedBudget: data.estimatedBudget,
+      variationsAmount: data.variationsAmount,
+      forecastCost: data.forecastCost,
+      notes: data.notes,
+    }, {
+      onSuccess: () => cancelInlineEdit(lineId),
+    });
+  }
 
   const initBudgetMutation = useMutation({
     mutationFn: async (data: { estimatedTotalBudget?: string; profitTargetPercent?: string; customerPrice?: string; notes?: string }) => {
@@ -190,7 +277,6 @@ export default function JobBudgetPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "lines"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "summary"] });
       toast({ title: "Budget line updated" });
-      closeLineDialog();
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -271,7 +357,9 @@ export default function JobBudgetPage() {
       childCostCodeId: lineChildCostCodeId && lineChildCostCodeId !== "__none__" ? lineChildCostCodeId : undefined,
     };
     if (editingLine) {
-      updateLineMutation.mutate({ id: editingLine.id, ...data });
+      updateLineMutation.mutate({ id: editingLine.id, ...data }, {
+        onSuccess: () => closeLineDialog(),
+      });
     } else {
       createLineMutation.mutate(data);
     }
@@ -525,76 +613,184 @@ export default function JobBudgetPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-24">Cost Code</TableHead>
+                      <TableHead className="w-10"></TableHead>
+                      <TableHead className="w-28">Code</TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead className="text-right">Estimated Budget</TableHead>
-                      <TableHead className="text-right">Tender Amount</TableHead>
-                      <TableHead>Contractor</TableHead>
-                      <TableHead className="text-right">Variations</TableHead>
-                      <TableHead className="text-right">Forecast Cost</TableHead>
-                      <TableHead className="hidden lg:table-cell">Notes</TableHead>
+                      <TableHead className="text-right w-36">Estimated Budget</TableHead>
+                      <TableHead className="text-right w-36">Variations</TableHead>
+                      <TableHead className="text-right w-36">Forecast Cost</TableHead>
+                      <TableHead className="hidden lg:table-cell w-48">Notes</TableHead>
                       <TableHead className="w-24 text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {budgetLines.map((line) => (
-                      <TableRow key={line.id} data-testid={`row-budget-line-${line.id}`}>
-                        <TableCell className="font-mono font-medium" data-testid={`text-line-code-${line.id}`}>
-                          {line.costCode.code}{line.childCostCode ? ` > ${line.childCostCode.code}` : ""}
-                        </TableCell>
-                        <TableCell data-testid={`text-line-name-${line.id}`}>
-                          {line.costCode.name}{line.childCostCode ? ` > ${line.childCostCode.name}` : ""}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-line-estimated-${line.id}`}>
-                          {formatCurrency(line.estimatedBudget)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-line-tender-${line.id}`}>
-                          {line.tenderSubmission ? formatCurrency(line.tenderSubmission.totalPrice) : "-"}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground" data-testid={`text-line-contractor-${line.id}`}>
-                          {line.contractor?.name || "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-line-variations-${line.id}`}>
-                          {formatCurrency(line.variationsAmount)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono" data-testid={`text-line-forecast-${line.id}`}>
-                          {formatCurrency(line.forecastCost)}
-                        </TableCell>
-                        <TableCell className="hidden lg:table-cell text-muted-foreground text-sm max-w-xs truncate">
-                          {line.notes || "-"}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => openEditLine(line)}
-                              data-testid={`button-edit-line-${line.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => setDeleteConfirm(line)}
-                              data-testid={`button-delete-line-${line.id}`}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {groupedBudgetLines.map((group) => {
+                      const isCollapsed = collapsedGroups.has(group.parentCostCodeId);
+                      const hasChildren = group.lines.some(l => l.childCostCode);
+                      return (
+                        <Fragment key={group.parentCostCodeId}>{/* Parent group header row */}
+                          <TableRow
+                            key={`parent-${group.parentCostCodeId}`}
+                            className="bg-muted/40 cursor-pointer"
+                            onClick={() => toggleGroup(group.parentCostCodeId)}
+                            data-testid={`row-parent-${group.parentCostCodeId}`}
+                          >
+                            <TableCell className="px-2">
+                              {hasChildren ? (
+                                isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                              ) : null}
+                            </TableCell>
+                            <TableCell className="font-mono font-bold" data-testid={`text-parent-code-${group.parentCostCodeId}`}>
+                              {group.parentCode}
+                            </TableCell>
+                            <TableCell className="font-bold" data-testid={`text-parent-name-${group.parentCostCodeId}`}>
+                              {group.parentName}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-estimated-${group.parentCostCodeId}`}>
+                              {formatCurrency(group.totalEstimated)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-variations-${group.parentCostCodeId}`}>
+                              {formatCurrency(group.totalVariations)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-forecast-${group.parentCostCodeId}`}>
+                              {formatCurrency(group.totalForecast)}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell" />
+                            <TableCell />
+                          </TableRow>
+                          {/* Child rows */}
+                          {!isCollapsed && group.lines.map((line) => {
+                            const isEditing = !!editingCells[line.id];
+                            const editData = editingCells[line.id];
+                            return (
+                              <TableRow key={line.id} data-testid={`row-budget-line-${line.id}`}>
+                                <TableCell />
+                                <TableCell className="font-mono text-sm text-muted-foreground pl-6" data-testid={`text-line-code-${line.id}`}>
+                                  {line.childCostCode ? line.childCostCode.code : line.costCode.code}
+                                </TableCell>
+                                <TableCell className="text-sm" data-testid={`text-line-name-${line.id}`}>
+                                  {line.childCostCode ? line.childCostCode.name : line.costCode.name}
+                                </TableCell>
+                                <TableCell className="text-right p-1">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editData.estimatedBudget}
+                                      onChange={(e) => updateInlineField(line.id, "estimatedBudget", e.target.value)}
+                                      className="text-right font-mono h-8 w-full"
+                                      data-testid={`input-inline-estimated-${line.id}`}
+                                    />
+                                  ) : (
+                                    <span className="font-mono text-sm" data-testid={`text-line-estimated-${line.id}`}>
+                                      {formatCurrency(line.estimatedBudget)}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right p-1">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editData.variationsAmount}
+                                      onChange={(e) => updateInlineField(line.id, "variationsAmount", e.target.value)}
+                                      className="text-right font-mono h-8 w-full"
+                                      data-testid={`input-inline-variations-${line.id}`}
+                                    />
+                                  ) : (
+                                    <span className="font-mono text-sm" data-testid={`text-line-variations-${line.id}`}>
+                                      {formatCurrency(line.variationsAmount)}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right p-1">
+                                  {isEditing ? (
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editData.forecastCost}
+                                      onChange={(e) => updateInlineField(line.id, "forecastCost", e.target.value)}
+                                      className="text-right font-mono h-8 w-full"
+                                      data-testid={`input-inline-forecast-${line.id}`}
+                                    />
+                                  ) : (
+                                    <span className="font-mono text-sm" data-testid={`text-line-forecast-${line.id}`}>
+                                      {formatCurrency(line.forecastCost)}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="hidden lg:table-cell p-1">
+                                  {isEditing ? (
+                                    <Input
+                                      value={editData.notes}
+                                      onChange={(e) => updateInlineField(line.id, "notes", e.target.value)}
+                                      className="h-8 w-full text-sm"
+                                      placeholder="Notes..."
+                                      data-testid={`input-inline-notes-${line.id}`}
+                                    />
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm truncate block max-w-xs">
+                                      {line.notes || "-"}
+                                    </span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    {isEditing ? (
+                                      <>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => saveInlineEdit(line.id)}
+                                          disabled={updateLineMutation.isPending}
+                                          data-testid={`button-save-inline-${line.id}`}
+                                        >
+                                          {updateLineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => cancelInlineEdit(line.id)}
+                                          data-testid={`button-cancel-inline-${line.id}`}
+                                        >
+                                          <X className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => startInlineEdit(line)}
+                                          data-testid={`button-edit-line-${line.id}`}
+                                        >
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          onClick={() => setDeleteConfirm(line)}
+                                          data-testid={`button-delete-line-${line.id}`}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </Fragment>
+                      );
+                    })}
                     {budgetLines.length > 0 && summary && (
                       <TableRow className="bg-muted/50 font-medium" data-testid="row-budget-totals">
+                        <TableCell />
                         <TableCell colSpan={2} className="font-bold">Totals</TableCell>
                         <TableCell className="text-right font-mono font-bold" data-testid="text-totals-estimated">
                           {formatCurrency(summary.totalEstimatedBudget)}
                         </TableCell>
-                        <TableCell className="text-right font-mono font-bold" data-testid="text-totals-tender">
-                          {formatCurrency(summary.totalTenderAmounts)}
-                        </TableCell>
-                        <TableCell />
                         <TableCell className="text-right font-mono font-bold" data-testid="text-totals-variations">
                           {formatCurrency(summary.totalVariations)}
                         </TableCell>

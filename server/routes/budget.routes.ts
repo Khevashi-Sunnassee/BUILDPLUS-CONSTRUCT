@@ -467,40 +467,89 @@ router.post("/api/jobs/:jobId/budget/lines/create-from-cost-codes", requireAuth,
         .orderBy(asc(jobCostCodes.sortOrder), asc(costCodes.code));
     }
 
+    const activeCostCodes = jobCostCodeRows.filter(cc => cc.isActive && !cc.isDisabled);
+
+    if (activeCostCodes.length === 0) {
+      return res.json({ created: 0, skipped: jobCostCodeRows.length, message: "All cost codes are inactive or disabled." });
+    }
+
+    const parentIds = activeCostCodes.map(cc => cc.costCodeId);
+    const allChildCodes = await db
+      .select({
+        id: childCostCodes.id,
+        parentCostCodeId: childCostCodes.parentCostCodeId,
+        code: childCostCodes.code,
+        name: childCostCodes.name,
+        isActive: childCostCodes.isActive,
+        sortOrder: childCostCodes.sortOrder,
+      })
+      .from(childCostCodes)
+      .where(and(
+        eq(childCostCodes.companyId, companyId),
+        inArray(childCostCodes.parentCostCodeId, parentIds),
+        eq(childCostCodes.isActive, true)
+      ))
+      .orderBy(asc(childCostCodes.sortOrder), asc(childCostCodes.code));
+
     const existingLines = await db
-      .select({ costCodeId: budgetLines.costCodeId })
+      .select({ costCodeId: budgetLines.costCodeId, childCostCodeId: budgetLines.childCostCodeId })
       .from(budgetLines)
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)));
 
-    const existingCostCodeIds = new Set(existingLines.map(l => l.costCodeId));
+    const existingKey = new Set(existingLines.map(l => `${l.costCodeId}|${l.childCostCodeId || ""}`));
 
-    const newCostCodes = jobCostCodeRows.filter(
-      cc => cc.isActive && !cc.isDisabled && !existingCostCodeIds.has(cc.costCodeId)
-    );
+    const insertValues: any[] = [];
+    let sortIdx = existingLines.length;
 
-    if (newCostCodes.length === 0) {
-      return res.json({ created: 0, skipped: jobCostCodeRows.length, message: "All cost codes already have budget lines or are inactive/disabled." });
+    for (const parentCC of activeCostCodes) {
+      const children = allChildCodes.filter(c => c.parentCostCodeId === parentCC.costCodeId);
+
+      if (children.length > 0) {
+        for (const child of children) {
+          const key = `${parentCC.costCodeId}|${child.id}`;
+          if (!existingKey.has(key)) {
+            insertValues.push({
+              companyId,
+              budgetId: budget.id,
+              jobId,
+              costCodeId: parentCC.costCodeId,
+              childCostCodeId: child.id,
+              estimatedBudget: "0",
+              variationsAmount: "0",
+              forecastCost: "0",
+              sortOrder: sortIdx++,
+            });
+          }
+        }
+      } else {
+        const key = `${parentCC.costCodeId}|`;
+        if (!existingKey.has(key)) {
+          insertValues.push({
+            companyId,
+            budgetId: budget.id,
+            jobId,
+            costCodeId: parentCC.costCodeId,
+            childCostCodeId: null,
+            estimatedBudget: "0",
+            variationsAmount: "0",
+            forecastCost: "0",
+            sortOrder: sortIdx++,
+          });
+        }
+      }
     }
 
-    const insertValues = newCostCodes.map((cc, idx) => ({
-      companyId,
-      budgetId: budget.id,
-      jobId,
-      costCodeId: cc.costCodeId,
-      estimatedBudget: "0",
-      variationsAmount: "0",
-      forecastCost: "0",
-      sortOrder: existingLines.length + idx,
-    }));
+    if (insertValues.length === 0) {
+      return res.json({ created: 0, skipped: activeCostCodes.length, message: "All cost codes already have budget lines." });
+    }
 
     await db.insert(budgetLines).values(insertValues);
 
     const inheritedMsg = inherited > 0 ? ` (${inherited} cost code(s) inherited from job type)` : "";
     res.json({
-      created: newCostCodes.length,
+      created: insertValues.length,
       inherited,
-      skipped: jobCostCodeRows.length - newCostCodes.length,
-      message: `Created ${newCostCodes.length} budget line(s) from cost codes.${inheritedMsg}`,
+      message: `Created ${insertValues.length} budget line(s) from cost codes.${inheritedMsg}`,
     });
   } catch (error: any) {
     logger.error("Error creating budget lines from cost codes:", error);
