@@ -2135,12 +2135,37 @@ for i in range(len(doc)):
     page = doc[i]
     text = page.get_text("text")
     
-    drawing_number = extract_field(text, [
-        r'(?:DWG|DRAWING)\\s*(?:NO|NUMBER|#|NUM)[.:\\s]*([A-Z0-9][A-Z0-9\\-_./]+)',
-        r'([A-Z]{2,6}[\\-_][A-Z]{2,6}[\\-_]\\d{3,6})',
-        r'([A-Z]{2,}[\\-_]\\d{4,})',
-        r'(?:^|\\n)([A-Z0-9]{2,}[\\-][A-Z0-9]{2,}[\\-][A-Z0-9]+)',
-    ])
+    def find_drawing_number(txt):
+        lines = txt.split("\\n")
+        bad_words = {"REV", "REVISION", "SCALE", "DATE", "DRAWN", "TITLE", "CLIENT", "PROJECT", "COVER", "PAGE", "SHEET", "OF", "NO", "NUMBER", "DWG", "DRAWING", "DESCRIPTION"}
+        
+        for idx, line in enumerate(lines):
+            upper = line.strip().upper()
+            if "DRAWING" in upper and ("NO" in upper or "NUM" in upper or "#" in upper):
+                for offset in range(1, 6):
+                    if idx + offset < len(lines):
+                        candidate = lines[idx + offset].strip()
+                        if candidate and candidate.upper() not in bad_words and len(candidate) >= 2:
+                            clean = re.sub(r'\\s+', ' ', candidate).strip()
+                            if re.match(r'^[A-Z0-9]', clean, re.IGNORECASE) and not clean.upper().startswith("REV"):
+                                return clean
+                break
+        
+        patterns = [
+            r'\\b([A-Z]{1,4}\\d{1,3}[.]\\d{1,4})\\b',
+            r'\\b(\\d{2,3}[\\-][A-Z]{1,4}[\\-]\\d{2,5})\\b',
+            r'([A-Z]{2,6}[\\-_][A-Z]{2,6}[\\-_]\\d{3,6})',
+            r'([A-Z]{2,}[\\-_]\\d{4,})',
+        ]
+        for p in patterns:
+            m = re.search(p, txt, re.IGNORECASE)
+            if m:
+                val = m.group(1).strip()
+                if val.upper() not in bad_words:
+                    return val
+        return ""
+    
+    drawing_number = find_drawing_number(text)
     
     title = extract_field(text, [
         r'(?:TITLE|DESCRIPTION)[:\\s]+([A-Z][A-Z\\s\\-0-9]+(?:PLAN|VIEW|SECTION|ELEVATION|DETAIL|ARRANGEMENT|LAYOUT|SCHEDULE))',
@@ -2200,7 +2225,7 @@ for i in range(len(doc)):
 
     thumbnail = ""
     try:
-        pix = page.get_pixmap(matrix=fitz.Matrix(1.5, 1.5))
+        pix = page.get_pixmap(matrix=fitz.Matrix(3, 3))
         import base64
         thumbnail = base64.b64encode(pix.tobytes("png")).decode("ascii")
     except:

@@ -549,7 +549,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
               <div className="flex-1 flex flex-col h-full min-w-0">
                 {currentPage ? (
                   <div className="flex gap-4 h-full">
-                    <div className="w-[340px] flex-shrink-0 flex flex-col h-full overflow-y-auto border rounded-md">
+                    <div className="w-[340px] flex-shrink-0 flex flex-col h-full border rounded-md overflow-hidden">
                       <div className="p-3 border-b bg-muted/30 flex items-center justify-between gap-2">
                         <h3 className="text-sm font-semibold">
                           Page {currentPage.pageNumber} Details
@@ -565,7 +565,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
                         )}
                       </div>
 
-                      <div className="p-3 space-y-3 flex-1">
+                      <div className="p-3 space-y-3 flex-1 min-h-0 overflow-y-auto">
                         <div>
                           <Label className="text-xs text-muted-foreground">Drawing Number</Label>
                           <Input
