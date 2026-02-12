@@ -260,7 +260,7 @@ export default function AdminPanelsPage() {
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const reportLogo = brandingSettings?.logoBase64 || null;
-  const companyName = brandingSettings?.companyName || "LTE Performance";
+  const companyName = brandingSettings?.companyName || "BuildPlus Ai";
 
   const deleteBySourceMutation = useMutation({
     mutationFn: async (source: number) => {

@@ -1,7 +1,7 @@
-# LTE Performance Management System
+# BuildPlus Ai Management System
 
 ## Overview
-The LTE Performance Management System optimizes panel production and delivery for the construction and manufacturing industries. It manages the entire panel production lifecycle, from CAD/Revit time management to delivery tracking. Key features include daily log management, approval workflows, reporting, analytics, KPI dashboards, and a logistics system for load list creation and delivery management. The system aims to enhance operational control, improve production efficiency, and support robust decision-making.
+The BuildPlus Ai Management System optimizes panel production and delivery for the construction and manufacturing industries. It manages the entire panel production lifecycle, from CAD/Revit time management to delivery tracking. Key features include daily log management, approval workflows, reporting, analytics, KPI dashboards, and a logistics system for load list creation and delivery management. The system aims to enhance operational control, improve production efficiency, and support robust decision-making.
 
 ## User Preferences
 I prefer detailed explanations.

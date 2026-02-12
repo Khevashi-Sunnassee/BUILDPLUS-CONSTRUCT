@@ -272,7 +272,7 @@ router.post("/api/test-gmail", requireAuth, async (req, res) => {
     const result = await emailService.sendEmail(
       to,
       "Test Email from LTE System (via Gmail)",
-      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #1a56db;">LTE Performance Management System</h2><p>This is a test email sent via <strong>Gmail</strong> from the LTE system.</p><p><strong>Sent at:</strong> ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" })}</p><p style="color: #666; font-size: 12px; margin-top: 20px;">This is an automated test message.</p></div>`
+      `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;"><h2 style="color: #1a56db;">BuildPlus Ai Management System</h2><p>This is a test email sent via <strong>Gmail</strong> from the LTE system.</p><p><strong>Sent at:</strong> ${new Date().toLocaleString("en-AU", { timeZone: "Australia/Brisbane" })}</p><p style="color: #666; font-size: 12px; margin-top: 20px;">This is an automated test message.</p></div>`
     );
     res.json(result);
   } catch (error: unknown) {

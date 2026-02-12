@@ -489,7 +489,7 @@ function SendPOSheet({
 
   const activePO = poDetail || po;
   const supplierEmail = activePO.supplierEmail || activePO.supplier?.email || "";
-  const companyName = settings?.companyName || "LTE Performance";
+  const companyName = settings?.companyName || "BuildPlus Ai";
 
   const [toEmail, setToEmail] = useState(supplierEmail);
   const [ccEmail, setCcEmail] = useState("");
@@ -503,7 +503,7 @@ function SendPOSheet({
     if (email && !toEmail) {
       setToEmail(email);
     }
-    const name = settings?.companyName || "LTE Performance";
+    const name = settings?.companyName || "BuildPlus Ai";
     setSubject(`Purchase Order ${activePO.poNumber} from ${name}`);
     setMessage(
       `Hi,\n\nPlease find attached Purchase Order ${activePO.poNumber} for ${formatCurrency(activePO.total)}.\n\nIf you have any questions regarding this order, please contact us.\n\nKind regards,\n${name}`

@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const BASE_TITLE = "LTE Performance";
+const BASE_TITLE = "BuildPlus Ai";
 
 export function useDocumentTitle(title?: string) {
   useEffect(() => {

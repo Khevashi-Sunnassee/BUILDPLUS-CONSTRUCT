@@ -651,7 +651,7 @@ router.post("/api/hire-bookings/:id/send-email", requireAuth, async (req: Reques
 
     const row = result[0];
     const [company] = await db.select().from(companies).where(eq(companies.id, companyId)).limit(1);
-    const companyName = company?.name || "LTE Performance Management";
+    const companyName = company?.name || "BuildPlus Ai";
 
     const subject = emailSubject || `Equipment Hire Booking ${row.booking.bookingNumber}`;
     const htmlContent = buildHireBookingHtml(row.booking, row.supplier, row.job, row.requestedBy, companyName);

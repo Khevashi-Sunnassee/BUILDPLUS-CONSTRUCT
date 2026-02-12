@@ -80,7 +80,7 @@ export default function LandingPage() {
   });
 
   useEffect(() => {
-    document.title = "LTE Performance - Construction Performance Management";
+    document.title = "BuildPlus Ai - Construction Performance Management";
     let metaDesc = document.querySelector('meta[name="description"]');
     if (!metaDesc) {
       metaDesc = document.createElement("meta");
@@ -98,7 +98,7 @@ export default function LandingPage() {
       ogTitle.setAttribute("property", "og:title");
       document.head.appendChild(ogTitle);
     }
-    ogTitle.setAttribute("content", "LTE Performance - Build Smarter. Deliver Faster.");
+    ogTitle.setAttribute("content", "BuildPlus Ai - Build Smarter. Deliver Faster.");
 
     let ogDesc = document.querySelector('meta[property="og:description"]');
     if (!ogDesc) {
@@ -271,7 +271,7 @@ export default function LandingPage() {
               )}
             </div>
             <p className="text-sm text-muted-foreground" data-testid="text-footer-url">
-              LTE Performance
+              BuildPlus Ai
             </p>
           </div>
         </div>

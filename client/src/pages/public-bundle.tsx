@@ -144,7 +144,7 @@ export default function PublicBundlePage() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground">
-          LTE Performance Management System
+          BuildPlus Ai Management System
         </p>
       </div>
     </div>

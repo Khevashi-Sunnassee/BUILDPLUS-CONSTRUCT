@@ -200,7 +200,7 @@ router.get("/api/cost-codes-with-children", requireAuth, async (req: Request, re
 router.get("/api/cost-codes/template/download", requireAuth, requirePermission("admin_cost_codes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = "LTE Performance";
+    workbook.creator = "BuildPlus Ai";
     workbook.created = new Date();
 
     const parentSheet = workbook.addWorksheet("PARENT CODES", {

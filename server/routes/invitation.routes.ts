@@ -57,9 +57,9 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
       try {
         const htmlBody = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <h2 style="color: #1a1a1a; margin-bottom: 16px;">You've been invited to LTE Performance</h2>
+            <h2 style="color: #1a1a1a; margin-bottom: 16px;">You've been invited to BuildPlus Ai</h2>
             <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6;">
-              ${inviterName} has invited you to join <strong>${company.name}</strong> on the LTE Performance Management System.
+              ${inviterName} has invited you to join <strong>${company.name}</strong> on the BuildPlus Ai Management System.
             </p>
             <p style="color: #4a4a4a; font-size: 16px; line-height: 1.6;">
               Click the button below to set up your account. This link will expire in 7 days.
@@ -84,7 +84,7 @@ router.post("/api/admin/invitations", requireRole("ADMIN"), async (req, res) => 
 
         await emailService.sendEmailWithAttachment({
           to: email,
-          subject: `You're invited to join ${company.name} on LTE Performance`,
+          subject: `You're invited to join ${company.name} on BuildPlus Ai`,
           body: htmlBody,
         });
 
