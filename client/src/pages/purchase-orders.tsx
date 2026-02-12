@@ -830,7 +830,7 @@ export default function PurchaseOrdersPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deletingPO, setDeletingPO] = useState<PurchaseOrderWithDetails | null>(null);
 
-  type SortField = "poNumber" | "supplier" | "requestedBy" | "total" | "status" | "createdAt" | "requiredByDate";
+  type SortField = "poNumber" | "supplier" | "requestedBy" | "total" | "status" | "createdAt" | "requiredByDate" | "costCode";
   type SortDirection = "asc" | "desc";
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -851,6 +851,22 @@ export default function PurchaseOrdersPage() {
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS],
   });
+
+  const { data: costCodesWithChildren = [] } = useQuery<any[]>({
+    queryKey: ["/api/cost-codes-with-children"],
+  });
+
+  const getCostCodeDisplay = useCallback((po: PurchaseOrderWithDetails): string => {
+    if (!po.costCodeId) return "-";
+    const parent = costCodesWithChildren.find((cc: any) => cc.id === po.costCodeId);
+    if (!parent) return "-";
+    let display = `${parent.code} — ${parent.name}`;
+    if (po.childCostCodeId) {
+      const child = parent.children?.find((c: any) => c.id === po.childCostCodeId);
+      if (child) display += ` / ${child.code}`;
+    }
+    return display;
+  }, [costCodesWithChildren]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -941,10 +957,13 @@ export default function PurchaseOrdersPage() {
           cmp = aDate - bDate;
           break;
         }
+        case "costCode":
+          cmp = getCostCodeDisplay(a).localeCompare(getCostCodeDisplay(b));
+          break;
       }
       return cmp * dir;
     });
-  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery, capexFilter, sortField, sortDirection]);
+  }, [purchaseOrders, statusFilter, supplierFilter, searchQuery, capexFilter, sortField, sortDirection, getCostCodeDisplay]);
 
   const clearFilters = () => {
     setSearchQuery("");
@@ -1110,6 +1129,7 @@ export default function PurchaseOrdersPage() {
                     { field: "supplier" as SortField, label: "Supplier", testId: "th-supplier" },
                     { field: "requestedBy" as SortField, label: "Requested By", testId: "th-requested-by" },
                     { field: "total" as SortField, label: "Total", testId: "th-total" },
+                    { field: "costCode" as SortField, label: "Cost Code", testId: "th-cost-code" },
                     { field: "status" as SortField, label: "Status", testId: "th-status" },
                     { field: "createdAt" as SortField, label: "Created Date", testId: "th-created-date" },
                     { field: "requiredByDate" as SortField, label: "Due Date", testId: "th-due-date" },
@@ -1156,6 +1176,9 @@ export default function PurchaseOrdersPage() {
                     </TableCell>
                     <TableCell data-testid={`cell-total-${po.id}`}>
                       {formatCurrency(po.total)}
+                    </TableCell>
+                    <TableCell data-testid={`cell-cost-code-${po.id}`}>
+                      <span className="text-sm text-muted-foreground">{getCostCodeDisplay(po)}</span>
                     </TableCell>
                     <TableCell data-testid={`cell-status-${po.id}`}>
                       <div className="flex items-center gap-2">

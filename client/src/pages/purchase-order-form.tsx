@@ -91,6 +91,8 @@ const formSchema = z.object({
   requiredByDate: z.date().optional().nullable(),
   notes: z.string().optional(),
   internalNotes: z.string().optional(),
+  costCodeId: z.string().optional().nullable(),
+  childCostCodeId: z.string().optional().nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -150,6 +152,22 @@ export default function PurchaseOrderFormPage() {
     queryKey: [JOBS_ROUTES.LIST],
   });
 
+  const { data: costCodesWithChildren = [] } = useQuery<any[]>({
+    queryKey: ["/api/cost-codes-with-children"],
+  });
+
+  const selectedCostCodeId = form.watch("costCodeId");
+
+  const filteredChildCodes = useMemo(() => {
+    if (!selectedCostCodeId) return [];
+    const parent = costCodesWithChildren.find((cc: any) => cc.id === selectedCostCodeId);
+    return (parent?.children || []).filter((child: any) => child.isActive);
+  }, [selectedCostCodeId, costCodesWithChildren]);
+
+  const activeCostCodes = useMemo(() => {
+    return costCodesWithChildren.filter((cc: any) => cc.isActive);
+  }, [costCodesWithChildren]);
+
   const filteredJobs = useMemo(() => {
     if (!jobSearchTerm.trim()) return jobs;
     const term = jobSearchTerm.toLowerCase();
@@ -192,6 +210,8 @@ export default function PurchaseOrderFormPage() {
       requiredByDate: isNew ? addDays(new Date(), 7) : null,
       notes: "",
       internalNotes: "",
+      costCodeId: null,
+      childCostCodeId: null,
     },
   });
 
@@ -253,6 +273,8 @@ export default function PurchaseOrderFormPage() {
         requiredByDate: existingPO.requiredByDate ? new Date(existingPO.requiredByDate) : null,
         notes: existingPO.notes || "",
         internalNotes: existingPO.internalNotes || "",
+        costCodeId: existingPO.costCodeId || null,
+        childCostCodeId: existingPO.childCostCodeId || null,
       });
       
       const mappedItems: LineItem[] = existingPO.items.map((item, index) => ({
@@ -1431,6 +1453,70 @@ export default function PurchaseOrderFormPage() {
                     <p className="mt-1">{(existingPO as any)?.projectName || "-"}</p>
                   )}
                 </div>
+                <div>
+                  <Label className="text-sm font-medium">Cost Code</Label>
+                  {canEdit ? (
+                    <Select
+                      value={form.watch("costCodeId") || ""}
+                      onValueChange={(value) => {
+                        form.setValue("costCodeId", value === "__none__" ? null : value || null);
+                        form.setValue("childCostCodeId", null);
+                      }}
+                    >
+                      <SelectTrigger data-testid="select-cost-code">
+                        <SelectValue placeholder="Select cost code (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {activeCostCodes.map((cc: any) => (
+                          <SelectItem key={cc.id} value={cc.id}>
+                            {cc.code} — {cc.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="mt-1">
+                      {(() => {
+                        const cc = costCodesWithChildren.find((c: any) => c.id === existingPO?.costCodeId);
+                        return cc ? `${cc.code} — ${cc.name}` : "-";
+                      })()}
+                    </p>
+                  )}
+                </div>
+                {(form.watch("costCodeId") || existingPO?.childCostCodeId) && filteredChildCodes.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium">Child Cost Code</Label>
+                    {canEdit ? (
+                      <Select
+                        value={form.watch("childCostCodeId") || ""}
+                        onValueChange={(value) => {
+                          form.setValue("childCostCodeId", value === "__none__" ? null : value || null);
+                        }}
+                      >
+                        <SelectTrigger data-testid="select-child-cost-code">
+                          <SelectValue placeholder="Select child cost code (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {filteredChildCodes.map((child: any) => (
+                            <SelectItem key={child.id} value={child.id}>
+                              {child.code} — {child.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="mt-1">
+                        {(() => {
+                          const parent = costCodesWithChildren.find((c: any) => c.id === existingPO?.costCodeId);
+                          const child = parent?.children?.find((c: any) => c.id === existingPO?.childCostCodeId);
+                          return child ? `${child.code} — ${child.name}` : "-";
+                        })()}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium">Required By Date</Label>
                   {canEdit ? (

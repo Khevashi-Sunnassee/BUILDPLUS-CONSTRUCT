@@ -1697,6 +1697,8 @@ export const purchaseOrders = pgTable("purchase_orders", {
   rejectedAt: timestamp("rejected_at"),
   rejectionReason: text("rejection_reason"),
   submittedAt: timestamp("submitted_at"),
+  costCodeId: varchar("cost_code_id", { length: 36 }).references(() => costCodes.id),
+  childCostCodeId: varchar("child_cost_code_id", { length: 36 }).references(() => childCostCodes.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -1705,6 +1707,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   requestedByIdx: index("purchase_orders_requested_by_idx").on(table.requestedById),
   supplierIdx: index("purchase_orders_supplier_idx").on(table.supplierId),
   companyIdx: index("purchase_orders_company_idx").on(table.companyId),
+  costCodeIdx: index("purchase_orders_cost_code_idx").on(table.costCodeId),
 }));
 
 export const purchaseOrderItems = pgTable("purchase_order_items", {
