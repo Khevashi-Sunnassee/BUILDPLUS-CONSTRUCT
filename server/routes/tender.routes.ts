@@ -40,8 +40,9 @@ const lineItemSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
-async function getNextTenderNumber(companyId: string): Promise<string> {
-  const result = await db
+async function getNextTenderNumber(companyId: string, tx?: any): Promise<string> {
+  const queryDb = tx || db;
+  const result = await queryDb
     .select({ tenderNumber: tenders.tenderNumber })
     .from(tenders)
     .where(eq(tenders.companyId, companyId))
@@ -153,64 +154,82 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
     const data = tenderSchema.parse(req.body);
     const documentIds: string[] = Array.isArray(req.body.documentIds) ? req.body.documentIds : [];
 
-    const tenderNumber = await getNextTenderNumber(companyId);
+    const maxRetries = 3;
+    let attempt = 0;
+    let result: any = null;
 
-    const [result] = await db
-      .insert(tenders)
-      .values({
-        companyId,
-        jobId: data.jobId,
-        tenderNumber,
-        title: data.title,
-        description: data.description || null,
-        status: data.status || "DRAFT",
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-        notes: data.notes || null,
-        createdById: userId,
-      })
-      .returning();
+    while (attempt < maxRetries) {
+      attempt++;
+      try {
+        result = await db.transaction(async (tx) => {
+          const tenderNumber = await getNextTenderNumber(companyId, tx);
 
-    if (documentIds.length > 0) {
-      const validDocs = await db.select({ id: documents.id })
-        .from(documents)
-        .where(and(
-          inArray(documents.id, documentIds),
-          eq(documents.companyId, companyId)
-        ));
-      const validDocIds = validDocs.map(d => d.id);
+          const [tender] = await tx
+            .insert(tenders)
+            .values({
+              companyId,
+              jobId: data.jobId,
+              tenderNumber,
+              title: data.title,
+              description: data.description || null,
+              status: data.status || "DRAFT",
+              dueDate: data.dueDate ? new Date(data.dueDate) : null,
+              notes: data.notes || null,
+              createdById: userId,
+            })
+            .returning();
 
-      if (validDocIds.length > 0) {
-        await db.transaction(async (tx) => {
-          const qrCodeId = `bundle-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
-          const [bundle] = await tx.insert(documentBundles).values({
-            companyId,
-            bundleName: `Tender ${tenderNumber} - ${data.title}`,
-            description: `Document bundle for tender ${tenderNumber}`,
-            qrCodeId,
-            jobId: data.jobId,
-            isPublic: false,
-            allowGuestAccess: false,
-            createdBy: userId,
-          }).returning();
+          if (documentIds.length > 0) {
+            const validDocs = await tx.select({ id: documents.id })
+              .from(documents)
+              .where(and(
+                inArray(documents.id, documentIds),
+                eq(documents.companyId, companyId)
+              ));
+            const validDocIds = validDocs.map(d => d.id);
 
-          for (let i = 0; i < validDocIds.length; i++) {
-            await tx.insert(documentBundleItems).values({
-              bundleId: bundle.id,
-              documentId: validDocIds[i],
-              sortOrder: i,
-              addedBy: userId,
-            });
+            if (validDocIds.length > 0) {
+              const qrCodeId = `bundle-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
+              const [bundle] = await tx.insert(documentBundles).values({
+                companyId,
+                bundleName: `Tender ${tenderNumber} - ${data.title}`,
+                description: `Document bundle for tender ${tenderNumber}`,
+                qrCodeId,
+                jobId: data.jobId,
+                isPublic: false,
+                allowGuestAccess: false,
+                createdBy: userId,
+              }).returning();
+
+              for (let i = 0; i < validDocIds.length; i++) {
+                await tx.insert(documentBundleItems).values({
+                  bundleId: bundle.id,
+                  documentId: validDocIds[i],
+                  sortOrder: i,
+                  addedBy: userId,
+                });
+              }
+
+              await tx.insert(tenderPackages).values({
+                companyId,
+                tenderId: tender.id,
+                bundleId: bundle.id,
+                name: `Tender Documents - ${data.title}`,
+                description: `${validDocIds.length} document(s) attached`,
+                sortOrder: 0,
+              });
+            }
           }
 
-          await tx.insert(tenderPackages).values({
-            companyId,
-            tenderId: result.id,
-            bundleId: bundle.id,
-            name: `Tender Documents - ${data.title}`,
-            description: `${validDocIds.length} document(s) attached`,
-            sortOrder: 0,
-          });
+          return tender;
         });
+        break;
+      } catch (txError: any) {
+        if (txError.code === "23505" && txError.constraint === "tenders_number_company_idx" && attempt < maxRetries) {
+          logger.warn(`Tender number collision on attempt ${attempt}, retrying...`);
+          continue;
+        }
+        throw txError;
       }
     }
 

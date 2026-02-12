@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, Fragment } from "react";
+import { useState, useMemo, useEffect, useCallback, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus, Loader2, DollarSign, ChevronDown, ChevronRight,
   Receipt, ArrowLeft, FileText, Save, Trash2, Target,
-  Paperclip, X, Search,
+  Paperclip, X, Search, AlertTriangle,
 } from "lucide-react";
 import type { Job, Tender, BudgetLine } from "@shared/schema";
 
@@ -194,13 +194,28 @@ export default function JobTendersPage() {
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
   const [docSearchTerm, setDocSearchTerm] = useState("");
 
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [hasUnsavedChanges]);
+
   const { data: job, isLoading: loadingJob } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
     enabled: !!jobId,
   });
 
   const { data: jobTenders = [], isLoading: loadingTenders } = useQuery<TenderWithSubmissions[]>({
-    queryKey: [`/api/jobs/${jobId}/tenders`],
+    queryKey: ["/api/jobs", jobId, "tenders"],
+    queryFn: async () => {
+      const res = await fetch(`/api/jobs/${jobId}/tenders`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch tenders");
+      return res.json();
+    },
     enabled: !!jobId,
   });
 
@@ -230,7 +245,12 @@ export default function JobTendersPage() {
   });
 
   const { data: sheetData, isLoading: loadingSheet } = useQuery<TenderSheetData>({
-    queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`],
+    queryKey: ["/api/jobs", jobId, "tenders", selectedTenderId, "sheet"],
+    queryFn: async () => {
+      const res = await fetch(`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch tender sheet");
+      return res.json();
+    },
     enabled: !!jobId && !!selectedTenderId,
   });
 
@@ -278,17 +298,33 @@ export default function JobTendersPage() {
     }
   }, [sheetData, selectedSubmissionId]);
 
+  const [unsavedWarningAction, setUnsavedWarningAction] = useState<(() => void) | null>(null);
+
+  function confirmOrWarn(action: () => void) {
+    if (hasUnsavedChanges) {
+      setUnsavedWarningAction(() => action);
+    } else {
+      action();
+    }
+  }
+
   function selectTender(tenderId: string) {
-    setSelectedTenderId(tenderId);
-    setSelectedSubmissionId(null);
-    setLineAmounts({});
-    setHasUnsavedChanges(false);
+    const doSwitch = () => {
+      setSelectedTenderId(tenderId);
+      setSelectedSubmissionId(null);
+      setLineAmounts({});
+      setHasUnsavedChanges(false);
+    };
+    confirmOrWarn(doSwitch);
   }
 
   function selectSubmission(subId: string) {
-    setSelectedSubmissionId(subId);
-    const sub = sheetData?.submissions.find(s => s.id === subId);
-    loadLineAmountsForSubmission(sub);
+    const doSwitch = () => {
+      setSelectedSubmissionId(subId);
+      const sub = sheetData?.submissions.find(s => s.id === subId);
+      loadLineAmountsForSubmission(sub);
+    };
+    confirmOrWarn(doSwitch);
   }
 
   function getLineAmount(costCodeId: string, childCostCodeId: string | null): string {
@@ -330,8 +366,7 @@ export default function JobTendersPage() {
     },
     onSuccess: async (res) => {
       const newTender = await res.json();
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tenders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders"] });
       toast({ title: "Tender created successfully" });
       setCreateTenderOpen(false);
       setFormTitle("");
@@ -354,8 +389,8 @@ export default function JobTendersPage() {
     },
     onSuccess: async (res) => {
       const newSub = await res.json();
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders", selectedTenderId, "sheet"] });
       toast({ title: "Supplier added to tender" });
       setAddSubmissionOpen(false);
       setFormSupplierId("");
@@ -376,7 +411,7 @@ export default function JobTendersPage() {
       return apiRequest("POST", `/api/jobs/${jobId}/tenders/${selectedTenderId}/documents`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders", selectedTenderId, "sheet"] });
       toast({ title: "Document bundle attached to tender" });
       setAddBundleOpen(false);
       setSelectedBundleId("");
@@ -391,7 +426,7 @@ export default function JobTendersPage() {
       return apiRequest("DELETE", `/api/jobs/${jobId}/tenders/${selectedTenderId}/documents/${packageId}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders", selectedTenderId, "sheet"] });
       toast({ title: "Document removed from tender" });
       setDeleteDocId(null);
     },
@@ -411,8 +446,8 @@ export default function JobTendersPage() {
       return apiRequest("POST", `/api/jobs/${jobId}/tenders/${selectedTenderId}/submissions/${selectedSubmissionId}/upsert-lines`, { lines });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders", selectedTenderId, "sheet"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "lines"] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "summary"] });
       toast({ title: "Tender amounts saved" });
@@ -428,8 +463,7 @@ export default function JobTendersPage() {
       return apiRequest("DELETE", `/api/tenders/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}/tenders`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/tenders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "tenders"] });
       toast({ title: "Tender deleted" });
       setDeleteConfirmTender(null);
       if (selectedTenderId === deleteConfirmTender) {
@@ -452,9 +486,29 @@ export default function JobTendersPage() {
     });
   }
 
+  if (!jobId) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="py-16 text-center text-muted-foreground" data-testid="text-no-job-id">
+            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-amber-500 opacity-60" />
+            <p className="text-lg font-medium">Job Not Found</p>
+            <p className="text-sm mt-1">No job ID was provided. Please navigate to a job first.</p>
+            <Link href="/jobs">
+              <Button variant="outline" className="mt-4" data-testid="button-go-to-jobs">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to Jobs
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (loadingJob || loadingTenders) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4" data-testid="loading-tender-page">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -658,6 +712,11 @@ export default function JobTendersPage() {
               <div className={`text-2xl font-bold ${difference >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-difference">
                 {totalTender > 0 ? formatCurrency(difference) : "-"}
               </div>
+              {totalTender > 0 && totalEstimated > 0 && (
+                <p className={`text-xs mt-1 ${difference >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-difference-pct">
+                  {difference >= 0 ? "Under" : "Over"} budget by {Math.abs((difference / totalEstimated) * 100).toFixed(1)}%
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -1114,6 +1173,35 @@ export default function JobTendersPage() {
             >
               {removeDocumentMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!unsavedWarningAction} onOpenChange={(open) => !open && setUnsavedWarningAction(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Unsaved Changes
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved tender amounts. Switching now will discard your changes. Would you like to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-discard">Keep Editing</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (unsavedWarningAction) {
+                  unsavedWarningAction();
+                  setUnsavedWarningAction(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground"
+              data-testid="button-confirm-discard"
+            >
+              Discard Changes
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
