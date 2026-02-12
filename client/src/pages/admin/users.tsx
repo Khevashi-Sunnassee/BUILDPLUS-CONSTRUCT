@@ -82,7 +82,6 @@ import type { PermissionLevel } from "@shared/schema";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown, ChevronUp, Eye, EyeOff, Pencil } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 const INVITE_FUNCTION_LABELS: Record<string, string> = {
   tasks: "Tasks",
@@ -1068,7 +1067,7 @@ export default function AdminUsersPage() {
               Set up email, role, and module permissions in one step. The invited user will register with these permissions pre-configured.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="flex-1 pr-4">
+          <div className="flex-1 overflow-y-auto pr-4">
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Email Address *</label>
@@ -1204,7 +1203,7 @@ export default function AdminUsersPage() {
                                 >
                                   <SelectValue placeholder="Set all" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                                   <SelectItem value="VIEW_AND_UPDATE">Full Access</SelectItem>
                                   <SelectItem value="VIEW">View Only</SelectItem>
                                   <SelectItem value="HIDDEN">Hidden</SelectItem>
@@ -1232,7 +1231,7 @@ export default function AdminUsersPage() {
                                     >
                                       <SelectValue />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent onCloseAutoFocus={(e) => e.preventDefault()}>
                                       <SelectItem value="VIEW_AND_UPDATE">Full Access</SelectItem>
                                       <SelectItem value="VIEW">View Only</SelectItem>
                                       <SelectItem value="HIDDEN">Hidden</SelectItem>
@@ -1249,7 +1248,7 @@ export default function AdminUsersPage() {
                 </div>
               </div>
             </div>
-          </ScrollArea>
+          </div>
           <DialogFooter className="pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setInviteDialogOpen(false)}>
               Cancel
