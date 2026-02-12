@@ -537,65 +537,6 @@ router.get("/api/procurement/items/active", requireAuth, async (req, res) => {
   }
 });
 
-router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    const item = await storage.getItem(String(req.params.id));
-    if (!item || item.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
-    res.json(item);
-  } catch (error: unknown) {
-    logger.error({ err: error }, "Error fetching item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch item" });
-  }
-});
-
-router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const parsed = itemSchema.safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-    }
-    const item = await storage.createItem({ ...parsed.data, companyId, name: parsed.data.description } as any);
-    res.json(item);
-  } catch (error: unknown) {
-    logger.error({ err: error }, "Error creating item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create item" });
-  }
-});
-
-router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    const existing = await storage.getItem(String(req.params.id));
-    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
-    const parsed = itemSchema.partial().safeParse(req.body);
-    if (!parsed.success) {
-      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-    }
-    const item = await storage.updateItem(String(req.params.id), parsed.data);
-    if (!item) return res.status(404).json({ error: "Item not found" });
-    res.json(item);
-  } catch (error: unknown) {
-    logger.error({ err: error }, "Error updating item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update item" });
-  }
-});
-
-router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, res) => {
-  try {
-    const companyId = req.companyId;
-    const existing = await storage.getItem(String(req.params.id));
-    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
-    await storage.deleteItem(String(req.params.id));
-    res.json({ success: true });
-  } catch (error: unknown) {
-    logger.error({ err: error }, "Error deleting item");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete item" });
-  }
-});
-
 router.get("/api/procurement/items/template", requireAuth, async (_req, res) => {
   try {
     const workbook = new ExcelJS.Workbook();
@@ -658,6 +599,65 @@ router.get("/api/procurement/items/template", requireAuth, async (_req, res) => 
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to generate items template");
     res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
+router.get("/api/procurement/items/:id", requireAuth, async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const item = await storage.getItem(String(req.params.id));
+    if (!item || item.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
+    res.json(item);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching item");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch item" });
+  }
+});
+
+router.post("/api/procurement/items", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const parsed = itemSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const item = await storage.createItem({ ...parsed.data, companyId, name: parsed.data.description } as any);
+    res.json(item);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error creating item");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create item" });
+  }
+});
+
+router.patch("/api/procurement/items/:id", requireRole("ADMIN", "MANAGER"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const existing = await storage.getItem(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
+    const parsed = itemSchema.partial().safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const item = await storage.updateItem(String(req.params.id), parsed.data);
+    if (!item) return res.status(404).json({ error: "Item not found" });
+    res.json(item);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error updating item");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update item" });
+  }
+});
+
+router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    const existing = await storage.getItem(String(req.params.id));
+    if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Item not found" });
+    await storage.deleteItem(String(req.params.id));
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error deleting item");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete item" });
   }
 });
 

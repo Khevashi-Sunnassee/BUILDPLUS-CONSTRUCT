@@ -789,13 +789,24 @@ export default function AdminItemsPage() {
           <div className="flex items-center justify-end gap-2 flex-wrap">
             <Button
               variant="outline"
-              onClick={() => {
-                const link = document.createElement("a");
-                link.href = PROCUREMENT_ROUTES.ITEMS_TEMPLATE;
-                link.download = "items_import_template.xlsx";
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+              onClick={async () => {
+                try {
+                  const response = await fetch(PROCUREMENT_ROUTES.ITEMS_TEMPLATE, {
+                    credentials: "include",
+                  });
+                  if (!response.ok) throw new Error("Download failed");
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = "Items_Import_Template.xlsx";
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                  window.URL.revokeObjectURL(url);
+                } catch {
+                  toast({ title: "Failed to download template", variant: "destructive" });
+                }
               }}
               data-testid="button-download-template"
             >
