@@ -98,8 +98,8 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 import { ChecklistForm, calculateCompletionRate, getMissingRequiredFields } from "@/components/checklist/checklist-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CHECKLIST_ROUTES } from "@shared/api-routes";
-import type { ChecklistInstance, ChecklistTemplate } from "@shared/schema";
-import { Save, Send, CheckCircle } from "lucide-react";
+import type { ChecklistInstance, ChecklistTemplate, ChecklistWorkOrder } from "@shared/schema";
+import { Save, Send, CheckCircle, ClipboardList } from "lucide-react";
 
 const formatCurrency = (value: string | number | null | undefined) => {
   if (value === null || value === undefined) return "-";
@@ -405,6 +405,11 @@ export default function AssetRegisterPage() {
     enabled: !!serviceInstance?.templateId && serviceDialogOpen,
   });
 
+  const { data: serviceWorkOrders = [] } = useQuery<ChecklistWorkOrder[]>({
+    queryKey: [CHECKLIST_ROUTES.WORK_ORDERS_BY_INSTANCE(serviceInstanceId!)],
+    enabled: !!serviceInstanceId && serviceDialogOpen,
+  });
+
   const serviceChecklistMutation = useMutation({
     mutationFn: async (asset: Asset) => {
       const res = await apiRequest("POST", "/api/checklist/instances/from-asset", {
@@ -443,6 +448,7 @@ export default function AssetRegisterPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!)] });
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.WORK_ORDERS_BY_INSTANCE(serviceInstanceId!)] });
       setServiceHasChanges(false);
       toast({ title: "Saved", description: "Your progress has been saved" });
     },
@@ -462,6 +468,7 @@ export default function AssetRegisterPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCES] });
       queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.INSTANCE_BY_ID(serviceInstanceId!)] });
+      queryClient.invalidateQueries({ queryKey: [CHECKLIST_ROUTES.WORK_ORDERS_BY_INSTANCE(serviceInstanceId!)] });
       setServiceHasChanges(false);
       setServiceCompleteDialogOpen(false);
       toast({ title: "Completed", description: "Service checklist has been completed" });
@@ -2433,6 +2440,51 @@ export default function AssetRegisterPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            )}
+
+            {serviceWorkOrders.length > 0 && (
+              <Card className="mt-4">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center gap-2">
+                    <ClipboardList className="h-5 w-5 text-amber-500" />
+                    <CardTitle className="text-base">Generated Work Orders</CardTitle>
+                    <Badge variant="secondary">{serviceWorkOrders.length}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {serviceWorkOrders.map((wo: ChecklistWorkOrder) => (
+                      <div
+                        key={wo.id}
+                        className="flex items-start justify-between gap-3 rounded-md border p-3"
+                        data-testid={`work-order-${wo.id}`}
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <p className="text-sm font-medium">{wo.fieldName}</p>
+                          <p className="text-xs text-muted-foreground">{wo.sectionName}</p>
+                          {wo.details && (
+                            <p className="text-xs text-muted-foreground">{wo.details}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Badge
+                            variant={wo.status === "open" ? "destructive" : wo.status === "resolved" ? "default" : "secondary"}
+                            className="text-xs"
+                          >
+                            {wo.status}
+                          </Badge>
+                          <Badge
+                            variant="outline"
+                            className="text-xs"
+                          >
+                            {wo.priority}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             )}
           </div>
           {serviceInstance?.status !== "completed" && serviceInstance?.status !== "signed_off" && serviceTemplate && (

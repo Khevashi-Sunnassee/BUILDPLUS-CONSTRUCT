@@ -196,6 +196,8 @@ export default function TemplateEditorPage() {
   const [editingFieldAutoPopulateFrom, setEditingFieldAutoPopulateFrom] = useState<string>("");
   const [editingFieldAutoPopulateField, setEditingFieldAutoPopulateField] = useState<string>("");
   const [editingFieldAutoPopulateSourceFieldId, setEditingFieldAutoPopulateSourceFieldId] = useState<string>("");
+  const [editingFieldWorkOrderEnabled, setEditingFieldWorkOrderEnabled] = useState(false);
+  const [editingFieldWorkOrderTriggerValue, setEditingFieldWorkOrderTriggerValue] = useState<string>("");
 
   const { data: template, isLoading } = useQuery<ChecklistTemplate>({
     queryKey: [CHECKLIST_ROUTES.TEMPLATE_BY_ID(id!)],
@@ -281,6 +283,8 @@ export default function TemplateEditorPage() {
       setEditingFieldAutoPopulateFrom(field.autoPopulateFrom || "");
       setEditingFieldAutoPopulateField(field.autoPopulateField || "");
       setEditingFieldAutoPopulateSourceFieldId(field.autoPopulateSourceFieldId || "");
+      setEditingFieldWorkOrderEnabled(field.workOrderEnabled || false);
+      setEditingFieldWorkOrderTriggerValue(field.workOrderTriggerValue || "");
       fieldForm.reset({
         name: field.name,
         type: field.type,
@@ -300,6 +304,8 @@ export default function TemplateEditorPage() {
       setEditingFieldDependsOnValue("");
       setEditingFieldAutoPopulateFrom("");
       setEditingFieldAutoPopulateField("");
+      setEditingFieldWorkOrderEnabled(false);
+      setEditingFieldWorkOrderTriggerValue("");
       fieldForm.reset({
         name: "",
         type: "text_field",
@@ -363,6 +369,8 @@ export default function TemplateEditorPage() {
       autoPopulateFrom: editingFieldAutoPopulateFrom || undefined,
       autoPopulateField: editingFieldAutoPopulateField || undefined,
       autoPopulateSourceFieldId: editingFieldAutoPopulateSourceFieldId || undefined,
+      workOrderEnabled: editingFieldWorkOrderEnabled || undefined,
+      workOrderTriggerValue: editingFieldWorkOrderTriggerValue || undefined,
     };
 
     setSections((prev) =>
@@ -723,14 +731,19 @@ export default function TemplateEditorPage() {
                         return (
                           <div
                             key={field.id}
-                            className="flex items-center gap-2 p-3 border rounded-md bg-background"
+                            className={`flex items-center gap-2 p-3 border rounded-md ${field.workOrderEnabled ? "border-amber-500/40 bg-amber-500/5" : "bg-background"}`}
                             data-testid={`field-${field.id}`}
                           >
                             <GripVertical className="h-4 w-4 text-muted-foreground cursor-move" />
-                            <Icon className="h-4 w-4 text-muted-foreground" />
+                            <Icon className={`h-4 w-4 ${field.workOrderEnabled ? "text-amber-500" : "text-muted-foreground"}`} />
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-medium truncate">{field.name}</span>
+                                {field.workOrderEnabled && (
+                                  <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                                    WO: {field.workOrderTriggerValue || "any"}
+                                  </Badge>
+                                )}
                                 {field.required && (
                                   <Badge variant="destructive" className="text-xs">
                                     Required
@@ -1259,6 +1272,69 @@ export default function TemplateEditorPage() {
                     </FormItem>
                   )}
                 />
+              </div>
+
+              <Separator />
+
+              <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <FormLabel className="text-amber-600 dark:text-amber-400">Work Order Trigger</FormLabel>
+                    <FormDescription className="text-xs">
+                      Automatically create a work order when this field matches a condition
+                    </FormDescription>
+                  </div>
+                  <Switch
+                    checked={editingFieldWorkOrderEnabled}
+                    onCheckedChange={(checked) => {
+                      setEditingFieldWorkOrderEnabled(checked);
+                      if (!checked) setEditingFieldWorkOrderTriggerValue("");
+                    }}
+                    data-testid="switch-field-work-order"
+                  />
+                </div>
+                {editingFieldWorkOrderEnabled && (
+                  <div className="space-y-1">
+                    <label className="text-xs text-muted-foreground">Trigger When Value Is</label>
+                    {(() => {
+                      const fieldType = fieldForm.watch("type");
+                      const triggerOptions =
+                        fieldType === "pass_fail_flag"
+                          ? [{ text: "Fail", value: "fail" }, { text: "Pass", value: "pass" }]
+                          : fieldType === "yes_no_na"
+                          ? [{ text: "Yes", value: "yes" }, { text: "No", value: "no" }, { text: "N/A", value: "na" }]
+                          : fieldType === "condition_option"
+                          ? [{ text: "Good", value: "good" }, { text: "Fair", value: "fair" }, { text: "Poor", value: "poor" }, { text: "N/A", value: "na" }]
+                          : fieldType === "inspection_check"
+                          ? [{ text: "Pass", value: "pass" }, { text: "Fail", value: "fail" }]
+                          : editingFieldOptions.length > 0
+                          ? editingFieldOptions
+                          : null;
+
+                      return triggerOptions ? (
+                        <Select value={editingFieldWorkOrderTriggerValue} onValueChange={setEditingFieldWorkOrderTriggerValue}>
+                          <SelectTrigger data-testid="select-work-order-trigger-value">
+                            <SelectValue placeholder="Select trigger value" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {triggerOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.text}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          placeholder="Value that triggers work order..."
+                          value={editingFieldWorkOrderTriggerValue}
+                          onChange={(e) => setEditingFieldWorkOrderTriggerValue(e.target.value)}
+                          data-testid="input-work-order-trigger-value"
+                        />
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
 
               <DialogFooter>

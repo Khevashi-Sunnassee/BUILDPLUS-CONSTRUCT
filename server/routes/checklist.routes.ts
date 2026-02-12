@@ -6,11 +6,13 @@ import {
   entitySubtypes,
   checklistTemplates,
   checklistInstances,
+  checklistWorkOrders,
   insertEntityTypeSchema,
   insertEntitySubtypeSchema,
   insertChecklistTemplateSchema,
   insertChecklistInstanceSchema,
 } from "@shared/schema";
+import type { ChecklistSection, ChecklistField } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import logger from "../lib/logger";
 
@@ -739,6 +741,15 @@ router.put("/api/checklist/instances/:id", requireAuth, async (req: Request, res
       return res.status(404).json({ error: "Instance not found" });
     }
 
+    if (parsed.data.responses && updated.templateId) {
+      processWorkOrderTriggers(
+        companyId!,
+        instanceId,
+        parsed.data.responses as Record<string, unknown>,
+        updated.templateId
+      ).catch(err => logger.error({ err }, "Work order trigger processing failed"));
+    }
+
     res.json(updated);
   } catch (error) {
     logger.error({ err: error }, "Failed to update instance");
@@ -871,6 +882,165 @@ router.get("/api/checklist/reports/summary", requireAuth, async (req: Request, r
   } catch (error) {
     logger.error({ err: error }, "Failed to fetch report summary");
     res.status(500).json({ error: "Failed to fetch report summary" });
+  }
+});
+
+// ============================================================================
+// WORK ORDER AUTO-CREATION HELPER
+// ============================================================================
+
+async function processWorkOrderTriggers(
+  companyId: string,
+  instanceId: string,
+  responses: Record<string, unknown>,
+  templateId: string
+) {
+  try {
+    const [template] = await db.select().from(checklistTemplates)
+      .where(and(
+        eq(checklistTemplates.id, templateId),
+        eq(checklistTemplates.companyId, companyId)
+      ));
+    if (!template?.sections) return;
+
+    const sections = (Array.isArray(template.sections) ? template.sections : []) as ChecklistSection[];
+
+    for (const section of sections) {
+      for (const field of (section.items || []) as ChecklistField[]) {
+        if (!field.workOrderEnabled) continue;
+
+        const responseValue = responses[field.id];
+        const triggerVal = (field.workOrderTriggerValue || "").toLowerCase();
+        const valueStr = responseValue !== undefined && responseValue !== null && responseValue !== ""
+          ? String(responseValue).toLowerCase() : "";
+
+        const triggerMatches = valueStr !== "" && (!triggerVal || valueStr === triggerVal);
+
+        const existing = await db.select().from(checklistWorkOrders)
+          .where(and(
+            eq(checklistWorkOrders.checklistInstanceId, instanceId),
+            eq(checklistWorkOrders.fieldId, field.id),
+            eq(checklistWorkOrders.companyId, companyId)
+          ));
+
+        if (triggerMatches) {
+          if (existing.length > 0) {
+            await db.update(checklistWorkOrders)
+              .set({ result: String(responseValue), updatedAt: new Date() })
+              .where(eq(checklistWorkOrders.id, existing[0].id));
+          } else {
+            await db.insert(checklistWorkOrders).values({
+              companyId,
+              checklistInstanceId: instanceId,
+              fieldId: field.id,
+              fieldName: field.name,
+              sectionName: section.name,
+              triggerValue: field.workOrderTriggerValue || null,
+              result: String(responseValue),
+              details: `${field.name} reported "${responseValue}" during inspection`,
+            });
+          }
+        } else if (existing.length > 0 && existing[0].status === "open") {
+          await db.update(checklistWorkOrders)
+            .set({
+              status: "cancelled",
+              resolutionNotes: "Auto-cancelled: response changed to non-trigger value",
+              updatedAt: new Date(),
+            })
+            .where(eq(checklistWorkOrders.id, existing[0].id));
+        }
+      }
+    }
+  } catch (error) {
+    logger.error({ err: error }, "Failed to process work order triggers");
+  }
+}
+
+// ============================================================================
+// WORK ORDERS CRUD
+// ============================================================================
+
+router.get("/api/checklist/instances/:instanceId/work-orders", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const instanceId = String(req.params.instanceId);
+
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const orders = await db.select().from(checklistWorkOrders)
+      .where(and(
+        eq(checklistWorkOrders.checklistInstanceId, instanceId),
+        eq(checklistWorkOrders.companyId, companyId!)
+      ))
+      .orderBy(desc(checklistWorkOrders.createdAt));
+
+    res.json(orders);
+  } catch (error) {
+    logger.error({ err: error }, "Failed to fetch work orders");
+    res.status(500).json({ error: "Failed to fetch work orders" });
+  }
+});
+
+router.get("/api/checklist/work-orders", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const orders = await db.select().from(checklistWorkOrders)
+      .where(eq(checklistWorkOrders.companyId, companyId!))
+      .orderBy(desc(checklistWorkOrders.createdAt));
+
+    res.json(orders);
+  } catch (error) {
+    logger.error({ err: error }, "Failed to fetch all work orders");
+    res.status(500).json({ error: "Failed to fetch work orders" });
+  }
+});
+
+router.patch("/api/checklist/work-orders/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    const workOrderId = String(req.params.id);
+    const userId = req.session.userId;
+
+    if (!companyId) {
+      return res.status(400).json({ error: "Company ID required" });
+    }
+
+    const { status, resolutionNotes, priority, details } = req.body;
+
+    const updateData: Record<string, unknown> = { updatedAt: new Date() };
+    if (status) updateData.status = status;
+    if (resolutionNotes !== undefined) updateData.resolutionNotes = resolutionNotes;
+    if (priority) updateData.priority = priority;
+    if (details !== undefined) updateData.details = details;
+
+    if (status === "resolved" || status === "closed") {
+      updateData.resolvedBy = userId;
+      updateData.resolvedAt = new Date();
+    }
+
+    const [updated] = await db.update(checklistWorkOrders)
+      .set(updateData)
+      .where(and(
+        eq(checklistWorkOrders.id, workOrderId),
+        eq(checklistWorkOrders.companyId, companyId!)
+      ))
+      .returning();
+
+    if (!updated) {
+      return res.status(404).json({ error: "Work order not found" });
+    }
+
+    res.json(updated);
+  } catch (error) {
+    logger.error({ err: error }, "Failed to update work order");
+    res.status(500).json({ error: "Failed to update work order" });
   }
 });
 

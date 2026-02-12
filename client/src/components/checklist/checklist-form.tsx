@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ChevronsUpDown, ChevronsDownUp, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertCircle, ChevronsUpDown, ChevronsDownUp, ChevronDown, ChevronRight, ClipboardList } from "lucide-react";
 import { renderField } from "./field-renderers";
 import type { SimpleAsset } from "./field-renderers";
 import { normalizeSections } from "./normalize-sections";
@@ -211,12 +211,18 @@ export function ChecklistForm({
                   return (
                   <div key={field.id} data-testid={`checklist-field-${field.id}`}>
                     {fieldIndex > 0 && <Separator className="mb-6" />}
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
+                    <div className={`space-y-2 ${field.workOrderEnabled ? "rounded-md border border-amber-500/30 bg-amber-500/5 p-3 -mx-1" : ""}`}>
+                      <div className="flex items-center gap-2 flex-wrap">
                         <label className="text-sm font-medium">
                           {field.name}
                           {field.required && <span className="text-red-500 ml-1">*</span>}
                         </label>
+                        {field.workOrderEnabled && (
+                          <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                            <ClipboardList className="h-3 w-3 mr-1" />
+                            Work Order
+                          </Badge>
+                        )}
                         {field.photoRequired && (
                           <Badge variant="secondary" className="text-xs">Photo Required</Badge>
                         )}

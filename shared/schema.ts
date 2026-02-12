@@ -2577,6 +2577,40 @@ export const insertChecklistInstanceSchema = createInsertSchema(checklistInstanc
 export type InsertChecklistInstance = z.infer<typeof insertChecklistInstanceSchema>;
 export type ChecklistInstance = typeof checklistInstances.$inferSelect;
 
+// ==================== CHECKLIST WORK ORDERS ====================
+export const workOrderStatusEnum = pgEnum("work_order_status", ["open", "in_progress", "resolved", "closed", "cancelled"]);
+export const workOrderPriorityEnum = pgEnum("work_order_priority", ["low", "medium", "high", "critical"]);
+
+export const checklistWorkOrders = pgTable("checklist_work_orders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).references(() => companies.id).notNull(),
+  checklistInstanceId: varchar("checklist_instance_id", { length: 36 }).references(() => checklistInstances.id).notNull(),
+  fieldId: varchar("field_id", { length: 100 }).notNull(),
+  fieldName: varchar("field_name", { length: 255 }).notNull(),
+  sectionName: varchar("section_name", { length: 255 }).notNull(),
+  triggerValue: varchar("trigger_value", { length: 255 }),
+  result: varchar("result", { length: 255 }),
+  details: text("details"),
+  photos: jsonb("photos").default([]),
+  status: workOrderStatusEnum("status").default("open").notNull(),
+  priority: workOrderPriorityEnum("priority").default("medium").notNull(),
+  assignedTo: varchar("assigned_to", { length: 36 }).references(() => users.id),
+  resolvedBy: varchar("resolved_by", { length: 36 }).references(() => users.id),
+  resolvedAt: timestamp("resolved_at"),
+  resolutionNotes: text("resolution_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("checklist_wo_company_idx").on(table.companyId),
+  instanceIdx: index("checklist_wo_instance_idx").on(table.checklistInstanceId),
+  fieldIdx: index("checklist_wo_field_idx").on(table.checklistInstanceId, table.fieldId),
+  statusIdx: index("checklist_wo_status_idx").on(table.status),
+}));
+
+export const insertChecklistWorkOrderSchema = createInsertSchema(checklistWorkOrders).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertChecklistWorkOrder = z.infer<typeof insertChecklistWorkOrderSchema>;
+export type ChecklistWorkOrder = typeof checklistWorkOrders.$inferSelect;
+
 // Extended Types with Relations
 export type ChecklistTemplateWithDetails = ChecklistTemplate & {
   entityType?: EntityType | null;
@@ -2664,6 +2698,8 @@ export type ChecklistField = {
   instructions?: string;
   defaultWorkOrderTypeId?: string | null;
   workOrderTriggers?: ChecklistWorkOrderTrigger[];
+  workOrderEnabled?: boolean;
+  workOrderTriggerValue?: string;
   min?: number | null;
   max?: number | null;
   step?: number | null;

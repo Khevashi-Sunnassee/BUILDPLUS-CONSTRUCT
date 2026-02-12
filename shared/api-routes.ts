@@ -684,6 +684,11 @@ export const CHECKLIST_ROUTES = {
   // Reporting
   REPORTS: '/api/checklist/reports',
   REPORT_SUMMARY: '/api/checklist/reports/summary',
+  
+  // Work Orders
+  WORK_ORDERS: '/api/checklist/work-orders',
+  WORK_ORDER_BY_ID: (id: string) => `/api/checklist/work-orders/${id}`,
+  WORK_ORDERS_BY_INSTANCE: (instanceId: string) => `/api/checklist/instances/${instanceId}/work-orders`,
 } as const;
 
 // ============================================================================
