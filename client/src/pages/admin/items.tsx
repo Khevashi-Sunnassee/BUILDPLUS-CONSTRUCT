@@ -90,6 +90,7 @@ const itemSchema = z.object({
   description: z.string().optional(),
   categoryId: z.string().optional(),
   supplierId: z.string().optional(),
+  constructionStageId: z.string().optional(),
   unitOfMeasure: z.string().default("EA"),
   unitPrice: z.string().optional(),
   minOrderQty: z.string().optional(),
@@ -132,6 +133,7 @@ function CategoryPanel({
   onToggle,
   categories,
   suppliers,
+  stages,
   onEdit,
   onDelete,
 }: {
@@ -140,6 +142,7 @@ function CategoryPanel({
   onToggle: () => void;
   categories: ItemCategory[] | undefined;
   suppliers: Supplier[] | undefined;
+  stages: { id: string; name: string; sortOrder: number }[] | undefined;
   onEdit: (item: Item) => void;
   onDelete: (itemId: string) => void;
 }) {
@@ -147,6 +150,12 @@ function CategoryPanel({
     if (!supplierId) return "-";
     const supplier = suppliers?.find(s => s.id === supplierId);
     return supplier?.name || "-";
+  };
+
+  const getStageName = (stageId: string | null | undefined) => {
+    if (!stageId) return "-";
+    const stage = stages?.find(s => s.id === stageId);
+    return stage?.name || "-";
   };
 
   const categoryName = group.category?.name || "Uncategorized";
@@ -193,6 +202,7 @@ function CategoryPanel({
                 <TableHead className="text-right w-28">Unit Price</TableHead>
                 <TableHead className="text-right w-20">Min Qty</TableHead>
                 <TableHead className="w-28">Category Type</TableHead>
+                {categoryType === "trade" && <TableHead className="w-32">Stage</TableHead>}
                 <TableHead className="w-24">Source</TableHead>
                 <TableHead className="w-24">Status</TableHead>
                 <TableHead className="text-right w-20">Actions</TableHead>
@@ -227,6 +237,11 @@ function CategoryPanel({
                       {categoryType === "trade" ? "Trade Item" : "Supply Item"}
                     </Badge>
                   </TableCell>
+                  {categoryType === "trade" && (
+                    <TableCell data-testid={`text-item-stage-${item.id}`}>
+                      {getStageName(item.constructionStageId)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Badge variant={item.itemType === "imported" ? "outline" : "secondary"} data-testid={`badge-item-type-${item.id}`}>
                       {item.itemType === "imported" ? "Imported" : "Local"}
@@ -300,6 +315,10 @@ export default function AdminItemsPage() {
 
   const { data: suppliers } = useQuery<Supplier[]>({
     queryKey: [PROCUREMENT_ROUTES.SUPPLIERS_ACTIVE],
+  });
+
+  const { data: constructionStages } = useQuery<{ id: string; name: string; sortOrder: number }[]>({
+    queryKey: [PROCUREMENT_ROUTES.CONSTRUCTION_STAGES],
   });
 
   const filteredItems = useMemo(() => {
@@ -510,6 +529,7 @@ export default function AdminItemsPage() {
         leadTimeDays: data.leadTimeDays ? parseInt(data.leadTimeDays) : null,
         categoryId: data.categoryId || null,
         supplierId: data.supplierId || null,
+        constructionStageId: data.constructionStageId || null,
       };
       return apiRequest("POST", PROCUREMENT_ROUTES.ITEMS, payload);
     },
@@ -533,6 +553,7 @@ export default function AdminItemsPage() {
         leadTimeDays: data.leadTimeDays ? parseInt(data.leadTimeDays) : null,
         categoryId: data.categoryId || null,
         supplierId: data.supplierId || null,
+        constructionStageId: data.constructionStageId || null,
       };
       return apiRequest("PATCH", PROCUREMENT_ROUTES.ITEM_BY_ID(id), payload);
     },
@@ -615,6 +636,7 @@ export default function AdminItemsPage() {
       description: "",
       categoryId: "",
       supplierId: "",
+      constructionStageId: "",
       unitOfMeasure: "EA",
       unitPrice: "",
       minOrderQty: "1",
@@ -633,6 +655,7 @@ export default function AdminItemsPage() {
       description: item.description || "",
       categoryId: item.categoryId || "",
       supplierId: item.supplierId || "",
+      constructionStageId: item.constructionStageId || "",
       unitOfMeasure: item.unitOfMeasure || "EA",
       unitPrice: item.unitPrice ? String(item.unitPrice) : "",
       minOrderQty: item.minOrderQty ? String(item.minOrderQty) : "1",
@@ -964,6 +987,7 @@ export default function AdminItemsPage() {
                   onToggle={() => toggleCategory(group.category?.id || null)}
                   categories={allCategories}
                   suppliers={suppliers}
+                  stages={constructionStages}
                   onEdit={openEditDialog}
                   onDelete={(itemId) => {
                     setDeletingItemId(itemId);
@@ -1236,6 +1260,45 @@ export default function AdminItemsPage() {
                   )}
                 />
               </div>
+
+              {(() => {
+                const selectedCategoryId = form.watch("categoryId");
+                const selectedCategory = activeCategories?.find(c => c.id === selectedCategoryId);
+                const isTrade = (selectedCategory as any)?.categoryType === "trade";
+                if (!isTrade) {
+                  const currentStageId = form.getValues("constructionStageId");
+                  if (currentStageId) {
+                    setTimeout(() => form.setValue("constructionStageId", ""), 0);
+                  }
+                  return null;
+                }
+                return (
+                  <FormField
+                    control={form.control}
+                    name="constructionStageId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Construction Stage</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-item-construction-stage">
+                              <SelectValue placeholder="Select construction stage" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {constructionStages?.map((stage) => (
+                              <SelectItem key={stage.id} value={stage.id}>
+                                {stage.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                );
+              })()}
 
               <div className="grid grid-cols-3 gap-4">
                 <FormField

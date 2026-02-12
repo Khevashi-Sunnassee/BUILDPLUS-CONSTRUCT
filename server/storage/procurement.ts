@@ -1,7 +1,7 @@
 import { eq, and, desc, sql, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
-  customers, suppliers, itemCategories, items,
+  customers, suppliers, itemCategories, items, constructionStages,
   purchaseOrders, purchaseOrderItems, purchaseOrderAttachments,
   users,
   type Customer, type InsertCustomer,
@@ -161,45 +161,50 @@ export const procurementMethods = {
     const rows = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .leftJoin(constructionStages, eq(items.constructionStageId, constructionStages.id))
       .where(companyId ? eq(items.companyId, companyId) : undefined)
       .orderBy(asc(items.name));
-    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers, constructionStage: r.construction_stages }));
   },
 
   async getActiveItems(companyId?: string): Promise<ItemWithDetails[]> {
     const rows = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .leftJoin(constructionStages, eq(items.constructionStageId, constructionStages.id))
       .where(companyId ? and(eq(items.companyId, companyId), eq(items.isActive, true)) : eq(items.isActive, true))
       .orderBy(asc(items.name));
-    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers, constructionStage: r.construction_stages }));
   },
 
   async getItem(id: string): Promise<ItemWithDetails | undefined> {
     const [row] = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .leftJoin(constructionStages, eq(items.constructionStageId, constructionStages.id))
       .where(eq(items.id, id));
     if (!row) return undefined;
-    return { ...row.items, category: row.item_categories, supplier: row.suppliers };
+    return { ...row.items, category: row.item_categories, supplier: row.suppliers, constructionStage: row.construction_stages };
   },
 
   async getItemsByCategory(categoryId: string): Promise<ItemWithDetails[]> {
     const rows = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .leftJoin(constructionStages, eq(items.constructionStageId, constructionStages.id))
       .where(eq(items.categoryId, categoryId))
       .orderBy(asc(items.name));
-    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers, constructionStage: r.construction_stages }));
   },
 
   async getItemsBySupplier(supplierId: string): Promise<ItemWithDetails[]> {
     const rows = await db.select().from(items)
       .leftJoin(itemCategories, eq(items.categoryId, itemCategories.id))
       .leftJoin(suppliers, eq(items.supplierId, suppliers.id))
+      .leftJoin(constructionStages, eq(items.constructionStageId, constructionStages.id))
       .where(eq(items.supplierId, supplierId))
       .orderBy(asc(items.name));
-    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers }));
+    return rows.map(r => ({ ...r.items, category: r.item_categories, supplier: r.suppliers, constructionStage: r.construction_stages }));
   },
 
   async createItem(data: InsertItem): Promise<Item> {

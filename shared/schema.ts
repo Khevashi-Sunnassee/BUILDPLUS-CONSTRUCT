@@ -1646,6 +1646,17 @@ export const itemCategories = pgTable("item_categories", {
   categoryTypeIdx: index("item_categories_category_type_idx").on(table.categoryType),
 }));
 
+export const constructionStages = pgTable("construction_stages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  sortOrderIdx: index("construction_stages_sort_order_idx").on(table.sortOrder),
+  nameIdx: uniqueIndex("construction_stages_name_idx").on(table.name),
+}));
+
 export const items = pgTable("items", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -1654,6 +1665,7 @@ export const items = pgTable("items", {
   description: text("description"),
   categoryId: varchar("category_id", { length: 36 }).references(() => itemCategories.id),
   supplierId: varchar("supplier_id", { length: 36 }).references(() => suppliers.id),
+  constructionStageId: varchar("construction_stage_id", { length: 36 }).references(() => constructionStages.id),
   unitOfMeasure: text("unit_of_measure").default("EA"),
   unitPrice: decimal("unit_price", { precision: 12, scale: 2 }),
   minOrderQty: integer("min_order_qty").default(1),
@@ -1675,6 +1687,7 @@ export const items = pgTable("items", {
   supplierIdx: index("items_supplier_idx").on(table.supplierId),
   companyIdx: index("items_company_idx").on(table.companyId),
   itemTypeIdx: index("items_item_type_idx").on(table.itemType),
+  constructionStageIdx: index("items_construction_stage_idx").on(table.constructionStageId),
 }));
 
 export const purchaseOrders = pgTable("purchase_orders", {
@@ -1767,6 +1780,10 @@ export type Supplier = typeof suppliers.$inferSelect;
 export const insertItemCategorySchema = createInsertSchema(itemCategories).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertItemCategory = z.infer<typeof insertItemCategorySchema>;
 export type ItemCategory = typeof itemCategories.$inferSelect;
+
+export const insertConstructionStageSchema = createInsertSchema(constructionStages).omit({ id: true, createdAt: true });
+export type InsertConstructionStage = z.infer<typeof insertConstructionStageSchema>;
+export type ConstructionStage = typeof constructionStages.$inferSelect;
 
 export const insertItemSchema = createInsertSchema(items).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertItem = z.infer<typeof insertItemSchema>;

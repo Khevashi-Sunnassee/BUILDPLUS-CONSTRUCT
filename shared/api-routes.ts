@@ -125,6 +125,9 @@ export const PROCUREMENT_ROUTES = {
   ITEM_CATEGORIES: '/api/procurement/item-categories',
   ITEM_CATEGORIES_ACTIVE: '/api/procurement/item-categories/active',
   ITEM_CATEGORY_BY_ID: (id: string | number) => `/api/procurement/item-categories/${id}`,
+
+  // Construction Stages
+  CONSTRUCTION_STAGES: '/api/procurement/construction-stages',
   
   // Customers
   CUSTOMERS: '/api/customers',

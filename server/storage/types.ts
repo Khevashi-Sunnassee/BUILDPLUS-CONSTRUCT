@@ -20,7 +20,7 @@ import type {
   Customer, InsertCustomer,
   Supplier, InsertSupplier,
   ItemCategory, InsertItemCategory,
-  Item, InsertItem,
+  Item, InsertItem, ConstructionStage,
   PurchaseOrder, InsertPurchaseOrder,
   PurchaseOrderItem, InsertPurchaseOrderItem,
   PurchaseOrderAttachment, InsertPurchaseOrderAttachment,
@@ -107,6 +107,7 @@ export interface PurchaseOrderWithDetails extends PurchaseOrder {
 export interface ItemWithDetails extends Item {
   category?: ItemCategory | null;
   supplier?: Supplier | null;
+  constructionStage?: ConstructionStage | null;
 }
 
 export interface TaskWithDetails extends Task {

@@ -3,8 +3,9 @@ import multer from "multer";
 import ExcelJS from "exceljs";
 import { z } from "zod";
 import { storage } from "../storage";
+import { db } from "../db";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
-import { InsertItem } from "@shared/schema";
+import { InsertItem, constructionStages } from "@shared/schema";
 import logger from "../lib/logger";
 import { emailService } from "../services/email.service";
 
@@ -45,6 +46,7 @@ const itemSchema = z.object({
   description: z.string().min(1, "Description is required").max(1000),
   categoryId: z.string().optional().nullable(),
   supplierId: z.string().optional().nullable(),
+  constructionStageId: z.string().optional().nullable(),
   unitOfMeasure: z.string().max(50).optional(),
   unitPrice: z.string().optional(),
   preferredSupplierId: z.string().optional().nullable(),
@@ -510,6 +512,16 @@ router.delete("/api/procurement/item-categories/:id", requireRole("ADMIN"), asyn
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting category");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to delete category" });
+  }
+});
+
+router.get("/api/procurement/construction-stages", requireAuth, async (req, res) => {
+  try {
+    const stages = await db.select().from(constructionStages).orderBy(constructionStages.sortOrder);
+    res.json(stages);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching construction stages");
+    res.status(500).json({ error: "Failed to fetch construction stages" });
   }
 });
 
