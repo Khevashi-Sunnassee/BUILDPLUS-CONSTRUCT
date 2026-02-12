@@ -5,7 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, costCodes, childCostCodes, tenderSubmissions, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
+import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, costCodes, childCostCodes, tenderSubmissions, tenders, tenderLineItems, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 const upload = multer({
@@ -112,6 +112,31 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
       }
     }
 
+    let tenderCounts: Record<string, number> = {};
+    const uniqueCostCodeIds = [...new Set(lines.map(l => l.line.costCodeId))];
+    if (uniqueCostCodeIds.length > 0) {
+      const tenderCountRows = await db
+        .select({
+          costCodeId: tenderLineItems.costCodeId,
+          count: sql<number>`count(distinct ${tenderSubmissions.id})::int`,
+        })
+        .from(tenderLineItems)
+        .innerJoin(tenderSubmissions, eq(tenderLineItems.tenderSubmissionId, tenderSubmissions.id))
+        .innerJoin(tenders, eq(tenderSubmissions.tenderId, tenders.id))
+        .where(and(
+          eq(tenders.jobId, jobId),
+          eq(tenders.companyId, companyId),
+          inArray(tenderLineItems.costCodeId, uniqueCostCodeIds),
+        ))
+        .groupBy(tenderLineItems.costCodeId);
+
+      for (const row of tenderCountRows) {
+        if (row.costCodeId) {
+          tenderCounts[row.costCodeId] = row.count;
+        }
+      }
+    }
+
     const mappedLines = lines.map((row) => ({
       ...row.line,
       costCode: row.costCode,
@@ -120,6 +145,7 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
       contractor: row.contractor?.id ? row.contractor : null,
       updatesCount: updatesCounts[row.line.id] || 0,
       filesCount: filesCounts[row.line.id] || 0,
+      tenderCount: tenderCounts[row.line.costCodeId] || 0,
     }));
 
     res.json({ ...budget, lines: mappedLines });
@@ -254,12 +280,69 @@ router.get("/api/jobs/:jobId/budget/lines", requireAuth, requirePermission("budg
       .where(and(eq(budgetLines.budgetId, budget.id), eq(budgetLines.companyId, companyId)))
       .orderBy(asc(budgetLines.sortOrder));
 
+    const lineIds = results.map(r => r.line.id);
+    let updatesCounts: Record<string, number> = {};
+    let filesCounts: Record<string, number> = {};
+    let tenderCounts: Record<string, number> = {};
+
+    if (lineIds.length > 0) {
+      const updatesCountRows = await db
+        .select({
+          budgetLineId: budgetLineUpdates.budgetLineId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(budgetLineUpdates)
+        .where(inArray(budgetLineUpdates.budgetLineId, lineIds))
+        .groupBy(budgetLineUpdates.budgetLineId);
+      for (const row of updatesCountRows) {
+        updatesCounts[row.budgetLineId] = row.count;
+      }
+
+      const filesCountRows = await db
+        .select({
+          budgetLineId: budgetLineFiles.budgetLineId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(budgetLineFiles)
+        .where(inArray(budgetLineFiles.budgetLineId, lineIds))
+        .groupBy(budgetLineFiles.budgetLineId);
+      for (const row of filesCountRows) {
+        filesCounts[row.budgetLineId] = row.count;
+      }
+
+      const uniqueCostCodeIds = [...new Set(results.map(r => r.line.costCodeId))];
+      if (uniqueCostCodeIds.length > 0) {
+        const tenderCountRows = await db
+          .select({
+            costCodeId: tenderLineItems.costCodeId,
+            count: sql<number>`count(distinct ${tenderSubmissions.id})::int`,
+          })
+          .from(tenderLineItems)
+          .innerJoin(tenderSubmissions, eq(tenderLineItems.tenderSubmissionId, tenderSubmissions.id))
+          .innerJoin(tenders, eq(tenderSubmissions.tenderId, tenders.id))
+          .where(and(
+            eq(tenders.jobId, jobId),
+            eq(tenders.companyId, companyId),
+            inArray(tenderLineItems.costCodeId, uniqueCostCodeIds),
+          ))
+          .groupBy(tenderLineItems.costCodeId);
+        for (const row of tenderCountRows) {
+          if (row.costCodeId) {
+            tenderCounts[row.costCodeId] = row.count;
+          }
+        }
+      }
+    }
+
     const mapped = results.map((row) => ({
       ...row.line,
       costCode: row.costCode,
       childCostCode: row.childCostCode?.id ? row.childCostCode : null,
       tenderSubmission: row.tenderSubmission?.id ? row.tenderSubmission : null,
       contractor: row.contractor?.id ? row.contractor : null,
+      updatesCount: updatesCounts[row.line.id] || 0,
+      filesCount: filesCounts[row.line.id] || 0,
+      tenderCount: tenderCounts[row.line.costCodeId] || 0,
     }));
 
     res.json(mapped);

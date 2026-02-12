@@ -40,6 +40,7 @@ interface BudgetLineWithDetails extends BudgetLine {
   contractor: { id: string; name: string } | null;
   updatesCount: number;
   filesCount: number;
+  tenderCount: number;
 }
 
 interface BudgetWithLines extends JobBudget {
@@ -149,6 +150,7 @@ export default function JobBudgetPage() {
     parentName: string;
     lines: BudgetLineWithDetails[];
     totalEstimated: number;
+    totalTenderPrice: number;
     totalVariations: number;
     totalForecast: number;
   }
@@ -164,6 +166,7 @@ export default function JobBudgetPage() {
           parentName: line.costCode.name,
           lines: [],
           totalEstimated: 0,
+          totalTenderPrice: 0,
           totalVariations: 0,
           totalForecast: 0,
         });
@@ -171,6 +174,7 @@ export default function JobBudgetPage() {
       const group = groups.get(pid)!;
       group.lines.push(line);
       group.totalEstimated += parseFloat(line.estimatedBudget || "0");
+      group.totalTenderPrice += parseFloat(line.tenderSubmission?.totalPrice || "0");
       group.totalVariations += parseFloat(line.variationsAmount || "0");
       group.totalForecast += parseFloat(line.forecastCost || "0");
     }
@@ -625,14 +629,18 @@ export default function JobBudgetPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10"></TableHead>
-                      <TableHead className="w-28">Code</TableHead>
+                      <TableHead className="w-24">Code</TableHead>
                       <TableHead>Name</TableHead>
-                      <TableHead className="w-16 text-center"></TableHead>
-                      <TableHead className="text-right w-36">Estimated Budget</TableHead>
-                      <TableHead className="text-right w-36">Variations</TableHead>
-                      <TableHead className="text-right w-36">Forecast Cost</TableHead>
-                      <TableHead className="hidden lg:table-cell w-48">Notes</TableHead>
-                      <TableHead className="w-16 text-right">Actions</TableHead>
+                      <TableHead className="w-14 text-center"></TableHead>
+                      <TableHead className="text-right w-28">Est. Budget</TableHead>
+                      <TableHead className="text-center w-16">Tenders</TableHead>
+                      <TableHead className="text-right w-28">Tender Price</TableHead>
+                      <TableHead className="text-right w-28">Diff to Budget</TableHead>
+                      <TableHead className="w-32">Contractor</TableHead>
+                      <TableHead className="text-right w-28">Variations</TableHead>
+                      <TableHead className="text-right w-28">Forecast Cost</TableHead>
+                      <TableHead className="text-right w-28">Loss / Gain</TableHead>
+                      <TableHead className="w-12 text-right"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -662,13 +670,23 @@ export default function JobBudgetPage() {
                             <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-estimated-${group.parentCostCodeId}`}>
                               {formatCurrency(group.totalEstimated)}
                             </TableCell>
+                            <TableCell />
+                            <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-tender-${group.parentCostCodeId}`}>
+                              {formatCurrency(group.totalTenderPrice)}
+                            </TableCell>
+                            <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-diff-${group.parentCostCodeId}`}>
+                              {formatCurrency(group.totalEstimated - group.totalTenderPrice)}
+                            </TableCell>
+                            <TableCell />
                             <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-variations-${group.parentCostCodeId}`}>
                               {formatCurrency(group.totalVariations)}
                             </TableCell>
                             <TableCell className="text-right font-mono font-semibold" data-testid={`text-parent-forecast-${group.parentCostCodeId}`}>
                               {formatCurrency(group.totalForecast)}
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell" />
+                            <TableCell className={`text-right font-mono font-semibold ${group.totalEstimated - group.totalForecast >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid={`text-parent-lossorgain-${group.parentCostCodeId}`}>
+                              {formatCurrency(group.totalEstimated - group.totalForecast)}
+                            </TableCell>
                             <TableCell />
                           </TableRow>
                           {/* Child rows */}
@@ -728,6 +746,7 @@ export default function JobBudgetPage() {
                                     </Tooltip>
                                   </div>
                                 </TableCell>
+                                {/* Estimated Budget - editable */}
                                 <TableCell className="text-right p-1">
                                   {isEditing ? (
                                     <Input
@@ -747,6 +766,37 @@ export default function JobBudgetPage() {
                                     </span>
                                   )}
                                 </TableCell>
+                                {/* No. Tenders */}
+                                <TableCell className="text-center" data-testid={`text-line-tenders-${line.id}`}>
+                                  <span className="text-sm">{line.tenderCount || 0}</span>
+                                </TableCell>
+                                {/* Selected Tender Price */}
+                                <TableCell className="text-right" data-testid={`text-line-tender-price-${line.id}`}>
+                                  <span className="font-mono text-sm">
+                                    {line.tenderSubmission ? formatCurrency(line.tenderSubmission.totalPrice) : "-"}
+                                  </span>
+                                </TableCell>
+                                {/* Difference to Budget */}
+                                <TableCell className="text-right" data-testid={`text-line-diff-${line.id}`}>
+                                  {(() => {
+                                    const est = parseFloat(line.estimatedBudget || "0");
+                                    const tender = parseFloat(line.tenderSubmission?.totalPrice || "0");
+                                    const diff = est - tender;
+                                    if (!line.tenderSubmission) return <span className="font-mono text-sm text-muted-foreground">-</span>;
+                                    return (
+                                      <span className={`font-mono text-sm ${diff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                        {formatCurrency(diff)}
+                                      </span>
+                                    );
+                                  })()}
+                                </TableCell>
+                                {/* Selected Contractor */}
+                                <TableCell data-testid={`text-line-contractor-${line.id}`}>
+                                  <span className="text-sm truncate block max-w-[120px]">
+                                    {line.contractor?.name || "-"}
+                                  </span>
+                                </TableCell>
+                                {/* Variations - editable */}
                                 <TableCell className="text-right p-1">
                                   {isEditing ? (
                                     <Input
@@ -765,6 +815,7 @@ export default function JobBudgetPage() {
                                     </span>
                                   )}
                                 </TableCell>
+                                {/* Forecast Cost - editable */}
                                 <TableCell className="text-right p-1">
                                   {isEditing ? (
                                     <Input
@@ -783,46 +834,41 @@ export default function JobBudgetPage() {
                                     </span>
                                   )}
                                 </TableCell>
-                                <TableCell className="hidden lg:table-cell p-1">
-                                  {isEditing ? (
-                                    <Input
-                                      value={editData.notes}
-                                      onChange={(e) => updateInlineField(line.id, "notes", e.target.value)}
-                                      onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(line.id); if (e.key === "Escape") cancelInlineEdit(line.id); }}
-                                      onBlur={() => saveInlineEdit(line.id)}
-                                      className="h-8 w-full text-sm"
-                                      placeholder="Notes..."
-                                      data-testid={`input-inline-notes-${line.id}`}
-                                    />
-                                  ) : (
-                                    <span className="text-muted-foreground text-sm truncate block max-w-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); startInlineEdit(line); }}>
-                                      {line.notes || "-"}
-                                    </span>
-                                  )}
+                                {/* Loss or Gain */}
+                                <TableCell className="text-right" data-testid={`text-line-lossorgain-${line.id}`}>
+                                  {(() => {
+                                    const est = parseFloat(line.estimatedBudget || "0");
+                                    const forecast = parseFloat(line.forecastCost || "0");
+                                    const lossOrGain = est - forecast;
+                                    return (
+                                      <span className={`font-mono text-sm ${lossOrGain >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                                        {formatCurrency(lossOrGain)}
+                                      </span>
+                                    );
+                                  })()}
                                 </TableCell>
+                                {/* Actions */}
                                 <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    {isEditing ? (
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        onClick={() => cancelInlineEdit(line.id)}
-                                        data-testid={`button-cancel-inline-${line.id}`}
-                                      >
-                                        <X className="h-4 w-4" />
-                                      </Button>
-                                    ) : (
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => setDeleteConfirm(line)}
-                                        data-testid={`button-delete-line-${line.id}`}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </div>
+                                  {isEditing ? (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onMouseDown={(e) => e.preventDefault()}
+                                      onClick={() => cancelInlineEdit(line.id)}
+                                      data-testid={`button-cancel-inline-${line.id}`}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setDeleteConfirm(line)}
+                                      data-testid={`button-delete-line-${line.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             );
@@ -838,13 +884,23 @@ export default function JobBudgetPage() {
                         <TableCell className="text-right font-mono font-bold" data-testid="text-totals-estimated">
                           {formatCurrency(summary.totalEstimatedBudget)}
                         </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right font-mono font-bold" data-testid="text-totals-tender">
+                          {formatCurrency(summary.totalTenderAmounts)}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-bold" data-testid="text-totals-diff">
+                          {formatCurrency(parseFloat(summary.totalEstimatedBudget || "0") - parseFloat(summary.totalTenderAmounts || "0"))}
+                        </TableCell>
+                        <TableCell />
                         <TableCell className="text-right font-mono font-bold" data-testid="text-totals-variations">
                           {formatCurrency(summary.totalVariations)}
                         </TableCell>
                         <TableCell className="text-right font-mono font-bold" data-testid="text-totals-forecast">
                           {formatCurrency(summary.totalForecastCost)}
                         </TableCell>
-                        <TableCell className="hidden lg:table-cell" />
+                        <TableCell className={`text-right font-mono font-bold ${parseFloat(summary.totalEstimatedBudget || "0") - parseFloat(summary.totalForecastCost || "0") >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`} data-testid="text-totals-lossorgain">
+                          {formatCurrency(parseFloat(summary.totalEstimatedBudget || "0") - parseFloat(summary.totalForecastCost || "0"))}
+                        </TableCell>
                         <TableCell />
                       </TableRow>
                     )}
