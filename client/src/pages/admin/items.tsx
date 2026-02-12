@@ -712,68 +712,77 @@ export default function AdminItemsPage() {
             </CardHeader>
             <CardContent>
               {allCategories && allCategories.length > 0 ? (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {allCategories.map((category) => (
-                      <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
-                        <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
-                          {category.name}
-                        </TableCell>
-                        <TableCell data-testid={`text-category-type-${category.id}`}>
-                          <Badge
-                            variant="outline"
-                            className={(category as any).categoryType === "trade"
-                              ? "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-400"
-                              : "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400"}
-                            data-testid={`badge-category-type-${category.id}`}
-                          >
-                            {(category as any).categoryType === "trade" ? "Trade Item" : "Supply Item"}
+                <div className="space-y-6">
+                  {[
+                    { type: "supply", label: "Supply Items", colorClass: "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400" },
+                    { type: "trade", label: "Trade Items", colorClass: "border-orange-500/50 bg-orange-500/10 text-orange-700 dark:text-orange-400" },
+                  ].map(({ type, label, colorClass }) => {
+                    const grouped = allCategories.filter((c) => ((c as any).categoryType || "supply") === type);
+                    if (grouped.length === 0) return null;
+                    return (
+                      <div key={type}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <Badge variant="outline" className={colorClass} data-testid={`badge-group-${type}`}>
+                            {label}
                           </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
-                          {category.description || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
-                            {category.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => openEditCategoryDialog(category)}
-                              data-testid={`button-edit-category-${category.id}`}
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setDeletingCategoryId(category.id);
-                                setCategoryDeleteDialogOpen(true);
-                              }}
-                              data-testid={`button-delete-category-${category.id}`}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          <span className="text-sm text-muted-foreground">
+                            {grouped.length} categor{grouped.length !== 1 ? "ies" : "y"}
+                          </span>
+                        </div>
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Description</TableHead>
+                              <TableHead>Status</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {grouped.map((category) => (
+                              <TableRow key={category.id} data-testid={`row-category-${category.id}`}>
+                                <TableCell className="font-medium" data-testid={`text-category-name-${category.id}`}>
+                                  {category.name}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground max-w-[300px] truncate" data-testid={`text-category-description-${category.id}`}>
+                                  {category.description || "-"}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={category.isActive ? "default" : "secondary"} data-testid={`badge-category-status-${category.id}`}>
+                                    {category.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openEditCategoryDialog(category)}
+                                      data-testid={`button-edit-category-${category.id}`}
+                                    >
+                                      <Edit2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => {
+                                        setDeletingCategoryId(category.id);
+                                        setCategoryDeleteDialogOpen(true);
+                                      }}
+                                      data-testid={`button-delete-category-${category.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    );
+                  })}
+                </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
