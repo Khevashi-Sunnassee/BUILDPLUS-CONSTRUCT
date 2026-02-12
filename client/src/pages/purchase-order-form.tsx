@@ -27,7 +27,7 @@ import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient, apiUpload } from "@/lib/queryClient";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Plus, Trash2, CalendarIcon, Printer, Send, Check, X, Save, AlertTriangle, Search, Building2, Upload, FileText, Download, Paperclip, PackageCheck, Loader2, Package, ExternalLink } from "lucide-react";
-import type { Supplier, Item, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
+import type { Supplier, Item, ItemCategory, PurchaseOrder, PurchaseOrderItem, User, Job, PurchaseOrderAttachment } from "@shared/schema";
 import { PROCUREMENT_ROUTES, JOBS_ROUTES, SETTINGS_ROUTES, PO_ATTACHMENTS_ROUTES } from "@shared/api-routes";
 import { ItemPickerDialog } from "@/components/ItemPickerDialog";
 
@@ -146,6 +146,10 @@ export default function PurchaseOrderFormPage() {
 
   const { data: items = [], isLoading: loadingItems } = useQuery<Item[]>({
     queryKey: [PROCUREMENT_ROUTES.ITEMS_ACTIVE],
+  });
+
+  const { data: itemCategories = [] } = useQuery<ItemCategory[]>({
+    queryKey: [PROCUREMENT_ROUTES.ITEM_CATEGORIES],
   });
 
   const { data: jobs = [] } = useQuery<Job[]>({
@@ -643,7 +647,14 @@ export default function PurchaseOrderFormPage() {
         lineTotal: (qty * price).toFixed(2),
       };
     }));
-  }, [items]);
+
+    if (!form.getValues("costCodeId") && selectedItem.categoryId) {
+      const category = itemCategories.find(c => c.id === selectedItem.categoryId);
+      if (category?.defaultCostCodeId) {
+        form.setValue("costCodeId", category.defaultCostCodeId);
+      }
+    }
+  }, [items, itemCategories, form]);
 
   const openItemPicker = useCallback((lineId: string) => {
     setItemPickerLineId(lineId);
