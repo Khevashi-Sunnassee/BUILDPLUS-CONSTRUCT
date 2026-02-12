@@ -217,6 +217,28 @@ export default function TenderCenterPage() {
     enabled: !!invitationTender,
   });
 
+  const { data: invitationPackages = [] } = useQuery<Array<{ id: string; bundleId: string | null; bundle: { id: string; bundleName: string; qrCodeId: string } | null; document: { id: string; title: string } | null }>>({
+    queryKey: ["/api/tenders", invitationTender?.id, "packages"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenders/${invitationTender!.id}/packages`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch packages");
+      return res.json();
+    },
+    enabled: !!invitationTender,
+  });
+
+  const invitationBundles = useMemo(() => {
+    const seen = new Set<string>();
+    return invitationPackages
+      .filter(p => {
+        if (!p.bundle?.id || !p.bundle?.qrCodeId) return false;
+        if (seen.has(p.bundle.id)) return false;
+        seen.add(p.bundle.id);
+        return true;
+      })
+      .map(p => p.bundle!);
+  }, [invitationPackages]);
+
   const filteredTenders = useMemo(() => {
     if (!searchQuery.trim()) return tenders;
     const q = searchQuery.toLowerCase();
@@ -1048,6 +1070,45 @@ export default function TenderCenterPage() {
                       />
                     </div>
                   </div>
+
+                  {invitationBundles.length > 0 && (
+                    <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-4" data-testid="section-email-bundles">
+                      <div className="flex items-start gap-3">
+                        <Package className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">
+                            Document Bundle{invitationBundles.length > 1 ? "s" : ""} Included in Email
+                          </p>
+                          <p className="text-xs text-blue-700 dark:text-blue-400 mb-3">
+                            The following document bundle{invitationBundles.length > 1 ? "s" : ""} will be automatically included in the invitation email with a QR code and direct link for each:
+                          </p>
+                          <div className="space-y-2">
+                            {invitationBundles.map((bundle, idx) => (
+                              <div key={bundle.id || idx} className="flex items-center gap-2 text-sm">
+                                <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                <span className="text-blue-800 dark:text-blue-300 truncate" data-testid={`text-bundle-name-${idx}`}>{bundle.bundleName}</span>
+                                <Badge variant="secondary" className="text-xs flex-shrink-0">QR + Link</Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {invitationBundles.length === 0 && invitationPackages.length === 0 && (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-md p-4" data-testid="section-no-bundles-warning">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <p className="text-sm font-medium text-amber-900 dark:text-amber-200">No Document Bundles Attached</p>
+                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                            This tender has no document bundles. Add a document bundle in the tender's Packages tab to include QR codes and document links in the invitation email.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>

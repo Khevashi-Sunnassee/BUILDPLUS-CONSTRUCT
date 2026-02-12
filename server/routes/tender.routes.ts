@@ -7,6 +7,7 @@ import { db } from "../db";
 import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import QRCode from "qrcode";
 import { emailService } from "../services/email.service";
 
 const router = Router();
@@ -1273,12 +1274,55 @@ router.get("/api/tenders/:id/members", requireAuth, requirePermission("tenders",
   }
 });
 
+router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const results = await db
+      .select({
+        pkg: tenderPackages,
+        bundle: {
+          id: documentBundles.id,
+          bundleName: documentBundles.bundleName,
+          qrCodeId: documentBundles.qrCodeId,
+        },
+        document: {
+          id: documents.id,
+          title: documents.title,
+        },
+      })
+      .from(tenderPackages)
+      .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
+      .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
+      .orderBy(asc(tenderPackages.sortOrder));
+
+    const mapped = results.map(r => ({
+      ...r.pkg,
+      bundle: r.bundle?.id ? r.bundle : null,
+      document: r.document?.id ? r.document : null,
+    }));
+
+    res.json(mapped);
+  } catch (error: any) {
+    logger.error("Error fetching tender packages:", error);
+    res.status(500).json({ message: "Failed to fetch tender packages", code: "INTERNAL_ERROR" });
+  }
+});
+
 router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
-    if (!(await verifyTenderOwnership(companyId, req.params.id))) {
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
       return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
     }
 
@@ -1307,9 +1351,56 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
       .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
       .where(and(
         inArray(tenderMembers.id, data.memberIds),
-        eq(tenderMembers.tenderId, req.params.id),
+        eq(tenderMembers.tenderId, tenderId),
         eq(tenderMembers.companyId, companyId),
       ));
+
+    const packages = await db
+      .select({
+        pkg: tenderPackages,
+        bundle: {
+          id: documentBundles.id,
+          bundleName: documentBundles.bundleName,
+          qrCodeId: documentBundles.qrCodeId,
+          description: documentBundles.description,
+        },
+      })
+      .from(tenderPackages)
+      .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
+      .orderBy(asc(tenderPackages.sortOrder));
+
+    const seenBundleIds = new Set<string>();
+    const bundlesWithQr = packages
+      .filter(p => {
+        if (!p.bundle?.id || !p.bundle?.qrCodeId) return false;
+        if (seenBundleIds.has(p.bundle.id)) return false;
+        seenBundleIds.add(p.bundle.id);
+        return true;
+      })
+      .map(p => ({
+        bundleName: p.bundle!.bundleName,
+        qrCodeId: p.bundle!.qrCodeId,
+        description: p.bundle!.description,
+      }));
+
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+
+    const qrDataUrls: Record<string, string> = {};
+    for (const bundle of bundlesWithQr) {
+      try {
+        const bundleUrl = `${baseUrl}/bundle/${bundle.qrCodeId}`;
+        const qrDataUrl = await QRCode.toDataURL(bundleUrl, {
+          width: 200,
+          margin: 2,
+          color: { dark: "#000000", light: "#ffffff" },
+          errorCorrectionLevel: "H",
+        });
+        qrDataUrls[bundle.qrCodeId] = qrDataUrl;
+      } catch (qrErr) {
+        logger.warn({ err: qrErr, qrCodeId: bundle.qrCodeId }, "Failed to generate QR code for bundle");
+      }
+    }
 
     let sent = 0;
     let failed = 0;
@@ -1324,7 +1415,46 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
       }
 
       try {
-        const htmlBody = data.message.replace(/\n/g, '<br>');
+        let bundleSection = "";
+        if (bundlesWithQr.length > 0) {
+          const bundleItems = bundlesWithQr.map(bundle => {
+            const bundleUrl = `${baseUrl}/bundle/${bundle.qrCodeId}`;
+            const qrImg = qrDataUrls[bundle.qrCodeId]
+              ? `<div style="margin: 12px 0; text-align: center;"><img src="${qrDataUrls[bundle.qrCodeId]}" alt="QR Code for ${bundle.bundleName}" width="180" height="180" style="border: 1px solid #e0e0e0; border-radius: 8px;" /></div>`
+              : "";
+            return `
+              <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+                <h3 style="margin: 0 0 8px 0; color: #1a1a1a; font-size: 16px;">${bundle.bundleName}</h3>
+                ${bundle.description ? `<p style="margin: 0 0 12px 0; color: #666; font-size: 14px;">${bundle.description}</p>` : ""}
+                ${qrImg}
+                <div style="text-align: center; margin-top: 12px;">
+                  <a href="${bundleUrl}" target="_blank" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 600;">View Tender Documents</a>
+                </div>
+                <p style="margin: 12px 0 0 0; text-align: center; font-size: 12px; color: #888;">
+                  Or copy this link: <a href="${bundleUrl}" style="color: #2563eb; word-break: break-all;">${bundleUrl}</a>
+                </p>
+              </div>`;
+          }).join("");
+
+          bundleSection = `
+            <div style="margin-top: 24px; border-top: 2px solid #2563eb; padding-top: 20px;">
+              <h2 style="margin: 0 0 16px 0; color: #1a1a1a; font-size: 18px;">Tender Document${bundlesWithQr.length > 1 ? "s" : ""}</h2>
+              <p style="margin: 0 0 16px 0; color: #555; font-size: 14px;">Please review the following document${bundlesWithQr.length > 1 ? " bundles" : " bundle"} for this tender. You can scan the QR code or click the link below to access the documents.</p>
+              ${bundleItems}
+            </div>`;
+        }
+
+        const htmlBody = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="margin-bottom: 24px;">
+              ${data.message.replace(/\n/g, "<br>")}
+            </div>
+            ${bundleSection}
+            <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999;">
+              <p>This is an automated tender invitation email. Please do not reply directly to this email.</p>
+            </div>
+          </div>`;
+
         await emailService.sendEmailWithAttachment({ to: email, subject: data.subject, body: htmlBody });
 
         await db.update(tenderMembers)
@@ -1339,7 +1469,7 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
       }
     }
 
-    res.json({ sent, failed, results });
+    res.json({ sent, failed, results, bundlesIncluded: bundlesWithQr.length });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
