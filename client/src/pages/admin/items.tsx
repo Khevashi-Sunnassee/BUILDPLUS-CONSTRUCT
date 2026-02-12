@@ -761,7 +761,14 @@ export default function AdminItemsPage() {
           <div className="flex items-center justify-end gap-2 flex-wrap">
             <Button
               variant="outline"
-              onClick={() => window.open(PROCUREMENT_ROUTES.ITEMS_TEMPLATE, "_blank")}
+              onClick={() => {
+                const link = document.createElement("a");
+                link.href = PROCUREMENT_ROUTES.ITEMS_TEMPLATE;
+                link.download = "items_import_template.xlsx";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+              }}
               data-testid="button-download-template"
             >
               <Download className="h-4 w-4 mr-2" />
