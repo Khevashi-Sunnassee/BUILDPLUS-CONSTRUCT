@@ -607,7 +607,6 @@ export default function JobTendersPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6"
                         onClick={() => setDeleteDocId(doc.id)}
                         data-testid={`button-remove-bundle-${doc.id}`}
                       >
@@ -627,7 +626,7 @@ export default function JobTendersPage() {
       </Card>
 
       {selectedTenderId && sheetData && selectedSubmissionId && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Card data-testid="card-total-estimated">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Est. Budget Total</CardTitle>
@@ -1081,7 +1080,7 @@ export default function JobTendersPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Tender?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this tender and all associated submissions and line items. This action cannot be undone.
+              This will permanently delete this tender. Tenders with existing supplier submissions cannot be deleted - remove all suppliers first. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

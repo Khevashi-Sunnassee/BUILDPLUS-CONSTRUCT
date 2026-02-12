@@ -45,7 +45,7 @@ async function getNextTenderNumber(companyId: string): Promise<string> {
     .select({ tenderNumber: tenders.tenderNumber })
     .from(tenders)
     .where(eq(tenders.companyId, companyId))
-    .orderBy(desc(tenders.createdAt))
+    .orderBy(desc(tenders.tenderNumber))
     .limit(1);
 
   if (result.length === 0) {
@@ -264,7 +264,7 @@ router.delete("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIE
     const submissions = await db
       .select({ id: tenderSubmissions.id })
       .from(tenderSubmissions)
-      .where(eq(tenderSubmissions.tenderId, req.params.id))
+      .where(and(eq(tenderSubmissions.tenderId, req.params.id), eq(tenderSubmissions.companyId, companyId)))
       .limit(1);
 
     if (submissions.length > 0) {
@@ -756,71 +756,75 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert
 
     const { lines } = schema.parse(req.body);
 
-    const existingItems = await db
-      .select()
-      .from(tenderLineItems)
-      .where(and(
-        eq(tenderLineItems.tenderSubmissionId, submissionId),
-        eq(tenderLineItems.companyId, companyId),
-      ));
+    let finalTotalPrice = "0";
 
-    const existingMap = new Map<string, typeof existingItems[0]>();
-    for (const item of existingItems) {
-      const key = `${item.costCodeId || ""}:${item.childCostCodeId || ""}`;
-      existingMap.set(key, item);
-    }
+    await db.transaction(async (tx) => {
+      const existingItems = await tx
+        .select()
+        .from(tenderLineItems)
+        .where(and(
+          eq(tenderLineItems.tenderSubmissionId, submissionId),
+          eq(tenderLineItems.companyId, companyId),
+        ));
 
-    for (const line of lines) {
-      const amount = parseFloat(line.amount) || 0;
-      const key = `${line.costCodeId}:${line.childCostCodeId || ""}`;
-      const existing = existingMap.get(key);
-
-      if (amount === 0 && existing) {
-        await db.delete(tenderLineItems).where(eq(tenderLineItems.id, existing.id));
-      } else if (amount !== 0 && existing) {
-        await db.update(tenderLineItems)
-          .set({
-            lineTotal: String(amount),
-            unitPrice: String(amount),
-            updatedAt: new Date(),
-          })
-          .where(eq(tenderLineItems.id, existing.id));
-      } else if (amount !== 0) {
-        await db.insert(tenderLineItems).values({
-          companyId,
-          tenderSubmissionId: submissionId,
-          costCodeId: line.costCodeId,
-          childCostCodeId: line.childCostCodeId || null,
-          description: "Tender amount",
-          quantity: "1",
-          unit: "EA",
-          unitPrice: String(amount),
-          lineTotal: String(amount),
-        });
+      const existingMap = new Map<string, typeof existingItems[0]>();
+      for (const item of existingItems) {
+        const key = `${item.costCodeId || ""}:${item.childCostCodeId || ""}`;
+        existingMap.set(key, item);
       }
-    }
 
-    const totalResult = await db
-      .select({ total: sql<string>`coalesce(sum(cast(${tenderLineItems.lineTotal} as numeric)), 0)::text` })
-      .from(tenderLineItems)
-      .where(and(
-        eq(tenderLineItems.tenderSubmissionId, submissionId),
-        eq(tenderLineItems.companyId, companyId),
-      ));
-    const totalPrice = totalResult[0]?.total || "0";
+      for (const line of lines) {
+        const amount = parseFloat(line.amount) || 0;
+        const key = `${line.costCodeId}:${line.childCostCodeId || ""}`;
+        const existing = existingMap.get(key);
 
-    await db.update(tenderSubmissions)
-      .set({
-        totalPrice,
-        subtotal: totalPrice,
-        updatedAt: new Date(),
-      })
-      .where(and(
-        eq(tenderSubmissions.id, submissionId),
-        eq(tenderSubmissions.companyId, companyId),
-      ));
+        if (amount === 0 && existing) {
+          await tx.delete(tenderLineItems).where(eq(tenderLineItems.id, existing.id));
+        } else if (amount !== 0 && existing) {
+          await tx.update(tenderLineItems)
+            .set({
+              lineTotal: String(amount),
+              unitPrice: String(amount),
+              updatedAt: new Date(),
+            })
+            .where(eq(tenderLineItems.id, existing.id));
+        } else if (amount !== 0) {
+          await tx.insert(tenderLineItems).values({
+            companyId,
+            tenderSubmissionId: submissionId,
+            costCodeId: line.costCodeId,
+            childCostCodeId: line.childCostCodeId || null,
+            description: "Tender amount",
+            quantity: "1",
+            unit: "EA",
+            unitPrice: String(amount),
+            lineTotal: String(amount),
+          });
+        }
+      }
 
-    res.json({ message: "Lines updated", totalPrice: String(totalPrice) });
+      const totalResult = await tx
+        .select({ total: sql<string>`coalesce(sum(cast(${tenderLineItems.lineTotal} as numeric)), 0)::text` })
+        .from(tenderLineItems)
+        .where(and(
+          eq(tenderLineItems.tenderSubmissionId, submissionId),
+          eq(tenderLineItems.companyId, companyId),
+        ));
+      finalTotalPrice = totalResult[0]?.total || "0";
+
+      await tx.update(tenderSubmissions)
+        .set({
+          totalPrice: finalTotalPrice,
+          subtotal: finalTotalPrice,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(tenderSubmissions.id, submissionId),
+          eq(tenderSubmissions.companyId, companyId),
+        ));
+    });
+
+    res.json({ message: "Lines updated", totalPrice: finalTotalPrice });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: "Validation error", errors: error.errors });
