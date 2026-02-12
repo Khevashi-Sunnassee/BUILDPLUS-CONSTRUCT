@@ -119,6 +119,7 @@ export const PROCUREMENT_ROUTES = {
   ITEMS_ACTIVE: '/api/procurement/items/active',
   ITEM_BY_ID: (id: string | number) => `/api/procurement/items/${id}`,
   ITEMS_IMPORT: '/api/procurement/items/import',
+  ITEMS_TEMPLATE: '/api/procurement/items/template',
   
   // Item Categories
   ITEM_CATEGORIES: '/api/procurement/item-categories',

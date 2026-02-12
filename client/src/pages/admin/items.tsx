@@ -17,6 +17,7 @@ import {
   X,
   Filter,
   FolderOpen,
+  Download,
 } from "lucide-react";
 import {
   Tabs,
@@ -747,7 +748,15 @@ export default function AdminItemsPage() {
         </TabsContent>
 
         <TabsContent value="items" className="space-y-4">
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={() => window.open(PROCUREMENT_ROUTES.ITEMS_TEMPLATE, "_blank")}
+              data-testid="button-download-template"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Download Template
+            </Button>
             <input
               type="file"
               ref={fileInputRef}

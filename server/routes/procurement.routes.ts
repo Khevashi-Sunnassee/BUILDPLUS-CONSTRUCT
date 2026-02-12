@@ -595,6 +595,71 @@ router.delete("/api/procurement/items/:id", requireRole("ADMIN"), async (req, re
   }
 });
 
+router.get("/api/procurement/items/template", requireAuth, async (_req, res) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Items");
+
+    const columns = [
+      { header: "Product Id", key: "productId", width: 18 },
+      { header: "Product Description", key: "description", width: 40 },
+      { header: "Category", key: "category", width: 20 },
+      { header: "Unit Price", key: "unitPrice", width: 15 },
+      { header: "HS Code", key: "hsCode", width: 15 },
+      { header: "AD Risk", key: "adRisk", width: 12 },
+      { header: "Ad Reference Url", key: "adReferenceUrl", width: 30 },
+      { header: "Compliance Notes", key: "complianceNotes", width: 30 },
+      { header: "Supplier Shortlist", key: "supplierShortlist", width: 25 },
+      { header: "Sources", key: "sources", width: 25 },
+    ];
+
+    sheet.columns = columns;
+
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+    headerRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4472C4" } };
+    headerRow.alignment = { vertical: "middle", wrapText: true };
+
+    sheet.addRow({
+      productId: "ITEM-001",
+      description: "Steel Reinforcement Bar 12mm",
+      category: "Steel",
+      unitPrice: 45.50,
+      hsCode: "7214.20",
+      adRisk: "Low",
+      adReferenceUrl: "",
+      complianceNotes: "AS/NZS 4671 compliant",
+      supplierShortlist: "BHP, OneSteel",
+      sources: "Domestic",
+    });
+    sheet.addRow({
+      productId: "ITEM-002",
+      description: "Concrete 40MPa Ready Mix",
+      category: "Concrete",
+      unitPrice: 280.00,
+      hsCode: "",
+      adRisk: "",
+      adReferenceUrl: "",
+      complianceNotes: "",
+      supplierShortlist: "Boral, Hanson",
+      sources: "Local",
+    });
+
+    const exampleRows = [sheet.getRow(2), sheet.getRow(3)];
+    exampleRows.forEach(row => {
+      row.font = { color: { argb: "FF808080" }, italic: true, size: 10 };
+    });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=Items_Import_Template.xlsx");
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Failed to generate items template");
+    res.status(500).json({ error: "Failed to generate template" });
+  }
+});
+
 router.post("/api/procurement/items/import", requireRole("ADMIN", "MANAGER"), upload.single("file"), async (req, res) => {
   try {
     const companyId = req.companyId;
