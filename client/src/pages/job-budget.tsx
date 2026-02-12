@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, Fragment, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -25,8 +25,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
-  Plus, Pencil, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
-  Receipt, Target, Settings2, ListPlus, ChevronDown, ChevronRight, Save, X,
+  Plus, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
+  Receipt, Target, Settings2, ListPlus, ChevronDown, ChevronRight, X,
 } from "lucide-react";
 import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
 
@@ -206,9 +206,12 @@ export default function JobBudgetPage() {
     }));
   }
 
+  const savingRef = useRef<Set<string>>(new Set());
+
   function saveInlineEdit(lineId: string) {
     const data = editingCells[lineId];
-    if (!data) return;
+    if (!data || savingRef.current.has(lineId)) return;
+    savingRef.current.add(lineId);
     updateLineMutation.mutate({
       id: lineId,
       estimatedBudget: data.estimatedBudget,
@@ -216,7 +219,8 @@ export default function JobBudgetPage() {
       forecastCost: data.forecastCost,
       notes: data.notes,
     }, {
-      onSuccess: () => cancelInlineEdit(lineId),
+      onSuccess: () => { savingRef.current.delete(lineId); cancelInlineEdit(lineId); },
+      onError: () => { savingRef.current.delete(lineId); },
     });
   }
 
@@ -678,11 +682,14 @@ export default function JobBudgetPage() {
                                       step="0.01"
                                       value={editData.estimatedBudget}
                                       onChange={(e) => updateInlineField(line.id, "estimatedBudget", e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(line.id); if (e.key === "Escape") cancelInlineEdit(line.id); }}
+                                      onBlur={() => saveInlineEdit(line.id)}
                                       className="text-right font-mono h-8 w-full"
+                                      autoFocus
                                       data-testid={`input-inline-estimated-${line.id}`}
                                     />
                                   ) : (
-                                    <span className="font-mono text-sm" data-testid={`text-line-estimated-${line.id}`}>
+                                    <span className="font-mono text-sm cursor-pointer" onClick={(e) => { e.stopPropagation(); startInlineEdit(line); }} data-testid={`text-line-estimated-${line.id}`}>
                                       {formatCurrency(line.estimatedBudget)}
                                     </span>
                                   )}
@@ -694,11 +701,13 @@ export default function JobBudgetPage() {
                                       step="0.01"
                                       value={editData.variationsAmount}
                                       onChange={(e) => updateInlineField(line.id, "variationsAmount", e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(line.id); if (e.key === "Escape") cancelInlineEdit(line.id); }}
+                                      onBlur={() => saveInlineEdit(line.id)}
                                       className="text-right font-mono h-8 w-full"
                                       data-testid={`input-inline-variations-${line.id}`}
                                     />
                                   ) : (
-                                    <span className="font-mono text-sm" data-testid={`text-line-variations-${line.id}`}>
+                                    <span className="font-mono text-sm cursor-pointer" onClick={(e) => { e.stopPropagation(); startInlineEdit(line); }} data-testid={`text-line-variations-${line.id}`}>
                                       {formatCurrency(line.variationsAmount)}
                                     </span>
                                   )}
@@ -710,11 +719,13 @@ export default function JobBudgetPage() {
                                       step="0.01"
                                       value={editData.forecastCost}
                                       onChange={(e) => updateInlineField(line.id, "forecastCost", e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(line.id); if (e.key === "Escape") cancelInlineEdit(line.id); }}
+                                      onBlur={() => saveInlineEdit(line.id)}
                                       className="text-right font-mono h-8 w-full"
                                       data-testid={`input-inline-forecast-${line.id}`}
                                     />
                                   ) : (
-                                    <span className="font-mono text-sm" data-testid={`text-line-forecast-${line.id}`}>
+                                    <span className="font-mono text-sm cursor-pointer" onClick={(e) => { e.stopPropagation(); startInlineEdit(line); }} data-testid={`text-line-forecast-${line.id}`}>
                                       {formatCurrency(line.forecastCost)}
                                     </span>
                                   )}
@@ -724,12 +735,14 @@ export default function JobBudgetPage() {
                                     <Input
                                       value={editData.notes}
                                       onChange={(e) => updateInlineField(line.id, "notes", e.target.value)}
+                                      onKeyDown={(e) => { if (e.key === "Enter") saveInlineEdit(line.id); if (e.key === "Escape") cancelInlineEdit(line.id); }}
+                                      onBlur={() => saveInlineEdit(line.id)}
                                       className="h-8 w-full text-sm"
                                       placeholder="Notes..."
                                       data-testid={`input-inline-notes-${line.id}`}
                                     />
                                   ) : (
-                                    <span className="text-muted-foreground text-sm truncate block max-w-xs">
+                                    <span className="text-muted-foreground text-sm truncate block max-w-xs cursor-pointer" onClick={(e) => { e.stopPropagation(); startInlineEdit(line); }}>
                                       {line.notes || "-"}
                                     </span>
                                   )}
@@ -737,44 +750,24 @@ export default function JobBudgetPage() {
                                 <TableCell className="text-right">
                                   <div className="flex items-center justify-end gap-1">
                                     {isEditing ? (
-                                      <>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => saveInlineEdit(line.id)}
-                                          disabled={updateLineMutation.isPending}
-                                          data-testid={`button-save-inline-${line.id}`}
-                                        >
-                                          {updateLineMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                                        </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => cancelInlineEdit(line.id)}
-                                          data-testid={`button-cancel-inline-${line.id}`}
-                                        >
-                                          <X className="h-4 w-4" />
-                                        </Button>
-                                      </>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => cancelInlineEdit(line.id)}
+                                        data-testid={`button-cancel-inline-${line.id}`}
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
                                     ) : (
-                                      <>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => startInlineEdit(line)}
-                                          data-testid={`button-edit-line-${line.id}`}
-                                        >
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                          size="icon"
-                                          variant="ghost"
-                                          onClick={() => setDeleteConfirm(line)}
-                                          data-testid={`button-delete-line-${line.id}`}
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                      </>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => setDeleteConfirm(line)}
+                                        data-testid={`button-delete-line-${line.id}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
                                     )}
                                   </div>
                                 </TableCell>
