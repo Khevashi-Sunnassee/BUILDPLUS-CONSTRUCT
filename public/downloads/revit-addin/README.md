@@ -1,4 +1,4 @@
-# LTE Time Tracking - Revit Add-in
+# BuildPlus Ai Time Tracking - Revit Add-in
 
 ## Overview
 This Revit add-in automatically captures time tracking data including:
@@ -24,16 +24,16 @@ This Revit add-in automatically captures time tracking data including:
    ```
 
 ### Build Steps
-1. Open `LTETimeTracking.csproj` in Visual Studio
+1. Open `BuildPlusTimeTracking.csproj` in Visual Studio
 2. Restore NuGet packages
 3. Build in Release configuration
-4. Output: `bin\Release\net48\LTETimeTracking.Revit.dll`
+4. Output: `bin\Release\net48\BuildPlusTimeTracking.Revit.dll`
 
 ## Installation
 
 1. Copy these files to your Revit add-ins folder:
-   - `LTETimeTracking.Revit.dll`
-   - `LTETimeTracking.addin`
+   - `BuildPlusTimeTracking.Revit.dll`
+   - `BuildPlusTimeTracking.addin`
    - `Newtonsoft.Json.dll`
 
    Location: `%APPDATA%\Autodesk\Revit\Addins\2024\`
@@ -64,8 +64,8 @@ This Revit add-in automatically captures time tracking data including:
 
 ### Data not appearing in portal
 - Ensure the Windows Agent service is running
-- Check agent logs at `C:\ProgramData\LTETimeTracking\logs\`
+- Check agent logs at `C:\ProgramData\BuildPlusTimeTracking\logs\`
 - Verify network connectivity to the portal
 
 ## Support
-Contact: support@lte.com.au
+Contact: support@buildplus.ai

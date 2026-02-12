@@ -31,7 +31,7 @@ async function doLogin(email: string, password: string) {
 
 export async function loginAdmin() {
   if (adminLoggedIn && adminCookie) return;
-  const result = await doLogin("admin@lte.com.au", "admin123");
+  const result = await doLogin("admin@buildplus.ai", "admin123");
   adminCookie = result.sessionCookie;
   adminCsrfToken = result.csrfToken;
   adminUserId = result.userId;
@@ -58,7 +58,7 @@ export async function loginUser() {
     const data = await signupRes.json();
     userUserId = data.user?.id || "";
   } else {
-    const result = await doLogin("admin@lte.com.au", "admin123");
+    const result = await doLogin("admin@buildplus.ai", "admin123");
     userCookie = result.sessionCookie;
     userCsrfToken = result.csrfToken;
     userUserId = result.userId;

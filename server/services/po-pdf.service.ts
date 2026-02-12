@@ -64,7 +64,7 @@ export function generatePurchaseOrderPdf(
   pdf.setTextColor(31, 41, 55);
   pdf.setFontSize(16);
   pdf.setFont("helvetica", "bold");
-  pdf.text(settings?.companyName || "LTE Precast Concrete Structures", headerTextX, 12);
+  pdf.text(settings?.companyName || "BuildPlus Ai", headerTextX, 12);
 
   pdf.setFontSize(20);
   pdf.setTextColor(107, 114, 128);

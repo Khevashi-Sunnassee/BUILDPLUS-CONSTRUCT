@@ -370,33 +370,33 @@ describe("Customer Schema", () => {
 describe("Insert Company Schema (from shared/schema.ts)", () => {
   it("should accept valid company data", () => {
     const result = insertCompanySchema.safeParse({
-      name: "LTE Precast",
-      code: "LTE",
+      name: "BuildPlus Ai",
+      code: "BPA",
     });
     expect(result.success).toBe(true);
   });
 
   it("should reject missing name", () => {
     const result = insertCompanySchema.safeParse({
-      code: "LTE",
+      code: "BPA",
     });
     expect(result.success).toBe(false);
   });
 
   it("should reject missing code", () => {
     const result = insertCompanySchema.safeParse({
-      name: "LTE Precast",
+      name: "BuildPlus Ai",
     });
     expect(result.success).toBe(false);
   });
 
   it("should accept company with optional fields", () => {
     const result = insertCompanySchema.safeParse({
-      name: "LTE Precast",
-      code: "LTE",
+      name: "BuildPlus Ai",
+      code: "BPA",
       address: "123 Factory Rd",
       phone: "0312345678",
-      email: "info@lte.com.au",
+      email: "info@buildplus.ai",
       abn: "12345678901",
       isActive: true,
     });

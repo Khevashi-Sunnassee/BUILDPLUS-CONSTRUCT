@@ -3,22 +3,22 @@
   SchemaVersion="1.0"
   ProductType="Application"
   AutodeskProduct="AutoCAD"
-  Name="LTE Time Tracking"
+  Name="BuildPlus Ai Time Tracking"
   Description="Automatic time tracking for AutoCAD drafting work"
   AppVersion="1.0.0"
-  Author="LTE Engineering Pty Ltd"
+  Author="BuildPlus Ai Pty Ltd"
   ProductCode="{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}">
 
-  <CompanyDetails Name="LTE Engineering" 
-                  Url="https://lte.com.au" 
-                  Email="support@lte.com.au"/>
+  <CompanyDetails Name="BuildPlus Ai" 
+                  Url="https://buildplus.ai" 
+                  Email="support@buildplus.ai"/>
 
   <Components Description="Main components">
     <RuntimeRequirements OS="Win64" Platform="AutoCAD" SeriesMin="R24.0" SeriesMax="R25.0"/>
-    <ComponentEntry AppName="LTETimeTracking" 
+    <ComponentEntry AppName="BuildPlusTimeTracking" 
                     Version="1.0.0" 
-                    ModuleName="./Contents/LTETimeTracking.AutoCAD.dll" 
-                    AppDescription="LTE Time Tracking Add-in" 
+                    ModuleName="./Contents/BuildPlusTimeTracking.AutoCAD.dll" 
+                    AppDescription="BuildPlus Ai Time Tracking Add-in" 
                     LoadOnAutoCADStartup="True"/>
   </Components>
 </ApplicationPackage>

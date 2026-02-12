@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo LTE Time Tracking - AutoCAD Add-in Builder
+echo BuildPlus Ai Time Tracking - AutoCAD Add-in Builder
 echo ============================================
 echo.
 
@@ -59,11 +59,11 @@ echo ============================================
 echo Build successful!
 echo.
 echo Output files:
-echo   bin\Release\net48\LTETimeTracking.AutoCAD.dll
+echo   bin\Release\net48\BuildPlusTimeTracking.AutoCAD.dll
 echo   bin\Release\net48\Newtonsoft.Json.dll
 echo.
 echo Installation options:
-echo   1. Bundle: Create LTETimeTracking.bundle folder
+echo   1. Bundle: Create BuildPlusTimeTracking.bundle folder
 echo   2. NETLOAD: Use NETLOAD command in AutoCAD
 echo.
 echo See README.md for detailed instructions.

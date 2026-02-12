@@ -2,7 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
-namespace LTETimeTracking.Agent
+namespace BuildPlusTimeTracking.Agent
 {
     public class TimeBlock
     {

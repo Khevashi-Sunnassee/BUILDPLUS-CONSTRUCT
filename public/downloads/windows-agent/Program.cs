@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using LTETimeTracking.Agent;
+using BuildPlusTimeTracking.Agent;
 
 var builder = Host.CreateApplicationBuilder(args);
 
@@ -12,7 +12,7 @@ builder.Services.AddSingleton<ConfigManager>();
 
 builder.Logging.AddEventLog(settings =>
 {
-    settings.SourceName = "LTETimeTracking";
+    settings.SourceName = "BuildPlusTimeTracking";
 });
 
 var host = builder.Build();

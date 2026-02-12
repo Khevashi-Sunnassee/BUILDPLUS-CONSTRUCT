@@ -5,8 +5,8 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <PublishSingleFile>true</PublishSingleFile>
     <SelfContained>true</SelfContained>
-    <RootNamespace>LTETimeTracking.Agent</RootNamespace>
-    <AssemblyName>LTETimeTracking.Agent</AssemblyName>
+    <RootNamespace>BuildPlusTimeTracking.Agent</RootNamespace>
+    <AssemblyName>BuildPlusTimeTracking.Agent</AssemblyName>
     <Version>1.0.0</Version>
     <UseWindowsForms>false</UseWindowsForms>
   </PropertyGroup>

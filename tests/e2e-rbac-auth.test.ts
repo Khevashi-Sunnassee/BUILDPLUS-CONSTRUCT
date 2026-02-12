@@ -49,7 +49,7 @@ describe("E2E: Authentication Guards", () => {
 
   it("should reject login with missing fields", async () => {
     const res = await unauthPost("/api/auth/login", {
-      email: "admin@lte.com.au",
+      email: "admin@buildplus.ai",
     });
     expect([400, 401]).toContain(res.status);
   });
@@ -90,7 +90,7 @@ describe("E2E: CSRF Protection", () => {
     const loginRes = await fetch("http://localhost:5000/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@lte.com.au", password: "admin123" }),
+      body: JSON.stringify({ email: "admin@buildplus.ai", password: "admin123" }),
     });
     const cookies = loginRes.headers.getSetCookie?.() || [];
     const sessionCookie = cookies.map((c: string) => c.split(";")[0]).join("; ");
@@ -128,11 +128,11 @@ describe("E2E: Session Security", () => {
     const res = await fetch("http://localhost:5000/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@lte.com.au", password: "admin123" }),
+      body: JSON.stringify({ email: "admin@buildplus.ai", password: "admin123" }),
     });
     const cookies = res.headers.getSetCookie?.() || [];
     const sessionCookie = cookies.find((c: string) =>
-      c.includes("connect.sid") || c.includes("lte.")
+      c.includes("connect.sid") || c.includes("buildplus.")
     );
     if (sessionCookie) {
       expect(sessionCookie.toLowerCase()).toContain("httponly");
@@ -143,7 +143,7 @@ describe("E2E: Session Security", () => {
     const loginRes = await fetch("http://localhost:5000/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@lte.com.au", password: "admin123" }),
+      body: JSON.stringify({ email: "admin@buildplus.ai", password: "admin123" }),
     });
     const cookies = loginRes.headers.getSetCookie?.() || [];
     const session = cookies.map((c: string) => c.split(";")[0]).join("; ");

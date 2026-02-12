@@ -8,10 +8,10 @@ using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Newtonsoft.Json;
 
-[assembly: ExtensionApplication(typeof(LTETimeTracking.AutoCAD.App))]
-[assembly: CommandClass(typeof(LTETimeTracking.AutoCAD.Commands))]
+[assembly: ExtensionApplication(typeof(BuildPlusTimeTracking.AutoCAD.App))]
+[assembly: CommandClass(typeof(BuildPlusTimeTracking.AutoCAD.Commands))]
 
-namespace LTETimeTracking.AutoCAD
+namespace BuildPlusTimeTracking.AutoCAD
 {
     public class App : IExtensionApplication
     {
@@ -38,7 +38,7 @@ namespace LTETimeTracking.AutoCAD
             _captureTimer.Start();
 
             Application.DocumentManager.MdiActiveDocument?.Editor.WriteMessage(
-                "\nLTE Time Tracking loaded. Type LTETRACK for status.\n");
+                "\nBuildPlus Ai Time Tracking loaded. Type BPTRACK for status.\n");
         }
 
         public void Terminate()
@@ -120,7 +120,7 @@ namespace LTETimeTracking.AutoCAD
             }
             catch (System.Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"LTE TimeTracking Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"BuildPlus Ai TimeTracking Error: {ex.Message}");
             }
         }
 
@@ -167,7 +167,7 @@ namespace LTETimeTracking.AutoCAD
             {
                 var json = JsonConvert.SerializeObject(block);
 
-                using (var pipe = new NamedPipeClientStream(".", "LTETimeTrackingPipe", PipeDirection.Out))
+                using (var pipe = new NamedPipeClientStream(".", "BuildPlusTimeTrackingPipe", PipeDirection.Out))
                 {
                     pipe.Connect(1000);
                     var bytes = Encoding.UTF8.GetBytes(json + "\n");
@@ -188,21 +188,21 @@ namespace LTETimeTracking.AutoCAD
 
     public class Commands
     {
-        [CommandMethod("LTETRACK")]
+        [CommandMethod("BPTRACK")]
         public void ShowStatus()
         {
             var doc = Application.DocumentManager.MdiActiveDocument;
             var ed = doc?.Editor;
             if (ed == null) return;
 
-            ed.WriteMessage("\n=== LTE Time Tracking Status ===\n");
+            ed.WriteMessage("\n=== BuildPlus Ai Time Tracking Status ===\n");
             ed.WriteMessage($"Document: {doc.Name}\n");
             ed.WriteMessage($"Layout: {LayoutManager.Current.CurrentLayout}\n");
             ed.WriteMessage("Status: Active\n");
             ed.WriteMessage("================================\n");
         }
 
-        [CommandMethod("LTESEND")]
+        [CommandMethod("BPSEND")]
         public void ForceSend()
         {
             App.SendTimeBlock(false);

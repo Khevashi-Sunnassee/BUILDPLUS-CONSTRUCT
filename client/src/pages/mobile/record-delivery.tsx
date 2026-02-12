@@ -360,7 +360,7 @@ export default function MobileRecordDeliveryPage() {
               </div>
             </CollapsibleSection>
 
-            <CollapsibleSection title="Depot to LTE" icon={Clock}>
+            <CollapsibleSection title="Depot to Site" icon={Clock}>
               <div className="grid grid-cols-2 gap-4">
                 <FormRow label="Leave Depot">
                   <Input
@@ -371,7 +371,7 @@ export default function MobileRecordDeliveryPage() {
                     data-testid="input-leave-depot"
                   />
                 </FormRow>
-                <FormRow label="Arrive LTE">
+                <FormRow label="Arrive Site">
                   <Input
                     type="time"
                     value={arriveLteTime}

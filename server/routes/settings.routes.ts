@@ -116,7 +116,7 @@ router.get("/api/settings/logo", async (req, res) => {
     const settings = await storage.getGlobalSettings();
     res.json({ 
       logoBase64: settings?.logoBase64 || null,
-      companyName: settings?.companyName || "LTE Precast Concrete Structures"
+      companyName: settings?.companyName || "BuildPlus Ai"
     });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to load logo" });

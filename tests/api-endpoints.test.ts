@@ -8,7 +8,7 @@ async function login() {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: "admin@lte.com.au", password: "admin123" }),
+    body: JSON.stringify({ email: "admin@buildplus.ai", password: "admin123" }),
   });
   const cookies = res.headers.getSetCookie?.() || [];
   sessionCookie = cookies
@@ -36,12 +36,12 @@ describe("API Endpoints - Authentication", () => {
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@lte.com.au", password: "admin123" }),
+      body: JSON.stringify({ email: "admin@buildplus.ai", password: "admin123" }),
     });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.user).toBeDefined();
-    expect(data.user.email).toBe("admin@lte.com.au");
+    expect(data.user.email).toBe("admin@buildplus.ai");
     expect(data.user.role).toBe("ADMIN");
   });
 
@@ -49,7 +49,7 @@ describe("API Endpoints - Authentication", () => {
     const res = await fetch(`${BASE_URL}/api/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: "admin@lte.com.au", password: "wrong" }),
+      body: JSON.stringify({ email: "admin@buildplus.ai", password: "wrong" }),
     });
     expect([400, 401]).toContain(res.status);
   });
@@ -58,7 +58,7 @@ describe("API Endpoints - Authentication", () => {
     const res = await authGet("/api/auth/me");
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.user?.email || data.email).toBe("admin@lte.com.au");
+    expect(data.user?.email || data.email).toBe("admin@buildplus.ai");
   });
 
   it("GET /api/auth/me should return 401 when not authenticated", async () => {

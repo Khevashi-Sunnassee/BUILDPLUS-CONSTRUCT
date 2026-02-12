@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo LTE Time Tracking - Revit Add-in Builder
+echo BuildPlus Ai Time Tracking - Revit Add-in Builder
 echo ============================================
 echo.
 
@@ -59,10 +59,10 @@ echo ============================================
 echo Build successful!
 echo.
 echo Output files:
-echo   bin\Release\net48\LTETimeTracking.Revit.dll
+echo   bin\Release\net48\BuildPlusTimeTracking.Revit.dll
 echo   bin\Release\net48\Newtonsoft.Json.dll
 echo.
-echo Copy these files along with LTETimeTracking.addin to:
+echo Copy these files along with BuildPlusTimeTracking.addin to:
 echo   %%APPDATA%%\Autodesk\Revit\Addins\2024\
 echo ============================================
 pause

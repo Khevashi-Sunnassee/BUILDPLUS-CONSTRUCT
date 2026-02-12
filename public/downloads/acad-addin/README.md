@@ -1,4 +1,4 @@
-# LTE Time Tracking - AutoCAD Add-in
+# BuildPlus Ai Time Tracking - AutoCAD Add-in
 
 ## Overview
 This AutoCAD add-in automatically captures time tracking data including:
@@ -24,20 +24,20 @@ This AutoCAD add-in automatically captures time tracking data including:
    ```
 
 ### Build Steps
-1. Open `LTETimeTracking.AutoCAD.csproj` in Visual Studio
+1. Open `BuildPlusTimeTracking.AutoCAD.csproj` in Visual Studio
 2. Restore NuGet packages
 3. Build in Release configuration
-4. Output: `bin\Release\net48\LTETimeTracking.AutoCAD.dll`
+4. Output: `bin\Release\net48\BuildPlusTimeTracking.AutoCAD.dll`
 
 ## Installation
 
 ### Option 1: Bundle Installation (Recommended)
 1. Create folder structure:
    ```
-   LTETimeTracking.bundle\
+   BuildPlusTimeTracking.bundle\
      PackageContents.xml
      Contents\
-       LTETimeTracking.AutoCAD.dll
+       BuildPlusTimeTracking.AutoCAD.dll
        Newtonsoft.Json.dll
    ```
 
@@ -49,15 +49,15 @@ This AutoCAD add-in automatically captures time tracking data including:
 ### Option 2: Manual NETLOAD
 1. Start AutoCAD
 2. Type `NETLOAD` at the command prompt
-3. Browse to `LTETimeTracking.AutoCAD.dll`
+3. Browse to `BuildPlusTimeTracking.AutoCAD.dll`
 4. Click Open
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `LTETRACK` | Show current tracking status |
-| `LTESEND` | Force send current time block to agent |
+| `BPTRACK` | Show current tracking status |
+| `BPSEND` | Force send current time block to agent |
 
 ## How It Works
 
@@ -78,13 +78,13 @@ This AutoCAD add-in automatically captures time tracking data including:
 - Check AutoCAD's APPLOAD command for loaded apps
 - Verify bundle folder structure is correct
 
-### "LTETRACK" command not found
+### "BPTRACK" command not found
 - Ensure the DLL loaded successfully
 - Check for errors in AutoCAD command line
 
 ### Data not appearing in portal
 - Ensure the Windows Agent service is running
-- Check agent logs at `C:\ProgramData\LTETimeTracking\logs\`
+- Check agent logs at `C:\ProgramData\BuildPlusTimeTracking\logs\`
 
 ## Support
-Contact: support@lte.com.au
+Contact: support@buildplus.ai

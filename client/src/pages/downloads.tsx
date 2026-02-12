@@ -115,8 +115,8 @@ export default function DownloadsPage() {
               <p><strong>Files included:</strong></p>
               <ul className="list-disc list-inside ml-2">
                 <li>App.cs - Main add-in code</li>
-                <li>LTETimeTracking.csproj - Project file</li>
-                <li>LTETimeTracking.addin - Manifest</li>
+                <li>BuildPlusTimeTracking.csproj - Project file</li>
+                <li>BuildPlusTimeTracking.addin - Manifest</li>
                 <li>build.bat - Build script</li>
                 <li>README.md - Setup instructions</li>
               </ul>
@@ -160,7 +160,7 @@ export default function DownloadsPage() {
               <p><strong>Files included:</strong></p>
               <ul className="list-disc list-inside ml-2">
                 <li>App.cs - Main add-in code</li>
-                <li>LTETimeTracking.AutoCAD.csproj - Project</li>
+                <li>BuildPlusTimeTracking.AutoCAD.csproj - Project</li>
                 <li>PackageContents.xml - Bundle manifest</li>
                 <li>build.bat - Build script</li>
                 <li>README.md - Setup instructions</li>
@@ -260,7 +260,7 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Download the Revit Add-in source code and build it with Visual Studio:</p>
                     <ol className="list-decimal list-inside ml-4 space-y-1">
-                      <li>Open <code className="bg-muted px-1 rounded">LTETimeTracking.csproj</code> in Visual Studio</li>
+                      <li>Open <code className="bg-muted px-1 rounded">BuildPlusTimeTracking.csproj</code> in Visual Studio</li>
                       <li>Set environment variable: <code className="bg-muted px-1 rounded">REVIT_SDK=C:\Program Files\Autodesk\Revit 2024</code></li>
                       <li>Build in Release configuration</li>
                       <li>Or run <code className="bg-muted px-1 rounded">build.bat</code></li>
@@ -278,8 +278,8 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Copy the built files to your Revit add-ins folder:</p>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><code className="bg-muted px-1 rounded">LTETimeTracking.Revit.dll</code></li>
-                      <li><code className="bg-muted px-1 rounded">LTETimeTracking.addin</code></li>
+                      <li><code className="bg-muted px-1 rounded">BuildPlusTimeTracking.Revit.dll</code></li>
+                      <li><code className="bg-muted px-1 rounded">BuildPlusTimeTracking.addin</code></li>
                       <li><code className="bg-muted px-1 rounded">Newtonsoft.Json.dll</code></li>
                     </ul>
                     <p className="mt-2">Destination:</p>
@@ -298,7 +298,7 @@ export default function DownloadsPage() {
                     </span>
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground space-y-2">
-                    <p>Close and reopen Revit. You should see the LTE Time Tracking loaded in the Add-Ins manager.</p>
+                    <p>Close and reopen Revit. You should see the BuildPlus Ai Time Tracking loaded in the Add-Ins manager.</p>
                     <p>If prompted about loading add-ins from an unknown publisher, click "Always Load".</p>
                   </AccordionContent>
                 </AccordionItem>
@@ -330,7 +330,7 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Download the AutoCAD Add-in source code and build it:</p>
                     <ol className="list-decimal list-inside ml-4 space-y-1">
-                      <li>Open <code className="bg-muted px-1 rounded">LTETimeTracking.AutoCAD.csproj</code> in Visual Studio</li>
+                      <li>Open <code className="bg-muted px-1 rounded">BuildPlusTimeTracking.AutoCAD.csproj</code> in Visual Studio</li>
                       <li>Set environment variable: <code className="bg-muted px-1 rounded">ACAD_SDK=C:\Program Files\Autodesk\AutoCAD 2024</code></li>
                       <li>Build in Release configuration</li>
                       <li>Or run <code className="bg-muted px-1 rounded">build.bat</code></li>
@@ -348,10 +348,10 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Create bundle folder structure:</p>
                     <pre className="bg-muted px-3 py-2 rounded text-sm font-mono overflow-x-auto">
-{`LTETimeTracking.bundle/
+{`BuildPlusTimeTracking.bundle/
   PackageContents.xml
   Contents/
-    LTETimeTracking.AutoCAD.dll
+    BuildPlusTimeTracking.AutoCAD.dll
     Newtonsoft.Json.dll`}
                     </pre>
                     <p className="mt-2">Copy to:</p>
@@ -384,8 +384,8 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Available commands:</p>
                     <ul className="list-disc list-inside ml-4 space-y-1">
-                      <li><code className="bg-muted px-1 rounded">LTETRACK</code> - Show tracking status</li>
-                      <li><code className="bg-muted px-1 rounded">LTESEND</code> - Force send current data</li>
+                      <li><code className="bg-muted px-1 rounded">BPTRACK</code> - Show tracking status</li>
+                      <li><code className="bg-muted px-1 rounded">BPSEND</code> - Force send current data</li>
                     </ul>
                   </AccordionContent>
                 </AccordionItem>
@@ -430,7 +430,7 @@ export default function DownloadsPage() {
                       <li>Open command prompt in the agent folder</li>
                       <li>Run <code className="bg-muted px-1 rounded">build.bat</code></li>
                     </ol>
-                    <p className="mt-2">Output: <code className="bg-muted px-1 rounded">LTETimeTracking.Agent.exe</code></p>
+                    <p className="mt-2">Output: <code className="bg-muted px-1 rounded">BuildPlusTimeTracking.Agent.exe</code></p>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -465,13 +465,13 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Edit the configuration file at:</p>
                     <code className="block bg-muted px-3 py-2 rounded text-sm font-mono mb-2">
-                      C:\ProgramData\LTETimeTracking\config.json
+                      C:\ProgramData\BuildPlusTimeTracking\config.json
                     </code>
                     <pre className="bg-muted px-3 py-2 rounded text-sm font-mono overflow-x-auto">
 {`{
   "ServerUrl": "${window.location.origin}",
   "DeviceKey": "YOUR_DEVICE_KEY_HERE",
-  "UserEmail": "${user?.email || "your.email@lte.com.au"}",
+  "UserEmail": "${user?.email || "your.email@buildplus.ai"}",
   "Timezone": "Australia/Melbourne",
   "UploadIntervalSeconds": 60,
   "MaxBatchSize": 50
@@ -490,7 +490,7 @@ export default function DownloadsPage() {
                   <AccordionContent className="text-muted-foreground space-y-2">
                     <p>Start the service:</p>
                     <code className="block bg-muted px-3 py-2 rounded text-sm font-mono">
-                      net start LTETimeTracking
+                      net start BuildPlusTimeTracking
                     </code>
                     <p className="mt-2">Check Windows Event Viewer for logs.</p>
                     <p>Open Revit or AutoCAD and verify time entries appear on your Dashboard.</p>
@@ -551,11 +551,11 @@ export default function DownloadsPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-muted-foreground">
-            If you're having trouble setting up the time tracking tools, contact your system administrator or the LTE IT support team.
+            If you're having trouble setting up the time tracking tools, contact your system administrator or the BuildPlus Ai support team.
           </p>
           <div className="flex items-center gap-2 text-sm">
             <Badge variant="outline">Support Email</Badge>
-            <span>support@lte.com.au</span>
+            <span>support@buildplus.ai</span>
           </div>
         </CardContent>
       </Card>

@@ -1,9 +1,9 @@
-# LTE Time Tracking - Windows Agent
+# BuildPlus Ai Time Tracking - Windows Agent
 
 ## Overview
 The Windows Agent is a background service that:
 - Receives time tracking data from Revit/AutoCAD add-ins via named pipe
-- Batches and uploads data to the LTE Time Tracking portal
+- Batches and uploads data to the BuildPlus Ai Time Tracking portal
 - Handles network failures with automatic retry
 - Runs as a Windows service with automatic startup
 
@@ -25,7 +25,7 @@ dotnet build
 # Build self-contained executable
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 
-# Output: bin\Release\net6.0-windows\win-x64\publish\LTETimeTracking.Agent.exe
+# Output: bin\Release\net6.0-windows\win-x64\publish\BuildPlusTimeTracking.Agent.exe
 ```
 
 ## Installation
@@ -34,22 +34,22 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=
 
 1. Copy the published files to a permanent location:
    ```
-   C:\Program Files\LTETimeTracking\
-     LTETimeTracking.Agent.exe
+   C:\Program Files\BuildPlusTimeTracking\
+     BuildPlusTimeTracking.Agent.exe
    ```
 
 2. Create the service using PowerShell (as Administrator):
    ```powershell
-   New-Service -Name "LTETimeTracking" `
-     -DisplayName "LTE Time Tracking Agent" `
+   New-Service -Name "BuildPlusTimeTracking" `
+     -DisplayName "BuildPlus Ai Time Tracking Agent" `
      -Description "Uploads CAD/Revit time tracking data to the portal" `
-     -BinaryPathName "C:\Program Files\LTETimeTracking\LTETimeTracking.Agent.exe" `
+     -BinaryPathName "C:\Program Files\BuildPlusTimeTracking\BuildPlusTimeTracking.Agent.exe" `
      -StartupType Automatic
    ```
 
 3. Start the service:
    ```powershell
-   Start-Service LTETimeTracking
+   Start-Service BuildPlusTimeTracking
    ```
 
 ### For Development/Testing
@@ -61,20 +61,20 @@ dotnet run
 
 Or run the compiled executable:
 ```bash
-.\LTETimeTracking.Agent.exe
+.\BuildPlusTimeTracking.Agent.exe
 ```
 
 ## Configuration
 
 The agent reads configuration from:
-`C:\ProgramData\LTETimeTracking\config.json`
+`C:\ProgramData\BuildPlusTimeTracking\config.json`
 
 Example config:
 ```json
 {
   "ServerUrl": "https://your-portal.replit.app",
   "DeviceKey": "your-device-key-from-admin-panel",
-  "UserEmail": "drafter@lte.com.au",
+  "UserEmail": "drafter@buildplus.ai",
   "Timezone": "Australia/Melbourne",
   "UploadIntervalSeconds": 60,
   "MaxBatchSize": 50
@@ -107,12 +107,12 @@ Example config:
 ## Logs
 
 Logs are written to:
-- Windows Event Log (source: LTETimeTracking)
+- Windows Event Log (source: BuildPlusTimeTracking)
 - Console output (when running in console mode)
 
 View logs:
 ```powershell
-Get-EventLog -LogName Application -Source LTETimeTracking -Newest 50
+Get-EventLog -LogName Application -Source BuildPlusTimeTracking -Newest 50
 ```
 
 ## Architecture
@@ -141,22 +141,22 @@ Get-EventLog -LogName Application -Source LTETimeTracking -Newest 50
 
 ### Add-ins not connecting
 - Ensure agent service is running
-- Check that named pipe "LTETimeTrackingPipe" exists:
+- Check that named pipe "BuildPlusTimeTrackingPipe" exists:
   ```powershell
-  [System.IO.Directory]::GetFiles("\\.\\pipe\\") | Select-String "LTE"
+  [System.IO.Directory]::GetFiles("\\.\\pipe\\") | Select-String "BuildPlus"
   ```
 
 ## Uninstalling
 
 ```powershell
 # Stop and remove service
-Stop-Service LTETimeTracking
-sc.exe delete LTETimeTracking
+Stop-Service BuildPlusTimeTracking
+sc.exe delete BuildPlusTimeTracking
 
 # Remove files
-Remove-Item -Recurse "C:\Program Files\LTETimeTracking"
-Remove-Item -Recurse "C:\ProgramData\LTETimeTracking"
+Remove-Item -Recurse "C:\Program Files\BuildPlusTimeTracking"
+Remove-Item -Recurse "C:\ProgramData\BuildPlusTimeTracking"
 ```
 
 ## Support
-Contact: support@lte.com.au
+Contact: support@buildplus.ai

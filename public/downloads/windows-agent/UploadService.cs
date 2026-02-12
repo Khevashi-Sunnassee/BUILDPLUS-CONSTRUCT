@@ -8,7 +8,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace LTETimeTracking.Agent
+namespace BuildPlusTimeTracking.Agent
 {
     public class UploadService : BackgroundService
     {

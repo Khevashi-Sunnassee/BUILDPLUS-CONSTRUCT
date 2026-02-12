@@ -1,6 +1,6 @@
-# LTE Time Tracking - Complete Setup Guide for Beginners
+# BuildPlus Ai Time Tracking - Complete Setup Guide for Beginners
 
-This guide will walk you through setting up the LTE Time Tracking system step-by-step. No prior experience required!
+This guide will walk you through setting up the BuildPlus Ai Time Tracking system step-by-step. No prior experience required!
 
 ---
 
@@ -76,15 +76,15 @@ The Windows Agent is the background service that collects time data and sends it
 
 ### Step 3.1: Download the Source Code
 1. Open your web browser
-2. Go to your LTE Time Tracking portal
+2. Go to your BuildPlus Ai Time Tracking portal
 3. Click **Downloads** in the sidebar
 4. Click **"View Source Code"** under Windows Agent
 5. You'll see a list of files - download each one:
-   - Right-click each file → **Save link as...** → Save to a folder called `C:\LTE\windows-agent\`
+   - Right-click each file → **Save link as...** → Save to a folder called `C:\BuildPlus\windows-agent\`
 
    Files to download:
    - `Program.cs`
-   - `LTETimeTracking.Agent.csproj`
+   - `BuildPlusTimeTracking.Agent.csproj`
    - `ConfigManager.cs`
    - `TimeBlockQueue.cs`
    - `PipeListenerService.cs`
@@ -96,8 +96,8 @@ The Windows Agent is the background service that collects time data and sends it
 ### Step 3.2: Open the Project in Visual Studio
 1. Open **Visual Studio 2022**
 2. On the start screen, click **"Open a project or solution"**
-3. Navigate to `C:\LTE\windows-agent\`
-4. Click on `LTETimeTracking.Agent.csproj`
+3. Navigate to `C:\BuildPlus\windows-agent\`
+4. Click on `BuildPlusTimeTracking.Agent.csproj`
 5. Click **Open**
 
 ### Step 3.3: Build the Project
@@ -111,13 +111,13 @@ The Windows Agent is the background service that collects time data and sends it
 1. In Visual Studio, go to menu: **Build** → **Publish Selection**
 2. Or manually find them at:
    ```
-   C:\LTE\windows-agent\bin\Release\net6.0-windows\win-x64\publish\
+   C:\BuildPlus\windows-agent\bin\Release\net6.0-windows\win-x64\publish\
    ```
-3. You should see `LTETimeTracking.Agent.exe`
+3. You should see `BuildPlusTimeTracking.Agent.exe`
 
 **Alternative: Use the Build Script**
 1. Open File Explorer
-2. Navigate to `C:\LTE\windows-agent\`
+2. Navigate to `C:\BuildPlus\windows-agent\`
 3. Double-click `build.bat`
 4. A black window will appear showing the build progress
 5. When it says "Build successful!", press any key to close
@@ -130,23 +130,23 @@ The Windows Agent is the background service that collects time data and sends it
 1. Open File Explorer
 2. Navigate to `C:\Program Files\`
 3. Right-click in empty space → **New** → **Folder**
-4. Name it `LTETimeTracking`
+4. Name it `BuildPlusTimeTracking`
 5. If Windows asks for permission, click **Continue**
 
 ### Step 4.2: Copy the Agent
 1. Go to your build output folder:
    ```
-   C:\LTE\windows-agent\bin\Release\net6.0-windows\win-x64\publish\
+   C:\BuildPlus\windows-agent\bin\Release\net6.0-windows\win-x64\publish\
    ```
-2. Select `LTETimeTracking.Agent.exe`
+2. Select `BuildPlusTimeTracking.Agent.exe`
 3. Right-click → **Copy**
-4. Go to `C:\Program Files\LTETimeTracking\`
+4. Go to `C:\Program Files\BuildPlusTimeTracking\`
 5. Right-click → **Paste**
 
 ### Step 4.3: Configure the Agent
 1. Press **Windows key + R** to open Run dialog
 2. Type `%PROGRAMDATA%` and press Enter
-3. Create a new folder called `LTETimeTracking`
+3. Create a new folder called `BuildPlusTimeTracking`
 4. Inside that folder, create a new text file
 5. Rename it from `New Text Document.txt` to `config.json`
    - If you don't see ".txt", go to View → check "File name extensions"
@@ -177,16 +177,16 @@ The Windows Agent is the background service that collects time data and sends it
 5. Type these commands (press Enter after each):
 
 ```powershell
-cd "C:\Program Files\LTETimeTracking"
+cd "C:\Program Files\BuildPlusTimeTracking"
 
-New-Service -Name "LTETimeTracking" -DisplayName "LTE Time Tracking Agent" -BinaryPathName "C:\Program Files\LTETimeTracking\LTETimeTracking.Agent.exe" -StartupType Automatic
+New-Service -Name "BuildPlusTimeTracking" -DisplayName "BuildPlus Ai Time Tracking Agent" -BinaryPathName "C:\Program Files\BuildPlusTimeTracking\BuildPlusTimeTracking.Agent.exe" -StartupType Automatic
 
-Start-Service LTETimeTracking
+Start-Service BuildPlusTimeTracking
 ```
 
 6. To verify it's running, type:
 ```powershell
-Get-Service LTETimeTracking
+Get-Service BuildPlusTimeTracking
 ```
 
 You should see "Running" in the Status column.
@@ -196,12 +196,12 @@ You should see "Running" in the Status column.
 ## 5. Building the Revit Add-in
 
 ### Step 5.1: Download the Source Code
-1. Go to your LTE Time Tracking portal → Downloads
+1. Go to your BuildPlus Ai Time Tracking portal → Downloads
 2. Click **"View Source Code"** under Revit Add-in
-3. Download all files to `C:\LTE\revit-addin\`:
+3. Download all files to `C:\BuildPlus\revit-addin\`:
    - `App.cs`
-   - `LTETimeTracking.csproj`
-   - `LTETimeTracking.addin`
+   - `BuildPlusTimeTracking.csproj`
+   - `BuildPlusTimeTracking.addin`
    - `build.bat`
    - `README.md`
 
@@ -220,8 +220,8 @@ You should see "Running" in the Status column.
 ### Step 5.3: Open and Build in Visual Studio
 1. Open **Visual Studio 2022**
 2. Click **"Open a project or solution"**
-3. Navigate to `C:\LTE\revit-addin\`
-4. Select `LTETimeTracking.csproj` → **Open**
+3. Navigate to `C:\BuildPlus\revit-addin\`
+4. Select `BuildPlusTimeTracking.csproj` → **Open**
 5. Change the dropdown at the top from **Debug** to **Release**
 6. Go to menu: **Build** → **Build Solution**
 7. Wait for "Build succeeded" message
@@ -229,11 +229,11 @@ You should see "Running" in the Status column.
 ### Step 5.4: Find Your Built Files
 The compiled files are at:
 ```
-C:\LTE\revit-addin\bin\Release\net48\
+C:\BuildPlus\revit-addin\bin\Release\net48\
 ```
 
 You need these files:
-- `LTETimeTracking.Revit.dll`
+- `BuildPlusTimeTracking.Revit.dll`
 - `Newtonsoft.Json.dll`
 
 ---
@@ -247,12 +247,12 @@ You need these files:
    - If it doesn't exist, create it
 
 ### Step 6.2: Copy the Files
-1. Copy these files from `C:\LTE\revit-addin\bin\Release\net48\`:
-   - `LTETimeTracking.Revit.dll`
+1. Copy these files from `C:\BuildPlus\revit-addin\bin\Release\net48\`:
+   - `BuildPlusTimeTracking.Revit.dll`
    - `Newtonsoft.Json.dll`
    
-2. Also copy from `C:\LTE\revit-addin\`:
-   - `LTETimeTracking.addin`
+2. Also copy from `C:\BuildPlus\revit-addin\`:
+   - `BuildPlusTimeTracking.addin`
 
 3. Paste all three files into the Revit Addins folder:
    ```
@@ -262,7 +262,7 @@ You need these files:
 ### Step 6.3: Start Revit and Allow the Add-in
 1. Open Revit
 2. You may see a security warning about loading add-ins
-3. Click **"Always Load"** to allow the LTE Time Tracking add-in
+3. Click **"Always Load"** to allow the BuildPlus Ai Time Tracking add-in
 4. The add-in is now active in the background
 
 ---
@@ -270,11 +270,11 @@ You need these files:
 ## 7. Building the AutoCAD Add-in
 
 ### Step 7.1: Download the Source Code
-1. Go to your LTE Time Tracking portal → Downloads
+1. Go to your BuildPlus Ai Time Tracking portal → Downloads
 2. Click **"View Source Code"** under AutoCAD Add-in
-3. Download all files to `C:\LTE\acad-addin\`:
+3. Download all files to `C:\BuildPlus\acad-addin\`:
    - `App.cs`
-   - `LTETimeTracking.AutoCAD.csproj`
+   - `BuildPlusTimeTracking.AutoCAD.csproj`
    - `PackageContents.xml`
    - `build.bat`
    - `README.md`
@@ -294,8 +294,8 @@ You need these files:
 ### Step 7.3: Build the Project
 1. Open **Visual Studio 2022**
 2. Click **"Open a project or solution"**
-3. Navigate to `C:\LTE\acad-addin\`
-4. Select `LTETimeTracking.AutoCAD.csproj` → **Open**
+3. Navigate to `C:\BuildPlus\acad-addin\`
+4. Select `BuildPlusTimeTracking.AutoCAD.csproj` → **Open**
 5. Change dropdown to **Release**
 6. Go to **Build** → **Build Solution**
 7. Wait for "Build succeeded"
@@ -308,41 +308,41 @@ You need these files:
 1. Open File Explorer
 2. Press **Windows key + R**
 3. Type `%APPDATA%\Autodesk\ApplicationPlugins` and press Enter
-4. Create a new folder called `LTETimeTracking.bundle`
+4. Create a new folder called `BuildPlusTimeTracking.bundle`
 5. Inside that folder, create another folder called `Contents`
 
 ### Step 8.2: Copy the Files
-1. Copy from `C:\LTE\acad-addin\bin\Release\net48\`:
-   - `LTETimeTracking.AutoCAD.dll`
+1. Copy from `C:\BuildPlus\acad-addin\bin\Release\net48\`:
+   - `BuildPlusTimeTracking.AutoCAD.dll`
    - `Newtonsoft.Json.dll`
    
 2. Paste them into:
    ```
-   %APPDATA%\Autodesk\ApplicationPlugins\LTETimeTracking.bundle\Contents\
+   %APPDATA%\Autodesk\ApplicationPlugins\BuildPlusTimeTracking.bundle\Contents\
    ```
 
-3. Copy from `C:\LTE\acad-addin\`:
+3. Copy from `C:\BuildPlus\acad-addin\`:
    - `PackageContents.xml`
    
 4. Paste it into (NOT the Contents folder, the main bundle folder):
    ```
-   %APPDATA%\Autodesk\ApplicationPlugins\LTETimeTracking.bundle\
+   %APPDATA%\Autodesk\ApplicationPlugins\BuildPlusTimeTracking.bundle\
    ```
 
 Your final folder structure should look like:
 ```
-LTETimeTracking.bundle\
+BuildPlusTimeTracking.bundle\
     PackageContents.xml
     Contents\
-        LTETimeTracking.AutoCAD.dll
+        BuildPlusTimeTracking.AutoCAD.dll
         Newtonsoft.Json.dll
 ```
 
 ### Step 8.3: Start AutoCAD
 1. Open AutoCAD
 2. The add-in should load automatically
-3. To verify, type `LTETRACK` in the command line and press Enter
-4. You should see "LTE Time Tracking Status" information
+3. To verify, type `BPTRACK` in the command line and press Enter
+4. You should see "BuildPlus Ai Time Tracking Status" information
 
 ---
 
@@ -351,19 +351,19 @@ LTETimeTracking.bundle\
 ### Test 1: Check the Windows Agent is Running
 1. Press **Windows key + R**
 2. Type `services.msc` and press Enter
-3. Look for "LTE Time Tracking Agent"
+3. Look for "BuildPlus Ai Time Tracking Agent"
 4. Status should show "Running"
 
 ### Test 2: Check Revit Add-in
 1. Open Revit
 2. Open any project file
 3. Work for a few minutes
-4. Check your LTE Time Tracking portal Dashboard
+4. Check your BuildPlus Ai Time Tracking portal Dashboard
 5. You should see time entries appearing
 
 ### Test 3: Check AutoCAD Add-in
 1. Open AutoCAD
-2. Type `LTETRACK` and press Enter
+2. Type `BPTRACK` and press Enter
 3. You should see status information
 4. Open a drawing and work for a few minutes
 5. Check your portal Dashboard for entries
@@ -389,7 +389,7 @@ LTETimeTracking.bundle\
 **Solution:**
 1. Open AutoCAD
 2. Type `NETLOAD` and press Enter
-3. Browse to: `%APPDATA%\Autodesk\ApplicationPlugins\LTETimeTracking.bundle\Contents\LTETimeTracking.AutoCAD.dll`
+3. Browse to: `%APPDATA%\Autodesk\ApplicationPlugins\BuildPlusTimeTracking.bundle\Contents\BuildPlusTimeTracking.AutoCAD.dll`
 4. Click Open
 
 ### Problem: No data appearing in the portal
@@ -401,7 +401,7 @@ LTETimeTracking.bundle\
    - UserEmail (your login email)
 3. Restart the agent service:
    - Open PowerShell as Administrator
-   - Type: `Restart-Service LTETimeTracking`
+   - Type: `Restart-Service BuildPlusTimeTracking`
 
 ### Problem: "Access denied" when creating folders
 **Solution:**
@@ -413,7 +413,7 @@ LTETimeTracking.bundle\
 
 ## Need More Help?
 
-Contact your system administrator or email: support@lte.com.au
+Contact your system administrator or email: support@buildplus.ai
 
 ---
 

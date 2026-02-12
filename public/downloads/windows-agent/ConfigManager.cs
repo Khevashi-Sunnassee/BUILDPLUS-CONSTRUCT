@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using Newtonsoft.Json;
 
-namespace LTETimeTracking.Agent
+namespace BuildPlusTimeTracking.Agent
 {
     public class AgentConfig
     {
@@ -22,7 +22,7 @@ namespace LTETimeTracking.Agent
         public ConfigManager()
         {
             var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            var appFolder = Path.Combine(programData, "LTETimeTracking");
+            var appFolder = Path.Combine(programData, "BuildPlusTimeTracking");
             Directory.CreateDirectory(appFolder);
             _configPath = Path.Combine(appFolder, "config.json");
         }
@@ -70,7 +70,7 @@ namespace LTETimeTracking.Agent
         public string GetLogPath()
         {
             var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
-            var logFolder = Path.Combine(programData, "LTETimeTracking", "logs");
+            var logFolder = Path.Combine(programData, "BuildPlusTimeTracking", "logs");
             Directory.CreateDirectory(logFolder);
             return logFolder;
         }

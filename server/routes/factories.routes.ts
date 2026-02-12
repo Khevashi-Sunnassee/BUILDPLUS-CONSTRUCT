@@ -476,7 +476,7 @@ router.get("/api/geocode", requireAuth, async (req, res) => {
     }
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=au&limit=1`;
     const response = await fetch(url, {
-      headers: { "User-Agent": "LTE-Performance-Management/1.0" },
+      headers: { "User-Agent": "BuildPlus-Ai-Management/1.0" },
     });
     if (!response.ok) {
       return res.status(502).json({ error: "Geocoding service unavailable" });

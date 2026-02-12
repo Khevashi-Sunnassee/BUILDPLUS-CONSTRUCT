@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>BuildPlus Ai Time Tracking</Name>
+    <Assembly>BuildPlusTimeTracking.Revit.dll</Assembly>
+    <FullClassName>BuildPlusTimeTracking.Revit.App</FullClassName>
+    <ClientId>8D83C886-B739-4ADF-A4A1-E3A4D7F1B5C2</ClientId>
+    <VendorId>BuildPlusAi</VendorId>
+    <VendorDescription>BuildPlus Ai Pty Ltd</VendorDescription>
+  </AddIn>
+</RevitAddIns>

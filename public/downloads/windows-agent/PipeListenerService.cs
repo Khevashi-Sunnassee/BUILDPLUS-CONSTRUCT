@@ -8,13 +8,13 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
-namespace LTETimeTracking.Agent
+namespace BuildPlusTimeTracking.Agent
 {
     public class PipeListenerService : BackgroundService
     {
         private readonly ILogger<PipeListenerService> _logger;
         private readonly TimeBlockQueue _queue;
-        private const string PipeName = "LTETimeTrackingPipe";
+        private const string PipeName = "BuildPlusTimeTrackingPipe";
 
         public PipeListenerService(ILogger<PipeListenerService> logger, TimeBlockQueue queue)
         {

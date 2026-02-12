@@ -1,6 +1,6 @@
 @echo off
 echo ============================================
-echo LTE Time Tracking - Windows Agent Builder
+echo BuildPlus Ai Time Tracking - Windows Agent Builder
 echo ============================================
 echo.
 
@@ -38,10 +38,10 @@ echo ============================================
 echo Build successful!
 echo.
 echo Output file:
-echo   bin\Release\net6.0-windows\win-x64\publish\LTETimeTracking.Agent.exe
+echo   bin\Release\net6.0-windows\win-x64\publish\BuildPlusTimeTracking.Agent.exe
 echo.
 echo To install as a Windows service:
-echo   1. Copy the exe to C:\Program Files\LTETimeTracking\
+echo   1. Copy the exe to C:\Program Files\BuildPlusTimeTracking\
 echo   2. Run install-service.ps1 as Administrator
 echo.
 echo See README.md for detailed instructions.

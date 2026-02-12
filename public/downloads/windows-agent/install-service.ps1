@@ -1,14 +1,14 @@
-# LTE Time Tracking Agent - Service Installation Script
+# BuildPlus Ai Time Tracking Agent - Service Installation Script
 # Run as Administrator
 
 param(
-    [string]$InstallPath = "C:\Program Files\LTETimeTracking",
-    [string]$ServiceName = "LTETimeTracking"
+    [string]$InstallPath = "C:\Program Files\BuildPlusTimeTracking",
+    [string]$ServiceName = "BuildPlusTimeTracking"
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "LTE Time Tracking Agent - Service Installer" -ForegroundColor Cyan
+Write-Host "BuildPlus Ai Time Tracking Agent - Service Installer" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Cyan
 
 # Check for admin rights
@@ -27,10 +27,10 @@ if (-not (Test-Path $InstallPath)) {
 # Copy files
 Write-Host "Copying files..." -ForegroundColor Yellow
 $sourcePath = Split-Path -Parent $MyInvocation.MyCommand.Path
-Copy-Item "$sourcePath\LTETimeTracking.Agent.exe" -Destination $InstallPath -Force
+Copy-Item "$sourcePath\BuildPlusTimeTracking.Agent.exe" -Destination $InstallPath -Force
 
 # Create config directory
-$configPath = "C:\ProgramData\LTETimeTracking"
+$configPath = "C:\ProgramData\BuildPlusTimeTracking"
 if (-not (Test-Path $configPath)) {
     New-Item -ItemType Directory -Path $configPath -Force | Out-Null
 }
@@ -65,10 +65,10 @@ if ($existingService) {
 
 # Create the service
 Write-Host "Creating Windows service..." -ForegroundColor Yellow
-$binaryPath = "$InstallPath\LTETimeTracking.Agent.exe"
+$binaryPath = "$InstallPath\BuildPlusTimeTracking.Agent.exe"
 
 New-Service -Name $ServiceName `
-    -DisplayName "LTE Time Tracking Agent" `
+    -DisplayName "BuildPlus Ai Time Tracking Agent" `
     -Description "Uploads CAD/Revit time tracking data to the portal" `
     -BinaryPathName $binaryPath `
     -StartupType Automatic

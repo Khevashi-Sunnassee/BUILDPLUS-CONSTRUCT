@@ -8,7 +8,7 @@ using Autodesk.Revit.DB;
 using Autodesk.Revit.UI.Events;
 using Newtonsoft.Json;
 
-namespace LTETimeTracking.Revit
+namespace BuildPlusTimeTracking.Revit
 {
     public class App : IExternalApplication
     {
@@ -104,7 +104,7 @@ namespace LTETimeTracking.Revit
             catch (Exception ex)
             {
                 // Log error but don't crash Revit
-                System.Diagnostics.Debug.WriteLine($"LTE TimeTracking Error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"BuildPlus Ai TimeTracking Error: {ex.Message}");
             }
         }
 
@@ -202,7 +202,7 @@ namespace LTETimeTracking.Revit
             {
                 var json = JsonConvert.SerializeObject(block);
                 
-                using (var pipe = new NamedPipeClientStream(".", "LTETimeTrackingPipe", PipeDirection.Out))
+                using (var pipe = new NamedPipeClientStream(".", "BuildPlusTimeTrackingPipe", PipeDirection.Out))
                 {
                     pipe.Connect(1000); // 1 second timeout
                     

@@ -11,8 +11,8 @@ export async function seedDatabase() {
   let seedCompanyId: string;
   if (existingCompanies.length === 0) {
     const [company] = await db.insert(companies).values({
-      name: "LTE Precast",
-      code: "LTE",
+      name: "BuildPlus Ai",
+      code: "BPA",
     }).returning();
     seedCompanyId = company.id;
     logger.info("Seed company created");
@@ -86,7 +86,7 @@ export async function seedDatabase() {
 
   const [adminUser] = await db.insert(users).values({
     companyId: seedCompanyId,
-    email: "admin@lte.com.au",
+    email: "admin@buildplus.ai",
     name: "Admin User",
     passwordHash: adminPasswordHash,
     role: "ADMIN",
@@ -95,7 +95,7 @@ export async function seedDatabase() {
 
   const [managerUser] = await db.insert(users).values({
     companyId: seedCompanyId,
-    email: "manager@lte.com.au",
+    email: "manager@buildplus.ai",
     name: "Sarah Chen",
     passwordHash: managerPasswordHash,
     role: "MANAGER",
@@ -104,7 +104,7 @@ export async function seedDatabase() {
 
   const [drafterUser] = await db.insert(users).values({
     companyId: seedCompanyId,
-    email: "drafter@lte.com.au",
+    email: "drafter@buildplus.ai",
     name: "Michael Torres",
     passwordHash: userPasswordHash,
     role: "USER",
@@ -113,7 +113,7 @@ export async function seedDatabase() {
 
   const [drafter2User] = await db.insert(users).values({
     companyId: seedCompanyId,
-    email: "james@lte.com.au",
+    email: "james@buildplus.ai",
     name: "James Wilson",
     passwordHash: userPasswordHash,
     role: "USER",
@@ -345,7 +345,7 @@ export async function seedDatabase() {
   ]);
 
   logger.info("Seed data created successfully!");
-  logger.info("Demo accounts: Admin: admin@lte.com.au / admin123, Manager: manager@lte.com.au / manager123, User: drafter@lte.com.au / user123");
+  logger.info("Demo accounts: Admin: admin@buildplus.ai / admin123, Manager: manager@buildplus.ai / manager123, User: drafter@buildplus.ai / user123");
 }
 
 const PRE_POUR_SECTIONS = [

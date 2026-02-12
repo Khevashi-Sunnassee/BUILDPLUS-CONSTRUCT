@@ -1,15 +1,15 @@
-# LTE Time Tracking Agent - Service Uninstall Script
+# BuildPlus Ai Time Tracking Agent - Service Uninstall Script
 # Run as Administrator
 
 param(
-    [string]$InstallPath = "C:\Program Files\LTETimeTracking",
-    [string]$ServiceName = "LTETimeTracking",
+    [string]$InstallPath = "C:\Program Files\BuildPlusTimeTracking",
+    [string]$ServiceName = "BuildPlusTimeTracking",
     [switch]$KeepConfig
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "LTE Time Tracking Agent - Service Uninstaller" -ForegroundColor Cyan
+Write-Host "BuildPlus Ai Time Tracking Agent - Service Uninstaller" -ForegroundColor Cyan
 Write-Host "==============================================" -ForegroundColor Cyan
 
 # Check for admin rights
@@ -42,7 +42,7 @@ if (Test-Path $InstallPath) {
 }
 
 # Remove config (optional)
-$configPath = "C:\ProgramData\LTETimeTracking"
+$configPath = "C:\ProgramData\BuildPlusTimeTracking"
 if (-not $KeepConfig -and (Test-Path $configPath)) {
     Write-Host "Removing configuration and logs..." -ForegroundColor Yellow
     Remove-Item -Path $configPath -Recurse -Force

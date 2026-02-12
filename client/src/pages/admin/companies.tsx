@@ -289,7 +289,7 @@ export default function AdminCompaniesPage() {
                     <FormLabel>Company Code</FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="e.g., LTE" 
+                        placeholder="e.g., BPA" 
                         {...field} 
                         maxLength={10}
                         data-testid="input-company-code"
