@@ -22,6 +22,7 @@ import {
   Search,
   X,
   Tag,
+  Filter,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -146,6 +147,7 @@ export default function AdminSuppliersPage() {
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [searchQuery, setSearchQuery] = useState("");
   const [costCodeFilter, setCostCodeFilter] = useState<string>("");
+  const [typeFilter, setTypeFilter] = useState<string>("");
 
   const toggleSort = useCallback((column: string) => {
     if (sortColumn === column) {
@@ -189,6 +191,15 @@ export default function AdminSuppliersPage() {
         filtered = filtered.filter(s => s.defaultCostCodeId === costCodeFilter);
       }
     }
+    if (typeFilter) {
+      if (typeFilter === "tender") {
+        filtered = filtered.filter(s => s.availableForTender);
+      } else if (typeFilter === "hire") {
+        filtered = filtered.filter(s => s.isEquipmentHire);
+      } else if (typeFilter === "tender_hire") {
+        filtered = filtered.filter(s => s.availableForTender && s.isEquipmentHire);
+      }
+    }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       filtered = filtered.filter(s =>
@@ -218,13 +229,20 @@ export default function AdminSuppliersPage() {
           bVal = bCc ? `${bCc.code} ${bCc.name}` : "";
           break;
         }
+        case "type": {
+          const aType = [a.availableForTender ? "Tender" : "", a.isEquipmentHire ? "Hire" : ""].filter(Boolean).join(" ");
+          const bType = [b.availableForTender ? "Tender" : "", b.isEquipmentHire ? "Hire" : ""].filter(Boolean).join(" ");
+          aVal = aType;
+          bVal = bType;
+          break;
+        }
         case "status": aVal = a.isActive ? "Active" : "Inactive"; bVal = b.isActive ? "Active" : "Inactive"; break;
         default: aVal = a.name || ""; bVal = b.name || "";
       }
       const cmp = aVal.localeCompare(bVal, undefined, { sensitivity: "base" });
       return sortDirection === "asc" ? cmp : -cmp;
     });
-  }, [suppliersRaw, sortColumn, sortDirection, searchQuery, costCodeFilter, costCodeMap]);
+  }, [suppliersRaw, sortColumn, sortDirection, searchQuery, costCodeFilter, typeFilter, costCodeMap]);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -483,15 +501,31 @@ export default function AdminSuppliersPage() {
             </SelectContent>
           </Select>
         </div>
-        {costCodeFilter && (
+        <div className="w-[200px]">
+          <Select value={typeFilter || "all"} onValueChange={(v) => setTypeFilter(v === "all" ? "" : v)}>
+            <SelectTrigger data-testid="select-filter-type">
+              <div className="flex items-center gap-2">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                <SelectValue placeholder="Filter by type..." />
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="tender">Available for Tender</SelectItem>
+              <SelectItem value="hire">Equipment Hire</SelectItem>
+              <SelectItem value="tender_hire">Tender &amp; Hire</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(costCodeFilter || typeFilter) && (
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setCostCodeFilter("")}
-            data-testid="button-clear-cost-code-filter"
+            onClick={() => { setCostCodeFilter(""); setTypeFilter(""); }}
+            data-testid="button-clear-filters"
           >
             <X className="h-3 w-3 mr-1" />
-            Clear Filter
+            Clear Filters
           </Button>
         )}
       </div>
@@ -526,6 +560,9 @@ export default function AdminSuppliersPage() {
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("costCode")} data-testid="sort-supplier-cost-code">
                     <span className="flex items-center">Cost Code<SortIcon column="costCode" /></span>
                   </TableHead>
+                  <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("type")} data-testid="sort-supplier-type">
+                    <span className="flex items-center">Type<SortIcon column="type" /></span>
+                  </TableHead>
                   <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("status")} data-testid="sort-supplier-status">
                     <span className="flex items-center">Status<SortIcon column="status" /></span>
                   </TableHead>
@@ -556,11 +593,8 @@ export default function AdminSuppliersPage() {
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell data-testid={`text-supplier-type-${supplier.id}`}>
                       <div className="flex items-center gap-1 flex-wrap">
-                        <Badge variant={supplier.isActive ? "default" : "secondary"} data-testid={`badge-supplier-status-${supplier.id}`}>
-                          {supplier.isActive ? "Active" : "Inactive"}
-                        </Badge>
                         {supplier.availableForTender && (
                           <Badge variant="outline" data-testid={`badge-supplier-tender-${supplier.id}`}>
                             Tender
@@ -571,7 +605,15 @@ export default function AdminSuppliersPage() {
                             Hire
                           </Badge>
                         )}
+                        {!supplier.availableForTender && !supplier.isEquipmentHire && (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={supplier.isActive ? "default" : "secondary"} data-testid={`badge-supplier-status-${supplier.id}`}>
+                        {supplier.isActive ? "Active" : "Inactive"}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
