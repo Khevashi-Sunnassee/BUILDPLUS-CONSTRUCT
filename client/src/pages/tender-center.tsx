@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -10,6 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
@@ -26,9 +29,9 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Eye, Pencil, Trash2, Loader2, Search, FileText, ChevronDown, ChevronRight,
-  DollarSign, Users, Send,
+  DollarSign, Users, Send, Mail, Package, X,
 } from "lucide-react";
-import type { Tender, TenderSubmission, Job } from "@shared/schema";
+import type { Tender, TenderSubmission, TenderMember, Job, DocumentBundle } from "@shared/schema";
 
 type TenderStatus = "DRAFT" | "OPEN" | "UNDER_REVIEW" | "APPROVED" | "CLOSED" | "CANCELLED";
 type SubmissionStatus = "SUBMITTED" | "REVISED" | "APPROVED" | "REJECTED";
@@ -36,6 +39,24 @@ type SubmissionStatus = "SUBMITTED" | "REVISED" | "APPROVED" | "REJECTED";
 interface TenderWithDetails extends Tender {
   job: { id: string; name: string; jobNumber: string } | null;
   createdBy: { id: string; name: string } | null;
+  memberCount?: number;
+  members?: Array<{ id: string; supplierId: string; status: string; supplier: { id: string; name: string; email: string | null } }>;
+}
+
+interface TenderMemberWithSupplier {
+  id: string;
+  tenderId: string;
+  supplierId: string;
+  status: string;
+  invitedAt: string | null;
+  sentAt: string | null;
+  supplier: { id: string; name: string; email: string | null };
+}
+
+interface BundleOption {
+  id: string;
+  bundleName: string;
+  jobId: string | null;
 }
 
 interface SubmissionWithDetails extends TenderSubmission {
@@ -134,8 +155,18 @@ export default function TenderCenterPage() {
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
   const [formStatus, setFormStatus] = useState<TenderStatus>("DRAFT");
-  const [formDueDate, setFormDueDate] = useState("");
+  const [formOpenDate, setFormOpenDate] = useState("");
+  const [formClosedDate, setFormClosedDate] = useState("");
+  const [formBundleId, setFormBundleId] = useState("");
+  const [formMemberIds, setFormMemberIds] = useState<string[]>([]);
   const [formNotes, setFormNotes] = useState("");
+  const [formActiveTab, setFormActiveTab] = useState("details");
+
+  const [invitationDialogOpen, setInvitationDialogOpen] = useState(false);
+  const [invitationTender, setInvitationTender] = useState<TenderWithDetails | null>(null);
+  const [invitationSelectedIds, setInvitationSelectedIds] = useState<string[]>([]);
+  const [invitationSubject, setInvitationSubject] = useState("");
+  const [invitationMessage, setInvitationMessage] = useState("");
 
   const [subFormSupplierId, setSubFormSupplierId] = useState("");
   const [subFormCoverNote, setSubFormCoverNote] = useState("");
@@ -171,6 +202,20 @@ export default function TenderCenterPage() {
     queryKey: ["/api/suppliers"],
   });
 
+  const { data: bundles = [] } = useQuery<BundleOption[]>({
+    queryKey: ["/api/document-bundles"],
+  });
+
+  const { data: invitationMembers = [], isLoading: loadingInvitationMembers } = useQuery<TenderMemberWithSupplier[]>({
+    queryKey: ["/api/tenders", invitationTender?.id, "members"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenders/${invitationTender!.id}/members`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch members");
+      return res.json();
+    },
+    enabled: !!invitationTender,
+  });
+
   const filteredTenders = useMemo(() => {
     if (!searchQuery.trim()) return tenders;
     const q = searchQuery.toLowerCase();
@@ -184,7 +229,7 @@ export default function TenderCenterPage() {
   }, [tenders, searchQuery]);
 
   const createTenderMutation = useMutation({
-    mutationFn: async (data: { jobId: string; title: string; description?: string; status?: string; dueDate?: string; notes?: string }) => {
+    mutationFn: async (data: Record<string, any>) => {
       return apiRequest("POST", "/api/tenders", data);
     },
     onSuccess: () => {
@@ -198,7 +243,7 @@ export default function TenderCenterPage() {
   });
 
   const updateTenderMutation = useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; jobId?: string; title?: string; description?: string; status?: string; dueDate?: string; notes?: string }) => {
+    mutationFn: async ({ id, ...data }: { id: string; [key: string]: any }) => {
       return apiRequest("PATCH", `/api/tenders/${id}`, data);
     },
     onSuccess: () => {
@@ -211,6 +256,25 @@ export default function TenderCenterPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendInvitationsMutation = useMutation({
+    mutationFn: async ({ tenderId, memberIds, subject, message }: { tenderId: string; memberIds: string[]; subject: string; message: string }) => {
+      const res = await apiRequest("POST", `/api/tenders/${tenderId}/send-invitations`, { memberIds, subject, message });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders"] });
+      if (invitationTender) {
+        queryClient.invalidateQueries({ queryKey: ["/api/tenders", invitationTender.id, "members"] });
+      }
+      toast({ title: `Invitations sent`, description: `${data.sent} email(s) sent successfully${data.failed > 0 ? `, ${data.failed} failed` : ""}` });
+      setInvitationDialogOpen(false);
+      setInvitationTender(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send invitations", description: error.message, variant: "destructive" });
     },
   });
 
@@ -251,8 +315,12 @@ export default function TenderCenterPage() {
     setFormTitle("");
     setFormDescription("");
     setFormStatus("DRAFT");
-    setFormDueDate("");
+    setFormOpenDate("");
+    setFormClosedDate("");
+    setFormBundleId("");
+    setFormMemberIds([]);
     setFormNotes("");
+    setFormActiveTab("details");
     setTenderFormOpen(true);
   }
 
@@ -262,8 +330,12 @@ export default function TenderCenterPage() {
     setFormTitle(tender.title);
     setFormDescription(tender.description || "");
     setFormStatus(tender.status as TenderStatus);
-    setFormDueDate(tender.dueDate ? format(new Date(tender.dueDate), "yyyy-MM-dd") : "");
+    setFormOpenDate(tender.openDate ? format(new Date(tender.openDate), "yyyy-MM-dd") : "");
+    setFormClosedDate(tender.closedDate ? format(new Date(tender.closedDate), "yyyy-MM-dd") : "");
+    setFormBundleId(tender.bundleId || "");
+    setFormMemberIds(tender.members?.map(m => m.supplierId) || []);
     setFormNotes(tender.notes || "");
+    setFormActiveTab("details");
     setTenderFormOpen(true);
   }
 
@@ -277,12 +349,15 @@ export default function TenderCenterPage() {
       toast({ title: "Job and Title are required", variant: "destructive" });
       return;
     }
-    const data = {
+    const data: Record<string, any> = {
       jobId: formJobId,
       title: formTitle.trim(),
       description: formDescription.trim() || undefined,
       status: formStatus,
-      dueDate: formDueDate || undefined,
+      openDate: formOpenDate || undefined,
+      closedDate: formClosedDate || undefined,
+      bundleId: formBundleId || undefined,
+      memberIds: formMemberIds,
       notes: formNotes.trim() || undefined,
     };
     if (editingTender) {
@@ -290,6 +365,47 @@ export default function TenderCenterPage() {
     } else {
       createTenderMutation.mutate(data);
     }
+  }
+
+  function openInvitationDialog(tender: TenderWithDetails) {
+    setInvitationTender(tender);
+    setInvitationSubject(`Tender Invitation: ${tender.tenderNumber} - ${tender.title}`);
+    setInvitationMessage(
+      `Dear Supplier,\n\nYou are invited to submit a tender for:\n\nTender: ${tender.tenderNumber}\nTitle: ${tender.title}\n${tender.job ? `Job: ${tender.job.jobNumber} - ${tender.job.name}\n` : ""}${tender.closedDate ? `Closing Date: ${format(new Date(tender.closedDate), "dd/MM/yyyy")}\n` : ""}\nPlease review the tender documents and submit your response.\n\nRegards`
+    );
+    setInvitationSelectedIds([]);
+    setInvitationDialogOpen(true);
+  }
+
+  useEffect(() => {
+    if (invitationMembers.length > 0 && invitationSelectedIds.length === 0) {
+      setInvitationSelectedIds(invitationMembers.filter(m => !!m.supplier.email).map(m => m.id));
+    }
+  }, [invitationMembers]);
+
+  function handleSendInvitations() {
+    if (!invitationTender || invitationSelectedIds.length === 0) {
+      toast({ title: "No members selected", variant: "destructive" });
+      return;
+    }
+    if (!invitationSubject.trim()) {
+      toast({ title: "Subject is required", variant: "destructive" });
+      return;
+    }
+    sendInvitationsMutation.mutate({
+      tenderId: invitationTender.id,
+      memberIds: invitationSelectedIds,
+      subject: invitationSubject.trim(),
+      message: invitationMessage.trim(),
+    });
+  }
+
+  function toggleMemberSupplier(supplierId: string) {
+    setFormMemberIds(prev =>
+      prev.includes(supplierId)
+        ? prev.filter(id => id !== supplierId)
+        : [...prev, supplierId]
+    );
   }
 
   function openSubmissionForm(tenderId: string) {
@@ -411,9 +527,10 @@ export default function TenderCenterPage() {
                     <TableHead>Title</TableHead>
                     <TableHead>Job</TableHead>
                     <TableHead className="w-28">Status</TableHead>
-                    <TableHead className="w-28">Due Date</TableHead>
+                    <TableHead className="w-28">Closed Date</TableHead>
                     <TableHead>Created By</TableHead>
-                    <TableHead className="w-28 text-right">Actions</TableHead>
+                    <TableHead className="w-20">Members</TableHead>
+                    <TableHead className="w-36 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -430,13 +547,24 @@ export default function TenderCenterPage() {
                         <TenderStatusBadge status={tender.status} />
                       </TableCell>
                       <TableCell className="text-muted-foreground" data-testid={`text-tender-due-${tender.id}`}>
-                        {tender.dueDate ? format(new Date(tender.dueDate), "dd/MM/yyyy") : "-"}
+                        {tender.closedDate ? format(new Date(tender.closedDate), "dd/MM/yyyy") : tender.dueDate ? format(new Date(tender.dueDate), "dd/MM/yyyy") : "-"}
                       </TableCell>
                       <TableCell className="text-muted-foreground" data-testid={`text-tender-created-by-${tender.id}`}>
                         {tender.createdBy?.name || "-"}
                       </TableCell>
+                      <TableCell className="text-muted-foreground" data-testid={`text-tender-members-${tender.id}`}>
+                        {tender.memberCount ?? 0}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => openInvitationDialog(tender)}
+                            data-testid={`button-mail-tender-${tender.id}`}
+                          >
+                            <Mail className="h-4 w-4" />
+                          </Button>
                           <Button
                             size="icon"
                             variant="ghost"
@@ -473,87 +601,184 @@ export default function TenderCenterPage() {
       </Card>
 
       <Dialog open={tenderFormOpen} onOpenChange={(open) => { if (!open) closeTenderForm(); }}>
-        <DialogContent className="max-w-lg" data-testid="dialog-tender-form">
+        <DialogContent className="max-w-2xl" data-testid="dialog-tender-form">
           <DialogHeader>
             <DialogTitle>{editingTender ? "Edit Tender" : "New Tender"}</DialogTitle>
             <DialogDescription>
               {editingTender ? "Update the tender details below." : "Create a new tender for a job."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="tender-job">Job</Label>
-              <Select value={formJobId} onValueChange={setFormJobId}>
-                <SelectTrigger data-testid="select-tender-job">
-                  <SelectValue placeholder="Select a job..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {jobs.map((job) => (
-                    <SelectItem key={job.id} value={job.id}>
-                      {job.jobNumber} - {job.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tender-title">Title</Label>
-              <Input
-                id="tender-title"
-                value={formTitle}
-                onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="Tender title..."
-                data-testid="input-tender-title"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tender-description">Description</Label>
-              <Textarea
-                id="tender-description"
-                value={formDescription}
-                onChange={(e) => setFormDescription(e.target.value)}
-                placeholder="Description..."
-                className="resize-none"
-                data-testid="input-tender-description"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+          <Tabs value={formActiveTab} onValueChange={setFormActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details" data-testid="tab-tender-details">Details</TabsTrigger>
+              <TabsTrigger value="members" data-testid="tab-tender-members">
+                Members {formMemberIds.length > 0 && <Badge variant="secondary" className="ml-1">{formMemberIds.length}</Badge>}
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="details" className="space-y-4 mt-4">
               <div className="space-y-2">
-                <Label htmlFor="tender-status">Status</Label>
-                <Select value={formStatus} onValueChange={(v) => setFormStatus(v as TenderStatus)}>
-                  <SelectTrigger data-testid="select-tender-status">
-                    <SelectValue />
+                <Label htmlFor="tender-job">Job</Label>
+                <Select value={formJobId} onValueChange={setFormJobId}>
+                  <SelectTrigger data-testid="select-tender-job">
+                    <SelectValue placeholder="Select a job..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(STATUS_LABELS) as TenderStatus[]).map((s) => (
-                      <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
+                    {jobs.map((job) => (
+                      <SelectItem key={job.id} value={job.id}>
+                        {job.jobNumber} - {job.name}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tender-due-date">Due Date</Label>
+                <Label htmlFor="tender-title">Title</Label>
                 <Input
-                  id="tender-due-date"
-                  type="date"
-                  value={formDueDate}
-                  onChange={(e) => setFormDueDate(e.target.value)}
-                  data-testid="input-tender-due-date"
+                  id="tender-title"
+                  value={formTitle}
+                  onChange={(e) => setFormTitle(e.target.value)}
+                  placeholder="Tender title..."
+                  data-testid="input-tender-title"
                 />
               </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tender-notes">Notes</Label>
-              <Textarea
-                id="tender-notes"
-                value={formNotes}
-                onChange={(e) => setFormNotes(e.target.value)}
-                placeholder="Notes..."
-                className="resize-none"
-                data-testid="input-tender-notes"
-              />
-            </div>
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="tender-description">Description</Label>
+                <Textarea
+                  id="tender-description"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Description..."
+                  className="resize-none"
+                  data-testid="input-tender-description"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tender-status">Status</Label>
+                  <Select value={formStatus} onValueChange={(v) => setFormStatus(v as TenderStatus)}>
+                    <SelectTrigger data-testid="select-tender-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(STATUS_LABELS) as TenderStatus[]).map((s) => (
+                        <SelectItem key={s} value={s}>{STATUS_LABELS[s]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="tender-open-date">Open Date</Label>
+                  <Input
+                    id="tender-open-date"
+                    type="date"
+                    value={formOpenDate}
+                    onChange={(e) => setFormOpenDate(e.target.value)}
+                    data-testid="input-tender-open-date"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tender-closed-date">Closed Date</Label>
+                  <Input
+                    id="tender-closed-date"
+                    type="date"
+                    value={formClosedDate}
+                    onChange={(e) => setFormClosedDate(e.target.value)}
+                    data-testid="input-tender-closed-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Document Bundle</Label>
+                  <Select value={formBundleId || "none"} onValueChange={(v) => setFormBundleId(v === "none" ? "" : v)}>
+                    <SelectTrigger data-testid="select-tender-bundle">
+                      <SelectValue placeholder="Select bundle..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No bundle</SelectItem>
+                      {bundles.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          <div className="flex items-center gap-2">
+                            <Package className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{b.bundleName}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tender-notes">Notes</Label>
+                <Textarea
+                  id="tender-notes"
+                  value={formNotes}
+                  onChange={(e) => setFormNotes(e.target.value)}
+                  placeholder="Notes..."
+                  className="resize-none"
+                  data-testid="input-tender-notes"
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="members" className="mt-4">
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Select suppliers to invite as tender members. You can send invitations after saving.
+                </p>
+                {suppliers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm" data-testid="text-no-suppliers">
+                    No suppliers available. Add suppliers in the admin section first.
+                  </div>
+                ) : (
+                  <div className="border rounded-md max-h-[350px] overflow-y-auto">
+                    {suppliers.map((supplier) => (
+                      <div
+                        key={supplier.id}
+                        className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0 hover-elevate"
+                        data-testid={`row-member-supplier-${supplier.id}`}
+                      >
+                        <Checkbox
+                          id={`member-${supplier.id}`}
+                          checked={formMemberIds.includes(supplier.id)}
+                          onCheckedChange={() => toggleMemberSupplier(supplier.id)}
+                          data-testid={`checkbox-member-${supplier.id}`}
+                        />
+                        <Label htmlFor={`member-${supplier.id}`} className="flex-1 cursor-pointer text-sm">
+                          {supplier.name}
+                        </Label>
+                        {formMemberIds.includes(supplier.id) && (
+                          <Badge variant="secondary" className="text-xs">Selected</Badge>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center justify-between gap-2 pt-2 flex-wrap">
+                  <p className="text-xs text-muted-foreground">
+                    {formMemberIds.length} supplier(s) selected
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormMemberIds(suppliers.map(s => s.id))}
+                      data-testid="button-select-all-members"
+                    >
+                      Select All
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFormMemberIds([])}
+                      data-testid="button-clear-all-members"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
           <DialogFooter>
             <Button variant="outline" onClick={closeTenderForm} data-testid="button-cancel-tender">Cancel</Button>
             <Button onClick={handleTenderSubmit} disabled={isTenderFormPending} data-testid="button-save-tender">
@@ -697,6 +922,153 @@ export default function TenderCenterPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={invitationDialogOpen} onOpenChange={(open) => { if (!open) { setInvitationDialogOpen(false); setInvitationTender(null); } }}>
+        <DialogContent className="max-w-[700px] max-h-[85vh] p-0 gap-0 overflow-hidden" data-testid="dialog-send-invitations">
+          <DialogHeader className="px-6 py-4 border-b">
+            <DialogTitle className="flex items-center gap-2" data-testid="text-invitation-title">
+              <Mail className="h-5 w-5" />
+              Send Tender Invitations
+            </DialogTitle>
+            <DialogDescription>
+              {invitationTender && `${invitationTender.tenderNumber} - ${invitationTender.title}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-y-auto" style={{ maxHeight: "calc(85vh - 180px)" }}>
+            <div className="px-6 py-4 space-y-4">
+              {loadingInvitationMembers ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : invitationMembers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground" data-testid="text-no-invitation-members">
+                  <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No members added to this tender yet.</p>
+                  <p className="text-xs mt-1">Edit the tender and add members in the Members tab first.</p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-sm font-medium mb-3">Tender invitations will be sent to the following members:</p>
+                    <div className="border rounded-md">
+                      {invitationMembers.map((member) => {
+                        const isSelected = invitationSelectedIds.includes(member.id);
+                        const hasEmail = !!member.supplier.email;
+                        return (
+                          <div
+                            key={member.id}
+                            className={`flex items-center gap-3 px-4 py-3 border-b last:border-b-0 ${!hasEmail ? "opacity-50" : ""}`}
+                            data-testid={`row-invitation-member-${member.id}`}
+                          >
+                            <Checkbox
+                              id={`inv-member-${member.id}`}
+                              checked={isSelected}
+                              disabled={!hasEmail}
+                              onCheckedChange={(checked) => {
+                                setInvitationSelectedIds(prev =>
+                                  checked
+                                    ? [...prev, member.id]
+                                    : prev.filter(id => id !== member.id)
+                                );
+                              }}
+                              data-testid={`checkbox-invitation-${member.id}`}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{member.supplier.name}</p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {hasEmail ? member.supplier.email : "No email address"}
+                              </p>
+                            </div>
+                            {member.status === "SENT" && (
+                              <Badge variant="secondary" className="text-xs flex-shrink-0">Previously Sent</Badge>
+                            )}
+                            {!hasEmail && (
+                              <Badge variant="destructive" className="text-xs flex-shrink-0">No Email</Badge>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between gap-2 mt-2 flex-wrap">
+                      <p className="text-xs text-muted-foreground">
+                        {invitationSelectedIds.length} of {invitationMembers.filter(m => !!m.supplier.email).length} member(s) selected
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInvitationSelectedIds(invitationMembers.filter(m => !!m.supplier.email).map(m => m.id))}
+                          data-testid="button-select-all-invitations"
+                        >
+                          Select All
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setInvitationSelectedIds([])}
+                          data-testid="button-clear-invitations"
+                        >
+                          Clear
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="inv-subject">Subject</Label>
+                      <Input
+                        id="inv-subject"
+                        value={invitationSubject}
+                        onChange={(e) => setInvitationSubject(e.target.value)}
+                        data-testid="input-invitation-subject"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="inv-message">Message</Label>
+                      <Textarea
+                        id="inv-message"
+                        value={invitationMessage}
+                        onChange={(e) => setInvitationMessage(e.target.value)}
+                        rows={8}
+                        className="resize-none text-sm"
+                        data-testid="input-invitation-message"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => { setInvitationDialogOpen(false); setInvitationTender(null); }}
+              data-testid="button-cancel-invitations"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSendInvitations}
+              disabled={sendInvitationsMutation.isPending || invitationSelectedIds.length === 0}
+              data-testid="button-send-invitations"
+            >
+              {sendInvitationsMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Send Invitations
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -755,9 +1127,15 @@ function TenderDetailContent({
             </p>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground">Due Date</p>
-            <p data-testid="text-detail-due-date">
-              {tender.dueDate ? format(new Date(tender.dueDate), "dd/MM/yyyy") : "-"}
+            <p className="text-sm text-muted-foreground">Open Date</p>
+            <p data-testid="text-detail-open-date">
+              {tender.openDate ? format(new Date(tender.openDate), "dd/MM/yyyy") : "-"}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Closed Date</p>
+            <p data-testid="text-detail-closed-date">
+              {tender.closedDate ? format(new Date(tender.closedDate), "dd/MM/yyyy") : tender.dueDate ? format(new Date(tender.dueDate), "dd/MM/yyyy") : "-"}
             </p>
           </div>
           <div>

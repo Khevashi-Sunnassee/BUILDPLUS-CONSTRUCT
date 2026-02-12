@@ -4,9 +4,10 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import crypto from "crypto";
+import { emailService } from "../services/email.service";
 
 const router = Router();
 
@@ -49,6 +50,9 @@ const tenderSchema = z.object({
   description: z.string().nullable().optional(),
   status: z.enum(["DRAFT", "OPEN", "UNDER_REVIEW", "APPROVED", "CLOSED", "CANCELLED"]).optional(),
   dueDate: z.string().nullable().optional(),
+  openDate: z.string().nullable().optional(),
+  closedDate: z.string().nullable().optional(),
+  bundleId: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -119,6 +123,15 @@ router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), as
       conditions.push(eq(tenders.status, status as any));
     }
 
+    const memberCountSubquery = db
+      .select({
+        tenderId: tenderMembers.tenderId,
+        count: sql<number>`count(*)::int`.as("member_count"),
+      })
+      .from(tenderMembers)
+      .groupBy(tenderMembers.tenderId)
+      .as("member_counts");
+
     const results = await db
       .select({
         tender: tenders,
@@ -131,10 +144,12 @@ router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), as
           id: users.id,
           name: users.name,
         },
+        memberCount: sql<number>`coalesce(${memberCountSubquery.count}, 0)`.as("memberCount"),
       })
       .from(tenders)
       .leftJoin(jobs, eq(tenders.jobId, jobs.id))
       .leftJoin(users, eq(tenders.createdById, users.id))
+      .leftJoin(memberCountSubquery, eq(tenders.id, memberCountSubquery.tenderId))
       .where(and(...conditions))
       .orderBy(desc(tenders.createdAt))
       .limit(queryLimit)
@@ -144,6 +159,7 @@ router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), as
       ...row.tender,
       job: row.job,
       createdBy: row.createdBy,
+      memberCount: row.memberCount,
     }));
 
     res.json(mapped);
@@ -181,11 +197,25 @@ router.get("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW")
       return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
 
+    const members = await db
+      .select({
+        member: tenderMembers,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+          email: suppliers.email,
+        },
+      })
+      .from(tenderMembers)
+      .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
+      .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
+
     const row = result[0];
     res.json({
       ...row.tender,
       job: row.job,
       createdBy: row.createdBy,
+      members: members.map(m => ({ ...m.member, supplier: m.supplier })),
     });
   } catch (error: any) {
     logger.error("Error fetching tender:", error);
@@ -199,6 +229,7 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
     const userId = req.session.userId!;
     const data = tenderSchema.parse(req.body);
     const documentIds: string[] = Array.isArray(req.body.documentIds) ? req.body.documentIds : [];
+    const memberIds: string[] = Array.isArray(req.body.memberIds) ? req.body.memberIds : [];
 
     const maxRetries = 3;
     let attempt = 0;
@@ -220,6 +251,9 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
               description: data.description || null,
               status: data.status || "DRAFT",
               dueDate: data.dueDate ? new Date(data.dueDate) : null,
+              openDate: data.openDate ? new Date(data.openDate) : null,
+              closedDate: data.closedDate ? new Date(data.closedDate) : null,
+              bundleId: data.bundleId || null,
               notes: data.notes || null,
               createdById: userId,
             })
@@ -263,6 +297,26 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
                 name: `Tender Documents - ${data.title}`,
                 description: `${validDocIds.length} document(s) attached`,
                 sortOrder: 0,
+              });
+            }
+          }
+
+          if (memberIds.length > 0) {
+            const validSuppliers = await tx.select({ id: suppliers.id })
+              .from(suppliers)
+              .where(and(
+                inArray(suppliers.id, memberIds),
+                eq(suppliers.companyId, companyId)
+              ));
+            const validSupplierIds = validSuppliers.map(s => s.id);
+
+            for (const supplierId of validSupplierIds) {
+              await tx.insert(tenderMembers).values({
+                companyId,
+                tenderId: tender.id,
+                supplierId,
+                status: "PENDING",
+                invitedAt: new Date(),
               });
             }
           }
@@ -313,6 +367,9 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
     if (data.description !== undefined) updateData.description = data.description || null;
     if (data.status !== undefined) updateData.status = data.status;
     if (data.dueDate !== undefined) updateData.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (data.openDate !== undefined) updateData.openDate = data.openDate ? new Date(data.openDate) : null;
+    if (data.closedDate !== undefined) updateData.closedDate = data.closedDate ? new Date(data.closedDate) : null;
+    if (data.bundleId !== undefined) updateData.bundleId = data.bundleId || null;
     if (data.notes !== undefined) updateData.notes = data.notes || null;
 
     const [result] = await db
@@ -324,6 +381,32 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
     if (!result) {
       return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
+
+    const memberIds: string[] | undefined = Array.isArray(req.body.memberIds) ? req.body.memberIds : undefined;
+    if (memberIds !== undefined) {
+      await db.delete(tenderMembers).where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
+
+      if (memberIds.length > 0) {
+        const validSuppliers = await db.select({ id: suppliers.id })
+          .from(suppliers)
+          .where(and(
+            inArray(suppliers.id, memberIds),
+            eq(suppliers.companyId, companyId)
+          ));
+        const validSupplierIds = validSuppliers.map(s => s.id);
+
+        for (const supplierId of validSupplierIds) {
+          await db.insert(tenderMembers).values({
+            companyId,
+            tenderId: req.params.id,
+            supplierId,
+            status: "PENDING",
+            invitedAt: new Date(),
+          });
+        }
+      }
+    }
+
     res.json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
@@ -1153,6 +1236,116 @@ router.delete("/api/jobs/:jobId/tenders/:tenderId/documents/:packageId", require
   } catch (error: any) {
     logger.error("Error removing tender document:", error);
     res.status(500).json({ message: "Failed to remove tender document", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.get("/api/tenders/:id/members", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, req.params.id))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const results = await db
+      .select({
+        member: tenderMembers,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+          email: suppliers.email,
+        },
+      })
+      .from(tenderMembers)
+      .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
+      .where(and(eq(tenderMembers.tenderId, req.params.id), eq(tenderMembers.companyId, companyId)));
+
+    const mapped = results.map((row) => ({
+      ...row.member,
+      supplier: row.supplier,
+    }));
+
+    res.json(mapped);
+  } catch (error: any) {
+    logger.error("Error fetching tender members:", error);
+    res.status(500).json({ message: "Failed to fetch tender members", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, req.params.id))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured" });
+    }
+
+    const schema = z.object({
+      memberIds: z.array(z.string()).min(1, "At least one member is required"),
+      subject: z.string().min(1, "Subject is required"),
+      message: z.string().min(1, "Message is required"),
+    });
+
+    const data = schema.parse(req.body);
+
+    const members = await db
+      .select({
+        member: tenderMembers,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+          email: suppliers.email,
+        },
+      })
+      .from(tenderMembers)
+      .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
+      .where(and(
+        inArray(tenderMembers.id, data.memberIds),
+        eq(tenderMembers.tenderId, req.params.id),
+        eq(tenderMembers.companyId, companyId),
+      ));
+
+    let sent = 0;
+    let failed = 0;
+    const results: Array<{ memberId: string; supplierName: string | null; status: string; error?: string }> = [];
+
+    for (const row of members) {
+      const email = row.supplier?.email;
+      if (!email) {
+        failed++;
+        results.push({ memberId: row.member.id, supplierName: row.supplier?.name || null, status: "failed", error: "No email address" });
+        continue;
+      }
+
+      try {
+        const htmlBody = data.message.replace(/\n/g, '<br>');
+        await emailService.sendEmailWithAttachment({ to: email, subject: data.subject, body: htmlBody });
+
+        await db.update(tenderMembers)
+          .set({ status: "SENT", sentAt: new Date() })
+          .where(eq(tenderMembers.id, row.member.id));
+
+        sent++;
+        results.push({ memberId: row.member.id, supplierName: row.supplier?.name || null, status: "sent" });
+      } catch (emailError: any) {
+        failed++;
+        results.push({ memberId: row.member.id, supplierName: row.supplier?.name || null, status: "failed", error: emailError.message || "Send failed" });
+      }
+    }
+
+    res.json({ sent, failed, results });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error sending tender invitations:", error);
+    res.status(500).json({ message: "Failed to send invitations", code: "INTERNAL_ERROR" });
   }
 });
 

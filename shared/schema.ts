@@ -4054,6 +4054,8 @@ export const jobCostCodes = pgTable("job_cost_codes", {
 }));
 
 // Tenders - per job, can have multiple
+export const tenderMemberStatusEnum = pgEnum("tender_member_status", ["PENDING", "INVITED", "SENT", "DECLINED"]);
+
 export const tenders = pgTable("tenders", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
@@ -4063,6 +4065,9 @@ export const tenders = pgTable("tenders", {
   description: text("description"),
   status: tenderStatusEnum("status").default("DRAFT").notNull(),
   dueDate: timestamp("due_date"),
+  openDate: timestamp("open_date"),
+  closedDate: timestamp("closed_date"),
+  bundleId: varchar("bundle_id", { length: 36 }).references(() => documentBundles.id),
   issuedAt: timestamp("issued_at"),
   approvedById: varchar("approved_by_id", { length: 36 }).references(() => users.id),
   approvedAt: timestamp("approved_at"),
@@ -4075,6 +4080,22 @@ export const tenders = pgTable("tenders", {
   jobIdx: index("tenders_job_idx").on(table.jobId),
   statusIdx: index("tenders_status_idx").on(table.status),
   tenderNumberCompanyIdx: uniqueIndex("tenders_number_company_idx").on(table.tenderNumber, table.companyId),
+}));
+
+export const tenderMembers = pgTable("tender_members", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderId: varchar("tender_id", { length: 36 }).notNull().references(() => tenders.id, { onDelete: "cascade" }),
+  supplierId: varchar("supplier_id", { length: 36 }).notNull().references(() => suppliers.id),
+  status: tenderMemberStatusEnum("status").default("PENDING").notNull(),
+  invitedAt: timestamp("invited_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tenderIdx: index("tender_members_tender_idx").on(table.tenderId),
+  supplierIdx: index("tender_members_supplier_idx").on(table.supplierId),
+  companyIdx: index("tender_members_company_idx").on(table.companyId),
+  tenderSupplierUnique: uniqueIndex("tender_members_tender_supplier_unique").on(table.tenderId, table.supplierId),
 }));
 
 // Tender document packages - links tenders to document bundles
@@ -4315,6 +4336,10 @@ export type Tender = typeof tenders.$inferSelect;
 export const insertTenderPackageSchema = createInsertSchema(tenderPackages).omit({ id: true, createdAt: true });
 export type InsertTenderPackage = z.infer<typeof insertTenderPackageSchema>;
 export type TenderPackage = typeof tenderPackages.$inferSelect;
+
+export const insertTenderMemberSchema = createInsertSchema(tenderMembers).omit({ id: true, createdAt: true });
+export type InsertTenderMember = z.infer<typeof insertTenderMemberSchema>;
+export type TenderMember = typeof tenderMembers.$inferSelect;
 
 export const insertTenderSubmissionSchema = createInsertSchema(tenderSubmissions).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTenderSubmission = z.infer<typeof insertTenderSubmissionSchema>;
