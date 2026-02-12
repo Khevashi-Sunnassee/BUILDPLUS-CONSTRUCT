@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -191,10 +191,12 @@ export default function AdminCostCodesPage() {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
+      const csrfToken = getCsrfToken();
       const res = await fetch("/api/cost-codes/import", {
         method: "POST",
         body: formData,
         credentials: "include",
+        headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Import failed" }));
