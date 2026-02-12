@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -24,10 +24,12 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus, Loader2, DollarSign, ChevronDown, ChevronRight,
   Receipt, ArrowLeft, FileText, Save, Trash2, Target,
-  Paperclip, X,
+  Paperclip, X, Search,
 } from "lucide-react";
 import type { Job, Tender, BudgetLine } from "@shared/schema";
 
@@ -142,6 +144,8 @@ export default function JobTendersPage() {
   const [formDocName, setFormDocName] = useState("");
   const [formDocDescription, setFormDocDescription] = useState("");
   const [formDocumentId, setFormDocumentId] = useState("");
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const [docSearchTerm, setDocSearchTerm] = useState("");
 
   const { data: job, isLoading: loadingJob } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
@@ -157,9 +161,16 @@ export default function JobTendersPage() {
     queryKey: ["/api/procurement/suppliers/active"],
   });
 
-  const { data: allDocuments = [] } = useQuery<{ id: string; title: string | null; documentNumber: string | null; fileName: string | null }[]>({
-    queryKey: ["/api/documents"],
+  const { data: jobDocumentsResult } = useQuery<{ documents: { id: string; title: string | null; documentNumber: string | null; fileName: string | null; revision: string | null }[] }>({
+    queryKey: ["/api/documents", { jobId }],
+    queryFn: async () => {
+      const res = await fetch(`/api/documents?jobId=${jobId}&limit=200&excludeChat=true`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch documents");
+      return res.json();
+    },
+    enabled: !!jobId,
   });
+  const jobDocuments = jobDocumentsResult?.documents || [];
 
   const { data: sheetData, isLoading: loadingSheet } = useQuery<TenderSheetData>({
     queryKey: [`/api/jobs/${jobId}/tenders/${selectedTenderId}/sheet`],
@@ -248,7 +259,7 @@ export default function JobTendersPage() {
   }
 
   const createTenderMutation = useMutation({
-    mutationFn: async (data: { jobId: string; title: string; description?: string; notes?: string }) => {
+    mutationFn: async (data: { jobId: string; title: string; description?: string; notes?: string; documentIds?: string[] }) => {
       return apiRequest("POST", "/api/tenders", data);
     },
     onSuccess: async (res) => {
@@ -260,6 +271,8 @@ export default function JobTendersPage() {
       setFormTitle("");
       setFormDescription("");
       setFormNotes("");
+      setSelectedDocIds(new Set());
+      setDocSearchTerm("");
       setSelectedTenderId(newTender.id);
       setSelectedSubmissionId(null);
       setLineAmounts({});
@@ -762,19 +775,22 @@ export default function JobTendersPage() {
         </Card>
       ) : null}
 
-      <Dialog open={createTenderOpen} onOpenChange={setCreateTenderOpen}>
-        <DialogContent>
+      <Dialog open={createTenderOpen} onOpenChange={(open) => {
+        setCreateTenderOpen(open);
+        if (!open) { setSelectedDocIds(new Set()); setDocSearchTerm(""); }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Tender</DialogTitle>
-            <DialogDescription>Create a new tender for this job. Each tender tracks pricing from a single supplier.</DialogDescription>
+            <DialogDescription>Create a new tender for this job. Select documents from the document register to include as a tender bundle.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Title</Label>
+              <Label>Title *</Label>
               <Input
                 value={formTitle}
                 onChange={(e) => setFormTitle(e.target.value)}
-                placeholder="e.g. Concrete Works - Supplier A"
+                placeholder="e.g. Concrete Works Package"
                 data-testid="input-tender-title"
               />
             </div>
@@ -798,6 +814,85 @@ export default function JobTendersPage() {
                 data-testid="input-tender-notes"
               />
             </div>
+
+            <div>
+              <Label className="flex items-center gap-2 mb-2">
+                <Paperclip className="h-4 w-4" />
+                Tender Documents ({selectedDocIds.size} selected)
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Select documents from this job's document register to create a tender bundle.
+              </p>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search documents..."
+                  value={docSearchTerm}
+                  onChange={(e) => setDocSearchTerm(e.target.value)}
+                  data-testid="input-doc-search"
+                />
+              </div>
+              {jobDocuments.length > 0 ? (
+                <Card>
+                  <ScrollArea className="h-48">
+                    <div className="divide-y">
+                      {jobDocuments
+                        .filter(doc => {
+                          if (!docSearchTerm.trim()) return true;
+                          const term = docSearchTerm.toLowerCase();
+                          return (
+                            doc.title?.toLowerCase().includes(term) ||
+                            doc.documentNumber?.toLowerCase().includes(term) ||
+                            doc.fileName?.toLowerCase().includes(term)
+                          );
+                        })
+                        .map((doc) => (
+                          <label
+                            key={doc.id}
+                            className="flex items-center gap-3 px-3 py-2 hover-elevate cursor-pointer"
+                            data-testid={`doc-select-${doc.id}`}
+                          >
+                            <Checkbox
+                              checked={selectedDocIds.has(doc.id)}
+                              onCheckedChange={(checked) => {
+                                setSelectedDocIds(prev => {
+                                  const next = new Set(prev);
+                                  if (checked) next.add(doc.id);
+                                  else next.delete(doc.id);
+                                  return next;
+                                });
+                              }}
+                            />
+                            <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm truncate">{doc.title || doc.fileName || "Untitled"}</p>
+                              {doc.documentNumber && (
+                                <p className="text-xs text-muted-foreground">{doc.documentNumber}{doc.revision ? ` Rev ${doc.revision}` : ""}</p>
+                              )}
+                            </div>
+                          </label>
+                        ))}
+                    </div>
+                  </ScrollArea>
+                </Card>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">No documents found for this job.</p>
+              )}
+              {selectedDocIds.size > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {Array.from(selectedDocIds).map(id => {
+                    const doc = jobDocuments.find(d => d.id === id);
+                    return doc ? (
+                      <Badge key={id} variant="secondary" className="gap-1" data-testid={`badge-selected-doc-${id}`}>
+                        <FileText className="h-3 w-3" />
+                        {doc.documentNumber || doc.title || doc.fileName || "Untitled"}
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateTenderOpen(false)}>Cancel</Button>
@@ -809,6 +904,7 @@ export default function JobTendersPage() {
                   title: formTitle.trim(),
                   description: formDescription.trim() || undefined,
                   notes: formNotes.trim() || undefined,
+                  documentIds: selectedDocIds.size > 0 ? Array.from(selectedDocIds) : undefined,
                 });
               }}
               disabled={createTenderMutation.isPending || !formTitle.trim()}
@@ -880,13 +976,13 @@ export default function JobTendersPage() {
             <DialogDescription>Attach a reference document to this tender (e.g. specifications, drawings, scope). You can link an existing document or add a named reference.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {allDocuments.length > 0 && (
+            {jobDocuments.length > 0 && (
               <div>
                 <Label>Link Existing Document (optional)</Label>
                 <Select value={formDocumentId} onValueChange={(val) => {
                   setFormDocumentId(val);
                   if (val && !formDocName.trim()) {
-                    const doc = allDocuments.find(d => d.id === val);
+                    const doc = jobDocuments.find((d: any) => d.id === val);
                     if (doc) setFormDocName(doc.title || doc.fileName || "");
                   }
                 }}>
@@ -894,7 +990,7 @@ export default function JobTendersPage() {
                     <SelectValue placeholder="Select from existing documents..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {allDocuments.map((doc) => (
+                    {jobDocuments.map((doc: any) => (
                       <SelectItem key={doc.id} value={doc.id}>
                         {doc.documentNumber ? `${doc.documentNumber} - ` : ""}{doc.title || doc.fileName || "Untitled"}
                       </SelectItem>

@@ -4,8 +4,9 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import crypto from "crypto";
 
 const router = Router();
 
@@ -150,6 +151,7 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
     const data = tenderSchema.parse(req.body);
+    const documentIds: string[] = Array.isArray(req.body.documentIds) ? req.body.documentIds : [];
 
     const tenderNumber = await getNextTenderNumber(companyId);
 
@@ -167,6 +169,50 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
         createdById: userId,
       })
       .returning();
+
+    if (documentIds.length > 0) {
+      const validDocs = await db.select({ id: documents.id })
+        .from(documents)
+        .where(and(
+          inArray(documents.id, documentIds),
+          eq(documents.companyId, companyId)
+        ));
+      const validDocIds = validDocs.map(d => d.id);
+
+      if (validDocIds.length > 0) {
+        await db.transaction(async (tx) => {
+          const qrCodeId = `bundle-${Date.now()}-${crypto.randomBytes(6).toString("hex")}`;
+          const [bundle] = await tx.insert(documentBundles).values({
+            companyId,
+            bundleName: `Tender ${tenderNumber} - ${data.title}`,
+            description: `Document bundle for tender ${tenderNumber}`,
+            qrCodeId,
+            jobId: data.jobId,
+            isPublic: false,
+            allowGuestAccess: false,
+            createdBy: userId,
+          }).returning();
+
+          for (let i = 0; i < validDocIds.length; i++) {
+            await tx.insert(documentBundleItems).values({
+              bundleId: bundle.id,
+              documentId: validDocIds[i],
+              sortOrder: i,
+              addedBy: userId,
+            });
+          }
+
+          await tx.insert(tenderPackages).values({
+            companyId,
+            tenderId: result.id,
+            bundleId: bundle.id,
+            name: `Tender Documents - ${data.title}`,
+            description: `${validDocIds.length} document(s) attached`,
+            sortOrder: 0,
+          });
+        });
+      }
+    }
 
     res.status(201).json(result);
   } catch (error: any) {
