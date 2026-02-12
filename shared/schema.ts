@@ -4208,6 +4208,7 @@ export const budgetLines = pgTable("budget_lines", {
   variationsAmount: decimal("variations_amount", { precision: 14, scale: 2 }).default("0"),
   forecastCost: decimal("forecast_cost", { precision: 14, scale: 2 }).default("0"),
   notes: text("notes"),
+  estimateLocked: boolean("estimate_locked").default(false).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -4365,3 +4366,25 @@ export type BoqGroup = typeof boqGroups.$inferSelect;
 export const insertBoqItemSchema = createInsertSchema(boqItems).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertBoqItem = z.infer<typeof insertBoqItemSchema>;
 export type BoqItem = typeof boqItems.$inferSelect;
+
+export const budgetLineDetailItems = pgTable("budget_line_detail_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  budgetLineId: varchar("budget_line_id", { length: 36 }).notNull().references(() => budgetLines.id, { onDelete: "cascade" }),
+  item: text("item").notNull(),
+  quantity: decimal("quantity", { precision: 14, scale: 4 }).default("0"),
+  unit: text("unit").default("EA"),
+  price: decimal("price", { precision: 14, scale: 2 }).default("0"),
+  lineTotal: decimal("line_total", { precision: 14, scale: 2 }).default("0"),
+  notes: text("notes"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  budgetLineIdx: index("budget_line_detail_items_line_idx").on(table.budgetLineId),
+  companyIdx: index("budget_line_detail_items_company_idx").on(table.companyId),
+}));
+
+export const insertBudgetLineDetailItemSchema = createInsertSchema(budgetLineDetailItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertBudgetLineDetailItem = z.infer<typeof insertBudgetLineDetailItemSchema>;
+export type BudgetLineDetailItem = typeof budgetLineDetailItems.$inferSelect;

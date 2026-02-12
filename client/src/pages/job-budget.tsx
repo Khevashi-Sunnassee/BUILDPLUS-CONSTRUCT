@@ -27,7 +27,7 @@ import {
 import {
   Plus, Trash2, Loader2, DollarSign, TrendingUp, BarChart3,
   Receipt, Target, Settings2, ListPlus, ChevronDown, ChevronRight, X,
-  MessageSquare, Paperclip,
+  MessageSquare, Paperclip, ClipboardList,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { JobBudget, BudgetLine, CostCode, Job } from "@shared/schema";
@@ -97,7 +97,7 @@ export default function JobBudgetPage() {
   const [lineNotes, setLineNotes] = useState("");
   const [lineContractorId, setLineContractorId] = useState("");
   const [sidebarLine, setSidebarLine] = useState<BudgetLineWithDetails | null>(null);
-  const [sidebarTab, setSidebarTab] = useState<"updates" | "files">("updates");
+  const [sidebarTab, setSidebarTab] = useState<"updates" | "files" | "items">("updates");
 
   const { data: job, isLoading: loadingJob } = useQuery<Job>({
     queryKey: ["/api/jobs", jobId],
@@ -744,6 +744,19 @@ export default function JobBudgetPage() {
                                       </TooltipTrigger>
                                       <TooltipContent>Files ({line.filesCount})</TooltipContent>
                                     </Tooltip>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={(e) => { e.stopPropagation(); setSidebarLine(line); setSidebarTab("items"); }}
+                                          data-testid={`btn-line-items-${line.id}`}
+                                        >
+                                          <ClipboardList className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>Line Items</TooltipContent>
+                                    </Tooltip>
                                   </div>
                                 </TableCell>
                                 {/* Estimated Budget - editable */}
@@ -1125,9 +1138,15 @@ export default function JobBudgetPage() {
             id: sidebarLine.id,
             costCode: sidebarLine.costCode,
             childCostCode: sidebarLine.childCostCode,
+            estimateLocked: sidebarLine.estimateLocked ?? false,
+            estimatedBudget: sidebarLine.estimatedBudget ?? "0",
           } : null}
           jobId={jobId}
           onClose={() => setSidebarLine(null)}
+          onBudgetUpdated={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "lines"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget", "summary"] });
+          }}
           initialTab={sidebarTab}
         />
       )}

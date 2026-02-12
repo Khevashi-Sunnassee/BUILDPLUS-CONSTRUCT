@@ -5,7 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, costCodes, childCostCodes, tenderSubmissions, tenders, tenderLineItems, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
+import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, budgetLineDetailItems, costCodes, childCostCodes, tenderSubmissions, tenders, tenderLineItems, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 
 const upload = multer({
@@ -830,5 +830,178 @@ router.delete("/api/budget-line-files/:id", requireAuth, requirePermission("budg
     res.status(500).json({ message: "Failed to delete file" });
   }
 });
+
+// ==================== Budget Line Detail Items ====================
+
+const detailItemSchema = z.object({
+  item: z.string().min(1, "Item description is required"),
+  quantity: z.string().nullable().optional(),
+  unit: z.string().nullable().optional(),
+  price: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  sortOrder: z.number().optional(),
+});
+
+router.get("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { budgetLineId } = req.params;
+
+    const items = await db
+      .select()
+      .from(budgetLineDetailItems)
+      .where(and(
+        eq(budgetLineDetailItems.budgetLineId, budgetLineId),
+        eq(budgetLineDetailItems.companyId, companyId),
+      ))
+      .orderBy(asc(budgetLineDetailItems.sortOrder), asc(budgetLineDetailItems.createdAt));
+
+    res.json(items);
+  } catch (error: any) {
+    logger.error("Error fetching budget line detail items:", error);
+    res.status(500).json({ message: "Failed to fetch detail items" });
+  }
+});
+
+router.post("/api/budget-lines/:budgetLineId/detail-items", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { budgetLineId } = req.params;
+    const data = detailItemSchema.parse(req.body);
+
+    const qty = parseFloat(data.quantity || "0");
+    const price = parseFloat(data.price || "0");
+    const lineTotal = (qty * price).toFixed(2);
+
+    const maxOrder = await db
+      .select({ max: sql<number>`coalesce(max(${budgetLineDetailItems.sortOrder}), -1)` })
+      .from(budgetLineDetailItems)
+      .where(eq(budgetLineDetailItems.budgetLineId, budgetLineId));
+
+    const [newItem] = await db.insert(budgetLineDetailItems).values({
+      companyId,
+      budgetLineId,
+      item: data.item,
+      quantity: data.quantity || "0",
+      unit: data.unit || "EA",
+      price: data.price || "0",
+      lineTotal,
+      notes: data.notes || null,
+      sortOrder: data.sortOrder ?? (maxOrder[0]?.max ?? -1) + 1,
+    }).returning();
+
+    await recalcLockedBudget(budgetLineId, companyId);
+
+    res.json(newItem);
+  } catch (error: any) {
+    logger.error("Error creating budget line detail item:", error);
+    res.status(500).json({ message: "Failed to create detail item" });
+  }
+});
+
+router.patch("/api/budget-line-detail-items/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id } = req.params;
+    const data = detailItemSchema.partial().parse(req.body);
+
+    const [existing] = await db.select().from(budgetLineDetailItems).where(and(
+      eq(budgetLineDetailItems.id, id),
+      eq(budgetLineDetailItems.companyId, companyId),
+    ));
+    if (!existing) return res.status(404).json({ message: "Item not found" });
+
+    const qty = parseFloat(data.quantity ?? existing.quantity ?? "0");
+    const price = parseFloat(data.price ?? existing.price ?? "0");
+    const lineTotal = (qty * price).toFixed(2);
+
+    const [updated] = await db.update(budgetLineDetailItems)
+      .set({
+        ...(data.item !== undefined && { item: data.item }),
+        ...(data.quantity !== undefined && { quantity: data.quantity || "0" }),
+        ...(data.unit !== undefined && { unit: data.unit || "EA" }),
+        ...(data.price !== undefined && { price: data.price || "0" }),
+        lineTotal,
+        ...(data.notes !== undefined && { notes: data.notes || null }),
+        ...(data.sortOrder !== undefined && { sortOrder: data.sortOrder }),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(budgetLineDetailItems.id, id), eq(budgetLineDetailItems.companyId, companyId)))
+      .returning();
+
+    await recalcLockedBudget(existing.budgetLineId, companyId);
+
+    res.json(updated);
+  } catch (error: any) {
+    logger.error("Error updating budget line detail item:", error);
+    res.status(500).json({ message: "Failed to update detail item" });
+  }
+});
+
+router.delete("/api/budget-line-detail-items/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id } = req.params;
+
+    const [existing] = await db.select().from(budgetLineDetailItems).where(and(
+      eq(budgetLineDetailItems.id, id),
+      eq(budgetLineDetailItems.companyId, companyId),
+    ));
+    if (!existing) return res.status(404).json({ message: "Item not found" });
+
+    await db.delete(budgetLineDetailItems).where(eq(budgetLineDetailItems.id, id));
+
+    await recalcLockedBudget(existing.budgetLineId, companyId);
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error("Error deleting budget line detail item:", error);
+    res.status(500).json({ message: "Failed to delete detail item" });
+  }
+});
+
+router.patch("/api/budget-lines/:budgetLineId/toggle-lock", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { budgetLineId } = req.params;
+    const { locked } = req.body;
+
+    const [line] = await db.select().from(budgetLines).where(and(
+      eq(budgetLines.id, budgetLineId),
+      eq(budgetLines.companyId, companyId),
+    ));
+    if (!line) return res.status(404).json({ message: "Budget line not found" });
+
+    await db.update(budgetLines)
+      .set({ estimateLocked: !!locked, updatedAt: new Date() })
+      .where(eq(budgetLines.id, budgetLineId));
+
+    if (locked) {
+      await recalcLockedBudget(budgetLineId, companyId);
+    }
+
+    res.json({ success: true, locked: !!locked });
+  } catch (error: any) {
+    logger.error("Error toggling budget lock:", error);
+    res.status(500).json({ message: "Failed to toggle lock" });
+  }
+});
+
+async function recalcLockedBudget(budgetLineId: string, companyId: string) {
+  const [line] = await db.select().from(budgetLines).where(and(
+    eq(budgetLines.id, budgetLineId),
+    eq(budgetLines.companyId, companyId),
+  ));
+  if (!line || !line.estimateLocked) return;
+
+  const [sumResult] = await db
+    .select({ total: sql<string>`coalesce(sum(${budgetLineDetailItems.lineTotal}), '0')` })
+    .from(budgetLineDetailItems)
+    .where(eq(budgetLineDetailItems.budgetLineId, budgetLineId));
+
+  await db.update(budgetLines)
+    .set({ estimatedBudget: sumResult.total, updatedAt: new Date() })
+    .where(eq(budgetLines.id, budgetLineId));
+}
 
 export const budgetRouter = router;
