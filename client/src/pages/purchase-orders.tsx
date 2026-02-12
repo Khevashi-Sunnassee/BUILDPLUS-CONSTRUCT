@@ -1012,13 +1012,7 @@ export default function PurchaseOrdersPage() {
         compressedLogo = await compressLogoForPdf(settings.logoBase64);
       }
       const pdf = await generatePoPdf(poDetail, poDetail.items || [], settings, compressedLogo, poTermsData);
-      pdf.autoPrint();
-      const pdfDataUri = pdf.output("dataurlnewwindow");
-      if (!pdfDataUri) {
-        const pdfBlob = pdf.output("blob");
-        const url = URL.createObjectURL(pdfBlob);
-        window.open(url);
-      }
+      pdf.save(`${poDetail.poNumber || "PurchaseOrder"}.pdf`);
     } catch (error) {
       toast({ title: "Failed to generate PDF", variant: "destructive" });
     }
