@@ -10,6 +10,39 @@ import crypto from "crypto";
 
 const router = Router();
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidId(id: string): boolean { return uuidRegex.test(id); }
+
+const EDITABLE_STATUSES = ["DRAFT", "OPEN", "UNDER_REVIEW"];
+
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  DRAFT: ["OPEN", "CANCELLED"],
+  OPEN: ["UNDER_REVIEW", "CLOSED", "CANCELLED"],
+  UNDER_REVIEW: ["APPROVED", "OPEN", "CLOSED", "CANCELLED"],
+  APPROVED: ["CLOSED"],
+  CLOSED: [],
+  CANCELLED: ["DRAFT"],
+};
+
+async function verifyTenderOwnership(companyId: string, tenderId: string, dbInstance?: any): Promise<boolean> {
+  const q = dbInstance || db;
+  const [t] = await q.select({ id: tenders.id }).from(tenders).where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+  return !!t;
+}
+
+async function verifySubmissionOwnership(companyId: string, tenderId: string, submissionId: string, dbInstance?: any): Promise<boolean> {
+  const q = dbInstance || db;
+  const [s] = await q.select({ id: tenderSubmissions.id }).from(tenderSubmissions).where(and(eq(tenderSubmissions.id, submissionId), eq(tenderSubmissions.tenderId, tenderId), eq(tenderSubmissions.companyId, companyId)));
+  return !!s;
+}
+
+async function verifyTenderEditable(companyId: string, tenderId: string, dbInstance?: any): Promise<{ editable: boolean; tender: any | null }> {
+  const q = dbInstance || db;
+  const [t] = await q.select({ id: tenders.id, status: tenders.status }).from(tenders).where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+  if (!t) return { editable: false, tender: null };
+  return { editable: EDITABLE_STATUSES.includes(t.status), tender: t };
+}
+
 const tenderSchema = z.object({
   jobId: z.string().min(1, "Job is required"),
   title: z.string().min(1, "Title is required"),
@@ -62,17 +95,27 @@ async function getNextTenderNumber(companyId: string, tx?: any): Promise<string>
   return "TDR-000001";
 }
 
+const VALID_STATUSES = ["DRAFT", "OPEN", "UNDER_REVIEW", "APPROVED", "CLOSED", "CANCELLED"];
+
+const paginationSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).optional().default(100),
+  offset: z.coerce.number().int().min(0).optional().default(0),
+});
+
 router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
     const { jobId, status } = req.query;
+    const { limit: queryLimit, offset: queryOffset } = paginationSchema.parse(req.query);
 
     let conditions = [eq(tenders.companyId, companyId)];
 
     if (jobId && typeof jobId === "string") {
+      if (!isValidId(jobId)) return res.status(400).json({ message: "Invalid jobId format", code: "VALIDATION_ERROR" });
       conditions.push(eq(tenders.jobId, jobId));
     }
     if (status && typeof status === "string") {
+      if (!VALID_STATUSES.includes(status)) return res.status(400).json({ message: `Invalid status. Must be one of: ${VALID_STATUSES.join(", ")}`, code: "VALIDATION_ERROR" });
       conditions.push(eq(tenders.status, status as any));
     }
 
@@ -93,7 +136,9 @@ router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), as
       .leftJoin(jobs, eq(tenders.jobId, jobs.id))
       .leftJoin(users, eq(tenders.createdById, users.id))
       .where(and(...conditions))
-      .orderBy(desc(tenders.createdAt));
+      .orderBy(desc(tenders.createdAt))
+      .limit(queryLimit)
+      .offset(queryOffset);
 
     const mapped = results.map((row) => ({
       ...row.tender,
@@ -104,13 +149,14 @@ router.get("/api/tenders", requireAuth, requirePermission("tenders", "VIEW"), as
     res.json(mapped);
   } catch (error: any) {
     logger.error("Error fetching tenders:", error);
-    res.status(500).json({ message: "Failed to fetch tenders" });
+    res.status(500).json({ message: "Failed to fetch tenders", code: "INTERNAL_ERROR" });
   }
 });
 
 router.get("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
     const result = await db
       .select({
@@ -132,7 +178,7 @@ router.get("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW")
       .limit(1);
 
     if (result.length === 0) {
-      return res.status(404).json({ message: "Tender not found" });
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
 
     const row = result[0];
@@ -143,7 +189,7 @@ router.get("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW")
     });
   } catch (error: any) {
     logger.error("Error fetching tender:", error);
-    res.status(500).json({ message: "Failed to fetch tender" });
+    res.status(500).json({ message: "Failed to fetch tender", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -236,17 +282,29 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
     res.status(201).json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error creating tender:", error);
-    res.status(500).json({ message: "Failed to create tender" });
+    res.status(500).json({ message: "Failed to create tender", code: "INTERNAL_ERROR" });
   }
 });
 
 router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
     const data = tenderSchema.partial().parse(req.body);
+
+    if (data.status !== undefined) {
+      const [currentTender] = await db.select({ id: tenders.id, status: tenders.status }).from(tenders).where(and(eq(tenders.id, req.params.id), eq(tenders.companyId, companyId)));
+      if (!currentTender) {
+        return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+      }
+      const allowed = VALID_TRANSITIONS[currentTender.status] || [];
+      if (!allowed.includes(data.status)) {
+        return res.status(400).json({ message: `Cannot transition from ${currentTender.status} to ${data.status}`, code: "STATUS_LOCKED" });
+      }
+    }
 
     const updateData: Record<string, any> = { updatedAt: new Date() };
 
@@ -264,21 +322,22 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
       .returning();
 
     if (!result) {
-      return res.status(404).json({ message: "Tender not found" });
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
     res.json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error updating tender:", error);
-    res.status(500).json({ message: "Failed to update tender" });
+    res.status(500).json({ message: "Failed to update tender", code: "INTERNAL_ERROR" });
   }
 });
 
 router.delete("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
     const submissions = await db
       .select({ id: tenderSubmissions.id })
@@ -287,7 +346,7 @@ router.delete("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIE
       .limit(1);
 
     if (submissions.length > 0) {
-      return res.status(400).json({ message: "Cannot delete tender with existing submissions" });
+      return res.status(400).json({ message: "Cannot delete tender with existing submissions", code: "VALIDATION_ERROR" });
     }
 
     const [deleted] = await db
@@ -296,18 +355,23 @@ router.delete("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIE
       .returning();
 
     if (!deleted) {
-      return res.status(404).json({ message: "Tender not found" });
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
     res.json({ message: "Tender deleted", id: deleted.id });
   } catch (error: any) {
     logger.error("Error deleting tender:", error);
-    res.status(500).json({ message: "Failed to delete tender" });
+    res.status(500).json({ message: "Failed to delete tender", code: "INTERNAL_ERROR" });
   }
 });
 
 router.get("/api/tenders/:tenderId/submissions", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    if (!isValidId(req.params.tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, req.params.tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
 
     const results = await db
       .select({
@@ -325,7 +389,8 @@ router.get("/api/tenders/:tenderId/submissions", requireAuth, requirePermission(
       .leftJoin(suppliers, eq(tenderSubmissions.supplierId, suppliers.id))
       .leftJoin(users, eq(tenderSubmissions.createdById, users.id))
       .where(and(eq(tenderSubmissions.tenderId, req.params.tenderId), eq(tenderSubmissions.companyId, companyId)))
-      .orderBy(desc(tenderSubmissions.createdAt));
+      .orderBy(desc(tenderSubmissions.createdAt))
+      .limit(50);
 
     const mapped = results.map((row) => ({
       ...row.submission,
@@ -336,7 +401,7 @@ router.get("/api/tenders/:tenderId/submissions", requireAuth, requirePermission(
     res.json(mapped);
   } catch (error: any) {
     logger.error("Error fetching tender submissions:", error);
-    res.status(500).json({ message: "Failed to fetch tender submissions" });
+    res.status(500).json({ message: "Failed to fetch tender submissions", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -344,7 +409,19 @@ router.post("/api/tenders/:tenderId/submissions", requireAuth, requirePermission
   try {
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
+    if (!isValidId(req.params.tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
     const data = submissionSchema.parse(req.body);
+
+    const { editable, tender } = await verifyTenderEditable(companyId, req.params.tenderId);
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+    if (!editable) {
+      return res.status(400).json({ message: `Cannot modify a tender with status: ${tender.status}`, code: "STATUS_LOCKED" });
+    }
+
+    const [supplier] = await db.select({ id: suppliers.id }).from(suppliers).where(and(eq(suppliers.id, data.supplierId), eq(suppliers.companyId, companyId)));
+    if (!supplier) return res.status(400).json({ message: "Supplier not found", code: "VALIDATION_ERROR" });
 
     const [result] = await db
       .insert(tenderSubmissions)
@@ -365,16 +442,22 @@ router.post("/api/tenders/:tenderId/submissions", requireAuth, requirePermission
     res.status(201).json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error creating tender submission:", error);
-    res.status(500).json({ message: "Failed to create tender submission" });
+    res.status(500).json({ message: "Failed to create tender submission", code: "INTERNAL_ERROR" });
   }
 });
 
 router.patch("/api/tenders/:tenderId/submissions/:id", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    if (!isValidId(req.params.tenderId) || !isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifySubmissionOwnership(companyId, req.params.tenderId, req.params.id))) {
+      return res.status(403).json({ message: "Submission not found or access denied", code: "FORBIDDEN" });
+    }
+
     const data = submissionSchema.partial().parse(req.body);
 
     const updateData: Record<string, any> = { updatedAt: new Date() };
@@ -394,15 +477,15 @@ router.patch("/api/tenders/:tenderId/submissions/:id", requireAuth, requirePermi
       .returning();
 
     if (!result) {
-      return res.status(404).json({ message: "Tender submission not found" });
+      return res.status(404).json({ message: "Tender submission not found", code: "NOT_FOUND" });
     }
     res.json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error updating tender submission:", error);
-    res.status(500).json({ message: "Failed to update tender submission" });
+    res.status(500).json({ message: "Failed to update tender submission", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -410,6 +493,11 @@ router.post("/api/tenders/:tenderId/submissions/:id/approve", requireAuth, requi
   try {
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
+    if (!isValidId(req.params.tenderId) || !isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifySubmissionOwnership(companyId, req.params.tenderId, req.params.id))) {
+      return res.status(403).json({ message: "Submission not found or access denied", code: "FORBIDDEN" });
+    }
 
     const [result] = await db
       .update(tenderSubmissions)
@@ -423,18 +511,23 @@ router.post("/api/tenders/:tenderId/submissions/:id/approve", requireAuth, requi
       .returning();
 
     if (!result) {
-      return res.status(404).json({ message: "Tender submission not found" });
+      return res.status(404).json({ message: "Tender submission not found", code: "NOT_FOUND" });
     }
     res.json(result);
   } catch (error: any) {
     logger.error("Error approving tender submission:", error);
-    res.status(500).json({ message: "Failed to approve tender submission" });
+    res.status(500).json({ message: "Failed to approve tender submission", code: "INTERNAL_ERROR" });
   }
 });
 
 router.get("/api/tenders/:tenderId/submissions/:submissionId/line-items", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    if (!isValidId(req.params.tenderId) || !isValidId(req.params.submissionId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifySubmissionOwnership(companyId, req.params.tenderId, req.params.submissionId))) {
+      return res.status(403).json({ message: "Submission not found or access denied", code: "FORBIDDEN" });
+    }
 
     const results = await db
       .select({
@@ -448,7 +541,8 @@ router.get("/api/tenders/:tenderId/submissions/:submissionId/line-items", requir
       .from(tenderLineItems)
       .leftJoin(costCodes, eq(tenderLineItems.costCodeId, costCodes.id))
       .where(and(eq(tenderLineItems.tenderSubmissionId, req.params.submissionId), eq(tenderLineItems.companyId, companyId)))
-      .orderBy(asc(tenderLineItems.sortOrder));
+      .orderBy(asc(tenderLineItems.sortOrder))
+      .limit(500);
 
     const mapped = results.map((row) => ({
       ...row.lineItem,
@@ -458,44 +552,85 @@ router.get("/api/tenders/:tenderId/submissions/:submissionId/line-items", requir
     res.json(mapped);
   } catch (error: any) {
     logger.error("Error fetching tender line items:", error);
-    res.status(500).json({ message: "Failed to fetch tender line items" });
+    res.status(500).json({ message: "Failed to fetch tender line items", code: "INTERNAL_ERROR" });
   }
 });
 
 router.post("/api/tenders/:tenderId/submissions/:submissionId/line-items", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const { tenderId, submissionId } = req.params;
+    if (!isValidId(tenderId) || !isValidId(submissionId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    const { editable, tender } = await verifyTenderEditable(companyId, tenderId);
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+    if (!editable) {
+      return res.status(400).json({ message: `Cannot modify a tender with status: ${tender.status}`, code: "STATUS_LOCKED" });
+    }
+
+    if (!(await verifySubmissionOwnership(companyId, tenderId, submissionId))) {
+      return res.status(403).json({ message: "Submission not found or access denied", code: "FORBIDDEN" });
+    }
+
     const data = lineItemSchema.parse(req.body);
 
-    const [result] = await db
-      .insert(tenderLineItems)
-      .values({
-        companyId,
-        tenderSubmissionId: req.params.submissionId,
-        costCodeId: data.costCodeId || null,
-        description: data.description,
-        quantity: data.quantity || "1",
-        unit: data.unit || "EA",
-        unitPrice: data.unitPrice || "0",
-        lineTotal: data.lineTotal || "0",
-        notes: data.notes || null,
-        sortOrder: data.sortOrder ?? 0,
-      })
-      .returning();
+    const result = await db.transaction(async (tx) => {
+      const [lineItem] = await tx
+        .insert(tenderLineItems)
+        .values({
+          companyId,
+          tenderSubmissionId: submissionId,
+          costCodeId: data.costCodeId || null,
+          description: data.description,
+          quantity: data.quantity || "1",
+          unit: data.unit || "EA",
+          unitPrice: data.unitPrice || "0",
+          lineTotal: data.lineTotal || "0",
+          notes: data.notes || null,
+          sortOrder: data.sortOrder ?? 0,
+        })
+        .returning();
+
+      const totalResult = await tx
+        .select({ total: sql<string>`coalesce(sum(cast(${tenderLineItems.lineTotal} as numeric)), 0)::text` })
+        .from(tenderLineItems)
+        .where(and(eq(tenderLineItems.tenderSubmissionId, submissionId), eq(tenderLineItems.companyId, companyId)));
+      await tx.update(tenderSubmissions).set({ totalPrice: totalResult[0]?.total || "0", subtotal: totalResult[0]?.total || "0", updatedAt: new Date() })
+        .where(and(eq(tenderSubmissions.id, submissionId), eq(tenderSubmissions.companyId, companyId)));
+
+      return lineItem;
+    });
 
     res.status(201).json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error creating tender line item:", error);
-    res.status(500).json({ message: "Failed to create tender line item" });
+    res.status(500).json({ message: "Failed to create tender line item", code: "INTERNAL_ERROR" });
   }
 });
 
 router.patch("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const { tenderId, submissionId, id } = req.params;
+    if (!isValidId(tenderId) || !isValidId(submissionId) || !isValidId(id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    const { editable, tender } = await verifyTenderEditable(companyId, tenderId);
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+    if (!editable) {
+      return res.status(400).json({ message: `Cannot modify a tender with status: ${tender.status}`, code: "STATUS_LOCKED" });
+    }
+
+    if (!(await verifySubmissionOwnership(companyId, tenderId, submissionId))) {
+      return res.status(403).json({ message: "Submission not found or access denied", code: "FORBIDDEN" });
+    }
+
     const data = lineItemSchema.partial().parse(req.body);
 
     const updateData: Record<string, any> = { updatedAt: new Date() };
@@ -509,41 +644,81 @@ router.patch("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id", 
     if (data.notes !== undefined) updateData.notes = data.notes || null;
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
-    const [result] = await db
-      .update(tenderLineItems)
-      .set(updateData)
-      .where(and(eq(tenderLineItems.id, req.params.id), eq(tenderLineItems.companyId, companyId)))
-      .returning();
+    const result = await db.transaction(async (tx) => {
+      const [lineItem] = await tx
+        .update(tenderLineItems)
+        .set(updateData)
+        .where(and(eq(tenderLineItems.id, id), eq(tenderLineItems.companyId, companyId)))
+        .returning();
+
+      if (!lineItem) return null;
+
+      const totalResult = await tx
+        .select({ total: sql<string>`coalesce(sum(cast(${tenderLineItems.lineTotal} as numeric)), 0)::text` })
+        .from(tenderLineItems)
+        .where(and(eq(tenderLineItems.tenderSubmissionId, submissionId), eq(tenderLineItems.companyId, companyId)));
+      await tx.update(tenderSubmissions).set({ totalPrice: totalResult[0]?.total || "0", subtotal: totalResult[0]?.total || "0", updatedAt: new Date() })
+        .where(and(eq(tenderSubmissions.id, submissionId), eq(tenderSubmissions.companyId, companyId)));
+
+      return lineItem;
+    });
 
     if (!result) {
-      return res.status(404).json({ message: "Tender line item not found" });
+      return res.status(404).json({ message: "Tender line item not found", code: "NOT_FOUND" });
     }
     res.json(result);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error updating tender line item:", error);
-    res.status(500).json({ message: "Failed to update tender line item" });
+    res.status(500).json({ message: "Failed to update tender line item", code: "INTERNAL_ERROR" });
   }
 });
 
 router.delete("/api/tenders/:tenderId/submissions/:submissionId/line-items/:id", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const { tenderId, submissionId, id } = req.params;
+    if (!isValidId(tenderId) || !isValidId(submissionId) || !isValidId(id)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
-    const [deleted] = await db
-      .delete(tenderLineItems)
-      .where(and(eq(tenderLineItems.id, req.params.id), eq(tenderLineItems.companyId, companyId)))
-      .returning();
-
-    if (!deleted) {
-      return res.status(404).json({ message: "Tender line item not found" });
+    const { editable, tender } = await verifyTenderEditable(companyId, tenderId);
+    if (!tender) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
-    res.json({ message: "Tender line item deleted", id: deleted.id });
+    if (!editable) {
+      return res.status(400).json({ message: `Cannot modify a tender with status: ${tender.status}`, code: "STATUS_LOCKED" });
+    }
+
+    if (!(await verifySubmissionOwnership(companyId, tenderId, submissionId))) {
+      return res.status(403).json({ message: "Submission not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const [deleted] = await tx
+        .delete(tenderLineItems)
+        .where(and(eq(tenderLineItems.id, id), eq(tenderLineItems.companyId, companyId)))
+        .returning();
+
+      if (!deleted) return null;
+
+      const totalResult = await tx
+        .select({ total: sql<string>`coalesce(sum(cast(${tenderLineItems.lineTotal} as numeric)), 0)::text` })
+        .from(tenderLineItems)
+        .where(and(eq(tenderLineItems.tenderSubmissionId, submissionId), eq(tenderLineItems.companyId, companyId)));
+      await tx.update(tenderSubmissions).set({ totalPrice: totalResult[0]?.total || "0", subtotal: totalResult[0]?.total || "0", updatedAt: new Date() })
+        .where(and(eq(tenderSubmissions.id, submissionId), eq(tenderSubmissions.companyId, companyId)));
+
+      return deleted;
+    });
+
+    if (!result) {
+      return res.status(404).json({ message: "Tender line item not found", code: "NOT_FOUND" });
+    }
+    res.json({ message: "Tender line item deleted", id: result.id });
   } catch (error: any) {
     logger.error("Error deleting tender line item:", error);
-    res.status(500).json({ message: "Failed to delete tender line item" });
+    res.status(500).json({ message: "Failed to delete tender line item", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -551,6 +726,7 @@ router.get("/api/jobs/:jobId/tenders", requireAuth, requirePermission("tenders",
   try {
     const companyId = req.session.companyId!;
     const jobId = req.params.jobId;
+    if (!isValidId(jobId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
     const results = await db
       .select({
@@ -563,7 +739,8 @@ router.get("/api/jobs/:jobId/tenders", requireAuth, requirePermission("tenders",
       .from(tenders)
       .leftJoin(users, eq(tenders.createdById, users.id))
       .where(and(eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)))
-      .orderBy(desc(tenders.createdAt));
+      .orderBy(desc(tenders.createdAt))
+      .limit(100);
 
     const tenderIds = results.map(r => r.tender.id);
     let submissionsByTender: Record<string, any[]> = {};
@@ -605,7 +782,7 @@ router.get("/api/jobs/:jobId/tenders", requireAuth, requirePermission("tenders",
     res.json(mapped);
   } catch (error: any) {
     logger.error("Error fetching job tenders:", error);
-    res.status(500).json({ message: "Failed to fetch job tenders" });
+    res.status(500).json({ message: "Failed to fetch job tenders", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -614,18 +791,31 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
     const companyId = req.session.companyId!;
     const jobId = req.params.jobId;
     const tenderId = req.params.tenderId;
+    if (!isValidId(jobId) || !isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
     const [tender] = await db
-      .select()
+      .select({
+        id: tenders.id,
+        jobId: tenders.jobId,
+        tenderNumber: tenders.tenderNumber,
+        title: tenders.title,
+        description: tenders.description,
+        status: tenders.status,
+        dueDate: tenders.dueDate,
+        notes: tenders.notes,
+        companyId: tenders.companyId,
+        createdById: tenders.createdById,
+        createdAt: tenders.createdAt,
+      })
       .from(tenders)
       .where(and(eq(tenders.id, tenderId), eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)));
 
     if (!tender) {
-      return res.status(404).json({ message: "Tender not found" });
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
 
     const [budget] = await db
-      .select()
+      .select({ id: jobBudgets.id })
       .from(jobBudgets)
       .where(and(eq(jobBudgets.jobId, jobId), eq(jobBudgets.companyId, companyId)));
 
@@ -671,7 +861,17 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
 
     if (submissionIds.length > 0) {
       const allLineItems = await db
-        .select()
+        .select({
+          id: tenderLineItems.id,
+          tenderSubmissionId: tenderLineItems.tenderSubmissionId,
+          costCodeId: tenderLineItems.costCodeId,
+          childCostCodeId: tenderLineItems.childCostCodeId,
+          lineTotal: tenderLineItems.lineTotal,
+          unitPrice: tenderLineItems.unitPrice,
+          quantity: tenderLineItems.quantity,
+          unit: tenderLineItems.unit,
+          sortOrder: tenderLineItems.sortOrder,
+        })
         .from(tenderLineItems)
         .where(and(
           inArray(tenderLineItems.tenderSubmissionId, submissionIds),
@@ -734,22 +934,22 @@ router.get("/api/jobs/:jobId/tenders/:tenderId/sheet", requireAuth, requirePermi
     });
   } catch (error: any) {
     logger.error("Error fetching tender sheet:", error);
-    res.status(500).json({ message: "Failed to fetch tender sheet" });
+    res.status(500).json({ message: "Failed to fetch tender sheet", code: "INTERNAL_ERROR" });
   }
 });
 
 router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert-lines", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const { submissionId, tenderId } = req.params;
+    const { submissionId, tenderId, jobId } = req.params;
+    if (!isValidId(jobId) || !isValidId(tenderId) || !isValidId(submissionId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
-    const [tender] = await db
-      .select({ id: tenders.id })
-      .from(tenders)
-      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
-
-    if (!tender) {
-      return res.status(404).json({ message: "Tender not found" });
+    const { editable, tender: tenderRecord } = await verifyTenderEditable(companyId, tenderId);
+    if (!tenderRecord) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+    if (!editable) {
+      return res.status(400).json({ message: `Cannot modify a tender with status: ${tenderRecord.status}`, code: "STATUS_LOCKED" });
     }
 
     const [submission] = await db
@@ -762,7 +962,7 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert
       ));
 
     if (!submission) {
-      return res.status(404).json({ message: "Submission not found" });
+      return res.status(404).json({ message: "Submission not found", code: "NOT_FOUND" });
     }
 
     const schema = z.object({
@@ -846,10 +1046,10 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/submissions/:submissionId/upsert
     res.json({ message: "Lines updated", totalPrice: finalTotalPrice });
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error upserting tender lines:", error);
-    res.status(500).json({ message: "Failed to update tender lines" });
+    res.status(500).json({ message: "Failed to update tender lines", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -857,14 +1057,23 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
   try {
     const companyId = req.session.companyId!;
     const { tenderId, jobId } = req.params;
+    if (!isValidId(jobId) || !isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
-    const [tender] = await db
+    const { editable, tender: tenderRecord } = await verifyTenderEditable(companyId, tenderId);
+    if (!tenderRecord) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
+    }
+    if (!editable) {
+      return res.status(400).json({ message: `Cannot modify a tender with status: ${tenderRecord.status}`, code: "STATUS_LOCKED" });
+    }
+
+    const [tenderJobCheck] = await db
       .select({ id: tenders.id })
       .from(tenders)
       .where(and(eq(tenders.id, tenderId), eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)));
 
-    if (!tender) {
-      return res.status(404).json({ message: "Tender not found" });
+    if (!tenderJobCheck) {
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
 
     const schema = z.object({
@@ -879,7 +1088,7 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
       .where(and(eq(documentBundles.id, data.bundleId), eq(documentBundles.companyId, companyId)));
 
     if (!bundle) {
-      return res.status(404).json({ message: "Document bundle not found" });
+      return res.status(404).json({ message: "Document bundle not found", code: "NOT_FOUND" });
     }
 
     const existing = await db
@@ -892,7 +1101,7 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
       ));
 
     if (existing.length > 0) {
-      return res.status(400).json({ message: "This bundle is already attached to this tender" });
+      return res.status(400).json({ message: "This bundle is already attached to this tender", code: "DUPLICATE" });
     }
 
     const maxOrder = await db
@@ -911,10 +1120,10 @@ router.post("/api/jobs/:jobId/tenders/:tenderId/documents", requireAuth, require
     res.json(pkg);
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Validation error", errors: error.errors });
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
     }
     logger.error("Error adding tender document:", error);
-    res.status(500).json({ message: "Failed to add tender document" });
+    res.status(500).json({ message: "Failed to add tender document", code: "INTERNAL_ERROR" });
   }
 });
 
@@ -922,6 +1131,7 @@ router.delete("/api/jobs/:jobId/tenders/:tenderId/documents/:packageId", require
   try {
     const companyId = req.session.companyId!;
     const { tenderId, jobId, packageId } = req.params;
+    if (!isValidId(jobId) || !isValidId(tenderId) || !isValidId(packageId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
 
     const [tender] = await db
       .select({ id: tenders.id })
@@ -929,7 +1139,7 @@ router.delete("/api/jobs/:jobId/tenders/:tenderId/documents/:packageId", require
       .where(and(eq(tenders.id, tenderId), eq(tenders.jobId, jobId), eq(tenders.companyId, companyId)));
 
     if (!tender) {
-      return res.status(404).json({ message: "Tender not found" });
+      return res.status(404).json({ message: "Tender not found", code: "NOT_FOUND" });
     }
 
     await db.delete(tenderPackages)
@@ -942,7 +1152,7 @@ router.delete("/api/jobs/:jobId/tenders/:tenderId/documents/:packageId", require
     res.json({ message: "Document removed from tender" });
   } catch (error: any) {
     logger.error("Error removing tender document:", error);
-    res.status(500).json({ message: "Failed to remove tender document" });
+    res.status(500).json({ message: "Failed to remove tender document", code: "INTERNAL_ERROR" });
   }
 });
 
