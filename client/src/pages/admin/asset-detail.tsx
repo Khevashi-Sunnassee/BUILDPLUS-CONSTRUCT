@@ -36,6 +36,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -418,66 +423,91 @@ export default function AssetDetailPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge status={asset.status} />
-          <Button
-            variant="outline"
-            onClick={openBasicEdit}
-            data-testid="button-edit-asset"
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setDeleteDialogOpen(true)}
-            data-testid="button-delete-asset"
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-          <Button
-            onClick={() => aiMutation.mutate()}
-            disabled={aiMutation.isPending}
-            data-testid="button-generate-ai"
-          >
-            {aiMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
-            )}
-            Generate AI Analysis
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              const params = new URLSearchParams({
-                create: "replacement",
-                assetId: id!,
-                assetName: asset.name || "",
-                assetTag: asset.assetTag || "",
-                assetCategory: asset.category || "",
-                assetCurrentValue: asset.currentValue || "",
-                assetLocation: asset.location || "",
-              });
-              navigate(`/capex-requests?${params.toString()}`);
-            }}
-            data-testid="button-replace-asset"
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Replace
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => serviceRequestMutation.mutate()}
-            disabled={serviceRequestMutation.isPending}
-            data-testid="button-repair-asset"
-          >
-            {serviceRequestMutation.isPending ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Wrench className="mr-2 h-4 w-4" />
-            )}
-            Service / Repair
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={openBasicEdit}
+                data-testid="button-edit-asset"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit asset details</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="destructive"
+                onClick={() => setDeleteDialogOpen(true)}
+                data-testid="button-delete-asset"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Permanently delete this asset</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={() => aiMutation.mutate()}
+                disabled={aiMutation.isPending}
+                data-testid="button-generate-ai"
+              >
+                {aiMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-4 w-4" />
+                )}
+                Generate AI Analysis
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Generate an AI-powered summary and analysis of this asset</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    create: "replacement",
+                    assetId: id!,
+                    assetName: asset.name || "",
+                    assetTag: asset.assetTag || "",
+                    assetCategory: asset.category || "",
+                    assetCurrentValue: asset.currentValue || "",
+                    assetLocation: asset.location || "",
+                  });
+                  navigate(`/capex-requests?${params.toString()}`);
+                }}
+                data-testid="button-replace-asset"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Replace
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create a CAPEX replacement request for this asset</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                onClick={() => serviceRequestMutation.mutate()}
+                disabled={serviceRequestMutation.isPending}
+                data-testid="button-repair-asset"
+              >
+                {serviceRequestMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Wrench className="mr-2 h-4 w-4" />
+                )}
+                Service / Repair
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open an Equipment Maintenance checklist for service or repair</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 

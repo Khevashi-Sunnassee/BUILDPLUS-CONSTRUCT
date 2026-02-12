@@ -28,7 +28,12 @@ import {
   RefreshCw,
   Wrench,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { ASSET_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import type { Asset } from "@shared/schema";
 import {
@@ -375,6 +380,30 @@ export default function AssetRegisterPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const [serviceChecklistAssetId, setServiceChecklistAssetId] = useState<string | null>(null);
+  const serviceChecklistMutation = useMutation({
+    mutationFn: async (asset: Asset) => {
+      const res = await apiRequest("POST", "/api/checklist/instances/from-asset", {
+        assetId: asset.id,
+        assetName: asset.name || "",
+        assetTag: asset.assetTag || "",
+        assetCategory: asset.category || "",
+        assetLocation: asset.location || "",
+        serialNumber: asset.serialNumber || "",
+      });
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Service checklist created" });
+      setServiceChecklistAssetId(null);
+      navigate(`/checklists/${data.id}`);
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to create service checklist", description: error.message, variant: "destructive" });
+      setServiceChecklistAssetId(null);
     },
   });
 
@@ -793,60 +822,86 @@ export default function AssetRegisterPage() {
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              openEditDialog(asset);
-            }}
-            data-testid={`button-edit-asset-${asset.id}`}
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              const params = new URLSearchParams({
-                create: "replacement",
-                assetId: asset.id,
-                assetName: asset.name || "",
-                assetTag: asset.assetTag || "",
-                assetCategory: asset.category || "",
-                assetCurrentValue: asset.currentValue || "",
-                assetLocation: asset.location || "",
-              });
-              navigate(`/capex-requests?${params.toString()}`);
-            }}
-            data-testid={`button-replace-asset-${asset.id}`}
-          >
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/admin/asset-repair/new?assetId=${asset.id}`);
-            }}
-            data-testid={`button-repair-asset-${asset.id}`}
-          >
-            <Wrench className="h-4 w-4" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeletingAssetId(asset.id);
-              setDeleteDialogOpen(true);
-            }}
-            data-testid={`button-delete-asset-${asset.id}`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  openEditDialog(asset);
+                }}
+                data-testid={`button-edit-asset-${asset.id}`}
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Edit asset</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const params = new URLSearchParams({
+                    create: "replacement",
+                    assetId: asset.id,
+                    assetName: asset.name || "",
+                    assetTag: asset.assetTag || "",
+                    assetCategory: asset.category || "",
+                    assetCurrentValue: asset.currentValue || "",
+                    assetLocation: asset.location || "",
+                  });
+                  navigate(`/capex-requests?${params.toString()}`);
+                }}
+                data-testid={`button-replace-asset-${asset.id}`}
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create CAPEX replacement request</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setServiceChecklistAssetId(asset.id);
+                  serviceChecklistMutation.mutate(asset);
+                }}
+                disabled={serviceChecklistMutation.isPending && serviceChecklistAssetId === asset.id}
+                data-testid={`button-repair-asset-${asset.id}`}
+              >
+                {serviceChecklistMutation.isPending && serviceChecklistAssetId === asset.id ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Wrench className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open service/repair checklist</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeletingAssetId(asset.id);
+                  setDeleteDialogOpen(true);
+                }}
+                data-testid={`button-delete-asset-${asset.id}`}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Delete asset</TooltipContent>
+          </Tooltip>
         </div>
       </TableCell>
     </TableRow>
@@ -1104,7 +1159,7 @@ export default function AssetRegisterPage() {
                         className="fill-muted-foreground"
                         tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                       />
-                      <Tooltip
+                      <RechartsTooltip
                         contentStyle={{
                           borderRadius: "8px",
                           border: "1px solid hsl(var(--border))",
@@ -1169,7 +1224,7 @@ export default function AssetRegisterPage() {
                         className="fill-muted-foreground"
                         tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`}
                       />
-                      <Tooltip
+                      <RechartsTooltip
                         contentStyle={{
                           borderRadius: "8px",
                           border: "1px solid hsl(var(--border))",

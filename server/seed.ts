@@ -1,6 +1,6 @@
 import { db } from "./db";
-import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes, entityTypes, entitySubtypes, checklistTemplates, companies } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { users, jobs, dailyLogs, logRows, globalSettings, workTypes, trailerTypes, entityTypes, entitySubtypes, checklistTemplates, checklistInstances, companies } from "@shared/schema";
+import { eq, and, sql } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import logger from "./lib/logger";
 
@@ -581,37 +581,44 @@ export async function ensureSystemChecklistModules() {
         }
 
         if (mod.code === "EQUIPMENT") {
-          const existingNonSystemTemplates = await db.select().from(checklistTemplates)
+          const allExistingMaintenanceTemplates = await db.select().from(checklistTemplates)
             .where(and(
               eq(checklistTemplates.companyId, company.id),
-              eq(checklistTemplates.entityTypeId, entityTypeId),
               eq(checklistTemplates.name, "Equipment Maintenance Log"),
-              eq(checklistTemplates.isSystem, false)
             ));
 
-          if (existingNonSystemTemplates.length > 0) {
-            for (const tmpl of existingNonSystemTemplates) {
+          if (allExistingMaintenanceTemplates.length > 0) {
+            for (const tmpl of allExistingMaintenanceTemplates) {
+              const updates: Record<string, any> = {
+                isSystem: true,
+                sections: EQUIPMENT_MAINTENANCE_SECTIONS as any,
+                description: "Standard service and repair checklist for equipment maintenance. Used for logging service requests, inspections, parts tracking, and sign-off from the Asset Register.",
+              };
+              if (tmpl.entityTypeId !== entityTypeId) {
+                updates.entityTypeId = entityTypeId;
+              }
               await db.update(checklistTemplates)
-                .set({
-                  isSystem: true,
-                  sections: EQUIPMENT_MAINTENANCE_SECTIONS as any,
-                  description: "Standard service and repair checklist for equipment maintenance. Used for logging service requests, inspections, parts tracking, and sign-off from the Asset Register.",
-                })
+                .set(updates)
                 .where(eq(checklistTemplates.id, tmpl.id));
-              logger.info(`Upgraded existing Equipment Maintenance Log template ${tmpl.id} to system template for company ${company.id}`);
+              if (!tmpl.isSystem || tmpl.entityTypeId !== entityTypeId) {
+                logger.info(`Upgraded Equipment Maintenance Log template ${tmpl.id} for company ${company.id}`);
+              }
             }
-          }
 
-          const existingEquipTemplates = await db.select().from(checklistTemplates)
-            .where(and(
-              eq(checklistTemplates.companyId, company.id),
-              eq(checklistTemplates.entityTypeId, entityTypeId),
-              eq(checklistTemplates.isSystem, true)
-            ));
-
-          const equipTemplateNames = existingEquipTemplates.map(t => t.name);
-
-          if (!equipTemplateNames.includes("Equipment Maintenance Log")) {
+            if (allExistingMaintenanceTemplates.length > 1) {
+              const keepId = allExistingMaintenanceTemplates[0].id;
+              for (let i = 1; i < allExistingMaintenanceTemplates.length; i++) {
+                const dupId = allExistingMaintenanceTemplates[i].id;
+                const [hasInstances] = await db.select({ count: sql`count(*)` })
+                  .from(checklistInstances)
+                  .where(eq(checklistInstances.templateId, dupId));
+                if (Number(hasInstances?.count) === 0) {
+                  await db.delete(checklistTemplates).where(eq(checklistTemplates.id, dupId));
+                  logger.info(`Removed duplicate Equipment Maintenance Log template ${dupId} for company ${company.id}`);
+                }
+              }
+            }
+          } else {
             await db.insert(checklistTemplates).values({
               companyId: company.id,
               name: "Equipment Maintenance Log",
