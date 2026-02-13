@@ -1,4 +1,4 @@
-import { useQuery, UseQueryOptions } from "@tanstack/react-query";
+import { useQuery, UseQueryOptions, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect, useCallback } from "react";
 
 function usePageVisible(): boolean {
@@ -67,18 +67,4 @@ function usePrevious<T>(value: T): T | undefined {
   }
 
   return prev;
-}
-
-export function useRefreshAllOnFocus(queryKeys: string[][]) {
-  const isVisible = usePageVisible();
-  const prevVisible = usePrevious(isVisible);
-  const { queryClient } = require("@/lib/queryClient");
-
-  useEffect(() => {
-    if (isVisible && prevVisible === false) {
-      queryKeys.forEach((key) => {
-        queryClient.invalidateQueries({ queryKey: key });
-      });
-    }
-  }, [isVisible, prevVisible, queryKeys]);
 }
