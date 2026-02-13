@@ -1277,7 +1277,7 @@ export default function AdminPanelsPage() {
 
   if (panelsLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Panels Management" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -1285,7 +1285,7 @@ export default function AdminPanelsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Panels Management">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           {filterJobId && (
@@ -1453,10 +1453,10 @@ export default function AdminPanelsPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-5 w-5" />
+                <ClipboardList className="h-5 w-5" aria-hidden="true" />
                 {viewMode === "list" ? "Panel List" : "Building & Level Summary"}
               </CardTitle>
-              <CardDescription>
+              <CardDescription aria-live="polite">
                 {filteredPanels?.length || 0} panels {statusFilter !== "all" && `(${statusFilter.replace("_", " ")})`}
               </CardDescription>
             </div>
@@ -1484,13 +1484,14 @@ export default function AdminPanelsPage() {
               {viewMode === "list" && (
                 <>
                   <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     <Input
                       placeholder="Search panel mark..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-8 w-[180px]"
                       data-testid="input-search-panel"
+                      aria-label="Search panels"
                     />
                   </div>
                   <div className="flex items-center gap-2">

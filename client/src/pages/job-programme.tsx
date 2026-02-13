@@ -570,7 +570,7 @@ export default function JobProgrammePage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4" aria-busy="true">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -599,7 +599,7 @@ export default function JobProgrammePage() {
   const deleteLabel = deleteEntry ? (deleteEntry.pourLabel ? `${deleteEntry.level} Pour ${deleteEntry.pourLabel}` : deleteEntry.level) : "";
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
+    <div className="p-4 md:p-6 space-y-4" role="main" aria-label="Job Programme">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <Link href="/admin/jobs">

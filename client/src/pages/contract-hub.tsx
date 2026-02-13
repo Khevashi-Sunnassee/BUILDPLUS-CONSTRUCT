@@ -325,7 +325,7 @@ export default function ContractHubPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" aria-busy="true">
         <Skeleton className="h-10 w-64" />
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => <Skeleton key={i} className="h-24" />)}
@@ -336,7 +336,7 @@ export default function ContractHubPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="contract-hub-page">
+    <div className="space-y-6" data-testid="contract-hub-page" role="main" aria-label="Contract Hub">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export default function ContractHubPage() {
             <FileText className="h-4 w-4 mr-2" />
             View PO Terms & Conditions
           </Button>
-          <Scale className="h-5 w-5 text-muted-foreground" />
+          <Scale className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
           <span className="text-sm text-muted-foreground">Legal Adviser</span>
         </div>
       </div>
@@ -364,7 +364,7 @@ export default function ContractHubPage() {
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-primary/10">
-                <Building2 className="h-4 w-4 text-primary" />
+                <Building2 className="h-4 w-4 text-primary" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.total}</p>
@@ -377,7 +377,7 @@ export default function ContractHubPage() {
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-amber-500/10">
-                <Clock className="h-4 w-4 text-amber-500" />
+                <Clock className="h-4 w-4 text-amber-500" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.awaiting}</p>
@@ -390,7 +390,7 @@ export default function ContractHubPage() {
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-blue-500/10">
-                <FileText className="h-4 w-4 text-blue-500" />
+                <FileText className="h-4 w-4 text-blue-500" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.review}</p>
@@ -403,7 +403,7 @@ export default function ContractHubPage() {
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-green-500/10">
-                <CheckCircle className="h-4 w-4 text-green-500" />
+                <CheckCircle className="h-4 w-4 text-green-500" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.executed}</p>
@@ -416,7 +416,7 @@ export default function ContractHubPage() {
           <CardContent className="pt-4 pb-3">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-red-500/10">
-                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <AlertTriangle className="h-4 w-4 text-red-500" aria-hidden="true" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{stats.atRisk}</p>
@@ -429,18 +429,19 @@ export default function ContractHubPage() {
 
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search jobs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
+            aria-label="Search contracts"
             data-testid="input-search-contracts"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[180px]" data-testid="select-contract-status-filter">
-            <Filter className="h-4 w-4 mr-2" />
+          <SelectTrigger className="w-[180px]" data-testid="select-contract-status-filter" aria-label="Filter by contract status">
+            <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
             <SelectValue placeholder="Contract Status" />
           </SelectTrigger>
           <SelectContent>
@@ -451,7 +452,7 @@ export default function ContractHubPage() {
           </SelectContent>
         </Select>
         <Select value={workStatusFilter} onValueChange={setWorkStatusFilter}>
-          <SelectTrigger className="w-[160px]" data-testid="select-work-status-filter">
+          <SelectTrigger className="w-[160px]" data-testid="select-work-status-filter" aria-label="Filter by work status">
             <SelectValue placeholder="Work Status" />
           </SelectTrigger>
           <SelectContent>
@@ -466,7 +467,7 @@ export default function ContractHubPage() {
         {filteredItems.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+              <FileText className="h-12 w-12 text-muted-foreground mb-4" aria-hidden="true" />
               <p className="text-lg font-medium">No jobs found</p>
               <p className="text-sm text-muted-foreground">Try adjusting your search or filters</p>
             </CardContent>
@@ -487,7 +488,7 @@ export default function ContractHubPage() {
                   <div className="flex items-center justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-4 min-w-0 flex-1">
                       <div className="flex-shrink-0 w-10 h-10 rounded-md bg-primary/10 flex items-center justify-center">
-                        <Shield className="h-5 w-5 text-primary" />
+                        <Shield className="h-5 w-5 text-primary" aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -536,7 +537,7 @@ export default function ContractHubPage() {
                         {statusConfig.label}
                       </Badge>
 
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </div>
                   </div>
                 </CardContent>

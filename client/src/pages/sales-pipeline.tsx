@@ -268,7 +268,7 @@ export default function SalesPipelinePage() {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto p-6" data-testid="page-sales-pipeline">
+    <div className="flex-1 overflow-y-auto p-6" data-testid="page-sales-pipeline" role="main" aria-label="Sales Pipeline">
       <div className="mb-6">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Sales Pipeline</h1>
@@ -282,10 +282,10 @@ export default function SalesPipelinePage() {
         <Card data-testid="card-total-pipeline">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Pipeline</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-pipeline">
+            <div className="text-2xl font-bold" data-testid="text-total-pipeline" aria-live="polite">
               {formatCurrency(totalValue.toString())}
             </div>
             <p className="text-xs text-muted-foreground mt-1">{opportunities.length} opportunities</p>
@@ -294,10 +294,10 @@ export default function SalesPipelinePage() {
         <Card data-testid="card-weighted-value">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Weighted Value</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-weighted-value">
+            <div className="text-2xl font-bold" data-testid="text-weighted-value" aria-live="polite">
               {formatCurrency(weightedValue.toString())}
             </div>
             <p className="text-xs text-muted-foreground mt-1">Adjusted by probability</p>
@@ -306,20 +306,20 @@ export default function SalesPipelinePage() {
         <Card data-testid="card-active-opps">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Active Opportunities</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
+            <Target className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-active-count">{activeCount}</div>
+            <div className="text-2xl font-bold" data-testid="text-active-count" aria-live="polite">{activeCount}</div>
             <p className="text-xs text-muted-foreground mt-1">Excluding lost & cancelled</p>
           </CardContent>
         </Card>
         <Card data-testid="card-avg-probability">
           <CardHeader className="flex flex-row items-center justify-between gap-1 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Avg Probability</CardTitle>
-            <Percent className="h-4 w-4 text-muted-foreground" />
+            <Percent className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-avg-probability">{avgProbability}%</div>
+            <div className="text-2xl font-bold" data-testid="text-avg-probability" aria-live="polite">{avgProbability}%</div>
             <p className="text-xs text-muted-foreground mt-1">Across all opportunities</p>
           </CardContent>
         </Card>
@@ -359,12 +359,13 @@ export default function SalesPipelinePage() {
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
           <Input
             placeholder="Search by name, customer, city, job number..."
             className="pl-9"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            aria-label="Search pipeline"
             data-testid="input-search-pipeline"
           />
         </div>
@@ -377,14 +378,14 @@ export default function SalesPipelinePage() {
       {/* Table */}
       {isLoading ? (
         <Card>
-          <CardContent className="p-12 text-center">
+          <CardContent className="p-12 text-center" aria-busy="true">
             <div className="animate-pulse text-muted-foreground">Loading opportunities...</div>
           </CardContent>
         </Card>
       ) : filtered.length === 0 ? (
         <Card>
           <CardContent className="p-12 text-center">
-            <Target className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" />
+            <Target className="h-12 w-12 text-muted-foreground mx-auto mb-3 opacity-40" aria-hidden="true" />
             <h3 className="font-semibold text-lg">No opportunities found</h3>
             <p className="text-muted-foreground mt-1 text-sm">
               {searchTerm || stageFilter !== "ALL"
@@ -434,7 +435,7 @@ export default function SalesPipelinePage() {
                       </td>
                       <td className="p-3">
                         <div className="text-sm flex items-center gap-1">
-                          <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <MapPin className="h-3 w-3 text-muted-foreground flex-shrink-0" aria-hidden="true" />
                           {opp.city || "-"}{opp.state ? `, ${opp.state}` : ""}
                         </div>
                       </td>
@@ -483,7 +484,7 @@ export default function SalesPipelinePage() {
                       </td>
                       <td className="p-3 text-sm text-muted-foreground">{formatDate(opp.createdAt)}</td>
                       <td className="p-3">
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                       </td>
                     </tr>
                   );

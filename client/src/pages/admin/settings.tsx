@@ -585,7 +585,7 @@ export default function AdminSettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="System Settings" aria-busy="true">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -593,7 +593,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="System Settings">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-settings-title">
@@ -610,7 +610,7 @@ export default function AdminSettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Building2 className="h-5 w-5" />
+            <Building2 className="h-5 w-5" aria-hidden="true" />
             Company Branding
           </CardTitle>
           <CardDescription>

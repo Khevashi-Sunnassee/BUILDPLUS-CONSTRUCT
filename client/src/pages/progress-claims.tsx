@@ -128,7 +128,7 @@ export default function ProgressClaimsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6" role="main" aria-label="Progress Claims" aria-busy="true">
         <Skeleton className="h-8 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
@@ -141,7 +141,7 @@ export default function ProgressClaimsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6" role="main" aria-label="Progress Claims">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ export default function ProgressClaimsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4" aria-live="polite">
         <Card data-testid="stat-total">
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Total Claims</p>
@@ -210,13 +210,14 @@ export default function ProgressClaimsPage() {
             <CardTitle className="text-lg">All Claims</CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
                 <Input
                   placeholder="Search claims..."
                   className="pl-8 w-[200px]"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   data-testid="input-search"
+                  aria-label="Search claims"
                 />
                 {searchQuery && (
                   <Button

@@ -508,12 +508,12 @@ export default function KPIDashboardPage() {
   const isLoading = productionLoading || costsLoading || draftingLoading;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="KPI Dashboard">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-            <BarChart3 className="h-6 w-6" />
+            <BarChart3 className="h-6 w-6" aria-hidden="true" />
             KPI Dashboard
           </h1>
             <PageHelpButton pageHelpKey="page.kpi-dashboard" />
@@ -525,8 +525,8 @@ export default function KPIDashboardPage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Select value={periodType} onValueChange={setPeriodType} data-testid="select-period">
-            <SelectTrigger className="w-[160px]" data-testid="button-select-period">
-              <Calendar className="h-4 w-4 mr-2" />
+            <SelectTrigger className="w-[160px]" data-testid="button-select-period" aria-label="Filter by period">
+              <Calendar className="h-4 w-4 mr-2" aria-hidden="true" />
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
             <SelectContent>
@@ -586,7 +586,7 @@ export default function KPIDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">Total Panels</CardTitle>
-              <Layers className="h-4 w-4 text-muted-foreground" />
+              <Layers className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -602,7 +602,7 @@ export default function KPIDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">Total Volume</CardTitle>
-              <Factory className="h-4 w-4 text-muted-foreground" />
+              <Factory className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -618,7 +618,7 @@ export default function KPIDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">Revenue</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-500" />
+              <TrendingUp className="h-4 w-4 text-green-500" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -634,7 +634,7 @@ export default function KPIDashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">Profit</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               {isLoading ? (

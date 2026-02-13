@@ -227,7 +227,7 @@ export default function ChecklistsPage() {
 
   if (instancesLoading || templatesLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" aria-busy="true">
         <Skeleton className="h-8 w-64 mb-4" />
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -239,12 +239,12 @@ export default function ChecklistsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Checklists">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-checklists-title">
-            <FileText className="h-6 w-6" />
+            <FileText className="h-6 w-6" aria-hidden="true" />
             Checklists
           </h1>
             <PageHelpButton pageHelpKey="page.checklists" />
@@ -267,18 +267,19 @@ export default function ChecklistsPage() {
         <CardContent className="pt-4">
           <div className="flex items-center gap-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Search by template, job, or checklist number..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
+                aria-label="Search checklists"
                 data-testid="input-search-checklists"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]" data-testid="select-status-filter">
-                <Filter className="h-4 w-4 mr-2" />
+              <SelectTrigger className="w-[180px]" data-testid="select-status-filter" aria-label="Filter by status">
+                <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -295,7 +296,7 @@ export default function ChecklistsPage() {
 
       {(!filteredInstances || filteredInstances.length === 0) ? (
         <Card className="p-8 text-center">
-          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+          <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" aria-hidden="true" />
           <h3 className="text-lg font-medium mb-2">
             {instances?.length === 0 ? "No Checklists Yet" : "No Results Found"}
           </h3>

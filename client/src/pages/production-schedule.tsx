@@ -268,7 +268,7 @@ export default function ProductionSchedulePage() {
   const totalPanels = stats ? stats.draft + stats.ifa + stats.ifc + stats.approved + stats.scheduled + stats.completed : 0;
 
   return (
-    <div className="space-y-6" data-testid="page-production-schedule">
+    <div className="space-y-6" data-testid="page-production-schedule" role="main" aria-label="Production Schedule">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -285,7 +285,7 @@ export default function ProductionSchedulePage() {
         <Card data-testid="stat-card-draft">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Draft</CardTitle>
-            <FileEdit className="h-4 w-4 text-muted-foreground" />
+            <FileEdit className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -299,7 +299,7 @@ export default function ProductionSchedulePage() {
         <Card data-testid="stat-card-ifa">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">IFA</CardTitle>
-            <FileClock className="h-4 w-4 text-blue-500" />
+            <FileClock className="h-4 w-4 text-blue-500" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -313,7 +313,7 @@ export default function ProductionSchedulePage() {
         <Card data-testid="stat-card-ifc">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">IFC</CardTitle>
-            <FileCheck className="h-4 w-4 text-green-500" />
+            <FileCheck className="h-4 w-4 text-green-500" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -327,7 +327,7 @@ export default function ProductionSchedulePage() {
         <Card data-testid="stat-card-approved">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Approved</CardTitle>
-            <Check className="h-4 w-4 text-emerald-500" />
+            <Check className="h-4 w-4 text-emerald-500" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -341,7 +341,7 @@ export default function ProductionSchedulePage() {
         <Card data-testid="stat-card-scheduled">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-            <Calendar className="h-4 w-4 text-purple-500" />
+            <Calendar className="h-4 w-4 text-purple-500" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -355,7 +355,7 @@ export default function ProductionSchedulePage() {
         <Card data-testid="stat-card-completed">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <Package className="h-4 w-4 text-teal-500" />
+            <Package className="h-4 w-4 text-teal-500" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -387,13 +387,14 @@ export default function ProductionSchedulePage() {
           {showReadyForProduction && (
           <div className="flex flex-wrap items-center gap-4 pt-4">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 type="text"
                 placeholder="Search panels..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
+                aria-label="Search panels"
                 data-testid="input-search-panels"
               />
             </div>

@@ -678,7 +678,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-full min-h-0 overflow-hidden" data-testid="chat-page">
+    <div className="flex h-full min-h-0 overflow-hidden" data-testid="chat-page" role="main" aria-label="Chat">
       <div className="w-80 shrink-0 border-r flex flex-col overflow-hidden">
         <div className="p-4 border-b">
           <div className="flex items-center justify-between gap-2 mb-3">

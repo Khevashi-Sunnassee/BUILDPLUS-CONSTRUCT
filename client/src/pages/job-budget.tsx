@@ -421,7 +421,7 @@ export default function JobBudgetPage() {
 
   if (loadingJob || loadingBudget) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4" aria-busy="true">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-6 w-48" />
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -435,7 +435,7 @@ export default function JobBudgetPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" role="main" aria-label="Job Budget">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Job Budget</h1>
@@ -483,7 +483,7 @@ export default function JobBudgetPage() {
           <Card data-testid="card-total-estimated">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Estimated Budget</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
+              <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-estimated">
@@ -494,7 +494,7 @@ export default function JobBudgetPage() {
           <Card data-testid="card-total-tender">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Tender Cost</CardTitle>
-              <Receipt className="h-4 w-4 text-muted-foreground" />
+              <Receipt className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-tender">
@@ -505,7 +505,7 @@ export default function JobBudgetPage() {
           <Card data-testid="card-total-variations">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Variations</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <TrendingUp className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-variations">
@@ -516,7 +516,7 @@ export default function JobBudgetPage() {
           <Card data-testid="card-total-forecast">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Forecast</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              <BarChart3 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-total-forecast">
@@ -527,7 +527,7 @@ export default function JobBudgetPage() {
           <Card data-testid="card-profit-margin">
             <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
               <CardTitle className="text-sm font-medium text-muted-foreground">Profit Margin</CardTitle>
-              <Target className="h-4 w-4 text-muted-foreground" />
+              <Target className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold" data-testid="text-profit-margin">

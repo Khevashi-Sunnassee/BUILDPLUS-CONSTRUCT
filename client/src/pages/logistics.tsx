@@ -744,7 +744,7 @@ export default function LogisticsPage() {
 
   if (loadListsLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" aria-busy="true">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-10 w-32" />
@@ -766,12 +766,12 @@ export default function LogisticsPage() {
   const completedLoadLists = filteredLoadLists.filter(ll => ll.status === "COMPLETE");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Logistics">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2" data-testid="text-page-title">
-            <Truck className="h-6 w-6" />
+            <Truck className="h-6 w-6" aria-hidden="true" />
             Logistics
           </h1>
             <PageHelpButton pageHelpKey="page.logistics" />
@@ -782,7 +782,7 @@ export default function LogisticsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={factoryFilter} onValueChange={setFactoryFilter}>
-            <SelectTrigger className="w-36" data-testid="select-factory-filter">
+            <SelectTrigger className="w-36" data-testid="select-factory-filter" aria-label="Filter by factory">
               <SelectValue placeholder="Factory" />
             </SelectTrigger>
             <SelectContent>

@@ -695,7 +695,7 @@ export default function JobActivitiesPage() {
 
   if (loadingActivities) {
     return (
-      <div className="p-4 md:p-6 space-y-4 h-full overflow-auto">
+      <div className="p-4 md:p-6 space-y-4 h-full overflow-auto" role="main" aria-label="Job Activities" aria-busy="true">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -704,7 +704,7 @@ export default function JobActivitiesPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-4 h-full overflow-auto">
+    <div className="p-4 md:p-6 space-y-4 h-full overflow-auto" role="main" aria-label="Job Activities">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/tasks")} data-testid="button-back-to-tasks">
@@ -717,7 +717,7 @@ export default function JobActivitiesPage() {
               </h1>
               <PageHelpButton pageHelpKey="page.job-activities" />
             </div>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground" aria-live="polite">
               {job ? `${job.jobNumber || ""} - ${job.name || ""}` : "Loading job..."}
               {hasActivities && ` | ${doneCount}/${totalActivities} complete (${progressPct}%)`}
               {overdueCount > 0 && (
@@ -733,7 +733,7 @@ export default function JobActivitiesPage() {
       {!hasActivities ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
+            <FileText className="h-12 w-12 text-muted-foreground mb-4" aria-hidden="true" />
             <h3 className="text-lg font-semibold mb-2">No Activities Yet</h3>
             <p className="text-muted-foreground mb-4 max-w-md">
               Load activities from a job type workflow to get started. Select the appropriate job type and all its activities will be created for this job.
@@ -748,13 +748,14 @@ export default function JobActivitiesPage() {
         <>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Search activities..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
                 data-testid="input-search-activities"
+                aria-label="Search activities"
               />
             </div>
 

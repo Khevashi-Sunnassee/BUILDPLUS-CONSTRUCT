@@ -1035,7 +1035,7 @@ export default function PurchaseOrdersPage() {
   }, [settings, poTermsData, toast]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Purchase Orders">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4">
           <div>
@@ -1055,13 +1055,14 @@ export default function PurchaseOrdersPage() {
         <CardContent>
           <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Search PO number, supplier, or project..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
                 data-testid="input-search-po"
+                aria-label="Search purchase orders"
               />
             </div>
             <Select value={supplierFilter} onValueChange={setSupplierFilter}>
@@ -1108,7 +1109,7 @@ export default function PurchaseOrdersPage() {
           </Tabs>
 
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2" aria-busy="true">
               {[...Array(5)].map((_, i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}

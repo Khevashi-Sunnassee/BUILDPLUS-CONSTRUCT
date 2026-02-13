@@ -363,7 +363,7 @@ export default function ReportsPage() {
   })) || [];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Reports">
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -378,8 +378,8 @@ export default function ReportsPage() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-36" data-testid="select-period">
-              <Calendar className="h-4 w-4 mr-2" />
+            <SelectTrigger className="w-36" data-testid="select-period" aria-label="Filter by period">
+              <Calendar className="h-4 w-4 mr-2" aria-hidden="true" />
               <SelectValue placeholder="Period" />
             </SelectTrigger>
             <SelectContent>

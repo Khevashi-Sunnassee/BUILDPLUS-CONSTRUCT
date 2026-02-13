@@ -532,7 +532,7 @@ export default function AdminUsersPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="User Management" aria-busy="true">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -540,7 +540,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="User Management">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

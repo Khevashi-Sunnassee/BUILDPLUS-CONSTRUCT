@@ -584,7 +584,7 @@ export default function TasksPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Tasks" aria-busy="true">
         <div className="flex items-center justify-between">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-9 w-32" />
@@ -599,7 +599,7 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="tasks-page">
+    <div className="space-y-6" data-testid="tasks-page" role="main" aria-label="Tasks">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -610,7 +610,7 @@ export default function TasksPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <Briefcase className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <Select value={jobFilter} onValueChange={setJobFilter}>
               <SelectTrigger className="w-[150px]" data-testid="select-job-filter">
                 <SelectValue placeholder="Filter by job" />

@@ -326,7 +326,7 @@ export default function DocumentRegister() {
     if (!pagination || pagination.totalPages <= 1) return null;
     return (
       <div className="flex items-center justify-between mt-4">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground" aria-live="polite">
           Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
           {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} documents
         </p>
@@ -358,10 +358,10 @@ export default function DocumentRegister() {
   };
 
   return (
-    <div className="space-y-6" data-testid="document-register-page">
+    <div className="space-y-6" data-testid="document-register-page" role="main" aria-label="Document Register">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <FileText className="h-8 w-8 text-primary" />
+          <FileText className="h-8 w-8 text-primary" aria-hidden="true" />
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold" data-testid="text-page-title">Document Register</h1>
@@ -448,7 +448,7 @@ export default function DocumentRegister() {
           <>
           <div className="flex gap-2 items-center mb-4">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Search documents..."
                 value={searchInput}
@@ -456,6 +456,7 @@ export default function DocumentRegister() {
                 onKeyDown={(e) => e.key === "Enter" && handleSearch()}
                 className="pl-10"
                 data-testid="input-search"
+                aria-label="Search documents"
               />
             </div>
             <Button variant="outline" onClick={handleSearch} data-testid="button-search">
@@ -471,7 +472,7 @@ export default function DocumentRegister() {
               <Label htmlFor="latest-only" className="text-sm">Latest versions only</Label>
             </div>
             <div className="flex items-center gap-2 ml-auto">
-              <Layers className="h-4 w-4 text-muted-foreground" />
+              <Layers className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Label className="text-sm text-muted-foreground whitespace-nowrap">Group by</Label>
               <Select value={groupBy} onValueChange={(v) => { setGroupBy(v); setCollapsedGroups(new Set()); }}>
                 <SelectTrigger className="w-[180px]" data-testid="select-group-by">

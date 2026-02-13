@@ -289,7 +289,7 @@ export default function HireBookingsPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -298,7 +298,7 @@ export default function HireBookingsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" role="main" aria-label="Hire Bookings">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">
@@ -316,17 +316,18 @@ export default function HireBookingsPage() {
       <div className="space-y-3">
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
             <Input
               placeholder="Search bookings..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
+              aria-label="Search hire bookings"
               data-testid="input-search-hire"
             />
           </div>
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]" data-testid="select-category-filter">
+            <SelectTrigger className="w-[180px]" data-testid="select-category-filter" aria-label="Filter by category">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -337,7 +338,7 @@ export default function HireBookingsPage() {
             </SelectContent>
           </Select>
           <Select value={equipmentFilter} onValueChange={setEquipmentFilter}>
-            <SelectTrigger className="w-[200px]" data-testid="select-equipment-filter">
+            <SelectTrigger className="w-[200px]" data-testid="select-equipment-filter" aria-label="Filter by equipment">
               <SelectValue placeholder="Equipment" />
             </SelectTrigger>
             <SelectContent>
@@ -415,7 +416,7 @@ export default function HireBookingsPage() {
         <Card data-testid="stat-total-bookings">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Bookings</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-total-bookings-count">{dashboardStats.totalBookings}</div>
@@ -424,7 +425,7 @@ export default function HireBookingsPage() {
         <Card data-testid="stat-drafts">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Drafts</CardTitle>
-            <Edit className="h-4 w-4 text-muted-foreground" />
+            <Edit className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-draft-count">{dashboardStats.draftCount}</div>
@@ -433,7 +434,7 @@ export default function HireBookingsPage() {
         <Card data-testid="stat-pending-approval">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Pending Approval</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${dashboardStats.pendingApproval > 0 ? "text-amber-600 dark:text-amber-400" : ""}`} data-testid="text-pending-count">
@@ -444,7 +445,7 @@ export default function HireBookingsPage() {
         <Card data-testid="stat-active">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Active / On Hire</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <Package className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-active-count">{dashboardStats.activeCount}</div>
@@ -453,7 +454,7 @@ export default function HireBookingsPage() {
         <Card data-testid="stat-daily-cost">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Cost / Day</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold" data-testid="text-daily-cost">
@@ -464,7 +465,7 @@ export default function HireBookingsPage() {
         <Card data-testid="stat-overdue">
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            <AlertTriangle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${dashboardStats.overdueCount > 0 ? "text-destructive" : ""}`} data-testid="text-overdue-count">

@@ -921,7 +921,7 @@ export default function AdminJobsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Jobs Management" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -929,7 +929,7 @@ export default function AdminJobsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Jobs Management">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -969,23 +969,24 @@ export default function AdminJobsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Briefcase className="h-5 w-5" />
+            <Briefcase className="h-5 w-5" aria-hidden="true" />
             Job Register
           </CardTitle>
-          <CardDescription>
+          <CardDescription aria-live="polite">
             {filteredAndSortedJobs.length} of {jobs?.length || 0} jobs
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="relative flex-1 min-w-[200px] max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <Input
                 placeholder="Search jobs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-9"
                 data-testid="input-search-jobs"
+                aria-label="Search jobs"
               />
             </div>
             <Select value={stateFilter} onValueChange={setStateFilter}>
