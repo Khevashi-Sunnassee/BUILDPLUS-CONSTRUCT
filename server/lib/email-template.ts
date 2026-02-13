@@ -10,22 +10,23 @@ interface BrandedEmailOptions {
   companyId?: string;
 }
 
-let cachedSettings: { companyName: string; logoBase64: string | null } | null = null;
-let cacheExpiry = 0;
+const brandingCache = new Map<string, { data: { companyName: string; logoBase64: string | null }; expiry: number }>();
 
 async function getCompanyBranding(companyId?: string): Promise<{ companyName: string; logoBase64: string | null }> {
+  const cacheKey = companyId || "__default__";
   const now = Date.now();
-  if (cachedSettings && now < cacheExpiry && !companyId) {
-    return cachedSettings;
+  const cached = brandingCache.get(cacheKey);
+  if (cached && now < cached.expiry) {
+    return cached.data;
   }
   try {
     const settings = await storage.getGlobalSettings(companyId);
-    cachedSettings = {
+    const data = {
       companyName: settings?.companyName || "BuildPlus Ai",
       logoBase64: settings?.logoBase64 || null,
     };
-    cacheExpiry = now + 5 * 60 * 1000;
-    return cachedSettings;
+    brandingCache.set(cacheKey, { data, expiry: now + 5 * 60 * 1000 });
+    return data;
   } catch (err) {
     logger.warn({ err }, "Failed to load company branding for email template");
     return { companyName: "BuildPlus Ai", logoBase64: null };

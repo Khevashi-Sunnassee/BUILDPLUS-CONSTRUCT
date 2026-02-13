@@ -35,10 +35,10 @@ router.get("/api/panels", requireAuth, async (req: Request, res: Response) => {
       res.json(panels);
     }
   } else {
-    const allPanels = await storage.getAllPanelRegisterItems();
-    let filtered = allPanels.filter(p => p.job?.companyId === companyId);
+    const allPanels = await storage.getAllPanelRegisterItems(req.companyId);
 
     const allowedIds = await getAllowedJobIds(req);
+    let filtered = allPanels;
     if (allowedIds !== null) {
       filtered = filtered.filter(p => p.job && allowedIds.has(p.job.id));
     }
@@ -65,10 +65,10 @@ router.get("/api/panels/ready-for-loading", requireAuth, async (req: Request, re
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const panels = await storage.getPanelsReadyForLoading();
-    let filtered = panels.filter((p) => p.job?.companyId === companyId);
+    const panels = await storage.getPanelsReadyForLoading(req.companyId);
 
     const allowedIds = await getAllowedJobIds(req);
+    let filtered = panels;
     if (allowedIds !== null) {
       filtered = filtered.filter((p) => p.job && allowedIds.has(p.job.id));
     }
@@ -173,9 +173,9 @@ router.get("/api/panels/admin", requireRole("ADMIN"), async (req: Request, res: 
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     
-    const panels = await storage.getAllPanelRegisterItems();
+    const panels = await storage.getAllPanelRegisterItems(req.companyId);
     
-    let filtered = panels.filter(p => p.job?.companyId === companyId);
+    let filtered = panels;
     if (jobId) {
       filtered = filtered.filter(p => p.jobId === jobId);
     }
@@ -336,7 +336,7 @@ router.delete("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request
 });
 
 router.get("/api/panels/admin/source-counts", requireRole("ADMIN"), async (req: Request, res: Response) => {
-  const counts = await storage.getPanelCountsBySource();
+  const counts = await storage.getPanelCountsBySource(req.companyId);
   res.json(counts);
 });
 

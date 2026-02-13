@@ -53,9 +53,13 @@ export const dailyLogMethods = {
     return db.select().from(dailyLogs).where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
   },
 
-  async getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]> {
+  async getSubmittedDailyLogs(companyId?: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]> {
+    const conditions = [eq(dailyLogs.status, "SUBMITTED")];
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+    }
     const logs = await db.select().from(dailyLogs).innerJoin(users, eq(dailyLogs.userId, users.id))
-      .where(eq(dailyLogs.status, "SUBMITTED")).orderBy(desc(dailyLogs.logDay));
+      .where(and(...conditions)).orderBy(desc(dailyLogs.logDay));
 
     const result = [];
     for (const log of logs) {

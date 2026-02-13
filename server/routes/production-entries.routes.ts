@@ -44,10 +44,10 @@ const router = Router();
 router.get("/api/production-entries", requireAuth, requirePermission("production_report"), async (req: Request, res: Response) => {
   const date = req.query.date as string;
   if (date) {
-    const entries = await storage.getProductionEntriesByDate(date);
+    const entries = await storage.getProductionEntriesByDate(date, req.companyId);
     res.json(entries);
   } else {
-    const entries = await storage.getAllProductionEntries();
+    const entries = await storage.getAllProductionEntries(req.companyId);
     res.json(entries);
   }
 });
@@ -55,6 +55,7 @@ router.get("/api/production-entries", requireAuth, requirePermission("production
 router.get("/api/production-entries/:id", requireAuth, requirePermission("production_report"), async (req: Request, res: Response) => {
   const entry = await storage.getProductionEntry(String(req.params.id));
   if (!entry) return res.status(404).json({ error: "Entry not found" });
+  if (entry.job.companyId !== req.companyId) return res.status(404).json({ error: "Entry not found" });
   res.json(entry);
 });
 
@@ -68,6 +69,10 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
     if (panelId) {
       const panel = await storage.getPanelById(panelId);
       if (!panel) {
+        return res.status(404).json({ error: "Panel not found" });
+      }
+      const panelJob = await storage.getJob(panel.jobId);
+      if (!panelJob || panelJob.companyId !== req.companyId) {
         return res.status(404).json({ error: "Panel not found" });
       }
       if (!panel.approvedForProduction) {

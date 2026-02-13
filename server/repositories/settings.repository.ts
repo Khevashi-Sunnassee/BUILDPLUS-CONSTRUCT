@@ -46,7 +46,10 @@ export class SettingsRepository {
     return db.select().from(mappingRules).orderBy(desc(mappingRules.createdAt));
   }
 
-  async getAllZones(): Promise<Zone[]> {
+  async getAllZones(companyId?: string): Promise<Zone[]> {
+    if (companyId) {
+      return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(zones.name);
+    }
     return db.select().from(zones).orderBy(zones.name);
   }
 

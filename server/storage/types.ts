@@ -144,16 +144,16 @@ export interface IStorage {
   createDevice(data: { userId: string; deviceName: string; os: string }): Promise<{ device: Device; deviceKey: string }>;
   updateDevice(id: string, data: Partial<{ deviceName: string; os: string; agentVersion: string; lastSeenAt: Date; isActive: boolean }>): Promise<Device | undefined>;
   deleteDevice(id: string): Promise<void>;
-  getAllDevices(): Promise<(Device & { user: User })[]>;
+  getAllDevices(companyId?: string): Promise<(Device & { user: User })[]>;
 
   createMappingRule(data: InsertMappingRule): Promise<MappingRule>;
   deleteMappingRule(id: string): Promise<void>;
   getMappingRule(id: string): Promise<MappingRule | undefined>;
-  getMappingRules(): Promise<MappingRule[]>;
+  getMappingRules(companyId?: string): Promise<MappingRule[]>;
 
   getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined>;
   getDailyLogsByUser(userId: string, filters?: { status?: string; dateRange?: string }): Promise<DailyLog[]>;
-  getSubmittedDailyLogs(): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]>;
+  getSubmittedDailyLogs(companyId?: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User })[]>;
   getDailyLogByUserAndDay(userId: string, logDay: string): Promise<DailyLog | undefined>;
   createDailyLog(data: { userId: string; logDay: string; status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED" }): Promise<DailyLog>;
   upsertDailyLog(data: { userId: string; logDay: string; tz: string }): Promise<DailyLog>;
@@ -190,11 +190,11 @@ export interface IStorage {
   createPanelRegisterItem(data: InsertPanelRegister): Promise<PanelRegister>;
   updatePanelRegisterItem(id: string, data: Partial<InsertPanelRegister>): Promise<PanelRegister | undefined>;
   deletePanelRegisterItem(id: string): Promise<void>;
-  getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]>;
+  getAllPanelRegisterItems(companyId?: string): Promise<(PanelRegister & { job: Job })[]>;
   getPaginatedPanelRegisterItems(options: { page: number; limit: number; jobId?: string; search?: string; status?: string; documentStatus?: string; factoryId?: string }): Promise<{ panels: (PanelRegister & { job: Job })[]; total: number; page: number; limit: number; totalPages: number }>;
   importPanelRegister(data: InsertPanelRegister[]): Promise<{ imported: number; skipped: number; importedIds: string[] }>;
   updatePanelActualHours(panelId: string, additionalMinutes: number): Promise<void>;
-  getPanelCountsBySource(): Promise<{ source: number; count: number }[]>;
+  getPanelCountsBySource(companyId?: string): Promise<{ source: number; count: number }[]>;
   panelsWithSourceHaveRecords(source: number): Promise<boolean>;
   deletePanelsBySource(source: number): Promise<number>;
   deletePanelsByJobAndSource(jobId: string, source: number): Promise<number>;
@@ -202,16 +202,16 @@ export interface IStorage {
   importEstimatePanels(data: any[]): Promise<{ imported: number; errors: string[]; importedIds: string[] }>;
 
   getProductionEntry(id: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job }) | undefined>;
-  getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
-  getProductionEntriesByDateAndFactory(date: string, factory: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
-  getProductionEntriesByDateAndFactoryId(date: string, factoryId: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
-  getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesByDate(date: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesByDateAndFactory(date: string, factory: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesByDateAndFactoryId(date: string, factoryId: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionEntriesInRange(startDate: string, endDate: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   createProductionEntry(data: InsertProductionEntry): Promise<ProductionEntry>;
   updateProductionEntry(id: string, data: Partial<InsertProductionEntry>): Promise<ProductionEntry | undefined>;
   deleteProductionEntry(id: string): Promise<void>;
   getProductionEntryByPanelId(panelId: string): Promise<ProductionEntry | undefined>;
-  getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
-  getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
+  getAllProductionEntries(companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
+  getProductionSummaryByDate(date: string, companyId?: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
   
   getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]>;
   getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined>;
@@ -229,7 +229,7 @@ export interface IStorage {
   createPanelType(data: InsertPanelType): Promise<PanelTypeConfig>;
   updatePanelType(id: string, data: Partial<InsertPanelType>): Promise<PanelTypeConfig | undefined>;
   deletePanelType(id: string): Promise<void>;
-  getAllPanelTypes(): Promise<PanelTypeConfig[]>;
+  getAllPanelTypes(companyId?: string): Promise<PanelTypeConfig[]>;
 
   getJobPanelRate(id: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig }) | undefined>;
   getJobPanelRates(jobId: string): Promise<(JobPanelRate & { panelType: PanelTypeConfig })[]>;
@@ -274,17 +274,17 @@ export interface IStorage {
     productionPdfUrl?: string | null;
   }): Promise<PanelRegister | undefined>;
   revokePanelProductionApproval(id: string): Promise<PanelRegister | undefined>;
-  getPanelsReadyForLoading(): Promise<(PanelRegister & { job: Job })[]>;
+  getPanelsReadyForLoading(companyId?: string): Promise<(PanelRegister & { job: Job })[]>;
   getPanelsApprovedForProduction(jobId?: string): Promise<(PanelRegister & { job: Job })[]>;
 
-  getAllTrailerTypes(): Promise<TrailerType[]>;
-  getActiveTrailerTypes(): Promise<TrailerType[]>;
+  getAllTrailerTypes(companyId?: string): Promise<TrailerType[]>;
+  getActiveTrailerTypes(companyId?: string): Promise<TrailerType[]>;
   getTrailerType(id: string): Promise<TrailerType | undefined>;
   createTrailerType(data: InsertTrailerType): Promise<TrailerType>;
   updateTrailerType(id: string, data: Partial<InsertTrailerType>): Promise<TrailerType | undefined>;
   deleteTrailerType(id: string): Promise<void>;
 
-  getAllLoadLists(): Promise<LoadListWithDetails[]>;
+  getAllLoadLists(companyId?: string): Promise<LoadListWithDetails[]>;
   getLoadList(id: string): Promise<LoadListWithDetails | undefined>;
   createLoadList(data: InsertLoadList, panelIds: string[]): Promise<LoadListWithDetails>;
   updateLoadList(id: string, data: Partial<InsertLoadList>): Promise<LoadList | undefined>;
@@ -301,17 +301,17 @@ export interface IStorage {
   getLoadReturn(loadListId: string): Promise<LoadReturnWithDetails | null>;
   createLoadReturn(data: InsertLoadReturn, panelIds: string[]): Promise<LoadReturnWithDetails>;
 
-  getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]>;
+  getWeeklyWageReports(startDate?: string, endDate?: string, companyId?: string): Promise<WeeklyWageReport[]>;
   getWeeklyWageReport(id: string): Promise<WeeklyWageReport | undefined>;
-  getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string): Promise<WeeklyWageReport | undefined>;
-  getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string): Promise<WeeklyWageReport | undefined>;
+  getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string, companyId?: string): Promise<WeeklyWageReport | undefined>;
+  getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string, companyId?: string): Promise<WeeklyWageReport | undefined>;
   createWeeklyWageReport(data: InsertWeeklyWageReport & { createdById: string }): Promise<WeeklyWageReport>;
   updateWeeklyWageReport(id: string, data: Partial<InsertWeeklyWageReport>): Promise<WeeklyWageReport | undefined>;
   deleteWeeklyWageReport(id: string): Promise<void>;
 
-  getWeeklyJobReports(projectManagerId?: string): Promise<WeeklyJobReportWithDetails[]>;
+  getWeeklyJobReports(projectManagerId?: string, companyId?: string): Promise<WeeklyJobReportWithDetails[]>;
   getWeeklyJobReport(id: string): Promise<WeeklyJobReportWithDetails | undefined>;
-  getWeeklyJobReportsByStatus(status: string): Promise<WeeklyJobReportWithDetails[]>;
+  getWeeklyJobReportsByStatus(status: string, companyId?: string): Promise<WeeklyJobReportWithDetails[]>;
   createWeeklyJobReport(data: InsertWeeklyJobReport, schedules: Omit<InsertWeeklyJobReportSchedule, "reportId">[]): Promise<WeeklyJobReportWithDetails>;
   updateWeeklyJobReport(id: string, data: Partial<InsertWeeklyJobReport>, schedules?: Omit<InsertWeeklyJobReportSchedule, "reportId">[]): Promise<WeeklyJobReportWithDetails | undefined>;
   submitWeeklyJobReport(id: string): Promise<WeeklyJobReport | undefined>;
@@ -319,9 +319,9 @@ export interface IStorage {
   rejectWeeklyJobReport(id: string, approvedById: string, rejectionReason: string): Promise<WeeklyJobReport | undefined>;
   deleteWeeklyJobReport(id: string): Promise<void>;
   getJobsForProjectManager(projectManagerId: string): Promise<Job[]>;
-  getApprovedWeeklyJobReports(): Promise<WeeklyJobReportWithDetails[]>;
+  getApprovedWeeklyJobReports(companyId?: string): Promise<WeeklyJobReportWithDetails[]>;
 
-  getEotClaims(): Promise<EotClaimWithDetails[]>;
+  getEotClaims(companyId?: string): Promise<EotClaimWithDetails[]>;
   getEotClaim(id: string): Promise<EotClaimWithDetails | undefined>;
   getEotClaimsByJob(jobId: string): Promise<EotClaimWithDetails[]>;
   createEotClaim(data: InsertEotClaim): Promise<EotClaim>;
@@ -339,7 +339,7 @@ export interface IStorage {
   initializeUserPermissions(userId: string): Promise<UserPermission[]>;
   getAllUserPermissionsForAdmin(companyId?: string): Promise<{ user: User; permissions: UserPermission[] }[]>;
 
-  getAllZones(): Promise<Zone[]>;
+  getAllZones(companyId?: string): Promise<Zone[]>;
   getZone(id: string): Promise<Zone | undefined>;
   getZoneByCode(code: string): Promise<Zone | undefined>;
   createZone(data: InsertZone): Promise<Zone>;
@@ -354,11 +354,11 @@ export interface IStorage {
   bookProductionSlot(id: string): Promise<ProductionSlot | undefined>;
   completeProductionSlot(id: string): Promise<ProductionSlot | undefined>;
   getProductionSlotAdjustments(slotId: string): Promise<ProductionSlotAdjustmentWithDetails[]>;
-  getJobsWithoutProductionSlots(): Promise<Job[]>;
+  getJobsWithoutProductionSlots(companyId?: string): Promise<Job[]>;
   deleteProductionSlot(id: string): Promise<void>;
   checkAndCompleteSlotByPanelCompletion(jobId: string, level: string, buildingNumber: number): Promise<void>;
 
-  getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<DraftingProgramWithDetails[]>;
+  getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[]; companyId?: string }): Promise<DraftingProgramWithDetails[]>;
   getDraftingProgram(id: string): Promise<DraftingProgramWithDetails | undefined>;
   getDraftingProgramByPanelId(panelId: string): Promise<DraftingProgram | undefined>;
   createDraftingProgram(data: InsertDraftingProgram): Promise<DraftingProgram>;
@@ -454,8 +454,8 @@ export interface IStorage {
   markAllTaskNotificationsRead(userId: string): Promise<void>;
   createTaskNotificationsForAssignees(taskId: string, excludeUserId: string, type: string, title: string, body: string | null, updateId: string | null): Promise<void>;
 
-  getAllDocumentTypes(): Promise<DocumentTypeConfig[]>;
-  getActiveDocumentTypes(): Promise<DocumentTypeConfig[]>;
+  getAllDocumentTypes(companyId?: string): Promise<DocumentTypeConfig[]>;
+  getActiveDocumentTypes(companyId?: string): Promise<DocumentTypeConfig[]>;
   getDocumentType(id: string): Promise<DocumentTypeConfig | undefined>;
   createDocumentType(data: InsertDocumentType): Promise<DocumentTypeConfig>;
   updateDocumentType(id: string, data: Partial<InsertDocumentType>): Promise<DocumentTypeConfig | undefined>;
@@ -466,15 +466,15 @@ export interface IStorage {
   updateDocumentTypeStatus(id: string, data: Partial<InsertDocumentTypeStatus>): Promise<DocumentTypeStatus | undefined>;
   deleteDocumentTypeStatus(id: string): Promise<void>;
   
-  getAllDocumentDisciplines(): Promise<DocumentDiscipline[]>;
-  getActiveDocumentDisciplines(): Promise<DocumentDiscipline[]>;
+  getAllDocumentDisciplines(companyId?: string): Promise<DocumentDiscipline[]>;
+  getActiveDocumentDisciplines(companyId?: string): Promise<DocumentDiscipline[]>;
   getDocumentDiscipline(id: string): Promise<DocumentDiscipline | undefined>;
   createDocumentDiscipline(data: InsertDocumentDiscipline): Promise<DocumentDiscipline>;
   updateDocumentDiscipline(id: string, data: Partial<InsertDocumentDiscipline>): Promise<DocumentDiscipline | undefined>;
   deleteDocumentDiscipline(id: string): Promise<void>;
   
-  getAllDocumentCategories(): Promise<DocumentCategory[]>;
-  getActiveDocumentCategories(): Promise<DocumentCategory[]>;
+  getAllDocumentCategories(companyId?: string): Promise<DocumentCategory[]>;
+  getActiveDocumentCategories(companyId?: string): Promise<DocumentCategory[]>;
   getDocumentCategory(id: string): Promise<DocumentCategory | undefined>;
   createDocumentCategory(data: InsertDocumentCategory): Promise<DocumentCategory>;
   updateDocumentCategory(id: string, data: Partial<InsertDocumentCategory>): Promise<DocumentCategory | undefined>;
@@ -506,7 +506,7 @@ export interface IStorage {
   getDocumentVersionHistory(documentId: string): Promise<Document[]>;
   createNewVersion(parentDocumentId: string, data: InsertDocument): Promise<Document>;
   
-  getAllDocumentBundles(): Promise<DocumentBundleWithItems[]>;
+  getAllDocumentBundles(companyId?: string): Promise<DocumentBundleWithItems[]>;
   getDocumentBundle(id: string): Promise<DocumentBundleWithItems | undefined>;
   getDocumentBundleByQr(qrCodeId: string): Promise<DocumentBundleWithItems | undefined>;
   createDocumentBundle(data: InsertDocumentBundle): Promise<DocumentBundle>;

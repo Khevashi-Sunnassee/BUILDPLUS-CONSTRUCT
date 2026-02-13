@@ -34,7 +34,7 @@ router.post("/ingest", async (req, res) => {
     });
 
     const createdOrUpdated: string[] = [];
-    const rules = await storage.getMappingRules();
+    const rules = await storage.getMappingRules(device.user.companyId);
 
     for (const b of body.blocks) {
       if (b.userEmail.toLowerCase() !== device.user.email.toLowerCase()) continue;

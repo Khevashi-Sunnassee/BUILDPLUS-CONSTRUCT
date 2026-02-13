@@ -56,7 +56,7 @@ router.get("/api/production-slots", requireAuth, async (req: Request, res: Respo
 
 router.get("/api/production-slots/jobs-without-slots", requireAuth, async (req: Request, res: Response) => {
   try {
-    const jobsWithoutSlots = await storage.getJobsWithoutProductionSlots();
+    const jobsWithoutSlots = await storage.getJobsWithoutProductionSlots(req.companyId);
     res.json(jobsWithoutSlots);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching jobs without slots");

@@ -11,7 +11,7 @@ router.get("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_wa
   try {
     const startDate = req.query.startDate as string | undefined;
     const endDate = req.query.endDate as string | undefined;
-    const reports = await storage.getWeeklyWageReports(startDate, endDate);
+    const reports = await storage.getWeeklyWageReports(startDate, endDate, req.companyId);
     res.json(reports);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching weekly wage reports");
@@ -22,7 +22,7 @@ router.get("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_wa
 router.get("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekly_wages"), async (req, res) => {
   try {
     const report = await storage.getWeeklyWageReport(String(req.params.id));
-    if (!report) {
+    if (!report || report.companyId !== req.companyId) {
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
@@ -41,13 +41,14 @@ router.post("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_w
     
     const { weekStartDate, weekEndDate, factory } = parseResult.data;
     
-    const existing = await storage.getWeeklyWageReportByWeek(weekStartDate, weekEndDate, factory || "");
+    const existing = await storage.getWeeklyWageReportByWeek(weekStartDate, weekEndDate, factory || "", req.companyId);
     if (existing) {
       return res.status(400).json({ error: "Weekly wage report already exists for this week and factory" });
     }
     
     const report = await storage.createWeeklyWageReport({
       ...parseResult.data,
+      companyId: req.companyId!,
       createdById: req.session.userId!,
     });
     res.json(report);
@@ -59,6 +60,10 @@ router.post("/api/weekly-wage-reports", requireAuth, requirePermission("weekly_w
 
 router.put("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekly_wages", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const existing = await storage.getWeeklyWageReport(String(req.params.id));
+    if (!existing || existing.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     const parseResult = insertWeeklyWageReportSchema.partial().safeParse(req.body);
     if (!parseResult.success) {
       return res.status(400).json({ error: parseResult.error.errors[0]?.message || "Invalid request data" });
@@ -77,6 +82,10 @@ router.put("/api/weekly-wage-reports/:id", requireAuth, requirePermission("weekl
 
 router.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), requirePermission("weekly_wages", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const existing = await storage.getWeeklyWageReport(String(req.params.id));
+    if (!existing || existing.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     await storage.deleteWeeklyWageReport(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
@@ -88,14 +97,14 @@ router.delete("/api/weekly-wage-reports/:id", requireRole("ADMIN", "MANAGER"), r
 router.get("/api/weekly-wage-reports/:id/analysis", requireAuth, async (req, res) => {
   try {
     const report = await storage.getWeeklyWageReport(String(req.params.id));
-    if (!report) {
+    if (!report || report.companyId !== req.companyId) {
       return res.status(404).json({ error: "Report not found" });
     }
     
-    const entries = await storage.getProductionEntriesInRange(report.weekStartDate, report.weekEndDate);
+    const entries = await storage.getProductionEntriesInRange(report.weekStartDate, report.weekEndDate, req.companyId);
     const factoryEntries = entries.filter(e => e.factory === report.factory);
     
-    const allPanelTypes = await storage.getAllPanelTypes();
+    const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
     const panelTypesMap = new Map(allPanelTypes.map(pt => [pt.code, pt]));
     
     let totalRevenue = 0;
@@ -179,7 +188,7 @@ router.get("/api/weekly-wage-reports/:id/analysis", requireAuth, async (req, res
 router.get("/api/weekly-job-reports", requireAuth, requirePermission("weekly_job_logs"), async (req, res) => {
   try {
     const projectManagerId = req.query.projectManagerId as string | undefined;
-    const reports = await storage.getWeeklyJobReports(projectManagerId);
+    const reports = await storage.getWeeklyJobReports(projectManagerId, req.companyId);
     res.json(reports);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching weekly job reports");
@@ -190,7 +199,7 @@ router.get("/api/weekly-job-reports", requireAuth, requirePermission("weekly_job
 router.get("/api/weekly-job-reports/my-reports", requireAuth, async (req, res) => {
   try {
     const userId = req.session.userId!;
-    const reports = await storage.getWeeklyJobReports(userId);
+    const reports = await storage.getWeeklyJobReports(userId, req.companyId);
     res.json(reports);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching my weekly job reports");
@@ -200,7 +209,7 @@ router.get("/api/weekly-job-reports/my-reports", requireAuth, async (req, res) =
 
 router.get("/api/weekly-job-reports/pending-approval", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
-    const reports = await storage.getWeeklyJobReportsByStatus("SUBMITTED");
+    const reports = await storage.getWeeklyJobReportsByStatus("SUBMITTED", req.companyId);
     res.json(reports);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching pending approval reports");
@@ -210,7 +219,7 @@ router.get("/api/weekly-job-reports/pending-approval", requireRole("ADMIN", "MAN
 
 router.get("/api/weekly-job-reports/approved", requireAuth, async (req, res) => {
   try {
-    const reports = await storage.getApprovedWeeklyJobReports();
+    const reports = await storage.getApprovedWeeklyJobReports(req.companyId);
     res.json(reports);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching approved reports");
@@ -221,7 +230,7 @@ router.get("/api/weekly-job-reports/approved", requireAuth, async (req, res) => 
 router.get("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
   try {
     const report = await storage.getWeeklyJobReport(String(req.params.id));
-    if (!report) {
+    if (!report || report.projectManager?.companyId !== req.companyId) {
       return res.status(404).json({ error: "Report not found" });
     }
     res.json(report);
@@ -249,6 +258,10 @@ router.post("/api/weekly-job-reports", requireAuth, async (req, res) => {
 
 router.put("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
   try {
+    const existing = await storage.getWeeklyJobReport(String(req.params.id));
+    if (!existing || existing.projectManager?.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     const { schedules, ...reportData } = req.body;
     const report = await storage.updateWeeklyJobReport(String(req.params.id), reportData, schedules);
     if (!report) {
@@ -263,6 +276,10 @@ router.put("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
 
 router.post("/api/weekly-job-reports/:id/submit", requireAuth, async (req, res) => {
   try {
+    const existing = await storage.getWeeklyJobReport(String(req.params.id));
+    if (!existing || existing.projectManager?.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     const report = await storage.submitWeeklyJobReport(String(req.params.id));
     if (!report) {
       return res.status(404).json({ error: "Report not found" });
@@ -276,6 +293,10 @@ router.post("/api/weekly-job-reports/:id/submit", requireAuth, async (req, res) 
 
 router.post("/api/weekly-job-reports/:id/approve", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
+    const existing = await storage.getWeeklyJobReport(String(req.params.id));
+    if (!existing || existing.projectManager?.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     const approvedById = req.session.userId!;
     const report = await storage.approveWeeklyJobReport(String(req.params.id), approvedById);
     if (!report) {
@@ -290,6 +311,10 @@ router.post("/api/weekly-job-reports/:id/approve", requireRole("ADMIN", "MANAGER
 
 router.post("/api/weekly-job-reports/:id/reject", requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
+    const existing = await storage.getWeeklyJobReport(String(req.params.id));
+    if (!existing || existing.projectManager?.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     const approvedById = req.session.userId!;
     const { rejectionReason } = req.body;
     const report = await storage.rejectWeeklyJobReport(String(req.params.id), approvedById, rejectionReason || "No reason provided");
@@ -305,6 +330,10 @@ router.post("/api/weekly-job-reports/:id/reject", requireRole("ADMIN", "MANAGER"
 
 router.delete("/api/weekly-job-reports/:id", requireAuth, async (req, res) => {
   try {
+    const existing = await storage.getWeeklyJobReport(String(req.params.id));
+    if (!existing || existing.projectManager?.companyId !== req.companyId) {
+      return res.status(404).json({ error: "Report not found" });
+    }
     await storage.deleteWeeklyJobReport(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {

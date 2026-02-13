@@ -162,7 +162,7 @@ router.post("/api/daily-logs", requireAuth, requirePermission("daily_reports", "
 });
 
 router.get("/api/daily-logs/submitted", requireRole("MANAGER", "ADMIN"), async (req, res) => {
-  const logs = await storage.getSubmittedDailyLogs();
+  const logs = await storage.getSubmittedDailyLogs(req.companyId);
   res.json(logs);
 });
 

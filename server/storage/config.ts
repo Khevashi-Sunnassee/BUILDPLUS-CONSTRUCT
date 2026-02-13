@@ -29,7 +29,10 @@ export const configMethods = {
     return settings;
   },
 
-  async getAllZones(): Promise<Zone[]> {
+  async getAllZones(companyId?: string): Promise<Zone[]> {
+    if (companyId) {
+      return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(asc(zones.name));
+    }
     return db.select().from(zones).orderBy(asc(zones.name));
   },
 

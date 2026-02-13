@@ -31,7 +31,7 @@ router.get("/api/production-schedule/stats", requireAuth, requirePermission("pro
     const jobId = req.query.jobId as string | undefined;
     const factoryId = req.query.factoryId as string | undefined;
 
-    const panels = await storage.getAllPanelRegisterItems();
+    const panels = await storage.getAllPanelRegisterItems(req.companyId);
     
     let filteredPanels = panels;
     if (jobId) {
@@ -41,7 +41,7 @@ router.get("/api/production-schedule/stats", requireAuth, requirePermission("pro
       filteredPanels = filteredPanels.filter(p => p.job.factoryId === factoryId);
     }
 
-    const allEntries = await storage.getAllProductionEntries();
+    const allEntries = await storage.getAllProductionEntries(req.companyId);
     const scheduledPanelIds = new Set(allEntries.filter(e => e.status === "PENDING").map(e => e.panelId));
     const completedPanelIds = new Set(allEntries.filter(e => e.status === "COMPLETED").map(e => e.panelId));
 
@@ -104,8 +104,8 @@ router.get("/api/production-schedule/ready-panels", requireAuth, requirePermissi
     const factoryId = req.query.factoryId as string | undefined;
     const search = req.query.search as string | undefined;
 
-    const panels = await storage.getAllPanelRegisterItems();
-    const allEntries = await storage.getAllProductionEntries();
+    const panels = await storage.getAllPanelRegisterItems(req.companyId);
+    const allEntries = await storage.getAllProductionEntries(req.companyId);
     const scheduledPanelIds = new Set(allEntries.map(e => e.panelId));
     
     let filteredPanels = panels.filter(p => 
@@ -130,7 +130,7 @@ router.get("/api/production-schedule/ready-panels", requireAuth, requirePermissi
       );
     }
 
-    const draftingPrograms = await storage.getDraftingPrograms();
+    const draftingPrograms = await storage.getDraftingPrograms({ companyId: req.companyId });
     const panelDraftingMap = new Map<string, any>();
     for (const dp of draftingPrograms) {
       panelDraftingMap.set(dp.panelId, dp);
@@ -220,9 +220,9 @@ router.get("/api/production-schedule/days", requireAuth, requirePermission("prod
     
     const { startDate, endDate, factoryId, status } = parseResult.data;
 
-    const entries = await storage.getProductionEntriesInRange(startDate, endDate);
+    const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
     
-    const factories = await factoryRepository.getAllFactories();
+    const factories = await factoryRepository.getAllFactories(req.companyId);
     const factoryIdToName = new Map<string, string>();
     for (const factory of factories) {
       factoryIdToName.set(factory.id, factory.name);

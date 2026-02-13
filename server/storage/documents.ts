@@ -14,11 +14,19 @@ import {
 } from "@shared/schema";
 
 export const documentMethods = {
-  async getAllDocumentTypes(): Promise<DocumentTypeConfig[]> {
+  async getAllDocumentTypes(companyId?: string): Promise<DocumentTypeConfig[]> {
+    if (companyId) {
+      return db.select().from(documentTypesConfig).where(eq(documentTypesConfig.companyId, companyId)).orderBy(asc(documentTypesConfig.sortOrder));
+    }
     return db.select().from(documentTypesConfig).orderBy(asc(documentTypesConfig.sortOrder));
   },
 
-  async getActiveDocumentTypes(): Promise<DocumentTypeConfig[]> {
+  async getActiveDocumentTypes(companyId?: string): Promise<DocumentTypeConfig[]> {
+    if (companyId) {
+      return db.select().from(documentTypesConfig)
+        .where(and(eq(documentTypesConfig.isActive, true), eq(documentTypesConfig.companyId, companyId)))
+        .orderBy(asc(documentTypesConfig.sortOrder));
+    }
     return db.select().from(documentTypesConfig)
       .where(eq(documentTypesConfig.isActive, true))
       .orderBy(asc(documentTypesConfig.sortOrder));
@@ -69,11 +77,19 @@ export const documentMethods = {
     await db.delete(documentTypeStatuses).where(eq(documentTypeStatuses.id, id));
   },
 
-  async getAllDocumentDisciplines(): Promise<DocumentDiscipline[]> {
+  async getAllDocumentDisciplines(companyId?: string): Promise<DocumentDiscipline[]> {
+    if (companyId) {
+      return db.select().from(documentDisciplines).where(eq(documentDisciplines.companyId, companyId)).orderBy(asc(documentDisciplines.sortOrder));
+    }
     return db.select().from(documentDisciplines).orderBy(asc(documentDisciplines.sortOrder));
   },
 
-  async getActiveDocumentDisciplines(): Promise<DocumentDiscipline[]> {
+  async getActiveDocumentDisciplines(companyId?: string): Promise<DocumentDiscipline[]> {
+    if (companyId) {
+      return db.select().from(documentDisciplines)
+        .where(and(eq(documentDisciplines.isActive, true), eq(documentDisciplines.companyId, companyId)))
+        .orderBy(asc(documentDisciplines.sortOrder));
+    }
     return db.select().from(documentDisciplines)
       .where(eq(documentDisciplines.isActive, true))
       .orderBy(asc(documentDisciplines.sortOrder));
@@ -101,11 +117,19 @@ export const documentMethods = {
     await db.delete(documentDisciplines).where(eq(documentDisciplines.id, id));
   },
 
-  async getAllDocumentCategories(): Promise<DocumentCategory[]> {
+  async getAllDocumentCategories(companyId?: string): Promise<DocumentCategory[]> {
+    if (companyId) {
+      return db.select().from(documentCategories).where(eq(documentCategories.companyId, companyId)).orderBy(asc(documentCategories.sortOrder));
+    }
     return db.select().from(documentCategories).orderBy(asc(documentCategories.sortOrder));
   },
 
-  async getActiveDocumentCategories(): Promise<DocumentCategory[]> {
+  async getActiveDocumentCategories(companyId?: string): Promise<DocumentCategory[]> {
+    if (companyId) {
+      return db.select().from(documentCategories)
+        .where(and(eq(documentCategories.isActive, true), eq(documentCategories.companyId, companyId)))
+        .orderBy(asc(documentCategories.sortOrder));
+    }
     return db.select().from(documentCategories)
       .where(eq(documentCategories.isActive, true))
       .orderBy(asc(documentCategories.sortOrder));
@@ -399,8 +423,12 @@ export const documentMethods = {
     return result;
   },
 
-  async getAllDocumentBundles(): Promise<DocumentBundleWithItems[]> {
-    const bundles = await db.select().from(documentBundles).orderBy(desc(documentBundles.createdAt));
+  async getAllDocumentBundles(companyId?: string): Promise<DocumentBundleWithItems[]> {
+    const conditions: any[] = [];
+    if (companyId) conditions.push(eq(documentBundles.companyId, companyId));
+    const bundles = conditions.length > 0
+      ? await db.select().from(documentBundles).where(and(...conditions)).orderBy(desc(documentBundles.createdAt))
+      : await db.select().from(documentBundles).orderBy(desc(documentBundles.createdAt));
     
     return Promise.all(bundles.map(async (bundle) => {
       const items = await db.select()

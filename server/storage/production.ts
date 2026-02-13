@@ -73,25 +73,29 @@ export const productionMethods = {
     return { ...result[0].production_entries, panel: result[0].panel_register, job: result[0].jobs };
   },
 
-  async getProductionEntriesByDate(date: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+  async getProductionEntriesByDate(date: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const conditions = [eq(productionEntries.productionDate, date)];
+    if (companyId) conditions.push(eq(jobs.companyId, companyId));
     const result = await db.select().from(productionEntries)
       .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id))
-      .where(eq(productionEntries.productionDate, date))
+      .where(and(...conditions))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
-  async getProductionEntriesInRange(startDate: string, endDate: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+  async getProductionEntriesInRange(startDate: string, endDate: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const conditions = [
+      gte(productionEntries.productionDate, startDate),
+      lte(productionEntries.productionDate, endDate),
+    ];
+    if (companyId) conditions.push(eq(jobs.companyId, companyId));
     const result = await db.select().from(productionEntries)
       .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id))
-      .where(and(
-        gte(productionEntries.productionDate, startDate),
-        lte(productionEntries.productionDate, endDate)
-      ))
+      .where(and(...conditions))
       .orderBy(asc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
@@ -117,17 +121,19 @@ export const productionMethods = {
     return entry;
   },
 
-  async getAllProductionEntries(): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
-    const result = await db.select().from(productionEntries)
+  async getAllProductionEntries(companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const query = db.select().from(productionEntries)
       .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
-      .innerJoin(users, eq(productionEntries.userId, users.id))
-      .orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
+      .innerJoin(users, eq(productionEntries.userId, users.id));
+    const result = companyId
+      ? await query.where(eq(jobs.companyId, companyId)).orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      : await query.orderBy(desc(productionEntries.productionDate), asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
-  async getProductionSummaryByDate(date: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]> {
-    const entries = await productionMethods.getProductionEntriesByDate(date);
+  async getProductionSummaryByDate(date: string, companyId?: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]> {
+    const entries = await productionMethods.getProductionEntriesByDate(date, companyId);
     const summary: Record<string, { count: number; totalVolumeM3: number; totalAreaM2: number }> = {};
     
     for (const entry of entries) {
@@ -143,28 +149,26 @@ export const productionMethods = {
     return Object.entries(summary).map(([panelType, data]) => ({ panelType, ...data }));
   },
 
-  async getProductionEntriesByDateAndFactory(date: string, factory: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+  async getProductionEntriesByDateAndFactory(date: string, factory: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const conditions = [eq(productionEntries.productionDate, date), eq(productionEntries.factory, factory)];
+    if (companyId) conditions.push(eq(jobs.companyId, companyId));
     const result = await db.select().from(productionEntries)
       .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id))
-      .where(and(
-        eq(productionEntries.productionDate, date),
-        eq(productionEntries.factory, factory)
-      ))
+      .where(and(...conditions))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
-  async getProductionEntriesByDateAndFactoryId(date: string, factoryId: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+  async getProductionEntriesByDateAndFactoryId(date: string, factoryId: string, companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]> {
+    const conditions = [eq(productionEntries.productionDate, date), eq(productionEntries.factoryId, factoryId)];
+    if (companyId) conditions.push(eq(jobs.companyId, companyId));
     const result = await db.select().from(productionEntries)
       .innerJoin(panelRegister, eq(productionEntries.panelId, panelRegister.id))
       .innerJoin(jobs, eq(productionEntries.jobId, jobs.id))
       .innerJoin(users, eq(productionEntries.userId, users.id))
-      .where(and(
-        eq(productionEntries.productionDate, date),
-        eq(productionEntries.factoryId, factoryId)
-      ))
+      .where(and(...conditions))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
@@ -551,27 +555,29 @@ export const productionMethods = {
     return adjustmentsWithDetails;
   },
 
-  async getJobsWithoutProductionSlots(): Promise<Job[]> {
+  async getJobsWithoutProductionSlots(companyId?: string): Promise<Job[]> {
     const jobsWithSlots = await db.selectDistinct({ jobId: productionSlots.jobId }).from(productionSlots);
     const jobIdsWithSlots = jobsWithSlots.map(j => j.jobId);
     
+    const baseConditions = [
+      eq(jobs.status, "ACTIVE"),
+      sql`${jobs.productionStartDate} IS NOT NULL`,
+      sql`${jobs.expectedCycleTimePerFloor} IS NOT NULL`,
+      sql`${jobs.levels} IS NOT NULL`,
+    ];
+    if (companyId) {
+      baseConditions.push(eq(jobs.companyId, companyId));
+    }
+    
     if (jobIdsWithSlots.length === 0) {
       return db.select().from(jobs)
-        .where(and(
-          eq(jobs.status, "ACTIVE"),
-          sql`${jobs.productionStartDate} IS NOT NULL`,
-          sql`${jobs.expectedCycleTimePerFloor} IS NOT NULL`,
-          sql`${jobs.levels} IS NOT NULL`
-        ))
+        .where(and(...baseConditions))
         .orderBy(asc(jobs.jobNumber));
     }
     
     return db.select().from(jobs)
       .where(and(
-        eq(jobs.status, "ACTIVE"),
-        sql`${jobs.productionStartDate} IS NOT NULL`,
-        sql`${jobs.expectedCycleTimePerFloor} IS NOT NULL`,
-        sql`${jobs.levels} IS NOT NULL`,
+        ...baseConditions,
         sql`${jobs.id} NOT IN (${sql.join(jobIdsWithSlots.map(id => sql`${id}`), sql`, `)})`
       ))
       .orderBy(asc(jobs.jobNumber));

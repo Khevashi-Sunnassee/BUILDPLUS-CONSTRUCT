@@ -12,12 +12,12 @@ const router = Router();
 // =============== TRAILER TYPES ===============
 
 router.get("/api/trailer-types", requireAuth, async (req, res) => {
-  const trailerTypes = await storage.getActiveTrailerTypes();
+  const trailerTypes = await storage.getActiveTrailerTypes(req.companyId);
   res.json(trailerTypes);
 });
 
 router.get("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) => {
-  const trailerTypes = await storage.getAllTrailerTypes();
+  const trailerTypes = await storage.getAllTrailerTypes(req.companyId);
   res.json(trailerTypes);
 });
 
@@ -43,7 +43,7 @@ router.delete("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, 
 // =============== ZONES ===============
 
 router.get("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
-  const zones = await storage.getAllZones();
+  const zones = await storage.getAllZones(req.companyId);
   res.json(zones);
 });
 
@@ -83,7 +83,7 @@ router.delete("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => 
 // =============== LOAD LISTS ===============
 
 router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async (req, res) => {
-  const loadLists = await storage.getAllLoadLists();
+  const loadLists = await storage.getAllLoadLists(req.companyId);
   res.json(loadLists);
 });
 
@@ -97,7 +97,7 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
   try {
     const { panelIds, docketNumber, scheduledDate, ...data } = req.body;
     
-    const existingLoadLists = await storage.getAllLoadLists();
+    const existingLoadLists = await storage.getAllLoadLists(req.companyId);
     const loadNumber = `LL-${String(existingLoadLists.length + 1).padStart(4, '0')}`;
     
     const date = scheduledDate ? new Date(scheduledDate) : new Date();

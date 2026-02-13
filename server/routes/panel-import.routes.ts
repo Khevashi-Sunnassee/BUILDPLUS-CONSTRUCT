@@ -43,13 +43,13 @@ router.post("/api/panels/admin/import", requireRole("ADMIN"), async (req: Reques
     if (!validationResult.success) return res.status(400).json({ error: "Validation failed", details: validationResult.error.format() });
     const { data, jobId } = validationResult.data;
     
-    const allJobs = await storage.getAllJobs();
+    const allJobs = await storage.getAllJobs(req.companyId);
     const jobsByNumber: Record<string, typeof allJobs[0]> = {};
     allJobs.forEach(job => {
       jobsByNumber[job.jobNumber.toLowerCase()] = job;
     });
     
-    const panelTypeConfigs = await storage.getAllPanelTypes();
+    const panelTypeConfigs = await storage.getAllPanelTypes(req.companyId);
     if (panelTypeConfigs.length === 0) {
       return res.status(400).json({ 
         error: "No panel types configured in system. Please add panel types in Settings before importing." 
@@ -325,7 +325,7 @@ router.post("/api/jobs/:jobId/import-estimate",
         await storage.deletePanelsByJobAndSource(String(jobId), 3);
       }
       
-      const panelTypeConfigs = await storage.getAllPanelTypes();
+      const panelTypeConfigs = await storage.getAllPanelTypes(req.companyId);
       if (panelTypeConfigs.length === 0) {
         return res.status(400).json({ 
           error: "No panel types configured in system. Please add panel types in Settings before importing." 

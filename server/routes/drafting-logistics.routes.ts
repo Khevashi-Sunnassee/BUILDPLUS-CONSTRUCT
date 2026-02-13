@@ -22,10 +22,10 @@ router.get("/api/reports/drafting-daily", requireAuth, async (req, res) => {
     }
   }
   
-  const allJobs = await storage.getAllJobs();
+  const allJobs = await storage.getAllJobs(req.companyId);
   const jobsMap = new Map(allJobs.filter(j => jobIds.has(j.id)).map(j => [j.id, j]));
   
-  const allWorkTypes = await storage.getActiveWorkTypes();
+  const allWorkTypes = await storage.getActiveWorkTypes(req.companyId);
   const workTypesMap = new Map(allWorkTypes.map(wt => [wt.id, wt]));
   
   const dailyData = new Map<string, {
@@ -200,7 +200,7 @@ router.get("/api/reports/logistics", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "startDate and endDate required" });
     }
     
-    const allLoadLists = await storage.getAllLoadLists();
+    const allLoadLists = await storage.getAllLoadLists(req.companyId);
     const completedLoadLists = allLoadLists.filter(ll => 
       ll.status === 'COMPLETE' && 
       ll.deliveryRecord?.deliveryDate &&

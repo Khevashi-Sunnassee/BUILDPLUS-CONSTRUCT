@@ -12,7 +12,7 @@ import type { DraftingProgramWithDetails } from "./types";
 import { subtractWorkingDays } from "./utils";
 
 export const schedulingMethods = {
-  async getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<DraftingProgramWithDetails[]> {
+  async getDraftingPrograms(filters?: { jobId?: string; status?: string; assignedToId?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[]; companyId?: string }): Promise<DraftingProgramWithDetails[]> {
     const conditions: any[] = [];
     if (filters?.jobId) conditions.push(eq(draftingProgram.jobId, filters.jobId));
     if (filters?.status) conditions.push(eq(draftingProgram.status, filters.status as typeof draftingProgram.status.enumValues[number]));
@@ -21,6 +21,9 @@ export const schedulingMethods = {
     if (filters?.dateTo) conditions.push(sql`${draftingProgram.drawingDueDate} <= ${filters.dateTo}`);
     if (filters?.factoryIds && filters.factoryIds.length > 0) {
       conditions.push(inArray(jobs.factoryId, filters.factoryIds));
+    }
+    if (filters?.companyId) {
+      conditions.push(eq(jobs.companyId, filters.companyId));
     }
     
     const query = db.select({

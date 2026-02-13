@@ -14,9 +14,9 @@ router.get("/api/reports/cost-analysis", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "startDate and endDate required" });
   }
   
-  const entries = await storage.getProductionEntriesInRange(startDate, endDate);
+  const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
   const filteredEntries = jobId ? entries.filter(e => e.jobId === jobId) : entries;
-  const allPanelTypes = await storage.getAllPanelTypes();
+  const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
   const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
   
   const normalizePanelType = (code: string | null): string => {
@@ -136,8 +136,8 @@ router.get("/api/reports/cost-analysis-daily", requireAuth, async (req, res) => 
     return res.status(400).json({ error: "startDate and endDate required" });
   }
   
-  const entries = await storage.getProductionEntriesInRange(startDate, endDate);
-  const allPanelTypes = await storage.getAllPanelTypes();
+  const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
+  const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
   const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
   
   const normalizePanelType = (code: string | null): string => {
@@ -283,12 +283,12 @@ router.get("/api/reports/labour-cost-analysis", requireAuth, async (req, res) =>
     return res.status(400).json({ error: "startDate and endDate required" });
   }
   
-  const entries = await storage.getProductionEntriesInRange(startDate, endDate);
+  const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
   const filteredEntries = factory && factory !== "all" 
     ? entries.filter(e => e.factory === factory) 
     : entries;
   
-  const allPanelTypes = await storage.getAllPanelTypes();
+  const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
   const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
   
   const normalizePanelType = (code: string | null): string => {

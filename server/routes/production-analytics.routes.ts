@@ -13,8 +13,8 @@ router.get("/api/reports/production-daily", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "startDate and endDate required" });
   }
   
-  const entries = await storage.getProductionEntriesInRange(startDate, endDate);
-  const allPanelTypes = await storage.getAllPanelTypes();
+  const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
+  const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
   const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
   
   const normalizePanelType = (code: string | null): string => {
@@ -106,8 +106,8 @@ router.get("/api/reports/production-with-costs", requireAuth, async (req, res) =
     return res.status(400).json({ error: "startDate and endDate required" });
   }
   
-  const entries = await storage.getProductionEntriesInRange(startDate, endDate);
-  const allPanelTypes = await storage.getAllPanelTypes();
+  const entries = await storage.getProductionEntriesInRange(startDate, endDate, req.companyId);
+  const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
   const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
   
   const normalizePanelType = (code: string | null): string => {

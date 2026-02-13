@@ -12,11 +12,19 @@ import {
 import type { LoadListWithDetails, LoadReturnWithDetails } from "./types";
 
 export const logisticsMethods = {
-  async getAllTrailerTypes(): Promise<TrailerType[]> {
+  async getAllTrailerTypes(companyId?: string): Promise<TrailerType[]> {
+    if (companyId) {
+      return db.select().from(trailerTypes).where(eq(trailerTypes.companyId, companyId)).orderBy(asc(trailerTypes.sortOrder));
+    }
     return db.select().from(trailerTypes).orderBy(asc(trailerTypes.sortOrder));
   },
 
-  async getActiveTrailerTypes(): Promise<TrailerType[]> {
+  async getActiveTrailerTypes(companyId?: string): Promise<TrailerType[]> {
+    if (companyId) {
+      return db.select().from(trailerTypes)
+        .where(and(eq(trailerTypes.isActive, true), eq(trailerTypes.companyId, companyId)))
+        .orderBy(asc(trailerTypes.sortOrder));
+    }
     return db.select().from(trailerTypes)
       .where(eq(trailerTypes.isActive, true))
       .orderBy(asc(trailerTypes.sortOrder));
@@ -70,13 +78,16 @@ export const logisticsMethods = {
     };
   },
 
-  async getAllLoadLists(): Promise<LoadListWithDetails[]> {
+  async getAllLoadLists(companyId?: string): Promise<LoadListWithDetails[]> {
     const allLoadLists = await db.select().from(loadLists).orderBy(desc(loadLists.createdAt));
     
     const results: LoadListWithDetails[] = [];
     for (const loadList of allLoadLists) {
       const details = await logisticsMethods.getLoadList(loadList.id);
-      if (details) results.push(details);
+      if (details) {
+        if (companyId && details.job.companyId !== companyId) continue;
+        results.push(details);
+      }
     }
     return results;
   },

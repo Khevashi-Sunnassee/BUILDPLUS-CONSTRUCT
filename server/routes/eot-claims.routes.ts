@@ -17,11 +17,8 @@ async function verifyEotClaimOwnership(claimJobId: string, companyId: string): P
 router.get("/api/eot-claims", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId!;
-    const claims = await storage.getEotClaims();
-    const companyJobs = await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, companyId));
-    const companyJobIds = new Set(companyJobs.map(j => j.id));
-    const filtered = claims.filter(c => companyJobIds.has(c.jobId));
-    res.json(filtered);
+    const claims = await storage.getEotClaims(companyId);
+    res.json(claims);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching EOT claims");
     res.status(500).json({ error: "Failed to fetch EOT claims" });

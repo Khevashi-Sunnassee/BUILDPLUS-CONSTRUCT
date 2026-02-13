@@ -93,7 +93,7 @@ const bulkUpload = multer({
 
 router.get("/api/document-types", requireAuth, async (req, res) => {
   try {
-    const types = await storage.getAllDocumentTypes();
+    const types = await storage.getAllDocumentTypes(req.companyId);
     res.json(types);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document types");
@@ -103,7 +103,7 @@ router.get("/api/document-types", requireAuth, async (req, res) => {
 
 router.get("/api/document-types/active", requireAuth, async (req, res) => {
   try {
-    const types = await storage.getActiveDocumentTypes();
+    const types = await storage.getActiveDocumentTypes(req.companyId);
     res.json(types);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document types");
@@ -240,7 +240,7 @@ router.delete("/api/document-types/:typeId/statuses/:statusId", requireRole("ADM
 
 router.get("/api/document-disciplines", requireAuth, async (req, res) => {
   try {
-    const disciplines = await storage.getAllDocumentDisciplines();
+    const disciplines = await storage.getAllDocumentDisciplines(req.companyId);
     res.json(disciplines);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document disciplines");
@@ -250,7 +250,7 @@ router.get("/api/document-disciplines", requireAuth, async (req, res) => {
 
 router.get("/api/document-disciplines/active", requireAuth, async (req, res) => {
   try {
-    const disciplines = await storage.getActiveDocumentDisciplines();
+    const disciplines = await storage.getActiveDocumentDisciplines(req.companyId);
     res.json(disciplines);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document disciplines");
@@ -312,7 +312,7 @@ router.delete("/api/document-disciplines/:id", requireRole("ADMIN"), async (req,
 
 router.get("/api/document-categories", requireAuth, async (req, res) => {
   try {
-    const categories = await storage.getAllDocumentCategories();
+    const categories = await storage.getAllDocumentCategories(req.companyId);
     res.json(categories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document categories");
@@ -322,7 +322,7 @@ router.get("/api/document-categories", requireAuth, async (req, res) => {
 
 router.get("/api/document-categories/active", requireAuth, async (req, res) => {
   try {
-    const categories = await storage.getActiveDocumentCategories();
+    const categories = await storage.getActiveDocumentCategories(req.companyId);
     res.json(categories);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching active document categories");
@@ -1192,7 +1192,7 @@ router.get("/api/document-bundles", requireAuth, async (req, res) => {
         .orderBy(desc(documentBundles.createdAt));
       return res.json(bundles);
     }
-    const bundles = await storage.getAllDocumentBundles();
+    const bundles = await storage.getAllDocumentBundles(req.companyId);
     res.json(bundles);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching document bundles");

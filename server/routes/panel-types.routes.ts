@@ -37,7 +37,7 @@ const costComponentsBodySchema = z.object({
 
 router.get("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const types = await storage.getAllPanelTypes();
+    const types = await storage.getAllPanelTypes(req.companyId);
     res.json(types);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel types" });
@@ -46,7 +46,7 @@ router.get("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request, 
 
 router.get("/api/panel-types/admin/cost-summaries", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    const types = await storage.getAllPanelTypes();
+    const types = await storage.getAllPanelTypes(req.companyId);
     const summaries: Record<string, { totalCostPercent: number; profitMargin: number }> = {};
     
     for (const type of types) {
@@ -140,7 +140,7 @@ router.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (
 
 router.get("/api/panel-types", requireAuth, async (req: Request, res: Response) => {
   try {
-    const types = await storage.getAllPanelTypes();
+    const types = await storage.getAllPanelTypes(req.companyId);
     res.json(types.filter(t => t.isActive));
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel types" });

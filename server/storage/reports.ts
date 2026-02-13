@@ -206,13 +206,18 @@ export const reportMethods = {
     };
   },
 
-  async getWeeklyWageReports(startDate?: string, endDate?: string): Promise<WeeklyWageReport[]> {
-    let query = db.select().from(weeklyWageReports);
+  async getWeeklyWageReports(startDate?: string, endDate?: string, companyId?: string): Promise<WeeklyWageReport[]> {
+    const conditions = [];
     if (startDate && endDate) {
-      query = query.where(and(
-        gte(weeklyWageReports.weekStartDate, startDate),
-        lte(weeklyWageReports.weekEndDate, endDate)
-      )) as typeof query;
+      conditions.push(gte(weeklyWageReports.weekStartDate, startDate));
+      conditions.push(lte(weeklyWageReports.weekEndDate, endDate));
+    }
+    if (companyId) {
+      conditions.push(eq(weeklyWageReports.companyId, companyId));
+    }
+    let query = db.select().from(weeklyWageReports);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
     }
     return await query.orderBy(desc(weeklyWageReports.weekStartDate), asc(weeklyWageReports.factory));
   },
@@ -222,23 +227,25 @@ export const reportMethods = {
     return report;
   },
 
-  async getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string): Promise<WeeklyWageReport | undefined> {
-    const [report] = await db.select().from(weeklyWageReports)
-      .where(and(
-        eq(weeklyWageReports.weekStartDate, weekStartDate),
-        eq(weeklyWageReports.weekEndDate, weekEndDate),
-        eq(weeklyWageReports.factory, factory)
-      ));
+  async getWeeklyWageReportByWeek(weekStartDate: string, weekEndDate: string, factory: string, companyId?: string): Promise<WeeklyWageReport | undefined> {
+    const conditions = [
+      eq(weeklyWageReports.weekStartDate, weekStartDate),
+      eq(weeklyWageReports.weekEndDate, weekEndDate),
+      eq(weeklyWageReports.factory, factory),
+    ];
+    if (companyId) conditions.push(eq(weeklyWageReports.companyId, companyId));
+    const [report] = await db.select().from(weeklyWageReports).where(and(...conditions));
     return report;
   },
 
-  async getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string): Promise<WeeklyWageReport | undefined> {
-    const [report] = await db.select().from(weeklyWageReports)
-      .where(and(
-        eq(weeklyWageReports.weekStartDate, weekStartDate),
-        eq(weeklyWageReports.weekEndDate, weekEndDate),
-        eq(weeklyWageReports.factoryId, factoryId)
-      ));
+  async getWeeklyWageReportByWeekAndFactoryId(weekStartDate: string, weekEndDate: string, factoryId: string, companyId?: string): Promise<WeeklyWageReport | undefined> {
+    const conditions = [
+      eq(weeklyWageReports.weekStartDate, weekStartDate),
+      eq(weeklyWageReports.weekEndDate, weekEndDate),
+      eq(weeklyWageReports.factoryId, factoryId),
+    ];
+    if (companyId) conditions.push(eq(weeklyWageReports.companyId, companyId));
+    const [report] = await db.select().from(weeklyWageReports).where(and(...conditions));
     return report;
   },
 
@@ -259,10 +266,24 @@ export const reportMethods = {
     await db.delete(weeklyWageReports).where(eq(weeklyWageReports.id, id));
   },
 
-  async getWeeklyJobReports(projectManagerId?: string): Promise<WeeklyJobReportWithDetails[]> {
-    let query = db.select().from(weeklyJobReports);
+  async getWeeklyJobReports(projectManagerId?: string, companyId?: string): Promise<WeeklyJobReportWithDetails[]> {
+    const conditions: any[] = [];
     if (projectManagerId) {
-      query = query.where(eq(weeklyJobReports.projectManagerId, projectManagerId)) as typeof query;
+      conditions.push(eq(weeklyJobReports.projectManagerId, projectManagerId));
+    }
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+    }
+    if (companyId) {
+      const reports = await db.select({ report: weeklyJobReports }).from(weeklyJobReports)
+        .innerJoin(users, eq(weeklyJobReports.projectManagerId, users.id))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(weeklyJobReports.reportDate));
+      return Promise.all(reports.map(r => enrichWeeklyJobReport(r.report)));
+    }
+    let query = db.select().from(weeklyJobReports);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions)) as typeof query;
     }
     const reports = await query.orderBy(desc(weeklyJobReports.reportDate));
     return Promise.all(reports.map(r => enrichWeeklyJobReport(r)));
@@ -274,9 +295,18 @@ export const reportMethods = {
     return enrichWeeklyJobReport(report);
   },
 
-  async getWeeklyJobReportsByStatus(status: string): Promise<WeeklyJobReportWithDetails[]> {
+  async getWeeklyJobReportsByStatus(status: string, companyId?: string): Promise<WeeklyJobReportWithDetails[]> {
+    const conditions: any[] = [eq(weeklyJobReports.status, status as typeof weeklyJobReports.status.enumValues[number])];
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+      const reports = await db.select({ report: weeklyJobReports }).from(weeklyJobReports)
+        .innerJoin(users, eq(weeklyJobReports.projectManagerId, users.id))
+        .where(and(...conditions))
+        .orderBy(desc(weeklyJobReports.reportDate));
+      return Promise.all(reports.map(r => enrichWeeklyJobReport(r.report)));
+    }
     const reports = await db.select().from(weeklyJobReports)
-      .where(eq(weeklyJobReports.status, status as typeof weeklyJobReports.status.enumValues[number]))
+      .where(and(...conditions))
       .orderBy(desc(weeklyJobReports.reportDate));
     return Promise.all(reports.map(r => enrichWeeklyJobReport(r)));
   },
@@ -351,15 +381,28 @@ export const reportMethods = {
       .orderBy(asc(jobs.jobNumber));
   },
 
-  async getApprovedWeeklyJobReports(): Promise<WeeklyJobReportWithDetails[]> {
+  async getApprovedWeeklyJobReports(companyId?: string): Promise<WeeklyJobReportWithDetails[]> {
+    const conditions = [eq(weeklyJobReports.status, "APPROVED")];
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+    }
     const reports = await db.select().from(weeklyJobReports)
-      .where(eq(weeklyJobReports.status, "APPROVED"))
+      .innerJoin(users, eq(weeklyJobReports.projectManagerId, users.id))
+      .where(and(...conditions))
       .orderBy(desc(weeklyJobReports.reportDate));
-    return Promise.all(reports.map(r => enrichWeeklyJobReport(r)));
+    return Promise.all(reports.map(r => enrichWeeklyJobReport(r.weekly_job_reports)));
   },
 
-  async getEotClaims(): Promise<EotClaimWithDetails[]> {
-    const claims = await db.select().from(eotClaims).orderBy(desc(eotClaims.createdAt));
+  async getEotClaims(companyId?: string): Promise<EotClaimWithDetails[]> {
+    let claims;
+    if (companyId) {
+      claims = await db.select({ eotClaim: eotClaims }).from(eotClaims)
+        .innerJoin(jobs, eq(eotClaims.jobId, jobs.id))
+        .where(eq(jobs.companyId, companyId))
+        .orderBy(desc(eotClaims.createdAt));
+      return Promise.all(claims.map(c => enrichEotClaim(c.eotClaim)));
+    }
+    claims = await db.select().from(eotClaims).orderBy(desc(eotClaims.createdAt));
     return Promise.all(claims.map(c => enrichEotClaim(c)));
   },
 

@@ -11,12 +11,17 @@ export interface WorkingDaysConfig {
 }
 
 export class FactoryRepository {
-  async getAllFactories(): Promise<Factory[]> {
+  async getAllFactories(companyId?: string): Promise<Factory[]> {
+    if (companyId) {
+      return db.select().from(factories).where(eq(factories.companyId, companyId)).orderBy(factories.name);
+    }
     return db.select().from(factories).orderBy(factories.name);
   }
 
-  async getActiveFactories(): Promise<Factory[]> {
-    return db.select().from(factories).where(eq(factories.isActive, true)).orderBy(factories.name);
+  async getActiveFactories(companyId?: string): Promise<Factory[]> {
+    const conditions = [eq(factories.isActive, true)];
+    if (companyId) conditions.push(eq(factories.companyId, companyId));
+    return db.select().from(factories).where(and(...conditions)).orderBy(factories.name);
   }
 
   async getFactory(id: string): Promise<Factory | undefined> {

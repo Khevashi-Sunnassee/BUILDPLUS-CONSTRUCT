@@ -46,10 +46,16 @@ export const panelMethods = {
     await db.delete(panelRegister).where(eq(panelRegister.id, id));
   },
 
-  async getAllPanelRegisterItems(): Promise<(PanelRegister & { job: Job })[]> {
-    const result = await db.select().from(panelRegister)
-      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
+  async getAllPanelRegisterItems(companyId?: string): Promise<(PanelRegister & { job: Job })[]> {
+    const conditions = [];
+    if (companyId) {
+      conditions.push(eq(jobs.companyId, companyId));
+    }
+    const query = db.select().from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id));
+    const result = conditions.length > 0
+      ? await query.where(and(...conditions)).orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark))
+      : await query.orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return result.map(r => ({ ...r.panel_register, job: r.jobs }));
   },
 
@@ -138,7 +144,18 @@ export const panelMethods = {
     }
   },
 
-  async getPanelCountsBySource(): Promise<{ source: number; count: number }[]> {
+  async getPanelCountsBySource(companyId?: string): Promise<{ source: number; count: number }[]> {
+    if (companyId) {
+      const result = await db.select({
+        source: panelRegister.source,
+        count: sql<number>`count(*)::int`
+      })
+      .from(panelRegister)
+      .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
+      .where(eq(jobs.companyId, companyId))
+      .groupBy(panelRegister.source);
+      return result;
+    }
     const result = await db.select({
       source: panelRegister.source,
       count: sql<number>`count(*)::int`
@@ -311,18 +328,23 @@ export const panelMethods = {
     return updated;
   },
 
-  async getPanelsReadyForLoading(): Promise<(PanelRegister & { job: Job })[]> {
+  async getPanelsReadyForLoading(companyId?: string): Promise<(PanelRegister & { job: Job })[]> {
     const panelsOnLoadListsSubquery = db.select({ panelId: loadListPanels.panelId }).from(loadListPanels);
+    
+    const conditions = [
+      eq(panelRegister.approvedForProduction, true),
+      eq(panelRegister.status, "COMPLETED"),
+      ne(panelRegister.lifecycleStatus, 0),
+      notInArray(panelRegister.id, panelsOnLoadListsSubquery)
+    ];
+    if (companyId) {
+      conditions.push(eq(jobs.companyId, companyId));
+    }
     
     const results = await db.select()
       .from(panelRegister)
       .innerJoin(jobs, eq(panelRegister.jobId, jobs.id))
-      .where(and(
-        eq(panelRegister.approvedForProduction, true),
-        eq(panelRegister.status, "COMPLETED"),
-        ne(panelRegister.lifecycleStatus, 0),
-        notInArray(panelRegister.id, panelsOnLoadListsSubquery)
-      ))
+      .where(and(...conditions))
       .orderBy(asc(jobs.jobNumber), asc(panelRegister.panelMark));
     return results.map(r => ({ ...r.panel_register, job: r.jobs }));
   },

@@ -159,7 +159,10 @@ export const userMethods = {
     return rule;
   },
 
-  async getMappingRules(): Promise<MappingRule[]> {
+  async getMappingRules(companyId?: string): Promise<MappingRule[]> {
+    if (companyId) {
+      return db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).orderBy(asc(mappingRules.priority));
+    }
     return db.select().from(mappingRules).orderBy(asc(mappingRules.priority));
   },
 };

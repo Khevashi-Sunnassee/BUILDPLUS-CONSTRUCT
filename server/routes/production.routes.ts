@@ -16,7 +16,7 @@ const router = Router();
 router.get("/api/production-summary", requireAuth, async (req: Request, res: Response) => {
   const date = req.query.date as string;
   if (!date) return res.status(400).json({ error: "Date required" });
-  const summary = await storage.getProductionSummaryByDate(date);
+  const summary = await storage.getProductionSummaryByDate(date, req.companyId);
   res.json(summary);
 });
 
@@ -26,9 +26,9 @@ router.get("/api/production-summary-with-costs", requireAuth, async (req: Reques
   if (!date) return res.status(400).json({ error: "Date required" });
   
   const entries = factoryFilter 
-    ? await storage.getProductionEntriesByDateAndFactory(date, factoryFilter)
-    : await storage.getProductionEntriesByDate(date);
-  const allPanelTypes = await storage.getAllPanelTypes();
+    ? await storage.getProductionEntriesByDateAndFactory(date, factoryFilter, req.companyId)
+    : await storage.getProductionEntriesByDate(date, req.companyId);
+  const allPanelTypes = await storage.getAllPanelTypes(req.companyId);
   const panelTypesByCode = new Map(allPanelTypes.map(pt => [pt.code, pt]));
   
   const jobRatesCache = new Map<string, Map<string, any>>();
@@ -112,7 +112,7 @@ router.get("/api/production-reports", requireAuth, async (req: Request, res: Res
   
   const productionDaysData = await storage.getProductionDays(start, end);
   
-  const entries = await storage.getProductionEntriesInRange(start, end);
+  const entries = await storage.getProductionEntriesInRange(start, end, req.companyId);
   
   const reportsByKey = new Map<string, {
     date: string;

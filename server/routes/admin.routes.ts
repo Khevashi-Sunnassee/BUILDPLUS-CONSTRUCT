@@ -33,8 +33,7 @@ const router = Router();
 router.get("/api/admin/devices", requireRole("ADMIN"), async (req, res) => {
   const companyId = req.companyId;
   if (!companyId) return res.status(400).json({ error: "Company context required" });
-  const allDevices = await storage.getAllDevices();
-  const filtered = allDevices.filter(d => d.companyId === companyId);
+  const filtered = await storage.getAllDevices(companyId);
   res.json(filtered);
 });
 
