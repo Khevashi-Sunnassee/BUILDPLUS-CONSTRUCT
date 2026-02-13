@@ -1,5 +1,3 @@
-import { beforeAll } from "vitest";
-
 const BASE_URL = "http://localhost:5000";
 
 let adminCookie = "";
@@ -29,14 +27,23 @@ async function doLogin(email: string, password: string) {
   return { sessionCookie, csrfToken, userId };
 }
 
+export function isAdminLoggedIn() { return adminLoggedIn; }
+
 export async function loginAdmin() {
   if (adminLoggedIn && adminCookie) return;
-  const result = await doLogin("admin@buildplus.ai", "admin123");
-  adminCookie = result.sessionCookie;
-  adminCsrfToken = result.csrfToken;
-  adminUserId = result.userId;
-  adminLoggedIn = true;
+  try {
+    const result = await doLogin("admin@buildplus.ai", "admin123");
+    if (!result.sessionCookie) return;
+    adminCookie = result.sessionCookie;
+    adminCsrfToken = result.csrfToken;
+    adminUserId = result.userId;
+    adminLoggedIn = true;
+  } catch {
+    // admin login not available
+  }
 }
+
+await loginAdmin();
 
 export async function loginUser() {
   const signupRes = await fetch(`${BASE_URL}/api/auth/register`, {

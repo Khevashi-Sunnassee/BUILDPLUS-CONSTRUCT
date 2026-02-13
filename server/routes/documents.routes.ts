@@ -1367,7 +1367,7 @@ function getClientIp(req: Request): string {
 
 // Helper to validate bundle access and log failed attempts
 async function validateBundleAccess(
-  bundle: { id: string; allowGuestAccess: boolean; expiresAt: string | Date | null } | null | undefined, 
+  bundle: { id: string; allowGuestAccess: boolean | null; expiresAt: string | Date | null } | null | undefined, 
   req: Request, 
   res: Response, 
   accessType: string

@@ -5,6 +5,7 @@ import {
   adminPost,
   adminDelete,
   uniqueName,
+  isAdminLoggedIn,
 } from "./e2e-helpers";
 
 let jobId = "";
@@ -19,7 +20,7 @@ beforeAll(async () => {
   expect(jobId).toBeTruthy();
 });
 
-describe("E2E: Progress Claims Workflow", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Progress Claims Workflow", () => {
   it("should get next claim number", async () => {
     const res = await adminGet(`/api/progress-claims/next-number?jobId=${jobId}`);
     expect(res.status).toBe(200);

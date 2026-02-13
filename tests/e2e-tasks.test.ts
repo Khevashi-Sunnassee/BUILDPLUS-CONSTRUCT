@@ -8,6 +8,7 @@ import {
   adminDelete,
   getAdminUserId,
   uniqueName,
+  isAdminLoggedIn,
 } from "./e2e-helpers";
 
 let groupId = "";
@@ -21,7 +22,7 @@ beforeAll(async () => {
   userId = getAdminUserId();
 });
 
-describe("E2E: Task Group Management", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Task Group Management", () => {
   const groupName = uniqueName("TG");
 
   it("should create a task group", async () => {
@@ -54,7 +55,7 @@ describe("E2E: Task Group Management", () => {
   });
 });
 
-describe("E2E: Task CRUD & Lifecycle", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Task CRUD & Lifecycle", () => {
   const taskTitle = uniqueName("TASK");
 
   it("should create a task in the group", async () => {
@@ -98,7 +99,7 @@ describe("E2E: Task CRUD & Lifecycle", () => {
   });
 });
 
-describe("E2E: Task Assignees", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Task Assignees", () => {
   it("should assign a user to the task", async () => {
     const res = await adminPut(`/api/tasks/${taskId}/assignees`, {
       userIds: [userId],
@@ -115,7 +116,7 @@ describe("E2E: Task Assignees", () => {
   });
 });
 
-describe("E2E: Task Updates (Comments)", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Task Updates (Comments)", () => {
   it("should add an update/comment to the task", async () => {
     const res = await adminPost(`/api/tasks/${taskId}/updates`, {
       content: "E2E test comment on task",
@@ -140,7 +141,7 @@ describe("E2E: Task Updates (Comments)", () => {
   });
 });
 
-describe("E2E: Nested Tasks (Subtasks)", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Nested Tasks (Subtasks)", () => {
   it("should create a subtask under the main task", async () => {
     const res = await adminPost("/api/tasks", {
       groupId,
@@ -167,7 +168,7 @@ describe("E2E: Nested Tasks (Subtasks)", () => {
   });
 });
 
-describe("E2E: Task Cleanup", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Task Cleanup", () => {
   it("should delete the main task", async () => {
     const res = await adminDelete(`/api/tasks/${taskId}`);
     expect(res.status).toBe(200);

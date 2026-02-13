@@ -18,6 +18,9 @@ import { getAllCacheStats } from "./lib/cache";
 import { getAllCircuitStats } from "./lib/circuit-breaker";
 import { getAllQueueStats } from "./lib/job-queue";
 import { requestMetrics, getEventLoopLag } from "./lib/metrics";
+import { sanitizeRequestBody, validateContentType } from "./middleware/sanitize";
+import { requestTimingMiddleware } from "./middleware/request-timing";
+import { healthRouter } from "./middleware/health";
 
 const app = express();
 
@@ -134,6 +137,11 @@ app.use(
 );
 
 app.use(express.urlencoded({ extended: false, limit: "10mb" }));
+
+app.use(sanitizeRequestBody);
+app.use(validateContentType);
+app.use(requestTimingMiddleware);
+app.use(healthRouter);
 
 // Request-ID middleware for tracing
 app.use((req, res, next) => {

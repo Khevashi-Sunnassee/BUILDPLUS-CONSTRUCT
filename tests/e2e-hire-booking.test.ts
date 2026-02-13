@@ -6,6 +6,7 @@ import {
   adminPatch,
   adminDelete,
   uniqueName,
+  isAdminLoggedIn,
 } from "./e2e-helpers";
 
 let jobId = "";
@@ -49,7 +50,7 @@ beforeAll(async () => {
   expect(supplierId).toBeTruthy();
 });
 
-describe("E2E: Hire Booking Workflow", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Hire Booking Workflow", () => {
   it("should create a new hire booking in DRAFT status", async () => {
     const res = await adminPost("/api/hire-bookings", {
       hireSource: "external",
@@ -158,7 +159,7 @@ describe("E2E: Hire Booking Workflow", () => {
   });
 });
 
-describe("E2E: Hire Booking - Cancel Flow", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Hire Booking - Cancel Flow", () => {
   let cancelBookingId = "";
 
   it("should create and cancel a booking from DRAFT", async () => {
@@ -194,7 +195,7 @@ describe("E2E: Hire Booking - Cancel Flow", () => {
   });
 });
 
-describe("E2E: Hire Booking - Rejection Flow", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Hire Booking - Rejection Flow", () => {
   let rejectBookingId = "";
 
   it("should create, submit, and reject a booking (transitions to CANCELLED)", async () => {

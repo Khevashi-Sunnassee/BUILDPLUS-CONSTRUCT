@@ -18,6 +18,9 @@ import LoginPage from "@/pages/login";
 import { HelpProvider } from "@/components/help/help-provider";
 import { HelpDrawer } from "@/components/help/help-drawer";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { initGlobalErrorTracking } from "@/lib/error-tracker";
+
+initGlobalErrorTracking();
 
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const DailyReportsPage = lazy(() => import("@/pages/daily-reports"));

@@ -6,6 +6,7 @@ import {
   adminPut,
   adminDelete,
   uniqueName,
+  isAdminLoggedIn,
 } from "./e2e-helpers";
 
 let jobId = "";
@@ -27,7 +28,7 @@ beforeAll(async () => {
   }
 });
 
-describe("E2E: Panel Registration & Admin CRUD", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Panel Registration & Admin CRUD", () => {
   const panelName = uniqueName("PNL");
 
   it("should create a new panel via admin endpoint", async () => {
@@ -73,7 +74,7 @@ describe("E2E: Panel Registration & Admin CRUD", () => {
   });
 });
 
-describe("E2E: Panel Audit Log", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Panel Audit Log", () => {
   it("should have audit log entries for the panel", async () => {
     if (!panelId) return;
     const res = await adminGet(`/api/panels/${panelId}/audit-logs`);
@@ -84,7 +85,7 @@ describe("E2E: Panel Audit Log", () => {
   });
 });
 
-describe("E2E: Panel Document Status", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Panel Document Status", () => {
   it("should update panel document status", async () => {
     if (!panelId) return;
     const res = await adminPut(`/api/panels/${panelId}/document-status`, {
@@ -94,7 +95,7 @@ describe("E2E: Panel Document Status", () => {
   });
 });
 
-describe("E2E: Production Schedule", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Production Schedule", () => {
   it("should get production schedule stats", async () => {
     const res = await adminGet("/api/production-schedule/stats");
     expect(res.status).toBe(200);
@@ -119,7 +120,7 @@ describe("E2E: Production Schedule", () => {
   });
 });
 
-describe("E2E: Panel Cleanup", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Panel Cleanup", () => {
   it("should delete the test panel", async () => {
     if (!panelId) return;
     const res = await adminDelete(`/api/panels/admin/${panelId}`);

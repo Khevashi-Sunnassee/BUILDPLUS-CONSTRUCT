@@ -41,6 +41,28 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
   - *Job Budget:* Per-job budget management at `/jobs/:id/budget`. Top-level budget with estimated total, profit target %, customer price. Budget lines per parent cost code with optional child cost code, linking to selected tender submissions and contractors. Variation tracking and forecast costs. Summary calculations. Budget Line Detail Items: mini BOQ/spreadsheet per budget line with item, qty, unit, price, lineTotal, notes. Lock mechanism (`estimateLocked` on budget_lines) to sync estimated budget to sum of detail items. Schema: `job_budgets`, `budget_lines` (has `childCostCodeId`, `estimateLocked`), `budget_line_files`, `budget_line_detail_items`. RBAC key: `budgets`.
   - *Bill of Quantities (BOQ):* Detailed item-level costing at `/jobs/:id/boq`. BOQ groups (buildings/levels) under parent cost codes with optional child codes. BOQ items with quantities, units (EA/SQM/M3/LM/M2/M/HR/DAY/TONNE/KG/LOT), unit pricing, line totals, optional child cost codes. Links to tender line items. Schema: `boq_groups` (has `childCostCodeId`), `boq_items` (has `childCostCodeId`). RBAC key: `budgets`.
 
+## Infrastructure & Quality
+
+### Middleware Stack
+- **Input Sanitization** (`server/middleware/sanitize.ts`): XSS prevention via script tag stripping, HTML entity encoding, content-type validation, and parameter validation for all incoming requests.
+- **Request Timing** (`server/middleware/request-timing.ts`): Performance monitoring with p95/avg response times, slow request detection (>3s warn, >10s critical), per-endpoint metrics tracking.
+- **Health Checks** (`server/middleware/health.ts`): Three endpoints - `/health` (overall status with DB/memory/event loop), `/health/db` (connection pool stats), `/health/metrics` (auth-required request performance metrics).
+- **CSRF Protection** (`server/middleware/csrf.ts`): Token-based CSRF with timing-safe comparison, exempt paths for public endpoints.
+- **Security Headers**: Helmet with CSP, X-Content-Type-Options, X-Frame-Options.
+- **Rate Limiting**: Per-session/IP rate limiting (300/min API, 20/15min auth, 30/min uploads).
+- **Compression**: gzip with threshold and SSE exemption.
+
+### Shared Utilities
+- **API Utils** (`server/lib/api-utils.ts`): Shared pagination (`parsePagination`), sorting (`parseSort`), filtering (`parseFilters`), search parsing, Zod body validation (`validateBody`), consistent error handling (`handleApiError`), and response formatting.
+- **Error Tracking** (`client/src/lib/error-tracker.ts`): Frontend error tracking with global error/unhandled rejection listeners, session storage persistence, and integration with ErrorBoundary component.
+- **Error Boundary** (`client/src/components/error-boundary.tsx`): React error boundary with error tracking integration, retry and reload actions.
+
+### Testing
+- **Framework**: Vitest with integration/E2E tests against live server
+- **Test helpers**: `tests/e2e-helpers.ts` with auth helpers, CSRF-aware request functions
+- **Coverage areas**: Health endpoints, input sanitization, API security (auth enforcement, CSRF, rate limiting, security headers, input validation, SQL injection), CRUD flows (customer, job, supplier, task lifecycle), shared API utilities, validation schemas, panel lifecycle, financial calculations
+- **Test count**: 300+ tests across 18 test files
+
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
 - **OpenAI**: AI services for PDF analysis and visual comparison summaries.

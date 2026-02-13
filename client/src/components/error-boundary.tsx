@@ -2,29 +2,35 @@ import { Component, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw } from "lucide-react";
+import { trackError } from "@/lib/error-tracker";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: ReactNode;
+  name?: string;
 }
 
 interface ErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
+  errorCount: number;
 }
 
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, errorCount: 0 };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: { componentStack?: string | null }) {
     console.error("Application error:", error, errorInfo);
+    const source = this.props.name ? `error-boundary:${this.props.name}` : "error-boundary";
+    trackError(error, source, errorInfo.componentStack || undefined);
+    this.setState(prev => ({ errorCount: prev.errorCount + 1 }));
   }
 
   handleReset = () => {

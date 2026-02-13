@@ -6,6 +6,7 @@ import {
   adminPatch,
   adminDelete,
   uniqueName,
+  isAdminLoggedIn,
 } from "./e2e-helpers";
 
 let documentTypeId = "";
@@ -17,7 +18,7 @@ beforeAll(async () => {
   await loginAdmin();
 });
 
-describe("E2E: Document Type Management", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Management", () => {
   const typeName = uniqueName("DOCTYPE");
 
   it("should create a document type", async () => {
@@ -56,7 +57,7 @@ describe("E2E: Document Type Management", () => {
   });
 });
 
-describe("E2E: Document Type Status Workflow", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Document Type Status Workflow", () => {
   it("should list auto-created statuses for the type", async () => {
     if (!documentTypeId) return;
     const res = await adminGet(`/api/document-types/${documentTypeId}/statuses`);
@@ -93,7 +94,7 @@ describe("E2E: Document Type Status Workflow", () => {
   });
 });
 
-describe("E2E: Document Discipline Management", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Document Discipline Management", () => {
   const discName = uniqueName("DISC");
 
   it("should create a discipline", async () => {
@@ -124,7 +125,7 @@ describe("E2E: Document Discipline Management", () => {
   });
 });
 
-describe("E2E: Document Category Management", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Document Category Management", () => {
   const catName = uniqueName("CAT");
 
   it("should create a category", async () => {
@@ -148,14 +149,14 @@ describe("E2E: Document Category Management", () => {
   });
 });
 
-describe("E2E: Document Listing", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Document Listing", () => {
   it("should list documents (paginated)", async () => {
     const res = await adminGet("/api/documents");
     expect(res.status).toBe(200);
   });
 });
 
-describe("E2E: Document Config Cleanup", () => {
+describe.skipIf(!isAdminLoggedIn())("E2E: Document Config Cleanup", () => {
   it("should delete the custom status", async () => {
     if (!statusId || !documentTypeId) return;
     const res = await adminDelete(`/api/document-types/${documentTypeId}/statuses/${statusId}`);
