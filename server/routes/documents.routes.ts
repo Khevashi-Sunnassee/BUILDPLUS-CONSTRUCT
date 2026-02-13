@@ -892,6 +892,7 @@ const sendDocumentsEmailSchema = z.object({
   message: z.string().min(1, "Message is required"),
   documentIds: z.array(z.string()).min(1, "At least one document is required"),
   sendCopy: z.boolean().default(false),
+  combinePdf: z.boolean().default(false),
 });
 
 router.post("/api/documents/send-email", requireAuth, async (req, res) => {
@@ -901,7 +902,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
       return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
     }
 
-    const { to, cc, subject, message, documentIds, sendCopy } = parsed.data;
+    const { to, cc, subject, message, documentIds, sendCopy, combinePdf } = parsed.data;
 
     if (!emailService.isConfigured()) {
       return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
@@ -960,12 +961,89 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
 
     const htmlBody = message.replace(/\n/g, "<br>");
 
-    const ZIP_THRESHOLD = 5 * 1024 * 1024; // 5MB
-    const totalSize = attachments.reduce((sum, att) => sum + att.content.length, 0);
     let finalAttachments = attachments;
     let wasZipped = false;
+    let wasCombined = false;
 
-    if (totalSize > ZIP_THRESHOLD) {
+    if (combinePdf && attachments.length > 1) {
+      const pdfAttachments = attachments.filter(a => a.contentType === "application/pdf" || a.filename.toLowerCase().endsWith(".pdf"));
+      const nonPdfAttachments = attachments.filter(a => a.contentType !== "application/pdf" && !a.filename.toLowerCase().endsWith(".pdf"));
+
+      if (pdfAttachments.length >= 2) {
+        const fs = await import("fs");
+        const pathMod = await import("path");
+        const os = await import("os");
+        const { spawn } = await import("child_process");
+
+        const tempDir = fs.mkdtempSync(pathMod.join(os.tmpdir(), "combine-pdf-"));
+        const inputFiles: string[] = [];
+        try {
+          for (let i = 0; i < pdfAttachments.length; i++) {
+            const filePath = pathMod.join(tempDir, `input_${i}.pdf`);
+            fs.writeFileSync(filePath, pdfAttachments[i].content);
+            inputFiles.push(filePath);
+          }
+          const outputPath = pathMod.join(tempDir, "combined.pdf");
+
+          const combineScript = `
+import fitz
+import sys
+import json
+
+input_files = json.loads(sys.argv[1])
+output_path = sys.argv[2]
+combined = fitz.open()
+
+for f in input_files:
+    try:
+        doc = fitz.open(f)
+        combined.insert_pdf(doc)
+        doc.close()
+    except Exception as e:
+        print(f"Warning: Could not add {f}: {e}", file=sys.stderr)
+
+page_count = len(combined)
+combined.save(output_path)
+combined.close()
+print(json.dumps({"pages": page_count}))
+`;
+
+          await new Promise<void>((resolve, reject) => {
+            let errorOutput = "";
+            const proc = spawn("python3", ["-c", combineScript, JSON.stringify(inputFiles), outputPath], { timeout: 60000 });
+            proc.stderr.on("data", (data: Buffer) => { errorOutput += data.toString(); });
+            proc.on("close", (code: number | null) => {
+              if (code === 0) resolve();
+              else reject(new Error(`PDF combine failed: ${errorOutput}`));
+            });
+            proc.on("error", (err: Error) => reject(err));
+          });
+
+          const combinedBuffer = fs.readFileSync(outputPath);
+          finalAttachments = [
+            { filename: "Combined Documents.pdf", content: combinedBuffer, contentType: "application/pdf" },
+            ...nonPdfAttachments,
+          ];
+          wasCombined = true;
+
+          logger.info({ inputCount: pdfAttachments.length, combinedSize: combinedBuffer.length }, "Documents combined into single PDF for email");
+        } catch (combineErr) {
+          logger.warn({ err: combineErr }, "Failed to combine PDFs, sending individually instead");
+        } finally {
+          try {
+            for (const f of inputFiles) { try { fs.unlinkSync(f); } catch {} }
+            const outputPath = pathMod.join(tempDir, "combined.pdf");
+            try { fs.unlinkSync(outputPath); } catch {}
+            fs.rmdirSync(tempDir);
+          } catch {}
+        }
+      }
+    }
+
+    const ZIP_THRESHOLD = 5 * 1024 * 1024; // 5MB
+    const totalSize = finalAttachments.reduce((sum, att) => sum + att.content.length, 0);
+
+    if (!wasCombined && totalSize > ZIP_THRESHOLD) {
       try {
         const zipBuffer = await new Promise<Buffer>((resolve, reject) => {
           const chunks: Buffer[] = [];
@@ -1010,8 +1088,8 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
     });
 
     if (result.success) {
-      logger.info({ documentCount: attachments.length, to, zipped: wasZipped }, "Documents email sent successfully");
-      res.json({ success: true, messageId: result.messageId, attachedCount: attachments.length, zipped: wasZipped });
+      logger.info({ documentCount: attachments.length, to, zipped: wasZipped, combined: wasCombined }, "Documents email sent successfully");
+      res.json({ success: true, messageId: result.messageId, attachedCount: finalAttachments.length, zipped: wasZipped, combined: wasCombined });
     } else {
       logger.error({ error: result.error }, "Failed to send documents email");
       res.status(500).json({ error: result.error || "Failed to send email" });
@@ -2098,13 +2176,30 @@ const drawingPackageUpload = multer({
 });
 
 router.post("/api/documents/drawing-package/analyze", requireAuth, drawingPackageUpload.single("file"), async (req: Request, res: Response) => {
-  req.setTimeout(300000);
-  res.setTimeout(300000);
+  req.setTimeout(600000);
+  res.setTimeout(600000);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  const sendProgress = (phase: string, current: number, total: number, detail?: string) => {
+    const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+    try { res.write(`data: ${JSON.stringify({ type: "progress", phase, current, total, percent, detail })}\n\n`); } catch {}
+  };
+
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ error: "No PDF file provided" });
+      res.write(`data: ${JSON.stringify({ type: "error", error: "No PDF file provided" })}\n\n`);
+      res.end();
+      return;
     }
+
+    sendProgress("pdf_extract", 0, 1, "Extracting pages from PDF...");
 
     const fs = await import("fs");
     const path = await import("path");
@@ -2283,6 +2378,7 @@ print(json.dumps({"totalPages": len(pages), "pages": pages}))
     });
 
     const analysisResult = JSON.parse(result);
+    sendProgress("pdf_extract", 1, 1, `Extracted ${analysisResult.pages?.length || 0} pages`);
 
     const aiApiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
     if (aiApiKey && analysisResult.pages && analysisResult.pages.length > 0) {
@@ -2366,18 +2462,6 @@ CRITICAL RULES:
         return page;
       };
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      });
-
-      const sendProgress = (phase: string, current: number, total: number, detail?: string) => {
-        const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-        res.write(`data: ${JSON.stringify({ type: "progress", phase, current, total, percent, detail })}\n\n`);
-      };
-
       sendProgress("ai_analysis", 0, analysisResult.pages.length, "Starting AI analysis...");
 
       const CONCURRENCY = 10;
@@ -2397,19 +2481,7 @@ CRITICAL RULES:
       }
       analysisResult.pages = pages;
       logger.info("OpenAI vision analysis complete for all pages");
-    } else {
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "X-Accel-Buffering": "no",
-      });
     }
-
-    const sendProgress = (phase: string, current: number, total: number, detail?: string) => {
-      const percent = total > 0 ? Math.round((current / total) * 100) : 0;
-      try { res.write(`data: ${JSON.stringify({ type: "progress", phase, current, total, percent, detail })}\n\n`); } catch {}
-    };
 
     sendProgress("matching", 0, 1, "Matching jobs and checking conflicts...");
 
@@ -2512,12 +2584,8 @@ CRITICAL RULES:
   } catch (error: unknown) {
     logger.error({ err: error }, "Error analyzing drawing package");
     try {
-      if (!res.headersSent) {
-        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to analyze drawing package" });
-      } else {
-        res.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Failed to analyze drawing package" })}\n\n`);
-        res.end();
-      }
+      res.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Failed to analyze drawing package" })}\n\n`);
+      res.end();
     } catch {}
   }
 });

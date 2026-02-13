@@ -6,6 +6,7 @@ import {
   Loader2,
   Paperclip,
   Archive,
+  FileStack,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,13 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [sendCopy, setSendCopy] = useState(false);
+  const [combinePdf, setCombinePdf] = useState(false);
+
+  const multipleSelected = selectedDocuments.length > 1;
+  const pdfCount = selectedDocuments.filter(d =>
+    d.mimeType === "application/pdf" || d.originalName?.toLowerCase().endsWith(".pdf")
+  ).length;
+  const canCombine = pdfCount >= 2;
 
   const buildDocumentList = useCallback((docs: DocumentWithDetails[]) => {
     return docs.map((d) => `- ${d.title} (${d.originalName})`).join("\n");
@@ -52,6 +60,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
     setSubject("");
     setMessage("");
     setSendCopy(false);
+    setCombinePdf(false);
   }, []);
 
   useEffect(() => {
@@ -59,6 +68,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
       setToEmail("");
       setCcEmail("");
       setSendCopy(false);
+      setCombinePdf(false);
       setSubject(`Documents - ${selectedDocuments.length} file${selectedDocuments.length > 1 ? "s" : ""} attached`);
       setMessage(
         `Hi,\n\nPlease find attached the documents you requested.\n\n${buildDocumentList(selectedDocuments)}\n\nKind regards`
@@ -76,12 +86,14 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
         message,
         documentIds: selectedDocuments.map((d) => d.id),
         sendCopy,
+        combinePdf: combinePdf && canCombine,
       });
       return res.json();
     },
     onSuccess: (data: any) => {
       const zippedNote = data.zipped ? " (sent as zip)" : "";
-      toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} files attached${zippedNote})` });
+      const combinedNote = data.combined ? " (combined into single PDF)" : "";
+      toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} file${data.attachedCount !== 1 ? "s" : ""} attached${combinedNote}${zippedNote})` });
       onOpenChange(false);
       resetForm();
       onSuccess();
@@ -180,6 +192,20 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                 />
                 <Label htmlFor="doc-send-copy" className="text-sm cursor-pointer">Send myself a copy</Label>
               </div>
+              {canCombine && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="doc-combine-pdf"
+                    checked={combinePdf}
+                    onCheckedChange={(v) => setCombinePdf(!!v)}
+                    data-testid="checkbox-doc-combine-pdf"
+                  />
+                  <Label htmlFor="doc-combine-pdf" className="text-sm cursor-pointer flex items-center gap-1.5">
+                    <FileStack className="h-3.5 w-3.5" />
+                    Combine PDFs into a single file
+                  </Label>
+                </div>
+              )}
             </div>
 
             <Separator />
@@ -225,26 +251,38 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
                       {(() => {
                         const totalBytes = selectedDocuments.reduce((sum, d) => sum + (d.fileSize || 0), 0);
-                        const willZip = totalBytes > 5 * 1024 * 1024;
+                        const willZip = !combinePdf && totalBytes > 5 * 1024 * 1024;
                         return (
                           <div className="flex items-center gap-1.5" data-testid="text-total-attachment-size">
+                            {combinePdf && canCombine && <FileStack className="h-3.5 w-3.5 text-muted-foreground" />}
                             {willZip && <Archive className="h-3.5 w-3.5 text-muted-foreground" />}
                             <p className="text-xs text-muted-foreground">
-                              {formatFileSize(totalBytes)}{willZip ? " — will be zipped" : ""}
+                              {formatFileSize(totalBytes)}
+                              {combinePdf && canCombine ? " — PDFs will be combined into single file" : willZip ? " — will be zipped" : ""}
                             </p>
                           </div>
                         );
                       })()}
                     </div>
-                    {selectedDocuments.map((doc) => (
-                      <div key={doc.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-attachment-${doc.id}`}>
-                        <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    {combinePdf && canCombine ? (
+                      <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid="email-attachment-combined">
+                        <FileStack className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="truncate font-medium">{doc.title}</p>
-                          <p className="text-xs text-muted-foreground truncate">{doc.originalName} ({formatFileSize(doc.fileSize)})</p>
+                          <p className="truncate font-medium">Combined Documents.pdf</p>
+                          <p className="text-xs text-muted-foreground">{pdfCount} PDFs combined into one file{pdfCount < selectedDocuments.length ? ` + ${selectedDocuments.length - pdfCount} other attachment(s)` : ""}</p>
                         </div>
                       </div>
-                    ))}
+                    ) : (
+                      selectedDocuments.map((doc) => (
+                        <div key={doc.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-attachment-${doc.id}`}>
+                          <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate font-medium">{doc.title}</p>
+                            <p className="text-xs text-muted-foreground truncate">{doc.originalName} ({formatFileSize(doc.fileSize)})</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </CardContent>
               </Card>
