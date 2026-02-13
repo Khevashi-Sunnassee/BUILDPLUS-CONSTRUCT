@@ -90,6 +90,60 @@ interface DrawingPackageDialogProps {
 
 type WizardStep = "upload" | "review" | "confirm";
 
+interface ProgressState {
+  phase: string;
+  current: number;
+  total: number;
+  percent: number;
+  detail: string;
+}
+
+async function readSSEStream(
+  response: Response,
+  onProgress: (progress: ProgressState) => void,
+): Promise<any> {
+  const reader = response.body?.getReader();
+  if (!reader) throw new Error("No response body");
+
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalResult: any = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (!line.startsWith("data: ")) continue;
+      try {
+        const event = JSON.parse(line.slice(6));
+        if (event.type === "progress") {
+          onProgress({
+            phase: event.phase,
+            current: event.current,
+            total: event.total,
+            percent: event.percent,
+            detail: event.detail || "",
+          });
+        } else if (event.type === "result") {
+          finalResult = event.data;
+        } else if (event.type === "error") {
+          throw new Error(event.error || "Operation failed");
+        }
+      } catch (e: any) {
+        if (e.message && !e.message.includes("Unexpected")) throw e;
+      }
+    }
+  }
+
+  if (!finalResult) throw new Error("No result received from server");
+  return finalResult;
+}
+
 export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,6 +162,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [progress, setProgress] = useState<ProgressState | null>(null);
 
   const { data: docTypes } = useQuery<any[]>({
     queryKey: [DOCUMENT_ROUTES.TYPES],
@@ -126,11 +181,12 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
 
   const analyzeMutation = useMutation({
     mutationFn: async (file: File) => {
+      setProgress({ phase: "pdf_extract", current: 0, total: 1, percent: 0, detail: "Extracting pages from PDF..." });
       const formData = new FormData();
       formData.append("file", file);
       const csrfToken = getCsrfToken();
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000);
+      const timeoutId = setTimeout(() => controller.abort(), 600000);
       const res = await fetch(DOCUMENT_ROUTES.DRAWING_PACKAGE_ANALYZE, {
         method: "POST",
         headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
@@ -140,12 +196,17 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
       });
       clearTimeout(timeoutId);
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.message || "Analysis failed");
+        const err = await res.text().catch(() => "");
+        throw new Error(err || "Analysis failed");
+      }
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/event-stream")) {
+        return await readSSEStream(res, setProgress);
       }
       return res.json();
     },
     onSuccess: (data: AnalysisResult) => {
+      setProgress(null);
       setAnalysisResult(data);
       const pagesWithSelection = data.pages.map((p) => ({
         ...p,
@@ -166,6 +227,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
       setStep("review");
     },
     onError: (error: Error) => {
+      setProgress(null);
       toast({ title: "Analysis Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -175,6 +237,8 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
       if (!selectedFile) throw new Error("No file selected");
       const selectedPages = pages.filter((p) => p.selected);
       if (selectedPages.length === 0) throw new Error("No drawings selected");
+
+      setProgress({ phase: "splitting", current: 0, total: selectedPages.length, percent: 0, detail: "Preparing files..." });
 
       const formData = new FormData();
       formData.append("file", selectedFile);
@@ -202,19 +266,30 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
       }))));
 
       const csrfToken = getCsrfToken();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 600000);
       const res = await fetch(DOCUMENT_ROUTES.DRAWING_PACKAGE_REGISTER, {
         method: "POST",
         headers: csrfToken ? { "x-csrf-token": csrfToken } : {},
         body: formData,
         credentials: "include",
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || err.message || "Registration failed");
+        const err = await res.text().catch(() => "");
+        throw new Error(err || "Registration failed");
+      }
+
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType.includes("text/event-stream")) {
+        return await readSSEStream(res, setProgress);
       }
       return res.json();
     },
     onSuccess: (data) => {
+      setProgress(null);
       const registered = data.results?.filter((r: any) => r.status === "registered").length || 0;
       const skipped = data.results?.filter((r: any) => r.status === "skipped").length || 0;
       toast({
@@ -225,6 +300,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
       handleClose();
     },
     onError: (error: Error) => {
+      setProgress(null);
       toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
     },
   });
@@ -240,6 +316,7 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
     setGlobalCategoryId("");
     setActivePage(1);
     setPreviewZoom(1);
+    setProgress(null);
     onOpenChange(false);
   }, [onOpenChange]);
 
@@ -396,64 +473,95 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
         <div className="flex-1 overflow-hidden min-h-0">
           {step === "upload" && (
             <div className="space-y-4 p-1 h-full">
-              <Card className="h-full">
-                <CardContent className="pt-6 h-full flex flex-col justify-center">
-                  <div
-                    className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-                      isDragging ? "border-primary bg-primary/5" : "hover-elevate"
-                    }`}
-                    onClick={() => fileInputRef.current?.click()}
-                    onDragOver={handleDragOver}
-                    onDragEnter={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                    data-testid="dropzone-drawing-package"
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf"
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      data-testid="input-drawing-package-file"
-                    />
-                    <Upload className={`h-16 w-16 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
-                    <p className="text-lg font-medium mb-1">
-                      {isDragging
-                        ? "Drop your PDF here"
-                        : selectedFile
-                        ? selectedFile.name
-                        : "Drag & drop a PDF file here, or click to browse"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedFile
-                        ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`
-                        : "Multi-page PDF drawing packages are supported"}
-                    </p>
-                  </div>
-                  {selectedFile && (
-                    <div className="flex items-center justify-between mt-4 p-3 rounded-md bg-muted">
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        <div>
-                          <p className="text-sm font-medium">{selectedFile.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                        </div>
+              {analyzeMutation.isPending && progress ? (
+                <Card className="h-full">
+                  <CardContent className="pt-6 h-full flex flex-col items-center justify-center gap-6">
+                    <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                    <div className="w-full max-w-md space-y-3" data-testid="analyze-progress">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">
+                          {progress.phase === "pdf_extract" ? "Extracting PDF pages..." :
+                           progress.phase === "ai_analysis" ? "AI analyzing drawings..." :
+                           progress.phase === "matching" ? "Matching jobs..." : "Processing..."}
+                        </span>
+                        <span className="font-mono text-muted-foreground">{progress.percent}%</span>
                       </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-                        data-testid="button-remove-file"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
+                      <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${progress.percent}%` }}
+                          data-testid="analyze-progress-bar"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">{progress.detail}</p>
+                      {progress.phase === "ai_analysis" && progress.total > 0 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          {progress.current} of {progress.total} pages analyzed
+                        </p>
+                      )}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="h-full">
+                  <CardContent className="pt-6 h-full flex flex-col justify-center">
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+                        isDragging ? "border-primary bg-primary/5" : "hover-elevate"
+                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                      onDragOver={handleDragOver}
+                      onDragEnter={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      data-testid="dropzone-drawing-package"
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        data-testid="input-drawing-package-file"
+                      />
+                      <Upload className={`h-16 w-16 mx-auto mb-4 ${isDragging ? "text-primary" : "text-muted-foreground"}`} />
+                      <p className="text-lg font-medium mb-1">
+                        {isDragging
+                          ? "Drop your PDF here"
+                          : selectedFile
+                          ? selectedFile.name
+                          : "Drag & drop a PDF file here, or click to browse"}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedFile
+                          ? `${(selectedFile.size / 1024 / 1024).toFixed(2)} MB`
+                          : "Multi-page PDF drawing packages are supported"}
+                      </p>
+                    </div>
+                    {selectedFile && (
+                      <div className="flex items-center justify-between mt-4 p-3 rounded-md bg-muted">
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-5 w-5" />
+                          <div>
+                            <p className="text-sm font-medium">{selectedFile.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                          data-testid="button-remove-file"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
 
@@ -845,6 +953,35 @@ export function DrawingPackageDialog({ open, onOpenChange }: DrawingPackageDialo
 
           {step === "confirm" && (
             <div className="overflow-y-auto h-full p-1 space-y-4">
+              {registerMutation.isPending && progress && (
+                <Card>
+                  <CardContent className="pt-4 flex flex-col items-center gap-4">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <div className="w-full max-w-md space-y-2" data-testid="register-progress">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">
+                          {progress.phase === "splitting" ? "Splitting PDF pages..." :
+                           progress.phase === "registering" ? "Registering drawings..." : "Processing..."}
+                        </span>
+                        <span className="font-mono text-muted-foreground">{progress.percent}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-3 overflow-hidden">
+                        <div
+                          className="bg-primary h-full rounded-full transition-all duration-300 ease-out"
+                          style={{ width: `${progress.percent}%` }}
+                          data-testid="register-progress-bar"
+                        />
+                      </div>
+                      <p className="text-xs text-muted-foreground text-center">{progress.detail}</p>
+                      {progress.total > 0 && (
+                        <p className="text-xs text-muted-foreground text-center">
+                          {progress.current} of {progress.total} drawings
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               <Card>
                 <CardContent className="pt-4 space-y-3">
                   <h3 className="text-sm font-semibold">Registration Summary</h3>

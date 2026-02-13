@@ -2366,18 +2366,52 @@ CRITICAL RULES:
         return page;
       };
 
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
+
+      const sendProgress = (phase: string, current: number, total: number, detail?: string) => {
+        const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+        res.write(`data: ${JSON.stringify({ type: "progress", phase, current, total, percent, detail })}\n\n`);
+      };
+
+      sendProgress("ai_analysis", 0, analysisResult.pages.length, "Starting AI analysis...");
+
       const CONCURRENCY = 10;
       const pages = analysisResult.pages;
+      let completedPages = 0;
       for (let i = 0; i < pages.length; i += CONCURRENCY) {
         const batch = pages.slice(i, i + CONCURRENCY);
-        const results = await Promise.all(batch.map(analyzePageWithAI));
+        const results = await Promise.all(batch.map(async (page: any) => {
+          const result = await analyzePageWithAI(page);
+          completedPages++;
+          sendProgress("ai_analysis", completedPages, pages.length, `Analyzing page ${completedPages} of ${pages.length}`);
+          return result;
+        }));
         for (let j = 0; j < results.length; j++) {
           pages[i + j] = results[j];
         }
       }
       analysisResult.pages = pages;
       logger.info("OpenAI vision analysis complete for all pages");
+    } else {
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
+      });
     }
+
+    const sendProgress = (phase: string, current: number, total: number, detail?: string) => {
+      const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+      try { res.write(`data: ${JSON.stringify({ type: "progress", phase, current, total, percent, detail })}\n\n`); } catch {}
+    };
+
+    sendProgress("matching", 0, 1, "Matching jobs and checking conflicts...");
 
     const allJobs = await storage.getAllJobs(req.companyId!);
     const jobs = allJobs;
@@ -2463,16 +2497,28 @@ CRITICAL RULES:
 
     try { fs.unlinkSync(inputPath); fs.rmdirSync(tempDir); } catch {}
 
-    res.json({
+    sendProgress("matching", 1, 1, "Complete");
+
+    const finalResult = {
       totalPages: analysisResult.totalPages,
       pages: pagesWithConflicts,
       matchedJob: matchedJobId ? { id: matchedJobId, name: matchedJobName } : null,
       jobs: jobs.map((j: any) => ({ id: j.id, name: `${j.jobNumber} - ${j.name}` })),
       originalFileName: file.originalname,
-    });
+    };
+
+    res.write(`data: ${JSON.stringify({ type: "result", data: finalResult })}\n\n`);
+    res.end();
   } catch (error: unknown) {
     logger.error({ err: error }, "Error analyzing drawing package");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to analyze drawing package" });
+    try {
+      if (!res.headersSent) {
+        res.status(500).json({ error: error instanceof Error ? error.message : "Failed to analyze drawing package" });
+      } else {
+        res.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Failed to analyze drawing package" })}\n\n`);
+        res.end();
+      }
+    } catch {}
   }
 });
 
@@ -2494,18 +2540,37 @@ function compareRevisions(a: string, b: string): number {
 router.post("/api/documents/drawing-package/register", requireAuth, drawingPackageUpload.single("file"), async (req: Request, res: Response) => {
   req.setTimeout(600000);
   res.setTimeout(600000);
+
+  res.writeHead(200, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+
+  const sendProgress = (phase: string, current: number, total: number, detail?: string) => {
+    const percent = total > 0 ? Math.round((current / total) * 100) : 0;
+    try { res.write(`data: ${JSON.stringify({ type: "progress", phase, current, total, percent, detail })}\n\n`); } catch {}
+  };
+
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ error: "No PDF file provided" });
+      res.write(`data: ${JSON.stringify({ type: "error", error: "No PDF file provided" })}\n\n`);
+      res.end();
+      return;
     }
 
     const drawingsData = JSON.parse(req.body.drawings || "[]");
     const globalJobId = req.body.jobId || null;
 
     if (!drawingsData.length) {
-      return res.status(400).json({ error: "No drawings to register" });
+      res.write(`data: ${JSON.stringify({ type: "error", error: "No drawings to register" })}\n\n`);
+      res.end();
+      return;
     }
+
+    sendProgress("splitting", 0, drawingsData.length, "Splitting PDF into individual pages...");
 
     const fs = await import("fs");
     const path = await import("path");
@@ -2558,13 +2623,22 @@ print(json.dumps(extracted))
 
     const extractedFiles: Array<{ filename: string; filepath: string; pageNumber: number }> = JSON.parse(splitResult);
 
+    sendProgress("splitting", drawingsData.length, drawingsData.length, "PDF split complete");
+
     const results: any[] = [];
+    let processedCount = 0;
+    const totalToProcess = drawingsData.length;
 
     for (const drawing of drawingsData) {
+      processedCount++;
+
       if (drawing.action === "skip") {
         results.push({ pageNumber: drawing.pageNumber, status: "skipped", drawingNumber: drawing.drawingNumber });
+        sendProgress("registering", processedCount, totalToProcess, `Skipped ${drawing.drawingNumber || `page ${drawing.pageNumber}`}`);
         continue;
       }
+
+      sendProgress("registering", processedCount, totalToProcess, `Uploading ${drawing.drawingNumber || `page ${drawing.pageNumber}`}...`);
 
       const pageFile = extractedFiles.find((f) => f.pageNumber === drawing.pageNumber);
       if (!pageFile) {
@@ -2648,14 +2722,14 @@ print(json.dumps(extracted))
     const skipped = results.filter((r) => r.status === "skipped").length;
     const errors = results.filter((r) => r.status === "error").length;
 
-    res.json({
-      success: true,
-      summary: { total: drawingsData.length, registered, skipped, errors },
-      results,
-    });
+    res.write(`data: ${JSON.stringify({ type: "result", data: { success: true, summary: { total: drawingsData.length, registered, skipped, errors }, results } })}\n\n`);
+    res.end();
   } catch (error: unknown) {
     logger.error({ err: error }, "Error registering drawing package");
-    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to register drawing package" });
+    try {
+      res.write(`data: ${JSON.stringify({ type: "error", error: error instanceof Error ? error.message : "Failed to register drawing package" })}\n\n`);
+      res.end();
+    } catch {}
   }
 });
 
