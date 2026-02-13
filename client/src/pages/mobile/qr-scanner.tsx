@@ -335,7 +335,7 @@ export default function MobileQrScanner() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24 pt-4">
+      <div className="flex-1 overflow-y-auto pb-40 pt-4">
         {!scanResult && !loading && (
           <div className="px-4 space-y-4">
             <div className="relative rounded-2xl border border-white/10 overflow-hidden bg-black">

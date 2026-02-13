@@ -442,7 +442,7 @@ export default function MobileTasksPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
         {activeTab === "tasks" && (
           <TasksListView
             groups={groups}

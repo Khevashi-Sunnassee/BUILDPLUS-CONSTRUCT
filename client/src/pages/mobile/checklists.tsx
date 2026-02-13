@@ -189,7 +189,7 @@ export default function MobileChecklistsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />

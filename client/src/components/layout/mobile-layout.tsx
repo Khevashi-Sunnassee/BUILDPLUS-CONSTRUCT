@@ -50,7 +50,7 @@ export function MobileLayout({ children, title, showBackButton = true }: MobileL
       </header>
       
       <main 
-        className="flex-1 overflow-y-auto overscroll-contain pb-24"
+        className="flex-1 overflow-y-auto overscroll-contain pb-40"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {children}

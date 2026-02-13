@@ -61,7 +61,7 @@ export default function MobileLogisticsPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
         <div className="grid grid-cols-3 gap-3 mb-6">
           <Link href="/mobile/logistics/create-load">
             <div

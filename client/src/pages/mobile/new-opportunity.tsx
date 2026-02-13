@@ -237,7 +237,7 @@ export default function MobileNewOpportunity() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-32 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
         {/* Project Name */}
         <FormField label="Project Name" required error={errors.name}>
           <input

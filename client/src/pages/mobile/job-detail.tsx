@@ -192,7 +192,7 @@ export default function MobileJobDetailPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-24">
+      <div className="flex-1 overflow-y-auto pb-40">
         {activeTab === "info" && <JobInfoTab job={job} />}
         {activeTab === "panels" && <JobPanelsTab jobId={job.id} onPanelClick={(id) => setLocation(`/mobile/panels/${id}`)} />}
         {activeTab === "log" && <JobAuditLogTab jobId={job.id} />}

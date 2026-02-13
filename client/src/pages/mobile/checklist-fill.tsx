@@ -280,7 +280,7 @@ export default function MobileChecklistFillPage() {
         </div>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-32 pt-4 space-y-4">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-40 pt-4 space-y-4">
         {isCompleted && (
           <div className="flex items-center gap-3 rounded-2xl border border-green-500/20 bg-green-500/10 px-4 py-3">
             <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />

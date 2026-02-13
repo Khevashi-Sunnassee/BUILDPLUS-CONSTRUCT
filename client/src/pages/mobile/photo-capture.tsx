@@ -179,7 +179,7 @@ export default function MobilePhotoCaptue() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4 space-y-4">
         {uploadSuccess ? (
           <div className="flex flex-col items-center justify-center gap-4 py-12">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20">

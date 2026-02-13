@@ -162,7 +162,7 @@ export default function MobilePmCallLogDetailPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4 space-y-4">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
           <div className="flex items-center gap-2 text-xs font-medium text-white/50">
             <User className="h-3.5 w-3.5" />

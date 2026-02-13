@@ -136,7 +136,7 @@ export default function MobilePmCallLogsPage() {
         </Select>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4 space-y-3">
         {isLoading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (

@@ -631,7 +631,7 @@ export default function MobileDocumentsPage() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-4 space-y-2">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4 space-y-2">
         {isUnauthorizedJob ? (
           <div className="flex flex-col items-center justify-center py-16" data-testid="unauthorized-job-message">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/20 mb-3">

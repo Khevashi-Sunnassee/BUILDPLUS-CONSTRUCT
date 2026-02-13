@@ -36,7 +36,7 @@ export default function MobileProfilePage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-24 pt-6">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-6">
         <div className="flex flex-col items-center mb-8">
           <Avatar className="h-24 w-24 mb-4">
             <AvatarFallback className="bg-purple-500/20 text-purple-400 text-2xl font-bold">

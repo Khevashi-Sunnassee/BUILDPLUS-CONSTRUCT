@@ -1055,7 +1055,7 @@ export default function MobilePmCallLogFormPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-5">
+      <div className="flex-1 overflow-y-auto px-4 pt-5 pb-40">
         {renderStepContent()}
       </div>
 
