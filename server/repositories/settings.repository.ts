@@ -7,13 +7,17 @@ import {
 } from "@shared/schema";
 
 export class SettingsRepository {
-  async getGlobalSettings(): Promise<GlobalSettings | undefined> {
+  async getGlobalSettings(companyId?: string): Promise<GlobalSettings | undefined> {
+    if (companyId) {
+      const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
+      return settings;
+    }
     const [settings] = await db.select().from(globalSettings).limit(1);
     return settings;
   }
 
-  async updateGlobalSettings(data: Partial<GlobalSettings>): Promise<GlobalSettings> {
-    const existing = await this.getGlobalSettings();
+  async updateGlobalSettings(data: Partial<GlobalSettings>, companyId?: string): Promise<GlobalSettings> {
+    const existing = await this.getGlobalSettings(companyId);
     if (existing) {
       const [updated] = await db.update(globalSettings)
         .set({ ...data, updatedAt: new Date() })
@@ -21,7 +25,11 @@ export class SettingsRepository {
         .returning();
       return updated;
     }
-    const [created] = await db.insert(globalSettings).values(data as any).returning();
+    const insertData = { ...data } as any;
+    if (companyId) {
+      insertData.companyId = companyId;
+    }
+    const [created] = await db.insert(globalSettings).values(insertData).returning();
     return created;
   }
 

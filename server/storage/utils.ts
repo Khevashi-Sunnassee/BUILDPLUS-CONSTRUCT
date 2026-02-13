@@ -11,22 +11,31 @@ export function randomKey(bytes = 32) {
   return crypto.randomBytes(bytes).toString("base64url");
 }
 
-export async function getFactoryWorkDays(factoryId: string | null): Promise<boolean[]> {
+export async function getFactoryWorkDays(factoryId: string | null, companyId?: string): Promise<boolean[]> {
   const defaultWorkDays = [false, true, true, true, true, true, false];
   
   if (!factoryId) {
+    if (companyId) {
+      const settings = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
+      return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
+    }
     const settings = await db.select().from(globalSettings).limit(1);
     return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
   }
   
   const [factory] = await db.select().from(factories).where(eq(factories.id, factoryId));
   if (!factory) {
+    if (companyId) {
+      const settings = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
+      return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
+    }
     const settings = await db.select().from(globalSettings).limit(1);
     return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
   }
   
   if (factory.inheritWorkDays) {
-    const settings = await db.select().from(globalSettings).limit(1);
+    const effectiveCompanyId = companyId || factory.companyId;
+    const settings = await db.select().from(globalSettings).where(eq(globalSettings.companyId, effectiveCompanyId));
     return (settings[0]?.productionWorkDays as boolean[]) ?? defaultWorkDays;
   }
   

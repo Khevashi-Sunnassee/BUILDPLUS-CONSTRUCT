@@ -170,8 +170,8 @@ export interface IStorage {
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
-  getGlobalSettings(): Promise<GlobalSettings | undefined>;
-  updateGlobalSettings(data: Partial<GlobalSettings>): Promise<GlobalSettings>;
+  getGlobalSettings(companyId?: string): Promise<GlobalSettings | undefined>;
+  updateGlobalSettings(data: Partial<GlobalSettings>, companyId?: string): Promise<GlobalSettings>;
 
   getDashboardStats(userId: string): Promise<any>;
   getReports(period: string): Promise<any>;
@@ -365,7 +365,7 @@ export interface IStorage {
   updateDraftingProgram(id: string, data: Partial<InsertDraftingProgram>): Promise<DraftingProgram | undefined>;
   deleteDraftingProgram(id: string): Promise<void>;
   deleteDraftingProgramByJob(jobId: string): Promise<number>;
-  generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }>;
+  generateDraftingProgramFromProductionSlots(companyId?: string): Promise<{ created: number; updated: number }>;
   assignDraftingResource(id: string, assignedToId: string, proposedStartDate: Date): Promise<DraftingProgram | undefined>;
 
   getAllCustomers(companyId?: string): Promise<Customer[]>;

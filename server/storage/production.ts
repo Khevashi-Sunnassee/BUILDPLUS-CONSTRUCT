@@ -342,7 +342,7 @@ export const productionMethods = {
       panelCountByLevel[level] = (panelCountByLevel[level] || 0) + 1;
     }
 
-    const workDays = await getFactoryWorkDays(job.factoryId);
+    const workDays = await getFactoryWorkDays(job.factoryId, job.companyId);
     let cfmeuCalendarType: "VIC_ONSITE" | "VIC_OFFSITE" | "QLD" | null = null;
     if (job.factoryId) {
       const [factory] = await db.select().from(factories).where(eq(factories.id, job.factoryId));

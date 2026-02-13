@@ -837,7 +837,7 @@ router.get("/purchase-orders/:id/pdf", requireAuth, async (req, res) => {
       return res.status(404).json({ error: "Purchase order not found" });
     }
 
-    const settings = await storage.getGlobalSettings();
+    const settings = await storage.getGlobalSettings(req.companyId);
     const { generatePurchaseOrderPdf } = await import("../services/po-pdf.service");
     const termsData = settings ? { poTermsHtml: settings.poTermsHtml, includePOTerms: settings.includePOTerms } : null;
     const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, companyName: settings.companyName } : null, termsData);
@@ -870,7 +870,7 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
       return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
     }
 
-    const settings = await storage.getGlobalSettings();
+    const settings = await storage.getGlobalSettings(req.companyId);
     const { generatePurchaseOrderPdf } = await import("../services/po-pdf.service");
     const termsData = settings ? { poTermsHtml: settings.poTermsHtml, includePOTerms: settings.includePOTerms } : null;
     const pdfBuffer = generatePurchaseOrderPdf(po, po.items || [], settings ? { logoBase64: settings.logoBase64, companyName: settings.companyName } : null, termsData);

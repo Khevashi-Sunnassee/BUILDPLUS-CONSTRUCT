@@ -7,18 +7,19 @@ interface BrandedEmailOptions {
   body: string;
   footerNote?: string;
   attachmentSummary?: string;
+  companyId?: string;
 }
 
 let cachedSettings: { companyName: string; logoBase64: string | null } | null = null;
 let cacheExpiry = 0;
 
-async function getCompanyBranding(): Promise<{ companyName: string; logoBase64: string | null }> {
+async function getCompanyBranding(companyId?: string): Promise<{ companyName: string; logoBase64: string | null }> {
   const now = Date.now();
-  if (cachedSettings && now < cacheExpiry) {
+  if (cachedSettings && now < cacheExpiry && !companyId) {
     return cachedSettings;
   }
   try {
-    const settings = await storage.getGlobalSettings();
+    const settings = await storage.getGlobalSettings(companyId);
     cachedSettings = {
       companyName: settings?.companyName || "BuildPlus Ai",
       logoBase64: settings?.logoBase64 || null,
@@ -32,7 +33,7 @@ async function getCompanyBranding(): Promise<{ companyName: string; logoBase64: 
 }
 
 export async function buildBrandedEmail(options: BrandedEmailOptions): Promise<string> {
-  const { companyName, logoBase64 } = await getCompanyBranding();
+  const { companyName, logoBase64 } = await getCompanyBranding(options.companyId);
 
   const logoHtml = logoBase64
     ? `<img src="${logoBase64}" alt="${companyName}" style="max-height: 36px; max-width: 180px; vertical-align: middle;" />`

@@ -87,8 +87,14 @@ export const schedulingMethods = {
     return result.length;
   },
 
-  async generateDraftingProgramFromProductionSlots(): Promise<{ created: number; updated: number }> {
-    const [settings] = await db.select().from(globalSettings);
+  async generateDraftingProgramFromProductionSlots(companyId?: string): Promise<{ created: number; updated: number }> {
+    let settingsQuery;
+    if (companyId) {
+      settingsQuery = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
+    } else {
+      settingsQuery = await db.select().from(globalSettings).limit(1);
+    }
+    const settings = settingsQuery[0];
     const defaultIfcDaysInAdvance = settings?.ifcDaysInAdvance ?? 14;
     const defaultDaysToAchieveIfc = settings?.daysToAchieveIfc ?? 21;
     

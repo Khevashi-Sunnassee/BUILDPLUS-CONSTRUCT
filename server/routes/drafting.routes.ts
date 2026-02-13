@@ -82,7 +82,7 @@ router.get("/api/drafting-program/:id", requireAuth, requirePermission("producti
 
 router.post("/api/drafting-program/generate", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
-    const result = await storage.generateDraftingProgramFromProductionSlots();
+    const result = await storage.generateDraftingProgramFromProductionSlots(req.companyId);
     res.json({ success: true, ...result });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating drafting program");

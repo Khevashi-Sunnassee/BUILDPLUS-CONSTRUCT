@@ -634,7 +634,8 @@ router.post("/api/admin/jobs", requireRole("ADMIN"), async (req: Request, res: R
     for (const field of emptyStringFields) {
       if (data[field] === "") data[field] = null;
     }
-    const globalSettings = await storage.getGlobalSettings();
+    const companyId = req.companyId;
+    const globalSettings = await storage.getGlobalSettings(companyId);
     if (data.procurementDaysInAdvance !== undefined && data.procurementDaysInAdvance !== null) {
       const val = parseInt(String(data.procurementDaysInAdvance), 10);
       if (isNaN(val) || val < 1) {
@@ -713,7 +714,7 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
       }
       data.productionDaysInAdvance = val;
     }
-    const globalSettings = await storage.getGlobalSettings();
+    const globalSettings = await storage.getGlobalSettings(req.companyId);
     
     if (data.daysInAdvance !== undefined && data.daysInAdvance !== null) {
       const newIfcDays = parseInt(String(data.daysInAdvance), 10);
@@ -1202,7 +1203,7 @@ router.post("/api/admin/jobs/:id/programme/recalculate", requireRole("ADMIN", "M
       return res.json([]);
     }
 
-    const factoryWorkDays = await getFactoryWorkDays(job.factoryId ?? null);
+    const factoryWorkDays = await getFactoryWorkDays(job.factoryId ?? null, req.companyId);
     const baseDate = new Date(job.productionStartDate);
     const rangeEnd = new Date(baseDate);
     rangeEnd.setFullYear(rangeEnd.getFullYear() + 5);
