@@ -331,6 +331,7 @@ export default function MobilePmCallLogFormPage() {
                 <Select value={selectedJobId} onValueChange={handleJobSelect}>
                   <SelectTrigger
                     className="bg-white/5 border-white/10 text-white"
+                    aria-required="true"
                     data-testid="select-job"
                   >
                     <SelectValue placeholder="Choose a job..." />
@@ -351,7 +352,7 @@ export default function MobilePmCallLogFormPage() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
                   <div>
-                    <p className="font-medium text-red-400" data-testid="text-no-programme-warning">
+                    <p className="font-medium text-red-400" role="alert" aria-live="assertive" data-testid="text-no-programme-warning">
                       No Job Programme Found
                     </p>
                     <p className="text-xs text-white/50 mt-1">
@@ -369,6 +370,7 @@ export default function MobilePmCallLogFormPage() {
                 onChange={(e) => setContactName(e.target.value)}
                 placeholder="Site PM name..."
                 className="bg-white/5 border-white/10 text-white placeholder:text-white/30"
+                aria-required="true"
                 data-testid="input-contact-name"
               />
             </div>
@@ -391,6 +393,7 @@ export default function MobilePmCallLogFormPage() {
                 value={callDateTime}
                 onChange={(e) => setCallDateTime(e.target.value)}
                 className="bg-white/5 border-white/10 text-white"
+                aria-required="true"
                 data-testid="input-call-datetime"
               />
             </div>
@@ -1003,7 +1006,7 @@ export default function MobilePmCallLogFormPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile PM Call Log Form">
       <div
         className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}

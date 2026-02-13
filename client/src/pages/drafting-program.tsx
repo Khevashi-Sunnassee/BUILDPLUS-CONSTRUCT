@@ -315,7 +315,7 @@ export default function DraftingProgramPage() {
   ).values());
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Drafting Program">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

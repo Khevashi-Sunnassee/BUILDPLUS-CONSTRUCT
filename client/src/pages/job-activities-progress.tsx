@@ -402,14 +402,14 @@ ${stagesHtml}
 
   if (parentActivities.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground" data-testid="text-no-activities">
+      <div className="text-center py-12 text-muted-foreground" data-testid="text-no-activities" role="main" aria-label="Job Activities Progress">
         No activities to display
       </div>
     );
   }
 
   return (
-    <div data-testid="progress-flow-chart">
+    <div data-testid="progress-flow-chart" role="main" aria-label="Job Activities Progress">
       <div className="flex items-center justify-between gap-3 flex-wrap mb-4 no-print">
         <div className="flex items-center gap-4 flex-wrap px-1">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">

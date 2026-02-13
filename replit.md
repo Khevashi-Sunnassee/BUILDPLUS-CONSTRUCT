@@ -59,14 +59,14 @@ The frontend features a KPI Dashboard with data visualization, PDF export capabi
 ## Coding Standards
 
 ### Accessibility
-- All pages must have `role="main"` with a descriptive `aria-label`.
+- All pages have `role="main"` with a descriptive `aria-label` (100% coverage across all page-level components).
 - All interactive elements (buttons, inputs, links) must have `aria-label` or visible label text.
-- Forms must use `aria-required` on required fields and `aria-invalid` on validation errors.
-- Loading states must use `aria-busy="true"` and live regions (`aria-live="polite"`) for status updates.
-- Decorative icons must have `aria-hidden="true"`; informational icons need `aria-label`.
-- Navigation landmarks must use `<nav>` with `aria-label` differentiating multiple navs.
-- Error alerts must use `role="alert"` and `aria-live="assertive"`.
-- ESLint enforces a11y rules via `eslint-plugin-jsx-a11y` in `eslint.config.js`.
+- Forms use `aria-required` on required fields across 13+ form pages (login, register, hire-booking, purchase-order, progress-claim, PM call log, asset repair, mobile forms).
+- Loading states use `aria-busy="true"` and live regions (`aria-live="polite"`) for status updates.
+- Error alerts use `role="alert"` and `aria-live="assertive"` for validation errors and critical notifications.
+- Decorative icons have `aria-hidden="true"`; informational icons need `aria-label`.
+- Navigation landmarks use `<nav>` with `aria-label` differentiating multiple navs.
+- ESLint enforces 11 a11y rules via `eslint-plugin-jsx-a11y` in `eslint.config.js`.
 
 ### Frontend Testing
 - All new components must have a co-located `.test.tsx` file using React Testing Library + Vitest.
@@ -74,19 +74,20 @@ The frontend features a KPI Dashboard with data visualization, PDF export capabi
 - Tests must cover: rendering, user interactions, error states, and accessibility (ARIA attributes).
 - Every interactive element must have a `data-testid` attribute for test targeting.
 - Run frontend tests: `npx vitest --config vitest.config.frontend.ts --run`.
-- Current coverage: 120 test files, 510 tests covering all pages (admin, core workflow, mobile, forms/details) and shared components.
+- Current coverage: 135 test files, 562+ tests covering all pages (admin, core workflow, mobile, forms/details), shared components, and 15 UI components (Button, Card, Badge, Input, Dialog, Table, Tabs, Select, Tooltip, Textarea, Skeleton, Avatar, DropdownMenu, AlertDialog, Sheet).
 - Test pattern: mock wouter, @/lib/auth, @/hooks/use-mobile, @/hooks/use-document-title; use renderWithProviders; verify role/aria-label/aria-busy/data-testid.
 
 ### Database Integrity
-- All monetary/quantity columns must have CHECK constraints (e.g., `CHECK (amount >= 0)`).
-- Rate fields (tax, retention) must be bounded: `CHECK (rate >= 0 AND rate <= 100)`.
-- Business-unique fields must have UNIQUE constraints (e.g., customer name + company).
+- All monetary/quantity columns have CHECK constraints (e.g., `CHECK (amount >= 0)`).
+- Rate fields (tax, retention, depreciation, interest) are bounded: `CHECK (rate >= 0 AND rate <= 100)`.
+- Business-unique fields have UNIQUE constraints (e.g., customer name + company).
 - New tables must define constraints in both Drizzle schema and as raw SQL migration.
-- Current counts: 54+ check constraints across 16 tables, 13 unique constraints, 203 unique indexes.
+- Current counts: 103 check constraints across 33 tables, 13 unique constraints, 203 unique indexes, 380 foreign keys.
 
 ### Developer Experience
 - Environment variables documented in `.env.example` with descriptions.
 - ESLint config in `eslint.config.js` with TypeScript, security, and 11 accessibility rules.
-- Quality check script: `bash scripts/quality-check.sh` (runs ESLint + frontend tests + TypeScript check).
+- Quality check script: `bash scripts/quality-check.sh` (4-step: ESLint zero-tolerance + frontend tests + TypeScript check + accessibility audit).
+- Pre-commit enforcement: `husky` + `lint-staged` configured (`.lintstagedrc.json`) to run ESLint on staged `.ts`/`.tsx` files.
 - Stale chunk handling: All lazy imports use `lazyWithRetry` to auto-reload after deployments.
 - Commit messages should reference the feature area (e.g., `[budget] Add cost code import`).

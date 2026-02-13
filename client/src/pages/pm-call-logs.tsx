@@ -92,7 +92,7 @@ export default function PmCallLogsPage() {
     log.draftingConcerns || log.clientDesignChanges || log.issuesReported || log.installationProblems;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-6xl mx-auto" role="main" aria-label="PM Call Logs">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">PM Call Logs</h1>

@@ -168,7 +168,7 @@ export default function AdminDevicesPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Device Management">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -176,7 +176,7 @@ export default function AdminDevicesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Device Management">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

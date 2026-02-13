@@ -447,7 +447,7 @@ export default function MobileDocumentsPage() {
     const FileIcon = getFileIcon(selectedDoc.mimeType);
     const isViewable = selectedDoc.mimeType.includes("pdf") || selectedDoc.mimeType.startsWith("image/");
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+      <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Documents">
         <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <div className="px-4 py-4 flex items-center gap-3">
             <button
@@ -514,7 +514,7 @@ export default function MobileDocumentsPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Documents">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="px-4 py-4">
           <div className="flex items-center gap-3 mb-3">

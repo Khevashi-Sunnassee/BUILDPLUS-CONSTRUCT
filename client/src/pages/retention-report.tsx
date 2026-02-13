@@ -63,7 +63,7 @@ export default function RetentionReportPage() {
   };
 
   return (
-    <div className="space-y-6 p-6" data-testid="page-retention-report">
+    <div className="space-y-6 p-6" data-testid="page-retention-report" role="main" aria-label="Retention Report">
       <div className="flex items-center gap-3 flex-wrap">
         <Link href="/progress-claims">
           <Button variant="ghost" size="icon" data-testid="button-back-claims">

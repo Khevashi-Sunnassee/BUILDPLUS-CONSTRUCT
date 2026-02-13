@@ -341,7 +341,7 @@ export default function ContractDetailPage() {
 
   if (!isLoaded) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Contract Detail">
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-96" />
       </div>
@@ -352,7 +352,7 @@ export default function ContractDetailPage() {
   const riskHighlights = (currentData.riskHighlights || []) as Array<{ title: string; description: string; severity: string }>;
 
   return (
-    <div className="space-y-6" data-testid="contract-detail-page">
+    <div className="space-y-6" data-testid="contract-detail-page" role="main" aria-label="Contract Detail">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/contracts")} data-testid="button-back-to-hub">

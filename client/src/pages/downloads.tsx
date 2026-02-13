@@ -34,7 +34,7 @@ export default function DownloadsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Downloads">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-downloads-title">

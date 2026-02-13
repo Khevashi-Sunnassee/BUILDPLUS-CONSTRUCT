@@ -439,7 +439,7 @@ export default function ProgressClaimFormPage() {
 
   if (!isNew && !existingClaim && claimId) {
     return (
-      <div className="p-4 md:p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-6" role="main" aria-label="Progress Claim Form" aria-busy="true">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-96" />
       </div>
@@ -447,7 +447,7 @@ export default function ProgressClaimFormPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-6" role="main" aria-label="Progress Claim Form">
       <div className="flex items-center gap-3 flex-wrap">
         <Button variant="ghost" size="icon" onClick={() => navigate("/progress-claims")} data-testid="button-back">
           <ChevronLeft className="h-5 w-5" />
@@ -567,7 +567,7 @@ export default function ProgressClaimFormPage() {
               </CardHeader>
               <CardContent>
                 <Select value={selectedJobId} onValueChange={(v) => { setSelectedJobId(v); setInitialized(false); setClaimItems([]); }}>
-                  <SelectTrigger data-testid="select-job">
+                  <SelectTrigger data-testid="select-job" aria-required="true">
                     <SelectValue placeholder="Choose a job..." />
                   </SelectTrigger>
                   <SelectContent>

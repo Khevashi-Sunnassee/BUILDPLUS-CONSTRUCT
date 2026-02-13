@@ -47,7 +47,7 @@ export default function MobilePanelsPage() {
   const otherPanels = panels.filter(p => !["IN_PROGRESS", "NOT_STARTED"].includes(p.status)).slice(0, 5);
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Panels">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-2 px-4 py-4">
           <Link href="/mobile/more">

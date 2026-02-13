@@ -483,7 +483,7 @@ export default function PhotoGallery() {
   );
 
   return (
-    <div className="space-y-6" data-testid="photo-gallery-page">
+    <div className="space-y-6" data-testid="photo-gallery-page" role="main" aria-label="Photo Gallery">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <ImageIcon className="h-8 w-8 text-primary" />

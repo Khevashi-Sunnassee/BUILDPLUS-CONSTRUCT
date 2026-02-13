@@ -161,7 +161,7 @@ export default function AdminCompaniesPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Companies Management">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -169,7 +169,7 @@ export default function AdminCompaniesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Companies Management">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

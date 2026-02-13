@@ -322,7 +322,7 @@ export default function DailyReportDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Daily Report Detail">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -331,7 +331,7 @@ export default function DailyReportDetailPage() {
 
   if (!log) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
+      <div className="flex flex-col items-center justify-center py-12" role="main" aria-label="Daily Report Detail">
         <FileText className="h-12 w-12 text-muted-foreground/50 mb-4" />
         <h3 className="text-lg font-medium">Daily log not found</h3>
         <Button variant="outline" className="mt-4" onClick={() => setLocation("/daily-reports")}>
@@ -345,7 +345,7 @@ export default function DailyReportDetailPage() {
   const canEdit = log.status === "PENDING" || log.status === "REJECTED";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Daily Report Detail">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/daily-reports")} data-testid="button-back">

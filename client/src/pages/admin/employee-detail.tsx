@@ -702,7 +702,7 @@ export default function EmployeeDetailPage() {
 
   if (employeeLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Employee Detail">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -711,7 +711,7 @@ export default function EmployeeDetailPage() {
 
   if (!employee) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Employee Detail">
         <Button variant="ghost" onClick={() => setLocation("/admin/employees")} data-testid="button-back-employees">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Employees
@@ -726,7 +726,7 @@ export default function EmployeeDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Employee Detail">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4 flex-wrap">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/admin/employees")} data-testid="button-back-employees">

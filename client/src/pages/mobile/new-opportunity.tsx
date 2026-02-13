@@ -79,7 +79,7 @@ function FormField({
         {required && <span className="text-red-400 ml-0.5">*</span>}
       </label>
       {children}
-      {error && <p className="text-red-400 text-xs mt-1">{error}</p>}
+      {error && <p className="text-red-400 text-xs mt-1" role="alert" aria-live="assertive">{error}</p>}
     </div>
   );
 }
@@ -219,7 +219,7 @@ export default function MobileNewOpportunity() {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile New Opportunity">
       <div
         className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10"
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
@@ -246,6 +246,7 @@ export default function MobileNewOpportunity() {
             placeholder="e.g. Southbank Tower Development"
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            aria-required="true"
             data-testid="input-project-name"
           />
         </FormField>
@@ -281,6 +282,7 @@ export default function MobileNewOpportunity() {
                 placeholder="Site/project address"
                 value={form.address}
                 onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
+                aria-required="true"
                 data-testid="input-address"
               />
             </FormField>
@@ -291,6 +293,7 @@ export default function MobileNewOpportunity() {
                 placeholder="City location"
                 value={form.city}
                 onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                aria-required="true"
                 data-testid="input-city"
               />
             </FormField>

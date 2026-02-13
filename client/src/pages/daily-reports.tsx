@@ -503,7 +503,7 @@ export default function DailyReportsPage() {
   const hasTodayTimesheet = logs?.some(log => log.logDay === today);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Daily Reports">
       {/* Warning banner if no timesheet for today */}
       {!isLoading && !hasTodayTimesheet && (
         <div className="bg-red-100 dark:bg-red-950 border border-red-300 dark:border-red-800 rounded-lg p-4 flex items-center gap-3" data-testid="alert-no-timesheet">

@@ -553,7 +553,7 @@ export default function ProductionReportDetailPage() {
 
   if (entriesLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Production Report Detail">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -561,7 +561,7 @@ export default function ProductionReportDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Production Report Detail">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => setLocation("/production-report")} data-testid="button-back">

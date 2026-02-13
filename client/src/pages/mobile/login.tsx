@@ -50,7 +50,7 @@ export default function MobileLoginPage() {
 
   return (
     <div
-      className="fixed inset-0 flex flex-col bg-[#070B12] text-white"
+      className="fixed inset-0 flex flex-col bg-[#070B12] text-white" role="main" aria-label="Mobile Login"
       style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       <div className="flex-1 flex flex-col justify-center px-6 overflow-y-auto" style={{ WebkitOverflowScrolling: "touch" as any }}>

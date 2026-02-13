@@ -79,7 +79,7 @@ export default function PmCallLogDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-4" role="main" aria-label="PM Call Log Detail">
         <Skeleton className="h-8 w-48" />
         <Skeleton className="h-32 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -89,7 +89,7 @@ export default function PmCallLogDetailPage() {
 
   if (!log) {
     return (
-      <div className="p-4 md:p-6 max-w-4xl mx-auto text-center py-12">
+      <div className="p-4 md:p-6 max-w-4xl mx-auto text-center py-12" role="main" aria-label="PM Call Log Detail">
         <p className="text-muted-foreground">Call log not found.</p>
         <Button variant="outline" className="mt-4" onClick={() => navigate("/pm-call-logs")}>
           Back to Call Logs
@@ -102,7 +102,7 @@ export default function PmCallLogDetailPage() {
   const onTimeCount = log.levels.filter((l) => l.status === "ON_TIME").length;
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6" role="main" aria-label="PM Call Log Detail">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/pm-call-logs")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />

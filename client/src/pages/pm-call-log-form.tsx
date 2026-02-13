@@ -289,7 +289,7 @@ export default function PmCallLogFormPage() {
                 <Skeleton className="h-9 w-full" />
               ) : (
                 <Select value={selectedJobId} onValueChange={handleJobSelect}>
-                  <SelectTrigger data-testid="select-job">
+                  <SelectTrigger data-testid="select-job" aria-required="true">
                     <SelectValue placeholder="Choose a job..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -335,6 +335,7 @@ export default function PmCallLogFormPage() {
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   placeholder="Site PM name..."
+                  aria-required="true"
                   data-testid="input-contact-name"
                 />
               </div>
@@ -357,6 +358,7 @@ export default function PmCallLogFormPage() {
                 type="datetime-local"
                 value={callDateTime}
                 onChange={(e) => setCallDateTime(e.target.value)}
+                aria-required="true"
                 data-testid="input-call-datetime"
               />
             </div>
@@ -894,7 +896,7 @@ export default function PmCallLogFormPage() {
   };
 
   return (
-    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-6" role="main" aria-label="PM Call Log Form">
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => navigate("/pm-call-logs")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />

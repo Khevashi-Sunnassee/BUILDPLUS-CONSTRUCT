@@ -98,8 +98,8 @@ export default function RegisterPage() {
 
   if (validating) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <div className="flex flex-col items-center gap-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" role="main" aria-label="Register">
+        <div className="flex flex-col items-center gap-4" aria-busy="true">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-muted-foreground">Validating your invitation...</p>
         </div>
@@ -110,7 +110,7 @@ export default function RegisterPage() {
   if (validateError || !inviteData?.valid) {
     const errorMessage = validateError instanceof Error ? validateError.message : "This invitation link is invalid or has expired.";
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" role="main" aria-label="Register">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
             <div className="h-16 mb-4 flex items-center justify-center">
@@ -121,7 +121,7 @@ export default function RegisterPage() {
             <CardContent className="p-8 text-center space-y-4">
               <AlertCircle className="h-12 w-12 text-destructive mx-auto" />
               <h2 className="text-xl font-semibold">Invalid Invitation</h2>
-              <p className="text-muted-foreground">{errorMessage}</p>
+              <p className="text-muted-foreground" role="alert" aria-live="assertive">{errorMessage}</p>
               <Button variant="outline" onClick={() => setLocation("/login")} data-testid="button-go-to-login">
                 Go to Sign In
               </Button>
@@ -134,7 +134,7 @@ export default function RegisterPage() {
 
   if (registered) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" role="main" aria-label="Register">
         <div className="w-full max-w-md">
           <div className="flex flex-col items-center mb-8">
             <div className="h-16 mb-4 flex items-center justify-center">
@@ -159,7 +159,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="fixed inset-0 overflow-y-auto bg-background">
+    <div className="fixed inset-0 overflow-y-auto bg-background" role="main" aria-label="Register">
       <div className="w-full max-w-md mx-auto p-4 py-8">
         <div className="flex flex-col items-center mb-8">
           <div className="h-16 mb-4 flex items-center justify-center" data-testid="img-register-logo">
@@ -181,7 +181,7 @@ export default function RegisterPage() {
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" aria-label="Registration form">
                 <div className="rounded-md bg-muted/50 p-3 text-sm text-muted-foreground" data-testid="text-invite-info">
                   <p>Company: <strong className="text-foreground">{inviteData.companyName}</strong></p>
                   <p>Email: <strong className="text-foreground">{inviteData.email}</strong></p>
@@ -197,6 +197,7 @@ export default function RegisterPage() {
                         <Input
                           placeholder="Enter your full name"
                           autoComplete="name"
+                          aria-required="true"
                           data-testid="input-register-name"
                           {...field}
                         />
@@ -217,6 +218,7 @@ export default function RegisterPage() {
                           type="tel"
                           placeholder="Enter your phone number"
                           autoComplete="tel"
+                          aria-required="true"
                           data-testid="input-register-phone"
                           {...field}
                         />
@@ -236,6 +238,7 @@ export default function RegisterPage() {
                         <Input
                           placeholder="Enter your address"
                           autoComplete="street-address"
+                          aria-required="true"
                           data-testid="input-register-address"
                           {...field}
                         />
@@ -257,6 +260,7 @@ export default function RegisterPage() {
                             type={showPassword ? "text" : "password"}
                             placeholder="Create a password (min 6 characters)"
                             autoComplete="new-password"
+                            aria-required="true"
                             data-testid="input-register-password"
                             {...field}
                           />
@@ -293,6 +297,7 @@ export default function RegisterPage() {
                             type={showConfirmPassword ? "text" : "password"}
                             placeholder="Confirm your password"
                             autoComplete="new-password"
+                            aria-required="true"
                             data-testid="input-register-confirm-password"
                             {...field}
                           />

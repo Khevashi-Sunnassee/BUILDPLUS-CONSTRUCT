@@ -1013,7 +1013,7 @@ export default function ManualEntryPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="main" aria-label="Manual Entry">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" onClick={() => logIdFromUrl ? navigate(`/daily-reports/${logIdFromUrl}`) : navigate("/daily-reports")} data-testid="button-back">
           <ArrowLeft className="h-4 w-4" />

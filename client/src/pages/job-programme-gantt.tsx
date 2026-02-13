@@ -297,7 +297,7 @@ export function ProgrammeGanttChart({
   }, [sortedEntries]);
 
   return (
-    <div className="border rounded-md bg-card" data-testid="programme-gantt-chart">
+    <div className="border rounded-md bg-card" data-testid="programme-gantt-chart" role="main" aria-label="Job Programme Gantt">
       <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
         <span className="text-sm font-medium text-muted-foreground">
           Programme Gantt Chart

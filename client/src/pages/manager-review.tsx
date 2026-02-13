@@ -123,7 +123,7 @@ export default function ManagerReviewPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Manager Review">
         <Skeleton className="h-8 w-48" />
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -135,7 +135,7 @@ export default function ManagerReviewPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Manager Review">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <h1 className="text-2xl font-bold tracking-tight" data-testid="text-manager-review-title">

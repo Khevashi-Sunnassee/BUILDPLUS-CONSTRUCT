@@ -1406,7 +1406,7 @@ export default function BroadcastPage() {
   const [activeTab, setActiveTab] = useState("send");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Broadcast">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <div className="flex items-center gap-2">

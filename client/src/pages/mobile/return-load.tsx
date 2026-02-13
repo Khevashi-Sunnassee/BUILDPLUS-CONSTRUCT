@@ -158,7 +158,7 @@ export default function MobileReturnLoadPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Return Load">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-2 px-4 py-4">
           <Link href="/mobile/logistics">
@@ -197,6 +197,7 @@ export default function MobileReturnLoadPage() {
               value={selectedLoadListId}
               onChange={(e) => setSelectedLoadListId(e.target.value)}
               className="w-full rounded-xl bg-white/5 border border-white/10 text-white px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+              aria-required="true"
               data-testid="select-load-list"
             >
               <option value="" className="bg-[#0D1117]">Select a completed load list...</option>
@@ -267,6 +268,7 @@ export default function MobileReturnLoadPage() {
                   onChange={(e) => setReturnReason(e.target.value)}
                   rows={3}
                   className="w-full rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/20 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-orange-500/50"
+                  aria-required="true"
                   data-testid="input-return-reason"
                 />
               </FormRow>

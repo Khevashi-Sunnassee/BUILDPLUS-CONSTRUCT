@@ -408,7 +408,7 @@ export default function AdminCostCodesPage() {
   const totalChildren = costCodesWithChildren?.reduce((sum, cc) => sum + cc.children.length, 0) || 0;
 
   return (
-    <div className="p-4 space-y-4 max-w-6xl mx-auto" data-testid="admin-cost-codes-page">
+    <div className="p-4 space-y-4 max-w-6xl mx-auto" role="main" aria-label="Cost Codes Management" data-testid="admin-cost-codes-page">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold" data-testid="text-page-title">Cost Codes</h1>

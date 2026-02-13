@@ -1415,7 +1415,7 @@ export default function ProductionSlotsPage() {
   }, [groupBy, slots.length]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Production Slots">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

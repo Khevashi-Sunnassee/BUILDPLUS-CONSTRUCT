@@ -55,7 +55,7 @@ export default function PublicBundlePage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="min-h-screen flex items-center justify-center bg-background" role="main" aria-label="Public Bundle">
         <div className="text-center space-y-4">
           <Loader2 className="h-12 w-12 animate-spin mx-auto text-primary" />
           <p className="text-muted-foreground">Loading bundle...</p>
@@ -66,7 +66,7 @@ export default function PublicBundlePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" role="main" aria-label="Public Bundle">
         <Alert variant="destructive" className="max-w-md">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Bundle Unavailable</AlertTitle>
@@ -80,7 +80,7 @@ export default function PublicBundlePage() {
 
   if (!bundle) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4" role="main" aria-label="Public Bundle">
         <Alert className="max-w-md">
           <Clock className="h-4 w-4" />
           <AlertTitle>Bundle Not Found</AlertTitle>
@@ -93,7 +93,7 @@ export default function PublicBundlePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background py-8 px-4">
+    <div className="min-h-screen bg-background py-8 px-4" role="main" aria-label="Public Bundle">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center space-y-2">
           <div className="flex justify-center">

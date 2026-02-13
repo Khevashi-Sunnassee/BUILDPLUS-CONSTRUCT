@@ -69,7 +69,7 @@ export default function PanelDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Panel Details">
         <Skeleton className="h-12 w-64" />
         <Skeleton className="h-48 w-full" />
         <Skeleton className="h-48 w-full" />
@@ -79,7 +79,7 @@ export default function PanelDetailsPage() {
 
   if (error || !panel) {
     return (
-      <div className="text-center py-12" data-testid="panel-not-found">
+      <div className="text-center py-12" data-testid="panel-not-found" role="main" aria-label="Panel Details">
         <Package className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
         <h1 className="text-2xl font-bold mb-2" data-testid="text-error-title">Panel Not Found</h1>
         <p className="text-muted-foreground" data-testid="text-error-message">The panel you're looking for doesn't exist or has been removed.</p>
@@ -88,7 +88,7 @@ export default function PanelDetailsPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="panel-details-page">
+    <div className="space-y-6" data-testid="panel-details-page" role="main" aria-label="Panel Details">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2" data-testid="text-panel-mark">

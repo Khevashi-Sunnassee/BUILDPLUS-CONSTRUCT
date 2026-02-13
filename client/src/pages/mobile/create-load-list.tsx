@@ -262,7 +262,7 @@ export default function MobileCreateLoadListPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Create Load List">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-2 px-4 py-4">
           <Link href="/mobile/logistics">
@@ -407,6 +407,7 @@ export default function MobileCreateLoadListPage() {
               value={selectedJobId}
               onChange={(e) => setSelectedJobId(e.target.value)}
               className="w-full rounded-xl bg-white/5 border border-white/10 text-white px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50"
+              aria-required="true"
               data-testid="select-job"
             >
               <option value="" className="bg-[#0D1117]">Select job...</option>
@@ -468,6 +469,7 @@ export default function MobileCreateLoadListPage() {
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
                 className="rounded-xl bg-white/5 border-white/10 text-white"
+                aria-required="true"
                 data-testid="input-scheduled-date"
               />
             </div>

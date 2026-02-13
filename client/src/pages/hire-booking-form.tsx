@@ -387,7 +387,7 @@ export default function HireBookingFormPage() {
 
   if (!isNew && bookingLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4" role="main" aria-label="Hire Booking Form" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[600px] w-full" />
       </div>
@@ -395,7 +395,7 @@ export default function HireBookingFormPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto hire-booking-print-area">
+    <div className="p-6 space-y-6 max-w-5xl mx-auto hire-booking-print-area" role="main" aria-label="Hire Booking Form">
       <div className="flex items-center gap-4 flex-wrap no-print">
         <Button variant="ghost" size="icon" onClick={() => navigate("/hire-bookings")} data-testid="button-back-hire">
           <ArrowLeft className="h-4 w-4" />
@@ -471,7 +471,7 @@ export default function HireBookingFormPage() {
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" aria-label="Hire booking form">
           <Card>
             <CardHeader>
               <CardTitle>Booking Details</CardTitle>
@@ -626,6 +626,7 @@ export default function HireBookingFormPage() {
                         {...field}
                         placeholder="Describe the equipment to be hired"
                         disabled={!canEdit}
+                        aria-required="true"
                         data-testid="input-equipment-description"
                       />
                     </FormControl>
@@ -920,6 +921,7 @@ export default function HireBookingFormPage() {
                           step="0.01"
                           placeholder="0.00"
                           disabled={!canEdit}
+                          aria-required="true"
                           data-testid="input-rate-amount"
                         />
                       </FormControl>
@@ -964,6 +966,7 @@ export default function HireBookingFormPage() {
                           value={field.value}
                           onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 1)}
                           disabled={!canEdit}
+                          aria-required="true"
                           data-testid="input-quantity"
                         />
                       </FormControl>

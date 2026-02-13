@@ -687,7 +687,7 @@ export default function AdminItemsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Items Management">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -695,7 +695,7 @@ export default function AdminItemsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Items Management">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

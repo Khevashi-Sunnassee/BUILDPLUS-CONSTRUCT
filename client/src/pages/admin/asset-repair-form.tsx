@@ -147,7 +147,7 @@ export default function AssetRepairFormPage() {
 
   if (assetLoading || editLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6" role="main" aria-label="Asset Repair Form" aria-busy="true">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -155,7 +155,7 @@ export default function AssetRepairFormPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" role="main" aria-label="Asset Repair Form">
       <div className="flex flex-wrap items-center gap-4">
         <Button
           variant="ghost"
@@ -245,6 +245,7 @@ export default function AssetRepairFormPage() {
                 value={formData.title}
                 onChange={(e) => update("title", e.target.value)}
                 placeholder="e.g. Engine oil leak repair"
+                aria-required="true"
                 data-testid="input-title"
               />
             </div>
@@ -271,6 +272,7 @@ export default function AssetRepairFormPage() {
               onChange={(e) => update("issueDescription", e.target.value)}
               placeholder="Describe the issue or reason for service..."
               rows={4}
+              aria-required="true"
               data-testid="input-issue-description"
             />
           </div>

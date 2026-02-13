@@ -1185,7 +1185,7 @@ export default function PurchaseOrderFormPage() {
 
   if (!isNew && loadingPO) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Purchase Order Form" aria-busy="true">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -1193,7 +1193,7 @@ export default function PurchaseOrderFormPage() {
   }
 
   return (
-    <div className="space-y-6 print:max-w-none">
+    <div className="space-y-6 print:max-w-none" role="main" aria-label="Purchase Order Form">
       <div className="flex items-center gap-4 print:hidden">
         <Button 
           variant="ghost" 
@@ -1327,7 +1327,7 @@ export default function PurchaseOrderFormPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Form {...form}>
+          <Form {...form} aria-label="Purchase order form">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4">
                 <div>
@@ -1470,6 +1470,7 @@ export default function PurchaseOrderFormPage() {
                       value={form.watch("projectName") || ""}
                       onChange={(e) => form.setValue("projectName", e.target.value)}
                       placeholder="Enter project name"
+                      aria-required="true"
                       data-testid="input-project-name"
                     />
                   ) : (
@@ -1540,6 +1541,7 @@ export default function PurchaseOrderFormPage() {
                       onChange={(e) => form.setValue("deliveryAddress", e.target.value)}
                       placeholder="Enter delivery address"
                       className="min-h-[80px]"
+                      aria-required="true"
                       data-testid="textarea-delivery-address"
                     />
                   ) : (

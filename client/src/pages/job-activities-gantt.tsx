@@ -366,7 +366,7 @@ export function GanttChart({
   }, [orderedActivities, timelineStart, timelineEnd, totalDays, dayWidth, months, weeks, jobTitle]);
 
   return (
-    <div className="border rounded-md bg-background overflow-hidden flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 400 }} data-testid="gantt-chart">
+    <div className="border rounded-md bg-background overflow-hidden flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 400 }} data-testid="gantt-chart" role="main" aria-label="Job Activities Gantt">
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b flex-shrink-0">
         <span className="text-xs font-medium text-muted-foreground">
           {format(timelineStart, "MMM yyyy")} &ndash; {format(timelineEnd, "MMM yyyy")}

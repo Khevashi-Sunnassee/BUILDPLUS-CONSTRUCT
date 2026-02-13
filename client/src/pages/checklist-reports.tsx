@@ -167,7 +167,7 @@ export default function ChecklistReportsPage() {
 
   if (summaryLoading || instancesLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Checklist Reports">
         <Skeleton className="h-8 w-64 mb-6" />
         <div className="grid gap-4 md:grid-cols-4 mb-6">
           {[1, 2, 3, 4].map((i) => (
@@ -179,7 +179,7 @@ export default function ChecklistReportsPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="page-checklist-reports">
+    <div className="space-y-6" data-testid="page-checklist-reports" role="main" aria-label="Checklist Reports">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-2">

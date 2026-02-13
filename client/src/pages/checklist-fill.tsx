@@ -132,7 +132,7 @@ export default function ChecklistFillPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Checklist Fill">
         <Skeleton className="h-8 w-64 mb-4" />
         <Skeleton className="h-[600px] w-full" />
       </div>
@@ -141,7 +141,7 @@ export default function ChecklistFillPage() {
 
   if (!instance || !template) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Checklist Fill">
         <Card className="p-8 text-center">
           <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-lg font-medium mb-2">Checklist Not Found</h3>
@@ -160,7 +160,7 @@ export default function ChecklistFillPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Checklist Fill">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild data-testid="button-back">

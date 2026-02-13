@@ -797,7 +797,7 @@ export default function ProcurementReoSchedulingPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-4" data-testid="procurement-reo-loading">
+      <div className="space-y-4" data-testid="procurement-reo-loading" role="main" aria-label="Procurement REO Scheduling">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
@@ -806,7 +806,7 @@ export default function ProcurementReoSchedulingPage() {
   }
 
   return (
-    <div className="space-y-6" data-testid="procurement-reo-scheduling-page">
+    <div className="space-y-6" data-testid="procurement-reo-scheduling-page" role="main" aria-label="Procurement REO Scheduling">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

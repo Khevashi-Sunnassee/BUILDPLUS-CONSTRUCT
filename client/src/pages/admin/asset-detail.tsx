@@ -379,7 +379,7 @@ export default function AssetDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-4">
+      <div className="p-6 space-y-4" role="main" aria-label="Asset Detail">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -388,7 +388,7 @@ export default function AssetDetailPage() {
 
   if (!asset) {
     return (
-      <div className="p-6">
+      <div className="p-6" role="main" aria-label="Asset Detail">
         <p className="text-muted-foreground">Asset not found.</p>
         <Button
           variant="outline"
@@ -406,7 +406,7 @@ export default function AssetDetailPage() {
   const photos = Array.isArray(asset.photos) ? asset.photos : [];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" role="main" aria-label="Asset Detail">
       <div className="flex flex-wrap items-center gap-4">
         <Button
           variant="ghost"

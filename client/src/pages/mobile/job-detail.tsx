@@ -115,7 +115,7 @@ export default function MobileJobDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white">
+      <div className="flex flex-col h-screen bg-[#070B12] text-white" role="main" aria-label="Mobile Job Detail">
         <div className="flex-shrink-0 border-b border-white/10 px-4 py-4" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
           <Skeleton className="h-8 w-48 bg-white/10" />
         </div>
@@ -129,7 +129,7 @@ export default function MobileJobDetailPage() {
 
   if (!job) {
     return (
-      <div className="flex flex-col h-screen bg-[#070B12] text-white items-center justify-center">
+      <div className="flex flex-col h-screen bg-[#070B12] text-white items-center justify-center" role="main" aria-label="Mobile Job Detail">
         <p className="text-white/60">Job not found</p>
         <Button variant="outline" className="mt-4 border-white/20 text-white" onClick={() => setLocation("/mobile/jobs")}>
           Back to Jobs
@@ -145,7 +145,7 @@ export default function MobileJobDetailPage() {
   ];
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Job Detail">
       <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-2 px-4 py-3">
           <Button
