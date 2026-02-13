@@ -2492,6 +2492,8 @@ function compareRevisions(a: string, b: string): number {
 }
 
 router.post("/api/documents/drawing-package/register", requireAuth, drawingPackageUpload.single("file"), async (req: Request, res: Response) => {
+  req.setTimeout(600000);
+  res.setTimeout(600000);
   try {
     const file = req.file;
     if (!file) {
@@ -2588,7 +2590,7 @@ print(json.dumps(extracted))
         let supersedeDocId: string | null = null;
         if (drawing.action === "supersede" && drawing.conflictDocumentId) {
           supersedeDocId = drawing.conflictDocumentId;
-          await storage.updateDocument(supersedeDocId, {
+          await storage.updateDocument(supersedeDocId as string, {
             status: "SUPERSEDED",
             isLatestVersion: false,
           });
@@ -2622,9 +2624,9 @@ print(json.dumps(extracted))
           drawingNumber: drawing.drawingNumber,
           title: drawing.title,
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         logger.error({ err, pageNumber: drawing.pageNumber }, "Error registering drawing page");
-        results.push({ pageNumber: drawing.pageNumber, status: "error", error: err.message });
+        results.push({ pageNumber: drawing.pageNumber, status: "error", error: err instanceof Error ? err.message : String(err) });
       }
     }
 
