@@ -143,6 +143,8 @@ const MobileJobDetailPage = lazyWithRetry(() => import("@/pages/mobile/job-detai
 const MobilePmCallLogsPage = lazyWithRetry(() => import("@/pages/mobile/pm-call-logs"));
 const MobilePmCallLogFormPage = lazyWithRetry(() => import("@/pages/mobile/pm-call-log-form"));
 const MobilePmCallLogDetailPage = lazyWithRetry(() => import("@/pages/mobile/pm-call-log-detail"));
+const MobileHireBookingsPage = lazyWithRetry(() => import("@/pages/mobile/hire-bookings"));
+const MobileHireBookingFormPage = lazyWithRetry(() => import("@/pages/mobile/hire-booking-form"));
 const PhotoGalleryPage = lazyWithRetry(() => import("@/pages/photo-gallery"));
 const SalesPipelinePage = lazyWithRetry(() => import("@/pages/sales-pipeline"));
 const HelpCenterPage = lazyWithRetry(() => import("@/pages/help-center"));
@@ -1024,6 +1026,16 @@ function Router() {
       <Route path="/mobile/pm-call-logs">
         <ProtectedRoute>
           <MobilePmCallLogsPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/hire-bookings/new">
+        <ProtectedRoute>
+          <MobileHireBookingFormPage />
+        </ProtectedRoute>
+      </Route>
+      <Route path="/mobile/hire-bookings">
+        <ProtectedRoute>
+          <MobileHireBookingsPage />
         </ProtectedRoute>
       </Route>
 

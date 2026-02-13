@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { CHAT_ROUTES, TASKS_ROUTES, ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, LOGISTICS_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { CHAT_ROUTES, TASKS_ROUTES, ADMIN_ROUTES, JOBS_ROUTES, PANELS_ROUTES, LOGISTICS_ROUTES, PROCUREMENT_ROUTES, HIRE_ROUTES } from "@shared/api-routes";
 import type { GlobalSettings } from "@shared/schema";
 import {
   ListTodo,
@@ -16,6 +16,7 @@ import {
   FolderOpen,
   ClipboardCheck,
   ImageIcon,
+  Package,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -142,6 +143,7 @@ export default function MobileDashboard() {
   const showPanels = !isHidden("panels");
   const showLogistics = !isHidden("logistics");
   const showPOs = !isHidden("purchase-orders");
+  const showHireBookings = !isHidden("hire_bookings");
   const showDocuments = !isHidden("documents");
   const showChecklists = !isHidden("checklists");
 
@@ -173,6 +175,11 @@ export default function MobileDashboard() {
   const { data: purchaseOrders = [] } = useQuery<PurchaseOrder[]>({
     queryKey: [PROCUREMENT_ROUTES.PURCHASE_ORDERS],
     enabled: showPOs,
+  });
+
+  const { data: hireBookings = [] } = useQuery<{ id: string; status: string }[]>({
+    queryKey: [HIRE_ROUTES.LIST],
+    enabled: showHireBookings,
   });
 
   const { data: globalSettings } = useQuery<GlobalSettings>({
@@ -307,6 +314,15 @@ export default function MobileDashboard() {
               label="Purchase Orders"
               count={purchaseOrders.length}
               href="/mobile/purchase-orders"
+            />
+          )}
+          {showHireBookings && (
+            <NavRow
+              icon={<Package className="h-5 w-5 text-amber-400" />}
+              iconBg="bg-amber-500/20"
+              label="Hire Equipment"
+              count={hireBookings.filter(b => ["ON_HIRE", "PICKED_UP", "BOOKED"].includes(b.status)).length}
+              href="/mobile/hire-bookings"
             />
           )}
           {showDocuments && (
