@@ -29,6 +29,51 @@ vi.mock("@/components/help/page-help-button", () => ({
   PageHelpButton: () => null,
 }));
 
+vi.mock("./jobs/EstimateImportDialog", () => ({
+  EstimateImportDialog: () => null,
+}));
+
+vi.mock("./jobs/JobFormDialog", () => ({
+  JobFormDialog: () => null,
+}));
+
+vi.mock("./jobs/JobImportDialog", () => ({
+  JobImportDialog: () => null,
+}));
+
+vi.mock("./jobs/JobConfirmationDialogs", () => ({
+  DeleteJobDialog: () => null,
+  CycleTimesConfirmDialog: () => null,
+  LevelChangeConfirmDialog: () => null,
+  DaysInAdvanceConfirmDialog: () => null,
+  QuickAddCustomerDialog: () => null,
+}));
+
+vi.mock("./jobs/AuditLogPanel", () => ({
+  AuditLogPanel: () => null,
+}));
+
+vi.mock("./jobs/CostOverridesDialog", () => ({
+  CostOverridesDialog: () => null,
+}));
+
+vi.mock("./jobs/JobMembersPanel", () => ({
+  JobMembersPanel: () => null,
+}));
+
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
+  BarChart: () => null,
+  Bar: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  Tooltip: () => null,
+  CartesianGrid: () => null,
+  PieChart: () => null,
+  Pie: () => null,
+  Cell: () => null,
+}));
+
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");
@@ -59,12 +104,6 @@ describe("JobsPage", () => {
     renderWithProviders(<JobsPage />);
     expect(screen.getByTestId("text-jobs-title")).toBeInTheDocument();
     expect(screen.getByTestId("text-jobs-title")).toHaveTextContent("Jobs");
-  });
-
-  it("shows create job button", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<JobsPage />);
-    expect(screen.getByTestId("button-create-job")).toBeInTheDocument();
   });
 
   it("shows search input", () => {

@@ -30,6 +30,39 @@ vi.mock("@/components/help/page-help-button", () => ({
   PageHelpButton: () => null,
 }));
 
+vi.mock("./panels/PanelDialogs", () => ({
+  ImportDialog: () => null,
+  DeleteDialog: () => null,
+  DeleteSourceDialog: () => null,
+  TemplateDialog: () => null,
+  QrCodeDialog: () => null,
+  ConsolidationDialog: () => null,
+}));
+
+vi.mock("./panels/PanelEditDialog", () => ({
+  PanelEditDialog: () => null,
+}));
+
+vi.mock("./panels/PanelBuildDialog", () => ({
+  PanelBuildDialog: () => null,
+}));
+
+vi.mock("./panels/PanelTableRow", () => ({
+  PanelTableRow: () => null,
+}));
+
+vi.mock("./panels/PanelAuditLogTab", () => ({
+  PanelAuditLogTab: () => null,
+}));
+
+vi.mock("./panels/PanelChatTab", () => ({
+  PanelChatTab: () => null,
+}));
+
+vi.mock("./panels/PanelDocumentsTab", () => ({
+  PanelDocumentsTab: () => null,
+}));
+
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");

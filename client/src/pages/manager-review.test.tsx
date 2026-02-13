@@ -1,12 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/test-utils";
-import DevicesPage from "./devices";
+import ManagerReviewPage from "./manager-review";
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/admin/devices", vi.fn()],
+  useLocation: () => ["/manager-review", vi.fn()],
   Link: ({ children, href, ...props }: any) => <a href={href} {...props}>{children}</a>,
-  useRoute: () => [false, {}],
+  useSearch: () => "",
+  useParams: () => ({ id: "1" }),
+  useRoute: () => [true, { id: "1" }],
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -29,41 +31,39 @@ vi.mock("@/components/help/page-help-button", () => ({
   PageHelpButton: () => null,
 }));
 
+vi.mock("@/hooks/use-toast", () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}));
+
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");
   return {
     ...actual,
     useQuery: (...args: any[]) => mockUseQuery(...args),
+    useQueryClient: () => ({ invalidateQueries: vi.fn(), setQueryData: vi.fn() }),
     useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }),
   };
 });
 
-describe("DevicesPage", () => {
-  it("shows loading skeleton when data is loading", () => {
+describe("ManagerReviewPage", () => {
+  it("shows loading skeleton state", () => {
     mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
-    renderWithProviders(<DevicesPage />);
-    const skeletons = document.querySelectorAll(".animate-pulse");
+    const { container } = renderWithProviders(<ManagerReviewPage />);
+    const skeletons = container.querySelectorAll(".animate-pulse");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("shows page title", () => {
+  it("renders the page title when loaded", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("text-devices-title")).toBeInTheDocument();
-    expect(screen.getByTestId("text-devices-title")).toHaveTextContent("Device Management");
+    renderWithProviders(<ManagerReviewPage />);
+    expect(screen.getByTestId("text-manager-review-title")).toHaveTextContent("Manager Review");
   });
 
-  it("shows add device button", () => {
+  it("shows empty state when no logs pending", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("button-add-device")).toBeInTheDocument();
-  });
-
-  it("renders table headers", () => {
-    mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByText("Device")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
+    renderWithProviders(<ManagerReviewPage />);
+    expect(screen.getByText("All caught up!")).toBeInTheDocument();
+    expect(screen.getByText("No logs pending review")).toBeInTheDocument();
   });
 });

@@ -55,3 +55,38 @@ The frontend features a KPI Dashboard with data visualization, PDF export capabi
 - **connect-pg-simple**: PostgreSQL-backed session store.
 - **Vitest**: Testing framework.
 - **ExcelJS**: Excel file generation library.
+
+## Coding Standards
+
+### Accessibility
+- All pages must have `role="main"` with a descriptive `aria-label`.
+- All interactive elements (buttons, inputs, links) must have `aria-label` or visible label text.
+- Forms must use `aria-required` on required fields and `aria-invalid` on validation errors.
+- Loading states must use `aria-busy="true"` and live regions (`aria-live="polite"`) for status updates.
+- Decorative icons must have `aria-hidden="true"`; informational icons need `aria-label`.
+- Navigation landmarks must use `<nav>` with `aria-label` differentiating multiple navs.
+- Error alerts must use `role="alert"` and `aria-live="assertive"`.
+- ESLint enforces a11y rules via `eslint-plugin-jsx-a11y` in `eslint.config.js`.
+
+### Frontend Testing
+- All new components must have a co-located `.test.tsx` file using React Testing Library + Vitest.
+- Config: `vitest.config.frontend.ts` with jsdom environment; shared test utilities in `client/src/test/test-utils.tsx`.
+- Tests must cover: rendering, user interactions, error states, and accessibility (ARIA attributes).
+- Every interactive element must have a `data-testid` attribute for test targeting.
+- Run frontend tests: `npx vitest --config vitest.config.frontend.ts --run`.
+- Current coverage: 120 test files, 510 tests covering all pages (admin, core workflow, mobile, forms/details) and shared components.
+- Test pattern: mock wouter, @/lib/auth, @/hooks/use-mobile, @/hooks/use-document-title; use renderWithProviders; verify role/aria-label/aria-busy/data-testid.
+
+### Database Integrity
+- All monetary/quantity columns must have CHECK constraints (e.g., `CHECK (amount >= 0)`).
+- Rate fields (tax, retention) must be bounded: `CHECK (rate >= 0 AND rate <= 100)`.
+- Business-unique fields must have UNIQUE constraints (e.g., customer name + company).
+- New tables must define constraints in both Drizzle schema and as raw SQL migration.
+- Current counts: 54+ check constraints across 16 tables, 13 unique constraints, 203 unique indexes.
+
+### Developer Experience
+- Environment variables documented in `.env.example` with descriptions.
+- ESLint config in `eslint.config.js` with TypeScript, security, and 11 accessibility rules.
+- Quality check script: `bash scripts/quality-check.sh` (runs ESLint + frontend tests + TypeScript check).
+- Stale chunk handling: All lazy imports use `lazyWithRetry` to auto-reload after deployments.
+- Commit messages should reference the feature area (e.g., `[budget] Add cost code import`).

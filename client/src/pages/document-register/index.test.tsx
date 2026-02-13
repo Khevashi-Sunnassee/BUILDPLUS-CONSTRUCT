@@ -1,17 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/test-utils";
-import DevicesPage from "./devices";
+import DocumentRegister from "./index";
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/admin/devices", vi.fn()],
+  useLocation: () => ["/documents", vi.fn()],
   Link: ({ children, href, ...props }: any) => <a href={href} {...props}>{children}</a>,
   useRoute: () => [false, {}],
 }));
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: "1", name: "Test User", email: "test@test.com", role: "admin" },
+    user: { id: "1", name: "Test User", email: "test@test.com", role: "ADMIN" },
     login: vi.fn(),
     logout: vi.fn(),
   }),
@@ -39,31 +39,29 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
-describe("DevicesPage", () => {
-  it("shows loading skeleton when data is loading", () => {
-    mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
-    renderWithProviders(<DevicesPage />);
-    const skeletons = document.querySelectorAll(".animate-pulse");
-    expect(skeletons.length).toBeGreaterThan(0);
+describe("DocumentRegister (subfolder index)", () => {
+  it("renders page with testid", () => {
+    mockUseQuery.mockReturnValue({ data: undefined, isLoading: false });
+    renderWithProviders(<DocumentRegister />);
+    expect(screen.getByTestId("document-register-page")).toBeInTheDocument();
   });
 
-  it("shows page title", () => {
+  it("renders page title Document Register", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("text-devices-title")).toBeInTheDocument();
-    expect(screen.getByTestId("text-devices-title")).toHaveTextContent("Device Management");
+    renderWithProviders(<DocumentRegister />);
+    expect(screen.getByTestId("text-page-title")).toHaveTextContent("Document Register");
   });
 
-  it("shows add device button", () => {
+  it("renders with role main", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("button-add-device")).toBeInTheDocument();
+    renderWithProviders(<DocumentRegister />);
+    const main = screen.getByRole("main");
+    expect(main).toHaveAttribute("aria-label", "Document Register");
   });
 
-  it("renders table headers", () => {
+  it("shows upload document button", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByText("Device")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
+    renderWithProviders(<DocumentRegister />);
+    expect(screen.getByTestId("button-upload-document")).toBeInTheDocument();
   });
 });

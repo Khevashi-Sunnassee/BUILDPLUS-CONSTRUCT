@@ -1,17 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/test-utils";
-import DevicesPage from "./devices";
+import AdminPanelsPage from "./index";
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/admin/devices", vi.fn()],
+  useLocation: () => ["/admin/panels", vi.fn()],
+  useSearch: () => "",
   Link: ({ children, href, ...props }: any) => <a href={href} {...props}>{children}</a>,
   useRoute: () => [false, {}],
 }));
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: "1", name: "Test User", email: "test@test.com", role: "admin" },
+    user: { id: "1", name: "Test User", email: "test@test.com", role: "ADMIN" },
     login: vi.fn(),
     logout: vi.fn(),
   }),
@@ -39,31 +40,31 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
-describe("DevicesPage", () => {
-  it("shows loading skeleton when data is loading", () => {
+describe("AdminPanelsPage (subfolder index)", () => {
+  it("shows loading state when data is loading", () => {
     mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
-    renderWithProviders(<DevicesPage />);
+    renderWithProviders(<AdminPanelsPage />);
     const skeletons = document.querySelectorAll(".animate-pulse");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("shows page title", () => {
+  it("renders panel register heading", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("text-devices-title")).toBeInTheDocument();
-    expect(screen.getByTestId("text-devices-title")).toHaveTextContent("Device Management");
+    renderWithProviders(<AdminPanelsPage />);
+    expect(screen.getByText("Panel Register")).toBeInTheDocument();
   });
 
-  it("shows add device button", () => {
+  it("renders with role main", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("button-add-device")).toBeInTheDocument();
+    renderWithProviders(<AdminPanelsPage />);
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
   });
 
-  it("renders table headers", () => {
+  it("shows search input for filtering panels", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByText("Device")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
+    renderWithProviders(<AdminPanelsPage />);
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    expect(searchInput).toBeInTheDocument();
   });
 });

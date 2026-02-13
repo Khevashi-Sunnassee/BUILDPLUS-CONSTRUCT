@@ -1,17 +1,17 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/test-utils";
-import DevicesPage from "./devices";
+import AdminJobsPage from "./index";
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/admin/devices", vi.fn()],
+  useLocation: () => ["/admin/jobs", vi.fn()],
   Link: ({ children, href, ...props }: any) => <a href={href} {...props}>{children}</a>,
   useRoute: () => [false, {}],
 }));
 
 vi.mock("@/lib/auth", () => ({
   useAuth: () => ({
-    user: { id: "1", name: "Test User", email: "test@test.com", role: "admin" },
+    user: { id: "1", name: "Test User", email: "test@test.com", role: "ADMIN" },
     login: vi.fn(),
     logout: vi.fn(),
   }),
@@ -29,6 +29,21 @@ vi.mock("@/components/help/page-help-button", () => ({
   PageHelpButton: () => null,
 }));
 
+vi.mock("./EstimateImportDialog", () => ({
+  EstimateImportDialog: () => null,
+}));
+
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }: any) => <div>{children}</div>,
+  BarChart: ({ children }: any) => <div>{children}</div>,
+  Bar: () => null,
+  XAxis: () => null,
+  YAxis: () => null,
+  CartesianGrid: () => null,
+  Tooltip: () => null,
+  Legend: () => null,
+}));
+
 const mockUseQuery = vi.fn();
 vi.mock("@tanstack/react-query", async () => {
   const actual = await vi.importActual("@tanstack/react-query");
@@ -39,31 +54,31 @@ vi.mock("@tanstack/react-query", async () => {
   };
 });
 
-describe("DevicesPage", () => {
-  it("shows loading skeleton when data is loading", () => {
+describe("AdminJobsPage (subfolder index)", () => {
+  it("shows loading skeletons when data is loading", () => {
     mockUseQuery.mockReturnValue({ data: undefined, isLoading: true });
-    renderWithProviders(<DevicesPage />);
+    renderWithProviders(<AdminJobsPage />);
     const skeletons = document.querySelectorAll(".animate-pulse");
     expect(skeletons.length).toBeGreaterThan(0);
   });
 
-  it("shows page title", () => {
+  it("renders page heading with Jobs text", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("text-devices-title")).toBeInTheDocument();
-    expect(screen.getByTestId("text-devices-title")).toHaveTextContent("Device Management");
+    renderWithProviders(<AdminJobsPage />);
+    expect(screen.getByText("Jobs")).toBeInTheDocument();
   });
 
-  it("shows add device button", () => {
+  it("renders with role main", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByTestId("button-add-device")).toBeInTheDocument();
+    renderWithProviders(<AdminJobsPage />);
+    const main = screen.getByRole("main");
+    expect(main).toBeInTheDocument();
   });
 
-  it("renders table headers", () => {
+  it("shows search input for filtering jobs", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
-    renderWithProviders(<DevicesPage />);
-    expect(screen.getByText("Device")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
+    renderWithProviders(<AdminJobsPage />);
+    const searchInput = screen.getByPlaceholderText(/search/i);
+    expect(searchInput).toBeInTheDocument();
   });
 });
