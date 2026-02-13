@@ -2098,6 +2098,8 @@ const drawingPackageUpload = multer({
 });
 
 router.post("/api/documents/drawing-package/analyze", requireAuth, drawingPackageUpload.single("file"), async (req: Request, res: Response) => {
+  req.setTimeout(300000);
+  res.setTimeout(300000);
   try {
     const file = req.file;
     if (!file) {
@@ -2364,7 +2366,7 @@ CRITICAL RULES:
         return page;
       };
 
-      const CONCURRENCY = 5;
+      const CONCURRENCY = 10;
       const pages = analysisResult.pages;
       for (let i = 0; i < pages.length; i += CONCURRENCY) {
         const batch = pages.slice(i, i + CONCURRENCY);

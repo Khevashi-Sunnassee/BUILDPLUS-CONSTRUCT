@@ -94,6 +94,9 @@ app.use('/download-files', express.static(downloadsPath), serveIndex(downloadsPa
 const chatUploadsPath = path.join(process.cwd(), 'uploads', 'chat');
 app.use('/uploads/chat', express.static(chatUploadsPath));
 const httpServer = createServer(app);
+httpServer.timeout = 300000;
+httpServer.keepAliveTimeout = 300000;
+httpServer.headersTimeout = 310000;
 
 declare module "http" {
   interface IncomingMessage {
