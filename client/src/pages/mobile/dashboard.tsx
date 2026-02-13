@@ -239,7 +239,7 @@ export default function MobileDashboard() {
 
       <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4" aria-busy={isLoading}>
         {isLoading ? (
-          <div className="grid grid-cols-4 gap-2" data-testid="skeleton-stats" aria-label="Loading statistics">
+          <div className="grid grid-cols-2 gap-2" data-testid="skeleton-stats" aria-label="Loading statistics">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <Skeleton className="h-8 w-12 bg-white/10" />
@@ -249,7 +249,7 @@ export default function MobileDashboard() {
             ))}
           </div>
         ) : statCards.length > 0 ? (
-          <div className={`grid gap-2`} style={{ gridTemplateColumns: `repeat(${Math.min(statCards.length, 4)}, 1fr)` }}>
+          <div className="grid grid-cols-2 gap-2">
             {statCards}
           </div>
         ) : null}
