@@ -8,6 +8,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { InsertItem, constructionStages } from "@shared/schema";
 import logger from "../lib/logger";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 
 const router = Router();
 
@@ -881,14 +882,23 @@ router.post("/purchase-orders/:id/send-with-pdf", requireAuth, async (req, res) 
     }];
 
     let bcc: string | undefined;
-    if (sendCopy && req.session.userId) {
+    let senderName = "A team member";
+    if (req.session.userId) {
       const currentUser = await storage.getUser(req.session.userId);
-      if (currentUser?.email) {
+      if (sendCopy && currentUser?.email) {
         bcc = currentUser.email;
+      }
+      if (currentUser) {
+        senderName = currentUser.name || currentUser.email;
       }
     }
 
-    const htmlBody = message.replace(/\n/g, "<br>");
+    const htmlBody = await buildBrandedEmail({
+      title: `Purchase Order: ${po.poNumber || "PO"}`,
+      subtitle: `Sent by ${senderName}`,
+      body: message.replace(/\n/g, "<br>"),
+      footerNote: "Please review the attached purchase order. If you have any questions, reply directly to this email.",
+    });
 
     const result = await emailService.sendEmailWithAttachment({
       to,
@@ -961,14 +971,23 @@ router.post("/api/purchase-orders/:id/send-email", requireAuth, async (req, res)
     }
 
     let bcc: string | undefined;
-    if (sendCopy && req.session.userId) {
+    let senderName = "A team member";
+    if (req.session.userId) {
       const currentUser = await storage.getUser(req.session.userId);
-      if (currentUser?.email) {
+      if (sendCopy && currentUser?.email) {
         bcc = currentUser.email;
+      }
+      if (currentUser) {
+        senderName = currentUser.name || currentUser.email;
       }
     }
 
-    const htmlBody = message.replace(/\n/g, "<br>");
+    const htmlBody = await buildBrandedEmail({
+      title: `Purchase Order: ${po.poNumber || "PO"}`,
+      subtitle: `Sent by ${senderName}`,
+      body: message.replace(/\n/g, "<br>"),
+      footerNote: "Please review the attached purchase order. If you have any questions, reply directly to this email.",
+    });
 
     const result = await emailService.sendEmailWithAttachment({
       to,

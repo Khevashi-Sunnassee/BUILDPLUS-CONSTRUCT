@@ -6,6 +6,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 
 const router = Router();
 
@@ -681,12 +682,23 @@ router.post("/api/tasks/send-email", requireAuth, async (req, res) => {
     }
 
     const currentUser = await storage.getUser(userId);
+    const senderName = currentUser
+      ? (currentUser.name || currentUser.email)
+      : "A team member";
+
+    const htmlBody = await buildBrandedEmail({
+      title: "Task Notification",
+      subtitle: `Sent by ${senderName}`,
+      body: data.message.replace(/\n/g, "<br>"),
+      footerNote: "If you have any questions, reply directly to this email.",
+    });
+
     const result = await emailService.sendEmailWithAttachment({
       to: data.to,
       cc: data.cc,
       bcc: data.sendCopy && currentUser?.email ? currentUser.email : undefined,
       subject: data.subject,
-      body: data.message.replace(/\n/g, "<br>"),
+      body: htmlBody,
     });
 
     if (!result.success) {

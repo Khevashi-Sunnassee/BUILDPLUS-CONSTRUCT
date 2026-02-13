@@ -12,6 +12,7 @@ import { jobMembers, documents, documentBundles } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
 import { emailService } from "../services/email.service";
+import { buildBrandedEmail } from "../lib/email-template";
 import logger from "../lib/logger";
 import { 
   insertDocumentSchema, 
@@ -952,14 +953,44 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
     }
 
     let bcc: string | undefined;
-    if (sendCopy && req.session.userId) {
+    let senderName = "A team member";
+    if (req.session.userId) {
       const currentUser = await storage.getUser(req.session.userId);
-      if (currentUser?.email) {
+      if (sendCopy && currentUser?.email) {
         bcc = currentUser.email;
+      }
+      if (currentUser) {
+        senderName = currentUser.name || currentUser.email;
       }
     }
 
-    const htmlBody = message.replace(/\n/g, "<br>");
+    const docListHtml = docs
+      .filter(d => d !== undefined)
+      .map(d => `<tr>
+        <td style="padding: 4px 8px; font-size: 13px; color: #334155;">${d.title}</td>
+        <td style="padding: 4px 8px; font-size: 13px; color: #64748b;">${d.originalName}</td>
+        <td style="padding: 4px 8px; font-size: 13px; color: #64748b;">${d.revision || "-"}</td>
+      </tr>`)
+      .join("");
+
+    const attachmentSummary = `
+      <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #334155;">${attachments.length} Document${attachments.length !== 1 ? "s" : ""} Attached:</p>
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+        <tr style="background-color: #e2e8f0;">
+          <td style="padding: 4px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">Title</td>
+          <td style="padding: 4px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">File</td>
+          <td style="padding: 4px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">Rev</td>
+        </tr>
+        ${docListHtml}
+      </table>`;
+
+    const htmlBody = await buildBrandedEmail({
+      title: "Documents Shared With You",
+      subtitle: `Sent by ${senderName}`,
+      body: message.replace(/\n/g, "<br>"),
+      attachmentSummary,
+      footerNote: "Please download the attached documents. If you have any questions, reply directly to this email.",
+    });
 
     let finalAttachments = attachments;
     let wasZipped = false;
