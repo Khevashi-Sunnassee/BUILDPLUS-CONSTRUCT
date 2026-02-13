@@ -162,7 +162,7 @@ export default function AdminHelpPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4">
+    <div className="max-w-6xl mx-auto space-y-4" role="main" aria-label="Help Management" aria-busy={isLoading}>
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <BookOpen className="h-6 w-6 text-muted-foreground" />

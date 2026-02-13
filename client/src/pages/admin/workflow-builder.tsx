@@ -649,7 +649,7 @@ export default function WorkflowBuilderPage() {
 
   if (loadingJobType || loadingTemplates) {
     return (
-      <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-4">
+      <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-4" role="main" aria-label="Workflow Builder" aria-busy="true">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-40 w-full" />
         <Skeleton className="h-40 w-full" />
@@ -658,7 +658,7 @@ export default function WorkflowBuilderPage() {
   }
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6">
+    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6" role="main" aria-label="Workflow Builder">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => navigate("/admin/job-types")} data-testid="button-back">

@@ -868,7 +868,7 @@ export default function AssetRegisterPage() {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-6" role="main" aria-label="Asset Register" aria-busy="true">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Skeleton className="h-8 w-48" />
           <Skeleton className="h-9 w-32" />
@@ -1028,7 +1028,7 @@ export default function AssetRegisterPage() {
   );
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-6 space-y-5" role="main" aria-label="Asset Register">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <Package className="h-6 w-6 text-muted-foreground" />

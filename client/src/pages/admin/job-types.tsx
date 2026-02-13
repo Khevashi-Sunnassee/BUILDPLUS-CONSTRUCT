@@ -142,7 +142,7 @@ export default function AdminJobTypesPage() {
   const hasNoData = !isLoading && (!jobTypesData || jobTypesData.length === 0);
 
   return (
-    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6">
+    <div className="container mx-auto p-4 md:p-6 max-w-6xl space-y-6" role="main" aria-label="Job Types" aria-busy={isLoading}>
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">

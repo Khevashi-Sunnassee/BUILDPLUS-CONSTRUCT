@@ -945,7 +945,7 @@ export default function JobTendersPage() {
   const difference = totalEstimated - totalTender;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" role="main" aria-label="Job Tenders">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <Link href={`/jobs/${jobId}/budget`}>

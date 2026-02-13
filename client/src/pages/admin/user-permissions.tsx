@@ -218,7 +218,7 @@ export default function UserPermissionsPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="User Permissions" aria-busy="true">
         <Skeleton className="h-8 w-64 mb-6" />
         <div className="space-y-4">
           {[1, 2, 3].map(i => (
@@ -230,7 +230,7 @@ export default function UserPermissionsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="User Permissions">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
           <Shield className="h-8 w-8 text-primary" />

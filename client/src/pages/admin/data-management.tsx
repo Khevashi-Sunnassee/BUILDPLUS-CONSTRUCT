@@ -487,7 +487,7 @@ export default function DataManagementPage() {
   const activeConfig = ENTITY_TABS.find((t) => t.key === activeTab);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6" role="main" aria-label="Data Management">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2">

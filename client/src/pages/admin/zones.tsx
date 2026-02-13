@@ -170,7 +170,7 @@ export default function AdminZonesPage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6" role="main" aria-label="Zone Management" aria-busy="true">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-[400px]" />
       </div>
@@ -178,7 +178,7 @@ export default function AdminZonesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Zone Management">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">

@@ -463,7 +463,7 @@ export default function AdminDocumentConfigPage() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="main" aria-label="Document Configuration">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
