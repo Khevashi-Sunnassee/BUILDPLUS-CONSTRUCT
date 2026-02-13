@@ -60,6 +60,13 @@ router.post("/api/panels/admin/:id/upload-pdf", requireRole("ADMIN", "MANAGER"),
       return res.status(404).json({ error: "Panel not found" });
     }
 
+    if (panel.jobId && req.companyId) {
+      const job = await storage.getJob(panel.jobId);
+      if (!job || job.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     const pdfBuffer = Buffer.from(pdfBase64, "base64");
     const pdfFileName = fileName || `${panel.panelMark}_IFC.pdf`;
     const typeId = await getIfcDocumentTypeId();
@@ -110,6 +117,13 @@ router.get("/api/panels/admin/:id/download-pdf", requireRole("ADMIN", "MANAGER")
       return res.status(404).json({ error: "Panel not found" });
     }
 
+    if (panel.jobId && req.companyId) {
+      const job = await storage.getJob(panel.jobId);
+      if (!job || job.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     if (!panel.productionPdfUrl) {
       return res.status(404).json({ error: "No PDF attached to this panel" });
     }
@@ -139,6 +153,13 @@ router.post("/api/panels/admin/:id/analyze-pdf", requireRole("ADMIN", "MANAGER")
     const panel = await storage.getPanelById(id as string);
     if (!panel) {
       return res.status(404).json({ error: "Panel not found" });
+    }
+
+    if (panel.jobId && req.companyId) {
+      const job = await storage.getJob(panel.jobId);
+      if (!job || job.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
     }
     
     const OpenAI = (await import("openai")).default;
@@ -236,6 +257,13 @@ router.post("/api/panels/admin/:id/approve-production", requireRole("ADMIN", "MA
       return res.status(404).json({ error: "Panel not found" });
     }
 
+    if (panel.jobId && req.companyId) {
+      const panelJob = await storage.getJob(panel.jobId);
+      if (!panelJob || panelJob.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
+
     if (panel.jobId) {
       const { jobHasCapability } = await import("@shared/job-phases");
       const job = await storage.getJob(panel.jobId);
@@ -279,6 +307,13 @@ router.post("/api/panels/admin/:id/revoke-production", requireRole("ADMIN", "MAN
     const panel = await storage.getPanelById(id as string);
     if (!panel) {
       return res.status(404).json({ error: "Panel not found" });
+    }
+
+    if (panel.jobId && req.companyId) {
+      const job = await storage.getJob(panel.jobId);
+      if (!job || job.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
     }
     
     const updated = await storage.revokePanelProductionApproval(id as string);

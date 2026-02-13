@@ -239,7 +239,7 @@ export const productionMethods = {
     );
   },
 
-  async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<ProductionSlotWithDetails[]> {
+  async getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[]; companyId?: string }): Promise<ProductionSlotWithDetails[]> {
     const conditions: any[] = [];
     if (filters?.jobId) conditions.push(eq(productionSlots.jobId, filters.jobId));
     if (filters?.status) conditions.push(eq(productionSlots.status, filters.status as typeof productionSlots.status.enumValues[number]));
@@ -248,6 +248,9 @@ export const productionMethods = {
     
     if (filters?.factoryIds && filters.factoryIds.length > 0) {
       conditions.push(inArray(jobs.factoryId, filters.factoryIds));
+    }
+    if (filters?.companyId) {
+      conditions.push(eq(jobs.companyId, filters.companyId));
     }
     
     const query = db.select({

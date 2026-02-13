@@ -300,6 +300,13 @@ router.post("/api/production-schedule/add-panels", requireAuth, requirePermissio
           errors.push(`Panel ${panelId} not found`);
           continue;
         }
+        if (req.companyId) {
+          const panelJob = await storage.getJob(panel.jobId);
+          if (!panelJob || panelJob.companyId !== req.companyId) {
+            errors.push(`Panel ${panelId} not found`);
+            continue;
+          }
+        }
         
         if (!panel.approvedForProduction) {
           errors.push(`Panel ${panel.panelMark} is not approved for production`);

@@ -83,7 +83,7 @@ export const reportMethods = {
     };
   },
 
-  async getReports(period: string): Promise<any> {
+  async getReports(period: string, companyId?: string): Promise<any> {
     const today = new Date();
     let startDate: Date;
     
@@ -105,11 +105,16 @@ export const reportMethods = {
     
     const startDateStr = startDate.toISOString().split("T")[0];
     
+    const conditions = [gte(dailyLogs.logDay, startDateStr)];
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+    }
+    
     const allRows = await db.select().from(logRows)
       .innerJoin(dailyLogs, eq(logRows.dailyLogId, dailyLogs.id))
       .leftJoin(jobs, eq(logRows.jobId, jobs.id))
-      .leftJoin(users, eq(dailyLogs.userId, users.id))
-      .where(gte(dailyLogs.logDay, startDateStr));
+      .innerJoin(users, eq(dailyLogs.userId, users.id))
+      .where(and(...conditions));
 
     const userMap = new Map<string, { name: string; email: string; totalMinutes: number; days: Set<string> }>();
     const jobMap = new Map<string, { name: string; code: string; totalMinutes: number }>();

@@ -22,11 +22,15 @@ router.get("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) =>
 });
 
 router.post("/api/admin/trailer-types", requireRole("ADMIN"), async (req, res) => {
+  if (req.companyId) req.body.companyId = req.companyId;
   const trailerType = await storage.createTrailerType(req.body);
   res.json(trailerType);
 });
 
 router.put("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
+  const existing = await storage.getTrailerType(req.params.id as string);
+  if (!existing) return res.status(404).json({ error: "Trailer type not found" });
+  if (req.companyId && existing.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
   const parsed = insertTrailerTypeSchema.partial().safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
@@ -36,6 +40,9 @@ router.put("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res
 });
 
 router.delete("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, res) => {
+  const existing = await storage.getTrailerType(req.params.id as string);
+  if (!existing) return res.status(404).json({ error: "Trailer type not found" });
+  if (req.companyId && existing.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
   await storage.deleteTrailerType(req.params.id as string);
   res.json({ success: true });
 });
@@ -50,11 +57,13 @@ router.get("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
 router.get("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
   const zone = await storage.getZone(req.params.id as string);
   if (!zone) return res.status(404).json({ error: "Zone not found" });
+  if (req.companyId && zone.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
   res.json(zone);
 });
 
 router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
   try {
+    if (req.companyId) req.body.companyId = req.companyId;
     const existing = await storage.getZoneByCode(req.body.code);
     if (existing) {
       return res.status(400).json({ error: "Zone with this code already exists" });
@@ -67,6 +76,9 @@ router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
 });
 
 router.put("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
+  const existingZone = await storage.getZone(req.params.id as string);
+  if (!existingZone) return res.status(404).json({ error: "Zone not found" });
+  if (req.companyId && existingZone.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
   const parsed = insertZoneSchema.partial().safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
@@ -76,6 +88,9 @@ router.put("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
 });
 
 router.delete("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
+  const existingZone = await storage.getZone(req.params.id as string);
+  if (!existingZone) return res.status(404).json({ error: "Zone not found" });
+  if (req.companyId && existingZone.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
   await storage.deleteZone(req.params.id as string);
   res.json({ success: true });
 });
@@ -90,6 +105,10 @@ router.get("/api/load-lists", requireAuth, requirePermission("logistics"), async
 router.get("/api/load-lists/:id", requireAuth, requirePermission("logistics"), async (req, res) => {
   const loadList = await storage.getLoadList(req.params.id as string);
   if (!loadList) return res.status(404).json({ error: "Load list not found" });
+  if (req.companyId && loadList.jobId) {
+    const job = await storage.getJob(loadList.jobId);
+    if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+  }
   res.json(loadList);
 });
 
@@ -142,6 +161,12 @@ router.delete("/api/load-lists/:id", requireRole("ADMIN", "MANAGER"), requirePer
 });
 
 router.post("/api/load-lists/:id/panels", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
+  const loadList = await storage.getLoadList(req.params.id as string);
+  if (!loadList) return res.status(404).json({ error: "Load list not found" });
+  if (req.companyId && loadList.jobId) {
+    const job = await storage.getJob(loadList.jobId);
+    if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+  }
   const { panelId, sequence } = req.body;
   const panel = await storage.addPanelToLoadList(req.params.id as string, panelId, sequence);
   advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: req.params.id });
@@ -149,6 +174,12 @@ router.post("/api/load-lists/:id/panels", requireAuth, requirePermission("logist
 });
 
 router.delete("/api/load-lists/:id/panels/:panelId", requireAuth, requirePermission("logistics", "VIEW_AND_UPDATE"), async (req, res) => {
+  const loadList = await storage.getLoadList(req.params.id as string);
+  if (!loadList) return res.status(404).json({ error: "Load list not found" });
+  if (req.companyId && loadList.jobId) {
+    const job = await storage.getJob(loadList.jobId);
+    if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+  }
   await storage.removePanelFromLoadList(req.params.id as string, req.params.panelId as string);
   logPanelChange(req.params.panelId as string, "Removed from load list", req.session.userId, { changedFields: { loadListId: req.params.id } });
   res.json({ success: true });
@@ -157,6 +188,13 @@ router.delete("/api/load-lists/:id/panels/:panelId", requireAuth, requirePermiss
 // =============== DELIVERY RECORDS ===============
 
 router.get("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
+  if (req.companyId) {
+    const loadList = await storage.getLoadList(req.params.id as string);
+    if (loadList?.jobId) {
+      const job = await storage.getJob(loadList.jobId);
+      if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+    }
+  }
   const record = await storage.getDeliveryRecord(req.params.id as string);
   res.json(record || null);
 });
@@ -164,6 +202,10 @@ router.get("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
 router.post("/api/load-lists/:id/delivery", requireAuth, async (req, res) => {
   try {
     const loadListForPhaseCheck = await storage.getLoadList(req.params.id as string);
+    if (req.companyId && loadListForPhaseCheck?.jobId) {
+      const jobCheck = await storage.getJob(loadListForPhaseCheck.jobId);
+      if (!jobCheck || jobCheck.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+    }
     if (loadListForPhaseCheck?.jobId) {
       const { jobHasCapability } = await import("@shared/job-phases");
       const job = await storage.getJob(loadListForPhaseCheck.jobId);
@@ -214,6 +256,13 @@ router.put("/api/delivery-records/:id", requireAuth, async (req, res) => {
 
 router.get("/api/load-lists/:id/return", requireAuth, async (req, res) => {
   try {
+    if (req.companyId) {
+      const loadList = await storage.getLoadList(req.params.id as string);
+      if (loadList?.jobId) {
+        const job = await storage.getJob(loadList.jobId);
+        if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const loadReturn = await storage.getLoadReturn(req.params.id as string);
     res.json(loadReturn || null);
   } catch (error: unknown) {
@@ -225,6 +274,10 @@ router.post("/api/load-lists/:id/return", requireAuth, async (req, res) => {
   try {
     const loadList = await storage.getLoadList(req.params.id as string);
     if (!loadList) return res.status(404).json({ error: "Load list not found" });
+    if (req.companyId && loadList.jobId) {
+      const job = await storage.getJob(loadList.jobId);
+      if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+    }
 
     const existingReturn = await storage.getLoadReturn(req.params.id as string);
     if (existingReturn) {

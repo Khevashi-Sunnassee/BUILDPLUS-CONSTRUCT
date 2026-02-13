@@ -16,6 +16,7 @@ router.get("/api/drafting-program", requireAuth, requirePermission("production_r
     if (assignedToId) filters.assignedToId = assignedToId as string;
     if (dateFrom) filters.dateFrom = new Date(dateFrom as string);
     if (dateTo) filters.dateTo = new Date(dateTo as string);
+    if (req.companyId) filters.companyId = req.companyId;
     
     const user = await storage.getUser(req.session.userId!);
     if (user?.selectedFactoryIds && user.selectedFactoryIds.length > 0) {
@@ -39,7 +40,7 @@ router.get("/api/drafting-program/my-allocated", requireAuth, requirePermission(
       ? user.selectedFactoryIds 
       : undefined;
     
-    const programs = await storage.getDraftingPrograms({ assignedToId: userId, factoryIds });
+    const programs = await storage.getDraftingPrograms({ assignedToId: userId, factoryIds, companyId: req.companyId });
     
     const completed = programs.filter(p => p.status === "COMPLETED");
     const inProgress = programs.filter(p => p.status === "IN_PROGRESS");
@@ -73,6 +74,9 @@ router.get("/api/drafting-program/:id", requireAuth, requirePermission("producti
   try {
     const program = await storage.getDraftingProgram(String(req.params.id));
     if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
+    if (req.companyId && program.job && program.job.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     res.json(program);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching drafting program entry");
@@ -97,6 +101,11 @@ const assignDraftingResourceSchema = z.object({
 
 router.post("/api/drafting-program/:id/assign", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const program = await storage.getDraftingProgram(String(req.params.id));
+    if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
+    if (req.companyId && program.job && program.job.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const parsed = assignDraftingResourceSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.errors.map(e => e.message).join(", ") });
@@ -122,6 +131,11 @@ const updateDraftingProgramSchema = z.object({
 
 router.patch("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const program = await storage.getDraftingProgram(String(req.params.id));
+    if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
+    if (req.companyId && program.job && program.job.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const parsed = updateDraftingProgramSchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: parsed.error.errors.map(e => e.message).join(", ") });
@@ -141,6 +155,11 @@ router.patch("/api/drafting-program/:id", requireAuth, requirePermission("produc
 
 router.delete("/api/drafting-program/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
+    const program = await storage.getDraftingProgram(String(req.params.id));
+    if (!program) return res.status(404).json({ error: "Drafting program entry not found" });
+    if (req.companyId && program.job && program.job.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     await storage.deleteDraftingProgram(String(req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
@@ -152,6 +171,12 @@ router.delete("/api/drafting-program/:id", requireAuth, requirePermission("produ
 router.delete("/api/drafting-program/job/:jobId", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req, res) => {
   try {
     const jobId = String(req.params.jobId);
+    if (req.companyId) {
+      const job = await storage.getJob(jobId);
+      if (!job || job.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     const deleted = await storage.deleteDraftingProgramByJob(jobId);
     res.json({ success: true, deleted });
   } catch (error: unknown) {

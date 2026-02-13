@@ -108,6 +108,9 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
 
 router.put("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
+    const existingEntry = await storage.getProductionEntry(String(req.params.id));
+    if (!existingEntry) return res.status(404).json({ error: "Entry not found" });
+    if (req.companyId && existingEntry.job?.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     const result = updateProductionEntrySchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
@@ -159,6 +162,7 @@ router.delete("/api/production-entries/:id", requireAuth, requirePermission("pro
     if (!entry) {
       return res.status(404).json({ error: "Production entry not found" });
     }
+    if (req.companyId && entry.job?.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     
     if (entry.panelId) {
       await storage.updatePanelRegisterItem(entry.panelId, { status: "PENDING" });
@@ -187,6 +191,7 @@ router.put("/api/production-entries/batch-status", requireAuth, requirePermissio
   for (const id of entryIds) {
     const entry = await storage.getProductionEntry(id);
     if (entry) {
+      if (req.companyId && entry.job?.companyId !== req.companyId) continue;
       validEntries.push({ id, panelId: entry.panelId });
     }
   }
@@ -237,6 +242,10 @@ router.get("/api/production-slots/:slotId/panel-entries", requireAuth, requirePe
     if (!slot) {
       return res.status(404).json({ error: "Production slot not found" });
     }
+    if (req.companyId) {
+      const job = await storage.getJob(slot.jobId);
+      if (!job || job.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
+    }
     
     const panels = await storage.getPanelsByJobAndLevel(slot.jobId, slot.level);
     
@@ -270,6 +279,10 @@ router.post("/api/production-slots/:slotId/assign-panels", requireAuth, requireP
     const slot = await storage.getProductionSlot(slotId);
     if (!slot) {
       return res.status(404).json({ error: "Production slot not found" });
+    }
+    if (req.companyId) {
+      const slotJob = await storage.getJob(slot.jobId);
+      if (!slotJob || slotJob.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     }
     
     if (slot.status !== "BOOKED") {

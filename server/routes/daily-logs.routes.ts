@@ -176,6 +176,12 @@ router.get("/api/daily-logs/:id", requireAuth, async (req, res) => {
   if (log.userId !== currentUser.id && currentUser.role !== "ADMIN" && currentUser.role !== "MANAGER") {
     return res.status(403).json({ error: "Forbidden" });
   }
+  if (log.userId !== currentUser.id && req.companyId) {
+    const logOwner = await storage.getUser(log.userId);
+    if (!logOwner || logOwner.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+  }
   res.json(log);
 });
 
@@ -202,6 +208,16 @@ router.post("/api/daily-logs/:id/submit", requireAuth, async (req, res) => {
 });
 
 router.post("/api/daily-logs/:id/approve", requireRole("MANAGER", "ADMIN"), async (req, res) => {
+  const existingLog = await storage.getDailyLog(req.params.id as string);
+  if (!existingLog) {
+    return res.status(404).json({ error: "Log not found" });
+  }
+  if (req.companyId) {
+    const logOwner = await storage.getUser(existingLog.userId);
+    if (!logOwner || logOwner.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+  }
   const result = approveDailyLogSchema.safeParse(req.body);
   if (!result.success) {
     return res.status(400).json({ error: result.error.format() });
@@ -243,6 +259,12 @@ router.patch("/api/log-rows/:id", requireAuth, async (req, res) => {
   if (log.userId !== currentUser.id && currentUser.role !== "ADMIN") {
     return res.status(403).json({ error: "You can only edit your own log rows" });
   }
+  if (log.userId !== currentUser.id && req.companyId) {
+    const logOwner = await storage.getUser(log.userId);
+    if (!logOwner || logOwner.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+  }
   if (log.status !== "PENDING" && log.status !== "REJECTED") {
     return res.status(400).json({ error: "Cannot edit rows in submitted/approved logs" });
   }
@@ -277,6 +299,12 @@ router.delete("/api/log-rows/:id", requireAuth, async (req, res) => {
     if (log.userId !== currentUser.id && currentUser.role !== "ADMIN") {
       return res.status(403).json({ error: "You can only delete your own log rows" });
     }
+    if (log.userId !== currentUser.id && req.companyId) {
+      const logOwner = await storage.getUser(log.userId);
+      if (!logOwner || logOwner.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+    }
     if (log.status !== "PENDING" && log.status !== "REJECTED" && currentUser.role !== "ADMIN") {
       return res.status(400).json({ error: "Cannot delete rows in submitted/approved logs" });
     }
@@ -298,6 +326,12 @@ router.delete("/api/daily-logs/:id", requireAuth, requirePermission("daily_repor
     if (!currentUser) return res.status(401).json({ error: "Unauthorized" });
     if (log.userId !== currentUser.id && currentUser.role !== "ADMIN") {
       return res.status(403).json({ error: "You can only delete your own daily logs" });
+    }
+    if (log.userId !== currentUser.id && req.companyId) {
+      const logOwner = await storage.getUser(log.userId);
+      if (!logOwner || logOwner.companyId !== req.companyId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
     }
     if (log.status === "APPROVED" && currentUser.role !== "ADMIN") {
       return res.status(400).json({ error: "Cannot delete approved logs" });

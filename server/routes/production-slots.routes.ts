@@ -17,6 +17,20 @@ const adjustSlotSchema = z.object({
 
 const router = Router();
 
+async function verifySlotCompanyAccess(req: Request, slotId: string): Promise<{ allowed: boolean; slot?: any }> {
+  const slot = await storage.getProductionSlot(slotId);
+  if (!slot) return { allowed: false };
+  if (req.companyId && slot.job && slot.job.companyId !== req.companyId) return { allowed: false };
+  return { allowed: true, slot };
+}
+
+async function verifyJobCompanyAccess(req: Request, jobId: string): Promise<boolean> {
+  if (!req.companyId) return true;
+  const job = await storage.getJob(jobId);
+  if (!job) return false;
+  return job.companyId === req.companyId;
+}
+
 router.get("/api/production-slots", requireAuth, async (req: Request, res: Response) => {
   try {
     const { jobId, status, dateFrom, dateTo, factoryId } = req.query;
@@ -46,6 +60,7 @@ router.get("/api/production-slots", requireAuth, async (req: Request, res: Respo
       filters.factoryIds = userFactoryIds;
     }
     
+    if (req.companyId) filters.companyId = req.companyId;
     const slots = await storage.getProductionSlots(filters);
     res.json(slots);
   } catch (error: unknown) {
@@ -70,6 +85,9 @@ router.get("/api/production-slots/:id", requireAuth, async (req: Request, res: R
     if (!slot) {
       return res.status(404).json({ error: "Production slot not found" });
     }
+    if (req.companyId && slot.job && slot.job.companyId !== req.companyId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     res.json(slot);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production slot");
@@ -79,7 +97,11 @@ router.get("/api/production-slots/:id", requireAuth, async (req: Request, res: R
 
 router.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
-    const result = await storage.checkPanelLevelCoverage(String(req.params.jobId));
+    const jobId = String(req.params.jobId);
+    if (!(await verifyJobCompanyAccess(req, jobId))) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const result = await storage.checkPanelLevelCoverage(jobId);
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error checking panel level coverage");
@@ -89,12 +111,16 @@ router.get("/api/production-slots/check-levels/:jobId", requireRole("ADMIN", "MA
 
 router.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
+    const jobId = String(req.params.jobId);
+    if (!(await verifyJobCompanyAccess(req, jobId))) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const result = generateSlotsSchema.safeParse(req.body || {});
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
     }
     const { skipEmptyLevels } = result.data;
-    const slots = await storage.generateProductionSlotsForJob(String(req.params.jobId), skipEmptyLevels);
+    const slots = await storage.generateProductionSlotsForJob(jobId, skipEmptyLevels);
     res.json(slots);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error generating production slots");
@@ -104,6 +130,11 @@ router.post("/api/production-slots/generate/:jobId", requireRole("ADMIN", "MANAG
 
 router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
+    const slotId = String(req.params.id);
+    const { allowed } = await verifySlotCompanyAccess(req, slotId);
+    if (!allowed) {
+      return res.status(403).json({ error: "Access denied" });
+    }
     const result = adjustSlotSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
@@ -111,7 +142,7 @@ router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"),
     const { newDate, reason, clientConfirmed, cascadeToLater } = result.data;
     const changedById = req.session.userId!;
     
-    const slot = await storage.adjustProductionSlot(String(req.params.id), {
+    const slot = await storage.adjustProductionSlot(slotId, {
       newDate: new Date(newDate),
       reason,
       changedById,
@@ -131,7 +162,12 @@ router.post("/api/production-slots/:id/adjust", requireRole("ADMIN", "MANAGER"),
 
 router.post("/api/production-slots/:id/book", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
-    const slot = await storage.bookProductionSlot(String(req.params.id));
+    const slotId = String(req.params.id);
+    const { allowed } = await verifySlotCompanyAccess(req, slotId);
+    if (!allowed) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const slot = await storage.bookProductionSlot(slotId);
     if (!slot) {
       return res.status(404).json({ error: "Production slot not found" });
     }
@@ -144,7 +180,12 @@ router.post("/api/production-slots/:id/book", requireRole("ADMIN", "MANAGER"), a
 
 router.post("/api/production-slots/:id/complete", requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
-    const slot = await storage.completeProductionSlot(String(req.params.id));
+    const slotId = String(req.params.id);
+    const { allowed } = await verifySlotCompanyAccess(req, slotId);
+    if (!allowed) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const slot = await storage.completeProductionSlot(slotId);
     if (!slot) {
       return res.status(404).json({ error: "Production slot not found" });
     }
@@ -157,7 +198,12 @@ router.post("/api/production-slots/:id/complete", requireRole("ADMIN", "MANAGER"
 
 router.get("/api/production-slots/:id/adjustments", requireAuth, async (req: Request, res: Response) => {
   try {
-    const adjustments = await storage.getProductionSlotAdjustments(String(req.params.id));
+    const slotId = String(req.params.id);
+    const { allowed } = await verifySlotCompanyAccess(req, slotId);
+    if (!allowed) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    const adjustments = await storage.getProductionSlotAdjustments(slotId);
     res.json(adjustments);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production slot adjustments");
@@ -167,7 +213,12 @@ router.get("/api/production-slots/:id/adjustments", requireAuth, async (req: Req
 
 router.delete("/api/production-slots/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
-    await storage.deleteProductionSlot(String(req.params.id));
+    const slotId = String(req.params.id);
+    const { allowed } = await verifySlotCompanyAccess(req, slotId);
+    if (!allowed) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    await storage.deleteProductionSlot(slotId);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting production slot");

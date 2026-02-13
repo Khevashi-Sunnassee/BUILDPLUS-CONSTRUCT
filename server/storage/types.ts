@@ -174,7 +174,7 @@ export interface IStorage {
   updateGlobalSettings(data: Partial<GlobalSettings>, companyId?: string): Promise<GlobalSettings>;
 
   getDashboardStats(userId: string): Promise<any>;
-  getReports(period: string): Promise<any>;
+  getReports(period: string, companyId?: string): Promise<any>;
 
   getJob(id: string): Promise<(Job & { panels: PanelRegister[] }) | undefined>;
   getJobByNumber(jobNumber: string): Promise<Job | undefined>;
@@ -346,7 +346,7 @@ export interface IStorage {
   updateZone(id: string, data: Partial<InsertZone>): Promise<Zone | undefined>;
   deleteZone(id: string): Promise<void>;
 
-  getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[] }): Promise<ProductionSlotWithDetails[]>;
+  getProductionSlots(filters?: { jobId?: string; status?: string; dateFrom?: Date; dateTo?: Date; factoryIds?: string[]; companyId?: string }): Promise<ProductionSlotWithDetails[]>;
   getProductionSlot(id: string): Promise<ProductionSlotWithDetails | undefined>;
   checkPanelLevelCoverage(jobId: string): Promise<{ jobLevels: number; panelLevels: number; highestJobLevel: string; highestPanelLevel: string; hasMismatch: boolean; emptyLevels: string[] }>;
   generateProductionSlotsForJob(jobId: string, skipEmptyLevels?: boolean): Promise<ProductionSlot[]>;

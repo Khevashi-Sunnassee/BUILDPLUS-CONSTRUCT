@@ -68,6 +68,7 @@ router.get("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Reque
   try {
     const type = await storage.getPanelType(req.params.id as string);
     if (!type) return res.status(404).json({ error: "Panel type not found" });
+    if (req.companyId && type.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     res.json(type);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to fetch panel type" });
@@ -78,6 +79,7 @@ router.post("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request,
   try {
     const result = createPanelTypeSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
+    if (req.companyId) result.data.companyId = req.companyId;
     const type = await storage.createPanelType(result.data);
     res.json(type);
   } catch (error: unknown) {
@@ -87,6 +89,9 @@ router.post("/api/panel-types/admin", requireRole("ADMIN"), async (req: Request,
 
 router.put("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const existing = await storage.getPanelType(req.params.id as string);
+    if (!existing) return res.status(404).json({ error: "Panel type not found" });
+    if (req.companyId && existing.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     const result = updatePanelTypeSchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const type = await storage.updatePanelType(req.params.id as string, result.data);
@@ -99,6 +104,9 @@ router.put("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Reque
 
 router.delete("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const existing = await storage.getPanelType(req.params.id as string);
+    if (!existing) return res.status(404).json({ error: "Panel type not found" });
+    if (req.companyId && existing.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     await storage.deletePanelType(req.params.id as string);
     res.json({ ok: true });
   } catch (error: unknown) {
@@ -108,6 +116,9 @@ router.delete("/api/panel-types/admin/:id", requireRole("ADMIN"), async (req: Re
 
 router.get("/api/panel-types/:id/cost-components", requireAuth, async (req: Request, res: Response) => {
   try {
+    const type = await storage.getPanelType(req.params.id as string);
+    if (!type) return res.status(404).json({ error: "Panel type not found" });
+    if (req.companyId && type.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     const components = await storage.getCostComponentsByPanelType(req.params.id as string);
     res.json(components);
   } catch (error: unknown) {
@@ -117,6 +128,9 @@ router.get("/api/panel-types/:id/cost-components", requireAuth, async (req: Requ
 
 router.put("/api/panel-types/:id/cost-components", requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
+    const type = await storage.getPanelType(req.params.id as string);
+    if (!type) return res.status(404).json({ error: "Panel type not found" });
+    if (req.companyId && type.companyId !== req.companyId) return res.status(403).json({ error: "Access denied" });
     const result = costComponentsBodySchema.safeParse(req.body);
     if (!result.success) return res.status(400).json({ error: "Validation failed", details: result.error.format() });
     const { components } = result.data;
