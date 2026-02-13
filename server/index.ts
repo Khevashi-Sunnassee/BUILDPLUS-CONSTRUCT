@@ -84,6 +84,9 @@ app.use(compression({
   level: 6,
   filter: (req, res) => {
     if (req.headers['x-no-compression']) return false;
+    if (req.url?.includes('/drawing-package/')) return false;
+    const contentType = res.getHeader('Content-Type');
+    if (typeof contentType === 'string' && contentType.includes('text/event-stream')) return false;
     return compression.filter(req, res);
   },
 }));
