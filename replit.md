@@ -41,6 +41,36 @@ The frontend features a KPI Dashboard with data visualization, PDF export, and i
   - *Job Budget:* Per-job budget management at `/jobs/:id/budget`. Top-level budget with estimated total, profit target %, customer price. Budget lines per parent cost code with optional child cost code, linking to selected tender submissions and contractors. Variation tracking and forecast costs. Summary calculations. Budget Line Detail Items: mini BOQ/spreadsheet per budget line with item, qty, unit, price, lineTotal, notes. Lock mechanism (`estimateLocked` on budget_lines) to sync estimated budget to sum of detail items. Schema: `job_budgets`, `budget_lines` (has `childCostCodeId`, `estimateLocked`), `budget_line_files`, `budget_line_detail_items`. RBAC key: `budgets`.
   - *Bill of Quantities (BOQ):* Detailed item-level costing at `/jobs/:id/boq`. BOQ groups (buildings/levels) under parent cost codes with optional child codes. BOQ items with quantities, units (EA/SQM/M3/LM/M2/M/HR/DAY/TONNE/KG/LOT), unit pricing, line totals, optional child cost codes. Links to tender line items. Schema: `boq_groups` (has `childCostCodeId`), `boq_items` (has `childCostCodeId`). RBAC key: `budgets`.
 
+## Coding Standards & Quality Rules
+
+### Accessibility (WCAG 2.1 AA)
+- All interactive elements (buttons, inputs, links) must have `aria-label` or visible label text.
+- Forms must use `aria-required` on required fields and `aria-invalid` on validation errors.
+- Loading states must use `aria-busy="true"` and live regions (`aria-live="polite"`) for status updates.
+- Decorative icons must have `aria-hidden="true"`; informational icons need `aria-label`.
+- Navigation landmarks must use `<nav>` with `aria-label` differentiating multiple navs.
+- Error alerts must use `role="alert"` and `aria-live="assertive"`.
+- ESLint enforces a11y rules via `eslint-plugin-jsx-a11y` in `eslint.config.js`.
+
+### Frontend Testing
+- All new components must have a co-located `.test.tsx` file using React Testing Library + Vitest.
+- Config: `vitest.config.frontend.ts` with jsdom environment; shared test utilities in `client/src/test/test-utils.tsx`.
+- Tests must cover: rendering, user interactions, error states, and accessibility (ARIA attributes).
+- Every interactive element must have a `data-testid` attribute for test targeting.
+- Run frontend tests: `npx vitest --config vitest.config.frontend.ts --run`.
+
+### Database Integrity
+- All monetary/quantity columns must have CHECK constraints (e.g., `CHECK (amount >= 0)`).
+- Rate fields (tax, retention) must be bounded: `CHECK (rate >= 0 AND rate <= 100)`.
+- Business-unique fields must have UNIQUE constraints (e.g., customer name + company).
+- New tables must define constraints in both Drizzle schema and as raw SQL migration.
+- Current counts: 32+ check constraints, 13+ unique constraints, 50+ unique indexes.
+
+### Developer Experience
+- Environment variables documented in `.env.example` with descriptions.
+- ESLint config in `eslint.config.js` with TypeScript, security, and accessibility rules.
+- Commit messages should reference the feature area (e.g., `[budget] Add cost code import`).
+
 ## Infrastructure & Quality
 
 ### Middleware Stack

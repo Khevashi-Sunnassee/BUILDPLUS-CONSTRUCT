@@ -19,7 +19,7 @@ interface TabButtonProps {
 
 function TabButton({ label, active, href, icon, badge }: TabButtonProps) {
   return (
-    <Link href={href}>
+    <Link href={href} aria-label={badge && badge > 0 ? `${label}, ${badge} unread` : label} aria-current={active ? "page" : undefined}>
       <div
         className={`flex flex-col items-center justify-center py-2 ${
           active ? "text-blue-400" : "text-white/60"
@@ -27,14 +27,14 @@ function TabButton({ label, active, href, icon, badge }: TabButtonProps) {
         data-testid={`tab-${label.toLowerCase()}`}
       >
         <div className="relative">
-          {icon}
+          <span aria-hidden="true">{icon}</span>
           {badge && badge > 0 ? (
-            <span className="absolute -right-2 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-2 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white" aria-hidden="true">
               {badge > 99 ? "99+" : badge}
             </span>
           ) : null}
         </div>
-        <span className="mt-1 text-[10px] font-medium">{label}</span>
+        <span className="mt-1 text-[10px] font-medium" aria-hidden="true">{label}</span>
       </div>
     </Link>
   );
@@ -89,15 +89,15 @@ export default function MobileBottomNav() {
   if (showScan) {
     const scanActive = isActive("/mobile/scan");
     visibleTabs.push(
-      <Link key="scan" href="/mobile/scan">
+      <Link key="scan" href="/mobile/scan" aria-label="Scan QR code" aria-current={scanActive ? "page" : undefined}>
         <div
           className="flex flex-col items-center justify-center py-1"
           data-testid="tab-scan"
         >
           <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${scanActive ? "bg-blue-500" : "bg-blue-500/20"}`}>
-            <ScanLine className={`h-5 w-5 ${scanActive ? "text-white" : "text-blue-400"}`} />
+            <ScanLine className={`h-5 w-5 ${scanActive ? "text-white" : "text-blue-400"}`} aria-hidden="true" />
           </div>
-          <span className={`mt-0.5 text-[10px] font-medium ${scanActive ? "text-blue-400" : "text-white/60"}`}>Scan</span>
+          <span className={`mt-0.5 text-[10px] font-medium ${scanActive ? "text-blue-400" : "text-white/60"}`} aria-hidden="true">Scan</span>
         </div>
       </Link>
     );
@@ -127,9 +127,10 @@ export default function MobileBottomNav() {
   );
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0D1117]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-white/10 bg-[#0D1117]" aria-label="Mobile navigation" role="navigation">
       <div
         className="grid h-16 items-center"
+        role="tablist"
         style={{
           gridTemplateColumns: `repeat(${visibleTabs.length}, 1fr)`,
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',

@@ -196,8 +196,8 @@ export default function MobileDashboard() {
   if (showPanels) statCards.push(<StatCard key="critical" value={criticalIssues} title="Critical" subtitle="Issues" accent="red" />);
 
   return (
-    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden">
-      <div className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+    <div className="flex flex-col h-screen bg-[#070B12] text-white overflow-hidden" role="main" aria-label="Mobile Dashboard">
+      <header className="flex-shrink-0 border-b border-white/10 bg-[#070B12]/95 backdrop-blur z-10" style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center justify-between px-4 py-4">
           <div className="flex items-center gap-2">
             {globalSettings?.logoBase64 ? (
@@ -210,7 +210,7 @@ export default function MobileDashboard() {
             ) : (
               <>
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10">
-                  <Home className="h-5 w-5 text-white" />
+                  <Home className="h-5 w-5 text-white" aria-hidden="true" />
                 </div>
                 <div className="text-lg font-bold">{globalSettings?.companyName || ""}</div>
               </>
@@ -218,28 +218,28 @@ export default function MobileDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="text-white/80" data-testid="button-search">
-              <Search className="h-5 w-5" />
+            <button className="text-white/80" data-testid="button-search" aria-label="Search">
+              <Search className="h-5 w-5" aria-hidden="true" />
             </button>
             {showChat && (
-              <Link href="/mobile/chat">
-                <button className="relative text-white/80" data-testid="button-chat-header">
-                  <MessageSquare className="h-5 w-5" />
+              <Link href="/mobile/chat" aria-label={unreadMessages > 0 ? `Chat, ${unreadMessages} unread messages` : "Chat"}>
+                <span className="relative text-white/80 inline-block">
+                  <MessageSquare className="h-5 w-5" aria-hidden="true" />
                   {unreadMessages > 0 && (
-                    <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white">
+                    <span className="absolute -right-2 -top-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-bold text-white" aria-hidden="true">
                       {unreadMessages > 99 ? "99+" : unreadMessages}
                     </span>
                   )}
-                </button>
+                </span>
               </Link>
             )}
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4">
+      <div className="flex-1 overflow-y-auto px-4 pb-40 pt-4" aria-busy={isLoading}>
         {isLoading ? (
-          <div className="grid grid-cols-4 gap-2" data-testid="skeleton-stats">
+          <div className="grid grid-cols-4 gap-2" data-testid="skeleton-stats" aria-label="Loading statistics">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <Skeleton className="h-8 w-12 bg-white/10" />
@@ -254,7 +254,7 @@ export default function MobileDashboard() {
           </div>
         ) : null}
 
-        <div className="mt-6 space-y-3">
+        <nav className="mt-6 space-y-3" aria-label="Quick access">
           {showTasks && (
             <NavRow
               icon={<ListTodo className="h-5 w-5 text-blue-400" />}
@@ -333,7 +333,7 @@ export default function MobileDashboard() {
               href="/mobile/checklists"
             />
           )}
-        </div>
+        </nav>
       </div>
 
       <MobileBottomNav />

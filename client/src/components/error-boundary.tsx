@@ -48,12 +48,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       }
 
       return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-background p-4" data-testid="error-boundary">
+        <div className="min-h-screen w-full flex items-center justify-center bg-background p-4" data-testid="error-boundary" role="alert" aria-live="assertive">
           <Card className="w-full max-w-lg">
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center gap-4">
                 <div className="rounded-full bg-destructive/10 p-3">
-                  <AlertTriangle className="h-8 w-8 text-destructive" />
+                  <AlertTriangle className="h-8 w-8 text-destructive" aria-hidden="true" />
                 </div>
                 <div className="space-y-2">
                   <h2 className="text-xl font-semibold" data-testid="text-error-title">Something went wrong</h2>

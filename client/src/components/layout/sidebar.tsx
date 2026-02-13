@@ -317,7 +317,7 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className="border-r border-sidebar-border">
+    <Sidebar className="border-r border-sidebar-border" aria-label="Main navigation">
       <SidebarHeader className="p-4">
         <div className="flex items-center justify-start">
           <div className="h-[60px] flex items-center justify-start" data-testid="img-sidebar-logo">
@@ -337,9 +337,9 @@ export function AppSidebar() {
         <Collapsible open={mainExpanded} onOpenChange={setMainExpanded}>
           <SidebarGroup>
             <CollapsibleTrigger className="w-full">
-              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1" aria-expanded={mainExpanded}>
                 <span>Main</span>
-                {mainExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                {mainExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
               </SidebarGroupLabel>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -391,9 +391,9 @@ export function AppSidebar() {
         <Collapsible open={productionExpanded} onOpenChange={setProductionExpanded}>
           <SidebarGroup>
             <CollapsibleTrigger className="w-full">
-              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1" aria-expanded={productionExpanded}>
                 <span>Production</span>
-                {productionExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                {productionExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
               </SidebarGroupLabel>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -424,9 +424,9 @@ export function AppSidebar() {
         <Collapsible open={adminFinanceExpanded} onOpenChange={setAdminFinanceExpanded}>
           <SidebarGroup>
             <CollapsibleTrigger className="w-full">
-              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+              <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1" aria-expanded={adminFinanceExpanded}>
                 <span>Admin & Finance</span>
-                {adminFinanceExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                {adminFinanceExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
               </SidebarGroupLabel>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -457,9 +457,9 @@ export function AppSidebar() {
           <Collapsible open={managementExpanded} onOpenChange={setManagementExpanded}>
             <SidebarGroup>
               <CollapsibleTrigger className="w-full">
-                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1" aria-expanded={managementExpanded}>
                   <span>Management</span>
-                  {managementExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {managementExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
                 </SidebarGroupLabel>
               </CollapsibleTrigger>
               <CollapsibleContent>
@@ -490,9 +490,9 @@ export function AppSidebar() {
           <Collapsible open={contactsExpanded} onOpenChange={setContactsExpanded}>
             <SidebarGroup>
               <CollapsibleTrigger className="w-full">
-                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1" aria-expanded={contactsExpanded}>
                   <span>Contacts</span>
-                  {contactsExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {contactsExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
                 </SidebarGroupLabel>
               </CollapsibleTrigger>
               <CollapsibleContent>
@@ -523,9 +523,9 @@ export function AppSidebar() {
           <Collapsible open={adminExpanded} onOpenChange={setAdminExpanded}>
             <SidebarGroup>
               <CollapsibleTrigger className="w-full">
-                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1">
+                <SidebarGroupLabel className="text-xs uppercase tracking-wider text-muted-foreground flex items-center justify-between cursor-pointer hover:bg-sidebar-accent/50 rounded px-2 py-1" aria-expanded={adminExpanded}>
                   <span>Settings</span>
-                  {adminExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                  {adminExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
                 </SidebarGroupLabel>
               </CollapsibleTrigger>
               <CollapsibleContent>
@@ -556,7 +556,7 @@ export function AppSidebar() {
       <SidebarFooter className="p-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-3 h-auto py-2 px-2" data-testid="button-user-menu">
+            <Button variant="ghost" className="w-full justify-start gap-3 h-auto py-2 px-2" data-testid="button-user-menu" aria-label={`User menu for ${user?.name || user?.email}`}>
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary/10 text-primary text-xs">
                   {getInitials(user?.name, user?.email)}
@@ -570,12 +570,12 @@ export function AppSidebar() {
                   {user?.role?.toLowerCase()}
                 </span>
               </div>
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem onClick={logout} className="text-destructive" data-testid="button-logout">
-              <LogOut className="h-4 w-4 mr-2" />
+              <LogOut className="h-4 w-4 mr-2" aria-hidden="true" />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>

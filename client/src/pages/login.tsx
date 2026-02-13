@@ -61,7 +61,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4" role="main" aria-label="Login page">
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
           <div className="h-16 mb-4 flex items-center justify-center" data-testid="img-login-logo">
@@ -79,14 +79,14 @@ export default function LoginPage() {
 
         <Card className="border-border shadow-lg">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-xl">Sign in</CardTitle>
+            <CardTitle className="text-xl" id="login-heading">Sign in</CardTitle>
             <CardDescription>
               Enter your credentials to access your account
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" aria-labelledby="login-heading">
                 <FormField
                   control={form.control}
                   name="email"
@@ -98,11 +98,12 @@ export default function LoginPage() {
                           type="email"
                           placeholder="you@company.com"
                           autoComplete="email"
+                          aria-required="true"
                           data-testid="input-email"
                           {...field}
                         />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage role="alert" />
                     </FormItem>
                   )}
                 />
@@ -118,6 +119,7 @@ export default function LoginPage() {
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             autoComplete="current-password"
+                            aria-required="true"
                             data-testid="input-password"
                             {...field}
                           />
@@ -128,6 +130,7 @@ export default function LoginPage() {
                             className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                             onClick={() => setShowPassword(!showPassword)}
                             aria-label={showPassword ? "Hide password" : "Show password"}
+                            aria-pressed={showPassword}
                             data-testid="button-toggle-password"
                           >
                             {showPassword ? (
@@ -138,14 +141,18 @@ export default function LoginPage() {
                           </Button>
                         </div>
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage role="alert" />
                     </FormItem>
                   )}
                 />
+                <div aria-live="polite" className="sr-only">
+                  {isLoading ? "Signing in, please wait..." : ""}
+                </div>
                 <Button 
                   type="submit" 
                   className="w-full" 
                   disabled={isLoading}
+                  aria-busy={isLoading}
                   data-testid="button-login"
                 >
                   {isLoading ? (

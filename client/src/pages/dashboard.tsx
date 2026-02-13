@@ -175,7 +175,7 @@ export default function DashboardPage() {
         <Card className="border-orange-500 bg-orange-500/5" data-testid="card-due-tasks">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 gap-2">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              <AlertTriangle className="h-5 w-5 text-orange-500" aria-hidden="true" />
               Due & Overdue Tasks
             </CardTitle>
             <Badge variant="default" className="text-lg px-3 py-1 bg-orange-500">
@@ -234,7 +234,7 @@ export default function DashboardPage() {
         <Card className="border-primary bg-primary/5" data-testid="card-unread-messages">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-primary" />
+              <MessageSquare className="h-5 w-5 text-primary" aria-hidden="true" />
               Unread Messages
             </CardTitle>
             <Badge variant="default" className="text-lg px-3 py-1">
@@ -286,7 +286,7 @@ export default function DashboardPage() {
         <Card className="border-blue-500 bg-blue-500/5" data-testid="card-task-notifications">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
-              <ListTodo className="h-5 w-5 text-blue-500" />
+              <ListTodo className="h-5 w-5 text-blue-500" aria-hidden="true" />
               Task Updates
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -350,7 +350,7 @@ export default function DashboardPage() {
         <Card data-testid="card-today-minutes">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Today's Work</CardTitle>
-            <Timer className="h-4 w-4 text-muted-foreground" />
+            <Timer className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -371,7 +371,7 @@ export default function DashboardPage() {
         <Card data-testid="card-pending-days">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Pending Days</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -390,7 +390,7 @@ export default function DashboardPage() {
         <Card data-testid="card-awaiting-approval">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Awaiting Approval</CardTitle>
-            <AlertCircle className="h-4 w-4 text-muted-foreground" />
+            <AlertCircle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -409,7 +409,7 @@ export default function DashboardPage() {
         <Card data-testid="card-approved-week">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium">Approved This Week</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+            <CheckCircle2 className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -430,7 +430,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
+              <Activity className="h-5 w-5" aria-hidden="true" />
               Quick Actions
             </CardTitle>
             <CardDescription>
@@ -464,7 +464,7 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
+              <Clock className="h-5 w-5" aria-hidden="true" />
               Recent Activity
             </CardTitle>
             <CardDescription>
@@ -506,7 +506,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="text-center py-6 text-muted-foreground">
-                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <Clock className="h-8 w-8 mx-auto mb-2 opacity-50" aria-hidden="true" />
                 <p className="text-sm">No recent activity</p>
                 <p className="text-xs">Time entries will appear here</p>
               </div>
