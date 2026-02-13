@@ -60,10 +60,9 @@ describe("DevicesPage", () => {
     expect(screen.getByTestId("button-add-device")).toBeInTheDocument();
   });
 
-  it("renders table headers", () => {
+  it("shows empty state when no devices", () => {
     mockUseQuery.mockReturnValue({ data: [], isLoading: false });
     renderWithProviders(<DevicesPage />);
-    expect(screen.getByText("Device")).toBeInTheDocument();
-    expect(screen.getByText("User")).toBeInTheDocument();
+    expect(screen.getByText("No devices registered")).toBeInTheDocument();
   });
 });
