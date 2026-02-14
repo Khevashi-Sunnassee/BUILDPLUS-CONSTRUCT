@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Eye, Pencil, Trash2, Loader2, Search, FileText, ChevronDown, ChevronRight,
-  DollarSign, Users, Send, Mail, Package, X, Info,
+  DollarSign, Users, Send, Mail, Package, X, Info, Layers, Link2, Unlink,
 } from "lucide-react";
 import type { Tender, TenderSubmission, TenderMember, Job, DocumentBundle } from "@shared/schema";
 
@@ -1234,6 +1234,8 @@ function TenderDetailContent({
           </div>
         )}
 
+        <TenderLinkedScopes tenderId={tender.id} />
+
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
             <h3 className="font-semibold flex items-center gap-2">
@@ -1412,5 +1414,167 @@ function SubmissionRow({
         </TableRow>
       )}
     </>
+  );
+}
+
+interface LinkedScope {
+  id: string;
+  scopeId: string;
+  tenderId: string;
+  sortOrder: number;
+  scope: {
+    id: string;
+    name: string;
+    status: string;
+    trade: { id: string; name: string } | null;
+  };
+}
+
+function TenderLinkedScopes({ tenderId }: { tenderId: string }) {
+  const { toast } = useToast();
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [selectedScopeId, setSelectedScopeId] = useState("");
+
+  const { data: linkedScopes = [], isLoading } = useQuery<LinkedScope[]>({
+    queryKey: ["/api/tenders", tenderId, "scopes"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenders/${tenderId}/scopes`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch linked scopes");
+      return res.json();
+    },
+  });
+
+  const { data: availableScopes = [] } = useQuery<Array<{ id: string; name: string; status: string; trade: { id: string; name: string } | null }>>({
+    queryKey: ["/api/scopes", { status: "ACTIVE" }],
+    queryFn: async () => {
+      const res = await fetch("/api/scopes?status=ACTIVE", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch scopes");
+      return res.json();
+    },
+    enabled: linkDialogOpen,
+  });
+
+  const linkMutation = useMutation({
+    mutationFn: async (scopeId: string) => {
+      await apiRequest("POST", `/api/tenders/${tenderId}/scopes`, {
+        scopeId,
+        sortOrder: linkedScopes.length,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "scopes"] });
+      setLinkDialogOpen(false);
+      setSelectedScopeId("");
+      toast({ title: "Scope linked to tender" });
+    },
+    onError: () => {
+      toast({ title: "Failed to link scope", variant: "destructive" });
+    },
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: async (scopeId: string) => {
+      await apiRequest("DELETE", `/api/tenders/${tenderId}/scopes/${scopeId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "scopes"] });
+      toast({ title: "Scope unlinked from tender" });
+    },
+    onError: () => {
+      toast({ title: "Failed to unlink scope", variant: "destructive" });
+    },
+  });
+
+  const alreadyLinkedIds = new Set(linkedScopes.map((ls) => ls.scopeId));
+  const unlinkedScopes = availableScopes.filter((s) => !alreadyLinkedIds.has(s.id));
+
+  return (
+    <div className="pt-4 border-t">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <h3 className="font-semibold flex items-center gap-2">
+          <Layers className="h-4 w-4" />
+          Linked Scopes ({linkedScopes.length})
+        </h3>
+        <Button size="sm" variant="outline" onClick={() => setLinkDialogOpen(true)} data-testid="button-link-scope">
+          <Link2 className="h-4 w-4 mr-1" />
+          Link Scope
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+        </div>
+      ) : linkedScopes.length === 0 ? (
+        <div className="text-center py-4 text-muted-foreground text-sm" data-testid="text-empty-linked-scopes">
+          No scopes linked. Link a scope of works to include with this tender.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {linkedScopes.map((ls) => (
+            <div
+              key={ls.id}
+              className="flex items-center justify-between gap-2 p-3 border rounded-md flex-wrap"
+              data-testid={`linked-scope-${ls.scopeId}`}
+            >
+              <div className="flex items-center gap-3 flex-wrap">
+                <div>
+                  <p className="font-medium text-sm">{ls.scope.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ls.scope.trade?.name || "Unknown Trade"}
+                  </p>
+                </div>
+                <Badge variant="secondary">{ls.scope.status}</Badge>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => unlinkMutation.mutate(ls.scopeId)}
+                disabled={unlinkMutation.isPending}
+                data-testid={`button-unlink-scope-${ls.scopeId}`}
+              >
+                <Unlink className="h-4 w-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="max-w-md" data-testid="dialog-link-scope">
+          <DialogHeader>
+            <DialogTitle>Link Scope of Works</DialogTitle>
+            <DialogDescription>Select an active scope to link to this tender.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={selectedScopeId} onValueChange={setSelectedScopeId}>
+              <SelectTrigger data-testid="select-link-scope">
+                <SelectValue placeholder="Select a scope..." />
+              </SelectTrigger>
+              <SelectContent>
+                {unlinkedScopes.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name} ({s.trade?.name || "No Trade"})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setLinkDialogOpen(false)} data-testid="button-cancel-link-scope">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => linkMutation.mutate(selectedScopeId)}
+                disabled={!selectedScopeId || linkMutation.isPending}
+                data-testid="button-confirm-link-scope"
+              >
+                {linkMutation.isPending && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}
+                Link Scope
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }

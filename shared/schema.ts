@@ -25,6 +25,10 @@ export const progressClaimStatusEnum = pgEnum("progress_claim_status", ["DRAFT",
 
 export const capexStatusEnum = pgEnum("capex_status", ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "WITHDRAWN"]);
 
+export const scopeStatusEnum = pgEnum("scope_status", ["DRAFT", "ACTIVE", "ARCHIVED"]);
+export const scopeItemStatusEnum = pgEnum("scope_item_status", ["INCLUDED", "EXCLUDED", "NA"]);
+export const scopeSourceEnum = pgEnum("scope_source", ["TEMPLATE", "AI_GENERATED", "CUSTOM", "IMPORTED"]);
+
 export const tenderStatusEnum = pgEnum("tender_status", ["DRAFT", "OPEN", "UNDER_REVIEW", "APPROVED", "CLOSED", "CANCELLED"]);
 export const tenderSubmissionStatusEnum = pgEnum("tender_submission_status", ["SUBMITTED", "REVISED", "APPROVED", "REJECTED"]);
 export const boqUnitEnum = pgEnum("boq_unit", ["EA", "SQM", "M3", "LM", "M2", "M", "HR", "DAY", "TONNE", "KG", "LOT"]);
@@ -201,6 +205,7 @@ export const FUNCTION_KEYS = [
   "admin_cost_codes",
   "tenders",
   "budgets",
+  "scopes",
 ] as const;
 
 export type FunctionKey = typeof FUNCTION_KEYS[number];
@@ -4480,3 +4485,90 @@ export const budgetLineDetailItems = pgTable("budget_line_detail_items", {
 export const insertBudgetLineDetailItemSchema = createInsertSchema(budgetLineDetailItems).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertBudgetLineDetailItem = z.infer<typeof insertBudgetLineDetailItemSchema>;
 export type BudgetLineDetailItem = typeof budgetLineDetailItems.$inferSelect;
+
+// ==================== SCOPE OF WORKS ====================
+
+export const scopeTrades = pgTable("scope_trades", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("scope_trades_company_idx").on(table.companyId),
+  nameCompanyIdx: uniqueIndex("scope_trades_name_company_idx").on(table.name, table.companyId),
+}));
+
+export const scopes = pgTable("scopes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  jobTypeId: varchar("job_type_id", { length: 36 }).references(() => jobTypes.id),
+  tradeId: varchar("trade_id", { length: 36 }).notNull().references(() => scopeTrades.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: scopeStatusEnum("status").default("DRAFT").notNull(),
+  source: scopeSourceEnum("source").default("CUSTOM").notNull(),
+  isTemplate: boolean("is_template").default(false).notNull(),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  updatedById: varchar("updated_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  companyIdx: index("scopes_company_idx").on(table.companyId),
+  jobTypeIdx: index("scopes_job_type_idx").on(table.jobTypeId),
+  tradeIdx: index("scopes_trade_idx").on(table.tradeId),
+  statusIdx: index("scopes_status_idx").on(table.status),
+  templateIdx: index("scopes_template_idx").on(table.isTemplate),
+}));
+
+export const scopeItems = pgTable("scope_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  scopeId: varchar("scope_id", { length: 36 }).notNull().references(() => scopes.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  category: text("category"),
+  description: text("description").notNull(),
+  details: text("details"),
+  status: scopeItemStatusEnum("status").default("INCLUDED").notNull(),
+  isCustom: boolean("is_custom").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  scopeIdx: index("scope_items_scope_idx").on(table.scopeId),
+  companyIdx: index("scope_items_company_idx").on(table.companyId),
+  categoryIdx: index("scope_items_category_idx").on(table.category),
+  statusIdx: index("scope_items_status_idx").on(table.status),
+}));
+
+export const tenderScopes = pgTable("tender_scopes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderId: varchar("tender_id", { length: 36 }).notNull().references(() => tenders.id, { onDelete: "cascade" }),
+  scopeId: varchar("scope_id", { length: 36 }).notNull().references(() => scopes.id),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tenderIdx: index("tender_scopes_tender_idx").on(table.tenderId),
+  scopeIdx: index("tender_scopes_scope_idx").on(table.scopeId),
+  companyIdx: index("tender_scopes_company_idx").on(table.companyId),
+  uniqueTenderScope: uniqueIndex("tender_scopes_unique_idx").on(table.tenderId, table.scopeId),
+}));
+
+export const insertScopeTradeSchema = createInsertSchema(scopeTrades).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertScopeTrade = z.infer<typeof insertScopeTradeSchema>;
+export type ScopeTrade = typeof scopeTrades.$inferSelect;
+
+export const insertScopeSchema = createInsertSchema(scopes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertScope = z.infer<typeof insertScopeSchema>;
+export type Scope = typeof scopes.$inferSelect;
+
+export const insertScopeItemSchema = createInsertSchema(scopeItems).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertScopeItem = z.infer<typeof insertScopeItemSchema>;
+export type ScopeItem = typeof scopeItems.$inferSelect;
+
+export const insertTenderScopeSchema = createInsertSchema(tenderScopes).omit({ id: true, createdAt: true });
+export type InsertTenderScope = z.infer<typeof insertTenderScopeSchema>;
+export type TenderScope = typeof tenderScopes.$inferSelect;

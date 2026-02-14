@@ -57,6 +57,7 @@ import { costCodesRouter } from "./cost-codes.routes";
 import { tenderRouter } from "./tender.routes";
 import { budgetRouter } from "./budget.routes";
 import { boqRouter } from "./boq.routes";
+import { scopesRouter } from "./scopes.routes";
 import { registerObjectStorageRoutes } from "../replit_integrations/object_storage";
 
 declare module "express-session" {
@@ -176,6 +177,7 @@ export async function setupRoutes(app: Express): Promise<void> {
   app.use(tenderRouter);
   app.use(budgetRouter);
   app.use(boqRouter);
+  app.use(scopesRouter);
   
   // Agent router has relative path (/ingest)
   app.use("/api/agent", agentRouter);

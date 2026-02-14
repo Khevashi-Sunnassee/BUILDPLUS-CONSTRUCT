@@ -120,6 +120,7 @@ const adminFinanceNavItems = [
   { title: "CAPEX Requests", url: "/capex-requests", icon: Landmark },
   { title: "Hire Bookings", url: "/hire-bookings", icon: Wrench },
   { title: "Tenders", url: "/tenders", icon: ClipboardList },
+  { title: "Scope of Works", url: "/scopes", icon: Layers },
   { title: "Weekly Wages", url: "/weekly-wages", icon: DollarSign },
   { title: "Asset Register", url: "/admin/asset-register", icon: Boxes },
 ];
@@ -181,6 +182,7 @@ const urlToFunctionKey: Record<string, string> = {
   "/capex-requests": "capex_requests",
   "/hire-bookings": "hire_bookings",
   "/tenders": "tenders",
+  "/scopes": "scopes",
   "/weekly-wages": "weekly_wages",
   "/admin/asset-register": "admin_assets",
   "/kpi-dashboard": "kpi_dashboard",
