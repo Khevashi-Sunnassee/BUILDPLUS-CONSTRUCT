@@ -49,3 +49,105 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **connect-pg-simple**: PostgreSQL-backed session store.
 - **Vitest**: Testing framework.
 - **ExcelJS**: Excel file generation library.
+
+## Coding Standards
+
+### Accessibility
+- All pages have `role="main"` with a descriptive `aria-label`.
+- All interactive elements have `aria-label` or visible label text.
+- Forms use `aria-required` on required fields.
+- Loading states use `aria-busy="true"` and `aria-live="polite"`.
+- Error alerts use `role="alert"` and `aria-live="assertive"`.
+- ESLint enforces 11 a11y rules via `eslint-plugin-jsx-a11y`.
+
+### Frontend Testing
+- 135 test files, 562+ tests using React Testing Library + Vitest.
+- Config: `vitest.config.frontend.ts` with jsdom environment.
+- Every interactive element must have a `data-testid` attribute.
+- Run: `npx vitest --config vitest.config.frontend.ts --run`.
+
+### Database Integrity
+- 142 CHECK constraints across tables (monetary >= 0, rates >= 0 AND <= 100).
+- 61 unique constraints, 390 foreign keys.
+- New tables must include companyId with FK to companies.
+
+### Developer Experience
+- Quality check: `bash scripts/quality-check.sh`.
+- Pre-commit: `husky` + `lint-staged` for ESLint.
+- Lazy imports use `lazyWithRetry` for stale chunk handling.
+
+---
+
+## Enterprise Coding Rules (300+ Users)
+
+### R1. Route Parameter Type Safety
+Extract `req.params.*` into typed const variables before use:
+```typescript
+const id = req.params.id as string;
+```
+
+### R2. Multi-Tenant Data Isolation
+EVERY query on company-owned tables MUST include `companyId` filter. No exceptions.
+
+### R3. Input Validation
+EVERY POST/PUT/PATCH endpoint MUST validate body with Zod schemas.
+
+### R4. Error Handling
+Try/catch with ZodError handling, 23505 duplicate detection, logger.error, user-friendly 500 messages.
+
+### R5. Authentication & Authorization
+Every route uses `requireAuth`. Role/permission checks on write/delete.
+
+### R6. API Response Structure
+Consistent: 201 created, 400 validation, 404 not found, 409 conflict, 500 server error.
+
+### R7. AI Endpoint Safety
+Validate input before OpenAI. Parse AI responses with try/catch.
+
+### R8. Database Schema Changes
+New tables need companyId. CHECK constraints on monetary/rate columns.
+
+### R9. Frontend Component Rules
+data-testid on interactive elements. Loading/error states. Cache invalidation after mutations.
+
+### R10. File Organization
+Routes: `server/routes/{module}.routes.ts`. Schemas: `shared/schema.ts`. Pages: `client/src/pages/`.
+
+---
+
+## Audit Checklist (Target: 90/100)
+
+### A. Type Safety & Build Health (15 pts)
+Zero LSP diagnostics, zero TS errors, typed req.params (R1).
+
+### B. Security & Multi-Tenant Isolation (25 pts)
+companyId on all queries (R2), requireAuth on all routes, UUID validation, no SQL injection.
+
+### C. Input Validation & Error Handling (15 pts)
+Zod on POST/PUT/PATCH (R3), consistent error responses (R4, R6).
+
+### D. Database Integrity (15 pts)
+CHECK constraints (142), UNIQUE constraints (61), foreign keys (390).
+
+### E. Frontend Quality (15 pts)
+data-testid (4,316), ARIA attrs (393), loading/error states, cache invalidation (641).
+
+### F. Code Quality (15 pts)
+Standard handler pattern, no TODOs/FIXMEs, consistent naming, logger usage (647).
+
+---
+
+## Recent Changes
+
+### 2026-02-14 (Session 2)
+- Fixed scope email bug: `emailService.sendEmail()` was called with object syntax instead of positional args - emails now send correctly.
+- Fixed req.params type safety across 8 more route files (30+ handlers): broadcast, asset-repair, boq, users, capex, customer, progress-claims, project-activities.
+- Added 39 new CHECK constraints (142 total, up from 103) on monetary/cost/hours/area/weight columns.
+- Fixed critical companyId isolation gaps in admin.routes.ts (stats queries), assets.routes.ts (update/delete), budget.routes.ts (child record deletes).
+- Added Zod validation to 5 route files: hire (reject/return/cancel), broadcast (send), capex (submit/approve/withdraw), reo-schedule (bulk/process/PO), contracts (create).
+- Fixed LSP type errors in hire.routes.ts and contracts.routes.ts.
+- Updated companyId eq() calls from 502 to 539, Zod validations from ~160 to 208.
+
+### 2026-02-14 (Session 1)
+- Fixed 56 LSP type errors in scopes.routes.ts (req.params type safety).
+- Added Enterprise Coding Rules (R1-R10) and Audit Checklist to replit.md.
