@@ -7,8 +7,8 @@ import archiver from "archiver";
 import { PassThrough } from "stream";
 import { z } from "zod";
 import { storage, db } from "../storage";
-import { eq, and, desc, or, isNull } from "drizzle-orm";
-import { jobMembers, documents, documentBundles } from "@shared/schema";
+import { eq, and, desc, or, isNull, inArray } from "drizzle-orm";
+import { jobMembers, documents, documentBundles, tenderPackages, tenders, documentBundleItems } from "@shared/schema";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { ObjectStorageService, ObjectNotFoundError } from "../replit_integrations/object_storage";
 import { emailService } from "../services/email.service";
@@ -30,6 +30,68 @@ const openai = new OpenAI({
 
 const router = Router();
 const objectStorageService = new ObjectStorageService();
+
+async function findAffectedOpenTenders(documentId: string, companyId: string) {
+  const directPackages = await db
+    .select({
+      tenderId: tenders.id,
+      tenderTitle: tenders.title,
+      tenderNumber: tenders.tenderNumber,
+      tenderStatus: tenders.status,
+      packageId: tenderPackages.id,
+    })
+    .from(tenderPackages)
+    .innerJoin(tenders, eq(tenderPackages.tenderId, tenders.id))
+    .where(and(
+      eq(tenderPackages.documentId, documentId),
+      eq(tenderPackages.companyId, companyId),
+      inArray(tenders.status, ["DRAFT", "OPEN", "UNDER_REVIEW"]),
+    ));
+
+  const bundleItems = await db
+    .select({ bundleId: documentBundleItems.bundleId })
+    .from(documentBundleItems)
+    .innerJoin(documentBundles, eq(documentBundleItems.bundleId, documentBundles.id))
+    .where(and(eq(documentBundleItems.documentId, documentId), eq(documentBundles.companyId, companyId)));
+
+  const bundleIds = bundleItems.map(b => b.bundleId);
+  let bundlePackages: typeof directPackages = [];
+  if (bundleIds.length > 0) {
+    bundlePackages = await db
+      .select({
+        tenderId: tenders.id,
+        tenderTitle: tenders.title,
+        tenderNumber: tenders.tenderNumber,
+        tenderStatus: tenders.status,
+        packageId: tenderPackages.id,
+      })
+      .from(tenderPackages)
+      .innerJoin(tenders, eq(tenderPackages.tenderId, tenders.id))
+      .where(and(
+        inArray(tenderPackages.bundleId, bundleIds),
+        eq(tenderPackages.companyId, companyId),
+        inArray(tenders.status, ["DRAFT", "OPEN", "UNDER_REVIEW"]),
+      ));
+  }
+
+  const allHits = [...directPackages, ...bundlePackages];
+  const tenderMap = new Map<string, { tenderId: string; tenderTitle: string; tenderNumber: string; tenderStatus: string; packageIds: string[] }>();
+  for (const hit of allHits) {
+    const existing = tenderMap.get(hit.tenderId);
+    if (existing) {
+      if (!existing.packageIds.includes(hit.packageId)) existing.packageIds.push(hit.packageId);
+    } else {
+      tenderMap.set(hit.tenderId, {
+        tenderId: hit.tenderId,
+        tenderTitle: hit.tenderTitle,
+        tenderNumber: hit.tenderNumber,
+        tenderStatus: hit.tenderStatus,
+        packageIds: [hit.packageId],
+      });
+    }
+  }
+  return Array.from(tenderMap.values());
+}
 
 const THUMBNAIL_WIDTH = 300;
 const THUMBNAIL_MAX_CACHE = 500;
@@ -571,6 +633,8 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
       const currentVersion = parseFloat(parentDoc.version || "1.0");
       const newVersion = String((currentVersion + 1).toFixed(1));
 
+      const affectedTenders = await findAffectedOpenTenders(supersedeDocumentId, companyId);
+
       const newDocument = await storage.createNewVersion(supersedeDocumentId, {
         companyId,
         title: title || parentDoc.title,
@@ -600,7 +664,11 @@ router.post("/api/documents/upload", requireAuth, upload.single("file"), async (
         isLatestVersion: true,
       });
 
-      return res.json(newDocument);
+      return res.json({
+        ...newDocument,
+        affectedTenders: affectedTenders.length > 0 ? affectedTenders : undefined,
+        supersededDocumentId: supersedeDocumentId,
+      });
     }
 
     const document = await storage.createDocument({
@@ -686,6 +754,8 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
       return res.status(400).json({ error: "Company context required" });
     }
 
+    const affectedTenders = await findAffectedOpenTenders(parentId, companyId);
+
     const newDocument = await storage.createNewVersion(parentId, {
       companyId,
       title: parentDoc.title,
@@ -715,7 +785,11 @@ router.post("/api/documents/:id/new-version", requireAuth, upload.single("file")
       isLatestVersion: true,
     });
 
-    res.json(newDocument);
+    res.json({
+      ...newDocument,
+      affectedTenders: affectedTenders.length > 0 ? affectedTenders : undefined,
+      supersededDocumentId: parentId,
+    });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating new document version");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create new version" });

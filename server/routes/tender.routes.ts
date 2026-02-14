@@ -1304,6 +1304,11 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
         document: {
           id: documents.id,
           title: documents.title,
+          documentNumber: documents.documentNumber,
+          version: documents.version,
+          revision: documents.revision,
+          isLatestVersion: documents.isLatestVersion,
+          status: documents.status,
         },
       })
       .from(tenderPackages)
@@ -1315,7 +1320,7 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
     const mapped = results.map(r => ({
       ...r.pkg,
       bundle: r.bundle?.id ? r.bundle : null,
-      document: r.document?.id ? r.document : null,
+      document: r.document?.id ? { ...r.document, isStale: r.document.isLatestVersion === false } : null,
     }));
 
     res.json(mapped);
@@ -1485,6 +1490,157 @@ router.post("/api/tenders/:id/send-invitations", requireAuth, requirePermission(
     }
     logger.error("Error sending tender invitations:", error);
     res.status(500).json({ message: "Failed to send invitations", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/notify-doc-updates", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id as string;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured" });
+    }
+
+    const schema = z.object({
+      changedDocuments: z.array(z.object({
+        documentTitle: z.string(),
+        documentNumber: z.string().optional(),
+        oldVersion: z.string().optional(),
+        newVersion: z.string().optional(),
+      })).min(1),
+      newDocumentId: z.string().optional(),
+      supersededDocumentId: z.string().optional(),
+    });
+    const data = schema.parse(req.body);
+
+    const [tender] = await db.select().from(tenders).where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
+    if (!tender) return res.status(404).json({ message: "Tender not found" });
+
+    const members = await db
+      .select({ member: tenderMembers, supplier: { id: suppliers.id, name: suppliers.name, email: suppliers.email } })
+      .from(tenderMembers)
+      .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
+      .where(and(eq(tenderMembers.tenderId, tenderId), eq(tenderMembers.companyId, companyId)));
+
+    let sent = 0;
+    let failed = 0;
+    const results: Array<{ supplierName: string | null; status: string; error?: string }> = [];
+
+    const docListHtml = data.changedDocuments.map(d =>
+      `<li><strong>${d.documentTitle}</strong>${d.documentNumber ? ` (${d.documentNumber})` : ""}${d.oldVersion && d.newVersion ? ` — updated from v${d.oldVersion} to v${d.newVersion}` : ""}</li>`
+    ).join("");
+
+    for (const row of members) {
+      const email = row.supplier?.email;
+      if (!email) { failed++; results.push({ supplierName: row.supplier?.name || null, status: "failed", error: "No email" }); continue; }
+
+      try {
+        const htmlBody = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1a56db;">Document Update Notice</h2>
+          <p>Dear ${row.supplier?.name || "Supplier"},</p>
+          <p>Please be advised that the following documents have been updated for tender <strong>${tender.tenderNumber} - ${tender.title}</strong>:</p>
+          <ul>${docListHtml}</ul>
+          <p>Please ensure you are referencing the latest versions when preparing your submission.</p>
+          <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999;">
+            <p>This is an automated notification. Please do not reply directly to this email.</p>
+          </div>
+        </div>`;
+
+        await emailService.sendEmailWithAttachment({ to: email, subject: `Document Update - Tender ${tender.tenderNumber}: ${tender.title}`, body: htmlBody });
+        sent++;
+        results.push({ supplierName: row.supplier?.name || null, status: "sent" });
+      } catch (emailError: unknown) {
+        failed++;
+        results.push({ supplierName: row.supplier?.name || null, status: "failed", error: emailError instanceof Error ? emailError.message : "Send failed" });
+      }
+    }
+
+    res.json({ sent, failed, results });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error sending document update notifications:", error);
+    res.status(500).json({ message: "Failed to send notifications", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/duplicate-package", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id as string;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const schema = z.object({
+      supersededDocumentId: z.string(),
+      newDocumentId: z.string(),
+      copyExisting: z.boolean().default(true),
+    });
+    const data = schema.parse(req.body);
+
+    const packages = await db
+      .select({ pkg: tenderPackages, bundle: { id: documentBundles.id, bundleName: documentBundles.bundleName } })
+      .from(tenderPackages)
+      .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)));
+
+    let updatedDirectCount = 0;
+    let updatedBundleCount = 0;
+
+    for (const pkg of packages) {
+      if (pkg.pkg.documentId === data.supersededDocumentId) {
+        await db.update(tenderPackages)
+          .set({ documentId: data.newDocumentId })
+          .where(eq(tenderPackages.id, pkg.pkg.id));
+        updatedDirectCount++;
+      }
+
+      if (pkg.pkg.bundleId) {
+        const bundleItems = await db
+          .select()
+          .from(documentBundleItems)
+          .where(and(eq(documentBundleItems.bundleId, pkg.pkg.bundleId), eq(documentBundleItems.documentId, data.supersededDocumentId)));
+
+        for (const item of bundleItems) {
+          await db.update(documentBundleItems)
+            .set({ documentId: data.newDocumentId })
+            .where(eq(documentBundleItems.id, item.id));
+          updatedBundleCount++;
+        }
+      }
+    }
+
+    const updatedPackages = await db
+      .select({ pkg: tenderPackages, document: { id: documents.id, title: documents.title, documentNumber: documents.documentNumber }, bundle: { id: documentBundles.id, bundleName: documentBundles.bundleName } })
+      .from(tenderPackages)
+      .leftJoin(documents, eq(tenderPackages.documentId, documents.id))
+      .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
+      .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
+      .orderBy(asc(tenderPackages.sortOrder));
+
+    const mapped = updatedPackages.map(p => ({
+      ...p.pkg,
+      document: p.document?.id ? p.document : null,
+      bundle: p.bundle?.id ? p.bundle : null,
+    }));
+
+    res.json({ message: "Package updated successfully", updatedDirectCount, updatedBundleCount, packages: mapped });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error duplicating tender package:", error);
+    res.status(500).json({ message: "Failed to update tender package", code: "INTERNAL_ERROR" });
   }
 });
 

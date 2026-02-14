@@ -72,6 +72,14 @@ interface DuplicateInfo {
   status: string;
 }
 
+interface AffectedTender {
+  tenderId: string;
+  tenderTitle: string;
+  tenderNumber: string;
+  tenderStatus: string;
+  packageIds: string[];
+}
+
 interface UploadDocumentDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -85,6 +93,9 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
   const [duplicateInfo, setDuplicateInfo] = useState<DuplicateInfo | null>(null);
   const [pendingFormData, setPendingFormData] = useState<FormData | null>(null);
   const [checkingDuplicate, setCheckingDuplicate] = useState(false);
+  const [tenderWarningOpen, setTenderWarningOpen] = useState(false);
+  const [affectedTenders, setAffectedTenders] = useState<AffectedTender[]>([]);
+  const [uploadResponseData, setUploadResponseData] = useState<{ supersededDocumentId?: string; id?: string } | null>(null);
 
   const uploadForm = useForm<UploadFormValues>({
     resolver: zodResolver(uploadFormSchema),
@@ -161,7 +172,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
       }
       return response.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       const wasSupersede = variables.get("supersedeDocumentId");
       toast({
         title: "Success",
@@ -173,6 +184,12 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
       onOpenChange(false);
       setSelectedFile(null);
       uploadForm.reset();
+
+      if (data?.affectedTenders && data.affectedTenders.length > 0) {
+        setAffectedTenders(data.affectedTenders);
+        setUploadResponseData({ supersededDocumentId: data.supersededDocumentId, id: data.id });
+        setTenderWarningOpen(true);
+      }
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -245,6 +262,63 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
     setDuplicateDialogOpen(false);
     setDuplicateInfo(null);
     setPendingFormData(null);
+  };
+
+  const notifySuppliersMutation = useMutation({
+    mutationFn: async ({ tenderId, changedDocuments }: { tenderId: string; changedDocuments: Array<{ documentTitle: string; documentNumber?: string }> }) => {
+      const response = await apiRequest("POST", `/api/tenders/${tenderId}/notify-doc-updates`, { changedDocuments });
+      return response.json();
+    },
+  });
+
+  const updatePackageMutation = useMutation({
+    mutationFn: async ({ tenderId, supersededDocumentId, newDocumentId }: { tenderId: string; supersededDocumentId: string; newDocumentId: string }) => {
+      const response = await apiRequest("POST", `/api/tenders/${tenderId}/duplicate-package`, { supersededDocumentId, newDocumentId });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders"] });
+    },
+  });
+
+  const handleUpdateTenderPackages = async () => {
+    if (!uploadResponseData?.supersededDocumentId || !uploadResponseData?.id) return;
+    try {
+      await Promise.all(affectedTenders.map((tender) =>
+        updatePackageMutation.mutateAsync({
+          tenderId: tender.tenderId,
+          supersededDocumentId: uploadResponseData.supersededDocumentId!,
+          newDocumentId: uploadResponseData.id!,
+        })
+      ));
+      toast({ title: "Tender packages updated", description: `Updated document references in ${affectedTenders.length} tender(s)` });
+      setTenderWarningOpen(false);
+      setAffectedTenders([]);
+      setUploadResponseData(null);
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to update some packages", variant: "destructive" });
+    }
+  };
+
+  const handleNotifySuppliers = async () => {
+    if (!uploadResponseData?.supersededDocumentId) return;
+    try {
+      await Promise.all(affectedTenders.map((tender) =>
+        notifySuppliersMutation.mutateAsync({
+          tenderId: tender.tenderId,
+          changedDocuments: [{ documentTitle: "Document updated", documentNumber: "" }],
+        })
+      ));
+      toast({ title: "Notifications sent", description: `Notified suppliers on ${affectedTenders.length} tender(s)` });
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Failed to send some notifications", variant: "destructive" });
+    }
+  };
+
+  const handleDismissTenderWarning = () => {
+    setTenderWarningOpen(false);
+    setAffectedTenders([]);
+    setUploadResponseData(null);
   };
 
   return (
@@ -663,6 +737,52 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
             </Button>
             <Button onClick={handleSupersede} data-testid="button-supersede-document">
               Supersede Existing
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={tenderWarningOpen} onOpenChange={setTenderWarningOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              Document Used in Open Tenders
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  The superseded document is currently referenced in the following active tender(s):
+                </p>
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {affectedTenders.map((tender) => (
+                    <div key={tender.tenderId} className="rounded-md border p-3 space-y-1 bg-muted/50">
+                      <div className="font-medium text-sm text-foreground">{tender.tenderTitle}</div>
+                      <div className="flex items-center gap-2 flex-wrap text-xs">
+                        <span className="text-muted-foreground">Tender #: {tender.tenderNumber}</span>
+                        <Badge variant="outline" className="text-xs">{tender.tenderStatus}</Badge>
+                        <span className="text-muted-foreground">{tender.packageIds.length} package(s) affected</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm">
+                  You can update the tender packages to reference the new document version and/or notify suppliers about the change.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 flex-wrap">
+            <Button variant="outline" onClick={handleDismissTenderWarning} data-testid="button-dismiss-tender-warning">
+              Dismiss
+            </Button>
+            <Button variant="outline" onClick={handleNotifySuppliers} disabled={notifySuppliersMutation.isPending} data-testid="button-notify-suppliers">
+              {notifySuppliersMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Notify Suppliers
+            </Button>
+            <Button onClick={handleUpdateTenderPackages} disabled={updatePackageMutation.isPending} data-testid="button-update-tender-packages">
+              {updatePackageMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              Update Packages
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -139,6 +139,17 @@ Standard handler pattern, no TODOs/FIXMEs, consistent naming, logger usage (647)
 
 ## Recent Changes
 
+### 2026-02-14 (Session 3)
+- Fixed task auto-assign bug: Activity tasks now auto-assign creator as assignee (matching regular tasks behavior).
+- Implemented tender document staleness detection system:
+  * Added `findAffectedOpenTenders()` helper in documents.routes.ts to detect tenders using superseded documents (checks direct packages and bundle references, scoped by companyId).
+  * Modified document supersede endpoints to return affected tender information in response.
+  * Added POST /api/tenders/:id/notify-doc-updates endpoint (Zod-validated, auth/permission-protected) to email suppliers about document changes.
+  * Added POST /api/tenders/:id/duplicate-package endpoint (Zod-validated, auth/permission-protected) to update tender packages with new document versions.
+  * Extended GET /api/tenders/:id/packages to return document staleness indicators (isLatestVersion, version, revision, documentNumber, status, isStale).
+  * Frontend UploadDocumentDialog shows warning dialog after superseding documents used in active tenders, with "Update Packages" and "Notify Suppliers" actions using async mutations with proper error handling.
+  * TenderDetailContent shows orange "Out of date" badges for stale document packages.
+
 ### 2026-02-14 (Session 2)
 - Fixed scope email bug: `emailService.sendEmail()` was called with object syntax instead of positional args - emails now send correctly.
 - Fixed req.params type safety across 8 more route files (30+ handlers): broadcast, asset-repair, boq, users, capex, customer, progress-claims, project-activities.

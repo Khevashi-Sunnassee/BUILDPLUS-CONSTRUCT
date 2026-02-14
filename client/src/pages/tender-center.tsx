@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import {
   Plus, Eye, Pencil, Trash2, Loader2, Search, FileText, ChevronDown, ChevronRight,
-  DollarSign, Users, Send, Mail, Package, X, Info, Layers, Link2, Unlink,
+  DollarSign, Users, Send, Mail, Package, X, Info, Layers, Link2, Unlink, AlertTriangle,
 } from "lucide-react";
 import type { Tender, TenderSubmission, TenderMember, Job, DocumentBundle } from "@shared/schema";
 
@@ -1165,6 +1165,23 @@ function TenderDetailContent({
     },
   });
 
+  const { data: detailPackages = [] } = useQuery<Array<{
+    id: string;
+    bundleId: string | null;
+    documentId: string | null;
+    bundle: { id: string; bundleName: string; qrCodeId: string } | null;
+    document: { id: string; title: string; documentNumber: string | null; version: string | null; revision: string | null; isLatestVersion: boolean | null; status: string | null; isStale: boolean } | null;
+  }>>({
+    queryKey: ["/api/tenders", tender.id, "packages"],
+    queryFn: async () => {
+      const res = await fetch(`/api/tenders/${tender.id}/packages`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch packages");
+      return res.json();
+    },
+  });
+
+  const staleDocuments = detailPackages.filter(p => p.document?.isStale);
+
   return (
     <>
       <DialogHeader>
@@ -1235,6 +1252,36 @@ function TenderDetailContent({
         )}
 
         <TenderLinkedScopes tenderId={tender.id} />
+
+        {staleDocuments.length > 0 && (
+          <div className="rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30 p-3 space-y-2" data-testid="section-stale-documents">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
+              <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                {staleDocuments.length} document(s) in this tender have been superseded
+              </span>
+            </div>
+            <div className="space-y-1">
+              {staleDocuments.map((pkg) => (
+                <div key={pkg.id} className="flex items-center gap-2 text-sm">
+                  <Badge variant="outline" className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600" data-testid={`badge-stale-doc-${pkg.id}`}>
+                    Out of date
+                  </Badge>
+                  <span className="text-muted-foreground truncate">
+                    {pkg.document?.title}{pkg.document?.documentNumber ? ` (${pkg.document.documentNumber})` : ""} — v{pkg.document?.version || "?"}{pkg.document?.revision || ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {detailPackages.length > 0 && staleDocuments.length === 0 && (
+          <div className="text-sm text-muted-foreground flex items-center gap-2" data-testid="text-packages-up-to-date">
+            <Package className="h-4 w-4" />
+            {detailPackages.filter(p => p.document).length} document(s) in package — all up to date
+          </div>
+        )}
 
         <div className="pt-4 border-t">
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
