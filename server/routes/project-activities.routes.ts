@@ -1892,6 +1892,11 @@ router.post("/api/job-activities/:activityId/tasks", requireAuth, requirePermiss
     }
 
     const task = await storage.createTask(taskData);
+
+    if (userId) {
+      await storage.setTaskAssignees(task.id, [userId]);
+    }
+
     const taskWithDetails = await storage.getTask(task.id);
     res.status(201).json(taskWithDetails || task);
   } catch (error: unknown) {
