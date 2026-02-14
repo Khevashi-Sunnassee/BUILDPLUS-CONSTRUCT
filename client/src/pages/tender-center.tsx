@@ -1254,17 +1254,17 @@ function TenderDetailContent({
         <TenderLinkedScopes tenderId={tender.id} />
 
         {staleDocuments.length > 0 && (
-          <div className="rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/30 p-3 space-y-2" data-testid="section-stale-documents">
+          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 space-y-2" data-testid="section-stale-documents">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-orange-500 flex-shrink-0" />
-              <span className="text-sm font-medium text-orange-800 dark:text-orange-300">
+              <AlertTriangle className="h-4 w-4 text-destructive flex-shrink-0" />
+              <span className="text-sm font-medium text-destructive">
                 {staleDocuments.length} document(s) in this tender have been superseded
               </span>
             </div>
             <div className="space-y-1">
               {staleDocuments.map((pkg) => (
                 <div key={pkg.id} className="flex items-center gap-2 text-sm">
-                  <Badge variant="outline" className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-600" data-testid={`badge-stale-doc-${pkg.id}`}>
+                  <Badge variant="destructive" className="text-xs" data-testid={`badge-stale-doc-${pkg.id}`}>
                     Out of date
                   </Badge>
                   <span className="text-muted-foreground truncate">

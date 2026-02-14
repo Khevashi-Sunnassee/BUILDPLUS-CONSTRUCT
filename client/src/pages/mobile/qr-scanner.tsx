@@ -716,15 +716,15 @@ function BundleScanResult({
 
       {staleCount > 0 && (
         <div
-          className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-3 flex items-start gap-3"
+          className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 flex items-start gap-3"
           data-testid="banner-bundle-stale-warning"
         >
-          <AlertTriangle className="h-5 w-5 text-orange-400 shrink-0 mt-0.5" />
+          <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-orange-300">
+            <p className="text-sm font-medium text-red-300">
               {staleCount} outdated {staleCount === 1 ? "document" : "documents"}
             </p>
-            <p className="text-xs text-orange-300/70 mt-0.5">
+            <p className="text-xs text-red-300/70 mt-0.5">
               Newer versions are available. Update from the document register.
             </p>
           </div>
@@ -748,7 +748,7 @@ function BundleScanResult({
               {docCount} {docCount === 1 ? "document" : "documents"}
             </Badge>
             {staleCount > 0 && (
-              <Badge className="bg-orange-500/20 text-orange-300 border-0 text-xs font-medium" data-testid="badge-bundle-stale-mobile">
+              <Badge className="bg-red-500/20 text-red-300 border-0 text-xs font-medium" data-testid="badge-bundle-stale-mobile">
                 {staleCount} outdated
               </Badge>
             )}
@@ -765,13 +765,13 @@ function BundleScanResult({
                   className="flex items-center gap-3 py-2"
                   data-testid={`bundle-doc-${item.documentId}`}
                 >
-                  <FileText className={`h-4 w-4 flex-shrink-0 ${isStale ? "text-orange-400" : "text-white/30"}`} />
+                  <FileText className={`h-4 w-4 flex-shrink-0 ${isStale ? "text-red-400" : "text-white/30"}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white truncate">
                       {item.document?.title || item.document?.originalName || "Document"}
                     </p>
                     {isStale && (
-                      <p className="text-xs text-orange-400" data-testid={`text-stale-indicator-${item.documentId}`}>
+                      <p className="text-xs text-red-400" data-testid={`text-stale-indicator-${item.documentId}`}>
                         v{item.document?.version || "1"}{item.document?.revision || ""} — superseded
                       </p>
                     )}

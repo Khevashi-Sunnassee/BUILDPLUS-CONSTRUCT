@@ -334,8 +334,8 @@ export function BundleGridView() {
                   )}
                   {staleCount > 0 && (
                     <Badge
-                      variant="outline"
-                      className="shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                      variant="destructive"
+                      className="shrink-0"
                       data-testid={`badge-bundle-stale-count-${bundle.id}`}
                     >
                       <AlertTriangle className="h-3 w-3 mr-1" />
@@ -435,8 +435,8 @@ export function BundleGridView() {
                                         </span>
                                         {isStale && (
                                           <Badge
-                                            variant="outline"
-                                            className="shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                                            variant="destructive"
+                                            className="shrink-0"
                                             data-testid={`badge-stale-doc-${item.id}`}
                                           >
                                             <AlertTriangle className="h-3 w-3 mr-1" />
@@ -481,7 +481,7 @@ export function BundleGridView() {
                                             disabled={requestLatestMutation.isPending}
                                             data-testid={`button-request-latest-${item.id}`}
                                           >
-                                            <RefreshCw className={`h-4 w-4 text-orange-600 dark:text-orange-400 ${requestLatestMutation.isPending ? "animate-spin" : ""}`} />
+                                            <RefreshCw className={`h-4 w-4 text-destructive ${requestLatestMutation.isPending ? "animate-spin" : ""}`} />
                                           </Button>
                                         </TooltipTrigger>
                                         <TooltipContent>Update to latest version</TooltipContent>

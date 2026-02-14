@@ -118,8 +118,7 @@ export default function PublicBundlePage() {
             </Badge>
             {staleCount > 0 && (
               <Badge
-                variant="outline"
-                className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                variant="destructive"
                 data-testid="badge-public-bundle-stale-count"
               >
                 <AlertTriangle className="h-3 w-3 mr-1" />
@@ -130,10 +129,10 @@ export default function PublicBundlePage() {
         </div>
 
         {staleCount > 0 && (
-          <Alert className="border-orange-300 dark:border-orange-600" data-testid="alert-public-bundle-stale">
-            <AlertTriangle className="h-4 w-4 text-orange-500" />
-            <AlertTitle className="text-orange-700 dark:text-orange-300">Some documents are outdated</AlertTitle>
-            <AlertDescription className="text-orange-600/80 dark:text-orange-400/80">
+          <Alert variant="destructive" data-testid="alert-public-bundle-stale">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Some documents are outdated</AlertTitle>
+            <AlertDescription>
               {staleCount} document{staleCount !== 1 ? "s have" : " has"} been superseded by newer versions. Contact the bundle owner for updates.
             </AlertDescription>
           </Alert>
@@ -148,18 +147,18 @@ export default function PublicBundlePage() {
             {bundle.items.map((doc) => (
               <div 
                 key={doc.id}
-                className={`flex items-center justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors ${doc.isStale ? "border-orange-300 dark:border-orange-600" : ""}`}
+                className={`flex items-center justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors ${doc.isStale ? "border-destructive" : ""}`}
                 data-testid={`public-bundle-doc-${doc.id}`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <FileText className={`h-8 w-8 shrink-0 ${doc.isStale ? "text-orange-500" : "text-muted-foreground"}`} />
+                  <FileText className={`h-8 w-8 shrink-0 ${doc.isStale ? "text-destructive" : "text-muted-foreground"}`} />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium" data-testid={`text-doc-title-${doc.id}`}>{doc.title}</p>
                       {doc.isStale && (
                         <Badge
-                          variant="outline"
-                          className="shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                          variant="destructive"
+                          className="shrink-0"
                           data-testid={`badge-stale-public-doc-${doc.id}`}
                         >
                           Superseded
