@@ -142,7 +142,8 @@ router.post("/api/scope-trades", requireAuth, requirePermission("scopes", "VIEW_
 router.put("/api/scope-trades/:id", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
     const data = tradeSchema.partial().parse(req.body);
 
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
@@ -154,7 +155,7 @@ router.put("/api/scope-trades/:id", requireAuth, requirePermission("scopes", "VI
     const [result] = await db
       .update(scopeTrades)
       .set(updateData)
-      .where(and(eq(scopeTrades.id, req.params.id), eq(scopeTrades.companyId, companyId)))
+      .where(and(eq(scopeTrades.id, id), eq(scopeTrades.companyId, companyId)))
       .returning();
 
     if (!result) return res.status(404).json({ message: "Trade not found" });
@@ -171,12 +172,13 @@ router.put("/api/scope-trades/:id", requireAuth, requirePermission("scopes", "VI
 router.delete("/api/scope-trades/:id", requireAuth, requireRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const linkedScopes = await db
       .select({ id: scopes.id })
       .from(scopes)
-      .where(and(eq(scopes.tradeId, req.params.id), eq(scopes.companyId, companyId)))
+      .where(and(eq(scopes.tradeId, id), eq(scopes.companyId, companyId)))
       .limit(1);
 
     if (linkedScopes.length > 0) {
@@ -185,7 +187,7 @@ router.delete("/api/scope-trades/:id", requireAuth, requireRole("ADMIN"), async 
 
     const [deleted] = await db
       .delete(scopeTrades)
-      .where(and(eq(scopeTrades.id, req.params.id), eq(scopeTrades.companyId, companyId)))
+      .where(and(eq(scopeTrades.id, id), eq(scopeTrades.companyId, companyId)))
       .returning();
 
     if (!deleted) return res.status(404).json({ message: "Trade not found" });
@@ -336,7 +338,8 @@ router.get("/api/scopes/stats", requireAuth, requirePermission("scopes", "VIEW")
 router.get("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const [result] = await db
       .select({
@@ -358,14 +361,14 @@ router.get("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW"), 
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .leftJoin(jobTypes, eq(scopes.jobTypeId, jobTypes.id))
       .leftJoin(users, eq(scopes.createdById, users.id))
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
 
     if (!result) return res.status(404).json({ message: "Scope not found" });
 
     const items = await db
       .select()
       .from(scopeItems)
-      .where(and(eq(scopeItems.scopeId, req.params.id), eq(scopeItems.companyId, companyId)))
+      .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
       .orderBy(asc(scopeItems.sortOrder), asc(scopeItems.createdAt));
 
     res.json({
@@ -421,7 +424,8 @@ router.put("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW_AND
   try {
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
     const data = scopeSchema.partial().parse(req.body);
 
     const updateData: Record<string, unknown> = { updatedAt: new Date(), updatedById: userId };
@@ -436,7 +440,7 @@ router.put("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW_AND
     const [result] = await db
       .update(scopes)
       .set(updateData)
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)))
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
       .returning();
 
     if (!result) return res.status(404).json({ message: "Scope not found" });
@@ -453,11 +457,12 @@ router.put("/api/scopes/:id", requireAuth, requirePermission("scopes", "VIEW_AND
 router.delete("/api/scopes/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const [deleted] = await db
       .delete(scopes)
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)))
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
       .returning();
 
     if (!deleted) return res.status(404).json({ message: "Scope not found" });
@@ -472,19 +477,20 @@ router.post("/api/scopes/:id/duplicate", requireAuth, requirePermission("scopes"
   try {
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const [original] = await db
       .select()
       .from(scopes)
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
 
     if (!original) return res.status(404).json({ message: "Scope not found" });
 
     const originalItems = await db
       .select()
       .from(scopeItems)
-      .where(and(eq(scopeItems.scopeId, req.params.id), eq(scopeItems.companyId, companyId)))
+      .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
       .orderBy(asc(scopeItems.sortOrder));
 
     const newName = req.body.name || `${original.name} (Copy)`;
@@ -535,7 +541,8 @@ router.put("/api/scopes/:id/status", requireAuth, requirePermission("scopes", "V
   try {
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const statusSchema = z.object({ status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]) });
     const { status } = statusSchema.parse(req.body);
@@ -543,7 +550,7 @@ router.put("/api/scopes/:id/status", requireAuth, requirePermission("scopes", "V
     const [result] = await db
       .update(scopes)
       .set({ status, updatedAt: new Date(), updatedById: userId })
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)))
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)))
       .returning();
 
     if (!result) return res.status(404).json({ message: "Scope not found" });
@@ -562,9 +569,10 @@ router.put("/api/scopes/:id/status", requireAuth, requirePermission("scopes", "V
 router.post("/api/scopes/:id/items", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
-    if (!(await verifyScopeOwnership(companyId, req.params.id))) {
+    if (!(await verifyScopeOwnership(companyId, id))) {
       return res.status(404).json({ message: "Scope not found" });
     }
 
@@ -573,7 +581,7 @@ router.post("/api/scopes/:id/items", requireAuth, requirePermission("scopes", "V
     const [result] = await db
       .insert(scopeItems)
       .values({
-        scopeId: req.params.id,
+        scopeId: id,
         companyId,
         category: data.category || null,
         description: data.description,
@@ -597,11 +605,13 @@ router.post("/api/scopes/:id/items", requireAuth, requirePermission("scopes", "V
 router.put("/api/scopes/:id/items/:itemId", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id) || !isValidId(req.params.itemId)) {
+    const id = req.params.id as string;
+    const itemId = req.params.itemId as string;
+    if (!isValidId(id) || !isValidId(itemId)) {
       return res.status(400).json({ message: "Invalid ID format" });
     }
 
-    if (!(await verifyScopeOwnership(companyId, req.params.id))) {
+    if (!(await verifyScopeOwnership(companyId, id))) {
       return res.status(404).json({ message: "Scope not found" });
     }
 
@@ -618,8 +628,8 @@ router.put("/api/scopes/:id/items/:itemId", requireAuth, requirePermission("scop
       .update(scopeItems)
       .set(updateData)
       .where(and(
-        eq(scopeItems.id, req.params.itemId),
-        eq(scopeItems.scopeId, req.params.id),
+        eq(scopeItems.id, itemId),
+        eq(scopeItems.scopeId, id),
         eq(scopeItems.companyId, companyId)
       ))
       .returning();
@@ -638,19 +648,21 @@ router.put("/api/scopes/:id/items/:itemId", requireAuth, requirePermission("scop
 router.delete("/api/scopes/:id/items/:itemId", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id) || !isValidId(req.params.itemId)) {
+    const id = req.params.id as string;
+    const itemId = req.params.itemId as string;
+    if (!isValidId(id) || !isValidId(itemId)) {
       return res.status(400).json({ message: "Invalid ID format" });
     }
 
-    if (!(await verifyScopeOwnership(companyId, req.params.id))) {
+    if (!(await verifyScopeOwnership(companyId, id))) {
       return res.status(404).json({ message: "Scope not found" });
     }
 
     const [deleted] = await db
       .delete(scopeItems)
       .where(and(
-        eq(scopeItems.id, req.params.itemId),
-        eq(scopeItems.scopeId, req.params.id),
+        eq(scopeItems.id, itemId),
+        eq(scopeItems.scopeId, id),
         eq(scopeItems.companyId, companyId)
       ))
       .returning();
@@ -666,9 +678,10 @@ router.delete("/api/scopes/:id/items/:itemId", requireAuth, requirePermission("s
 router.put("/api/scopes/:id/items/bulk-status", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
-    if (!(await verifyScopeOwnership(companyId, req.params.id))) {
+    if (!(await verifyScopeOwnership(companyId, id))) {
       return res.status(404).json({ message: "Scope not found" });
     }
 
@@ -687,7 +700,7 @@ router.put("/api/scopes/:id/items/bulk-status", requireAuth, requirePermission("
         .set({ status: item.status, updatedAt: new Date() })
         .where(and(
           eq(scopeItems.id, item.id),
-          eq(scopeItems.scopeId, req.params.id),
+          eq(scopeItems.scopeId, id),
           eq(scopeItems.companyId, companyId)
         ))
         .returning();
@@ -707,9 +720,10 @@ router.put("/api/scopes/:id/items/bulk-status", requireAuth, requirePermission("
 router.post("/api/scopes/:id/items/reorder", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
-    if (!(await verifyScopeOwnership(companyId, req.params.id))) {
+    if (!(await verifyScopeOwnership(companyId, id))) {
       return res.status(404).json({ message: "Scope not found" });
     }
 
@@ -727,7 +741,7 @@ router.post("/api/scopes/:id/items/reorder", requireAuth, requirePermission("sco
         .set({ sortOrder: item.sortOrder, updatedAt: new Date() })
         .where(and(
           eq(scopeItems.id, item.id),
-          eq(scopeItems.scopeId, req.params.id),
+          eq(scopeItems.scopeId, id),
           eq(scopeItems.companyId, companyId)
         ));
     }
@@ -829,9 +843,10 @@ Return ONLY the JSON array, no other text.`;
 router.post("/api/scopes/:id/import", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
-    if (!(await verifyScopeOwnership(companyId, req.params.id))) {
+    if (!(await verifyScopeOwnership(companyId, id))) {
       return res.status(404).json({ message: "Scope not found" });
     }
 
@@ -848,13 +863,13 @@ router.post("/api/scopes/:id/import", requireAuth, requirePermission("scopes", "
     const maxSort = await db
       .select({ max: sql<number>`coalesce(max(${scopeItems.sortOrder}), -1)` })
       .from(scopeItems)
-      .where(and(eq(scopeItems.scopeId, req.params.id), eq(scopeItems.companyId, companyId)));
+      .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)));
 
     let nextSort = (maxSort[0]?.max || 0) + 1;
 
     const inserted = await db.insert(scopeItems).values(
       items.map((item, idx) => ({
-        scopeId: req.params.id,
+        scopeId: id,
         companyId,
         category: item.category || null,
         description: item.description,
@@ -878,7 +893,8 @@ router.post("/api/scopes/:id/import", requireAuth, requirePermission("scopes", "
 router.get("/api/scopes/:id/export", requireAuth, requirePermission("scopes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const [scope] = await db
       .select({
@@ -889,14 +905,14 @@ router.get("/api/scopes/:id/export", requireAuth, requirePermission("scopes", "V
       .from(scopes)
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .leftJoin(jobTypes, eq(scopes.jobTypeId, jobTypes.id))
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
 
     if (!scope) return res.status(404).json({ message: "Scope not found" });
 
     const items = await db
       .select()
       .from(scopeItems)
-      .where(and(eq(scopeItems.scopeId, req.params.id), eq(scopeItems.companyId, companyId)))
+      .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
       .orderBy(asc(scopeItems.sortOrder));
 
     res.json({
@@ -926,7 +942,8 @@ router.get("/api/scopes/:id/export", requireAuth, requirePermission("scopes", "V
 router.get("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.tenderId)) return res.status(400).json({ message: "Invalid ID format" });
+    const tenderId = req.params.tenderId as string;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format" });
 
     const results = await db
       .select({
@@ -940,7 +957,7 @@ router.get("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("tend
       .from(tenderScopes)
       .innerJoin(scopes, eq(tenderScopes.scopeId, scopes.id))
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
-      .where(and(eq(tenderScopes.tenderId, req.params.tenderId), eq(tenderScopes.companyId, companyId)))
+      .where(and(eq(tenderScopes.tenderId, tenderId), eq(tenderScopes.companyId, companyId)))
       .orderBy(asc(tenderScopes.sortOrder));
 
     const mapped = results.map((row) => ({
@@ -958,7 +975,8 @@ router.get("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("tend
 router.post("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.tenderId)) return res.status(400).json({ message: "Invalid ID format" });
+    const tenderId = req.params.tenderId as string;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format" });
 
     const linkSchema = z.object({
       scopeId: z.string().min(1, "Scope ID is required"),
@@ -969,7 +987,7 @@ router.post("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("ten
     const [tender] = await db
       .select({ id: tenders.id })
       .from(tenders)
-      .where(and(eq(tenders.id, req.params.tenderId), eq(tenders.companyId, companyId)));
+      .where(and(eq(tenders.id, tenderId), eq(tenders.companyId, companyId)));
     if (!tender) return res.status(404).json({ message: "Tender not found" });
 
     if (!(await verifyScopeOwnership(companyId, data.scopeId))) {
@@ -980,7 +998,7 @@ router.post("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("ten
       .insert(tenderScopes)
       .values({
         companyId,
-        tenderId: req.params.tenderId,
+        tenderId,
         scopeId: data.scopeId,
         sortOrder: data.sortOrder ?? 0,
       })
@@ -1002,15 +1020,17 @@ router.post("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("ten
 router.delete("/api/tenders/:tenderId/scopes/:scopeId", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.tenderId) || !isValidId(req.params.scopeId)) {
+    const tenderId = req.params.tenderId as string;
+    const scopeId = req.params.scopeId as string;
+    if (!isValidId(tenderId) || !isValidId(scopeId)) {
       return res.status(400).json({ message: "Invalid ID format" });
     }
 
     const [deleted] = await db
       .delete(tenderScopes)
       .where(and(
-        eq(tenderScopes.tenderId, req.params.tenderId),
-        eq(tenderScopes.scopeId, req.params.scopeId),
+        eq(tenderScopes.tenderId, tenderId),
+        eq(tenderScopes.scopeId, scopeId),
         eq(tenderScopes.companyId, companyId)
       ))
       .returning();
@@ -1106,7 +1126,8 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
 router.get("/api/scopes/:id/print", requireAuth, requirePermission("scopes", "VIEW"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid ID format" });
+    const id = req.params.id as string;
+    if (!isValidId(id)) return res.status(400).json({ message: "Invalid ID format" });
 
     const [scope] = await db
       .select({
@@ -1119,14 +1140,14 @@ router.get("/api/scopes/:id/print", requireAuth, requirePermission("scopes", "VI
       .leftJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
       .leftJoin(jobTypes, eq(scopes.jobTypeId, jobTypes.id))
       .leftJoin(users, eq(scopes.createdById, users.id))
-      .where(and(eq(scopes.id, req.params.id), eq(scopes.companyId, companyId)));
+      .where(and(eq(scopes.id, id), eq(scopes.companyId, companyId)));
 
     if (!scope) return res.status(404).json({ message: "Scope not found" });
 
     const items = await db
       .select()
       .from(scopeItems)
-      .where(and(eq(scopeItems.scopeId, req.params.id), eq(scopeItems.companyId, companyId)))
+      .where(and(eq(scopeItems.scopeId, id), eq(scopeItems.companyId, companyId)))
       .orderBy(asc(scopeItems.sortOrder));
 
     const categories = new Map<string, typeof items>();
