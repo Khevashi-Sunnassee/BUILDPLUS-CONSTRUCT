@@ -146,7 +146,13 @@ router.get("/api/contracts/:id", requireAuth, async (req: Request, res: Response
 router.post("/api/contracts", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
-    const data = { ...req.body, companyId };
+
+    const parsed = insertContractSchema.safeParse({ ...req.body, companyId });
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const data = parsed.data;
 
     const [existing] = await db
       .select()
@@ -157,7 +163,7 @@ router.post("/api/contracts", requireAuth, async (req: Request, res: Response) =
       return res.status(409).json({ error: "Contract already exists for this job" });
     }
 
-    const [contract] = await db.insert(contracts).values(data as Record<string, unknown>).returning();
+    const [contract] = await db.insert(contracts).values({ ...data, companyId } as typeof contracts.$inferInsert).returning();
     res.status(201).json(contract);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating contract");

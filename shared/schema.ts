@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json, jsonb, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, pgEnum, uniqueIndex, index, decimal, real, json, jsonb, numeric, check } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -115,6 +115,15 @@ export const users = pgTable("users", {
 }, (table) => ({
   emailCompanyIdx: uniqueIndex("users_email_company_idx").on(table.email, table.companyId),
   companyIdx: index("users_company_idx").on(table.companyId),
+  poApprovalLimitCheck: check("users_po_approval_limit_check", sql`${table.poApprovalLimit} >= 0`),
+  capexApprovalLimitCheck: check("users_capex_approval_limit_check", sql`${table.capexApprovalLimit} >= 0`),
+  mondayHoursCheck: check("users_monday_hours_check", sql`${table.mondayHours} >= 0`),
+  tuesdayHoursCheck: check("users_tuesday_hours_check", sql`${table.tuesdayHours} >= 0`),
+  wednesdayHoursCheck: check("users_wednesday_hours_check", sql`${table.wednesdayHours} >= 0`),
+  thursdayHoursCheck: check("users_thursday_hours_check", sql`${table.thursdayHours} >= 0`),
+  fridayHoursCheck: check("users_friday_hours_check", sql`${table.fridayHours} >= 0`),
+  saturdayHoursCheck: check("users_saturday_hours_check", sql`${table.saturdayHours} >= 0`),
+  sundayHoursCheck: check("users_sunday_hours_check", sql`${table.sundayHours} >= 0`),
 }));
 
 export const invitationStatusEnum = pgEnum("invitation_status", ["PENDING", "ACCEPTED", "EXPIRED", "CANCELLED"]);
@@ -390,6 +399,7 @@ export const jobs = pgTable("jobs", {
   factoryIdx: index("jobs_factory_idx").on(table.factoryId),
   companyIdx: index("jobs_company_idx").on(table.companyId),
   jobTypeIdx: index("jobs_job_type_idx").on(table.jobTypeId),
+  estimatedValueCheck: check("jobs_estimated_value_check", sql`${table.estimatedValue} >= 0`),
 }));
 
 export const jobMembers = pgTable("job_members", {
@@ -491,6 +501,8 @@ export const draftingProgram = pgTable("drafting_program", {
   assignedToIdx: index("drafting_program_assigned_to_idx").on(table.assignedToId),
   statusIdx: index("drafting_program_status_idx").on(table.status),
   dueDateIdx: index("drafting_program_due_date_idx").on(table.drawingDueDate),
+  estimatedHoursCheck: check("drafting_program_estimated_hours_check", sql`${table.estimatedHours} >= 0`),
+  actualHoursCheck: check("drafting_program_actual_hours_check", sql`${table.actualHours} >= 0`),
 }));
 
 export const workTypes = pgTable("work_types", {
@@ -692,6 +704,12 @@ export const panelRegister = pgTable("panel_register", {
   jobPanelIdx: uniqueIndex("panel_register_job_panel_idx").on(table.jobId, table.panelMark),
   approvedForProductionIdx: index("panel_register_approved_for_production_idx").on(table.approvedForProduction),
   lifecycleStatusIdx: index("panel_register_lifecycle_status_idx").on(table.lifecycleStatus),
+  estimatedHoursCheck: check("panel_register_estimated_hours_check", sql`${table.estimatedHours} >= 0`),
+  actualHoursCheck: check("panel_register_actual_hours_check", sql`${table.actualHours} >= 0`),
+  netWeightCheck: check("panel_register_net_weight_check", sql`${table.netWeight} >= 0`),
+  grossAreaCheck: check("panel_register_gross_area_check", sql`${table.grossArea} >= 0`),
+  craneCapacityWeightCheck: check("panel_register_crane_capacity_weight_check", sql`${table.craneCapacityWeight} >= 0`),
+  panelAreaCheck: check("panel_register_panel_area_check", sql`${table.panelArea} >= 0`),
 }));
 
 export const panelAuditLogs = pgTable("panel_audit_logs", {
@@ -957,6 +975,17 @@ export const panelTypes = pgTable("panel_types", {
 }, (table) => ({
   codeCompanyIdx: uniqueIndex("panel_types_code_company_idx").on(table.code, table.companyId),
   companyIdx: index("panel_types_company_idx").on(table.companyId),
+  labourCostPerM2Check: check("panel_types_labour_cost_per_m2_check", sql`${table.labourCostPerM2} >= 0`),
+  labourCostPerM3Check: check("panel_types_labour_cost_per_m3_check", sql`${table.labourCostPerM3} >= 0`),
+  supplyCostPerM2Check: check("panel_types_supply_cost_per_m2_check", sql`${table.supplyCostPerM2} >= 0`),
+  supplyCostPerM3Check: check("panel_types_supply_cost_per_m3_check", sql`${table.supplyCostPerM3} >= 0`),
+  installCostPerM2Check: check("panel_types_install_cost_per_m2_check", sql`${table.installCostPerM2} >= 0`),
+  installCostPerM3Check: check("panel_types_install_cost_per_m3_check", sql`${table.installCostPerM3} >= 0`),
+  totalRatePerM2Check: check("panel_types_total_rate_per_m2_check", sql`${table.totalRatePerM2} >= 0`),
+  totalRatePerM3Check: check("panel_types_total_rate_per_m3_check", sql`${table.totalRatePerM3} >= 0`),
+  sellRatePerM2Check: check("panel_types_sell_rate_per_m2_check", sql`${table.sellRatePerM2} >= 0`),
+  sellRatePerM3Check: check("panel_types_sell_rate_per_m3_check", sql`${table.sellRatePerM3} >= 0`),
+  expectedWeightPerM3Check: check("panel_types_expected_weight_per_m3_check", sql`${table.expectedWeightPerM3} >= 0`),
 }));
 
 export const jobPanelRates = pgTable("job_panel_rates", {
@@ -975,6 +1004,14 @@ export const jobPanelRates = pgTable("job_panel_rates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   jobPanelTypeIdx: uniqueIndex("job_panel_rates_job_panel_type_idx").on(table.jobId, table.panelTypeId),
+  labourCostPerM2Check: check("job_panel_rates_labour_cost_per_m2_check", sql`${table.labourCostPerM2} >= 0`),
+  labourCostPerM3Check: check("job_panel_rates_labour_cost_per_m3_check", sql`${table.labourCostPerM3} >= 0`),
+  supplyCostPerM2Check: check("job_panel_rates_supply_cost_per_m2_check", sql`${table.supplyCostPerM2} >= 0`),
+  supplyCostPerM3Check: check("job_panel_rates_supply_cost_per_m3_check", sql`${table.supplyCostPerM3} >= 0`),
+  totalRatePerM2Check: check("job_panel_rates_total_rate_per_m2_check", sql`${table.totalRatePerM2} >= 0`),
+  totalRatePerM3Check: check("job_panel_rates_total_rate_per_m3_check", sql`${table.totalRatePerM3} >= 0`),
+  sellRatePerM2Check: check("job_panel_rates_sell_rate_per_m2_check", sql`${table.sellRatePerM2} >= 0`),
+  sellRatePerM3Check: check("job_panel_rates_sell_rate_per_m3_check", sql`${table.sellRatePerM3} >= 0`),
 }));
 
 export const productionEntries = pgTable("production_entries", {

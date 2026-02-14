@@ -257,19 +257,24 @@ router.delete("/api/reo-schedules/:scheduleId/items/:itemId", requireAuth, async
   }
 });
 
+const bulkStatusSchema = z.object({
+  itemIds: z.array(z.string().min(1)).min(1, "itemIds array is required"),
+  status: z.enum(["PENDING", "APPROVED", "REJECTED", "ORDERED"], {
+    errorMap: () => ({ message: "Valid status is required (PENDING, APPROVED, REJECTED, ORDERED)" }),
+  }),
+});
+
 router.post("/api/reo-schedules/:scheduleId/items/bulk-status", requireAuth, async (req: Request, res: Response) => {
   try {
     const scheduleId = req.params.scheduleId as string;
-    const { itemIds, status } = req.body;
     const companyId = req.companyId;
 
-    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
-      return res.status(400).json({ message: "itemIds array is required" });
+    const parsed = bulkStatusSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
     }
 
-    if (!status || !["PENDING", "APPROVED", "REJECTED", "ORDERED"].includes(status)) {
-      return res.status(400).json({ message: "Valid status is required" });
-    }
+    const { itemIds, status } = parsed.data;
 
     const schedule = await storage.getReoSchedule(scheduleId);
     if (!schedule) {
@@ -288,11 +293,21 @@ router.post("/api/reo-schedules/:scheduleId/items/bulk-status", requireAuth, asy
   }
 });
 
+const processScheduleSchema = z.object({
+  pdfBase64: z.string().optional().nullable(),
+});
+
 router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: Request, res: Response) => {
   try {
     const scheduleId = req.params.scheduleId as string;
-    const { pdfBase64 } = req.body;
     const companyId = req.companyId;
+
+    const parsed = processScheduleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
+    }
+
+    const { pdfBase64 } = parsed.data;
 
     const schedule = await storage.getReoScheduleWithDetails(scheduleId);
     if (!schedule) {
@@ -368,20 +383,24 @@ router.post("/api/reo-schedules/:scheduleId/process", requireAuth, async (req: R
   }
 });
 
+const createPoFromScheduleSchema = z.object({
+  supplierId: z.string().min(1, "Supplier ID is required"),
+  itemIds: z.array(z.string().min(1)).min(1, "Item IDs are required"),
+  notes: z.string().optional().nullable(),
+});
+
 router.post("/api/reo-schedules/:scheduleId/create-po", requireAuth, async (req: Request, res: Response) => {
   try {
     const scheduleId = req.params.scheduleId as string;
-    const { supplierId, itemIds, notes } = req.body;
     const companyId = req.companyId;
     const userId = req.session.userId;
 
-    if (!supplierId) {
-      return res.status(400).json({ message: "Supplier ID is required" });
+    const parsed = createPoFromScheduleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: "Validation error", errors: parsed.error.errors });
     }
 
-    if (!itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
-      return res.status(400).json({ message: "Item IDs are required" });
-    }
+    const { supplierId, itemIds, notes } = parsed.data;
 
     const schedule = await storage.getReoScheduleWithDetails(scheduleId);
     if (!schedule) {

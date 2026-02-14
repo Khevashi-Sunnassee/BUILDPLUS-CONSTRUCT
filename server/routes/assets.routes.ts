@@ -853,7 +853,7 @@ router.patch("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request,
     }
     const [updated] = await db.update(assets)
       .set({ ...safeData, updatedAt: new Date() } as any)
-      .where(eq(assets.id, String(req.params.id)))
+      .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)))
       .returning();
     res.json(updated);
   } catch (error: unknown) {
@@ -869,7 +869,7 @@ router.delete("/api/admin/assets/:id", requireRole("ADMIN"), async (req: Request
     const [existing] = await db.select().from(assets)
       .where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     if (!existing) return res.status(404).json({ error: "Asset not found" });
-    await db.delete(assets).where(eq(assets.id, String(req.params.id)));
+    await db.delete(assets).where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Failed to delete asset");
@@ -889,7 +889,7 @@ router.post("/api/admin/assets/:id/ai-summary", requireRole("ADMIN"), async (req
     }
 
     const maintenanceHistory = await db.select().from(assetMaintenanceRecords)
-      .where(eq(assetMaintenanceRecords.assetId, asset.id))
+      .where(and(eq(assetMaintenanceRecords.assetId, asset.id), eq(assetMaintenanceRecords.companyId, companyId)))
       .orderBy(desc(assetMaintenanceRecords.maintenanceDate))
       .limit(10);
 
@@ -930,7 +930,7 @@ Format as clean HTML with headings and bullet points.`;
     const summary = response.choices[0]?.message?.content || "";
     const [updated] = await db.update(assets)
       .set({ aiSummary: summary, updatedAt: new Date() })
-      .where(eq(assets.id, asset.id))
+      .where(and(eq(assets.id, asset.id), eq(assets.companyId, companyId)))
       .returning();
     res.json({ aiSummary: summary });
   } catch (error: unknown) {
@@ -1030,7 +1030,7 @@ router.post("/api/admin/assets/:id/transfers", requireRole("ADMIN"), async (req:
     if (parsed.data.toAssignee) updateFields.assignedTo = parsed.data.toAssignee;
     if (Object.keys(updateFields).length > 0) {
       updateFields.updatedAt = new Date();
-      await db.update(assets).set(updateFields).where(eq(assets.id, String(req.params.id)));
+      await db.update(assets).set(updateFields).where(and(eq(assets.id, String(req.params.id)), eq(assets.companyId, companyId)));
     }
 
     res.status(201).json(record);

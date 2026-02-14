@@ -89,13 +89,15 @@ router.get("/api/admin/assets/:assetId/repair-requests", requireAuth, async (req
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
 
+    const assetId = req.params.assetId as string;
+
     const rows = await db.select()
       .from(assetRepairRequests)
       .leftJoin(users, eq(assetRepairRequests.requestedById, users.id))
       .leftJoin(suppliers, eq(assetRepairRequests.vendorId, suppliers.id))
       .where(and(
         eq(assetRepairRequests.companyId, companyId),
-        eq(assetRepairRequests.assetId, req.params.assetId)
+        eq(assetRepairRequests.assetId, assetId)
       ))
       .orderBy(desc(assetRepairRequests.createdAt));
 
@@ -115,6 +117,7 @@ router.get("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id as string;
 
     const [row] = await db.select()
       .from(assetRepairRequests)
@@ -122,7 +125,7 @@ router.get("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
       .leftJoin(users, eq(assetRepairRequests.requestedById, users.id))
       .leftJoin(suppliers, eq(assetRepairRequests.vendorId, suppliers.id))
       .where(and(
-        eq(assetRepairRequests.id, req.params.id),
+        eq(assetRepairRequests.id, id),
         eq(assetRepairRequests.companyId, companyId)
       ));
 
@@ -179,6 +182,7 @@ router.put("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id as string;
 
     const parsed = updateRepairSchema.parse(req.body);
 
@@ -195,7 +199,7 @@ router.put("/api/asset-repair-requests/:id", requireAuth, async (req, res) => {
     const [updated] = await db.update(assetRepairRequests)
       .set(updateData)
       .where(and(
-        eq(assetRepairRequests.id, req.params.id),
+        eq(assetRepairRequests.id, id),
         eq(assetRepairRequests.companyId, companyId)
       ))
       .returning();
@@ -243,10 +247,11 @@ router.delete("/api/asset-repair-requests/:id", requireAuth, async (req, res) =>
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const id = req.params.id as string;
 
     const [deleted] = await db.delete(assetRepairRequests)
       .where(and(
-        eq(assetRepairRequests.id, req.params.id),
+        eq(assetRepairRequests.id, id),
         eq(assetRepairRequests.companyId, companyId)
       ))
       .returning();

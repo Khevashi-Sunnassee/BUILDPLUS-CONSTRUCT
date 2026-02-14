@@ -309,7 +309,9 @@ const updatePermissionSchema = z.object({
 
 // Admin: Update user permission
 router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMIN"), async (req, res) => {
-  const user = await storage.getUser(String(req.params.userId));
+  const userId = req.params.userId as string;
+  const functionKey = req.params.functionKey as FunctionKey;
+  const user = await storage.getUser(userId);
   if (!user || user.companyId !== req.companyId) {
     return res.status(404).json({ error: "User not found" });
   }
@@ -319,8 +321,8 @@ router.put("/api/admin/user-permissions/:userId/:functionKey", requireRole("ADMI
   }
   const { permissionLevel } = result.data;
   const permission = await storage.setUserPermission(
-    String(req.params.userId),
-    req.params.functionKey as FunctionKey,
+    userId,
+    functionKey,
     permissionLevel
   );
   res.json(permission);

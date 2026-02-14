@@ -1107,11 +1107,11 @@ router.post("/api/scopes/email", requireAuth, requirePermission("scopes", "VIEW"
       `;
     }
 
-    await emailService.sendEmail({
-      to: recipientEmail,
-      subject: `Scope of Works - ${scopeResults.map(r => r.scope.name).join(", ")}`,
-      html: htmlContent,
-    });
+    await emailService.sendEmail(
+      recipientEmail,
+      `Scope of Works - ${scopeResults.map(r => r.scope.name).join(", ")}`,
+      htmlContent,
+    );
 
     res.json({ message: "Email sent successfully" });
   } catch (error: unknown) {

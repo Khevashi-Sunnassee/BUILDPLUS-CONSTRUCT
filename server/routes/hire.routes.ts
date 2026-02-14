@@ -435,8 +435,26 @@ router.post("/api/hire-bookings/:id/approve", requireAuth, requireRole("ADMIN", 
   });
 });
 
+const rejectBookingSchema = z.object({
+  reason: z.string().optional(),
+  comments: z.string().optional(),
+});
+
 router.post("/api/hire-bookings/:id/reject", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
-  await transitionStatus(req, res, "CANCELLED");
+  try {
+    const parsed = rejectBookingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    await transitionStatus(req, res, "CANCELLED", {
+      notes: parsed.data.reason || parsed.data.comments || undefined,
+    });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to reject hire booking" });
+  }
 });
 
 router.post("/api/hire-bookings/:id/book", requireAuth, async (req: Request, res: Response) => {
@@ -451,12 +469,44 @@ router.post("/api/hire-bookings/:id/on-hire", requireAuth, async (req: Request, 
   await transitionStatus(req, res, "ON_HIRE");
 });
 
+const returnBookingSchema = z.object({
+  returnDate: z.string().optional(),
+  returnNotes: z.string().optional(),
+  condition: z.string().optional(),
+});
+
 router.post("/api/hire-bookings/:id/return", requireAuth, async (req: Request, res: Response) => {
-  await transitionStatus(req, res, "RETURNED");
+  try {
+    const parsed = returnBookingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    const extraUpdates: Record<string, unknown> = {};
+    if (parsed.data.returnDate) extraUpdates.actualReturnDate = new Date(parsed.data.returnDate);
+    if (parsed.data.returnNotes) extraUpdates.notes = parsed.data.returnNotes;
+    await transitionStatus(req, res, "RETURNED", extraUpdates);
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to return hire booking" });
+  }
+});
+
+const cancelBookingSchema = z.object({
+  reason: z.string().optional(),
+  comments: z.string().optional(),
 });
 
 router.post("/api/hire-bookings/:id/cancel", requireAuth, async (req: Request, res: Response) => {
-  await transitionStatus(req, res, "CANCELLED");
+  try {
+    const parsed = cancelBookingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+    await transitionStatus(req, res, "CANCELLED", {
+      notes: parsed.data.reason || parsed.data.comments || undefined,
+    });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to cancel hire booking" });
+  }
 });
 
 router.post("/api/hire-bookings/:id/close", requireAuth, requireRole("ADMIN", "MANAGER"), async (req: Request, res: Response) => {
@@ -489,7 +539,7 @@ router.delete("/api/hire-bookings/:id", requireAuth, requireRole("ADMIN"), async
   }
 });
 
-function buildHireBookingHtml(booking: Record<string, string | number | boolean | null | undefined>, supplier: Record<string, string | number | boolean | null | undefined> | null, job: Record<string, string | number | boolean | null | undefined> | null, requestedBy: Record<string, string | number | boolean | null | undefined> | null, companyName: string): string {
+function buildHireBookingHtml(booking: Record<string, any>, supplier: Record<string, any> | null, job: Record<string, any> | null, requestedBy: Record<string, any> | null, companyName: string): string {
   const fmtDate = (d: string | Date | null | undefined) => d ? format(new Date(d as string | Date), "dd/MM/yyyy") : "-";
   const fmtCurrency = (v: string | number | null | undefined) => v ? `$${parseFloat(String(v)).toFixed(2)}` : "-";
   const rateLabels: Record<string, string> = { day: "Per Day", week: "Per Week", month: "Per Month", custom: "Custom" };
@@ -576,11 +626,11 @@ function buildHireBookingHtml(booking: Record<string, string | number | boolean 
       ${booking.deliveryRequired ? `
         <tr><td>Delivery Required</td><td>Yes</td></tr>
         ${booking.deliveryAddress ? `<tr><td>Delivery Address</td><td>${booking.deliveryAddress}</td></tr>` : ""}
-        ${booking.deliveryCost ? `<tr><td>Delivery Cost</td><td>${fmtCurrency(booking.deliveryCost)}</td></tr>` : ""}
+        ${booking.deliveryCost ? `<tr><td>Delivery Cost</td><td>${fmtCurrency(booking.deliveryCost as string | number | null)}</td></tr>` : ""}
       ` : ""}
       ${booking.pickupRequired ? `
         <tr><td>Pickup Required</td><td>Yes</td></tr>
-        ${booking.pickupCost ? `<tr><td>Pickup Cost</td><td>${fmtCurrency(booking.pickupCost)}</td></tr>` : ""}
+        ${booking.pickupCost ? `<tr><td>Pickup Cost</td><td>${fmtCurrency(booking.pickupCost as string | number | null)}</td></tr>` : ""}
       ` : ""}
     </table>
   </div>

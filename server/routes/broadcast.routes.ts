@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { z } from "zod";
 import { storage } from "../storage";
 import { requireAuth } from "./middleware/auth.middleware";
 import { broadcastService } from "../services/broadcast.service";
@@ -68,12 +69,13 @@ router.patch("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
 
 router.delete("/api/broadcast-templates/:id", requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const companyId = req.session.companyId;
-    const existing = await storage.getBroadcastTemplate(String(req.params.id));
+    const existing = await storage.getBroadcastTemplate(id);
     if (!existing || existing.companyId !== companyId) {
       return res.status(404).json({ error: "Template not found" });
     }
-    await storage.deleteBroadcastTemplate(String(req.params.id));
+    await storage.deleteBroadcastTemplate(id);
     res.json({ success: true });
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -102,7 +104,8 @@ router.get("/api/broadcasts/channels-status", requireAuth, async (_req, res) => 
 
 router.get("/api/broadcasts/:id", requireAuth, async (req, res) => {
   try {
-    const message = await storage.getBroadcastMessage(String(req.params.id));
+    const id = req.params.id as string;
+    const message = await storage.getBroadcastMessage(id);
     if (!message) return res.status(404).json({ error: "Broadcast not found" });
     res.json(message);
   } catch (error: unknown) {
@@ -112,7 +115,8 @@ router.get("/api/broadcasts/:id", requireAuth, async (req, res) => {
 
 router.get("/api/broadcasts/:id/deliveries", requireAuth, async (req, res) => {
   try {
-    const deliveries = await storage.getBroadcastDeliveries(String(req.params.id));
+    const id = req.params.id as string;
+    const deliveries = await storage.getBroadcastDeliveries(id);
     res.json(deliveries);
   } catch (error: unknown) {
     res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
@@ -225,17 +229,32 @@ router.get("/api/broadcasts/recipients", requireAuth, async (req, res) => {
   }
 });
 
+const sendBroadcastSchema = z.object({
+  subject: z.string().optional().nullable(),
+  message: z.string().min(1, "Message is required"),
+  channels: z.array(z.string().min(1)).min(1, "At least one channel is required"),
+  recipientType: z.string().min(1, "Recipient type is required"),
+  recipientIds: z.array(z.string()).optional().nullable(),
+  customRecipients: z.array(z.object({
+    name: z.string().optional(),
+    email: z.string().optional().nullable(),
+    phone: z.string().optional().nullable(),
+  })).optional().nullable(),
+  templateId: z.string().optional().nullable(),
+});
+
 router.post("/api/broadcasts/send", requireAuth, async (req, res) => {
   try {
     const companyId = req.session.companyId;
     const userId = req.session.userId;
     if (!companyId || !userId) return res.status(400).json({ error: "No session context" });
 
-    const { subject, message, channels, recipientType, recipientIds, customRecipients, templateId } = req.body;
-
-    if (!message || !channels || !recipientType) {
-      return res.status(400).json({ error: "Message, channels, and recipientType are required" });
+    const parsed = sendBroadcastSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     }
+
+    const { subject, message, channels, recipientType, recipientIds, customRecipients, templateId } = parsed.data;
 
     const broadcastMessage = await storage.createBroadcastMessage({
       companyId,

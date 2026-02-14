@@ -382,9 +382,10 @@ router.patch("/api/customers/:id", requireRole("ADMIN"), async (req, res) => {
 router.delete("/api/customers/:id", requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
-    const existing = await storage.getCustomer(String(req.params.id));
+    const id = req.params.id as string;
+    const existing = await storage.getCustomer(id);
     if (!existing || existing.companyId !== companyId) return res.status(404).json({ error: "Customer not found" });
-    await storage.deleteCustomer(String(req.params.id));
+    await storage.deleteCustomer(id);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting customer");

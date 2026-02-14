@@ -141,8 +141,9 @@ router.get("/api/job-types", requireAuth, async (req, res) => {
 router.get("/api/job-types/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const [result] = await db.select().from(jobTypes)
-      .where(and(eq(jobTypes.id, String(req.params.id)), eq(jobTypes.companyId, companyId!)));
+      .where(and(eq(jobTypes.id, id), eq(jobTypes.companyId, companyId!)));
     if (!result) return res.status(404).json({ error: "Job type not found" });
     res.json(result);
   } catch (error: unknown) {
@@ -178,16 +179,17 @@ router.post("/api/job-types", requireAuth, requireRole("ADMIN", "MANAGER"), asyn
 router.patch("/api/job-types/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const parsed = jobTypeSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
 
     const [existing] = await db.select().from(jobTypes)
-      .where(and(eq(jobTypes.id, String(req.params.id)), eq(jobTypes.companyId, companyId!)));
+      .where(and(eq(jobTypes.id, id), eq(jobTypes.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Job type not found" });
 
     const [result] = await db.update(jobTypes)
       .set({ ...parsed.data, updatedAt: new Date() })
-      .where(eq(jobTypes.id, String(req.params.id)))
+      .where(eq(jobTypes.id, id))
       .returning();
     res.json(result);
   } catch (error: unknown) {
@@ -199,11 +201,12 @@ router.patch("/api/job-types/:id", requireAuth, requireRole("ADMIN", "MANAGER"),
 router.delete("/api/job-types/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const [existing] = await db.select().from(jobTypes)
-      .where(and(eq(jobTypes.id, String(req.params.id)), eq(jobTypes.companyId, companyId!)));
+      .where(and(eq(jobTypes.id, id), eq(jobTypes.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Job type not found" });
 
-    await db.delete(jobTypes).where(eq(jobTypes.id, String(req.params.id)));
+    await db.delete(jobTypes).where(eq(jobTypes.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting job type");
@@ -254,16 +257,17 @@ router.post("/api/activity-stages", requireAuth, requireRole("ADMIN", "MANAGER")
 router.patch("/api/activity-stages/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const parsed = stageSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
 
     const [existing] = await db.select().from(activityStages)
-      .where(and(eq(activityStages.id, String(req.params.id)), eq(activityStages.companyId, companyId!)));
+      .where(and(eq(activityStages.id, id), eq(activityStages.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Stage not found" });
 
     const [result] = await db.update(activityStages)
       .set(parsed.data)
-      .where(eq(activityStages.id, String(req.params.id)))
+      .where(eq(activityStages.id, id))
       .returning();
     res.json(result);
   } catch (error: unknown) {
@@ -275,11 +279,12 @@ router.patch("/api/activity-stages/:id", requireAuth, requireRole("ADMIN", "MANA
 router.delete("/api/activity-stages/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const [existing] = await db.select().from(activityStages)
-      .where(and(eq(activityStages.id, String(req.params.id)), eq(activityStages.companyId, companyId!)));
+      .where(and(eq(activityStages.id, id), eq(activityStages.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Stage not found" });
 
-    await db.delete(activityStages).where(eq(activityStages.id, String(req.params.id)));
+    await db.delete(activityStages).where(eq(activityStages.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting stage");
@@ -329,16 +334,17 @@ router.post("/api/activity-consultants", requireAuth, requireRole("ADMIN", "MANA
 router.patch("/api/activity-consultants/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const parsed = consultantSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
 
     const [existing] = await db.select().from(activityConsultants)
-      .where(and(eq(activityConsultants.id, String(req.params.id)), eq(activityConsultants.companyId, companyId!)));
+      .where(and(eq(activityConsultants.id, id), eq(activityConsultants.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Consultant not found" });
 
     const [result] = await db.update(activityConsultants)
       .set(parsed.data)
-      .where(eq(activityConsultants.id, String(req.params.id)))
+      .where(eq(activityConsultants.id, id))
       .returning();
     res.json(result);
   } catch (error: unknown) {
@@ -350,11 +356,12 @@ router.patch("/api/activity-consultants/:id", requireAuth, requireRole("ADMIN", 
 router.delete("/api/activity-consultants/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const [existing] = await db.select().from(activityConsultants)
-      .where(and(eq(activityConsultants.id, String(req.params.id)), eq(activityConsultants.companyId, companyId!)));
+      .where(and(eq(activityConsultants.id, id), eq(activityConsultants.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Consultant not found" });
 
-    await db.delete(activityConsultants).where(eq(activityConsultants.id, String(req.params.id)));
+    await db.delete(activityConsultants).where(eq(activityConsultants.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting consultant");
@@ -954,6 +961,7 @@ router.post("/api/jobs/:jobId/activities/sync-predecessors", requireAuth, requir
 router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const activityUpdateSchema = z.object({
       name: z.string().min(1).optional(),
       description: z.string().optional().nullable(),
@@ -976,7 +984,7 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
     if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
 
     const [existing] = await db.select().from(jobActivities)
-      .where(and(eq(jobActivities.id, String(req.params.id)), eq(jobActivities.companyId, companyId!)));
+      .where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Activity not found" });
 
     const updateData: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
@@ -999,7 +1007,7 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
 
     if (updateData.status === "DONE") {
       const checklists = await db.select().from(jobActivityChecklists)
-        .where(eq(jobActivityChecklists.activityId, String(req.params.id)));
+        .where(eq(jobActivityChecklists.activityId, id));
       if (checklists.length > 0) {
         const incomplete = checklists.filter(c => !c.isCompleted);
         if (incomplete.length > 0) {
@@ -1036,7 +1044,7 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
 
     const [result] = await db.update(jobActivities)
       .set(updateData)
-      .where(eq(jobActivities.id, String(req.params.id)))
+      .where(eq(jobActivities.id, id))
       .returning();
 
     if (Object.keys(changedFields).length > 0 && existing.jobId) {
@@ -1063,11 +1071,12 @@ router.patch("/api/job-activities/:id", requireAuth, async (req, res) => {
 router.delete("/api/job-activities/:id", requireAuth, requireRole("ADMIN", "MANAGER"), async (req, res) => {
   try {
     const companyId = req.companyId;
+    const id = req.params.id as string;
     const [existing] = await db.select().from(jobActivities)
-      .where(and(eq(jobActivities.id, String(req.params.id)), eq(jobActivities.companyId, companyId!)));
+      .where(and(eq(jobActivities.id, id), eq(jobActivities.companyId, companyId!)));
     if (!existing) return res.status(404).json({ error: "Activity not found" });
 
-    await db.delete(jobActivities).where(eq(jobActivities.id, String(req.params.id)));
+    await db.delete(jobActivities).where(eq(jobActivities.id, id));
 
     if (existing.jobId) {
       logJobChange(existing.jobId, "ACTIVITY_DELETED", req.session?.userId || null, req.session?.name || null, {
@@ -1201,8 +1210,9 @@ router.post("/api/jobs/:jobId/activities/recalculate", requireAuth, async (req, 
 
 router.get("/api/job-activities/:id/assignees", requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const result = await db.select().from(jobActivityAssignees)
-      .where(eq(jobActivityAssignees.activityId, String(req.params.id)));
+      .where(eq(jobActivityAssignees.activityId, id));
     res.json(result);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching activity assignees");
@@ -1239,12 +1249,13 @@ router.put("/api/job-activities/:id/assignees", requireAuth, async (req, res) =>
 
 router.get("/api/job-activities/:id/updates", requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const updates = await db.select().from(jobActivityUpdates)
-      .where(eq(jobActivityUpdates.activityId, String(req.params.id)))
+      .where(eq(jobActivityUpdates.activityId, id))
       .orderBy(asc(jobActivityUpdates.createdAt));
 
     const files = await db.select().from(jobActivityFiles)
-      .where(eq(jobActivityFiles.activityId, String(req.params.id)));
+      .where(eq(jobActivityFiles.activityId, id));
 
     const result = updates.map(u => ({
       ...u,
@@ -1261,9 +1272,10 @@ router.post("/api/job-activities/:id/updates", requireAuth, async (req, res) => 
   try {
     const { content } = req.body;
     if (!content || typeof content !== "string") return res.status(400).json({ error: "Content is required" });
+    const id = req.params.id as string;
 
     const [result] = await db.insert(jobActivityUpdates).values({
-      activityId: String(req.params.id),
+      activityId: id,
       userId: req.session.userId!,
       content,
     }).returning();
@@ -1276,12 +1288,13 @@ router.post("/api/job-activities/:id/updates", requireAuth, async (req, res) => 
 
 router.delete("/api/job-activity-updates/:id", requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const [existing] = await db.select().from(jobActivityUpdates)
-      .where(eq(jobActivityUpdates.id, String(req.params.id)));
+      .where(eq(jobActivityUpdates.id, id));
     if (!existing) return res.status(404).json({ error: "Update not found" });
     if (existing.userId !== req.session.userId) return res.status(403).json({ error: "Can only delete own updates" });
 
-    await db.delete(jobActivityUpdates).where(eq(jobActivityUpdates.id, String(req.params.id)));
+    await db.delete(jobActivityUpdates).where(eq(jobActivityUpdates.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting activity update");
@@ -1295,8 +1308,9 @@ router.delete("/api/job-activity-updates/:id", requireAuth, async (req, res) => 
 
 router.get("/api/job-activities/:id/files", requireAuth, async (req, res) => {
   try {
+    const id = req.params.id as string;
     const result = await db.select().from(jobActivityFiles)
-      .where(eq(jobActivityFiles.activityId, String(req.params.id)))
+      .where(eq(jobActivityFiles.activityId, id))
       .orderBy(desc(jobActivityFiles.createdAt));
     res.json(result);
   } catch (error: unknown) {
@@ -1342,7 +1356,8 @@ router.post("/api/job-activities/:id/files", requireAuth, upload.single("file"),
 
 router.delete("/api/job-activity-files/:id", requireAuth, async (req, res) => {
   try {
-    await db.delete(jobActivityFiles).where(eq(jobActivityFiles.id, String(req.params.id)));
+    const id = req.params.id as string;
+    await db.delete(jobActivityFiles).where(eq(jobActivityFiles.id, id));
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting activity file");
@@ -1356,8 +1371,9 @@ router.delete("/api/job-activity-files/:id", requireAuth, async (req, res) => {
 
 router.get("/api/job-activities/:activityId/checklists", requireAuth, async (req, res) => {
   try {
+    const activityId = req.params.activityId as string;
     const result = await db.select().from(jobActivityChecklists)
-      .where(eq(jobActivityChecklists.activityId, String(req.params.activityId)))
+      .where(eq(jobActivityChecklists.activityId, activityId))
       .orderBy(asc(jobActivityChecklists.sortOrder));
     res.json(result);
   } catch (error: unknown) {

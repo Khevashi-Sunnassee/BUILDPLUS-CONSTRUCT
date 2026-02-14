@@ -111,6 +111,7 @@ router.post("/api/jobs/:jobId/boq/groups", requireAuth, requirePermission("budge
 router.patch("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = req.params.id as string;
     const data = boqGroupSchema.partial().parse(req.body);
 
     const [result] = await db
@@ -121,7 +122,7 @@ router.patch("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission("
         description: data.description !== undefined ? (data.description || null) : undefined,
         updatedAt: new Date(),
       })
-      .where(and(eq(boqGroups.id, req.params.id), eq(boqGroups.companyId, companyId)))
+      .where(and(eq(boqGroups.id, id), eq(boqGroups.companyId, companyId)))
       .returning();
 
     if (!result) {
@@ -140,10 +141,11 @@ router.patch("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission("
 router.delete("/api/jobs/:jobId/boq/groups/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = req.params.id as string;
 
     const [deleted] = await db
       .delete(boqGroups)
-      .where(and(eq(boqGroups.id, req.params.id), eq(boqGroups.companyId, companyId)))
+      .where(and(eq(boqGroups.id, id), eq(boqGroups.companyId, companyId)))
       .returning();
 
     if (!deleted) {
@@ -260,10 +262,12 @@ router.patch("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("b
     if (data.notes !== undefined) updateData.notes = data.notes || null;
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
+    const id = req.params.id as string;
+
     const [result] = await db
       .update(boqItems)
       .set(updateData)
-      .where(and(eq(boqItems.id, req.params.id), eq(boqItems.companyId, companyId)))
+      .where(and(eq(boqItems.id, id), eq(boqItems.companyId, companyId)))
       .returning();
 
     if (!result) {
@@ -282,10 +286,11 @@ router.patch("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("b
 router.delete("/api/jobs/:jobId/boq/items/:id", requireAuth, requirePermission("budgets", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
+    const id = req.params.id as string;
 
     const [deleted] = await db
       .delete(boqItems)
-      .where(and(eq(boqItems.id, req.params.id), eq(boqItems.companyId, companyId)))
+      .where(and(eq(boqItems.id, id), eq(boqItems.companyId, companyId)))
       .returning();
 
     if (!deleted) {

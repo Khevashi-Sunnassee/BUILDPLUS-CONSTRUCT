@@ -119,7 +119,8 @@ router.get("/api/capex-requests/:id", requireAuth, async (req, res) => {
   try {
     const companyId = req.companyId;
     if (!companyId) return res.status(400).json({ error: "Company context required" });
-    const capex = await storage.getCapexRequest(req.params.id);
+    const id = req.params.id as string;
+    const capex = await storage.getCapexRequest(id);
     if (!capex) return res.status(404).json({ error: "CAPEX request not found" });
     if (capex.companyId !== companyId) return res.status(403).json({ error: "Forbidden" });
     res.json(capex);
@@ -131,7 +132,8 @@ router.get("/api/capex-requests/:id", requireAuth, async (req, res) => {
 
 router.get("/api/capex-requests/:id/audit-history", requireAuth, async (req, res) => {
   try {
-    const events = await storage.getCapexAuditHistory(req.params.id);
+    const id = req.params.id as string;
+    const events = await storage.getCapexAuditHistory(id);
     res.json(events);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching CAPEX audit history");
@@ -179,7 +181,8 @@ router.post("/api/capex-requests", requireAuth, requirePermission("capex_request
 
 router.put("/api/capex-requests/:id", requireAuth, requirePermission("capex_requests"), async (req, res) => {
   try {
-    const existing = await storage.getCapexRequest(req.params.id);
+    const id = req.params.id as string;
+    const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
 
     const parsed = createCapexSchema.safeParse(req.body);
@@ -190,17 +193,17 @@ router.put("/api/capex-requests/:id", requireAuth, requirePermission("capex_requ
     const userId = req.session.userId!;
     const user = await storage.getUser(userId);
 
-    await storage.updateCapexRequest(req.params.id, parsed.data);
+    await storage.updateCapexRequest(id, parsed.data);
 
     await storage.createCapexAuditEvent({
-      capexRequestId: req.params.id,
+      capexRequestId: id,
       eventType: "edited",
       actorId: userId,
       actorName: user?.name || user?.email || "Unknown",
       metadata: { changes: parsed.data },
     });
 
-    const detailed = await storage.getCapexRequest(req.params.id);
+    const detailed = await storage.getCapexRequest(id);
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error updating CAPEX request");
@@ -208,9 +211,19 @@ router.put("/api/capex-requests/:id", requireAuth, requirePermission("capex_requ
   }
 });
 
+const submitCapexSchema = z.object({
+  comments: z.string().optional(),
+}).passthrough();
+
 router.put("/api/capex-requests/:id/submit", requireAuth, async (req, res) => {
   try {
-    const existing = await storage.getCapexRequest(req.params.id);
+    const parsed = submitCapexSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const id = req.params.id as string;
+    const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "DRAFT") return res.status(400).json({ error: "Only draft requests can be submitted" });
 
@@ -223,18 +236,18 @@ router.put("/api/capex-requests/:id/submit", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "An approving manager must be assigned before submitting" });
     }
 
-    const request = await storage.submitCapexRequest(req.params.id);
+    const request = await storage.submitCapexRequest(id);
     const user = await storage.getUser(userId);
 
     await storage.createCapexAuditEvent({
-      capexRequestId: req.params.id,
+      capexRequestId: id,
       eventType: "submitted",
       actorId: userId,
       actorName: user?.name || user?.email || "Unknown",
       metadata: { totalCost: existing.totalEquipmentCost },
     });
 
-    const detailed = await storage.getCapexRequest(req.params.id);
+    const detailed = await storage.getCapexRequest(id);
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error submitting CAPEX request");
@@ -242,9 +255,19 @@ router.put("/api/capex-requests/:id/submit", requireAuth, async (req, res) => {
   }
 });
 
+const approveCapexSchema = z.object({
+  comments: z.string().optional(),
+}).passthrough();
+
 router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => {
   try {
-    const existing = await storage.getCapexRequest(req.params.id);
+    const parsed = approveCapexSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const id = req.params.id as string;
+    const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted requests can be approved" });
 
@@ -271,10 +294,10 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
     }
 
     const correlationId = crypto.randomUUID();
-    const request = await storage.approveCapexRequest(req.params.id, userId);
+    const request = await storage.approveCapexRequest(id, userId);
 
     await storage.createCapexAuditEvent({
-      capexRequestId: req.params.id,
+      capexRequestId: id,
       eventType: "approved",
       actorId: userId,
       actorName: user.name || user.email || "Unknown",
@@ -286,7 +309,7 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
       try {
         await storage.approvePurchaseOrder(existing.purchaseOrderId, userId);
         await storage.createCapexAuditEvent({
-          capexRequestId: req.params.id,
+          capexRequestId: id,
           eventType: "linked_po_approved",
           actorId: userId,
           actorName: user.name || user.email || "Unknown",
@@ -298,7 +321,7 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
       }
     }
 
-    const detailed = await storage.getCapexRequest(req.params.id);
+    const detailed = await storage.getCapexRequest(id);
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error approving CAPEX request");
@@ -308,7 +331,8 @@ router.post("/api/capex-requests/:id/approve", requireAuth, async (req, res) => 
 
 router.post("/api/capex-requests/:id/reject", requireAuth, async (req, res) => {
   try {
-    const existing = await storage.getCapexRequest(req.params.id);
+    const id = req.params.id as string;
+    const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted requests can be rejected" });
 
@@ -327,17 +351,17 @@ router.post("/api/capex-requests/:id/reject", requireAuth, async (req, res) => {
       return res.status(403).json({ error: "You do not have permission to reject this request" });
     }
 
-    const request = await storage.rejectCapexRequest(req.params.id, userId, parsed.data.reason);
+    const request = await storage.rejectCapexRequest(id, userId, parsed.data.reason);
 
     await storage.createCapexAuditEvent({
-      capexRequestId: req.params.id,
+      capexRequestId: id,
       eventType: "rejected",
       actorId: userId,
       actorName: user.name || user.email || "Unknown",
       metadata: { reason: parsed.data.reason },
     });
 
-    const detailed = await storage.getCapexRequest(req.params.id);
+    const detailed = await storage.getCapexRequest(id);
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error rejecting CAPEX request");
@@ -345,9 +369,20 @@ router.post("/api/capex-requests/:id/reject", requireAuth, async (req, res) => {
   }
 });
 
+const withdrawCapexSchema = z.object({
+  reason: z.string().optional(),
+  comments: z.string().optional(),
+}).passthrough();
+
 router.post("/api/capex-requests/:id/withdraw", requireAuth, async (req, res) => {
   try {
-    const existing = await storage.getCapexRequest(req.params.id);
+    const parsed = withdrawCapexSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const id = req.params.id as string;
+    const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted requests can be withdrawn" });
 
@@ -364,10 +399,10 @@ router.post("/api/capex-requests/:id/withdraw", requireAuth, async (req, res) =>
     }
 
     const correlationId = crypto.randomUUID();
-    const request = await storage.withdrawCapexRequest(req.params.id);
+    const request = await storage.withdrawCapexRequest(id);
 
     await storage.createCapexAuditEvent({
-      capexRequestId: req.params.id,
+      capexRequestId: id,
       eventType: "withdrawn",
       actorId: userId,
       actorName: user.name || user.email || "Unknown",
@@ -375,7 +410,7 @@ router.post("/api/capex-requests/:id/withdraw", requireAuth, async (req, res) =>
       correlationId,
     });
 
-    const detailed = await storage.getCapexRequest(req.params.id);
+    const detailed = await storage.getCapexRequest(id);
     res.json(detailed);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error withdrawing CAPEX request");
@@ -385,7 +420,8 @@ router.post("/api/capex-requests/:id/withdraw", requireAuth, async (req, res) =>
 
 router.delete("/api/capex-requests/:id/draft", requireAuth, async (req, res) => {
   try {
-    const existing = await storage.getCapexRequest(req.params.id);
+    const id = req.params.id as string;
+    const existing = await storage.getCapexRequest(id);
     if (!existing) return res.status(404).json({ error: "CAPEX request not found" });
     if (existing.status !== "DRAFT") return res.status(400).json({ error: "Only draft requests can be discarded" });
 
@@ -394,7 +430,7 @@ router.delete("/api/capex-requests/:id/draft", requireAuth, async (req, res) => 
       return res.status(403).json({ error: "Only the creator can discard this draft" });
     }
 
-    await storage.deleteCapexRequest(req.params.id);
+    await storage.deleteCapexRequest(id);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error discarding CAPEX draft");

@@ -162,80 +162,75 @@ type DeletionCategory = typeof dataDeletionCategories[number];
 
 router.get("/api/admin/data-deletion/counts", requireRole("ADMIN"), async (req, res) => {
   try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
     const counts: Record<string, number> = {};
     
-    const [panelCount] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister);
+    const [panelCount] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).where(eq(panelRegister.companyId, companyId));
     counts.panels = Number(panelCount.count);
     
-    const [slotCount] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots);
+    const [slotCount] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots).where(eq(productionSlots.companyId, companyId));
     counts.production_slots = Number(slotCount.count);
     
-    const [draftingCount] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram);
+    const [draftingCount] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).where(eq(draftingProgram.companyId, companyId));
     counts.drafting_program = Number(draftingCount.count);
     
-    const [logCount] = await db.select({ count: sql<number>`count(*)` }).from(dailyLogs);
+    const [logCount] = await db.select({ count: sql<number>`count(*)` }).from(dailyLogs).where(eq(dailyLogs.companyId, companyId));
     counts.daily_logs = Number(logCount.count);
     
-    const [poCount] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders);
+    const [poCount] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders).where(eq(purchaseOrders.companyId, companyId));
     counts.purchase_orders = Number(poCount.count);
     
-    const [loadListCount] = await db.select({ count: sql<number>`count(*)` }).from(loadLists);
+    const [loadListCount] = await db.select({ count: sql<number>`count(*)` }).from(loadLists).where(eq(loadLists.companyId, companyId));
     counts.logistics = Number(loadListCount.count);
     
-    const [wageCount] = await db.select({ count: sql<number>`count(*)` }).from(weeklyWageReports);
+    const [wageCount] = await db.select({ count: sql<number>`count(*)` }).from(weeklyWageReports).where(eq(weeklyWageReports.companyId, companyId));
     counts.weekly_wages = Number(wageCount.count);
     
-    const [chatCount] = await db.select({ count: sql<number>`count(*)` }).from(conversations);
+    const [chatCount] = await db.select({ count: sql<number>`count(*)` }).from(conversations).where(eq(conversations.companyId, companyId));
     counts.chats = Number(chatCount.count);
     
-    const [taskCount] = await db.select({ count: sql<number>`count(*)` }).from(tasks);
+    const [taskCount] = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(eq(tasks.companyId, companyId));
     counts.tasks = Number(taskCount.count);
     
-    const [supplierCount] = await db.select({ count: sql<number>`count(*)` }).from(suppliers);
+    const [supplierCount] = await db.select({ count: sql<number>`count(*)` }).from(suppliers).where(eq(suppliers.companyId, companyId));
     counts.suppliers = Number(supplierCount.count);
     
-    const [jobCount] = await db.select({ count: sql<number>`count(*)` }).from(jobs);
+    const [jobCount] = await db.select({ count: sql<number>`count(*)` }).from(jobs).where(eq(jobs.companyId, companyId));
     counts.jobs = Number(jobCount.count);
     
-    const [assetCount] = await db.select({ count: sql<number>`count(*)` }).from(assets);
+    const [assetCount] = await db.select({ count: sql<number>`count(*)` }).from(assets).where(eq(assets.companyId, companyId));
     counts.assets = Number(assetCount.count);
     
-    const [documentCount] = await db.select({ count: sql<number>`count(*)` }).from(documents);
+    const [documentCount] = await db.select({ count: sql<number>`count(*)` }).from(documents).where(eq(documents.companyId, companyId));
     counts.documents = Number(documentCount.count);
     
-    const [contractCount] = await db.select({ count: sql<number>`count(*)` }).from(contracts);
+    const [contractCount] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(eq(contracts.companyId, companyId));
     counts.contracts = Number(contractCount.count);
     
-    const [progressClaimCount] = await db.select({ count: sql<number>`count(*)` }).from(progressClaims);
+    const [progressClaimCount] = await db.select({ count: sql<number>`count(*)` }).from(progressClaims).where(eq(progressClaims.companyId, companyId));
     counts.progress_claims = Number(progressClaimCount.count);
     
-    const [broadcastTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastTemplates);
+    const [broadcastTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastTemplates).where(eq(broadcastTemplates.companyId, companyId));
     counts.broadcast_templates = Number(broadcastTemplateCount.count);
     
-    const [activityTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(activityTemplates);
+    const [activityTemplateCount] = await db.select({ count: sql<number>`count(*)` }).from(activityTemplates).where(eq(activityTemplates.companyId, companyId));
     counts.activity_templates = Number(activityTemplateCount.count);
     
-    const [jobActivityCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivities);
+    const [jobActivityCount] = await db.select({ count: sql<number>`count(*)` }).from(jobActivities).where(eq(jobActivities.companyId, companyId));
     counts.job_activities = Number(jobActivityCount.count);
     
-    const companyId = req.companyId;
-    
-    const costCodeWhere = companyId ? eq(costCodes.companyId, companyId) : undefined;
-    const [costCodeCount] = await db.select({ count: sql<number>`count(*)` }).from(costCodes).where(costCodeWhere);
+    const [costCodeCount] = await db.select({ count: sql<number>`count(*)` }).from(costCodes).where(eq(costCodes.companyId, companyId));
     counts.cost_codes = Number(costCodeCount.count);
     
-    const tenderWhere = companyId ? eq(tenders.companyId, companyId) : undefined;
-    const [tenderCount] = await db.select({ count: sql<number>`count(*)` }).from(tenders).where(tenderWhere);
+    const [tenderCount] = await db.select({ count: sql<number>`count(*)` }).from(tenders).where(eq(tenders.companyId, companyId));
     counts.tenders = Number(tenderCount.count);
     
-    const budgetWhere = companyId ? eq(jobBudgets.companyId, companyId) : undefined;
-    const [budgetCount] = await db.select({ count: sql<number>`count(*)` }).from(jobBudgets).where(budgetWhere);
+    const [budgetCount] = await db.select({ count: sql<number>`count(*)` }).from(jobBudgets).where(eq(jobBudgets.companyId, companyId));
     counts.budgets = Number(budgetCount.count);
     
-    const boqWhere = companyId ? eq(boqGroups.companyId, companyId) : undefined;
-    const boqItemWhere = companyId ? eq(boqItems.companyId, companyId) : undefined;
-    const [boqGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(boqWhere);
-    const [boqItemCount] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(boqItemWhere);
+    const [boqGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(eq(boqGroups.companyId, companyId));
+    const [boqItemCount] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(eq(boqItems.companyId, companyId));
     counts.boq = Number(boqGroupCount.count) + Number(boqItemCount.count);
     
     res.json(counts);
@@ -253,13 +248,15 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       return res.status(400).json({ error: "No categories selected" });
     }
     
+    const cid = req.companyId;
+    if (!cid) return res.status(400).json({ error: "Company context required" });
     const errors: string[] = [];
     const warnings: string[] = [];
     
     const selected = new Set(categories);
     
     if (selected.has("suppliers") && !selected.has("purchase_orders")) {
-      const [poWithSupplier] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders);
+      const [poWithSupplier] = await db.select({ count: sql<number>`count(*)` }).from(purchaseOrders).where(eq(purchaseOrders.companyId, cid));
       if (Number(poWithSupplier.count) > 0) {
         errors.push("Cannot delete Suppliers while Purchase Orders exist. Select Purchase Orders for deletion first, or delete them manually.");
       }
@@ -267,25 +264,25 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     
     if (selected.has("jobs")) {
       if (!selected.has("panels")) {
-        const [panelWithJob] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister);
+        const [panelWithJob] = await db.select({ count: sql<number>`count(*)` }).from(panelRegister).where(eq(panelRegister.companyId, cid));
         if (Number(panelWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Panels exist. Select Panels for deletion first.");
         }
       }
       if (!selected.has("production_slots")) {
-        const [slotWithJob] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots);
+        const [slotWithJob] = await db.select({ count: sql<number>`count(*)` }).from(productionSlots).where(eq(productionSlots.companyId, cid));
         if (Number(slotWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Production Slots exist. Select Production Slots for deletion first.");
         }
       }
       if (!selected.has("drafting_program")) {
-        const [draftingWithJob] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram);
+        const [draftingWithJob] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).where(eq(draftingProgram.companyId, cid));
         if (Number(draftingWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Drafting Program entries exist. Select Drafting Program for deletion first.");
         }
       }
       if (!selected.has("logistics")) {
-        const [loadListWithJob] = await db.select({ count: sql<number>`count(*)` }).from(loadLists);
+        const [loadListWithJob] = await db.select({ count: sql<number>`count(*)` }).from(loadLists).where(eq(loadLists.companyId, cid));
         if (Number(loadListWithJob.count) > 0) {
           errors.push("Cannot delete Jobs while Load Lists exist. Select Logistics for deletion first.");
         }
@@ -306,7 +303,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     
     if (selected.has("panels")) {
       if (!selected.has("drafting_program")) {
-        const [draftingWithPanel] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram);
+        const [draftingWithPanel] = await db.select({ count: sql<number>`count(*)` }).from(draftingProgram).where(eq(draftingProgram.companyId, cid));
         if (Number(draftingWithPanel.count) > 0) {
           errors.push("Cannot delete Panels while Drafting Program entries exist. Select Drafting Program for deletion first.");
         }
@@ -326,22 +323,22 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     if (selected.has("production_slots") && !selected.has("drafting_program")) {
       const [draftingWithSlot] = await db.select({ count: sql<number>`count(*)` })
         .from(draftingProgram)
-        .where(isNotNull(draftingProgram.productionSlotId));
+        .where(and(eq(draftingProgram.companyId, cid), isNotNull(draftingProgram.productionSlotId)));
       if (Number(draftingWithSlot.count) > 0) {
         warnings.push("Production slot references in Drafting Program will be cleared.");
       }
     }
     
     if (selected.has("tasks")) {
-      const [taskGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(taskGroups);
+      const [taskGroupCount] = await db.select({ count: sql<number>`count(*)` }).from(taskGroups).where(eq(taskGroups.companyId, cid));
       if (Number(taskGroupCount.count) > 0) {
         warnings.push("Task Groups will also be deleted along with Tasks.");
       }
     }
     
     if (selected.has("assets")) {
-      const [maintenanceCount] = await db.select({ count: sql<number>`count(*)` }).from(assetMaintenanceRecords);
-      const [transferCount] = await db.select({ count: sql<number>`count(*)` }).from(assetTransfers);
+      const [maintenanceCount] = await db.select({ count: sql<number>`count(*)` }).from(assetMaintenanceRecords).where(eq(assetMaintenanceRecords.companyId, cid));
+      const [transferCount] = await db.select({ count: sql<number>`count(*)` }).from(assetTransfers).where(eq(assetTransfers.companyId, cid));
       const totalRelated = Number(maintenanceCount.count) + Number(transferCount.count);
       if (totalRelated > 0) {
         warnings.push(`${totalRelated} asset maintenance records and transfers will also be deleted.`);
@@ -349,7 +346,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("documents")) {
-      const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(isNotNull(contracts.aiSourceDocumentId));
+      const [contractDocRef] = await db.select({ count: sql<number>`count(*)` }).from(contracts).where(and(eq(contracts.companyId, cid), isNotNull(contracts.aiSourceDocumentId)));
       if (Number(contractDocRef.count) > 0 && !selected.has("contracts")) {
         errors.push("Cannot delete Documents while Contracts reference them. Select Contracts for deletion first, or unlink them.");
       }
@@ -371,7 +368,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("broadcast_templates")) {
-      const [msgCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastMessages);
+      const [msgCount] = await db.select({ count: sql<number>`count(*)` }).from(broadcastMessages).where(eq(broadcastMessages.companyId, cid));
       if (Number(msgCount.count) > 0) {
         warnings.push(`${msgCount.count} broadcast message(s) will also be deleted with templates.`);
       }
@@ -394,30 +391,26 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       }
     }
     
-    const cid = req.companyId;
-    
     if (selected.has("cost_codes")) {
       if (!selected.has("budgets")) {
-        const [budgetLineRef] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(cid ? eq(budgetLines.companyId, cid) : undefined);
+        const [budgetLineRef] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(eq(budgetLines.companyId, cid));
         if (Number(budgetLineRef.count) > 0) {
           errors.push("Cannot delete Cost Codes while Budget Lines reference them. Select Budgets for deletion first.");
         }
       }
       if (!selected.has("boq")) {
-        const [boqRef] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(cid ? eq(boqGroups.companyId, cid) : undefined);
+        const [boqRef] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(eq(boqGroups.companyId, cid));
         if (Number(boqRef.count) > 0) {
           errors.push("Cannot delete Cost Codes while BOQ Groups reference them. Select Bill of Quantities for deletion first.");
         }
       }
       if (!selected.has("tenders")) {
-        const [tenderLineRef] = await db.select({ count: sql<number>`count(*)` }).from(tenderLineItems).where(cid ? eq(tenderLineItems.companyId, cid) : undefined);
+        const [tenderLineRef] = await db.select({ count: sql<number>`count(*)` }).from(tenderLineItems).where(eq(tenderLineItems.companyId, cid));
         if (Number(tenderLineRef.count) > 0) {
           warnings.push("Tender line items reference cost codes. Those references will be cleared.");
         }
       }
-      const companyCostCodeIds = cid
-        ? (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, cid))).map(r => r.id)
-        : [];
+      const companyCostCodeIds = (await db.select({ id: costCodes.id }).from(costCodes).where(eq(costCodes.companyId, cid))).map(r => r.id);
       if (companyCostCodeIds.length > 0) {
         const [childCount] = await db.select({ count: sql<number>`count(*)` }).from(childCostCodes).where(inArray(childCostCodes.parentCostCodeId, companyCostCodeIds));
         const [defaultCount] = await db.select({ count: sql<number>`count(*)` }).from(costCodeDefaults).where(inArray(costCodeDefaults.costCodeId, companyCostCodeIds));
@@ -432,7 +425,7 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     if (selected.has("tenders")) {
       if (!selected.has("budgets")) {
         const [budgetTenderRef] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(
-          cid ? and(eq(budgetLines.companyId, cid), isNotNull(budgetLines.selectedTenderSubmissionId)) : isNotNull(budgetLines.selectedTenderSubmissionId)
+          and(eq(budgetLines.companyId, cid), isNotNull(budgetLines.selectedTenderSubmissionId))
         );
         if (Number(budgetTenderRef.count) > 0) {
           warnings.push("Budget lines reference tender submissions. Those references will be cleared.");
@@ -440,15 +433,15 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       }
       if (!selected.has("boq")) {
         const [boqTenderRef] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(
-          cid ? and(eq(boqItems.companyId, cid), isNotNull(boqItems.tenderLineItemId)) : isNotNull(boqItems.tenderLineItemId)
+          and(eq(boqItems.companyId, cid), isNotNull(boqItems.tenderLineItemId))
         );
         if (Number(boqTenderRef.count) > 0) {
           warnings.push("BOQ items reference tender line items. Those references will be cleared.");
         }
       }
-      const [submissionCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderSubmissions).where(cid ? eq(tenderSubmissions.companyId, cid) : undefined);
-      const [lineItemCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderLineItems).where(cid ? eq(tenderLineItems.companyId, cid) : undefined);
-      const [packageCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderPackages).where(cid ? eq(tenderPackages.companyId, cid) : undefined);
+      const [submissionCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderSubmissions).where(eq(tenderSubmissions.companyId, cid));
+      const [lineItemCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderLineItems).where(eq(tenderLineItems.companyId, cid));
+      const [packageCount] = await db.select({ count: sql<number>`count(*)` }).from(tenderPackages).where(eq(tenderPackages.companyId, cid));
       const totalRelated = Number(submissionCount.count) + Number(lineItemCount.count) + Number(packageCount.count);
       if (totalRelated > 0) {
         warnings.push(`${totalRelated} tender submission(s), line item(s), and package(s) will also be deleted.`);
@@ -458,14 +451,14 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     if (selected.has("budgets")) {
       if (!selected.has("boq")) {
         const [boqBudgetRef] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(
-          cid ? and(eq(boqGroups.companyId, cid), isNotNull(boqGroups.budgetLineId)) : isNotNull(boqGroups.budgetLineId)
+          and(eq(boqGroups.companyId, cid), isNotNull(boqGroups.budgetLineId))
         );
         if (Number(boqBudgetRef.count) > 0) {
           warnings.push("BOQ groups reference budget lines. Those references will be cleared.");
         }
       }
-      const [budgetLineCount] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(cid ? eq(budgetLines.companyId, cid) : undefined);
-      const companyBudgetIdsForFiles = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(cid ? eq(jobBudgets.companyId, cid) : undefined)).map(r => r.id);
+      const [budgetLineCount] = await db.select({ count: sql<number>`count(*)` }).from(budgetLines).where(eq(budgetLines.companyId, cid));
+      const companyBudgetIdsForFiles = (await db.select({ id: jobBudgets.id }).from(jobBudgets).where(eq(jobBudgets.companyId, cid))).map(r => r.id);
       const companyBudgetLineIdsForFiles = companyBudgetIdsForFiles.length > 0
         ? (await db.select({ id: budgetLines.id }).from(budgetLines).where(inArray(budgetLines.budgetId, companyBudgetIdsForFiles))).map(r => r.id)
         : [];
@@ -479,8 +472,8 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
     }
     
     if (selected.has("boq")) {
-      const [boqItemCountVal] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(cid ? eq(boqItems.companyId, cid) : undefined);
-      const [boqGroupCountVal] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(cid ? eq(boqGroups.companyId, cid) : undefined);
+      const [boqItemCountVal] = await db.select({ count: sql<number>`count(*)` }).from(boqItems).where(eq(boqItems.companyId, cid));
+      const [boqGroupCountVal] = await db.select({ count: sql<number>`count(*)` }).from(boqGroups).where(eq(boqGroups.companyId, cid));
       const totalRelated = Number(boqItemCountVal.count) + Number(boqGroupCountVal.count);
       if (totalRelated > 0) {
         warnings.push(`${totalRelated} BOQ group(s) and item(s) will be permanently deleted.`);

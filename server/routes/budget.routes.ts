@@ -748,6 +748,12 @@ router.post("/api/budget-lines/:lineId/updates", requireAuth, requirePermission(
 
 router.delete("/api/budget-line-updates/:id", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
+    const companyId = req.session.companyId!;
+    const [update] = await db.select({ id: budgetLineUpdates.id, budgetLineId: budgetLineUpdates.budgetLineId })
+      .from(budgetLineUpdates)
+      .innerJoin(budgetLines, eq(budgetLineUpdates.budgetLineId, budgetLines.id))
+      .where(and(eq(budgetLineUpdates.id, req.params.id), eq(budgetLines.companyId, companyId)));
+    if (!update) return res.status(404).json({ message: "Update not found" });
     await db.delete(budgetLineUpdates).where(eq(budgetLineUpdates.id, req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
@@ -825,6 +831,12 @@ router.post("/api/budget-lines/:lineId/files", requireAuth, requirePermission("b
 
 router.delete("/api/budget-line-files/:id", requireAuth, requirePermission("budgets", "VIEW"), async (req: Request, res: Response) => {
   try {
+    const companyId = req.session.companyId!;
+    const [file] = await db.select({ id: budgetLineFiles.id })
+      .from(budgetLineFiles)
+      .innerJoin(budgetLines, eq(budgetLineFiles.budgetLineId, budgetLines.id))
+      .where(and(eq(budgetLineFiles.id, req.params.id), eq(budgetLines.companyId, companyId)));
+    if (!file) return res.status(404).json({ message: "File not found" });
     await db.delete(budgetLineFiles).where(eq(budgetLineFiles.id, req.params.id));
     res.json({ success: true });
   } catch (error: unknown) {
