@@ -15,6 +15,8 @@ import {
   Loader2,
   X,
   Check,
+  AlertTriangle,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +120,19 @@ export function BundleGridView() {
     },
     onSuccess: () => {
       toast({ title: "Document removed from bundle" });
+      queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.BUNDLES] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const requestLatestMutation = useMutation({
+    mutationFn: async ({ bundleId, itemId }: { bundleId: string; itemId: string }) => {
+      await apiRequest("POST", `/api/document-bundles/${bundleId}/items/${itemId}/request-latest`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Document updated to latest version" });
       queryClient.invalidateQueries({ queryKey: [DOCUMENT_ROUTES.BUNDLES] });
     },
     onError: (error: Error) => {
@@ -274,6 +289,7 @@ export function BundleGridView() {
             const isExpanded = expandedBundles.has(bundle.id);
             const isTender = bundle.bundleName.toLowerCase().startsWith("tender package");
             const isExpired = bundle.expiresAt && new Date(bundle.expiresAt) < new Date();
+            const staleCount = bundle.items?.filter((item: any) => item.document?.isLatestVersion === false).length || 0;
 
             return (
               <div
@@ -314,6 +330,16 @@ export function BundleGridView() {
                   {isExpired && (
                     <Badge variant="destructive" className="shrink-0">
                       Expired
+                    </Badge>
+                  )}
+                  {staleCount > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                      data-testid={`badge-bundle-stale-count-${bundle.id}`}
+                    >
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      {staleCount} outdated
                     </Badge>
                   )}
                   {bundle.description && (
@@ -393,6 +419,7 @@ export function BundleGridView() {
                         {bundle.items?.length > 0 ? (
                           bundle.items.map((item) => {
                             const doc = item.document;
+                            const isStale = doc && (doc as any).isLatestVersion === false;
                             return (
                               <TableRow
                                 key={item.id}
@@ -402,9 +429,21 @@ export function BundleGridView() {
                                   <div className="flex items-center gap-2">
                                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                                     <div className="flex flex-col">
-                                      <span className="font-medium text-sm">
-                                        {doc?.title || "Unknown Document"}
-                                      </span>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className="font-medium text-sm">
+                                          {doc?.title || "Unknown Document"}
+                                        </span>
+                                        {isStale && (
+                                          <Badge
+                                            variant="outline"
+                                            className="shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                                            data-testid={`badge-stale-doc-${item.id}`}
+                                          >
+                                            <AlertTriangle className="h-3 w-3 mr-1" />
+                                            Out of date
+                                          </Badge>
+                                        )}
+                                      </div>
                                       {doc?.originalName && (
                                         <span className="text-xs text-muted-foreground">
                                           {doc.originalName}
@@ -427,6 +466,27 @@ export function BundleGridView() {
                                 </TableCell>
                                 <TableCell>
                                   <div className="flex justify-end gap-1">
+                                    {isStale && (
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <Button
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() =>
+                                              requestLatestMutation.mutate({
+                                                bundleId: bundle.id,
+                                                itemId: item.id,
+                                              })
+                                            }
+                                            disabled={requestLatestMutation.isPending}
+                                            data-testid={`button-request-latest-${item.id}`}
+                                          >
+                                            <RefreshCw className={`h-4 w-4 text-orange-600 dark:text-orange-400 ${requestLatestMutation.isPending ? "animate-spin" : ""}`} />
+                                          </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Update to latest version</TooltipContent>
+                                      </Tooltip>
+                                    )}
                                     {doc && (
                                       <>
                                         <Button

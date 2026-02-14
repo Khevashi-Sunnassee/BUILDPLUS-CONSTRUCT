@@ -1428,6 +1428,73 @@ router.delete("/api/document-bundles/:id", requireRole("ADMIN", "MANAGER"), asyn
   }
 });
 
+// Request latest version of a document in a bundle
+router.post("/api/document-bundles/:bundleId/items/:itemId/request-latest", requireAuth, async (req, res) => {
+  try {
+    const bundleId = req.params.bundleId as string;
+    const itemId = req.params.itemId as string;
+    const companyId = req.companyId;
+
+    const bundle = await storage.getDocumentBundle(bundleId);
+    if (!bundle || bundle.companyId !== companyId) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    const bundleItem = bundle.items.find(item => item.id === itemId);
+    if (!bundleItem) {
+      return res.status(404).json({ error: "Bundle item not found" });
+    }
+
+    const currentDoc = bundleItem.document;
+    if (!currentDoc) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    if (currentDoc.isLatestVersion) {
+      return res.status(400).json({ error: "Document is already the latest version" });
+    }
+
+    let latestDoc = null;
+    if (currentDoc.documentNumber) {
+      const [latest] = await db.select().from(documents)
+        .where(and(
+          eq(documents.documentNumber, currentDoc.documentNumber),
+          eq(documents.companyId, companyId),
+          eq(documents.isLatestVersion, true)
+        ))
+        .limit(1);
+      latestDoc = latest;
+    }
+
+    if (!latestDoc) {
+      const allVersions = await db.select().from(documents)
+        .where(and(
+          eq(documents.companyId, companyId),
+          eq(documents.isLatestVersion, true),
+          eq(documents.parentDocumentId, currentDoc.parentDocumentId || currentDoc.id)
+        ))
+        .limit(1);
+      if (allVersions.length > 0) {
+        latestDoc = allVersions[0];
+      }
+    }
+
+    if (!latestDoc) {
+      return res.status(404).json({ error: "Latest version not found" });
+    }
+
+    await db.update(documentBundleItems)
+      .set({ documentId: latestDoc.id })
+      .where(eq(documentBundleItems.id, itemId));
+
+    const updatedBundle = await storage.getDocumentBundle(bundleId);
+    res.json({ success: true, bundle: updatedBundle });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error updating bundle item to latest version");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to update bundle item" });
+  }
+});
+
 // ==================== PUBLIC BUNDLE ACCESS (No Auth) ====================
 
 // Helper to get client IP address
@@ -1496,6 +1563,11 @@ router.get("/api/public/bundles/:qrCodeId", async (req, res) => {
         fileName: item.document.originalName,
         mimeType: item.document.mimeType,
         fileSize: item.document.fileSize,
+        version: item.document.version,
+        revision: item.document.revision,
+        documentNumber: item.document.documentNumber,
+        isLatestVersion: item.document.isLatestVersion,
+        isStale: item.document.isLatestVersion === false,
       })),
     });
   } catch (error: unknown) {

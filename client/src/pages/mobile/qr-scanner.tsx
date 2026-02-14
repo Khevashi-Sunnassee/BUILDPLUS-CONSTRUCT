@@ -17,6 +17,7 @@ import {
   PackageOpen,
   Package,
   AlertCircle,
+  AlertTriangle,
   CheckCircle,
   Loader2,
   Layers,
@@ -24,6 +25,7 @@ import {
   Weight,
   Ruler,
   RotateCcw,
+  RefreshCw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -67,6 +69,10 @@ interface BundleDocument {
     originalName: string;
     mimeType: string;
     fileSize: number;
+    version?: string;
+    revision?: string;
+    isLatestVersion?: boolean;
+    documentNumber?: string;
   };
 }
 
@@ -693,6 +699,8 @@ function BundleScanResult({
   onViewDocuments: () => void;
 }) {
   const docCount = bundle.items?.length || 0;
+  const staleItems = bundle.items?.filter((item) => item.document?.isLatestVersion === false) || [];
+  const staleCount = staleItems.length;
 
   return (
     <div className="px-4 space-y-4" data-testid="bundle-scan-result">
@@ -706,6 +714,23 @@ function BundleScanResult({
         </div>
       </div>
 
+      {staleCount > 0 && (
+        <div
+          className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-3 flex items-start gap-3"
+          data-testid="banner-bundle-stale-warning"
+        >
+          <AlertTriangle className="h-5 w-5 text-orange-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-orange-300">
+              {staleCount} outdated {staleCount === 1 ? "document" : "documents"}
+            </p>
+            <p className="text-xs text-orange-300/70 mt-0.5">
+              Newer versions are available. Update from the document register.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
@@ -718,25 +743,42 @@ function BundleScanResult({
               </p>
             )}
           </div>
-          <Badge className="bg-indigo-500/20 text-indigo-300 border-0 text-xs font-medium shrink-0">
-            {docCount} {docCount === 1 ? "document" : "documents"}
-          </Badge>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <Badge className="bg-indigo-500/20 text-indigo-300 border-0 text-xs font-medium">
+              {docCount} {docCount === 1 ? "document" : "documents"}
+            </Badge>
+            {staleCount > 0 && (
+              <Badge className="bg-orange-500/20 text-orange-300 border-0 text-xs font-medium" data-testid="badge-bundle-stale-mobile">
+                {staleCount} outdated
+              </Badge>
+            )}
+          </div>
         </div>
 
         {bundle.items && bundle.items.length > 0 && (
           <div className="space-y-2 pt-2 border-t border-white/10">
-            {bundle.items.slice(0, 5).map((item) => (
-              <div
-                key={item.id}
-                className="flex items-center gap-3 py-2"
-                data-testid={`bundle-doc-${item.documentId}`}
-              >
-                <FileText className="h-4 w-4 text-white/30 flex-shrink-0" />
-                <p className="text-sm text-white truncate">
-                  {item.document?.title || item.document?.originalName || "Document"}
-                </p>
-              </div>
-            ))}
+            {bundle.items.slice(0, 5).map((item) => {
+              const isStale = item.document?.isLatestVersion === false;
+              return (
+                <div
+                  key={item.id}
+                  className="flex items-center gap-3 py-2"
+                  data-testid={`bundle-doc-${item.documentId}`}
+                >
+                  <FileText className={`h-4 w-4 flex-shrink-0 ${isStale ? "text-orange-400" : "text-white/30"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white truncate">
+                      {item.document?.title || item.document?.originalName || "Document"}
+                    </p>
+                    {isStale && (
+                      <p className="text-xs text-orange-400" data-testid={`text-stale-indicator-${item.documentId}`}>
+                        v{item.document?.version || "1"}{item.document?.revision || ""} — superseded
+                      </p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             {bundle.items.length > 5 && (
               <p className="text-xs text-white/40 text-center pt-1">
                 +{bundle.items.length - 5} more documents

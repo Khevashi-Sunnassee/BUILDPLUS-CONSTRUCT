@@ -149,6 +149,12 @@ Standard handler pattern, no TODOs/FIXMEs, consistent naming, logger usage (647)
   * Extended GET /api/tenders/:id/packages to return document staleness indicators (isLatestVersion, version, revision, documentNumber, status, isStale).
   * Frontend UploadDocumentDialog shows warning dialog after superseding documents used in active tenders, with "Update Packages" and "Notify Suppliers" actions using async mutations with proper error handling.
   * TenderDetailContent shows orange "Out of date" badges for stale document packages.
+- Implemented bundle-level document staleness tracking:
+  * Updated public bundle endpoint (GET /api/public/bundles/:qrCodeId) to include version, revision, documentNumber, isLatestVersion, isStale fields.
+  * Added POST /api/document-bundles/:bundleId/items/:itemId/request-latest endpoint (requireAuth, companyId-scoped) to manually update a single bundle item to its latest document version (finds latest by documentNumber or parentDocumentId chain).
+  * BundleGridView: Shows stale count badge on bundle header rows, orange "Out of date" badge per stale document, and "Request Latest" button (RefreshCw icon) with mutation and cache invalidation.
+  * BundleScanResult (mobile QR scanner): Shows orange staleness warning banner with count, stale count badge, and per-doc version/superseded indicators.
+  * PublicBundle page: Shows staleness alert banner, stale count badge, per-doc "Superseded" badges, orange border highlighting, and version info. Directs users to contact bundle owner for updates (no auto-replacement on public page).
 
 ### 2026-02-14 (Session 2)
 - Fixed scope email bug: `emailService.sendEmail()` was called with object syntax instead of positional args - emails now send correctly.

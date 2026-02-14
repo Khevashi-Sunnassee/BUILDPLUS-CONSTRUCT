@@ -1,6 +1,6 @@
 import { useParams } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { FileText, Download, AlertCircle, Clock, Package, Loader2 } from "lucide-react";
+import { FileText, Download, AlertCircle, AlertTriangle, Clock, Package, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,11 @@ interface PublicBundleDocument {
   originalName: string;
   fileSize: number;
   mimeType: string;
+  version?: string;
+  revision?: string;
+  documentNumber?: string;
+  isLatestVersion?: boolean;
+  isStale?: boolean;
 }
 
 interface PublicBundle {
@@ -92,6 +97,8 @@ export default function PublicBundlePage() {
     );
   }
 
+  const staleCount = bundle.items.filter((doc) => doc.isStale).length;
+
   return (
     <div className="min-h-screen bg-background py-8 px-4" role="main" aria-label="Public Bundle">
       <div className="max-w-2xl mx-auto space-y-6">
@@ -105,10 +112,32 @@ export default function PublicBundlePage() {
           {bundle.description && (
             <p className="text-muted-foreground" data-testid="text-bundle-description">{bundle.description}</p>
           )}
-          <Badge variant="outline" className="mt-2">
-            {bundle.items.length} document{bundle.items.length !== 1 ? "s" : ""}
-          </Badge>
+          <div className="flex justify-center gap-2 flex-wrap">
+            <Badge variant="outline">
+              {bundle.items.length} document{bundle.items.length !== 1 ? "s" : ""}
+            </Badge>
+            {staleCount > 0 && (
+              <Badge
+                variant="outline"
+                className="text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                data-testid="badge-public-bundle-stale-count"
+              >
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                {staleCount} outdated
+              </Badge>
+            )}
+          </div>
         </div>
+
+        {staleCount > 0 && (
+          <Alert className="border-orange-300 dark:border-orange-600" data-testid="alert-public-bundle-stale">
+            <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <AlertTitle className="text-orange-700 dark:text-orange-300">Some documents are outdated</AlertTitle>
+            <AlertDescription className="text-orange-600/80 dark:text-orange-400/80">
+              {staleCount} document{staleCount !== 1 ? "s have" : " has"} been superseded by newer versions. Contact the bundle owner for updates.
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card>
           <CardHeader>
@@ -119,20 +148,34 @@ export default function PublicBundlePage() {
             {bundle.items.map((doc) => (
               <div 
                 key={doc.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                className={`flex items-center justify-between gap-3 p-4 border rounded-lg hover:bg-muted/50 transition-colors ${doc.isStale ? "border-orange-300 dark:border-orange-600" : ""}`}
+                data-testid={`public-bundle-doc-${doc.id}`}
               >
-                <div className="flex items-center gap-3">
-                  <FileText className="h-8 w-8 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium" data-testid={`text-doc-title-${doc.id}`}>{doc.title}</p>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <FileText className={`h-8 w-8 shrink-0 ${doc.isStale ? "text-orange-500" : "text-muted-foreground"}`} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium" data-testid={`text-doc-title-${doc.id}`}>{doc.title}</p>
+                      {doc.isStale && (
+                        <Badge
+                          variant="outline"
+                          className="shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-600"
+                          data-testid={`badge-stale-public-doc-${doc.id}`}
+                        >
+                          Superseded
+                        </Badge>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
                       {formatFileSize(doc.fileSize)} • {doc.originalName}
+                      {doc.version && ` • v${doc.version}${doc.revision || ""}`}
                     </p>
                   </div>
                 </div>
                 <Button 
                   variant="outline"
                   onClick={() => handleDownload(doc.id, doc.originalName)}
+                  className="shrink-0"
                   data-testid={`button-download-${doc.id}`}
                 >
                   <Download className="h-4 w-4 mr-2" />
