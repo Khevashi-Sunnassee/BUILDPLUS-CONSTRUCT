@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { JOBS_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { SuburbLookup } from "@/components/suburb-lookup";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -776,12 +777,14 @@ export default function SalesPipelinePage() {
                 />
               </div>
               <div>
-                <Label htmlFor="new-opp-city">City *</Label>
-                <Input
-                  id="new-opp-city"
-                  placeholder="City"
+                <Label htmlFor="new-opp-city">City / Suburb *</Label>
+                <SuburbLookup
                   value={newOpp.city}
-                  onChange={(e) => setNewOpp((p) => ({ ...p, city: e.target.value }))}
+                  onChange={(val) => setNewOpp((p) => ({ ...p, city: val }))}
+                  onSelect={(result) => {
+                    setNewOpp((p) => ({ ...p, city: result.suburb, state: result.state }));
+                  }}
+                  placeholder="Start typing suburb..."
                   data-testid="input-new-opp-city"
                 />
               </div>
