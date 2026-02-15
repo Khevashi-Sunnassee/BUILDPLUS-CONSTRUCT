@@ -554,13 +554,13 @@ export function BudgetLineSidebar({
                           </div>
 
                           {update.contentType === "email" ? (
-                            <div className="mt-2 border rounded-md bg-muted/20">
+                            <div className="mt-2 border rounded-md overflow-hidden">
                               <div
-                                className="flex items-center gap-2 p-2 cursor-pointer"
+                                className="flex items-center gap-2 p-2 bg-muted/30 cursor-pointer"
                                 onClick={() => toggleEmailExpand(update.id)}
                                 data-testid={`btn-toggle-email-${update.id}`}
                               >
-                                <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <Mail className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                 <span className="text-sm font-medium truncate flex-1">
                                   {update.emailSubject || "(No Subject)"}
                                 </span>
@@ -571,25 +571,29 @@ export function BudgetLineSidebar({
                                 )}
                               </div>
                               {expandedEmails.has(update.id) && (
-                                <div className="border-t p-2 space-y-1">
-                                  {update.emailFrom && (
-                                    <p className="text-xs text-muted-foreground">
-                                      <span className="font-medium">From:</span> {update.emailFrom}
-                                    </p>
-                                  )}
-                                  {update.emailTo && (
-                                    <p className="text-xs text-muted-foreground">
-                                      <span className="font-medium">To:</span> {update.emailTo}
-                                    </p>
-                                  )}
-                                  {update.emailDate && (
-                                    <p className="text-xs text-muted-foreground">
-                                      <span className="font-medium">Date:</span>{" "}
-                                      {(() => { try { return format(new Date(update.emailDate), "dd/MM/yyyy HH:mm"); } catch { return update.emailDate; } })()}
-                                    </p>
-                                  )}
-                                  <div className="mt-2 pt-2 border-t">
-                                    <p className="text-sm whitespace-pre-wrap">{update.content}</p>
+                                <div className="border-t">
+                                  <div className="p-3 bg-muted/10 space-y-1 border-b">
+                                    {update.emailFrom && (
+                                      <div className="flex gap-2 text-xs">
+                                        <span className="font-semibold text-muted-foreground w-10 flex-shrink-0">From</span>
+                                        <span>{update.emailFrom}</span>
+                                      </div>
+                                    )}
+                                    {update.emailTo && (
+                                      <div className="flex gap-2 text-xs">
+                                        <span className="font-semibold text-muted-foreground w-10 flex-shrink-0">To</span>
+                                        <span>{update.emailTo}</span>
+                                      </div>
+                                    )}
+                                    {update.emailDate && (
+                                      <div className="flex gap-2 text-xs">
+                                        <span className="font-semibold text-muted-foreground w-10 flex-shrink-0">Date</span>
+                                        <span>{(() => { try { return format(new Date(update.emailDate), "dd/MM/yyyy HH:mm"); } catch { return update.emailDate; } })()}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="p-3 max-h-80 overflow-y-auto">
+                                    <div className="text-sm leading-relaxed whitespace-pre-wrap">{update.content}</div>
                                   </div>
                                 </div>
                               )}
