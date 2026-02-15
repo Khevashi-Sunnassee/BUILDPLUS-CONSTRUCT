@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
+import { MultiFileDropZone } from "@/components/MultiFileDropZone";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -154,7 +155,6 @@ export default function ManualEntryPage() {
   const [productionDialogOpen, setProductionDialogOpen] = useState(false);
   const [productionPanel, setProductionPanel] = useState<PanelWithJob | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [productionFormData, setProductionFormData] = useState({
     loadWidth: "",
@@ -170,7 +170,6 @@ export default function ManualEntryPage() {
     productionPdfUrl: "",
   });
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
   
   // Panel details collapse state - default to collapsed
   const [panelDetailsExpanded, setPanelDetailsExpanded] = useState(false);
@@ -815,22 +814,6 @@ export default function ManualEntryPage() {
       primaryLifters: "",
       productionPdfUrl: "",
     });
-  };
-
-  const handlePdfDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === "application/pdf") {
-      setPdfFile(file);
-    }
-  }, []);
-
-  const handlePdfSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPdfFile(file);
-    }
   };
 
   const analyzePdf = async () => {
@@ -1803,15 +1786,8 @@ export default function ManualEntryPage() {
             {/* PDF Upload Section */}
             <div className="space-y-2">
               <Label>Production Drawing PDF</Label>
-              <div
-                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                  isDragging ? "border-primary bg-primary/5" : "border-muted-foreground/25"
-                }`}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handlePdfDrop}
-              >
-                {pdfFile ? (
+              {pdfFile ? (
+                <div className="border-2 border-dashed rounded-lg p-6 text-center border-muted-foreground/25">
                   <div className="flex items-center justify-center gap-3">
                     <FileText className="h-8 w-8 text-primary" />
                     <div className="text-left">
@@ -1829,32 +1805,18 @@ export default function ManualEntryPage() {
                       <XCircle className="h-4 w-4" />
                     </Button>
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <FileText className="h-10 w-10 mx-auto text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">
-                      Drag and drop a PDF here, or click to browse
-                    </p>
-                    <input
-                      type="file"
-                      ref={pdfInputRef}
-                      accept=".pdf"
-                      onChange={handlePdfSelect}
-                      className="hidden"
-                      data-testid="input-pdf-upload"
-                    />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => pdfInputRef.current?.click()}
-                      data-testid="button-browse-pdf"
-                    >
-                      <Upload className="h-4 w-4 mr-2" />
-                      Browse
-                    </Button>
-                  </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                <MultiFileDropZone
+                  onFiles={(files) => {
+                    if (files.length > 0) setPdfFile(files[0]);
+                  }}
+                  accept=".pdf"
+                  label="Drop a PDF here or click to browse"
+                  hint="PDF files supported"
+                  testId="dropzone-pdf"
+                />
+              )}
               {pdfFile && (
                 <Button
                   onClick={analyzePdf}

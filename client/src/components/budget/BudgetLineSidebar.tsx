@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { MultiFileDropZone } from "@/components/MultiFileDropZone";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -124,7 +125,6 @@ export function BudgetLineSidebar({
 
   const [newUpdate, setNewUpdate] = useState("");
   const [pastedImages, setPastedImages] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: updates = [], isLoading: updatesLoading } = useQuery<BudgetLineUpdate[]>({
@@ -265,12 +265,11 @@ export function BudgetLineSidebar({
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleMultiFileUpload = useCallback((files: File[]) => {
+    for (const file of files) {
       uploadFileMutation.mutate({ file });
     }
-  };
+  }, [uploadFileMutation]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData.items;
@@ -503,22 +502,15 @@ export function BudgetLineSidebar({
 
           {activeTab === "files" && (
             <div className="space-y-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <Button
-                variant="outline"
-                className="w-full border-dashed"
-                onClick={() => fileInputRef.current?.click()}
+              <MultiFileDropZone
+                onFiles={handleMultiFileUpload}
                 disabled={uploadFileMutation.isPending}
-                data-testid="btn-budget-upload-file"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {uploadFileMutation.isPending ? "Uploading..." : "Upload File"}
-              </Button>
+                compact
+                label="Drop files here or click to browse"
+                hint="Drag multiple files at once, including from Outlook"
+                uploadingLabel="Uploading..."
+                testId="dropzone-budget-files"
+              />
 
               {filesLoading ? (
                 <div className="space-y-2">

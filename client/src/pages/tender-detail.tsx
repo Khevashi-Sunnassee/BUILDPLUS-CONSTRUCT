@@ -3,6 +3,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
+import { MultiFileDropZone } from "@/components/MultiFileDropZone";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { TENDER_MEMBER_ROUTES } from "@shared/api-routes";
@@ -450,7 +451,6 @@ function InvitationSidebar({
   const [activeTab, setActiveTab] = useState<"updates" | "files" | "activity">(initialTab || "updates");
   const [newUpdate, setNewUpdate] = useState("");
   const [pastedImages, setPastedImages] = useState<globalThis.File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -522,10 +522,11 @@ function InvitationSidebar({
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) uploadFileMutation.mutate({ file });
-  };
+  const handleMultiFileUpload = useCallback((files: File[]) => {
+    for (const file of files) {
+      uploadFileMutation.mutate({ file });
+    }
+  }, [uploadFileMutation]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData.items;
@@ -745,22 +746,15 @@ function InvitationSidebar({
 
           {activeTab === "files" && (
             <div className="space-y-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <Button
-                variant="outline"
-                className="w-full border-dashed"
-                onClick={() => fileInputRef.current?.click()}
+              <MultiFileDropZone
+                onFiles={handleMultiFileUpload}
                 disabled={uploadFileMutation.isPending}
-                data-testid="btn-upload-invitation-file"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {uploadFileMutation.isPending ? "Uploading..." : "Upload File"}
-              </Button>
+                compact
+                label="Drop files here or click to browse"
+                hint="Drag multiple files at once, including from Outlook"
+                uploadingLabel="Uploading..."
+                testId="dropzone-tender-files"
+              />
 
               {filesLoading ? (
                 <div className="space-y-2">

@@ -15,13 +15,13 @@ import {
   Trash2,
   X,
   Send,
-  Upload,
   FileText,
   Image,
   File,
 } from "lucide-react";
 import type { Task, TaskUpdate, TaskFile } from "./types";
 import { getInitials } from "./types";
+import { MultiFileDropZone } from "@/components/MultiFileDropZone";
 
 export function TaskSidebar({
   task,
@@ -36,7 +36,6 @@ export function TaskSidebar({
   const [activeTab, setActiveTab] = useState<"updates" | "files" | "activity">(initialTab || "updates");
   const [newUpdate, setNewUpdate] = useState("");
   const [pastedImages, setPastedImages] = useState<File[]>([]);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -115,12 +114,11 @@ export function TaskSidebar({
     },
   });
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
+  const handleMultiFileUpload = useCallback((files: File[]) => {
+    for (const file of files) {
       uploadFileMutation.mutate({ file });
     }
-  };
+  }, [uploadFileMutation]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = e.clipboardData.items;
@@ -359,22 +357,15 @@ export function TaskSidebar({
 
           {activeTab === "files" && (
             <div className="space-y-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileSelect}
-              />
-              <Button
-                variant="outline"
-                className="w-full border-dashed"
-                onClick={() => fileInputRef.current?.click()}
+              <MultiFileDropZone
+                onFiles={handleMultiFileUpload}
                 disabled={uploadFileMutation.isPending}
-                data-testid="btn-upload-file"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {uploadFileMutation.isPending ? "Uploading..." : "Upload File"}
-              </Button>
+                compact
+                label="Drop files here or click to browse"
+                hint="Drag multiple files at once, including from Outlook"
+                uploadingLabel="Uploading..."
+                testId="dropzone-task-files"
+              />
 
               {filesLoading ? (
                 <div className="space-y-2">

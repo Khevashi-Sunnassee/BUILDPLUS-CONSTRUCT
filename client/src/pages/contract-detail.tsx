@@ -5,6 +5,7 @@ import { PageHelpButton } from "@/components/help/page-help-button";
 import { CONTRACT_ROUTES, DOCUMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
 import { queryClient, apiRequest, getCsrfToken } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { MultiFileDropZone } from "@/components/MultiFileDropZone";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -859,16 +860,20 @@ export default function ContractDetailPage() {
                     <p className="text-sm text-muted-foreground">Reading document, extracting field values, and assessing risks from a subcontractor perspective. This may take up to 60 seconds.</p>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-3">
-                    <Upload className="h-10 w-10 text-muted-foreground" />
-                    <p className="font-medium">Upload Contract Document</p>
-                    <p className="text-sm text-muted-foreground">PDF, Word, or image files supported</p>
-                    <input ref={aiFileInputRef} type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={handleAiUpload} data-testid="input-ai-file-upload" />
-                    <Button variant="outline" type="button" onClick={() => aiFileInputRef.current?.click()} data-testid="button-select-ai-file">
-                      <FileUp className="h-4 w-4 mr-2" />
-                      Select File
-                    </Button>
-                  </div>
+                  <MultiFileDropZone
+                    onFiles={(files) => {
+                      if (files.length > 0) {
+                        const dt = new DataTransfer();
+                        dt.items.add(files[0]);
+                        const fakeEvent = { target: { files: dt.files } } as React.ChangeEvent<HTMLInputElement>;
+                        handleAiUpload(fakeEvent);
+                      }
+                    }}
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    label="Drop contract document here or click to browse"
+                    hint="PDF, Word, or image files supported"
+                    testId="dropzone-ai-contract"
+                  />
                 )}
               </div>
             </div>
@@ -923,29 +928,16 @@ export default function ContractDetailPage() {
             <DialogTitle>Add Project Documents</DialogTitle>
             <DialogDescription>Upload multiple documents to the project register</DialogDescription>
           </DialogHeader>
-          <div className="border-2 border-dashed rounded-md p-8 text-center">
-            <div className="flex flex-col items-center gap-3">
-              <Upload className="h-10 w-10 text-muted-foreground" />
-              <p className="font-medium">Select Files</p>
-              <p className="text-sm text-muted-foreground">PDF, Word, Excel, images, and other file types</p>
-              <input
-                ref={docFileInputRef}
-                type="file"
-                className="hidden"
-                multiple
-                onChange={(e) => {
-                  if (e.target.files?.length) {
-                    handleProjectDocUpload(e.target.files);
-                  }
-                }}
-                data-testid="input-project-doc-upload"
-              />
-              <Button variant="outline" type="button" onClick={() => docFileInputRef.current?.click()} data-testid="button-browse-files">
-                <FileUp className="h-4 w-4 mr-2" />
-                Browse Files
-              </Button>
-            </div>
-          </div>
+          <MultiFileDropZone
+            onFiles={(files) => {
+              const dt = new DataTransfer();
+              files.forEach(f => dt.items.add(f));
+              handleProjectDocUpload(dt.files);
+            }}
+            label="Drop files here or click to browse"
+            hint="PDF, Word, Excel, images, and other file types"
+            testId="dropzone-contract-docs"
+          />
         </DialogContent>
       </Dialog>
     </div>
