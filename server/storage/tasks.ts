@@ -275,7 +275,7 @@ export const taskMethods = {
   async reorderTasks(groupId: string, taskIds: string[]): Promise<void> {
     if (taskIds.length === 0) return;
     const now = new Date();
-    const caseFragments = taskIds.map((id, i) => sql`WHEN ${id} THEN ${i}`);
+    const caseFragments = taskIds.map((id, i) => sql`WHEN ${id} THEN ${i}::integer`);
     await db.update(tasks)
       .set({
         sortOrder: sql`CASE id ${sql.join(caseFragments, sql` `)} END`,
@@ -314,7 +314,7 @@ export const taskMethods = {
     }
 
     if (reorderIds.length > 0) {
-      const caseFragments = reorderIds.map((id, i) => sql`WHEN ${id} THEN ${reorderOrders[i]}`);
+      const caseFragments = reorderIds.map((id, i) => sql`WHEN ${id} THEN ${reorderOrders[i]}::integer`);
       await db.update(tasks)
         .set({
           sortOrder: sql`CASE id ${sql.join(caseFragments, sql` `)} END`,
