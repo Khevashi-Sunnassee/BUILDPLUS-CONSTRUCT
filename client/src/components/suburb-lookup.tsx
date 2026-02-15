@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Input } from "@/components/ui/input";
 import { MapPin } from "lucide-react";
 
@@ -30,9 +31,23 @@ export function SuburbLookup({
   const [results, setResults] = useState<SuburbResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const updateDropdownPosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    setDropdownStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+    });
+  }, []);
 
   const search = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -47,21 +62,35 @@ export function SuburbLookup({
         setResults(data);
         setIsOpen(data.length > 0);
         setHighlightIndex(-1);
+        if (data.length > 0) {
+          updateDropdownPosition();
+        }
       }
     } catch {
       setResults([]);
     }
-  }, []);
+  }, [updateDropdownPosition]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleScroll = () => updateDropdownPosition();
+    window.addEventListener("scroll", handleScroll, true);
+    return () => window.removeEventListener("scroll", handleScroll, true);
+  }, [isOpen, updateDropdownPosition]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -93,19 +122,53 @@ export function SuburbLookup({
     }
   };
 
+  const handleFocus = () => {
+    if (results.length > 0) {
+      updateDropdownPosition();
+      setIsOpen(true);
+    }
+  };
+
+  const dropdown = isOpen && results.length > 0 ? createPortal(
+    <div
+      ref={dropdownRef}
+      style={dropdownStyle}
+      className="rounded-md border bg-popover text-popover-foreground shadow-md overflow-hidden"
+      data-testid="suburb-lookup-results"
+    >
+      <div className="max-h-[200px] overflow-y-auto">
+        {results.map((r, idx) => (
+          <button
+            key={`${r.suburb}-${r.postcode}-${r.state}`}
+            type="button"
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left cursor-pointer ${
+              idx === highlightIndex ? "bg-accent text-accent-foreground" : "hover-elevate"
+            }`}
+            onClick={() => handleSelect(r)}
+            data-testid={`suburb-result-${idx}`}
+          >
+            <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+            <span className="font-medium">{r.suburb}</span>
+            <span className="text-muted-foreground ml-auto">{r.state} {r.postcode}</span>
+          </button>
+        ))}
+      </div>
+    </div>,
+    document.body
+  ) : null;
+
   return (
     <div ref={containerRef} className={`relative ${className ? "" : ""}`}>
       <div className="relative">
         {!className && <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />}
         {className ? (
-          // Custom styling mode (e.g., mobile form)
           <input
             ref={inputRef}
             type="text"
             value={value}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (results.length > 0) setIsOpen(true); }}
+            onFocus={handleFocus}
             placeholder={placeholder}
             className={`${className} relative`}
             data-testid={testId}
@@ -113,13 +176,12 @@ export function SuburbLookup({
             autoComplete="off"
           />
         ) : (
-          // Default shadcn Input mode
           <Input
             ref={inputRef}
             value={value}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            onFocus={() => { if (results.length > 0) setIsOpen(true); }}
+            onFocus={handleFocus}
             placeholder={placeholder}
             className={`pl-8`}
             data-testid={testId}
@@ -128,30 +190,7 @@ export function SuburbLookup({
           />
         )}
       </div>
-      {isOpen && results.length > 0 && (
-        <div
-          className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md overflow-hidden"
-          data-testid="suburb-lookup-results"
-        >
-          <div className="max-h-[200px] overflow-y-auto">
-            {results.map((r, idx) => (
-              <button
-                key={`${r.suburb}-${r.postcode}-${r.state}`}
-                type="button"
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left cursor-pointer ${
-                  idx === highlightIndex ? "bg-accent text-accent-foreground" : "hover-elevate"
-                }`}
-                onClick={() => handleSelect(r)}
-                data-testid={`suburb-result-${idx}`}
-              >
-                <MapPin className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-                <span className="font-medium">{r.suburb}</span>
-                <span className="text-muted-foreground ml-auto">{r.state} {r.postcode}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {dropdown}
     </div>
   );
 }
