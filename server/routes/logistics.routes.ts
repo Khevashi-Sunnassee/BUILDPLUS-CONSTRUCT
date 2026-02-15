@@ -130,6 +130,11 @@ router.post("/api/load-lists", requireAuth, requirePermission("logistics", "VIEW
       loadTime,
       createdById: req.session.userId!,
     }, panelIds || []);
+    if (panelIds && panelIds.length > 0) {
+      for (const panelId of panelIds) {
+        advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.ON_LOAD_LIST, "Added to load list", req.session.userId, { loadListId: loadList.id });
+      }
+    }
     res.json(loadList);
   } catch (error: unknown) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Failed to create load list" });

@@ -106,6 +106,66 @@ router.post("/api/production-entries", requireAuth, requirePermission("productio
   }
 });
 
+router.put("/api/production-entries/batch-status", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  const batchResult = batchStatusSchema.safeParse(req.body);
+  if (!batchResult.success) {
+    return res.status(400).json({ error: batchResult.error.format() });
+  }
+  const { entryIds, status } = batchResult.data;
+  if (!entryIds || !Array.isArray(entryIds) || entryIds.length === 0 || !status) {
+    return res.status(400).json({ error: "entryIds array and status required" });
+  }
+  if (!["PENDING", "COMPLETED"].includes(status)) {
+    return res.status(400).json({ error: "Invalid status. Must be PENDING or COMPLETED" });
+  }
+  const validEntries: { id: string; panelId: string }[] = [];
+  for (const id of entryIds) {
+    const entry = await storage.getProductionEntry(id);
+    if (entry) {
+      if (req.companyId && entry.job?.companyId !== req.companyId) continue;
+      validEntries.push({ id, panelId: entry.panelId });
+    }
+  }
+  if (validEntries.length === 0) {
+    return res.status(404).json({ error: "No valid entries found" });
+  }
+  const updated = await Promise.all(
+    validEntries.map(e => storage.updateProductionEntry(e.id, { status }))
+  );
+  
+  if (status === "COMPLETED") {
+    const uniquePanelIds = Array.from(new Set(validEntries.map(e => e.panelId)));
+    
+    await Promise.all(
+      uniquePanelIds.map(panelId => storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" }))
+    );
+    for (const panelId of uniquePanelIds) {
+      advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.PRODUCED, "Production completed (batch)", req.session.userId);
+    }
+    
+    const slotsToCheck = new Map<string, { jobId: string; level: string; building: number }>();
+    for (const panelId of uniquePanelIds) {
+      const panel = await storage.getPanelRegisterItem(panelId);
+      if (panel && panel.level && panel.building) {
+        const key = `${panel.jobId}-${panel.level}-${panel.building}`;
+        if (!slotsToCheck.has(key)) {
+          slotsToCheck.set(key, {
+            jobId: panel.jobId,
+            level: panel.level,
+            building: parseInt(panel.building) || 1
+          });
+        }
+      }
+    }
+    
+    for (const item of Array.from(slotsToCheck.values())) {
+      await storage.checkAndCompleteSlotByPanelCompletion(item.jobId, item.level, item.building);
+    }
+  }
+  
+  res.json({ updated: updated.length });
+});
+
 router.put("/api/production-entries/:id", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {
     const existingEntry = await storage.getProductionEntry(String(req.params.id));
@@ -173,66 +233,6 @@ router.delete("/api/production-entries/:id", requireAuth, requirePermission("pro
   } catch (error: unknown) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Failed to delete production entry" });
   }
-});
-
-router.put("/api/production-entries/batch-status", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
-  const batchResult = batchStatusSchema.safeParse(req.body);
-  if (!batchResult.success) {
-    return res.status(400).json({ error: batchResult.error.format() });
-  }
-  const { entryIds, status } = batchResult.data;
-  if (!entryIds || !Array.isArray(entryIds) || entryIds.length === 0 || !status) {
-    return res.status(400).json({ error: "entryIds array and status required" });
-  }
-  if (!["PENDING", "COMPLETED"].includes(status)) {
-    return res.status(400).json({ error: "Invalid status. Must be PENDING or COMPLETED" });
-  }
-  const validEntries: { id: string; panelId: string }[] = [];
-  for (const id of entryIds) {
-    const entry = await storage.getProductionEntry(id);
-    if (entry) {
-      if (req.companyId && entry.job?.companyId !== req.companyId) continue;
-      validEntries.push({ id, panelId: entry.panelId });
-    }
-  }
-  if (validEntries.length === 0) {
-    return res.status(404).json({ error: "No valid entries found" });
-  }
-  const updated = await Promise.all(
-    validEntries.map(e => storage.updateProductionEntry(e.id, { status }))
-  );
-  
-  if (status === "COMPLETED") {
-    const uniquePanelIds = Array.from(new Set(validEntries.map(e => e.panelId)));
-    
-    await Promise.all(
-      uniquePanelIds.map(panelId => storage.updatePanelRegisterItem(panelId, { status: "COMPLETED" }))
-    );
-    for (const panelId of uniquePanelIds) {
-      advancePanelLifecycleIfLower(panelId, PANEL_LIFECYCLE_STATUS.PRODUCED, "Production completed (batch)", req.session.userId);
-    }
-    
-    const slotsToCheck = new Map<string, { jobId: string; level: string; building: number }>();
-    for (const panelId of uniquePanelIds) {
-      const panel = await storage.getPanelRegisterItem(panelId);
-      if (panel && panel.level && panel.building) {
-        const key = `${panel.jobId}-${panel.level}-${panel.building}`;
-        if (!slotsToCheck.has(key)) {
-          slotsToCheck.set(key, {
-            jobId: panel.jobId,
-            level: panel.level,
-            building: parseInt(panel.building) || 1
-          });
-        }
-      }
-    }
-    
-    for (const item of Array.from(slotsToCheck.values())) {
-      await storage.checkAndCompleteSlotByPanelCompletion(item.jobId, item.level, item.building);
-    }
-  }
-  
-  res.json({ updated: updated.length });
 });
 
 router.get("/api/production-slots/:slotId/panel-entries", requireAuth, requirePermission("production_report", "VIEW"), async (req: Request, res: Response) => {

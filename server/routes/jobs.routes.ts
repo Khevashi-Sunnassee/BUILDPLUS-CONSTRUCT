@@ -693,6 +693,13 @@ router.put("/api/admin/jobs/:id", requireRole("ADMIN"), async (req: Request, res
         data.productionStartDate = null;
       }
     }
+    if (data.estimatedStartDate !== undefined) {
+      if (data.estimatedStartDate && typeof data.estimatedStartDate === 'string') {
+        data.estimatedStartDate = new Date(data.estimatedStartDate);
+      } else {
+        data.estimatedStartDate = null;
+      }
+    }
     if (data.daysToAchieveIfc !== undefined && data.daysToAchieveIfc !== null) {
       const val = parseInt(String(data.daysToAchieveIfc), 10);
       if (isNaN(val) || val < 1) {

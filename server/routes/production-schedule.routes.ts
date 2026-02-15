@@ -274,7 +274,7 @@ router.get("/api/production-schedule/days", requireAuth, requirePermission("prod
 const addPanelsSchema = z.object({
   panelIds: z.array(z.string()).min(1, "At least one panel ID is required"),
   productionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Production date must be in YYYY-MM-DD format"),
-  factoryId: z.string().optional(),
+  factoryId: z.string().nullable().optional(),
 });
 
 router.post("/api/production-schedule/add-panels", requireAuth, requirePermission("production_report", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
