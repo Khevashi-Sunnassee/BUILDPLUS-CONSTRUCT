@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { JOBS_ROUTES, PROCUREMENT_ROUTES } from "@shared/api-routes";
+import { JOBS_ROUTES, PROCUREMENT_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
 import { SuburbLookup } from "@/components/suburb-lookup";
@@ -56,6 +56,13 @@ interface Customer {
   name: string;
 }
 
+interface JobType {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 const STATES = ["NSW", "VIC", "QLD", "SA", "WA", "TAS", "NT", "ACT"];
 
 interface Opportunity {
@@ -82,6 +89,7 @@ interface Opportunity {
   probability: number | null;
   estimatedStartDate: string | null;
   comments: string | null;
+  jobTypeId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,6 +164,7 @@ export default function SalesPipelinePage() {
     opportunityType: "",
     probability: "",
     comments: "",
+    jobTypeId: "",
   });
 
   const { data: opportunities = [], isLoading } = useQuery<Opportunity[]>({
@@ -177,8 +186,12 @@ export default function SalesPipelinePage() {
     queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_ACTIVE],
   });
 
+  const { data: jobTypes = [] } = useQuery<JobType[]>({
+    queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_TYPES],
+  });
+
   const resetNewOppForm = () => {
-    setNewOpp({ name: "", customerId: "", address: "", city: "", state: "", estimatedValue: "", opportunityType: "", probability: "", comments: "" });
+    setNewOpp({ name: "", customerId: "", address: "", city: "", state: "", estimatedValue: "", opportunityType: "", probability: "", comments: "", jobTypeId: "" });
   };
 
   const createOpportunity = useMutation({
@@ -197,6 +210,7 @@ export default function SalesPipelinePage() {
       if (newOpp.opportunityType) body.opportunityType = newOpp.opportunityType;
       if (newOpp.probability) body.probability = parseInt(newOpp.probability);
       if (newOpp.comments) body.comments = newOpp.comments;
+      if (newOpp.jobTypeId) body.jobTypeId = newOpp.jobTypeId;
       const res = await apiRequest("POST", JOBS_ROUTES.OPPORTUNITIES, body);
       return res.json();
     },
@@ -597,6 +611,10 @@ export default function SalesPipelinePage() {
                       <div className="text-sm">{getOppTypeLabel(selectedOpp.opportunityType)}</div>
                     </div>
                     <div>
+                      <div className="text-xs text-muted-foreground mb-1">Job Type</div>
+                      <div className="text-sm">{selectedOpp.jobTypeId ? (jobTypes.find(jt => jt.id === selectedOpp.jobTypeId)?.name || "-") : "-"}</div>
+                    </div>
+                    <div>
                       <div className="text-xs text-muted-foreground mb-1">Buildings</div>
                       <div className="text-sm">{selectedOpp.numberOfBuildings ?? "-"}</div>
                     </div>
@@ -761,6 +779,20 @@ export default function SalesPipelinePage() {
                 <SelectContent>
                   {[...customers].sort((a, b) => (a.name || '').localeCompare(b.name || '')).map((c) => (
                     <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="new-opp-job-type">Job Type</Label>
+              <Select value={newOpp.jobTypeId || "__none__"} onValueChange={(v) => setNewOpp((p) => ({ ...p, jobTypeId: v === "__none__" ? "" : v }))}>
+                <SelectTrigger id="new-opp-job-type" data-testid="select-new-opp-job-type">
+                  <SelectValue placeholder="Select job type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">No job type</SelectItem>
+                  {jobTypes.filter(jt => jt.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map((jt) => (
+                    <SelectItem key={jt.id} value={jt.id}>{jt.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

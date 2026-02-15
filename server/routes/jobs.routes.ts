@@ -74,6 +74,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       estimatedStartDate: jobs.estimatedStartDate,
       comments: jobs.comments,
       jobPhase: jobs.jobPhase,
+      jobTypeId: jobs.jobTypeId,
       createdAt: jobs.createdAt,
       updatedAt: jobs.updatedAt,
     })
@@ -131,6 +132,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       probability: z.number().int().min(0).max(100).optional().nullable(),
       estimatedStartDate: z.string().optional().nullable(),
       comments: z.string().optional().nullable(),
+      jobTypeId: z.string().max(36).optional().nullable(),
     });
 
     const parsed = opportunitySchema.safeParse(req.body);
@@ -191,6 +193,7 @@ router.post("/api/jobs/opportunities", requireAuth, async (req: Request, res: Re
       probability: parsed.data.probability ?? null,
       estimatedStartDate: parsed.data.estimatedStartDate ? new Date(parsed.data.estimatedStartDate) : null,
       comments: parsed.data.comments || null,
+      jobTypeId: parsed.data.jobTypeId || null,
     };
 
     const job = await storage.createJob(data);
@@ -244,6 +247,7 @@ router.patch("/api/jobs/opportunities/:id", requireAuth, async (req: Request, re
       probability: z.number().int().min(0).max(100).optional().nullable(),
       estimatedStartDate: z.string().optional().nullable(),
       comments: z.string().optional().nullable(),
+      jobTypeId: z.string().max(36).optional().nullable(),
       statusNote: z.string().max(500).optional(),
     });
 

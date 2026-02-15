@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { PROCUREMENT_ROUTES, JOBS_ROUTES } from "@shared/api-routes";
+import { PROCUREMENT_ROUTES, JOBS_ROUTES, PROJECT_ACTIVITIES_ROUTES } from "@shared/api-routes";
 import { useToast } from "@/hooks/use-toast";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import { SuburbLookup } from "@/components/suburb-lookup";
@@ -37,6 +37,13 @@ interface Customer {
   contactName?: string;
   phone?: string;
   email?: string;
+}
+
+interface JobType {
+  id: string;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
 }
 
 const OPPORTUNITY_STATUS_OPTIONS = [
@@ -118,6 +125,7 @@ export default function MobileNewOpportunity() {
     probability: "",
     estimatedStartDate: "",
     comments: "",
+    jobTypeId: "",
   });
 
   const [newCustomer, setNewCustomer] = useState({
@@ -131,6 +139,10 @@ export default function MobileNewOpportunity() {
 
   const { data: customers = [], isLoading: loadingCustomers } = useQuery<Customer[]>({
     queryKey: [PROCUREMENT_ROUTES.CUSTOMERS_ACTIVE],
+  });
+
+  const { data: jobTypes = [] } = useQuery<JobType[]>({
+    queryKey: [PROJECT_ACTIVITIES_ROUTES.JOB_TYPES],
   });
 
   const createOpportunity = useMutation({
@@ -211,6 +223,7 @@ export default function MobileNewOpportunity() {
     if (form.probability) data.probability = parseInt(form.probability);
     if (form.estimatedStartDate) data.estimatedStartDate = form.estimatedStartDate;
     if (form.comments) data.comments = form.comments;
+    if (form.jobTypeId) data.jobTypeId = form.jobTypeId;
 
     createOpportunity.mutate(data);
   };
@@ -266,6 +279,26 @@ export default function MobileNewOpportunity() {
               </span>
               <ChevronDown className="h-4 w-4 text-white/40 flex-shrink-0" />
             </button>
+          </div>
+        </FormField>
+
+        {/* Job Type */}
+        <FormField label="Job Type">
+          <div className="relative">
+            <select
+              className={selectClass}
+              value={form.jobTypeId}
+              onChange={(e) => setForm((f) => ({ ...f, jobTypeId: e.target.value }))}
+              data-testid="select-job-type"
+            >
+              <option value="" className="bg-[#0D1117]">Select job type...</option>
+              {jobTypes.filter(jt => jt.isActive).sort((a, b) => a.sortOrder - b.sortOrder).map((jt) => (
+                <option key={jt.id} value={jt.id} className="bg-[#0D1117]">
+                  {jt.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40 pointer-events-none" />
           </div>
         </FormField>
 
