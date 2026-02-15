@@ -8,6 +8,10 @@ export interface ParsedEmail {
   body: string;
 }
 
+function sanitize(str: string): string {
+  return str.replace(/\0/g, "").replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+}
+
 export async function parseEmailFile(buffer: Buffer, fileName: string): Promise<ParsedEmail> {
   const isEml = fileName.toLowerCase().endsWith(".eml");
   const isMsg = fileName.toLowerCase().endsWith(".msg");
@@ -28,11 +32,11 @@ export async function parseEmailFile(buffer: Buffer, fileName: string): Promise<
       emailBody = parsed.text || (parsed.html ? String(parsed.html).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim() : "");
     } catch {
       emailSubject = "(Could not parse email)";
-      emailBody = buffer.toString("utf-8").substring(0, 5000);
+      emailBody = sanitize(buffer.toString("utf-8")).substring(0, 5000);
     }
   } else if (isMsg) {
     try {
-      const content = buffer.toString("utf-8");
+      const content = sanitize(buffer.toString("utf-8"));
       const subjectMatch = content.match(/Subject:\s*(.+?)[\r\n]/i);
       const fromMatch = content.match(/From:\s*(.+?)[\r\n]/i);
       const toMatch = content.match(/To:\s*(.+?)[\r\n]/i);
@@ -48,8 +52,8 @@ export async function parseEmailFile(buffer: Buffer, fileName: string): Promise<
       emailBody = "Could not parse .msg file. The email file has been saved as an attachment.";
     }
   } else {
-    emailBody = buffer.toString("utf-8").substring(0, 5000);
-    emailSubject = fileName;
+    emailBody = sanitize(buffer.toString("utf-8")).substring(0, 5000);
+    emailSubject = sanitize(fileName);
   }
 
   if (emailBody.length > 5000) {
@@ -57,10 +61,10 @@ export async function parseEmailFile(buffer: Buffer, fileName: string): Promise<
   }
 
   return {
-    subject: emailSubject,
-    from: emailFrom,
-    to: emailTo,
-    date: emailDate,
-    body: emailBody,
+    subject: sanitize(emailSubject),
+    from: sanitize(emailFrom),
+    to: sanitize(emailTo),
+    date: sanitize(emailDate),
+    body: sanitize(emailBody),
   };
 }
