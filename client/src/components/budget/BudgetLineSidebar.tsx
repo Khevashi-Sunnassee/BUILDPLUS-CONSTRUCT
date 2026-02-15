@@ -550,11 +550,25 @@ export function BudgetLineSidebar({
                               onClick={() => setSelectedEmail(update)}
                               data-testid={`btn-open-email-${update.id}`}
                             >
-                              <div className="flex items-center gap-2 p-2 bg-muted/30">
-                                <Mail className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                                <span className="text-sm font-medium truncate flex-1">
-                                  {update.emailSubject || "(No Subject)"}
-                                </span>
+                              <div className="p-3 bg-muted/30 space-y-1.5">
+                                <div className="flex items-center gap-2">
+                                  <Mail className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                                  <span className="text-sm font-medium truncate flex-1">
+                                    {update.emailSubject || "(No Subject)"}
+                                  </span>
+                                </div>
+                                {update.emailFrom && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground pl-6">
+                                    <span className="font-medium">From:</span>
+                                    <span className="truncate">{update.emailFrom}</span>
+                                  </div>
+                                )}
+                                {update.emailDate && (
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground pl-6">
+                                    <span className="font-medium">Date:</span>
+                                    <span>{(() => { try { return format(new Date(update.emailDate), "dd/MM/yyyy HH:mm"); } catch { return update.emailDate; } })()}</span>
+                                  </div>
+                                )}
                               </div>
                               {update.content && (
                                 <div className="px-3 py-2 border-t">

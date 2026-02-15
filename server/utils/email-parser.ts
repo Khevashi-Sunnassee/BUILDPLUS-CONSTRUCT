@@ -9,7 +9,10 @@ export interface ParsedEmail {
   body: string;
 }
 
-const openai = new OpenAI();
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || undefined,
+});
 
 export async function summarizeEmailBody(body: string, maxWords: number = 80): Promise<string> {
   if (!body || body.trim().length === 0) return "(Empty email)";
@@ -36,6 +39,7 @@ export async function summarizeEmailBody(body: string, maxWords: number = 80): P
     if (result) return result;
     return body.split(/\s+/).slice(0, maxWords).join(" ") + "...";
   } catch (error) {
+    console.error("Email summarization failed:", error instanceof Error ? error.message : error);
     return body.split(/\s+/).slice(0, maxWords).join(" ") + "...";
   }
 }
