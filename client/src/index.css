@@ -364,3 +364,40 @@
     margin: 0 !important;
   }
 }
+
+.ql-toolbar.ql-snow {
+  border-color: hsl(var(--border)) !important;
+  border-radius: 0.375rem 0.375rem 0 0;
+}
+.ql-container.ql-snow {
+  border-color: hsl(var(--border)) !important;
+  border-radius: 0 0 0.375rem 0.375rem;
+  min-height: 350px;
+  font-size: 14px;
+}
+.dark .ql-toolbar.ql-snow {
+  background: hsl(var(--muted));
+}
+.dark .ql-container.ql-snow {
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
+.dark .ql-editor.ql-blank::before {
+  color: hsl(var(--muted-foreground));
+}
+.dark .ql-snow .ql-stroke {
+  stroke: hsl(var(--foreground)) !important;
+}
+.dark .ql-snow .ql-fill {
+  fill: hsl(var(--foreground)) !important;
+}
+.dark .ql-snow .ql-picker-label {
+  color: hsl(var(--foreground)) !important;
+}
+.dark .ql-snow .ql-picker-options {
+  background: hsl(var(--popover)) !important;
+  border-color: hsl(var(--border)) !important;
+}
+.dark .ql-snow .ql-picker-item {
+  color: hsl(var(--foreground)) !important;
+}

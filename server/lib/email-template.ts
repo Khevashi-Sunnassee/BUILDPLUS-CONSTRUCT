@@ -33,7 +33,7 @@ const DEFAULT_TEMPLATE = `<!DOCTYPE html>
         <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%); padding: 20px 28px;">
+            <td style="background: linear-gradient(135deg, #111111 0%, #6b7280 100%); padding: 20px 28px;">
               <table cellpadding="0" cellspacing="0" border="0" width="100%">
                 <tr>
                   <td style="padding-bottom: 6px;">{{LOGO}}</td>

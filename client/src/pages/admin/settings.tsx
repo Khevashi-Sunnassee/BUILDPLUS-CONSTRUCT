@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -42,6 +42,8 @@ import type { GlobalSettings, Department } from "@shared/schema";
 import { ADMIN_ROUTES, SETTINGS_ROUTES } from "@shared/api-routes";
 import { PageHelpButton } from "@/components/help/page-help-button";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+const ReactQuill = lazy(() => import("react-quill-new"));
+import "react-quill-new/dist/quill.snow.css";
 
 const settingsSchema = z.object({
   tz: z.string().min(1, "Timezone is required"),
@@ -91,6 +93,7 @@ export default function AdminSettingsPage() {
   const [emailTemplatePreviewHtml, setEmailTemplatePreviewHtml] = useState<string | null>(null);
   const [showEditTemplateDialog, setShowEditTemplateDialog] = useState(false);
   const [editTemplateValue, setEditTemplateValue] = useState("");
+  const [templateEditMode, setTemplateEditMode] = useState<"visual" | "source">("visual");
 
   const deletionCategories = useMemo(() => [
     { key: "activity_templates", label: "Activity Templates", description: "Workflow activity templates and subtasks" },
@@ -1722,20 +1725,64 @@ export default function AdminSettingsPage() {
       </Card>
 
       <Dialog open={showEditTemplateDialog} onOpenChange={setShowEditTemplateDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Email Template</DialogTitle>
             <DialogDescription>
-              Edit the raw HTML for the email notification template. Use the available placeholders to insert dynamic content.
+              Edit the email notification template. Use placeholders like {"{{TITLE}}"}, {"{{BODY}}"}, {"{{GREETING}}"}, {"{{COMPANY_NAME}}"} for dynamic content.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 min-h-0">
-            <Textarea
-              value={editTemplateValue}
-              onChange={(e) => setEditTemplateValue(e.target.value)}
-              className="font-mono text-sm min-h-[400px]"
-              data-testid="textarea-email-template"
-            />
+          <div className="flex items-center gap-2 pb-2">
+            <Button
+              variant={templateEditMode === "visual" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTemplateEditMode("visual")}
+              data-testid="button-template-mode-visual"
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              Visual Editor
+            </Button>
+            <Button
+              variant={templateEditMode === "source" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setTemplateEditMode("source")}
+              data-testid="button-template-mode-source"
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              HTML Source
+            </Button>
+          </div>
+          <div className="flex-1 min-h-0 overflow-auto">
+            {templateEditMode === "visual" ? (
+              <Suspense fallback={<div className="flex items-center justify-center h-64"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                <div className="border rounded-md" data-testid="editor-email-template-visual">
+                  <ReactQuill
+                    theme="snow"
+                    value={editTemplateValue}
+                    onChange={setEditTemplateValue}
+                    modules={{
+                      toolbar: [
+                        [{ 'header': [1, 2, 3, false] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ 'color': [] }, { 'background': [] }],
+                        [{ 'align': [] }],
+                        [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                        ['link'],
+                        ['clean'],
+                      ],
+                    }}
+                    style={{ minHeight: '400px' }}
+                  />
+                </div>
+              </Suspense>
+            ) : (
+              <Textarea
+                value={editTemplateValue}
+                onChange={(e) => setEditTemplateValue(e.target.value)}
+                className="font-mono text-sm min-h-[400px]"
+                data-testid="textarea-email-template"
+              />
+            )}
           </div>
           <DialogFooter>
             <Button
