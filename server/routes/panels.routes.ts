@@ -222,6 +222,11 @@ router.get("/api/panels/:id/details", requireAuth, async (req: Request, res: Res
   }
 });
 
+router.get("/api/panels/admin/source-counts", requireRole("ADMIN"), async (req: Request, res: Response) => {
+  const counts = await storage.getPanelCountsBySource(req.companyId);
+  res.json(counts);
+});
+
 router.get("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request, res: Response) => {
   const companyId = req.companyId;
   const panel = await storage.getPanelRegisterItem(req.params.id as string);
@@ -333,11 +338,6 @@ router.delete("/api/panels/admin/:id", requireRole("ADMIN"), async (req: Request
   logPanelChange(panel.id, "Panel deleted", req.session.userId, { changedFields: { panelMark: panel.panelMark } });
   await storage.deletePanelRegisterItem(req.params.id as string);
   res.json({ ok: true });
-});
-
-router.get("/api/panels/admin/source-counts", requireRole("ADMIN"), async (req: Request, res: Response) => {
-  const counts = await storage.getPanelCountsBySource(req.companyId);
-  res.json(counts);
 });
 
 router.delete("/api/panels/admin/by-source/:source", requireRole("ADMIN"), async (req: Request, res: Response) => {
