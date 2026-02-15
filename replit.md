@@ -1,7 +1,7 @@
 # BuildPlus Ai Management System
 
 ## Overview
-The BuildPlus AI Management System optimizes panel production and delivery for construction and manufacturing. It manages the entire panel lifecycle, from CAD/Revit time management to delivery tracking, aiming to enhance operational control, efficiency, and decision-making. Key features include daily log management, approval workflows, reporting, analytics, KPI dashboards, and logistics for load lists and delivery. The system is designed for enterprise-grade scale, supporting 300+ simultaneous users with multi-company deployment and data isolation.
+The BuildPlus AI Management System optimizes panel production and delivery for construction and manufacturing. It manages the entire panel lifecycle, from CAD/Revit time management to delivery tracking, aiming to enhance operational control, efficiency, and decision-making. Key features include daily log management, approval workflows, reporting, analytics, KPI dashboards, and logistics for load lists and delivery. The system is designed for enterprise-grade scale, supporting 300+ simultaneous users with multi-company deployment and data isolation, providing a comprehensive solution for managing complex construction and manufacturing workflows.
 
 ## User Preferences
 I prefer detailed explanations.
@@ -13,25 +13,35 @@ Do not make changes to the file `package-lock.json`.
 ## System Architecture
 The system utilizes a client-server architecture. The frontend is a React application built with Vite, `shadcn/ui`, and Tailwind CSS for a modern UI/UX, including a KPI Dashboard with data visualization and interactive maps. The backend is an Express.js application using PostgreSQL and Drizzle ORM. Authentication is email/password-based with bcrypt and `express-session`, incorporating Role-Based Access Control (RBAC).
 
+**UI/UX Decisions:**
+- Modern, responsive design using `shadcn/ui` and Tailwind CSS.
+- KPI Dashboard with data visualization and interactive maps for operational insights.
+
 **Technical Implementations & Features:**
 - **Core Management:** Time management, approval workflows, reporting, analytics, and administration for users, jobs, customers, and global settings.
 - **Job & Panel Lifecycle:** CRUD operations for customer and job management, panel registration, production approvals, estimate import, and detailed panel field management with 14-stage panel and 5-phase job lifecycles, both with audit logging.
 - **AI Integration:** OpenAI is used for PDF analysis (panel specifications) and AI-powered visual comparisons.
 - **Financial & Logistics:** Configurable rates, cost analysis, production tracking, load list creation, and delivery recording.
-- **Scheduling:** Drafting and procurement scheduling linked to production slots, supporting multi-factory operations.
-- **Communication:** Teams-style chat with DMs, groups, channels, @mentions, notifications, file attachments, and message topics.
-- **Sales & Document Management:** Mobile-first pre-sales opportunity management with a sales pipeline; document management with version control, bundles, entity linking, bulk upload, and AI metadata extraction.
-- **Photo Gallery:** Visual gallery with search, filtering, grouping, full-screen viewing, multi-select, and download.
+- **Scheduling:** Drafting and procurement scheduling linked to production slots, supporting multi-factory operations; enhanced job program scheduling with pour labels, sequence ordering, and drag-and-drop.
+- **Communication:** Teams-style chat with DMs, groups, channels, @mentions, notifications, and file attachments.
+- **Sales & Document Management:** Mobile-first pre-sales opportunity management; document management with version control, bundles, entity linking, bulk upload, and AI metadata extraction.
 - **Mobile Functionality:** QR scanner for panels and document bundles, mobile panel checklists with conditional fields, and mobile PM Call Logs.
-- **Advanced Features:** Panel consolidation, contract retention tracking, and visual document comparison.
-- **Asset Register:** Asset lifecycle management including depreciation, insurance, maintenance, transfer history, AI analysis, and integrated repair requests.
+- **Advanced Features:** Panel consolidation, contract retention tracking, visual document comparison, and a comprehensive Asset Register with lifecycle management.
 - **Hire Booking Engine:** Equipment hire management with approval workflows for internal and external assets.
-- **Job Programme:** Enhanced scheduling for job production levels with pour labels, sequence ordering, estimated/manual dates, drag-and-drop, inline editing, split-level functionality, and automatic recalculation.
-- **Project Activities / Workflow System:** Template-driven activity workflow system for job types, with nested tasks, statuses, date editing, comments, file attachments, and MS Project-style dependencies.
-- **User Invitation System:** Admin-initiated email invitations with secure tokens, public registration, and tracking.
-- **CAPEX Module:** Capital expenditure request management with approval workflows, multi-section forms, approval limits, audit trails, and bidirectional PO integration.
-- **Scope of Works Builder:** AI-powered scope generation for tender management across trades, featuring AI-generated and custom scope items, bulk status updates, duplication, export, and bidirectional linking with tenders.
-- **Budget System:** Four-phase cost management: two-tier cost codes, a tender center for supplier submissions, job tender sheets for entry against budget line items, and per-job budget management with estimated totals, profit targets, variations, and forecast costs, including Bill of Quantities (BOQ).
+- **Project Activities / Workflow System:** Template-driven activity workflow system for job types, with nested tasks, statuses, comments, and MS Project-style dependencies.
+- **User Invitation System:** Admin-initiated email invitations with secure tokens and public registration.
+- **CAPEX Module:** Capital expenditure request management with approval workflows, audit trails, and bidirectional PO integration.
+- **Scope of Works Builder:** AI-powered scope generation for tender management across trades.
+- **Budget System:** Four-phase cost management including two-tier cost codes, a tender center, job tender sheets, and per-job budget management with Bill of Quantities (BOQ).
+
+**System Design Choices:**
+- **Multi-Tenancy:** Designed for multi-company deployment with strict data isolation, ensuring every query on company-owned tables includes a `companyId` filter.
+- **Scalability:** Supports 300+ simultaneous users.
+- **Robustness:** Extensive input validation using Zod, comprehensive error handling, and consistent API response structures.
+- **Security:** Role-Based Access Control (RBAC), authentication via `bcrypt` and `express-session`, and UUID validation.
+- **Data Integrity:** Enforced through 142 CHECK constraints, 61 unique constraints, and 390 foreign keys.
+- **Accessibility:** All interactive elements and pages adhere to accessibility standards (`aria-label`, `aria-required`, `role="alert"`).
+- **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); data integrity verified with comprehensive company isolation tests.
 
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
@@ -49,137 +59,3 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **connect-pg-simple**: PostgreSQL-backed session store.
 - **Vitest**: Testing framework.
 - **ExcelJS**: Excel file generation library.
-
-## Coding Standards
-
-### Accessibility
-- All pages have `role="main"` with a descriptive `aria-label`.
-- All interactive elements have `aria-label` or visible label text.
-- Forms use `aria-required` on required fields.
-- Loading states use `aria-busy="true"` and `aria-live="polite"`.
-- Error alerts use `role="alert"` and `aria-live="assertive"`.
-- ESLint enforces 11 a11y rules via `eslint-plugin-jsx-a11y`.
-
-### Frontend Testing
-- 135 test files, 562+ tests using React Testing Library + Vitest.
-- Config: `vitest.config.frontend.ts` with jsdom environment.
-- Every interactive element must have a `data-testid` attribute.
-- Run: `npx vitest --config vitest.config.frontend.ts --run`.
-
-### Database Integrity
-- 142 CHECK constraints across tables (monetary >= 0, rates >= 0 AND <= 100).
-- 61 unique constraints, 390 foreign keys.
-- New tables must include companyId with FK to companies.
-
-### Developer Experience
-- Quality check: `bash scripts/quality-check.sh`.
-- Pre-commit: `husky` + `lint-staged` for ESLint.
-- Lazy imports use `lazyWithRetry` for stale chunk handling.
-
----
-
-## Enterprise Coding Rules (300+ Users)
-
-### R1. Route Parameter Type Safety
-Extract `req.params.*` into typed const variables before use:
-```typescript
-const id = req.params.id as string;
-```
-
-### R2. Multi-Tenant Data Isolation
-EVERY query on company-owned tables MUST include `companyId` filter. No exceptions.
-
-### R3. Input Validation
-EVERY POST/PUT/PATCH endpoint MUST validate body with Zod schemas.
-
-### R4. Error Handling
-Try/catch with ZodError handling, 23505 duplicate detection, logger.error, user-friendly 500 messages.
-
-### R5. Authentication & Authorization
-Every route uses `requireAuth`. Role/permission checks on write/delete.
-
-### R6. API Response Structure
-Consistent: 201 created, 400 validation, 404 not found, 409 conflict, 500 server error.
-
-### R7. AI Endpoint Safety
-Validate input before OpenAI. Parse AI responses with try/catch.
-
-### R8. Database Schema Changes
-New tables need companyId. CHECK constraints on monetary/rate columns.
-
-### R9. Frontend Component Rules
-data-testid on interactive elements. Loading/error states. Cache invalidation after mutations.
-
-### R10. File Organization
-Routes: `server/routes/{module}.routes.ts`. Schemas: `shared/schema.ts`. Pages: `client/src/pages/`.
-
----
-
-## Audit Checklist (Target: 90/100)
-
-### A. Type Safety & Build Health (15 pts)
-Zero LSP diagnostics, zero TS errors, typed req.params (R1).
-
-### B. Security & Multi-Tenant Isolation (25 pts)
-companyId on all queries (R2), requireAuth on all routes, UUID validation, no SQL injection.
-
-### C. Input Validation & Error Handling (15 pts)
-Zod on POST/PUT/PATCH (R3), consistent error responses (R4, R6).
-
-### D. Database Integrity (15 pts)
-CHECK constraints (142), UNIQUE constraints (61), foreign keys (390).
-
-### E. Frontend Quality (15 pts)
-data-testid (4,316), ARIA attrs (393), loading/error states, cache invalidation (641).
-
-### F. Code Quality (15 pts)
-Standard handler pattern, no TODOs/FIXMEs, consistent naming, logger usage (647).
-
----
-
-## Recent Changes
-
-### 2026-02-15 (Session 2)
-- Fixed critical companyId injection vulnerability in document creation endpoints (categories, disciplines, types, type statuses) - now override companyId from req.companyId instead of accepting from request body.
-- Dropped 4 global unique constraints (factories_code_unique, work_types_code_unique, zones_code_unique, panel_types_code_unique) that prevented multiple companies from using the same codes. Per-company composite unique indexes (e.g., factories_code_company_idx) already existed in the Drizzle schema.
-- Extended settings validation schema to support productionWorkDays, draftingWorkDays, cfmeuCalendar, includePOTerms fields.
-- Created comprehensive company isolation test script (scripts/company-isolation-test.cjs) with 174 passing tests validating multi-tenant data separation across all modules.
-- Verified complete isolation: settings, departments, factories, work types, zones, customers, jobs, employees, cost codes, documents, assets, chat, tasks, broadcasts, and all other company-owned data.
-
-### 2026-02-15 (Session 1)
-- Implemented multi-company visibility and switching:
-  * `/me` endpoint now returns `companyName` and `activeCompanyId` based on session's current companyId (supports admin company switching).
-  * Added `POST /switch-company` endpoint (admin-only, requireAuth) with Zod validation, verifies target company exists and is active before updating session.
-  * Sidebar shows company name under logo for all users; admins with multiple companies see a dropdown switcher.
-  * Company switch clears React Query cache and refetches user data so all pages reflect the new company's data.
-  * Session-based company switching integrates with existing middleware (`req.companyId = req.session.companyId`) for seamless data isolation.
-
-### 2026-02-14 (Session 3)
-- Fixed task auto-assign bug: Activity tasks now auto-assign creator as assignee (matching regular tasks behavior).
-- Implemented tender document staleness detection system:
-  * Added `findAffectedOpenTenders()` helper in documents.routes.ts to detect tenders using superseded documents (checks direct packages and bundle references, scoped by companyId).
-  * Modified document supersede endpoints to return affected tender information in response.
-  * Added POST /api/tenders/:id/notify-doc-updates endpoint (Zod-validated, auth/permission-protected) to email suppliers about document changes.
-  * Added POST /api/tenders/:id/duplicate-package endpoint (Zod-validated, auth/permission-protected) to update tender packages with new document versions.
-  * Extended GET /api/tenders/:id/packages to return document staleness indicators (isLatestVersion, version, revision, documentNumber, status, isStale).
-  * Frontend UploadDocumentDialog shows warning dialog after superseding documents used in active tenders, with "Update Packages" and "Notify Suppliers" actions using async mutations with proper error handling.
-  * TenderDetailContent shows orange "Out of date" badges for stale document packages.
-- Implemented bundle-level document staleness tracking:
-  * Updated public bundle endpoint (GET /api/public/bundles/:qrCodeId) to include version, revision, documentNumber, isLatestVersion, isStale fields.
-  * Added POST /api/document-bundles/:bundleId/items/:itemId/request-latest endpoint (requireAuth, companyId-scoped) to manually update a single bundle item to its latest document version (finds latest by documentNumber or parentDocumentId chain).
-  * BundleGridView: Shows stale count badge on bundle header rows, orange "Out of date" badge per stale document, and "Request Latest" button (RefreshCw icon) with mutation and cache invalidation.
-  * BundleScanResult (mobile QR scanner): Shows orange staleness warning banner with count, stale count badge, and per-doc version/superseded indicators.
-  * PublicBundle page: Shows staleness alert banner, stale count badge, per-doc "Superseded" badges, orange border highlighting, and version info. Directs users to contact bundle owner for updates (no auto-replacement on public page).
-
-### 2026-02-14 (Session 2)
-- Fixed scope email bug: `emailService.sendEmail()` was called with object syntax instead of positional args - emails now send correctly.
-- Fixed req.params type safety across 8 more route files (30+ handlers): broadcast, asset-repair, boq, users, capex, customer, progress-claims, project-activities.
-- Added 39 new CHECK constraints (142 total, up from 103) on monetary/cost/hours/area/weight columns.
-- Fixed critical companyId isolation gaps in admin.routes.ts (stats queries), assets.routes.ts (update/delete), budget.routes.ts (child record deletes).
-- Added Zod validation to 5 route files: hire (reject/return/cancel), broadcast (send), capex (submit/approve/withdraw), reo-schedule (bulk/process/PO), contracts (create).
-- Fixed LSP type errors in hire.routes.ts and contracts.routes.ts.
-- Updated companyId eq() calls from 502 to 539, Zod validations from ~160 to 208.
-
-### 2026-02-14 (Session 1)
-- Fixed 56 LSP type errors in scopes.routes.ts (req.params type safety).
-- Added Enterprise Coding Rules (R1-R10) and Audit Checklist to replit.md.
