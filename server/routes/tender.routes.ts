@@ -4,6 +4,7 @@ import multer from "multer";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { parseEmailFile } from "../utils/email-parser";
 import { db } from "../db";
 import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, tenderMemberUpdates, tenderMemberFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes, tenderScopes, scopes, scopeItems, scopeTrades } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
@@ -2851,6 +2852,42 @@ router.delete("/api/tender-member-updates/:id", requireAuth, requirePermission("
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting tender member update");
     res.status(500).json({ error: "Failed to delete update" });
+  }
+});
+
+const tenderEmailUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+router.post("/api/tender-members/:id/email-drop", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), tenderEmailUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session?.userId;
+    if (!userId) return res.status(401).json({ error: "Authentication required" });
+    const memberId = String(req.params.id);
+
+    const member = await verifyTenderMemberOwnership(companyId, memberId);
+    if (!member) return res.status(404).json({ error: "Invitation not found" });
+
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+    const parsed = await parseEmailFile(file.buffer, file.originalname || "email");
+
+    const [update] = await db.insert(tenderMemberUpdates).values({
+      tenderMemberId: memberId,
+      userId,
+      content: parsed.body,
+      contentType: "email",
+      emailSubject: parsed.subject,
+      emailFrom: parsed.from,
+      emailTo: parsed.to,
+      emailDate: parsed.date,
+    }).returning();
+
+    res.json(update);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error processing tender member email drop");
+    res.status(500).json({ error: "Failed to process email" });
   }
 });
 

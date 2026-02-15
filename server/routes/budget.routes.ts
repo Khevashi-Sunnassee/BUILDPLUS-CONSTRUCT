@@ -4,6 +4,7 @@ import multer from "multer";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
+import { parseEmailFile } from "../utils/email-parser";
 import { db } from "../db";
 import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, budgetLineDetailItems, costCodes, childCostCodes, tenderSubmissions, tenders, tenderLineItems, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -757,6 +758,36 @@ router.delete("/api/budget-line-updates/:id", requireAuth, requirePermission("bu
   } catch (error: unknown) {
     logger.error("Error deleting budget line update:", error);
     res.status(500).json({ message: "Failed to delete update" });
+  }
+});
+
+const budgetEmailUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+router.post("/api/budget-lines/:lineId/email-drop", requireAuth, requirePermission("budgets", "VIEW"), budgetEmailUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const lineId = req.params.lineId;
+
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+    const parsed = await parseEmailFile(file.buffer, file.originalname || "email");
+
+    const [update] = await db.insert(budgetLineUpdates).values({
+      budgetLineId: lineId,
+      userId,
+      content: parsed.body,
+      contentType: "email",
+      emailSubject: parsed.subject,
+      emailFrom: parsed.from,
+      emailTo: parsed.to,
+      emailDate: parsed.date,
+    }).returning();
+
+    res.json(update);
+  } catch (error: unknown) {
+    logger.error("Error processing budget line email drop:", error);
+    res.status(500).json({ error: "Failed to process email" });
   }
 });
 

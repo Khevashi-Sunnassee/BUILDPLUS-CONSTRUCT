@@ -60,6 +60,11 @@ export interface TaskUpdate {
   taskId: string;
   userId: string;
   content: string;
+  contentType?: string | null;
+  emailSubject?: string | null;
+  emailFrom?: string | null;
+  emailTo?: string | null;
+  emailDate?: string | null;
   createdAt: string;
   user: User;
   files?: TaskFile[];

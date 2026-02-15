@@ -330,6 +330,7 @@ export const TASKS_ROUTES = {
   SEND_EMAIL: '/api/tasks/send-email',
   ASSIGNEE_BY_ID: (id: string | number) => `/api/task-assignees/${id}`,
   GROUP_MEMBERS: (id: string | number) => `/api/task-groups/${id}/members`,
+  EMAIL_DROP: (id: string | number) => `/api/tasks/${id}/email-drop`,
 } as const;
 
 // ============================================================================
@@ -908,5 +909,13 @@ export const TENDER_MEMBER_ROUTES = {
   UPDATE_BY_ID: (id: string | number) => `/api/tender-member-updates/${id}`,
   FILES: (id: string | number) => `/api/tender-members/${id}/files`,
   FILE_BY_ID: (id: string | number) => `/api/tender-member-files/${id}`,
+  EMAIL_DROP: (id: string | number) => `/api/tender-members/${id}/email-drop`,
 } as const;
 export type TenderMemberRoutes = typeof TENDER_MEMBER_ROUTES;
+
+export const BUDGET_LINE_ROUTES = {
+  UPDATES: (id: string | number) => `/api/budget-lines/${id}/updates`,
+  FILES: (id: string | number) => `/api/budget-lines/${id}/files`,
+  EMAIL_DROP: (id: string | number) => `/api/budget-lines/${id}/email-drop`,
+} as const;
+export type BudgetLineRoutes = typeof BUDGET_LINE_ROUTES;

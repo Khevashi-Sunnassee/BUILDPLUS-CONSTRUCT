@@ -7,6 +7,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
+import { parseEmailFile } from "../utils/email-parser";
 
 const router = Router();
 
@@ -511,6 +512,61 @@ router.post("/api/tasks/:id/updates", requireAuth, requirePermission("tasks", "V
   } catch (error: unknown) {
     logger.error({ err: error }, "Error creating task update");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to create task update" });
+  }
+});
+
+const emailUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+router.post("/api/tasks/:id/email-drop", requireAuth, requirePermission("tasks", "VIEW_AND_UPDATE"), emailUpload.single("file"), async (req, res) => {
+  try {
+    const companyId = req.companyId;
+    if (!companyId) return res.status(400).json({ error: "Company context required" });
+    const userId = req.session?.userId;
+    if (!userId) return res.status(401).json({ error: "Authentication required" });
+    const taskId = String(req.params.id);
+
+    const task = await storage.getTask(taskId);
+    if (!task) return res.status(404).json({ error: "Task not found" });
+    if (task.groupId) {
+      const group = await storage.getTaskGroup(task.groupId);
+      if (!group || group.companyId !== companyId) return res.status(404).json({ error: "Task not found" });
+    }
+    const adminManager = await isAdminOrManager(req as any);
+    if (!adminManager && !canAccessTask(task, userId)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+    const parsed = await parseEmailFile(file.buffer, file.originalname || "email");
+
+    const update = await storage.createTaskUpdate({
+      taskId,
+      userId,
+      content: parsed.body,
+      contentType: "email",
+      emailSubject: parsed.subject,
+      emailFrom: parsed.from,
+      emailTo: parsed.to,
+      emailDate: parsed.date,
+    });
+
+    const fromUser = await storage.getUser(userId);
+    const fromName = fromUser?.name || fromUser?.email || "Someone";
+    await storage.createTaskNotificationsForAssignees(
+      taskId,
+      userId,
+      "COMMENT",
+      `Email dropped on "${task.title || "Task"}"`,
+      `${fromName} shared: ${emailSubject}`,
+      update.id
+    );
+
+    res.status(201).json(update);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error processing email drop");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to process email" });
   }
 });
 

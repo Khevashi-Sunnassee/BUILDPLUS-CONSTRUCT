@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { BUDGET_LINE_ROUTES } from "@shared/api-routes";
 import { MultiFileDropZone } from "@/components/MultiFileDropZone";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,6 +17,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import {
   MessageSquare,
   Paperclip,
@@ -30,6 +32,9 @@ import {
   Lock,
   Unlock,
   ClipboardList,
+  Mail,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface BudgetLineInfo {
@@ -45,6 +50,11 @@ interface BudgetLineUpdate {
   budgetLineId: string;
   userId: string;
   content: string;
+  contentType?: string | null;
+  emailSubject?: string | null;
+  emailFrom?: string | null;
+  emailTo?: string | null;
+  emailDate?: string | null;
   createdAt: string;
   user: { id: string; name: string | null; email: string };
   files?: BudgetLineFileItem[];
@@ -201,6 +211,71 @@ export function BudgetLineSidebar({
       toast({ variant: "destructive", title: "Error", description: error.message });
     },
   });
+
+  const emailDropMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await apiUpload(BUDGET_LINE_ROUTES.EMAIL_DROP(line?.id || ""), formData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/budget-lines/${line?.id}/updates`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "budget"] });
+      toast({ title: "Email added to updates" });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to process email" });
+    },
+  });
+
+  const [emailDragging, setEmailDragging] = useState(false);
+  const emailDragCounter = useRef(0);
+  const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
+
+  const toggleEmailExpand = (id: string) => {
+    setExpandedEmails(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleUpdatesDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    emailDragCounter.current++;
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) setEmailDragging(true);
+  }, []);
+
+  const handleUpdatesDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    emailDragCounter.current--;
+    if (emailDragCounter.current === 0) setEmailDragging(false);
+  }, []);
+
+  const handleUpdatesDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+  }, []);
+
+  const handleUpdatesDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    setEmailDragging(false);
+    emailDragCounter.current = 0;
+    const droppedFiles: File[] = [];
+    if (e.dataTransfer.items) {
+      for (let i = 0; i < e.dataTransfer.items.length; i++) {
+        const item = e.dataTransfer.items[i];
+        if (item.kind === "file") { const f = item.getAsFile(); if (f) droppedFiles.push(f); }
+      }
+    } else if (e.dataTransfer.files) {
+      for (let i = 0; i < e.dataTransfer.files.length; i++) droppedFiles.push(e.dataTransfer.files[i]);
+    }
+    const emailFiles = droppedFiles.filter(f => { const n = f.name.toLowerCase(); return n.endsWith(".eml") || n.endsWith(".msg"); });
+    const otherFiles = droppedFiles.filter(f => { const n = f.name.toLowerCase(); return !n.endsWith(".eml") && !n.endsWith(".msg"); });
+    for (const file of emailFiles) emailDropMutation.mutate(file);
+    for (const file of otherFiles) uploadFileMutation.mutate({ file });
+  }, [emailDropMutation, uploadFileMutation]);
 
   const createDetailItemMutation = useMutation({
     mutationFn: async (data: { item: string; quantity?: string; unit?: string; price?: string; notes?: string }) => {
@@ -381,14 +456,33 @@ export function BudgetLineSidebar({
 
         <div className="flex-1 overflow-y-auto p-4">
           {activeTab === "updates" && (
-            <div className="space-y-4">
+            <div
+              className="space-y-4"
+              onDragEnter={handleUpdatesDragEnter}
+              onDragLeave={handleUpdatesDragLeave}
+              onDragOver={handleUpdatesDragOver}
+              onDrop={handleUpdatesDrop}
+            >
+              {emailDragging && (
+                <div className="border-2 border-dashed border-primary rounded-md p-4 text-center bg-primary/5 transition-colors">
+                  <Mail className="h-8 w-8 mx-auto mb-2 text-primary" />
+                  <p className="text-sm font-medium text-primary">Drop emails or files here</p>
+                  <p className="text-xs text-muted-foreground">.eml and .msg files will be parsed as emails</p>
+                </div>
+              )}
+              {emailDropMutation.isPending && (
+                <div className="flex items-center gap-2 p-3 border rounded-md bg-muted/30">
+                  <Mail className="h-4 w-4 animate-pulse text-primary" />
+                  <span className="text-sm text-muted-foreground">Processing email...</span>
+                </div>
+              )}
               <div className="flex flex-col gap-2">
                 <Textarea
                   ref={textareaRef}
                   value={newUpdate}
                   onChange={(e) => setNewUpdate(e.target.value)}
                   onPaste={handlePaste}
-                  placeholder="Write an update - paste screenshots here"
+                  placeholder="Write a note, paste screenshots, or drag emails from Outlook"
                   className="min-h-[80px] resize-none"
                   data-testid="input-budget-new-update"
                 />
@@ -435,7 +529,7 @@ export function BudgetLineSidebar({
                 <div className="text-center py-8 text-muted-foreground">
                   <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No updates yet</p>
-                  <p className="text-sm">Share progress or notes about this budget line</p>
+                  <p className="text-sm">Write a note, drop an email, or share files about this budget line</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -446,15 +540,66 @@ export function BudgetLineSidebar({
                           <AvatarFallback>{getInitials(update.user.name)}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-sm">{update.user.name || update.user.email}</span>
+                            {update.contentType === "email" && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Mail className="h-3 w-3 mr-1" />
+                                Email
+                              </Badge>
+                            )}
                             <span className="text-xs text-muted-foreground">
                               {format(new Date(update.createdAt), "dd/MM/yyyy HH:mm")}
                             </span>
                           </div>
-                          {update.content && (
-                            <p className="text-sm mt-1 whitespace-pre-wrap">{update.content}</p>
+
+                          {update.contentType === "email" ? (
+                            <div className="mt-2 border rounded-md bg-muted/20">
+                              <div
+                                className="flex items-center gap-2 p-2 cursor-pointer"
+                                onClick={() => toggleEmailExpand(update.id)}
+                                data-testid={`btn-toggle-email-${update.id}`}
+                              >
+                                <Mail className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                <span className="text-sm font-medium truncate flex-1">
+                                  {update.emailSubject || "(No Subject)"}
+                                </span>
+                                {expandedEmails.has(update.id) ? (
+                                  <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                ) : (
+                                  <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                )}
+                              </div>
+                              {expandedEmails.has(update.id) && (
+                                <div className="border-t p-2 space-y-1">
+                                  {update.emailFrom && (
+                                    <p className="text-xs text-muted-foreground">
+                                      <span className="font-medium">From:</span> {update.emailFrom}
+                                    </p>
+                                  )}
+                                  {update.emailTo && (
+                                    <p className="text-xs text-muted-foreground">
+                                      <span className="font-medium">To:</span> {update.emailTo}
+                                    </p>
+                                  )}
+                                  {update.emailDate && (
+                                    <p className="text-xs text-muted-foreground">
+                                      <span className="font-medium">Date:</span>{" "}
+                                      {(() => { try { return format(new Date(update.emailDate), "dd/MM/yyyy HH:mm"); } catch { return update.emailDate; } })()}
+                                    </p>
+                                  )}
+                                  <div className="mt-2 pt-2 border-t">
+                                    <p className="text-sm whitespace-pre-wrap">{update.content}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            update.content && (
+                              <p className="text-sm mt-1 whitespace-pre-wrap">{update.content}</p>
+                            )
                           )}
+
                           {update.files && update.files.length > 0 && (
                             <div className="flex flex-wrap gap-2 mt-2">
                               {update.files.map((file) =>
