@@ -173,21 +173,37 @@ export const productionMethods = {
     return result.map(r => ({ ...r.production_entries, panel: r.panel_register, job: r.jobs, user: r.users }));
   },
 
-  async getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]> {
+  async getProductionDays(startDate: string, endDate: string, companyId?: string): Promise<ProductionDay[]> {
+    const conditions: any[] = [
+      gte(productionDays.productionDate, startDate),
+      lte(productionDays.productionDate, endDate),
+    ];
+    if (companyId) {
+      const companyFactoryIds = (await db.select({ id: factories.id }).from(factories).where(eq(factories.companyId, companyId))).map(f => f.id);
+      if (companyFactoryIds.length > 0) {
+        conditions.push(sql`(${productionDays.factoryId} IS NULL OR ${productionDays.factoryId} IN (${sql.join(companyFactoryIds.map(id => sql`${id}`), sql`, `)}))`);
+      }
+    }
     return await db.select().from(productionDays)
-      .where(and(
-        gte(productionDays.productionDate, startDate),
-        lte(productionDays.productionDate, endDate)
-      ))
+      .where(and(...conditions))
       .orderBy(desc(productionDays.productionDate), asc(productionDays.factory));
   },
 
-  async getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined> {
+  async getProductionDay(date: string, factory: string, companyId?: string): Promise<ProductionDay | undefined> {
+    const conditions: any[] = [
+      eq(productionDays.productionDate, date),
+      eq(productionDays.factory, factory),
+    ];
+    if (companyId) {
+      const companyFactoryIds = (await db.select({ id: factories.id }).from(factories).where(eq(factories.companyId, companyId))).map(f => f.id);
+      if (companyFactoryIds.length > 0) {
+        conditions.push(sql`(${productionDays.factoryId} IS NULL OR ${productionDays.factoryId} IN (${sql.join(companyFactoryIds.map(id => sql`${id}`), sql`, `)}))`);
+      } else {
+        return undefined;
+      }
+    }
     const [day] = await db.select().from(productionDays)
-      .where(and(
-        eq(productionDays.productionDate, date),
-        eq(productionDays.factory, factory)
-      ));
+      .where(and(...conditions));
     return day;
   },
 
@@ -209,19 +225,24 @@ export const productionMethods = {
     await db.delete(productionDays).where(eq(productionDays.id, id));
   },
 
-  async deleteProductionDayByDateAndFactory(date: string, factory: string): Promise<void> {
-    await db.delete(productionEntries).where(
-      and(
-        eq(productionEntries.productionDate, date),
-        eq(productionEntries.factory, factory)
-      )
-    );
-    await db.delete(productionDays).where(
-      and(
-        eq(productionDays.productionDate, date),
-        eq(productionDays.factory, factory)
-      )
-    );
+  async deleteProductionDayByDateAndFactory(date: string, factory: string, companyId?: string): Promise<void> {
+    const entryConditions: any[] = [
+      eq(productionEntries.productionDate, date),
+      eq(productionEntries.factory, factory),
+    ];
+    const dayConditions: any[] = [
+      eq(productionDays.productionDate, date),
+      eq(productionDays.factory, factory),
+    ];
+    if (companyId) {
+      const companyFactoryIds = (await db.select({ id: factories.id }).from(factories).where(eq(factories.companyId, companyId))).map(f => f.id);
+      if (companyFactoryIds.length > 0) {
+        entryConditions.push(sql`(${productionEntries.factoryId} IS NULL OR ${productionEntries.factoryId} IN (${sql.join(companyFactoryIds.map(id => sql`${id}`), sql`, `)}))`);
+        dayConditions.push(sql`(${productionDays.factoryId} IS NULL OR ${productionDays.factoryId} IN (${sql.join(companyFactoryIds.map(id => sql`${id}`), sql`, `)}))`);
+      }
+    }
+    await db.delete(productionEntries).where(and(...entryConditions));
+    await db.delete(productionDays).where(and(...dayConditions));
   },
 
   async deleteProductionDayByDateAndFactoryId(date: string, factoryId: string): Promise<void> {

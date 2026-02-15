@@ -158,17 +158,21 @@ export const dailyLogMethods = {
       .orderBy(asc(dailyLogs.logDay));
   },
 
-  async getDailyLogsWithRowsInRange(startDate: string, endDate: string): Promise<Array<{
+  async getDailyLogsWithRowsInRange(startDate: string, endDate: string, companyId?: string): Promise<Array<{
     log: DailyLog;
     user: User;
     rows: LogRow[];
   }>> {
+    const conditions: any[] = [
+      gte(dailyLogs.logDay, startDate),
+      lte(dailyLogs.logDay, endDate),
+    ];
+    if (companyId) {
+      conditions.push(eq(users.companyId, companyId));
+    }
     const logs = await db.select().from(dailyLogs)
       .innerJoin(users, eq(dailyLogs.userId, users.id))
-      .where(and(
-        gte(dailyLogs.logDay, startDate),
-        lte(dailyLogs.logDay, endDate)
-      ))
+      .where(and(...conditions))
       .orderBy(asc(dailyLogs.logDay));
     
     if (logs.length === 0) return [];

@@ -228,16 +228,16 @@ export class DocumentRegisterService {
     return objectStorageService.getObjectEntityFile(storageKey);
   }
 
-  async getDocumentsByConversation(conversationId: string) {
-    return storage.getDocuments({ conversationId, showLatestOnly: true });
+  async getDocumentsByConversation(conversationId: string, companyId?: string) {
+    return storage.getDocuments({ companyId, conversationId, showLatestOnly: true });
   }
 
-  async getDocumentsByMessage(messageId: string) {
-    return storage.getDocuments({ messageId, showLatestOnly: true });
+  async getDocumentsByMessage(messageId: string, companyId?: string) {
+    return storage.getDocuments({ companyId, messageId, showLatestOnly: true });
   }
 
-  async getDocumentsByPanel(panelId: string) {
-    return storage.getDocuments({ panelId, showLatestOnly: true });
+  async getDocumentsByPanel(panelId: string, companyId?: string) {
+    return storage.getDocuments({ companyId, panelId, showLatestOnly: true });
   }
 
   async getDocumentTypeIdByPrefix(prefix: string): Promise<string | null> {

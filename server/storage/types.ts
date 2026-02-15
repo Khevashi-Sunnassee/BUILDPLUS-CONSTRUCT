@@ -165,7 +165,7 @@ export interface IStorage {
   deleteLogRow(id: string): Promise<void>;
   deleteDailyLog(id: string): Promise<void>;
   deleteProductionDay(id: string): Promise<void>;
-  deleteProductionDayByDateAndFactory(date: string, factory: string): Promise<void>;
+  deleteProductionDayByDateAndFactory(date: string, factory: string, companyId?: string): Promise<void>;
   deleteProductionDayByDateAndFactoryId(date: string, factoryId: string): Promise<void>;
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
@@ -213,12 +213,12 @@ export interface IStorage {
   getAllProductionEntries(companyId?: string): Promise<(ProductionEntry & { panel: PanelRegister; job: Job; user: User })[]>;
   getProductionSummaryByDate(date: string, companyId?: string): Promise<{ panelType: string; count: number; totalVolumeM3: number; totalAreaM2: number }[]>;
   
-  getProductionDays(startDate: string, endDate: string): Promise<ProductionDay[]>;
-  getProductionDay(date: string, factory: string): Promise<ProductionDay | undefined>;
+  getProductionDays(startDate: string, endDate: string, companyId?: string): Promise<ProductionDay[]>;
+  getProductionDay(date: string, factory: string, companyId?: string): Promise<ProductionDay | undefined>;
   getProductionDayByFactoryId(date: string, factoryId: string): Promise<ProductionDay | undefined>;
   createProductionDay(data: InsertProductionDay): Promise<ProductionDay>;
   getDailyLogsInRange(startDate: string, endDate: string): Promise<DailyLog[]>;
-  getDailyLogsWithRowsInRange(startDate: string, endDate: string): Promise<Array<{
+  getDailyLogsWithRowsInRange(startDate: string, endDate: string, companyId?: string): Promise<Array<{
     log: DailyLog;
     user: User;
     rows: LogRow[];
@@ -481,6 +481,7 @@ export interface IStorage {
   deleteDocumentCategory(id: string): Promise<void>;
   
   getDocuments(filters: {
+    companyId?: string;
     page?: number;
     limit?: number;
     search?: string;

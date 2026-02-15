@@ -110,7 +110,7 @@ router.get("/api/production-reports", requireAuth, async (req: Request, res: Res
   const end = endDate ? String(endDate) : format(new Date(), "yyyy-MM-dd");
   const start = startDate ? String(startDate) : format(subDays(new Date(), 30), "yyyy-MM-dd");
   
-  const productionDaysData = await storage.getProductionDays(start, end);
+  const productionDaysData = await storage.getProductionDays(start, end, req.companyId);
   
   const entries = await storage.getProductionEntriesInRange(start, end, req.companyId);
   
@@ -201,7 +201,7 @@ router.get("/api/production-days", requireAuth, async (req: Request, res: Respon
       return res.status(400).json({ error: "startDate and endDate are required" });
     }
     
-    const productionDaysData = await storage.getProductionDays(startDate, endDate);
+    const productionDaysData = await storage.getProductionDays(startDate, endDate, req.companyId);
     res.json(productionDaysData);
   } catch (error: unknown) {
     logger.error({ err: error }, "Error fetching production days");
@@ -221,7 +221,7 @@ router.post("/api/production-days", requireAuth, async (req: Request, res: Respo
       return res.status(400).json({ error: "Date and factory are required" });
     }
     
-    const existing = await storage.getProductionDay(productionDate, factory);
+    const existing = await storage.getProductionDay(productionDate, factory, req.companyId);
     if (existing) {
       return res.status(400).json({ error: "Production day already exists for this date and factory" });
     }
@@ -243,7 +243,7 @@ router.delete("/api/production-days/:date", requireRole("MANAGER", "ADMIN"), asy
   try {
     const date = String(req.params.date);
     const factory = String(req.query.factory || "QLD");
-    await storage.deleteProductionDayByDateAndFactory(date, factory);
+    await storage.deleteProductionDayByDateAndFactory(date, factory, req.companyId);
     res.json({ success: true });
   } catch (error: unknown) {
     logger.error({ err: error }, "Error deleting production day");

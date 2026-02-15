@@ -158,6 +158,7 @@ export const documentMethods = {
   },
 
   async getDocuments(filters: {
+    companyId?: string;
     page?: number;
     limit?: number;
     search?: string;
@@ -182,6 +183,7 @@ export const documentMethods = {
     const offset = (page - 1) * limit;
 
     const conditions: any[] = [];
+    if (filters.companyId) conditions.push(eq(documents.companyId, filters.companyId));
     
     if (filters.search) {
       const searchTerm = `%${filters.search.toLowerCase()}%`;

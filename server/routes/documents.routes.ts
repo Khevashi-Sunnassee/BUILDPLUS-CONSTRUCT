@@ -463,6 +463,7 @@ router.get("/api/documents", requireAuth, async (req, res) => {
     }
 
     const result = await storage.getDocuments({
+      companyId: req.companyId,
       page: page ? parseInt(String(page)) : 1,
       limit: limit ? parseInt(String(limit)) : 50,
       search: search ? String(search) : undefined,
@@ -2193,6 +2194,7 @@ router.get("/api/panels/:panelId/documents", requireAuth, async (req, res) => {
     }
 
     const result = await storage.getDocuments({
+      companyId: companyId,
       page: 1,
       limit: 100,
       panelId: panelId,
@@ -2241,6 +2243,7 @@ router.post("/api/panels/:panelId/documents/upload", requireAuth, upload.single(
 
     if (status === "IFC") {
       const existingDocs = await storage.getDocuments({
+        companyId: companyId,
         page: 1,
         limit: 100,
         panelId: panelId,
@@ -2380,6 +2383,7 @@ router.patch("/api/panels/:panelId/documents/:documentId/status", requireAuth, a
 
     if (status === "IFC") {
       const existingDocs = await storage.getDocuments({
+        companyId: req.companyId,
         page: 1,
         limit: 100,
         panelId: panelId,
@@ -2771,9 +2775,9 @@ CRITICAL RULES:
 
     let existingDocuments: any[] = [];
     if (drawingNumbers.length > 0) {
-      const docsResult = await storage.getDocuments({ limit: 10000 });
+      const docsResult = await storage.getDocuments({ companyId: req.companyId, limit: 10000 });
       existingDocuments = docsResult.documents.filter((d: any) =>
-        d.companyId === req.companyId && d.documentNumber && drawingNumbers.includes(d.documentNumber)
+        d.documentNumber && drawingNumbers.includes(d.documentNumber)
       );
     }
 

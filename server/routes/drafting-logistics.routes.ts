@@ -13,7 +13,7 @@ router.get("/api/reports/drafting-daily", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "startDate and endDate required" });
   }
   
-  const logsWithRows = await storage.getDailyLogsWithRowsInRange(startDate, endDate);
+  const logsWithRows = await storage.getDailyLogsWithRowsInRange(startDate, endDate, req.companyId);
   
   const jobIds = new Set<string>();
   for (const { rows } of logsWithRows) {
