@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import multer from "multer";
+import ExcelJS from "exceljs";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
@@ -12,6 +14,23 @@ import { buildBrandedEmail } from "../lib/email-template";
 
 const router = Router();
 const openai = new OpenAI();
+
+const SCOPE_IMPORT_TYPES = [
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
+];
+const scopeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (SCOPE_IMPORT_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`File type not allowed. Only Excel (.xlsx) and CSV files are accepted.`));
+    }
+  },
+});
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function isValidId(id: string): boolean { return uuidRegex.test(id); }
@@ -966,7 +985,206 @@ Include trade-specific items covering: preparation, execution, inspection, docum
   }
 });
 
-// ============ IMPORT / EXPORT ============
+// ============ FILE IMPORT (UPLOAD & CREATE) ============
+
+router.post("/api/scopes/import-parse", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), scopeUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+
+    const items: { category: string; description: string; details: string }[] = [];
+
+    const workbook = new ExcelJS.Workbook();
+    if (req.file.mimetype === "text/csv") {
+      await workbook.csv.read(require("stream").Readable.from(req.file.buffer));
+    } else {
+      await workbook.xlsx.load(req.file.buffer);
+    }
+
+    const sheet = workbook.worksheets[0];
+    if (!sheet || sheet.rowCount < 2) {
+      return res.status(400).json({ message: "File is empty or has no data rows" });
+    }
+
+    const headerRow = sheet.getRow(1);
+    const headers: string[] = [];
+    headerRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
+      headers[colNum - 1] = String(cell.value || "").toLowerCase().trim();
+    });
+
+    const catIdx = headers.findIndex(h => h.includes("category") || h.includes("cat") || h.includes("section") || h.includes("group"));
+    const descIdx = headers.findIndex(h => h.includes("description") || h.includes("desc") || h.includes("item") || h.includes("scope") || h.includes("text") || h.includes("title"));
+    const detailIdx = headers.findIndex(h => h.includes("detail") || h.includes("note") || h.includes("spec") || h.includes("comment") || h.includes("info"));
+
+    if (descIdx === -1) {
+      const firstCol = headers[0] || "";
+      if (!firstCol) {
+        return res.status(400).json({ message: "Could not find a description column. Please ensure your file has a column header containing 'description', 'item', 'scope', or 'text'." });
+      }
+      for (let r = 2; r <= sheet.rowCount; r++) {
+        const row = sheet.getRow(r);
+        const cellVal = String(row.getCell(1).value || "").trim();
+        if (!cellVal) continue;
+        items.push({ category: "General", description: cellVal, details: "" });
+      }
+    } else {
+      for (let r = 2; r <= sheet.rowCount; r++) {
+        const row = sheet.getRow(r);
+        const desc = String(row.getCell(descIdx + 1).value || "").trim();
+        if (!desc) continue;
+        items.push({
+          category: catIdx >= 0 ? String(row.getCell(catIdx + 1).value || "General").trim() : "General",
+          description: desc,
+          details: detailIdx >= 0 ? String(row.getCell(detailIdx + 1).value || "").trim() : "",
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      return res.status(400).json({ message: "No scope items found in the file. Ensure the file has rows with content." });
+    }
+
+    res.json({ items, count: items.length, fileName: req.file.originalname });
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error parsing scope import file");
+    res.status(500).json({ message: "Failed to parse the uploaded file" });
+  }
+});
+
+router.post("/api/scopes/import-create", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const userId = req.session.userId!;
+
+    const schema = z.object({
+      name: z.string().min(1, "Name is required"),
+      tradeId: z.string().min(1, "Trade is required"),
+      jobTypeId: z.string().nullable().optional(),
+      description: z.string().nullable().optional(),
+      aiFormat: z.boolean().default(false),
+      items: z.array(z.object({
+        category: z.string(),
+        description: z.string().min(1),
+        details: z.string().optional().default(""),
+      })),
+    });
+    const data = schema.parse(req.body);
+
+    if (!(await verifyTradeOwnership(companyId, data.tradeId))) {
+      return res.status(400).json({ message: "Invalid trade" });
+    }
+    if (data.jobTypeId) {
+      const [jt] = await db.select({ id: jobTypes.id }).from(jobTypes).where(and(eq(jobTypes.id, data.jobTypeId), eq(jobTypes.companyId, companyId)));
+      if (!jt) return res.status(400).json({ message: "Invalid job type" });
+    }
+
+    let finalItems = data.items;
+
+    if (data.aiFormat) {
+      const [trade] = await db.select({ name: scopeTrades.name }).from(scopeTrades).where(eq(scopeTrades.id, data.tradeId));
+
+      const rawItemsList = data.items.map((item, idx) =>
+        `${idx + 1}. [${item.category}] ${item.description}${item.details ? ` - ${item.details}` : ""}`
+      ).join("\n");
+
+      const prompt = `You are an expert construction scope of works consultant in Australia. A user has imported the following scope items from a spreadsheet. Your job is to:
+
+1. Clean up, reword, and standardize each item to be professional, clear, and industry-standard
+2. Ensure proper categorization (fix incorrect categories, merge duplicates, split items that cover multiple concerns)
+3. Add missing technical details, Australian Standards references, and specifications where appropriate
+4. Ensure items are comprehensive - add any obvious missing items for the trade
+5. Remove any items that are clearly not scope items (e.g., headers, totals, empty rows)
+6. Organize by proper construction scope categories
+
+Trade: ${trade?.name || "General"}
+${data.description ? `Project Context: ${data.description}` : ""}
+
+Raw imported items:
+${rawItemsList}
+
+Return a JSON object with an "items" key containing an array of objects with exactly these fields:
+- "category": A proper construction scope category (e.g., "GENERAL REQUIREMENTS", "MATERIALS AND SPECIFICATIONS", "METHODOLOGY AND SEQUENCING", "QUALITY ASSURANCE AND TESTING", "HEALTH AND SAFETY", "WARRANTIES AND DEFECTS LIABILITY", "EXCLUSIONS AND LIMITATIONS", "HANDOVER AND COMPLETION", etc.)
+- "description": A concise but complete description of the scope item (1-2 sentences, professional language)
+- "details": Additional technical details, specifications, standards references, or clarifications (2-4 sentences)
+- "status": Always "INCLUDED"
+
+Maintain all original intent but improve quality, clarity, and completeness. Keep the total count similar (within +/- 20% of original) unless many items are clearly duplicates or not scope items.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.5,
+        max_tokens: 8000,
+        response_format: { type: "json_object" },
+      });
+
+      const content = response.choices[0]?.message?.content || "{}";
+      let parsed: any;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        return res.status(500).json({ message: "AI failed to format the items. Please try again or import without AI formatting." });
+      }
+
+      const aiItems = Array.isArray(parsed) ? parsed : (parsed.items || parsed.scope_items || Object.values(parsed)[0]);
+      if (Array.isArray(aiItems)) {
+        finalItems = aiItems
+          .filter((item: any) => item.description && typeof item.description === "string")
+          .map((item: any) => ({
+            category: item.category || "General",
+            description: item.description,
+            details: item.details || "",
+          }));
+      }
+    }
+
+    const result = await db.transaction(async (tx) => {
+      const [newScope] = await tx.insert(scopes).values({
+        companyId,
+        name: data.name,
+        tradeId: data.tradeId,
+        jobTypeId: data.jobTypeId || null,
+        description: data.description || null,
+        status: "DRAFT",
+        source: "IMPORTED",
+        createdById: userId,
+        updatedById: userId,
+      }).returning();
+
+      if (finalItems.length > 0) {
+        await tx.insert(scopeItems).values(
+          finalItems.map((item: any, idx: number) => ({
+            companyId,
+            scopeId: newScope.id,
+            category: item.category || "General",
+            description: item.description,
+            details: item.details || null,
+            status: "INCLUDED" as const,
+            sortOrder: idx + 1,
+          }))
+        );
+      }
+
+      return newScope;
+    });
+
+    res.json({
+      scope: result,
+      items: finalItems,
+      count: finalItems.length,
+      aiFormatted: data.aiFormat,
+    });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", errors: error.errors });
+    }
+    logger.error({ err: error }, "Error creating imported scope");
+    res.status(500).json({ message: "Failed to create scope from import" });
+  }
+});
+
+// ============ IMPORT / EXPORT (EXISTING SCOPE) ============
 
 router.post("/api/scopes/:id/import", requireAuth, requirePermission("scopes", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
   try {

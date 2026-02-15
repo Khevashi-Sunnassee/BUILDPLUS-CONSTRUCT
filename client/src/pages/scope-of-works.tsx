@@ -151,6 +151,18 @@ export default function ScopeOfWorksPage() {
   const [aiCreateDescription, setAiCreateDescription] = useState("");
   const [aiCreateGeneratedItems, setAiCreateGeneratedItems] = useState<AIGeneratedItem[]>([]);
 
+  const [importOpen, setImportOpen] = useState(false);
+  const [importStep, setImportStep] = useState<"upload" | "configure" | "ai-ask" | "processing" | "review">("upload");
+  const [importFileName, setImportFileName] = useState("");
+  const [importParsedItems, setImportParsedItems] = useState<{ category: string; description: string; details: string }[]>([]);
+  const [importName, setImportName] = useState("");
+  const [importTradeId, setImportTradeId] = useState("");
+  const [importJobTypeId, setImportJobTypeId] = useState("");
+  const [importDescription, setImportDescription] = useState("");
+  const [importAiFormat, setImportAiFormat] = useState(false);
+  const [importFinalItems, setImportFinalItems] = useState<AIGeneratedItem[]>([]);
+  const [importUploading, setImportUploading] = useState(false);
+
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>([]);
@@ -544,6 +556,109 @@ export default function ScopeOfWorksPage() {
       tradeId: aiCreateTradeId,
       jobTypeId: aiCreateJobTypeId && aiCreateJobTypeId !== "none" ? aiCreateJobTypeId : undefined,
       description: aiCreateDescription.trim() || undefined,
+    });
+  }
+
+  function handleChooseImport() {
+    setCreateModeDialogOpen(false);
+    setImportOpen(true);
+    setImportStep("upload");
+    setImportFileName("");
+    setImportParsedItems([]);
+    setImportName("");
+    setImportTradeId("");
+    setImportJobTypeId("");
+    setImportDescription("");
+    setImportAiFormat(false);
+    setImportFinalItems([]);
+    setImportUploading(false);
+  }
+
+  function closeImport() {
+    setImportOpen(false);
+    setImportStep("upload");
+    setImportFileName("");
+    setImportParsedItems([]);
+    setImportName("");
+    setImportTradeId("");
+    setImportJobTypeId("");
+    setImportDescription("");
+    setImportAiFormat(false);
+    setImportFinalItems([]);
+    setImportUploading(false);
+  }
+
+  async function handleImportFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("/api/scopes/import-parse", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toast({ title: "Upload Failed", description: err.message || "Failed to parse file", variant: "destructive" });
+        setImportUploading(false);
+        return;
+      }
+      const data = await res.json();
+      setImportParsedItems(data.items);
+      setImportFileName(data.fileName || file.name);
+      setImportStep("configure");
+    } catch (err: any) {
+      toast({ title: "Upload Failed", description: err.message || "Failed to upload file", variant: "destructive" });
+    } finally {
+      setImportUploading(false);
+    }
+  }
+
+  function handleImportConfigure() {
+    if (!importName.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+    if (!importTradeId || importTradeId === "none") {
+      toast({ title: "Please select a trade", variant: "destructive" });
+      return;
+    }
+    setImportStep("ai-ask");
+  }
+
+  const importCreateMutation = useMutation({
+    mutationFn: async (data: { name: string; tradeId: string; jobTypeId?: string; description?: string; aiFormat: boolean; items: any[] }) => {
+      const res = await apiRequest("POST", "/api/scopes/import-create", data);
+      return res.json();
+    },
+    onSuccess: (data: { scope: Scope; items: any[]; count: number; aiFormatted: boolean }) => {
+      setImportFinalItems(data.items || []);
+      setImportStep("review");
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes/stats"] });
+      toast({ title: `Scope imported with ${data.count || 0} items${data.aiFormatted ? " (AI formatted)" : ""}` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Import Failed", description: error.message, variant: "destructive" });
+      setImportStep("ai-ask");
+    },
+  });
+
+  function handleImportWithAi(useAi: boolean) {
+    setImportAiFormat(useAi);
+    setImportStep("processing");
+    importCreateMutation.mutate({
+      name: importName.trim(),
+      tradeId: importTradeId,
+      jobTypeId: importJobTypeId && importJobTypeId !== "none" ? importJobTypeId : undefined,
+      description: importDescription.trim() || undefined,
+      aiFormat: useAi,
+      items: importParsedItems,
     });
   }
 
@@ -1370,12 +1485,12 @@ export default function ScopeOfWorksPage() {
       </Dialog>
 
       <Dialog open={createModeDialogOpen} onOpenChange={setCreateModeDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle data-testid="text-create-mode-title">Create Scope</DialogTitle>
             <DialogDescription>Choose how you want to create your scope of works</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="grid grid-cols-3 gap-4 py-4">
             <button
               onClick={handleChooseManual}
               className="flex flex-col items-center gap-3 p-6 border rounded-md hover-elevate cursor-pointer text-center"
@@ -1384,7 +1499,7 @@ export default function ScopeOfWorksPage() {
               <Pencil className="h-8 w-8 text-muted-foreground" />
               <div>
                 <p className="font-medium">Create Manual</p>
-                <p className="text-xs text-muted-foreground mt-1">Build your scope from scratch with manual item entry</p>
+                <p className="text-xs text-muted-foreground mt-1">Build your scope from scratch</p>
               </div>
             </button>
             <button
@@ -1395,7 +1510,18 @@ export default function ScopeOfWorksPage() {
               <Sparkles className="h-8 w-8 text-primary" />
               <div>
                 <p className="font-medium">Create with AI</p>
-                <p className="text-xs text-muted-foreground mt-1">AI generates a comprehensive scope with 40-80 items</p>
+                <p className="text-xs text-muted-foreground mt-1">AI generates 40-80 items</p>
+              </div>
+            </button>
+            <button
+              onClick={handleChooseImport}
+              className="flex flex-col items-center gap-3 p-6 border rounded-md hover-elevate cursor-pointer text-center"
+              data-testid="button-create-import"
+            >
+              <Upload className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="font-medium">Import File</p>
+                <p className="text-xs text-muted-foreground mt-1">Upload Excel or CSV file</p>
               </div>
             </button>
           </div>
@@ -1529,6 +1655,271 @@ export default function ScopeOfWorksPage() {
 
               <DialogFooter>
                 <Button onClick={closeAiCreate} data-testid="button-close-ai-create">
+                  <Check className="h-4 w-4 mr-2" />
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={importOpen} onOpenChange={(open) => { if (!open) closeImport(); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" data-testid="text-import-title">
+              <Upload className="h-5 w-5" />
+              {importStep === "upload" && "Import Scope from File"}
+              {importStep === "configure" && "Configure Imported Scope"}
+              {importStep === "ai-ask" && "AI Check & Format"}
+              {importStep === "processing" && (importAiFormat ? "AI is Formatting Items..." : "Creating Scope...")}
+              {importStep === "review" && "Import Complete"}
+            </DialogTitle>
+            <DialogDescription>
+              {importStep === "upload" && "Upload an Excel (.xlsx) or CSV file containing scope items."}
+              {importStep === "configure" && `Parsed ${importParsedItems.length} items from ${importFileName}. Configure your scope details.`}
+              {importStep === "ai-ask" && "Would you like AI to check and reformat the imported items into proper scope format?"}
+              {importStep === "processing" && (importAiFormat ? "AI is reviewing, standardizing, and reformatting your imported items. This may take 30-60 seconds." : "Creating your scope with the imported items...")}
+              {importStep === "review" && `Scope created with ${importFinalItems.length} items${importAiFormat ? " (AI formatted)" : ""}.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {importStep === "upload" && (
+            <div className="space-y-4 py-4">
+              <div className="border-2 border-dashed rounded-md p-8 text-center">
+                {importUploading ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Parsing file...</p>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center gap-3 cursor-pointer">
+                    <Upload className="h-10 w-10 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium">Click to upload or drag and drop</p>
+                      <p className="text-xs text-muted-foreground mt-1">Excel (.xlsx) or CSV files supported</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      className="hidden"
+                      onChange={handleImportFileUpload}
+                      data-testid="input-import-file"
+                    />
+                  </label>
+                )}
+              </div>
+              <div className="bg-muted/50 rounded-md p-3 text-xs text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">File format tips:</p>
+                <p>Your file should have column headers in the first row. The system will auto-detect columns named:</p>
+                <p>Description/Item/Scope/Text (required), Category/Section/Group, Details/Notes/Specs</p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeImport} data-testid="button-cancel-import">
+                  Cancel
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {importStep === "configure" && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-md p-3 text-sm">
+                <span className="font-medium">{importParsedItems.length}</span> items parsed from <span className="font-medium">{importFileName}</span>
+              </div>
+              <div className="border rounded-md overflow-auto max-h-40">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead className="w-36">Category</TableHead>
+                      <TableHead>Description</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importParsedItems.slice(0, 10).map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>
+                        <TableCell className="text-sm">{item.description}</TableCell>
+                      </TableRow>
+                    ))}
+                    {importParsedItems.length > 10 && (
+                      <TableRow>
+                        <TableCell colSpan={3} className="text-center text-muted-foreground text-xs">
+                          ... and {importParsedItems.length - 10} more items
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label htmlFor="import-scope-name">Scope Name *</Label>
+                <Input
+                  id="import-scope-name"
+                  value={importName}
+                  onChange={(e) => setImportName(e.target.value)}
+                  placeholder="e.g. Imported Bricklaying Scope"
+                  data-testid="input-import-scope-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="import-scope-trade">Trade *</Label>
+                <Select value={importTradeId} onValueChange={setImportTradeId}>
+                  <SelectTrigger data-testid="select-import-scope-trade">
+                    <SelectValue placeholder="Select trade..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trades.map((trade) => (
+                      <SelectItem key={trade.id} value={trade.id}>
+                        {trade.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="import-scope-jobtype">Job Type (optional)</Label>
+                <Select value={importJobTypeId} onValueChange={setImportJobTypeId}>
+                  <SelectTrigger data-testid="select-import-scope-jobtype">
+                    <SelectValue placeholder="Select job type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Job Type</SelectItem>
+                    {jobTypes.map((jt) => (
+                      <SelectItem key={jt.id} value={jt.id}>
+                        {jt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="import-scope-desc">Project Description (optional)</Label>
+                <Textarea
+                  id="import-scope-desc"
+                  value={importDescription}
+                  onChange={(e) => setImportDescription(e.target.value)}
+                  placeholder="Describe the project context for better AI formatting..."
+                  rows={2}
+                  data-testid="textarea-import-scope-description"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setImportStep("upload")} data-testid="button-import-back">
+                  Back
+                </Button>
+                <Button
+                  onClick={handleImportConfigure}
+                  disabled={!importName.trim() || !importTradeId || importTradeId === "none"}
+                  data-testid="button-import-next"
+                >
+                  Next
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {importStep === "ai-ask" && (
+            <div className="space-y-6 py-4">
+              <div className="text-center space-y-3">
+                <Sparkles className="h-12 w-12 mx-auto text-primary" />
+                <p className="text-lg font-medium">Would you like AI to check and update your imported items?</p>
+                <p className="text-sm text-muted-foreground">
+                  AI will review your {importParsedItems.length} imported items and:
+                </p>
+              </div>
+              <div className="bg-muted/50 rounded-md p-4 space-y-2 text-sm">
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Standardize descriptions with professional construction language</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Fix and organize categories into proper scope sections</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Add technical details, Australian Standards references, and specifications</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Remove duplicates and add any obviously missing items</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => handleImportWithAi(false)}
+                  className="h-auto py-4 flex flex-col gap-1"
+                  data-testid="button-import-no-ai"
+                >
+                  <span className="font-medium">Import As-Is</span>
+                  <span className="text-xs text-muted-foreground">Keep original formatting</span>
+                </Button>
+                <Button
+                  onClick={() => handleImportWithAi(true)}
+                  className="h-auto py-4 flex flex-col gap-1"
+                  data-testid="button-import-with-ai"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span className="font-medium">AI Check & Update</span>
+                  <span className="text-xs text-muted-foreground">Takes 30-60 seconds</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {importStep === "processing" && (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              {importAiFormat ? (
+                <>
+                  <p className="text-muted-foreground">AI is reviewing and reformatting your scope items...</p>
+                  <p className="text-xs text-muted-foreground">Standardizing descriptions, organizing categories, adding details</p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">Creating your scope...</p>
+              )}
+            </div>
+          )}
+
+          {importStep === "review" && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-md p-3 text-sm">
+                <span className="font-medium">{importFinalItems.length}</span> items imported
+                {importAiFormat && " and formatted by AI"} across{" "}
+                <span className="font-medium">
+                  {new Set(importFinalItems.map(i => i.category)).size}
+                </span>{" "}
+                categories.
+              </div>
+
+              <div className="border rounded-md overflow-auto max-h-96">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-48">Category</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importFinalItems.map((item, idx) => (
+                      <TableRow key={idx} data-testid={`row-import-item-${idx}`}>
+                        <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>
+                        <TableCell className="font-medium text-sm">{item.description}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{item.details}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DialogFooter>
+                <Button onClick={closeImport} data-testid="button-close-import">
                   <Check className="h-4 w-4 mr-2" />
                   Done
                 </Button>
