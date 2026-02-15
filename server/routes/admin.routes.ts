@@ -300,9 +300,10 @@ router.post("/api/admin/data-deletion/validate", requireRole("ADMIN"), async (re
       }
       const companyJobIdsForReports = (await db.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, cid))).map(r => r.id);
       if (companyJobIdsForReports.length > 0) {
-        const [weeklyJobReportCount] = await db.select({ count: sql<number>`count(*)` }).from(weeklyJobReports).where(inArray(weeklyJobReports.jobId, companyJobIdsForReports));
-        if (Number(weeklyJobReportCount.count) > 0) {
-          warnings.push(`${weeklyJobReportCount.count} Weekly Job Reports will also be deleted with Jobs.`);
+        const [weeklyScheduleCount] = await db.select({ count: sql<number>`count(*)` }).from(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIdsForReports));
+        if (Number(weeklyScheduleCount.count) > 0) {
+          const reportIds = (await db.selectDistinct({ reportId: weeklyJobReportSchedules.reportId }).from(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIdsForReports))).map(r => r.reportId);
+          warnings.push(`${reportIds.length} Weekly Job Reports (with ${weeklyScheduleCount.count} schedule entries) will also be deleted with Jobs.`);
         }
       }
     }
@@ -694,8 +695,11 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
         await tx.update(conversations).set({ jobId: null }).where(and(eq(conversations.companyId, delCompanyId), isNotNull(conversations.jobId)));
         const companyJobIds = (await tx.select({ id: jobs.id }).from(jobs).where(eq(jobs.companyId, delCompanyId))).map(r => r.id);
         if (companyJobIds.length > 0) {
+          const reportIdsToDelete = (await tx.selectDistinct({ reportId: weeklyJobReportSchedules.reportId }).from(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIds))).map(r => r.reportId);
           await tx.delete(weeklyJobReportSchedules).where(inArray(weeklyJobReportSchedules.jobId, companyJobIds));
-          await tx.delete(weeklyJobReports).where(inArray(weeklyJobReports.jobId, companyJobIds));
+          if (reportIdsToDelete.length > 0) {
+            await tx.delete(weeklyJobReports).where(inArray(weeklyJobReports.id, reportIdsToDelete));
+          }
           await tx.delete(productionDays).where(inArray(productionDays.jobId, companyJobIds));
           await tx.delete(jobPanelRates).where(inArray(jobPanelRates.jobId, companyJobIds));
           await tx.delete(mappingRules).where(inArray(mappingRules.jobId, companyJobIds));
