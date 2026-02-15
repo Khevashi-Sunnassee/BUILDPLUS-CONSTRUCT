@@ -259,6 +259,7 @@ export const globalSettings = pgTable("global_settings", {
   cfmeuCalendar: cfmeuCalendarEnum("cfmeu_calendar").default("NONE").notNull(),
   poTermsHtml: text("po_terms_html"),
   includePOTerms: boolean("include_po_terms").default(false).notNull(),
+  emailTemplateHtml: text("email_template_html"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
