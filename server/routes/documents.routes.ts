@@ -31,6 +31,47 @@ const openai = new OpenAI({
 const router = Router();
 const objectStorageService = new ObjectStorageService();
 
+function getDocumentLinkSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error("SESSION_SECRET is required for document link signing");
+  }
+  return secret;
+}
+const DOCUMENT_LINK_EXPIRY_DAYS = 7;
+
+function generateDocumentDownloadToken(documentId: string): string {
+  const expiresAt = Date.now() + DOCUMENT_LINK_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  const payload = JSON.stringify({ documentId, expiresAt });
+  const hmac = crypto.createHmac("sha256", getDocumentLinkSecret()).update(payload).digest("hex");
+  const tokenData = Buffer.from(payload).toString("base64url");
+  return `${tokenData}.${hmac}`;
+}
+
+function verifyDocumentDownloadToken(token: string): { documentId: string } | null {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [tokenData, hmac] = parts;
+  try {
+    const payload = Buffer.from(tokenData, "base64url").toString("utf-8");
+    const expectedHmac = crypto.createHmac("sha256", getDocumentLinkSecret()).update(payload).digest("hex");
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) return null;
+    const parsed = JSON.parse(payload);
+    if (!parsed.documentId || !parsed.expiresAt) return null;
+    if (Date.now() > parsed.expiresAt) return null;
+    return { documentId: parsed.documentId };
+  } catch {
+    return null;
+  }
+}
+
+function formatFileSizeServer(bytes: number): string {
+  if (!bytes) return "N/A";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 async function findAffectedOpenTenders(documentId: string, companyId: string) {
   const [directPackages, bundleItems] = await Promise.all([
     db.select({
@@ -973,6 +1014,7 @@ const sendDocumentsEmailSchema = z.object({
   documentIds: z.array(z.string()).min(1, "At least one document is required"),
   sendCopy: z.boolean().default(false),
   combinePdf: z.boolean().default(false),
+  sendAsLinks: z.boolean().default(false),
 });
 
 router.post("/api/documents/send-email", requireAuth, async (req, res) => {
@@ -982,18 +1024,115 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
       return res.status(400).json({ error: parsed.error.errors[0]?.message || "Invalid request" });
     }
 
-    const { to, cc, subject, message, documentIds, sendCopy, combinePdf } = parsed.data;
+    const { to, cc, subject, message, documentIds, sendCopy, combinePdf, sendAsLinks } = parsed.data;
     const companyId = req.companyId;
 
     if (!emailService.isConfigured()) {
       return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
     }
 
-    const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
-    const failedDocs: string[] = [];
-
     const docs = await storage.getDocumentsByIds(documentIds);
     const docsMap = new Map(docs.map(d => [d.id, d]));
+
+    let bcc: string | undefined;
+    let senderName = "A team member";
+    if (req.session.userId) {
+      const currentUser = await storage.getUser(req.session.userId);
+      if (sendCopy && currentUser?.email) {
+        bcc = currentUser.email;
+      }
+      if (currentUser) {
+        senderName = currentUser.name || currentUser.email;
+      }
+    }
+
+    if (sendAsLinks) {
+      const appDomain = process.env.APP_URL
+        || (process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : "")
+        || (process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "")
+        || `${req.protocol}://${req.get("host")}`;
+
+      if (!appDomain) {
+        return res.status(500).json({ error: "Cannot generate download links: application URL is not configured" });
+      }
+
+      const linkItems: Array<{ title: string; originalName: string; revision: string; fileSize: number; downloadUrl: string }> = [];
+      const failedDocs: string[] = [];
+
+      for (const docId of documentIds) {
+        const doc = docsMap.get(docId);
+        if (!doc) {
+          failedDocs.push(`Unknown document (${docId})`);
+          continue;
+        }
+        const token = generateDocumentDownloadToken(docId);
+        const downloadUrl = `${appDomain}/api/public/documents/${token}/download`;
+        linkItems.push({
+          title: doc.title,
+          originalName: doc.originalName,
+          revision: doc.revision || "-",
+          fileSize: doc.fileSize || 0,
+          downloadUrl,
+        });
+      }
+
+      if (linkItems.length === 0) {
+        return res.status(400).json({ error: `Could not generate links: ${failedDocs.join(", ")}` });
+      }
+
+      const linksHtml = linkItems.map(item => `<tr>
+        <td style="padding: 8px; font-size: 13px; color: #334155;">${item.title}</td>
+        <td style="padding: 8px; font-size: 13px; color: #64748b;">${item.originalName}</td>
+        <td style="padding: 8px; font-size: 13px; color: #64748b;">${item.revision}</td>
+        <td style="padding: 8px; font-size: 13px; color: #64748b;">${formatFileSizeServer(item.fileSize)}</td>
+        <td style="padding: 8px;">
+          <a href="${item.downloadUrl}" style="display: inline-block; padding: 6px 16px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: 600;">Download</a>
+        </td>
+      </tr>`).join("");
+
+      const attachmentSummary = `
+        <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #334155;">${linkItems.length} Document${linkItems.length !== 1 ? "s" : ""} Available for Download:</p>
+        <p style="margin: 0 0 12px 0; font-size: 11px; color: #94a3b8;">Links expire after 7 days</p>
+        <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
+          <tr style="background-color: #e2e8f0;">
+            <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">Title</td>
+            <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">File</td>
+            <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">Rev</td>
+            <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">Size</td>
+            <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;"></td>
+          </tr>
+          ${linksHtml}
+        </table>`;
+
+      const htmlBody = await buildBrandedEmail({
+        title: "Documents Shared With You",
+        subtitle: `Sent by ${senderName}`,
+        body: message.replace(/\n/g, "<br>"),
+        attachmentSummary,
+        footerNote: "Click the download buttons above to save documents. Links are valid for 7 days. If you have any questions, reply directly to this email.",
+        companyId,
+      });
+
+      const result = await emailService.sendEmailWithAttachment({
+        to,
+        cc: cc || undefined,
+        bcc,
+        subject,
+        body: htmlBody,
+      });
+
+      if (result.success) {
+        logger.info({ documentCount: linkItems.length, to, mode: "links" }, "Documents email sent with download links");
+        res.json({ success: true, messageId: result.messageId, attachedCount: linkItems.length, sentAsLinks: true });
+      } else {
+        logger.error({ error: result.error }, "Failed to send documents email (links mode)");
+        res.status(500).json({ error: result.error || "Failed to send email" });
+      }
+      return;
+    }
+
+    const attachments: Array<{ filename: string; content: Buffer; contentType: string }> = [];
+    const failedDocs: string[] = [];
 
     for (const docId of documentIds) {
       try {
@@ -1030,18 +1169,6 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
     if (attachments.length === 0) {
       const failedList = failedDocs.join(", ");
       return res.status(400).json({ error: `Could not load document files for attachment: ${failedList}. The files may have been deleted from storage.` });
-    }
-
-    let bcc: string | undefined;
-    let senderName = "A team member";
-    if (req.session.userId) {
-      const currentUser = await storage.getUser(req.session.userId);
-      if (sendCopy && currentUser?.email) {
-        bcc = currentUser.email;
-      }
-      if (currentUser) {
-        senderName = currentUser.name || currentUser.email;
-      }
     }
 
     const docListHtml = docs
@@ -1558,6 +1685,41 @@ router.post("/api/document-bundles/:bundleId/notify-updates", requireAuth, async
     }
     logger.error({ err: error }, "Error sending bundle update notification");
     res.status(500).json({ error: "Failed to send notification" });
+  }
+});
+
+// ==================== PUBLIC DOCUMENT DOWNLOAD (Token-based, No Auth) ====================
+
+router.get("/api/public/documents/:token/download", async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token);
+    const verified = verifyDocumentDownloadToken(token);
+
+    if (!verified) {
+      return res.status(403).json({ error: "Invalid or expired download link. Please request a new link." });
+    }
+
+    const document = await storage.getDocument(verified.documentId);
+    if (!document) {
+      return res.status(404).json({ error: "Document not found" });
+    }
+
+    const objectFile = await objectStorageService.getObjectEntityFile(document.storageKey);
+    const [metadata] = await objectFile.getMetadata();
+
+    res.set({
+      "Content-Type": metadata.contentType || "application/octet-stream",
+      "Content-Disposition": buildContentDisposition("attachment", document.originalName),
+    });
+
+    const stream = objectFile.createReadStream();
+    stream.pipe(res);
+  } catch (error: unknown) {
+    if (error instanceof ObjectNotFoundError) {
+      return res.status(404).json({ error: "File not found in storage" });
+    }
+    logger.error({ err: error }, "Error downloading public document via token");
+    res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
   }
 });
 

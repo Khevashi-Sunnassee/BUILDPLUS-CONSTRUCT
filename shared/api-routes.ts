@@ -623,6 +623,9 @@ export const DOCUMENT_ROUTES = {
   // Send documents via email
   SEND_DOCUMENTS_EMAIL: '/api/documents/send-email',
 
+  // Public document download (token-based, no auth)
+  PUBLIC_DOCUMENT_DOWNLOAD: (token: string) => `/api/public/documents/${token}/download`,
+
   // Drawing Package Processing
   DRAWING_PACKAGE_ANALYZE: '/api/documents/drawing-package/analyze',
   DRAWING_PACKAGE_REGISTER: '/api/documents/drawing-package/register',

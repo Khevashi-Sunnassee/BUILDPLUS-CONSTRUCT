@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
   Mail,
@@ -7,6 +7,8 @@ import {
   Paperclip,
   Archive,
   FileStack,
+  Link2,
+  AlertTriangle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,9 +26,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DOCUMENT_ROUTES } from "@shared/api-routes";
 import type { DocumentWithDetails } from "./types";
 import { formatFileSize } from "./types";
+
+const ATTACHMENT_SIZE_LIMIT = 20 * 1024 * 1024;
 
 interface SendDocumentsEmailDialogProps {
   open: boolean;
@@ -43,12 +54,20 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
   const [message, setMessage] = useState("");
   const [sendCopy, setSendCopy] = useState(false);
   const [combinePdf, setCombinePdf] = useState(false);
+  const [deliveryMethod, setDeliveryMethod] = useState<"attach" | "links">("attach");
 
   const multipleSelected = selectedDocuments.length > 1;
   const pdfCount = selectedDocuments.filter(d =>
     d.mimeType === "application/pdf" || d.originalName?.toLowerCase().endsWith(".pdf")
   ).length;
   const canCombine = pdfCount >= 2;
+
+  const totalBytes = useMemo(() =>
+    selectedDocuments.reduce((sum, d) => sum + (d.fileSize || 0), 0),
+    [selectedDocuments]
+  );
+
+  const exceedsAttachmentLimit = totalBytes > ATTACHMENT_SIZE_LIMIT;
 
   const buildDocumentList = useCallback((docs: DocumentWithDetails[]) => {
     return docs.map((d) => `- ${d.title} (${d.originalName})`).join("\n");
@@ -61,6 +80,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
     setMessage("");
     setSendCopy(false);
     setCombinePdf(false);
+    setDeliveryMethod("attach");
   }, []);
 
   useEffect(() => {
@@ -69,13 +89,33 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
       setCcEmail("");
       setSendCopy(false);
       setCombinePdf(false);
-      setSubject(`Documents - ${selectedDocuments.length} file${selectedDocuments.length > 1 ? "s" : ""} attached`);
+
+      const total = selectedDocuments.reduce((sum, d) => sum + (d.fileSize || 0), 0);
+      const forceLinks = total > ATTACHMENT_SIZE_LIMIT;
+      setDeliveryMethod(forceLinks ? "links" : "attach");
+
+      const methodLabel = forceLinks ? "download links included" : "attached";
+      setSubject(`Documents - ${selectedDocuments.length} file${selectedDocuments.length > 1 ? "s" : ""} ${methodLabel}`);
       setMessage(
-        `Hi,\n\nPlease find attached the documents you requested.\n\n${buildDocumentList(selectedDocuments)}\n\nKind regards`
+        forceLinks
+          ? `Hi,\n\nPlease find download links for the documents you requested below.\n\n${buildDocumentList(selectedDocuments)}\n\nLinks are valid for 7 days.\n\nKind regards`
+          : `Hi,\n\nPlease find attached the documents you requested.\n\n${buildDocumentList(selectedDocuments)}\n\nKind regards`
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
+
+  useEffect(() => {
+    if (!open || selectedDocuments.length === 0) return;
+    const methodLabel = deliveryMethod === "links" ? "download links included" : "attached";
+    setSubject(`Documents - ${selectedDocuments.length} file${selectedDocuments.length > 1 ? "s" : ""} ${methodLabel}`);
+    setMessage(
+      deliveryMethod === "links"
+        ? `Hi,\n\nPlease find download links for the documents you requested below.\n\n${buildDocumentList(selectedDocuments)}\n\nLinks are valid for 7 days.\n\nKind regards`
+        : `Hi,\n\nPlease find attached the documents you requested.\n\n${buildDocumentList(selectedDocuments)}\n\nKind regards`
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deliveryMethod]);
 
   const sendMutation = useMutation({
     mutationFn: async () => {
@@ -86,14 +126,19 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
         message,
         documentIds: selectedDocuments.map((d) => d.id),
         sendCopy,
-        combinePdf: combinePdf && canCombine,
+        combinePdf: deliveryMethod === "attach" && combinePdf && canCombine,
+        sendAsLinks: deliveryMethod === "links",
       });
       return res.json();
     },
     onSuccess: (data: any) => {
-      const zippedNote = data.zipped ? " (sent as zip)" : "";
-      const combinedNote = data.combined ? " (combined into single PDF)" : "";
-      toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} file${data.attachedCount !== 1 ? "s" : ""} attached${combinedNote}${zippedNote})` });
+      if (data.sentAsLinks) {
+        toast({ title: "Email sent", description: `Download links emailed to ${toEmail} (${data.attachedCount} document${data.attachedCount !== 1 ? "s" : ""})` });
+      } else {
+        const zippedNote = data.zipped ? " (sent as zip)" : "";
+        const combinedNote = data.combined ? " (combined into single PDF)" : "";
+        toast({ title: "Email sent", description: `Documents emailed to ${toEmail} (${data.attachedCount} file${data.attachedCount !== 1 ? "s" : ""} attached${combinedNote}${zippedNote})` });
+      }
       onOpenChange(false);
       resetForm();
       onSuccess();
@@ -174,7 +219,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                 id="doc-email-message"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                rows={10}
+                rows={8}
                 className="resize-none text-sm"
                 data-testid="input-doc-email-message"
               />
@@ -183,6 +228,43 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
             <Separator />
 
             <div className="space-y-3">
+              <div className="space-y-2">
+                <Label className="text-sm">Delivery method</Label>
+                <Select
+                  value={deliveryMethod}
+                  onValueChange={(v) => setDeliveryMethod(v as "attach" | "links")}
+                  data-testid="select-delivery-method"
+                >
+                  <SelectTrigger data-testid="select-trigger-delivery-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="attach" disabled={exceedsAttachmentLimit} data-testid="select-item-attach">
+                      <span className="flex items-center gap-1.5">
+                        <Paperclip className="h-3.5 w-3.5" />
+                        Attach files directly
+                        {exceedsAttachmentLimit && <span className="text-xs text-muted-foreground">(exceeds 20MB)</span>}
+                      </span>
+                    </SelectItem>
+                    <SelectItem value="links" data-testid="select-item-links">
+                      <span className="flex items-center gap-1.5">
+                        <Link2 className="h-3.5 w-3.5" />
+                        Send download links
+                      </span>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                {exceedsAttachmentLimit && deliveryMethod === "links" && (
+                  <div className="flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <span>Total size ({formatFileSize(totalBytes)}) exceeds 20MB attachment limit. Download links will be sent instead.</span>
+                  </div>
+                )}
+                {deliveryMethod === "links" && (
+                  <p className="text-xs text-muted-foreground">Links expire after 7 days. Recipients can download files without logging in.</p>
+                )}
+              </div>
+
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="doc-send-copy"
@@ -192,7 +274,7 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                 />
                 <Label htmlFor="doc-send-copy" className="text-sm cursor-pointer">Send myself a copy</Label>
               </div>
-              {canCombine && (
+              {deliveryMethod === "attach" && canCombine && (
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="doc-combine-pdf"
@@ -238,7 +320,8 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                   <div className="text-center space-y-1">
                     <p className="text-lg font-semibold">Document Delivery</p>
                     <p className="text-sm text-muted-foreground">
-                      {selectedDocuments.length} document{selectedDocuments.length !== 1 ? "s" : ""} attached
+                      {selectedDocuments.length} document{selectedDocuments.length !== 1 ? "s" : ""}
+                      {deliveryMethod === "links" ? " — download links" : " attached"}
                     </p>
                   </div>
                   <Separator />
@@ -248,9 +331,10 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                   <Separator />
                   <div className="space-y-2">
                     <div className="flex items-center justify-between flex-wrap gap-1">
-                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
-                      {(() => {
-                        const totalBytes = selectedDocuments.reduce((sum, d) => sum + (d.fileSize || 0), 0);
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                        {deliveryMethod === "links" ? "Download Links" : "Attachments"}
+                      </p>
+                      {deliveryMethod === "attach" && (() => {
                         const willZip = !combinePdf && totalBytes > 5 * 1024 * 1024;
                         return (
                           <div className="flex items-center gap-1.5" data-testid="text-total-attachment-size">
@@ -263,8 +347,13 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                           </div>
                         );
                       })()}
+                      {deliveryMethod === "links" && (
+                        <p className="text-xs text-muted-foreground" data-testid="text-links-expiry">
+                          Expires in 7 days
+                        </p>
+                      )}
                     </div>
-                    {combinePdf && canCombine ? (
+                    {deliveryMethod === "attach" && combinePdf && canCombine ? (
                       <div className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid="email-attachment-combined">
                         <FileStack className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                         <div className="flex-1 min-w-0">
@@ -275,11 +364,18 @@ export function SendDocumentsEmailDialog({ open, onOpenChange, selectedDocuments
                     ) : (
                       selectedDocuments.map((doc) => (
                         <div key={doc.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-attachment-${doc.id}`}>
-                          <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          {deliveryMethod === "links" ? (
+                            <Link2 className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                          ) : (
+                            <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          )}
                           <div className="flex-1 min-w-0">
                             <p className="truncate font-medium">{doc.title}</p>
                             <p className="text-xs text-muted-foreground truncate">{doc.originalName} ({formatFileSize(doc.fileSize)})</p>
                           </div>
+                          {deliveryMethod === "links" && (
+                            <span className="text-xs text-blue-500 flex-shrink-0">Download</span>
+                          )}
                         </div>
                       ))
                     )}
