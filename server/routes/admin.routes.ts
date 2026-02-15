@@ -3,7 +3,7 @@ import { storage, db } from "../storage";
 import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { 
   insertWorkTypeSchema, insertDeviceSchema,
-  users, jobs, productionSlots, panelRegister, draftingProgram, dailyLogs, logRows, productionEntries, 
+  users, jobs, productionSlots, panelRegister, panelAuditLogs, draftingProgram, dailyLogs, logRows, timerSessions, timerEvents, productionEntries, 
   weeklyWageReports, weeklyJobReports, weeklyJobReportSchedules,
   loadLists, loadListPanels, purchaseOrders, purchaseOrderItems, purchaseOrderAttachments, 
   suppliers, items, itemCategories,
@@ -580,7 +580,15 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
         if (companyUserIds.length > 0) {
           const companyLogIds = (await tx.select({ id: dailyLogs.id }).from(dailyLogs).where(inArray(dailyLogs.userId, companyUserIds))).map(r => r.id);
           if (companyLogIds.length > 0) {
-            await tx.delete(approvalEvents).where(inArray(approvalEvents.logId, companyLogIds));
+            await tx.delete(approvalEvents).where(inArray(approvalEvents.dailyLogId, companyLogIds));
+            const companyLogRowIds = (await tx.select({ id: logRows.id }).from(logRows).where(inArray(logRows.dailyLogId, companyLogIds))).map(r => r.id);
+            if (companyLogRowIds.length > 0) {
+              const companyTimerSessionIds = (await tx.select({ id: timerSessions.id }).from(timerSessions).where(inArray(timerSessions.logRowId, companyLogRowIds))).map(r => r.id);
+              if (companyTimerSessionIds.length > 0) {
+                await tx.delete(timerEvents).where(inArray(timerEvents.timerSessionId, companyTimerSessionIds));
+              }
+              await tx.delete(timerSessions).where(inArray(timerSessions.logRowId, companyLogRowIds));
+            }
             await tx.delete(logRows).where(inArray(logRows.dailyLogId, companyLogIds));
             const result = await tx.delete(dailyLogs).where(inArray(dailyLogs.id, companyLogIds));
             deletedCounts.daily_logs = result.rowCount || 0;
@@ -600,10 +608,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
       if (selected.has("purchase_orders")) {
         const companyPOIds = (await tx.select({ id: purchaseOrders.id }).from(purchaseOrders).where(eq(purchaseOrders.companyId, delCompanyId))).map(r => r.id);
         if (companyPOIds.length > 0) {
-          const companyPOItemIds = (await tx.select({ id: purchaseOrderItems.id }).from(purchaseOrderItems).where(inArray(purchaseOrderItems.purchaseOrderId, companyPOIds))).map(r => r.id);
-          if (companyPOItemIds.length > 0) {
-            await tx.delete(purchaseOrderAttachments).where(inArray(purchaseOrderAttachments.purchaseOrderItemId, companyPOItemIds));
-          }
+          await tx.delete(purchaseOrderAttachments).where(inArray(purchaseOrderAttachments.purchaseOrderId, companyPOIds));
           await tx.delete(purchaseOrderItems).where(inArray(purchaseOrderItems.purchaseOrderId, companyPOIds));
         }
         const result = await tx.delete(purchaseOrders).where(eq(purchaseOrders.companyId, delCompanyId));
@@ -656,7 +661,10 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
           if (companyPanelIds.length > 0) {
             await tx.update(conversations).set({ panelId: null }).where(and(eq(conversations.companyId, delCompanyId), isNotNull(conversations.panelId)));
             await tx.update(logRows).set({ panelRegisterId: null }).where(inArray(logRows.panelRegisterId, companyPanelIds));
+            await tx.delete(panelAuditLogs).where(inArray(panelAuditLogs.panelId, companyPanelIds));
             await tx.delete(productionEntries).where(inArray(productionEntries.panelId, companyPanelIds));
+            await tx.delete(loadListPanels).where(inArray(loadListPanels.panelId, companyPanelIds));
+            await tx.delete(progressClaimItems).where(inArray(progressClaimItems.panelId, companyPanelIds));
             const result = await tx.delete(panelRegister).where(inArray(panelRegister.id, companyPanelIds));
             deletedCounts.panels = result.rowCount || 0;
           } else {
@@ -673,7 +681,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
           const companySlotIds = (await tx.select({ id: productionSlots.id }).from(productionSlots).where(inArray(productionSlots.jobId, companyJobIds))).map(r => r.id);
           if (companySlotIds.length > 0) {
             await tx.update(draftingProgram).set({ productionSlotId: null }).where(inArray(draftingProgram.productionSlotId, companySlotIds));
-            await tx.delete(productionSlotAdjustments).where(inArray(productionSlotAdjustments.slotId, companySlotIds));
+            await tx.delete(productionSlotAdjustments).where(inArray(productionSlotAdjustments.productionSlotId, companySlotIds));
             const result = await tx.delete(productionSlots).where(inArray(productionSlots.id, companySlotIds));
             deletedCounts.production_slots = result.rowCount || 0;
           } else {
@@ -700,11 +708,42 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
           if (reportIdsToDelete.length > 0) {
             await tx.delete(weeklyJobReports).where(inArray(weeklyJobReports.id, reportIdsToDelete));
           }
-          await tx.delete(productionDays).where(inArray(productionDays.jobId, companyJobIds));
+          const companyUserIdsForPD = (await tx.select({ id: users.id }).from(users).where(eq(users.companyId, delCompanyId))).map(r => r.id);
+          if (companyUserIdsForPD.length > 0) {
+            await tx.delete(productionDays).where(inArray(productionDays.createdById, companyUserIdsForPD));
+          }
           await tx.delete(jobPanelRates).where(inArray(jobPanelRates.jobId, companyJobIds));
           await tx.delete(mappingRules).where(inArray(mappingRules.jobId, companyJobIds));
           await tx.delete(jobLevelCycleTimes).where(inArray(jobLevelCycleTimes.jobId, companyJobIds));
           await tx.update(logRows).set({ jobId: null }).where(inArray(logRows.jobId, companyJobIds));
+          await tx.update(timerSessions).set({ jobId: null }).where(inArray(timerSessions.jobId, companyJobIds));
+          await tx.delete(productionEntries).where(inArray(productionEntries.jobId, companyJobIds));
+          const companyPanelIdsForJobs = (await tx.select({ id: panelRegister.id }).from(panelRegister).where(inArray(panelRegister.jobId, companyJobIds))).map(r => r.id);
+          if (companyPanelIdsForJobs.length > 0) {
+            await tx.delete(panelAuditLogs).where(inArray(panelAuditLogs.panelId, companyPanelIdsForJobs));
+            await tx.delete(loadListPanels).where(inArray(loadListPanels.panelId, companyPanelIdsForJobs));
+            await tx.delete(progressClaimItems).where(inArray(progressClaimItems.panelId, companyPanelIdsForJobs));
+            await tx.update(logRows).set({ panelRegisterId: null }).where(inArray(logRows.panelRegisterId, companyPanelIdsForJobs));
+            await tx.delete(panelRegister).where(inArray(panelRegister.id, companyPanelIdsForJobs));
+          }
+          await tx.delete(draftingProgram).where(inArray(draftingProgram.jobId, companyJobIds));
+          const companyLLIdsForJobs = (await tx.select({ id: loadLists.id }).from(loadLists).where(inArray(loadLists.jobId, companyJobIds))).map(r => r.id);
+          if (companyLLIdsForJobs.length > 0) {
+            await tx.delete(deliveryRecords).where(inArray(deliveryRecords.loadListId, companyLLIdsForJobs));
+            await tx.delete(loadListPanels).where(inArray(loadListPanels.loadListId, companyLLIdsForJobs));
+            await tx.delete(loadLists).where(inArray(loadLists.id, companyLLIdsForJobs));
+          }
+          const companyClaimIdsForJobs = (await tx.select({ id: progressClaims.id }).from(progressClaims).where(inArray(progressClaims.jobId, companyJobIds))).map(r => r.id);
+          if (companyClaimIdsForJobs.length > 0) {
+            await tx.delete(progressClaimItems).where(inArray(progressClaimItems.progressClaimId, companyClaimIdsForJobs));
+            await tx.delete(progressClaims).where(inArray(progressClaims.id, companyClaimIdsForJobs));
+          }
+          const companySlotIdsForJobs = (await tx.select({ id: productionSlots.id }).from(productionSlots).where(inArray(productionSlots.jobId, companyJobIds))).map(r => r.id);
+          if (companySlotIdsForJobs.length > 0) {
+            await tx.update(draftingProgram).set({ productionSlotId: null }).where(inArray(draftingProgram.productionSlotId, companySlotIdsForJobs));
+            await tx.delete(productionSlotAdjustments).where(inArray(productionSlotAdjustments.productionSlotId, companySlotIdsForJobs));
+            await tx.delete(productionSlots).where(inArray(productionSlots.id, companySlotIdsForJobs));
+          }
         }
         const result = await tx.delete(jobs).where(eq(jobs.companyId, delCompanyId));
         deletedCounts.jobs = result.rowCount || 0;
