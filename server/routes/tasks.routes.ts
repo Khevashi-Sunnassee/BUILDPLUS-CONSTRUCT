@@ -559,7 +559,7 @@ router.post("/api/tasks/:id/email-drop", requireAuth, requirePermission("tasks",
       userId,
       "COMMENT",
       `Email dropped on "${task.title || "Task"}"`,
-      `${fromName} shared: ${emailSubject}`,
+      `${fromName} shared: ${parsed.subject}`,
       update.id
     );
 
