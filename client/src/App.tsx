@@ -108,6 +108,7 @@ const RetentionReportPage = lazyWithRetry(() => import("@/pages/retention-report
 const AdminJobTypesPage = lazyWithRetry(() => import("@/pages/admin/job-types"));
 const AdminCostCodesPage = lazyWithRetry(() => import("@/pages/admin/cost-codes"));
 const TenderCenterPage = lazyWithRetry(() => import("@/pages/tender-center"));
+const TenderDetailPage = lazyWithRetry(() => import("@/pages/tender-detail"));
 const ScopeOfWorksPage = lazyWithRetry(() => import("@/pages/scope-of-works"));
 const JobBudgetPage = lazyWithRetry(() => import("@/pages/job-budget"));
 const JobTendersPage = lazyWithRetry(() => import("@/pages/job-tenders"));
@@ -439,6 +440,14 @@ function Router() {
         <ProtectedRoute>
           <AuthenticatedLayout>
             <TenderCenterPage />
+          </AuthenticatedLayout>
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/tenders/:id">
+        <ProtectedRoute>
+          <AuthenticatedLayout>
+            <TenderDetailPage />
           </AuthenticatedLayout>
         </ProtectedRoute>
       </Route>
