@@ -26,6 +26,7 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Communication:** Teams-style chat with DMs, groups, channels, @mentions, notifications, and file attachments.
 - **Sales & Document Management:** Mobile-first pre-sales opportunity management; document management with version control, bundles, entity linking, bulk upload, and AI metadata extraction.
 - **Mobile Functionality:** QR scanner for panels and document bundles, mobile panel checklists with conditional fields, and mobile PM Call Logs.
+- **Address Autocomplete:** Australian suburb/postcode/state lookup across all address forms (customers, suppliers, employees, jobs, factories, mobile opportunities) using a built-in dataset via `SuburbLookup` component and `/api/address-lookup` endpoint.
 - **Advanced Features:** Panel consolidation, contract retention tracking, visual document comparison, and a comprehensive Asset Register with lifecycle management.
 - **Hire Booking Engine:** Equipment hire management with approval workflows for internal and external assets.
 - **Project Activities / Workflow System:** Template-driven activity workflow system for job types, with nested tasks, statuses, comments, and MS Project-style dependencies.
