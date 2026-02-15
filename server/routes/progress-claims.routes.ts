@@ -87,6 +87,57 @@ async function calculateRetention(
   };
 }
 
+async function getPreviouslyClaimedPercents(
+  companyId: string,
+  jobId: string,
+  excludeClaimId?: string
+): Promise<Map<string, number>> {
+  let conditions = [
+    eq(progressClaims.jobId, jobId),
+    eq(progressClaims.companyId, companyId),
+    inArray(progressClaims.status, ["APPROVED"]),
+  ];
+  if (excludeClaimId) {
+    conditions.push(sql`${progressClaims.id} != ${excludeClaimId}`);
+  }
+
+  const items = await db
+    .select({
+      panelId: progressClaimItems.panelId,
+      percentComplete: progressClaimItems.percentComplete,
+    })
+    .from(progressClaimItems)
+    .innerJoin(progressClaims, eq(progressClaimItems.progressClaimId, progressClaims.id))
+    .where(and(...conditions));
+
+  const map = new Map<string, number>();
+  for (const item of items) {
+    const prev = map.get(item.panelId) || 0;
+    map.set(item.panelId, prev + safeParseFinancial(item.percentComplete, 0));
+  }
+  return map;
+}
+
+function validateClaimItemsPercent(
+  claimItems: Array<Record<string, unknown>>,
+  previousPercents: Map<string, number>
+): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+  for (const item of claimItems) {
+    const panelId = item.panelId as string;
+    const pct = safeParseFinancial(item.percentComplete, 0);
+    if (pct <= 0) continue;
+    const prevPct = previousPercents.get(panelId) || 0;
+    const totalPct = prevPct + pct;
+    if (totalPct > 100.005) {
+      errors.push(
+        `Panel ${item.panelMark}: claiming ${pct}% but ${prevPct}% already claimed (total ${totalPct.toFixed(1)}% exceeds 100%)`
+      );
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
+
 router.get("/api/progress-claims", requireAuth, async (req: Request, res: Response) => {
   try {
     const companyId = req.session.companyId!;
@@ -441,17 +492,35 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
     const panelTypeMap = new Map(allPanelTypes.map(pt => [pt.code, pt]));
     const jobRateMap = new Map(allJobRates.map(jr => [jr.panelTypeId, jr]));
 
-    const alreadyClaimedPanelIds = await db
-      .select({ panelId: progressClaimItems.panelId })
+    const excludeClaimId = req.query.excludeClaimId as string | undefined;
+
+    let claimConditions = [
+      eq(progressClaims.jobId, jobId),
+      eq(progressClaims.companyId, companyId),
+      inArray(progressClaims.status, ["APPROVED"]),
+    ];
+    if (excludeClaimId) {
+      claimConditions.push(sql`${progressClaims.id} != ${excludeClaimId}`);
+    }
+
+    const previousClaimItems = await db
+      .select({
+        panelId: progressClaimItems.panelId,
+        percentComplete: progressClaimItems.percentComplete,
+        lineTotal: progressClaimItems.lineTotal,
+      })
       .from(progressClaimItems)
       .innerJoin(progressClaims, eq(progressClaimItems.progressClaimId, progressClaims.id))
-      .where(and(
-        eq(progressClaims.jobId, jobId),
-        eq(progressClaims.companyId, companyId),
-        inArray(progressClaims.status, ["APPROVED"]),
-      ));
+      .where(and(...claimConditions));
 
-    const claimedSet = new Set(alreadyClaimedPanelIds.map(r => r.panelId));
+    const claimedPercentByPanel = new Map<string, number>();
+    const claimedAmountByPanel = new Map<string, number>();
+    for (const item of previousClaimItems) {
+      const prev = claimedPercentByPanel.get(item.panelId) || 0;
+      claimedPercentByPanel.set(item.panelId, prev + safeParseFinancial(item.percentComplete, 0));
+      const prevAmt = claimedAmountByPanel.get(item.panelId) || 0;
+      claimedAmountByPanel.set(item.panelId, prevAmt + safeParseFinancial(item.lineTotal, 0));
+    }
 
     const panelsWithRevenue = panels.map(panel => {
       const pt = panelTypeMap.get(panel.panelType);
@@ -470,9 +539,12 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
         revenue = sellRateM3 * volume;
       }
 
-      const isClaimed = panel.lifecycleStatus === PANEL_LIFECYCLE_STATUS.CLAIMED || claimedSet.has(panel.id);
+      const previouslyClaimedPercent = claimedPercentByPanel.get(panel.id) || 0;
+      const previouslyClaimedAmount = claimedAmountByPanel.get(panel.id) || 0;
+      const remainingClaimablePercent = Math.max(0, 100 - previouslyClaimedPercent);
+      const isClaimed = panel.lifecycleStatus === PANEL_LIFECYCLE_STATUS.CLAIMED || previouslyClaimedPercent >= 100;
       const hasReachedPhase = panel.lifecycleStatus >= claimableAtPhase;
-      const autoPercent = hasReachedPhase && !isClaimed ? 100 : 0;
+      const autoPercent = hasReachedPhase && !isClaimed ? remainingClaimablePercent : 0;
 
       return {
         ...panel,
@@ -480,6 +552,9 @@ router.get("/api/progress-claims/job/:jobId/claimable-panels", requireAuth, asyn
         isClaimed,
         hasReachedPhase,
         autoPercent,
+        previouslyClaimedPercent: parseFloat(previouslyClaimedPercent.toFixed(2)),
+        previouslyClaimedAmount: previouslyClaimedAmount.toFixed(2),
+        remainingClaimablePercent: parseFloat(remainingClaimablePercent.toFixed(2)),
         claimableAtPhase,
       };
     });
@@ -554,6 +629,17 @@ router.post("/api/progress-claims", requireAuth, async (req: Request, res: Respo
     const companyId = req.session.companyId!;
     const userId = req.session.userId!;
     const { items: claimItems, ...claimData } = req.body;
+
+    if (claimItems && claimItems.length > 0) {
+      const previousPercents = await getPreviouslyClaimedPercents(companyId, claimData.jobId);
+      const validation = validateClaimItemsPercent(claimItems, previousPercents);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: "Claim exceeds previously claimed amounts",
+          details: validation.errors,
+        });
+      }
+    }
 
     const result = await db
       .select({ cnt: count() })
@@ -645,6 +731,17 @@ router.patch("/api/progress-claims/:id", requireAuth, async (req: Request, res: 
     if (claim.status !== "DRAFT") return res.status(400).json({ error: "Only draft claims can be edited" });
 
     const { items: claimItems, version: clientVersion, ...claimData } = req.body;
+
+    if (claimItems !== undefined && claimItems.length > 0) {
+      const previousPercents = await getPreviouslyClaimedPercents(companyId, claim.jobId, claim.id);
+      const validation = validateClaimItemsPercent(claimItems, previousPercents);
+      if (!validation.valid) {
+        return res.status(400).json({
+          error: "Claim exceeds previously claimed amounts",
+          details: validation.errors,
+        });
+      }
+    }
 
     if (claimItems !== undefined) {
       const validItems = (claimItems || []).filter((item: Record<string, unknown>) => safeParseFinancial(item.percentComplete, 0) > 0);
@@ -763,6 +860,8 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
     if (!claim) return res.status(404).json({ error: "Progress claim not found" });
     if (claim.status !== "SUBMITTED") return res.status(400).json({ error: "Only submitted claims can be approved" });
 
+    const previousPercents = await getPreviouslyClaimedPercents(companyId, claim.jobId, claim.id);
+
     const updated = await db.transaction(async (tx) => {
       const [approvedClaim] = await tx.update(progressClaims)
         .set({
@@ -778,7 +877,11 @@ router.post("/api/progress-claims/:id/approve", requireAuth, async (req: Request
         .where(eq(progressClaimItems.progressClaimId, claim.id));
 
       const fullClaimPanelIds = items
-        .filter(item => safeParseFinancial(item.percentComplete, 0) >= 100)
+        .filter(item => {
+          const thisPercent = safeParseFinancial(item.percentComplete, 0);
+          const prevPercent = previousPercents.get(item.panelId) || 0;
+          return (prevPercent + thisPercent) >= 99.995;
+        })
         .map(item => item.panelId);
 
       if (fullClaimPanelIds.length > 0) {

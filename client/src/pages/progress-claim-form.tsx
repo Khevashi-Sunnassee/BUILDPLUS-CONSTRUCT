@@ -50,6 +50,9 @@ interface ClaimablePanel {
   isClaimed: boolean;
   hasReachedPhase: boolean;
   autoPercent: number;
+  previouslyClaimedPercent: number;
+  previouslyClaimedAmount: string;
+  remainingClaimablePercent: number;
   claimableAtPhase: number;
 }
 
@@ -62,6 +65,8 @@ interface ClaimItemState {
   lineTotal: number;
   lifecycleStatus: number;
   isClaimed: boolean;
+  previouslyClaimedPercent: number;
+  remainingClaimablePercent: number;
 }
 
 interface Job {
@@ -212,6 +217,8 @@ export default function ProgressClaimFormPage() {
               lineTotal: rev * pct / 100,
               lifecycleStatus: panel.lifecycleStatus,
               isClaimed: panel.isClaimed,
+              previouslyClaimedPercent: panel.previouslyClaimedPercent || 0,
+              remainingClaimablePercent: panel.remainingClaimablePercent ?? 100,
             };
           }
           return {
@@ -223,6 +230,8 @@ export default function ProgressClaimFormPage() {
             lineTotal: parseFloat(panel.revenue || "0") * panel.autoPercent / 100,
             lifecycleStatus: panel.lifecycleStatus,
             isClaimed: panel.isClaimed,
+            previouslyClaimedPercent: panel.previouslyClaimedPercent || 0,
+            remainingClaimablePercent: panel.remainingClaimablePercent ?? 100,
           };
         });
         setClaimItems(items);
@@ -237,6 +246,8 @@ export default function ProgressClaimFormPage() {
           lineTotal: parseFloat(panel.revenue || "0") * panel.autoPercent / 100,
           lifecycleStatus: panel.lifecycleStatus,
           isClaimed: panel.isClaimed,
+          previouslyClaimedPercent: panel.previouslyClaimedPercent || 0,
+          remainingClaimablePercent: panel.remainingClaimablePercent ?? 100,
         }));
         setClaimItems(items);
         setInitialized(true);
@@ -247,7 +258,8 @@ export default function ProgressClaimFormPage() {
   const updatePercent = useCallback((panelId: string, pct: number) => {
     setClaimItems(prev => prev.map(item => {
       if (item.panelId === panelId) {
-        const clamped = Math.max(0, Math.min(100, pct));
+        const maxAllowed = item.remainingClaimablePercent;
+        const clamped = Math.max(0, Math.min(maxAllowed, pct));
         return { ...item, percentComplete: clamped, lineTotal: item.panelRevenue * clamped / 100 };
       }
       return item;
@@ -647,12 +659,16 @@ export default function ProgressClaimFormPage() {
                                   <TableHead className="w-[120px]">Panel</TableHead>
                                   <TableHead>Phase</TableHead>
                                   <TableHead className="text-right w-[120px]">Revenue</TableHead>
-                                  <TableHead className="text-right w-[100px]">% Claimed</TableHead>
-                                  <TableHead className="text-right w-[120px]">Claim Amount</TableHead>
+                                  <TableHead className="text-right w-[80px]">Prev %</TableHead>
+                                  <TableHead className="text-right w-[100px]">This Claim %</TableHead>
+                                  <TableHead className="text-right w-[80px]">Total %</TableHead>
+                                  <TableHead className="text-right w-[120px]">This Claim $</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {items.map((item) => (
+                                {items.map((item) => {
+                                  const totalPercent = item.previouslyClaimedPercent + item.percentComplete;
+                                  return (
                                   <TableRow
                                     key={item.panelId}
                                     className={item.isClaimed ? "opacity-50" : ""}
@@ -667,12 +683,15 @@ export default function ProgressClaimFormPage() {
                                     <TableCell className="text-right font-mono text-sm">
                                       {formatCurrency(item.panelRevenue)}
                                     </TableCell>
+                                    <TableCell className="text-right font-mono text-sm text-muted-foreground" data-testid={`text-prev-percent-${item.panelId}`}>
+                                      {item.previouslyClaimedPercent > 0 ? `${item.previouslyClaimedPercent}%` : "-"}
+                                    </TableCell>
                                     <TableCell className="text-right">
                                       {isDraftMode && !item.isClaimed ? (
                                         <Input
                                           type="number"
                                           min={0}
-                                          max={100}
+                                          max={item.remainingClaimablePercent}
                                           step={1}
                                           className="w-[80px] text-right ml-auto"
                                           value={item.percentComplete}
@@ -685,11 +704,15 @@ export default function ProgressClaimFormPage() {
                                         </span>
                                       )}
                                     </TableCell>
+                                    <TableCell className="text-right font-mono text-sm" data-testid={`text-total-percent-${item.panelId}`}>
+                                      {totalPercent > 0 ? `${totalPercent}%` : "-"}
+                                    </TableCell>
                                     <TableCell className="text-right font-mono font-medium" data-testid={`text-line-total-${item.panelId}`}>
                                       {formatCurrency(item.lineTotal)}
                                     </TableCell>
                                   </TableRow>
-                                ))}
+                                  );
+                                })}
                               </TableBody>
                             </Table>
                           </div>
