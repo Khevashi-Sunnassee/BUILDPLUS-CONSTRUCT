@@ -199,6 +199,28 @@ export default function TasksPage() {
     },
   });
 
+  const reorderGroupsMutation = useMutation({
+    mutationFn: async ({ groupIds }: { groupIds: string[] }) => {
+      return apiRequest("POST", TASKS_ROUTES.GROUPS_REORDER, { groupIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TASKS_ROUTES.GROUPS] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error reordering groups", description: error.message });
+    },
+  });
+
+  const handleMoveGroup = useCallback((groupId: string, direction: 'up' | 'down') => {
+    const currentIndex = groups.findIndex(g => g.id === groupId);
+    if (currentIndex === -1) return;
+    const targetIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= groups.length) return;
+    const newOrder = groups.map(g => g.id);
+    [newOrder[currentIndex], newOrder[targetIndex]] = [newOrder[targetIndex], newOrder[currentIndex]];
+    reorderGroupsMutation.mutate({ groupIds: newOrder });
+  }, [groups, reorderGroupsMutation]);
+
   const createGroupMutation = useMutation({
     mutationFn: async (name: string) => {
       return apiRequest("POST", TASKS_ROUTES.GROUPS, { name });
@@ -462,7 +484,7 @@ export default function TasksPage() {
   };
 
   const findTaskById = (id: string): { task: Task; groupId: string } | null => {
-    for (const group of filteredGroups) {
+    for (const group of groups) {
       const task = group.tasks.find(t => t.id === id);
       if (task) return { task, groupId: group.id };
     }
@@ -470,7 +492,7 @@ export default function TasksPage() {
   };
 
   const findGroupContainingTask = (taskId: string): string | null => {
-    for (const group of filteredGroups) {
+    for (const group of groups) {
       if (group.tasks.some(t => t.id === taskId)) {
         return group.id;
       }
@@ -530,7 +552,7 @@ export default function TasksPage() {
     
     if (overId.startsWith("group-droppable-")) {
       const targetGroupId = overId.replace("group-droppable-", "");
-      const targetGroup = filteredGroups.find(g => g.id === targetGroupId);
+      const targetGroup = groups.find(g => g.id === targetGroupId);
       if (targetGroup && activeTaskInfo.groupId !== targetGroupId) {
         moveTaskMutation.mutate({
           taskId: active.id as string,
@@ -541,7 +563,7 @@ export default function TasksPage() {
       return;
     }
 
-    const overGroup = filteredGroups.find(g => g.id === overId);
+    const overGroup = groups.find(g => g.id === overId);
     if (overGroup) {
       if (activeTaskInfo.groupId !== overId) {
         moveTaskMutation.mutate({
@@ -556,7 +578,7 @@ export default function TasksPage() {
     const overTaskInfo = findTaskById(overId);
     if (overTaskInfo) {
       if (activeTaskInfo.groupId === overTaskInfo.groupId) {
-        const group = filteredGroups.find(g => g.id === activeTaskInfo.groupId);
+        const group = groups.find(g => g.id === activeTaskInfo.groupId);
         if (group) {
           const taskIds = group.tasks.map(t => t.id);
           const oldIndex = taskIds.indexOf(active.id as string);
@@ -569,7 +591,7 @@ export default function TasksPage() {
           }
         }
       } else {
-        const overGroupTasks = filteredGroups.find(g => g.id === overTaskInfo.groupId)?.tasks || [];
+        const overGroupTasks = groups.find(g => g.id === overTaskInfo.groupId)?.tasks || [];
         const targetIndex = overGroupTasks.findIndex(t => t.id === overId);
         moveTaskMutation.mutate({
           taskId: active.id as string,
@@ -780,7 +802,7 @@ export default function TasksPage() {
           </div>
         ) : (
           <div className="border rounded-lg overflow-hidden bg-card">
-            {filteredGroups.map((group) => (
+            {filteredGroups.map((group, index) => (
               <TaskGroupComponent
                 key={group.id}
                 group={group}
@@ -794,6 +816,9 @@ export default function TasksPage() {
                 isDropTarget={overGroupId === group.id}
                 collapseAllVersion={collapseAllVersion}
                 expandAllVersion={expandAllVersion}
+                onMoveGroup={handleMoveGroup}
+                groupIndex={groups.findIndex(g => g.id === group.id)}
+                totalGroups={groups.length}
               />
             ))}
           </div>

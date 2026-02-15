@@ -87,6 +87,9 @@ export function TaskGroupComponent({
   isDropTarget,
   collapseAllVersion,
   expandAllVersion,
+  onMoveGroup,
+  groupIndex,
+  totalGroups,
 }: {
   group: TaskGroup;
   users: User[];
@@ -99,6 +102,9 @@ export function TaskGroupComponent({
   isDropTarget?: boolean;
   collapseAllVersion?: number;
   expandAllVersion?: number;
+  onMoveGroup?: (groupId: string, direction: 'up' | 'down') => void;
+  groupIndex?: number;
+  totalGroups?: number;
 }) {
   const { toast } = useToast();
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
@@ -461,6 +467,22 @@ export function TaskGroupComponent({
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => setIsEditingName(true)} data-testid={`menu-rename-group-${group.id}`}>
               Rename group
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={groupIndex === 0}
+              onClick={() => onMoveGroup?.(group.id, 'up')}
+              data-testid={`menu-move-up-group-${group.id}`}
+            >
+              <ArrowUp className="h-4 w-4 mr-2" />
+              Move Up
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={totalGroups !== undefined && groupIndex === totalGroups - 1}
+              onClick={() => onMoveGroup?.(group.id, 'down')}
+              data-testid={`menu-move-down-group-${group.id}`}
+            >
+              <ArrowDown className="h-4 w-4 mr-2" />
+              Move Down
             </DropdownMenuItem>
             <DropdownMenuSub>
               <DropdownMenuSubTrigger data-testid={`menu-color-group-${group.id}`}>
