@@ -11,7 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronDown,
   ChevronRight,
@@ -26,6 +27,7 @@ import {
   Palette,
   Check,
   Users,
+  GripVertical,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -90,6 +92,7 @@ export function TaskGroupComponent({
   onMoveGroup,
   groupIndex,
   totalGroups,
+  sortableGroupId,
 }: {
   group: TaskGroup;
   users: User[];
@@ -105,12 +108,21 @@ export function TaskGroupComponent({
   onMoveGroup?: (groupId: string, direction: 'up' | 'down') => void;
   groupIndex?: number;
   totalGroups?: number;
+  sortableGroupId?: string;
 }) {
   const { toast } = useToast();
   const { setNodeRef: setDroppableRef, isOver } = useDroppable({
     id: `group-droppable-${group.id}`,
     data: { type: "group", groupId: group.id },
   });
+  const {
+    attributes: sortableAttributes,
+    listeners: sortableListeners,
+    setNodeRef: setSortableRef,
+    transform: sortableTransform,
+    transition: sortableTransition,
+    isDragging: isSortableDragging,
+  } = useSortable({ id: sortableGroupId || group.id });
   const [isCollapsed, setIsCollapsed] = useState(group.isCollapsed);
 
   useEffect(() => {
@@ -301,16 +313,35 @@ export function TaskGroupComponent({
     setIsEditingName(false);
   };
 
+  const combinedRef = useCallback((node: HTMLDivElement | null) => {
+    setDroppableRef(node);
+    setSortableRef(node);
+  }, [setDroppableRef, setSortableRef]);
+
+  const sortableStyle = {
+    transform: CSS.Transform.toString(sortableTransform),
+    transition: sortableTransition,
+  };
+
   return (
     <div
-      ref={setDroppableRef}
-      className={cn("mb-6 transition-all duration-150", isDropTarget && "ring-2 ring-primary/50 rounded-lg")}
+      ref={combinedRef}
+      className={cn("mb-6 transition-all duration-150", isDropTarget && "ring-2 ring-primary/50 rounded-lg", isSortableDragging && "opacity-50")}
+      style={sortableStyle}
       data-testid={`task-group-${group.id}`}
     >
       <div
         className="flex items-center gap-2 py-2 px-2 rounded-t-lg"
         style={{ backgroundColor: `${group.color}20`, borderLeft: `4px solid ${group.color}` }}
       >
+        <div
+          className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+          {...sortableAttributes}
+          {...sortableListeners}
+          data-testid={`drag-handle-group-${group.id}`}
+        >
+          <GripVertical className="h-4 w-4" />
+        </div>
         <Button
           variant="ghost"
           size="icon"

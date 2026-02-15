@@ -23,6 +23,7 @@ import {
   pointerWithin,
   CollisionDetection,
 } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import {
   Plus,
   Briefcase,
@@ -53,6 +54,7 @@ export default function TasksPage() {
   const [showCompleted, setShowCompleted] = useState(false);
   const [dueDateFilter, setDueDateFilter] = useState<string>("all");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeGroupDragId, setActiveGroupDragId] = useState<string | null>(null);
   const [overGroupId, setOverGroupId] = useState<string | null>(null);
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
@@ -500,8 +502,17 @@ export default function TasksPage() {
     return null;
   };
 
+  const GROUP_SORTABLE_PREFIX = "sortable-group-";
+
   const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
+    const id = event.active.id as string;
+    if (id.startsWith(GROUP_SORTABLE_PREFIX)) {
+      setActiveGroupDragId(id.replace(GROUP_SORTABLE_PREFIX, ""));
+      setActiveId(null);
+    } else {
+      setActiveId(id);
+      setActiveGroupDragId(null);
+    }
     setOverGroupId(null);
   };
 
@@ -509,6 +520,10 @@ export default function TasksPage() {
     const { active, over } = event;
     if (!over) {
       setOverGroupId(null);
+      return;
+    }
+
+    if ((active.id as string).startsWith(GROUP_SORTABLE_PREFIX)) {
       return;
     }
 
@@ -541,9 +556,27 @@ export default function TasksPage() {
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setActiveGroupDragId(null);
     setOverGroupId(null);
 
     if (!over) return;
+
+    const activeIdStr = active.id as string;
+    const overIdStr = over.id as string;
+
+    if (activeIdStr.startsWith(GROUP_SORTABLE_PREFIX) && overIdStr.startsWith(GROUP_SORTABLE_PREFIX)) {
+      const activeGroupId = activeIdStr.replace(GROUP_SORTABLE_PREFIX, "");
+      const overGroupId = overIdStr.replace(GROUP_SORTABLE_PREFIX, "");
+      if (activeGroupId !== overGroupId) {
+        const oldIndex = groups.findIndex(g => g.id === activeGroupId);
+        const newIndex = groups.findIndex(g => g.id === overGroupId);
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const newOrder = arrayMove(groups.map(g => g.id), oldIndex, newIndex);
+          reorderGroupsMutation.mutate({ groupIds: newOrder });
+        }
+      }
+      return;
+    }
 
     const activeTaskInfo = findTaskById(active.id as string);
     if (!activeTaskInfo) return;
@@ -603,6 +636,7 @@ export default function TasksPage() {
   };
 
   const activeTask = activeId ? findTaskById(activeId)?.task : null;
+  const activeGroupDrag = activeGroupDragId ? groups.find(g => g.id === activeGroupDragId) : null;
 
   if (isLoading) {
     return (
@@ -801,33 +835,45 @@ export default function TasksPage() {
             </div>
           </div>
         ) : (
-          <div className="border rounded-lg overflow-hidden bg-card">
-            {filteredGroups.map((group, index) => (
-              <TaskGroupComponent
-                key={group.id}
-                group={group}
-                users={users}
-                jobs={jobs}
-                onOpenSidebar={setSelectedTask}
-                allGroups={filteredGroups}
-                showCompleted={showCompleted}
-                selectedTaskIds={selectedTaskIds}
-                onToggleTaskSelected={toggleTaskSelected}
-                isDropTarget={overGroupId === group.id}
-                collapseAllVersion={collapseAllVersion}
-                expandAllVersion={expandAllVersion}
-                onMoveGroup={handleMoveGroup}
-                groupIndex={groups.findIndex(g => g.id === group.id)}
-                totalGroups={groups.length}
-              />
-            ))}
-          </div>
+          <SortableContext items={filteredGroups.map(g => `${GROUP_SORTABLE_PREFIX}${g.id}`)} strategy={verticalListSortingStrategy}>
+            <div className="border rounded-lg overflow-visible bg-card">
+              {filteredGroups.map((group, index) => (
+                <TaskGroupComponent
+                  key={group.id}
+                  group={group}
+                  users={users}
+                  jobs={jobs}
+                  onOpenSidebar={setSelectedTask}
+                  allGroups={filteredGroups}
+                  showCompleted={showCompleted}
+                  selectedTaskIds={selectedTaskIds}
+                  onToggleTaskSelected={toggleTaskSelected}
+                  isDropTarget={overGroupId === group.id}
+                  collapseAllVersion={collapseAllVersion}
+                  expandAllVersion={expandAllVersion}
+                  onMoveGroup={handleMoveGroup}
+                  groupIndex={groups.findIndex(g => g.id === group.id)}
+                  totalGroups={groups.length}
+                  sortableGroupId={`${GROUP_SORTABLE_PREFIX}${group.id}`}
+                />
+              ))}
+            </div>
+          </SortableContext>
         )}
 
         <DragOverlay>
           {activeTask && (
             <div className="bg-card border shadow-lg rounded-md p-2 opacity-90">
               <span className="text-sm font-medium">{activeTask.title}</span>
+            </div>
+          )}
+          {activeGroupDrag && (
+            <div className="bg-card border shadow-lg rounded-md p-3 opacity-90">
+              <div className="flex items-center gap-2">
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: activeGroupDrag.color }} />
+                <span className="font-semibold text-sm" style={{ color: activeGroupDrag.color }}>{activeGroupDrag.name}</span>
+                <span className="text-xs text-muted-foreground ml-1">{activeGroupDrag.tasks.length} items</span>
+              </div>
             </div>
           )}
         </DragOverlay>
