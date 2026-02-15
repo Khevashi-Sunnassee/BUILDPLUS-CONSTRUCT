@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,6 +21,8 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -169,6 +171,8 @@ export default function AdminEmployeesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [sortColumn, setSortColumn] = useState<string>("lastName");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 25;
 
   const toggleSort = useCallback((column: string) => {
     if (sortColumn === column) {
@@ -252,6 +256,17 @@ export default function AdminEmployeesPage() {
       return sortDirection === "asc" ? cmp : -cmp;
     });
   }, [employeesList, searchQuery, sortColumn, sortDirection]);
+
+  const totalPages = Math.ceil((filteredEmployees?.length || 0) / pageSize);
+  const paginatedEmployees = useMemo(() => {
+    if (!filteredEmployees) return [];
+    const start = (currentPage - 1) * pageSize;
+    return filteredEmployees.slice(start, start + pageSize);
+  }, [filteredEmployees, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sortColumn, sortDirection]);
 
   const form = useForm<EmployeeFormData>({
     resolver: zodResolver(employeeSchema),
@@ -432,7 +447,7 @@ export default function AdminEmployeesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredEmployees.map((employee) => (
+                {paginatedEmployees.map((employee) => (
                   <TableRow key={employee.id} data-testid={`row-employee-${employee.id}`}>
                     <TableCell className="font-mono text-sm" data-testid={`text-employee-number-${employee.id}`}>
                       {employee.employeeNumber}
@@ -494,6 +509,22 @@ export default function AdminEmployeesPage() {
                 ))}
               </TableBody>
             </Table>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between gap-2 pt-4">
+                <p className="text-sm text-muted-foreground" data-testid="text-pagination-info">
+                  Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, filteredEmployees?.length || 0)} of {filteredEmployees?.length || 0}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="icon" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)} data-testid="button-prev-page">
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm px-2" data-testid="text-current-page">Page {currentPage} of {totalPages}</span>
+                  <Button variant="outline" size="icon" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)} data-testid="button-next-page">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
