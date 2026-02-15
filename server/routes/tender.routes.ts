@@ -1707,6 +1707,43 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
     const costCodeNames = selectedCodes.map(c => `${c.code} - ${c.name}`).join(", ");
     const location = [job?.address, job?.city, job?.state].filter(Boolean).join(", ") || "Australia";
     const projectValue = job?.estimatedValue ? `$${parseFloat(job.estimatedValue).toLocaleString()}` : "Not specified";
+    const estimatedValueNum = job?.estimatedValue ? parseFloat(job.estimatedValue) : 0;
+
+    const jobTypeNameLower = jobTypeName.toLowerCase();
+    let searchRadiusKm = 40;
+    let projectScale = "Medium";
+
+    const isSmallResidential = jobTypeNameLower.includes("residential") ||
+      jobTypeNameLower.includes("house") ||
+      jobTypeNameLower.includes("renovation") ||
+      jobTypeNameLower.includes("extension") ||
+      jobTypeNameLower.includes("duplex");
+
+    const isLargeProject = jobTypeNameLower.includes("high-rise") ||
+      jobTypeNameLower.includes("highrise") ||
+      jobTypeNameLower.includes("high rise") ||
+      jobTypeNameLower.includes("precast") ||
+      jobTypeNameLower.includes("infrastructure") ||
+      jobTypeNameLower.includes("civil") ||
+      jobTypeNameLower.includes("industrial") ||
+      jobTypeNameLower.includes("hospital") ||
+      jobTypeNameLower.includes("government");
+
+    if (isSmallResidential || estimatedValueNum < 200000) {
+      searchRadiusKm = 25;
+      projectScale = "Small Residential (1-5 days typical)";
+    } else if (isLargeProject || estimatedValueNum > 2000000) {
+      searchRadiusKm = 80;
+      projectScale = "Large / Long Duration";
+    } else {
+      searchRadiusKm = 45;
+      projectScale = "Medium Commercial / Multi-Week";
+    }
+
+    if (estimatedValueNum > 5000000) {
+      searchRadiusKm = 100;
+      projectScale = "Major Project (state-wide search)";
+    }
 
     const openai = new OpenAI();
 
@@ -1714,12 +1751,22 @@ router.post("/api/tenders/:id/find-suppliers", requireAuth, requirePermission("t
 
 Project Details:
 - Project Type: ${jobTypeName}
+- Project Scale: ${projectScale}
 - Project Name: ${job?.name || tender.title}
 - Location: ${location}
 - Estimated Value: ${projectValue}
 - Trade Categories Needed: ${costCodeNames}
+- Search Radius: ${searchRadiusKm}km from the project location
 
-Find 8-12 real Australian suppliers/subcontractors that would be relevant for these trade categories in or near the specified location. For each supplier, provide realistic business details.
+IMPORTANT SEARCH RADIUS RULES (Australian construction industry standards):
+- This is classified as a "${projectScale}" project.
+- You MUST find suppliers located within ${searchRadiusKm}km of ${location}.
+- For small residential jobs (1-5 days), trades prefer to stay within 25km / 30 minutes drive and will avoid CBD congestion unless premium rates.
+- For medium commercial multi-week work (consistent work), trades will travel 40-50km, especially if parking and site access are good.
+- For large projects (high-rise, precast, long duration), trades will travel 60-90km or even temporarily relocate.
+- Prioritise suppliers closest to the job site first, then expand outward within the ${searchRadiusKm}km radius.
+
+Find 8-12 real Australian suppliers/subcontractors that would be relevant for these trade categories within ${searchRadiusKm}km of ${location}. For each supplier, provide realistic business details.
 
 IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each object must have these exact fields:
 [
@@ -1729,11 +1776,12 @@ IMPORTANT: Return ONLY a valid JSON array. No markdown, no explanation. Each obj
     "email": "string - business email address",
     "phone": "string - Australian phone number",
     "specialty": "string - brief description of their specialty/trade",
-    "location": "string - city/suburb and state"
+    "location": "string - city/suburb and state",
+    "estimatedDistanceKm": "number - estimated distance in km from job site"
   }
 ]
 
-Return between 8 and 12 suppliers. Make sure they are realistic for the ${location} area and relevant to the trade categories: ${costCodeNames}.`;
+Return between 8 and 12 suppliers. Make sure they are realistic for the ${location} area (within ${searchRadiusKm}km) and relevant to the trade categories: ${costCodeNames}. Sort results by proximity (closest first).`;
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -1754,6 +1802,7 @@ Return between 8 and 12 suppliers. Make sure they are realistic for the ${locati
       phone: string;
       specialty: string;
       location: string;
+      estimatedDistanceKm?: number;
     }> = [];
 
     try {
@@ -1772,6 +1821,8 @@ Return between 8 and 12 suppliers. Make sure they are realistic for the ${locati
         location,
         projectType: jobTypeName,
         projectValue,
+        searchRadiusKm,
+        projectScale,
       },
     });
   } catch (error: unknown) {

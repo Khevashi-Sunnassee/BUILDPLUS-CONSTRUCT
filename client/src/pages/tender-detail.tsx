@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, FileText, Eye, Pencil, Plus, Loader2, ChevronDown, ChevronRight,
   DollarSign, Users, Mail, Package, Layers, Link2, Unlink, AlertTriangle, Download, Search, X,
-  Sparkles, UserPlus, Phone, Building2,
+  Sparkles, UserPlus, Phone, Building2, MapPin,
 } from "lucide-react";
 
 interface TenderDetail {
@@ -72,6 +72,7 @@ interface FoundSupplier {
   phone: string;
   specialty: string;
   location: string;
+  estimatedDistanceKm?: number;
   selected?: boolean;
 }
 
@@ -422,7 +423,7 @@ export default function TenderDetailPage() {
   const [selectedCostCodeIds, setSelectedCostCodeIds] = useState<string[]>([]);
   const [foundSuppliers, setFoundSuppliers] = useState<FoundSupplier[]>([]);
   const [selectedFoundSuppliers, setSelectedFoundSuppliers] = useState<Set<number>>(new Set());
-  const [searchContext, setSearchContext] = useState<{ costCodes: string; location: string; projectType: string } | null>(null);
+  const [searchContext, setSearchContext] = useState<{ costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } | null>(null);
 
   const { data: tender, isLoading, error } = useQuery<TenderDetail>({
     queryKey: ["/api/tenders", tenderId],
@@ -501,7 +502,7 @@ export default function TenderDetailPage() {
       const res = await apiRequest("POST", `/api/tenders/${tenderId}/find-suppliers`, { costCodeIds });
       return res.json();
     },
-    onSuccess: (data: { suppliers: FoundSupplier[]; context: { costCodes: string; location: string; projectType: string } }) => {
+    onSuccess: (data: { suppliers: FoundSupplier[]; context: { costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } }) => {
       setFoundSuppliers(data.suppliers);
       setSelectedFoundSuppliers(new Set(data.suppliers.map((_, i) => i)));
       setSearchContext(data.context);
@@ -1230,6 +1231,12 @@ export default function TenderDetailPage() {
                   <div><span className="font-medium">Location:</span> {searchContext.location}</div>
                   <div><span className="font-medium">Categories:</span> {searchContext.costCodes}</div>
                   <div><span className="font-medium">Project Type:</span> {searchContext.projectType}</div>
+                  {searchContext.projectScale && (
+                    <div><span className="font-medium">Project Scale:</span> {searchContext.projectScale}</div>
+                  )}
+                  {searchContext.searchRadiusKm && (
+                    <div><span className="font-medium">Search Radius:</span> {searchContext.searchRadiusKm}km from job site</div>
+                  )}
                 </div>
               )}
 
@@ -1280,7 +1287,15 @@ export default function TenderDetailPage() {
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium" data-testid={`text-found-name-${index}`}>{supplier.companyName}</span>
                             {supplier.location && (
-                              <Badge variant="outline" className="text-xs">{supplier.location}</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                <MapPin className="h-3 w-3 mr-0.5" />
+                                {supplier.location}
+                              </Badge>
+                            )}
+                            {supplier.estimatedDistanceKm != null && (
+                              <Badge variant="secondary" className="text-xs">
+                                ~{supplier.estimatedDistanceKm}km
+                              </Badge>
                             )}
                           </div>
                           {supplier.specialty && (
