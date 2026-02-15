@@ -20,27 +20,34 @@ interface CompanyBrandingData {
 const brandingCache = new Map<string, { data: CompanyBrandingData; expiry: number }>();
 
 const DEFAULT_TEMPLATE = `<!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>{{TITLE}}</title>
+  <!--[if mso]>
+  <style type="text/css">
+    table { border-collapse: collapse; }
+    .header-cell { background-color: #1a1a1a !important; }
+  </style>
+  <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f1f5f9; padding: 24px 0;">
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="background-color: #f1f5f9;">
     <tr>
-      <td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
+      <td align="center" style="padding: 24px 0;">
+        <table width="600" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width: 600px; width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #111111 0%, #6b7280 100%); padding: 20px 28px;">
-              <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <td class="header-cell" bgcolor="#1a1a1a" style="background-color: #1a1a1a; padding: 20px 28px;">
+              <table cellpadding="0" cellspacing="0" border="0" width="100%" role="presentation">
                 <tr>
                   <td style="padding-bottom: 6px;">{{LOGO}}</td>
                 </tr>
                 <tr>
                   <td>
-                    <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #ffffff;">{{TITLE}}</h2>
+                    <h2 style="margin: 0; font-size: 17px; font-weight: 600; color: #ffffff; mso-line-height-rule: exactly;">{{TITLE}}</h2>
                     {{SUBTITLE}}
                   </td>
                 </tr>
@@ -57,7 +64,7 @@ const DEFAULT_TEMPLATE = `<!DOCTYPE html>
           </tr>
           <!-- Footer -->
           <tr>
-            <td style="padding: 16px 28px 20px; border-top: 1px solid #e2e8f0; background-color: #f8fafc;">
+            <td bgcolor="#f8fafc" style="padding: 16px 28px 20px; border-top: 1px solid #e2e8f0; background-color: #f8fafc;">
               <p style="margin: 0; font-size: 12px; color: #64748b;">
                 This is an automated notification from {{COMPANY_NAME}}. Please do not reply directly to this email.
               </p>
