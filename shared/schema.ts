@@ -4610,3 +4610,40 @@ export type ScopeItem = typeof scopeItems.$inferSelect;
 export const insertTenderScopeSchema = createInsertSchema(tenderScopes).omit({ id: true, createdAt: true });
 export type InsertTenderScope = z.infer<typeof insertTenderScopeSchema>;
 export type TenderScope = typeof tenderScopes.$inferSelect;
+
+export const tenderNotes = pgTable("tender_notes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderId: varchar("tender_id", { length: 36 }).notNull().references(() => tenders.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  createdById: varchar("created_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  tenderIdx: index("tender_notes_tender_idx").on(table.tenderId),
+  companyIdx: index("tender_notes_company_idx").on(table.companyId),
+}));
+
+export const tenderFiles = pgTable("tender_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
+  tenderId: varchar("tender_id", { length: 36 }).notNull().references(() => tenders.id, { onDelete: "cascade" }),
+  fileName: text("file_name").notNull(),
+  filePath: text("file_path"),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  description: text("description"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  tenderIdx: index("tender_files_tender_idx").on(table.tenderId),
+  companyIdx: index("tender_files_company_idx").on(table.companyId),
+}));
+
+export const insertTenderNoteSchema = createInsertSchema(tenderNotes).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTenderNote = z.infer<typeof insertTenderNoteSchema>;
+export type TenderNote = typeof tenderNotes.$inferSelect;
+
+export const insertTenderFileSchema = createInsertSchema(tenderFiles).omit({ id: true, createdAt: true });
+export type InsertTenderFile = z.infer<typeof insertTenderFileSchema>;
+export type TenderFile = typeof tenderFiles.$inferSelect;

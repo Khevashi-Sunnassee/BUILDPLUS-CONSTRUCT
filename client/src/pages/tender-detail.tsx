@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -21,7 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, FileText, Eye, Pencil, Plus, Loader2, ChevronDown, ChevronRight,
   DollarSign, Users, Mail, Package, Layers, Link2, Unlink, AlertTriangle, Download, Search, X,
-  Sparkles, UserPlus, Phone, Building2, MapPin,
+  Sparkles, UserPlus, Phone, Building2, MapPin, Send, Trash2, StickyNote, Paperclip, Upload,
 } from "lucide-react";
 
 interface TenderDetail {
@@ -139,6 +139,25 @@ interface LineItemData {
   lineTotal: string;
   notes: string | null;
   costCode: { id: string; code: string; name: string } | null;
+}
+
+interface TenderNoteData {
+  id: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: { id: string; name: string } | null;
+}
+
+interface TenderFileData {
+  id: string;
+  fileName: string;
+  filePath: string | null;
+  fileSize: number | null;
+  mimeType: string | null;
+  description: string | null;
+  createdAt: string;
+  uploadedBy: { id: string; name: string } | null;
 }
 
 interface SupplierOption {
@@ -430,6 +449,18 @@ export default function TenderDetailPage() {
   const [radiusInfo, setRadiusInfo] = useState<{ searchRadiusKm: number; projectScale: string; location: string; projectType: string; projectValue: string } | null>(null);
   const [loadingRadius, setLoadingRadius] = useState(false);
 
+  const [sendInviteOpen, setSendInviteOpen] = useState(false);
+  const [sendInviteMember, setSendInviteMember] = useState<TenderMemberWithDetails | null>(null);
+  const [inviteSubject, setInviteSubject] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+
+  const [noteContent, setNoteContent] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteContent, setEditingNoteContent] = useState("");
+
+  const [fileDescription, setFileDescription] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
   const { data: tender, isLoading, error } = useQuery<TenderDetail>({
     queryKey: ["/api/tenders", tenderId],
     enabled: !!tenderId,
@@ -454,6 +485,16 @@ export default function TenderDetailPage() {
 
   const { data: tenderMembers = [], isLoading: loadingMembers } = useQuery<TenderMemberWithDetails[]>({
     queryKey: ["/api/tenders", tenderId, "members"],
+    enabled: !!tenderId,
+  });
+
+  const { data: tenderNotesData = [], isLoading: loadingNotes } = useQuery<TenderNoteData[]>({
+    queryKey: ["/api/tenders", tenderId, "notes"],
+    enabled: !!tenderId,
+  });
+
+  const { data: tenderFilesData = [], isLoading: loadingFiles } = useQuery<TenderFileData[]>({
+    queryKey: ["/api/tenders", tenderId, "files"],
     enabled: !!tenderId,
   });
 
@@ -538,6 +579,103 @@ export default function TenderDetailPage() {
     },
     onError: (error: Error) => {
       toast({ title: "Failed to add suppliers", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const sendInviteMutation = useMutation({
+    mutationFn: async ({ memberId, subject, message }: { memberId: string; subject: string; message: string }) => {
+      const res = await apiRequest("POST", `/api/tenders/${tenderId}/members/${memberId}/send-invite`, { subject, message });
+      return res.json();
+    },
+    onSuccess: (data: { supplierName: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "members"] });
+      toast({ title: `Invitation sent to ${data.supplierName}` });
+      setSendInviteOpen(false);
+      setSendInviteMember(null);
+      setInviteSubject("");
+      setInviteMessage("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send invitation", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const createNoteMutation = useMutation({
+    mutationFn: async (content: string) => {
+      return apiRequest("POST", `/api/tenders/${tenderId}/notes`, { content });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "notes"] });
+      toast({ title: "Note added" });
+      setNoteContent("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ noteId, content }: { noteId: string; content: string }) => {
+      return apiRequest("PATCH", `/api/tenders/${tenderId}/notes/${noteId}`, { content });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "notes"] });
+      toast({ title: "Note updated" });
+      setEditingNoteId(null);
+      setEditingNoteContent("");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (noteId: string) => {
+      return apiRequest("DELETE", `/api/tenders/${tenderId}/notes/${noteId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "notes"] });
+      toast({ title: "Note deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch(`/api/tenders/${tenderId}/files`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Upload failed" }));
+        throw new Error(err.message || "Upload failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "files"] });
+      toast({ title: "File uploaded" });
+      setFileDescription("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const deleteFileMutation = useMutation({
+    mutationFn: async (fileId: string) => {
+      return apiRequest("DELETE", `/api/tenders/${tenderId}/files/${fileId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "files"] });
+      toast({ title: "File deleted" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
@@ -800,6 +938,14 @@ export default function TenderDetailPage() {
             <Layers className="h-4 w-4 mr-1" />
             Scopes ({linkedScopes.length})
           </TabsTrigger>
+          <TabsTrigger value="notes" data-testid="tab-notes">
+            <StickyNote className="h-4 w-4 mr-1" />
+            Notes ({tenderNotesData.length})
+          </TabsTrigger>
+          <TabsTrigger value="files" data-testid="tab-files">
+            <Paperclip className="h-4 w-4 mr-1" />
+            Files ({tenderFilesData.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="invitations" className="mt-4 space-y-4">
@@ -827,6 +973,7 @@ export default function TenderDetailPage() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Trade Category</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead className="w-20 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -880,6 +1027,22 @@ export default function TenderDetailPage() {
                         >
                           {member.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => {
+                            setSendInviteMember(member);
+                            setInviteSubject(`Tender Invitation - ${tender?.tenderNumber}: ${tender?.title}`);
+                            setInviteMessage(`You are invited to submit a tender for ${tender?.title}.\n\nPlease review the attached documents and submit your proposal by the due date.\n\nRegards`);
+                            setSendInviteOpen(true);
+                          }}
+                          disabled={!member.supplier?.email}
+                          data-testid={`button-send-invite-${member.id}`}
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1032,7 +1195,280 @@ export default function TenderDetailPage() {
             </div>
           )}
         </TabsContent>
+
+        <TabsContent value="notes" className="mt-4 space-y-4">
+          <h3 className="text-lg font-semibold">Notes</h3>
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <Textarea
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                placeholder="Add a note..."
+                className="resize-none"
+                data-testid="input-tender-note"
+              />
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => { if (noteContent.trim()) createNoteMutation.mutate(noteContent.trim()); }}
+                  disabled={createNoteMutation.isPending || !noteContent.trim()}
+                  data-testid="button-add-note"
+                >
+                  {createNoteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Note
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          {loadingNotes ? (
+            <Skeleton className="h-32 w-full" />
+          ) : tenderNotesData.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground" data-testid="text-no-notes">
+              <StickyNote className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">No notes yet</p>
+              <p className="text-sm mt-1">Add a note above to record important information about this tender.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {tenderNotesData.map((note) => (
+                <Card key={note.id} data-testid={`card-note-${note.id}`}>
+                  <CardContent className="pt-4">
+                    {editingNoteId === note.id ? (
+                      <div className="space-y-3">
+                        <Textarea
+                          value={editingNoteContent}
+                          onChange={(e) => setEditingNoteContent(e.target.value)}
+                          className="resize-none"
+                          data-testid={`input-edit-note-${note.id}`}
+                        />
+                        <div className="flex items-center justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => { setEditingNoteId(null); setEditingNoteContent(""); }} data-testid={`button-cancel-edit-note-${note.id}`}>
+                            Cancel
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => updateNoteMutation.mutate({ noteId: note.id, content: editingNoteContent.trim() })}
+                            disabled={updateNoteMutation.isPending || !editingNoteContent.trim()}
+                            data-testid={`button-save-note-${note.id}`}
+                          >
+                            {updateNoteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm whitespace-pre-wrap" data-testid={`text-note-content-${note.id}`}>{note.content}</p>
+                        <div className="flex items-center justify-between gap-4 mt-3 flex-wrap">
+                          <p className="text-xs text-muted-foreground">
+                            {note.createdBy?.name || "Unknown"} - {format(new Date(note.createdAt), "dd/MM/yyyy HH:mm")}
+                            {note.updatedAt !== note.createdAt && " (edited)"}
+                          </p>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => { setEditingNoteId(note.id); setEditingNoteContent(note.content); }}
+                              data-testid={`button-edit-note-${note.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => deleteNoteMutation.mutate(note.id)}
+                              disabled={deleteNoteMutation.isPending}
+                              data-testid={`button-delete-note-${note.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="files" className="mt-4 space-y-4">
+          <h3 className="text-lg font-semibold">Files</h3>
+          <Card>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-end gap-3 flex-wrap">
+                <div className="flex-1 min-w-[200px]">
+                  <Label>File</Label>
+                  <Input
+                    type="file"
+                    ref={fileInputRef}
+                    data-testid="input-tender-file"
+                  />
+                </div>
+                <div className="flex-1 min-w-[200px]">
+                  <Label>Description (optional)</Label>
+                  <Input
+                    value={fileDescription}
+                    onChange={(e) => setFileDescription(e.target.value)}
+                    placeholder="Brief description..."
+                    data-testid="input-file-description"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    const file = fileInputRef.current?.files?.[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    if (fileDescription.trim()) formData.append("description", fileDescription.trim());
+                    uploadFileMutation.mutate(formData);
+                  }}
+                  disabled={uploadFileMutation.isPending}
+                  data-testid="button-upload-file"
+                >
+                  {uploadFileMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                  Upload
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          {loadingFiles ? (
+            <Skeleton className="h-32 w-full" />
+          ) : tenderFilesData.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground" data-testid="text-no-files">
+              <Paperclip className="h-12 w-12 mx-auto mb-3 opacity-40" />
+              <p className="font-medium">No files yet</p>
+              <p className="text-sm mt-1">Upload files above to attach documents to this tender.</p>
+            </div>
+          ) : (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>File Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="w-24">Size</TableHead>
+                    <TableHead className="w-32">Uploaded By</TableHead>
+                    <TableHead className="w-28">Date</TableHead>
+                    <TableHead className="w-24 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {tenderFilesData.map((file) => (
+                    <TableRow key={file.id} data-testid={`row-file-${file.id}`}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                          <span className="text-sm font-medium" data-testid={`text-file-name-${file.id}`}>{file.fileName}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-file-desc-${file.id}`}>
+                        {file.description || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {file.fileSize ? `${(file.fileSize / 1024).toFixed(0)} KB` : "-"}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {file.uploadedBy?.name || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(file.createdAt), "dd/MM/yyyy")}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => window.open(`/api/tenders/${tenderId}/files/${file.id}/download`, "_blank")}
+                            data-testid={`button-download-file-${file.id}`}
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteFileMutation.mutate(file.id)}
+                            disabled={deleteFileMutation.isPending}
+                            data-testid={`button-delete-file-${file.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
+          )}
+        </TabsContent>
       </Tabs>
+
+      <Dialog open={sendInviteOpen} onOpenChange={(open) => { if (!open) { setSendInviteOpen(false); setSendInviteMember(null); setInviteSubject(""); setInviteMessage(""); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Send Invitation
+            </DialogTitle>
+            <DialogDescription>
+              Send an email invitation to {sendInviteMember?.supplier?.name || "this supplier"}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>To</Label>
+              <Input
+                value={sendInviteMember?.supplier?.email || ""}
+                disabled
+                data-testid="input-invite-to"
+              />
+            </div>
+            <div>
+              <Label>Subject</Label>
+              <Input
+                value={inviteSubject}
+                onChange={(e) => setInviteSubject(e.target.value)}
+                placeholder="Email subject..."
+                data-testid="input-invite-subject"
+              />
+            </div>
+            <div>
+              <Label>Message</Label>
+              <Textarea
+                value={inviteMessage}
+                onChange={(e) => setInviteMessage(e.target.value)}
+                placeholder="Email message..."
+                className="resize-none min-h-[120px]"
+                data-testid="input-invite-message"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setSendInviteOpen(false); setSendInviteMember(null); }} data-testid="button-cancel-invite">
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (sendInviteMember) {
+                  sendInviteMutation.mutate({
+                    memberId: sendInviteMember.id,
+                    subject: inviteSubject,
+                    message: inviteMessage,
+                  });
+                }
+              }}
+              disabled={sendInviteMutation.isPending || !inviteSubject.trim() || !inviteMessage.trim()}
+              data-testid="button-send-invite"
+            >
+              {sendInviteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              <Send className="h-4 w-4 mr-2" />
+              Send Invitation
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={submissionFormOpen} onOpenChange={(open) => { if (!open) closeSubmissionForm(); else setSubmissionFormOpen(true); }}>
         <DialogContent className="max-w-lg">

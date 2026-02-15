@@ -1,16 +1,25 @@
 import { Router, Request, Response } from "express";
 import { z } from "zod";
+import multer from "multer";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
 import OpenAI from "openai";
+import { ObjectStorageService } from "../replit_integrations/object_storage";
+
+const tenderUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
+
+const tenderObjectStorage = new ObjectStorageService();
 
 const router = Router();
 
@@ -2167,6 +2176,359 @@ router.post("/api/tenders/:id/add-found-suppliers", requireAuth, requirePermissi
     }
     logger.error("Error adding found suppliers:", error);
     res.status(500).json({ message: "Failed to add suppliers", code: "INTERNAL_ERROR" });
+  }
+});
+
+// ===== TENDER NOTES ROUTES =====
+
+router.get("/api/tenders/:id/notes", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const notes = await db
+      .select({
+        id: tenderNotes.id,
+        content: tenderNotes.content,
+        createdAt: tenderNotes.createdAt,
+        updatedAt: tenderNotes.updatedAt,
+        createdBy: {
+          id: users.id,
+          name: users.name,
+        },
+      })
+      .from(tenderNotes)
+      .leftJoin(users, eq(tenderNotes.createdById, users.id))
+      .where(and(eq(tenderNotes.tenderId, tenderId), eq(tenderNotes.companyId, companyId)))
+      .orderBy(desc(tenderNotes.createdAt));
+
+    res.json(notes);
+  } catch (error: unknown) {
+    logger.error("Error fetching tender notes:", error);
+    res.status(500).json({ message: "Failed to fetch notes", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/notes", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const schema = z.object({ content: z.string().min(1, "Note content is required") });
+    const data = schema.parse(req.body);
+
+    const [note] = await db
+      .insert(tenderNotes)
+      .values({
+        companyId,
+        tenderId,
+        content: data.content,
+        createdById: req.session.userId!,
+      })
+      .returning();
+
+    res.json(note);
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error creating tender note:", error);
+    res.status(500).json({ message: "Failed to create note", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.patch("/api/tenders/:id/notes/:noteId", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id: tenderId, noteId } = req.params;
+    if (!isValidId(tenderId) || !isValidId(noteId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    const schema = z.object({ content: z.string().min(1, "Note content is required") });
+    const data = schema.parse(req.body);
+
+    const [updated] = await db
+      .update(tenderNotes)
+      .set({ content: data.content, updatedAt: new Date() })
+      .where(and(eq(tenderNotes.id, noteId), eq(tenderNotes.tenderId, tenderId), eq(tenderNotes.companyId, companyId)))
+      .returning();
+
+    if (!updated) return res.status(404).json({ message: "Note not found", code: "NOT_FOUND" });
+    res.json(updated);
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error updating tender note:", error);
+    res.status(500).json({ message: "Failed to update note", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.delete("/api/tenders/:id/notes/:noteId", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id: tenderId, noteId } = req.params;
+    if (!isValidId(tenderId) || !isValidId(noteId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    const [deleted] = await db
+      .delete(tenderNotes)
+      .where(and(eq(tenderNotes.id, noteId), eq(tenderNotes.tenderId, tenderId), eq(tenderNotes.companyId, companyId)))
+      .returning({ id: tenderNotes.id });
+
+    if (!deleted) return res.status(404).json({ message: "Note not found", code: "NOT_FOUND" });
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error("Error deleting tender note:", error);
+    res.status(500).json({ message: "Failed to delete note", code: "INTERNAL_ERROR" });
+  }
+});
+
+// ===== TENDER FILES ROUTES =====
+
+router.get("/api/tenders/:id/files", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    const files = await db
+      .select({
+        id: tenderFiles.id,
+        fileName: tenderFiles.fileName,
+        filePath: tenderFiles.filePath,
+        fileSize: tenderFiles.fileSize,
+        mimeType: tenderFiles.mimeType,
+        description: tenderFiles.description,
+        createdAt: tenderFiles.createdAt,
+        uploadedBy: {
+          id: users.id,
+          name: users.name,
+        },
+      })
+      .from(tenderFiles)
+      .leftJoin(users, eq(tenderFiles.uploadedById, users.id))
+      .where(and(eq(tenderFiles.tenderId, tenderId), eq(tenderFiles.companyId, companyId)))
+      .orderBy(desc(tenderFiles.createdAt));
+
+    res.json(files);
+  } catch (error: unknown) {
+    logger.error("Error fetching tender files:", error);
+    res.status(500).json({ message: "Failed to fetch files", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.post("/api/tenders/:id/files", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), tenderUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const tenderId = req.params.id;
+    if (!isValidId(tenderId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No file provided", code: "VALIDATION_ERROR" });
+    }
+
+    const uploadURL = await tenderObjectStorage.getObjectEntityUploadURL();
+    const objectPath = tenderObjectStorage.normalizeObjectEntityPath(uploadURL);
+
+    const uploadResponse = await fetch(uploadURL, {
+      method: "PUT",
+      body: req.file.buffer,
+      headers: { "Content-Type": req.file.mimetype },
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error("Failed to upload file to storage");
+    }
+
+    await tenderObjectStorage.trySetObjectEntityAclPolicy(objectPath, {
+      owner: req.session.userId!,
+      visibility: "private",
+    });
+
+    const description = req.body.description || null;
+
+    const [file] = await db
+      .insert(tenderFiles)
+      .values({
+        companyId,
+        tenderId,
+        fileName: req.file.originalname,
+        filePath: objectPath,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+        description,
+        uploadedById: req.session.userId!,
+      })
+      .returning();
+
+    res.json(file);
+  } catch (error: unknown) {
+    logger.error("Error uploading tender file:", error);
+    res.status(500).json({ message: "Failed to upload file", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.get("/api/tenders/:id/files/:fileId/download", requireAuth, requirePermission("tenders", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id: tenderId, fileId } = req.params;
+    if (!isValidId(tenderId) || !isValidId(fileId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    const [file] = await db
+      .select()
+      .from(tenderFiles)
+      .where(and(eq(tenderFiles.id, fileId), eq(tenderFiles.tenderId, tenderId), eq(tenderFiles.companyId, companyId)));
+
+    if (!file || !file.filePath) return res.status(404).json({ message: "File not found", code: "NOT_FOUND" });
+
+    const objectFile = await tenderObjectStorage.getObjectEntityFile(file.filePath);
+    await tenderObjectStorage.downloadObject(objectFile, res);
+  } catch (error: unknown) {
+    logger.error("Error downloading tender file:", error);
+    res.status(500).json({ message: "Failed to download file", code: "INTERNAL_ERROR" });
+  }
+});
+
+router.delete("/api/tenders/:id/files/:fileId", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id: tenderId, fileId } = req.params;
+    if (!isValidId(tenderId) || !isValidId(fileId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    const [deleted] = await db
+      .delete(tenderFiles)
+      .where(and(eq(tenderFiles.id, fileId), eq(tenderFiles.tenderId, tenderId), eq(tenderFiles.companyId, companyId)))
+      .returning({ id: tenderFiles.id });
+
+    if (!deleted) return res.status(404).json({ message: "File not found", code: "NOT_FOUND" });
+    res.json({ success: true });
+  } catch (error: unknown) {
+    logger.error("Error deleting tender file:", error);
+    res.status(500).json({ message: "Failed to delete file", code: "INTERNAL_ERROR" });
+  }
+});
+
+// ===== SEND INVITE TO SINGLE MEMBER =====
+
+router.post("/api/tenders/:id/members/:memberId/send-invite", requireAuth, requirePermission("tenders", "VIEW_AND_UPDATE"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const { id: tenderId, memberId } = req.params;
+    if (!isValidId(tenderId) || !isValidId(memberId)) return res.status(400).json({ message: "Invalid ID format", code: "VALIDATION_ERROR" });
+
+    if (!(await verifyTenderOwnership(companyId, tenderId))) {
+      return res.status(403).json({ message: "Tender not found or access denied", code: "FORBIDDEN" });
+    }
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured" });
+    }
+
+    const schema = z.object({
+      subject: z.string().min(1, "Subject is required"),
+      message: z.string().min(1, "Message is required"),
+    });
+    const data = schema.parse(req.body);
+
+    const [row] = await db
+      .select({
+        member: tenderMembers,
+        supplier: {
+          id: suppliers.id,
+          name: suppliers.name,
+          email: suppliers.email,
+        },
+      })
+      .from(tenderMembers)
+      .leftJoin(suppliers, eq(tenderMembers.supplierId, suppliers.id))
+      .where(and(eq(tenderMembers.id, memberId), eq(tenderMembers.tenderId, tenderId), eq(tenderMembers.companyId, companyId)));
+
+    if (!row) return res.status(404).json({ message: "Member not found", code: "NOT_FOUND" });
+
+    const email = row.supplier?.email;
+    if (!email) return res.status(400).json({ message: "Supplier has no email address", code: "VALIDATION_ERROR" });
+
+    const [tender] = await db
+      .select({ tenderNumber: tenders.tenderNumber, title: tenders.title })
+      .from(tenders)
+      .where(eq(tenders.id, tenderId));
+
+    const packages = await db
+      .select({
+        pkg: tenderPackages,
+        bundle: {
+          id: documentBundles.id,
+          bundleName: documentBundles.bundleName,
+          qrCodeId: documentBundles.qrCodeId,
+          description: documentBundles.description,
+        },
+      })
+      .from(tenderPackages)
+      .leftJoin(documentBundles, eq(tenderPackages.bundleId, documentBundles.id))
+      .where(and(eq(tenderPackages.tenderId, tenderId), isNotNull(tenderPackages.bundleId)));
+
+    let bundleSection = "";
+    const bundlesWithQr = packages.filter(p => p.bundle?.qrCodeId);
+    if (bundlesWithQr.length > 0) {
+      const bundleItems = (await Promise.all(bundlesWithQr.map(async (p) => {
+        const bundleUrl = `${process.env.REPLIT_DOMAINS ? `https://${process.env.REPLIT_DOMAINS.split(",")[0]}` : ""}/bundles/${p.bundle!.qrCodeId}`;
+        let qrImg = "";
+        try {
+          const qrDataUrl = await QRCode.toDataURL(bundleUrl, { width: 150, margin: 1 });
+          qrImg = `<div style="text-align: center; margin: 12px 0;"><img src="${qrDataUrl}" alt="QR Code" style="width: 150px; height: 150px;" /></div>`;
+        } catch { /* skip QR */ }
+        return `<div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+          <h3 style="margin: 0 0 4px 0; font-size: 16px;">${p.bundle!.bundleName}</h3>
+          ${qrImg}
+          <div style="text-align: center; margin-top: 12px;">
+            <a href="${bundleUrl}" target="_blank" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 6px;">View Tender Documents</a>
+          </div>
+        </div>`;
+      }))).join("");
+
+      bundleSection = `<div style="margin-top: 24px; border-top: 2px solid #2563eb; padding-top: 20px;">
+        <h2 style="margin: 0 0 16px 0; font-size: 18px;">Tender Documents</h2>
+        ${bundleItems}
+      </div>`;
+    }
+
+    const htmlBody = await buildBrandedEmail({
+      title: "Tender Invitation",
+      recipientName: row.supplier?.name || undefined,
+      body: `<div style="margin-bottom: 24px;">${data.message.replace(/\n/g, "<br>")}</div>${bundleSection}`,
+      companyId,
+    });
+
+    await emailService.sendEmailWithAttachment({ to: email, subject: data.subject, body: htmlBody });
+
+    await db.update(tenderMembers)
+      .set({ status: "SENT", sentAt: new Date() })
+      .where(eq(tenderMembers.id, memberId));
+
+    res.json({ success: true, supplierName: row.supplier?.name });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error("Error sending single tender invite:", error);
+    res.status(500).json({ message: "Failed to send invitation", code: "INTERNAL_ERROR" });
   }
 });
 
