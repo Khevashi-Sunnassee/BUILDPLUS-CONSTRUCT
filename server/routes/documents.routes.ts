@@ -1495,6 +1495,67 @@ router.post("/api/document-bundles/:bundleId/items/:itemId/request-latest", requ
   }
 });
 
+router.post("/api/document-bundles/:bundleId/notify-updates", requireAuth, async (req, res) => {
+  try {
+    const bundleId = req.params.bundleId as string;
+    const companyId = req.companyId;
+
+    if (!emailService.isConfigured()) {
+      return res.status(503).json({ error: "Email service is not configured" });
+    }
+
+    const schema = z.object({
+      recipientEmail: z.string().email(),
+      recipientName: z.string().optional(),
+      updatedDocuments: z.array(z.object({
+        documentTitle: z.string(),
+        documentNumber: z.string().optional(),
+        oldVersion: z.string().optional(),
+        newVersion: z.string().optional(),
+      })).min(1),
+    });
+    const data = schema.parse(req.body);
+
+    const bundle = await storage.getDocumentBundle(bundleId);
+    if (!bundle || bundle.companyId !== companyId) {
+      return res.status(404).json({ error: "Bundle not found" });
+    }
+
+    const docListHtml = data.updatedDocuments.map(d =>
+      `<li><strong>${d.documentTitle}</strong>${d.documentNumber ? ` (${d.documentNumber})` : ""}${d.oldVersion && d.newVersion ? ` — updated from v${d.oldVersion} to v${d.newVersion}` : ""}</li>`
+    ).join("");
+
+    const htmlBody = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2 style="color: #1a56db;">Document Bundle Update Notice</h2>
+      <p>Dear ${data.recipientName || "Recipient"},</p>
+      <p>Please be advised that the following documents in bundle <strong>${bundle.bundleName}</strong> have been updated:</p>
+      <ul>${docListHtml}</ul>
+      <p>Please ensure you are referencing the latest versions of these documents.</p>
+      <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e0e0e0; font-size: 12px; color: #999;">
+        <p>This is an automated notification from BuildPlus AI. Please do not reply directly to this email.</p>
+      </div>
+    </div>`;
+
+    const result = await emailService.sendEmailWithAttachment({
+      to: data.recipientEmail,
+      subject: `Document Bundle Update - ${bundle.bundleName}`,
+      body: htmlBody,
+    });
+
+    if (result.success) {
+      res.json({ sent: true, messageId: result.messageId, recipientEmail: data.recipientEmail });
+    } else {
+      res.status(500).json({ sent: false, error: result.error });
+    }
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ message: "Validation error", code: "VALIDATION_ERROR", errors: error.errors });
+    }
+    logger.error({ err: error }, "Error sending bundle update notification");
+    res.status(500).json({ error: "Failed to send notification" });
+  }
+});
+
 // ==================== PUBLIC BUNDLE ACCESS (No Auth) ====================
 
 // Helper to get client IP address
