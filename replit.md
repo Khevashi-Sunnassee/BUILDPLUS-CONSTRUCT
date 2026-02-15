@@ -139,6 +139,14 @@ Standard handler pattern, no TODOs/FIXMEs, consistent naming, logger usage (647)
 
 ## Recent Changes
 
+### 2026-02-15 (Session 1)
+- Implemented multi-company visibility and switching:
+  * `/me` endpoint now returns `companyName` and `activeCompanyId` based on session's current companyId (supports admin company switching).
+  * Added `POST /switch-company` endpoint (admin-only, requireAuth) with Zod validation, verifies target company exists and is active before updating session.
+  * Sidebar shows company name under logo for all users; admins with multiple companies see a dropdown switcher.
+  * Company switch clears React Query cache and refetches user data so all pages reflect the new company's data.
+  * Session-based company switching integrates with existing middleware (`req.companyId = req.session.companyId`) for seamless data isolation.
+
 ### 2026-02-14 (Session 3)
 - Fixed task auto-assign bug: Activity tasks now auto-assign creator as assignee (matching regular tasks behavior).
 - Implemented tender document staleness detection system:
