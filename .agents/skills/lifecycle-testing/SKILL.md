@@ -1,11 +1,11 @@
 ---
 name: lifecycle-testing
-description: Complete lifecycle testing workflow for BuildPlus AI panel management. Use when running end-to-end tests of the panel lifecycle from opportunity creation through delivery and claims.
+description: Complete lifecycle testing workflow for BuildPlus AI panel management. Use when running end-to-end tests of the panel lifecycle from job setup through production, delivery, and claims.
 ---
 
 # Panel Lifecycle Testing
 
-Complete 15-stage lifecycle test for BuildPlus AI panel management system. This covers the full panel lifecycle from job type setup through opportunity creation, drafting, production scheduling, delivery, and progress claims.
+Complete 15-stage lifecycle test for BuildPlus AI panel management system. This covers the full panel lifecycle from job setup through drafting, production, delivery confirmation, and progress claims.
 
 ## Prerequisites
 
@@ -17,9 +17,26 @@ Complete 15-stage lifecycle test for BuildPlus AI panel management system. This 
 
 - Company ID: `b72c8e39-03b5-4181-bc63-d435b291d04b`
 - Factory ID: `12e8f794-370f-4601-bc9e-1831c28bd624`
+- Factory State: `VIC` (C2 Sydney Factory)
 - Admin credentials: `admin@salvo.com.au` / `admin123`
 - User ID: `8b4de49b-d70e-44aa-b195-e4d2e09bb738`
 - Test Job ID (latest): `48ded35d-df3c-405d-924d-c6742d84af45`
+- Customer ID: `5762255d-144a-4cbb-82f7-6b07025af487`
+
+## Key Schema Notes
+
+These column/enum references are commonly needed and error-prone:
+
+| Table | Important Columns | Notes |
+|-------|-------------------|-------|
+| `panel_register` | `lifecycle_status` (int), `document_status` (enum), `approved_for_production` (bool) | document_status is an enum, cast with `::text` in SQL |
+| `production_entries` | `production_date` (not `pour_date`), `factory_id`, `status`, `user_id` | No `company_id` column |
+| `daily_logs` | `user_id`, `log_day`, `factory`, `factory_id`, `status` | No `company_id` column; filtered by `user_id` |
+| `log_rows` | `daily_log_id`, `start_at`, `end_at`, `panel_mark`, `job_id`, `panel_register_id` | Linked to daily_logs |
+| `job_activities` | `status` enum: `NOT_STARTED`, `IN_PROGRESS`, `STUCK`, `DONE`, `ON_HOLD`, `SKIPPED` | NOT "COMPLETED" |
+| `delivery_records` | `load_list_id`, `docket_number`, `delivery_date`, many time fields | Linked to load_lists |
+| `load_lists` | `job_id`, `load_number`, `status`, `load_date`, `factory_id` | Status values: DRAFT, LOADING, LOADED, IN_TRANSIT, COMPLETE |
+| `progress_claims` | `subtotal`, `tax_rate`, `tax_amount`, `total` (all numeric) | Financial values in dollars |
 
 ## Complete Lifecycle Workflow
 
@@ -28,7 +45,10 @@ Complete 15-stage lifecycle test for BuildPlus AI panel management system. This 
 Before creating jobs, ensure the company has a job type with activity workflow templates:
 
 ```sql
--- Create job type
+-- Check if job type exists
+SELECT id, name FROM job_types WHERE company_id = '<companyId>';
+
+-- Create job type if needed
 INSERT INTO job_types (id, company_id, name, description, is_active) 
 VALUES (gen_random_uuid(), '<companyId>', 'Panel Manufacturing', 'Full panel lifecycle', true);
 
@@ -41,27 +61,10 @@ INSERT INTO activity_templates (id, company_id, job_type_id, name, description, 
 VALUES (gen_random_uuid(), '<companyId>', '<jobTypeId>', 'Site Survey', 'Initial site assessment', '<stageId>', 5, 1);
 ```
 
-### Stage 2: Create Opportunity
+### Stage 2: Create Customer & Job
 
 ```bash
-curl -X POST /api/opportunities -d '{
-  "companyName": "Test Client",
-  "contactName": "Test Contact",
-  "email": "test@example.com",
-  "phone": "0400000000",
-  "estimatedValue": 500000,
-  "status": "NEW",
-  "source": "REFERRAL"
-}'
-```
-
-### Stage 3: Win Opportunity & Create Job
-
-```bash
-# Update opportunity status to WON
-curl -X PATCH /api/opportunities/<id> -d '{"status": "WON"}'
-
-# Create customer
+# Create customer (if needed)
 curl -X POST /api/customers -d '{
   "name": "Test Client Pty Ltd",
   "contactName": "Test Contact",
@@ -79,11 +82,12 @@ curl -X POST /api/jobs -d '{
 }'
 ```
 
-### Stage 4: Register Panels
+### Stage 3: Register Panels
 
 Panels must have correct level values (numeric strings like "1", "2") for production slot matching.
 
 ```bash
+# Register 5 panels per level (10 total for a 2-level job)
 curl -X POST /api/panels/register -d '{
   "jobId": "<jobId>",
   "panelMark": "L1-P01",
@@ -93,11 +97,12 @@ curl -X POST /api/panels/register -d '{
   "width": 3000,
   "thickness": 200
 }'
+# Repeat for L1-P02..L1-P05 (level "1") and L2-P01..L2-P05 (level "2")
 ```
 
-### Stage 5: Configure Job for Production
+### Stage 4: Configure Job for Production
 
-Set production parameters on the job. **IMPORTANT:** Use a production_start_date within the next 30 days so it appears in the Production Schedule page (which defaults to today + 30 days).
+**IMPORTANT:** Use a `production_start_date` within the next 30 days so it appears in the Production Schedule page (which defaults to today + 30 days).
 
 ```sql
 UPDATE jobs SET 
@@ -108,43 +113,39 @@ UPDATE jobs SET
 WHERE id = '<jobId>';
 ```
 
-### Stage 6: Generate Production Slots
+### Stage 5: Generate Production Slots
 
 ```bash
-curl -X POST /api/production-slots/generate -d '{
-  "jobId": "<jobId>"
-}'
+curl -X POST /api/production-slots/generate -d '{"jobId": "<jobId>"}'
 ```
 
-This creates one slot per level. Verify:
+Creates one slot per level. Verify:
 ```sql
-SELECT * FROM production_slots WHERE job_id = '<jobId>';
+SELECT id, level, status::text FROM production_slots WHERE job_id = '<jobId>';
 ```
 
-### Stage 7: Generate Drafting Program
+### Stage 6: Generate Drafting Program
 
 ```bash
-curl -X POST /api/drafting-program/generate -d '{
-  "jobId": "<jobId>"
-}'
+curl -X POST /api/drafting-program/generate -d '{"jobId": "<jobId>"}'
 ```
 
 Creates one entry per panel. Verify:
 ```sql
-SELECT id, panel_id, status FROM drafting_program WHERE job_id = '<jobId>';
+SELECT id, panel_id, status::text FROM drafting_program WHERE job_id = '<jobId>';
 ```
 
-### Stage 8: Create Drafting Register Entries (Daily Logs)
+### Stage 7: Create Drafting Register Entries (Daily Logs)
 
-The Drafting Register (at `/daily-reports`) shows daily time log entries for drafters working on panels. These must be created BEFORE panels are advanced to IFC status. Each entry represents time spent drafting a panel in Revit/AutoCAD.
+The Drafting Register page (`/daily-reports`) shows daily time log entries. The page defaults to "This Week" date range, so **daily log dates MUST be within the current week** (today or recent days).
 
 The `/api/manual-entry` endpoint auto-creates or reuses `daily_logs` records grouped by date. Each call creates one `log_rows` entry linked to a daily log.
 
 ```bash
-# Create manual time entries for each panel (this auto-creates daily_logs)
-# Repeat for each panel, distributing across multiple days
+# Create manual time entries for each panel
+# Use CURRENT dates (today and yesterday) so they appear in "This Week" filter
 curl -X POST /api/manual-entry -d '{
-  "logDay": "2026-02-09",
+  "logDay": "<today YYYY-MM-DD>",
   "jobId": "<jobId>",
   "panelRegisterId": "<panelId>",
   "app": "Revit",
@@ -154,28 +155,30 @@ curl -X POST /api/manual-entry -d '{
   "drawingCode": "DWG-L1-P01",
   "notes": "Drafting work on panel L1-P01"
 }'
+# Repeat for each panel, distributing 5 per day across 2 days
 ```
 
-After creating all entries, retrieve the daily log IDs and submit/approve them:
+After creating all entries, submit and approve the daily logs:
 
 ```bash
 # Get daily log IDs
 curl -s /api/daily-logs?dateRange=all
+# Returns array with id, logDay, status
 
 # Submit each daily log
 curl -X POST /api/daily-logs/<logId>/submit
 
-# Approve each daily log (requires approval permission)
+# Approve each daily log
 curl -X POST /api/daily-logs/<logId>/approve -d '{"approve": true, "comment": "Approved"}'
 ```
 
-Then update the drafting program entries to COMPLETED status:
+Update drafting program entries to COMPLETED:
 
 ```bash
 # For each drafting program entry
 curl -X PATCH /api/drafting-program/<draftingProgramId> -d '{
   "status": "COMPLETED",
-  "completedAt": "2026-02-10T16:00:00.000Z",
+  "completedAt": "<ISO datetime>",
   "estimatedHours": "1.5",
   "actualHours": "1.5"
 }'
@@ -183,41 +186,27 @@ curl -X PATCH /api/drafting-program/<draftingProgramId> -d '{
 
 Verify:
 ```sql
-SELECT COUNT(*) FROM daily_logs WHERE user_id = '<userId>';
+SELECT log_day, status FROM daily_logs WHERE user_id = '<userId>' ORDER BY log_day DESC;
 SELECT COUNT(*) FROM log_rows WHERE daily_log_id IN (SELECT id FROM daily_logs WHERE user_id = '<userId>');
-SELECT status, COUNT(*) FROM drafting_program WHERE job_id = '<jobId>' GROUP BY status;
+SELECT status::text, COUNT(*) FROM drafting_program WHERE job_id = '<jobId>' GROUP BY status;
 ```
 
-### Stage 9: Instantiate Job Activities
+### Stage 8: Instantiate Job Activities
 
 ```bash
 curl -X POST /api/jobs/<jobId>/activities/instantiate
 ```
 
-Creates activities from the job type's workflow templates. Verify:
+Verify:
 ```sql
-SELECT name, status FROM job_activities WHERE job_id = '<jobId>' ORDER BY sort_order;
+SELECT name, status::text FROM job_activities WHERE job_id = '<jobId>' ORDER BY sort_order;
 ```
 
-### Stage 10: Advance Panel Lifecycle & Document Status
+### Stage 9: Advance Panel Lifecycle & Document Status
 
-Panel lifecycle stages (lifecycle_status values):
-- 1: REGISTERED
-- 2: ESTIMATE_APPROVED
-- 3: APPROVED_FOR_DRAFTING
-- 4: DRAFTING_IN_PROGRESS
-- 5: DRAFTED
-- 6: IFC (Issued for Construction)
-- 7: REO_SCHEDULED
-- 8: APPROVED_FOR_PRODUCTION
-- 9: IN_PRODUCTION
-- 10: PRODUCED
-- 11: SHIPPED
-
-**IMPORTANT:** Also set `document_status` and `approved_for_production` fields. These are used by the Production Schedule page to determine which panels are "Ready for Production".
+**IMPORTANT:** Set `document_status` and `approved_for_production` fields. These are used by the Production Schedule page to determine "Ready for Production" panels.
 
 ```sql
--- Advance all panels through lifecycle and set document/production status
 UPDATE panel_register SET 
   lifecycle_status = 11,
   document_status = 'IFC',
@@ -225,63 +214,117 @@ UPDATE panel_register SET
 WHERE job_id = '<jobId>';
 ```
 
-### Stage 11: Create Production Entries (Production Schedule)
+### Stage 10: Create Production Entries (Production Schedule)
 
-Production entries populate the **Production Schedule** page (`/production-schedule`). **IMPORTANT:** The `production_date` must be within the page's default date range (today to today+30 days) for entries to be visible.
-
-The `production_entries` table columns: `id, panel_id, job_id, user_id, production_date, volume_m3, area_m2, notes, factory, status, bay_number, factory_id`.
+**IMPORTANT:** The `production_date` must be within the page's default 30-day date range (today to today+30) for entries to be visible on the Production Schedule page.
 
 ```sql
--- Create production entries with dates within the visible range
 INSERT INTO production_entries (id, panel_id, job_id, user_id, production_date, factory_id, status)
 SELECT gen_random_uuid(), id, job_id, '<userId>', CURRENT_DATE + INTERVAL '14 days', '<factoryId>', 'COMPLETED'
 FROM panel_register WHERE job_id = '<jobId>';
 ```
 
-Verify production schedule is visible:
+Verify:
 ```bash
 curl "/api/production-schedule/stats"
+# Should show completed: 10
 curl "/api/production-schedule/days?startDate=<today>&endDate=<today+30>&factoryId=<factoryId>"
+# Should show 1 day with 10 panels
 ```
 
-### Stage 12: Create Reo Schedules
+### Stage 11: Create Reo Schedules
 
 ```sql
--- Create reo schedules with COMPLETED status
 INSERT INTO reo_schedules (id, company_id, job_id, panel_id, status)
 SELECT gen_random_uuid(), company_id, job_id, id, 'COMPLETED'
 FROM panel_register WHERE job_id = '<jobId>';
 ```
 
-### Stage 13: Complete Job Activities
-
-Job activities use the `activity_status` enum: `NOT_STARTED`, `IN_PROGRESS`, `STUCK`, `DONE`, `ON_HOLD`, `SKIPPED`.
+### Stage 12: Complete Job Activities
 
 ```sql
--- Mark all activities as DONE
 UPDATE job_activities SET status = 'DONE' WHERE job_id = '<jobId>';
 ```
 
-### Stage 14: Create Load List & Delivery
+### Stage 13: Create Load List with Panels
 
 ```bash
-# Create load list
+# Create load list with complete data
 curl -X POST /api/load-lists -d '{
   "jobId": "<jobId>",
   "loadNumber": "LOAD-001",
-  "status": "DELIVERED"
+  "status": "COMPLETE"
 }'
+```
 
-# Add panels to load list
+Then update with factory and date:
+```sql
+UPDATE load_lists SET 
+  load_date = CURRENT_DATE + INTERVAL '14 days',
+  load_time = '06:00',
+  factory_id = '<factoryId>'
+WHERE job_id = '<jobId>';
+```
+
+Add all panels:
+```bash
 curl -X POST /api/load-lists/<loadListId>/panels -d '{
-  "panelIds": ["<panelId1>", "<panelId2>"]
+  "panelIds": ["<panelId1>", "<panelId2>", ... ]
 }'
+```
 
-# Create delivery record
-curl -X POST /api/delivery-records -d '{
-  "loadListId": "<loadListId>",
-  "deliveryDate": "2026-04-15"
+Verify:
+```sql
+SELECT load_number, status, load_date, factory_id FROM load_lists WHERE job_id = '<jobId>';
+SELECT COUNT(*) FROM load_list_panels WHERE load_list_id = '<loadListId>';
+```
+
+### Stage 14: Create Delivery Record (Delivery Confirmation)
+
+Create a complete delivery record with truck details, times, and location data.
+
+**IMPORTANT:** The delivery creation endpoint is on the load list, NOT a standalone route:
+
+```bash
+# Create delivery record via load list endpoint
+curl -X POST /api/load-lists/<loadListId>/delivery -d '{
+  "deliveryDate": "<delivery date>",
+  "docketNumber": "DEL-2026-0001"
 }'
+```
+
+Then populate all delivery fields via update:
+
+```bash
+# Update delivery record with full details
+curl -X PUT /api/delivery-records/<deliveryRecordId> -d '{...}'
+```
+
+Or populate via SQL:
+```sql
+UPDATE delivery_records SET 
+  docket_number = 'DEL-2026-0001',
+  load_document_number = 'LD-001',
+  truck_rego = 'ABC-123',
+  trailer_rego = 'TRL-456',
+  preload = 'Standard flatbed',
+  load_number = 'LOAD-001',
+  number_panels = 10,
+  comment = 'Full delivery of all panels',
+  start_time = '06:00',
+  leave_depot_time = '06:30',
+  arrive_lte_time = '07:00',
+  pickup_location = '<Factory Name>',
+  pickup_arrive_time = '07:15',
+  pickup_leave_time = '08:00',
+  delivery_location = '<Site Address>',
+  arrive_holding_time = '09:00',
+  leave_holding_time = '09:15',
+  site_first_lift_time = '09:30',
+  site_last_lift_time = '12:30',
+  return_depot_arrive_time = '13:30',
+  total_hours = '7.5'
+WHERE load_list_id = '<loadListId>';
 ```
 
 ### Stage 15: Create Progress Claim
@@ -291,21 +334,27 @@ curl -X POST /api/progress-claims -d '{
   "jobId": "<jobId>",
   "claimNumber": "PC-001",
   "claimType": "PROGRESS",
-  "status": "DRAFT",
-  "subtotal": 450000,
-  "taxRate": 10,
-  "taxAmount": 45000,
-  "total": 495000
+  "status": "DRAFT"
 }'
+```
+
+Then set financial values:
+```sql
+UPDATE progress_claims SET 
+  subtotal = 450000,
+  tax_rate = 10,
+  tax_amount = 45000,
+  total = 495000
+WHERE job_id = '<jobId>';
 ```
 
 ## Verification Checklist
 
-After completing all stages, verify data exists across all entities:
+After completing all stages, run this comprehensive check:
 
 ```sql
--- Should return counts for each entity
-SELECT 'panel_register' as entity, COUNT(*) FROM panel_register WHERE job_id = '<jobId>'
+-- Entity counts
+SELECT 'panel_register' as entity, COUNT(*) as count FROM panel_register WHERE job_id = '<jobId>'
 UNION ALL SELECT 'production_slots', COUNT(*) FROM production_slots WHERE job_id = '<jobId>'
 UNION ALL SELECT 'drafting_program', COUNT(*) FROM drafting_program WHERE job_id = '<jobId>'
 UNION ALL SELECT 'daily_logs', COUNT(*) FROM daily_logs WHERE user_id = '<userId>'
@@ -314,10 +363,12 @@ UNION ALL SELECT 'job_activities', COUNT(*) FROM job_activities WHERE job_id = '
 UNION ALL SELECT 'production_entries', COUNT(*) FROM production_entries WHERE job_id = '<jobId>'
 UNION ALL SELECT 'reo_schedules', COUNT(*) FROM reo_schedules WHERE job_id = '<jobId>'
 UNION ALL SELECT 'load_lists', COUNT(*) FROM load_lists WHERE job_id = '<jobId>'
+UNION ALL SELECT 'load_list_panels', COUNT(*) FROM load_list_panels WHERE load_list_id IN (SELECT id FROM load_lists WHERE job_id = '<jobId>')
+UNION ALL SELECT 'delivery_records', COUNT(*) FROM delivery_records WHERE load_list_id IN (SELECT id FROM load_lists WHERE job_id = '<jobId>')
 UNION ALL SELECT 'progress_claims', COUNT(*) FROM progress_claims WHERE job_id = '<jobId>';
 ```
 
-Also verify statuses are correct:
+Status verification:
 ```sql
 SELECT 'drafting_program' as entity, status::text, COUNT(*) FROM drafting_program WHERE job_id = '<jobId>' GROUP BY status
 UNION ALL SELECT 'daily_logs', status::text, COUNT(*) FROM daily_logs WHERE user_id = '<userId>' GROUP BY status
@@ -326,31 +377,45 @@ UNION ALL SELECT 'reo_schedules', status::text, COUNT(*) FROM reo_schedules WHER
 UNION ALL SELECT 'job_activities', status::text, COUNT(*) FROM job_activities WHERE job_id = '<jobId>' GROUP BY status;
 ```
 
+Delivery record completeness:
+```sql
+SELECT docket_number, truck_rego, delivery_date, number_panels, total_hours, 
+  delivery_location, site_first_lift_time, site_last_lift_time
+FROM delivery_records WHERE load_list_id IN (SELECT id FROM load_lists WHERE job_id = '<jobId>');
+```
+
+Progress claim values:
+```sql
+SELECT claim_number, status, subtotal, tax_rate, tax_amount, total 
+FROM progress_claims WHERE job_id = '<jobId>';
+```
+
 ## Page-Level Verification
 
-Verify each page shows data by hitting its API endpoint:
-
-| Page | Route | Key API Endpoint | What to Check |
+| Page | Route | Key API Endpoint | Expected Data |
 |------|-------|------------------|---------------|
-| Drafting Program | `/drafting-program` | `GET /api/drafting-program` | All entries show COMPLETED status |
-| Drafting Register | `/daily-reports` | `GET /api/daily-logs?dateRange=all` | Daily logs with APPROVED status, row counts |
-| Production Schedule | `/production-schedule` | `GET /api/production-schedule/days?startDate=...&endDate=...` | Days with panels within date range |
+| Drafting Program | `/drafting-program` | `GET /api/drafting-program` | 10 entries, all COMPLETED |
+| Drafting Register | `/daily-reports` | `GET /api/daily-logs?dateRange=week` | 2 daily logs (today+yesterday), APPROVED, 5 rows each |
+| Production Schedule | `/production-schedule` | `GET /api/production-schedule/days?startDate=...&endDate=...` | 1 day with 10 panels within 30-day window |
 | Production Report | `/production-report` | `GET /api/production-report` | Panels with production data |
-| Production Slots | `/production-slots` | `GET /api/production-slots?jobId=...` | Slots per level |
+| Production Slots | `/production-slots` | `GET /api/production-slots?jobId=...` | 2 slots (one per level) |
+| Load Lists | `/load-lists` | `GET /api/load-lists?jobId=...` | 1 load list, COMPLETE status, 10 panels |
+| Delivery Records | (within load list detail) | Linked from load list | Full delivery record with times and locations |
+| Progress Claims | `/progress-claims` | `GET /api/progress-claims?jobId=...` | 1 claim, $495,000 total |
 
 ## Critical Notes
 
-- **Level matching is EXACT**: panel.level must equal slot.level exactly (e.g., "1" not "L1")
-- **Production Schedule date range**: The page defaults to today + 30 days. Production entry `production_date` MUST fall within this range or the schedule appears empty.
-- **Production Schedule "Ready Panels"**: Only shows panels with `document_status` = IFC/APPROVED, `approved_for_production` = true, AND no existing production_entries. Once entries exist, panels move to the "Production Days Register" section.
-- **Factory filter cross-company bug**: User's default factory from one company can filter out data when viewing another company. The fix validates factory exists in current company's factories list before applying default filter.
-- **Production slots require**: productionStartDate (Date), factoryId (UUID), expectedCycleTimePerFloor (number), levels (comma-separated string matching panel levels)
-- **Job activity statuses**: Use enum values `NOT_STARTED`, `IN_PROGRESS`, `STUCK`, `DONE`, `ON_HOLD`, `SKIPPED` (NOT "COMPLETED")
-- **Reo schedule statuses**: Can use `PENDING` or `COMPLETED` text values
-- **production_entries columns**: Uses `production_date` (not `pour_date`), `factory_id`, `status`, `panel_id`, `job_id`, `user_id`
-- **Multi-company context**: Users can switch companies. Company isolation is enforced server-side via req.companyId.
-- **API caching disabled**: Express ETag caching caused 304 responses with stale data. Cache-Control headers prevent this.
-- **Daily logs have no company_id column**: They are filtered by `user_id` and `factory_id`, not company_id.
+- **Daily log dates**: The Drafting Register page defaults to "This Week" date range. Daily log `log_day` values MUST be within the current week or they won't appear. Use `CURRENT_DATE` and `CURRENT_DATE - 1` when creating test data.
+- **Production Schedule date range**: The page defaults to today + 30 days. Production entry `production_date` MUST fall within this range.
+- **Production Schedule "Ready Panels"**: Only shows panels with `document_status` = IFC/APPROVED, `approved_for_production` = true, AND no existing production_entries. Once entries exist, panels appear in "Production Days Register".
+- **Level matching is EXACT**: panel.level must equal slot.level exactly (e.g., "1" not "L1").
+- **Factory filter cross-company bug**: User's default factory from one company can filter out data when viewing another company. Validate factory exists in current company before applying.
+- **Job activity statuses**: Use enum `NOT_STARTED`, `IN_PROGRESS`, `STUCK`, `DONE`, `ON_HOLD`, `SKIPPED` (NOT "COMPLETED").
+- **document_status is an enum**: Cast with `::text` in aggregate SQL queries.
+- **daily_logs has no company_id**: Filter by `user_id` and optionally `factory_id`.
+- **production_entries has no company_id**: Filter by `job_id`.
+- **Delivery records**: The `delivery_records` table has extensive time tracking fields covering the full delivery journey from depot to site and back.
+- **Progress claims**: Financial fields (`subtotal`, `tax_amount`, `total`) are numeric/decimal - set explicitly after creation.
 
 ## Cleanup
 

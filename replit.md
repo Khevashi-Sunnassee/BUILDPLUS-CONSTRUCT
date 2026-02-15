@@ -44,6 +44,15 @@ The system utilizes a client-server architecture. The frontend is a React applic
 - **Accessibility:** All interactive elements and pages adhere to accessibility standards (`aria-label`, `aria-required`, `role="alert"`).
 - **Testing:** Frontend tested with React Testing Library + Vitest (135 files, 562+ tests); data integrity verified with comprehensive company isolation tests.
 
+## Lifecycle Testing
+
+The lifecycle testing skill (`.agents/skills/lifecycle-testing/SKILL.md`) documents the complete 15-stage panel lifecycle test workflow. Key points:
+
+- **Test Company:** Salvo Property Group (admin@salvo.com.au / admin123)
+- **15 Stages:** Job setup → Panel registration → Production slots → Drafting program → Drafting Register (daily logs) → Job activities → Panel lifecycle advancement → Production entries → Reo schedules → Activity completion → Load lists → Delivery confirmation → Progress claims
+- **Date-Sensitive Data:** Daily log dates must be within the current week for the Drafting Register page; production entry dates must be within 30 days for the Production Schedule page.
+- **Schema Gotchas:** `production_entries` uses `production_date` (not `pour_date`); `daily_logs` has no `company_id` column (filter by `user_id`); `job_activities` status enum uses `DONE` not `COMPLETED`; `document_status` is an enum requiring `::text` cast in SQL aggregations.
+
 ## External Dependencies
 - **PostgreSQL**: Primary relational database.
 - **OpenAI**: AI services for PDF analysis and visual comparisons.
