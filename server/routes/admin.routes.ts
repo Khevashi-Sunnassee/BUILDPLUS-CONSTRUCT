@@ -661,6 +661,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
           if (companyPanelIds.length > 0) {
             await tx.update(conversations).set({ panelId: null }).where(and(eq(conversations.companyId, delCompanyId), isNotNull(conversations.panelId)));
             await tx.update(logRows).set({ panelRegisterId: null }).where(inArray(logRows.panelRegisterId, companyPanelIds));
+            await tx.update(timerSessions).set({ panelRegisterId: null }).where(inArray(timerSessions.panelRegisterId, companyPanelIds));
             await tx.delete(panelAuditLogs).where(inArray(panelAuditLogs.panelId, companyPanelIds));
             await tx.delete(productionEntries).where(inArray(productionEntries.panelId, companyPanelIds));
             await tx.delete(loadListPanels).where(inArray(loadListPanels.panelId, companyPanelIds));
@@ -724,6 +725,7 @@ router.post("/api/admin/data-deletion/delete", requireRole("ADMIN"), async (req,
             await tx.delete(loadListPanels).where(inArray(loadListPanels.panelId, companyPanelIdsForJobs));
             await tx.delete(progressClaimItems).where(inArray(progressClaimItems.panelId, companyPanelIdsForJobs));
             await tx.update(logRows).set({ panelRegisterId: null }).where(inArray(logRows.panelRegisterId, companyPanelIdsForJobs));
+            await tx.update(timerSessions).set({ panelRegisterId: null }).where(inArray(timerSessions.panelRegisterId, companyPanelIdsForJobs));
             await tx.delete(panelRegister).where(inArray(panelRegister.id, companyPanelIdsForJobs));
           }
           await tx.delete(draftingProgram).where(inArray(draftingProgram.jobId, companyJobIds));
