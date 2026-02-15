@@ -65,6 +65,31 @@ function verifyDocumentDownloadToken(token: string): { documentId: string } | nu
   }
 }
 
+function generateBulkDownloadToken(documentIds: string[]): string {
+  const expiresAt = Date.now() + DOCUMENT_LINK_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+  const payload = JSON.stringify({ documentIds, expiresAt });
+  const hmac = crypto.createHmac("sha256", getDocumentLinkSecret()).update(payload).digest("hex");
+  const tokenData = Buffer.from(payload).toString("base64url");
+  return `${tokenData}.${hmac}`;
+}
+
+function verifyBulkDownloadToken(token: string): { documentIds: string[] } | null {
+  const parts = token.split(".");
+  if (parts.length !== 2) return null;
+  const [tokenData, hmac] = parts;
+  try {
+    const payload = Buffer.from(tokenData, "base64url").toString("utf-8");
+    const expectedHmac = crypto.createHmac("sha256", getDocumentLinkSecret()).update(payload).digest("hex");
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) return null;
+    const parsed = JSON.parse(payload);
+    if (!Array.isArray(parsed.documentIds) || !parsed.expiresAt) return null;
+    if (Date.now() > parsed.expiresAt) return null;
+    return { documentIds: parsed.documentIds };
+  } catch {
+    return null;
+  }
+}
+
 function formatFileSizeServer(bytes: number): string {
   if (!bytes) return "N/A";
   if (bytes < 1024) return `${bytes} B`;
@@ -1080,6 +1105,9 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
         return res.status(400).json({ error: `Could not generate links: ${failedDocs.join(", ")}` });
       }
 
+      const bulkToken = generateBulkDownloadToken(documentIds.filter(id => docsMap.has(id)));
+      const bulkDownloadUrl = `${appDomain}/api/public/documents/bulk/${bulkToken}/download`;
+
       const linksHtml = linkItems.map(item => `<tr>
         <td style="padding: 8px; font-size: 13px; color: #334155;">${item.title}</td>
         <td style="padding: 8px; font-size: 13px; color: #64748b;">${item.originalName}</td>
@@ -1090,9 +1118,14 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
         </td>
       </tr>`).join("");
 
+      const totalSize = linkItems.reduce((sum, item) => sum + item.fileSize, 0);
+
       const attachmentSummary = `
         <p style="margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: #334155;">${linkItems.length} Document${linkItems.length !== 1 ? "s" : ""} Available for Download:</p>
         <p style="margin: 0 0 12px 0; font-size: 11px; color: #94a3b8;">Links expire after 7 days</p>
+        <div style="margin: 0 0 16px 0; text-align: center;">
+          <a href="${bulkDownloadUrl}" style="display: inline-block; padding: 10px 28px; background-color: #16a34a; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 14px; font-weight: 700;">Download All as ZIP (${formatFileSizeServer(totalSize)})</a>
+        </div>
         <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse;">
           <tr style="background-color: #e2e8f0;">
             <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">Title</td>
@@ -1720,6 +1753,54 @@ router.get("/api/public/documents/:token/download", async (req: Request, res: Re
     }
     logger.error({ err: error }, "Error downloading public document via token");
     res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download document" });
+  }
+});
+
+router.get("/api/public/documents/bulk/:token/download", async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token);
+    const verified = verifyBulkDownloadToken(token);
+
+    if (!verified) {
+      return res.status(403).json({ error: "Invalid or expired download link. Please request a new link." });
+    }
+
+    const docs = await storage.getDocumentsByIds(verified.documentIds);
+    if (docs.length === 0) {
+      return res.status(404).json({ error: "No documents found" });
+    }
+
+    res.set({
+      "Content-Type": "application/zip",
+      "Content-Disposition": buildContentDisposition("attachment", "Documents.zip"),
+    });
+
+    const archive = archiver("zip", { zlib: { level: 5 } });
+    archive.on("error", (err: Error) => {
+      logger.error({ err }, "Error creating zip archive for bulk download");
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Failed to create zip archive" });
+      }
+    });
+
+    archive.pipe(res);
+
+    for (const doc of docs) {
+      try {
+        const objectFile = await objectStorageService.getObjectEntityFile(doc.storageKey);
+        const stream = objectFile.createReadStream();
+        archive.append(stream, { name: doc.originalName });
+      } catch (err) {
+        logger.warn({ docId: doc.id, err }, "Failed to add document to bulk zip, skipping");
+      }
+    }
+
+    await archive.finalize();
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error processing bulk document download");
+    if (!res.headersSent) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Failed to download documents" });
+    }
   }
 });
 
