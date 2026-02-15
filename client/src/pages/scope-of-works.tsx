@@ -142,6 +142,15 @@ export default function ScopeOfWorksPage() {
   const [aiProjectDescription, setAiProjectDescription] = useState("");
   const [aiGeneratedItems, setAiGeneratedItems] = useState<AIGeneratedItem[]>([]);
 
+  const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
+  const [aiCreateOpen, setAiCreateOpen] = useState(false);
+  const [aiCreateStep, setAiCreateStep] = useState<"form" | "generating" | "review">("form");
+  const [aiCreateName, setAiCreateName] = useState("");
+  const [aiCreateTradeId, setAiCreateTradeId] = useState("");
+  const [aiCreateJobTypeId, setAiCreateJobTypeId] = useState("");
+  const [aiCreateDescription, setAiCreateDescription] = useState("");
+  const [aiCreateGeneratedItems, setAiCreateGeneratedItems] = useState<AIGeneratedItem[]>([]);
+
   const [emailDialogOpen, setEmailDialogOpen] = useState(false);
   const [emailRecipient, setEmailRecipient] = useState("");
   const [selectedScopeIds, setSelectedScopeIds] = useState<string[]>([]);
@@ -178,13 +187,17 @@ export default function ScopeOfWorksPage() {
     queryKey: ["/api/scopes/stats"],
   });
 
-  const { data: trades = [] } = useQuery<ScopeTrade[]>({
+  const { data: rawTrades = [] } = useQuery<ScopeTrade[]>({
     queryKey: ["/api/scope-trades"],
   });
 
-  const { data: jobTypes = [] } = useQuery<JobType[]>({
+  const trades = useMemo(() => [...rawTrades].sort((a, b) => a.name.localeCompare(b.name)), [rawTrades]);
+
+  const { data: rawJobTypes = [] } = useQuery<JobType[]>({
     queryKey: ["/api/job-types"],
   });
+
+  const jobTypes = useMemo(() => [...rawJobTypes].sort((a, b) => a.name.localeCompare(b.name)), [rawJobTypes]);
 
   const { data: scopeDetail, isLoading: loadingDetail } = useQuery<Scope>({
     queryKey: ["/api/scopes", detailScope?.id],
@@ -468,6 +481,72 @@ export default function ScopeOfWorksPage() {
       });
   }
 
+  const aiCreateScopeMutation = useMutation({
+    mutationFn: async (data: { name: string; tradeId?: string; jobTypeId?: string; description?: string }) => {
+      const res = await apiRequest("POST", "/api/scopes/ai-create", data);
+      return res.json();
+    },
+    onSuccess: (data: { scope: Scope; items: AIGeneratedItem[]; count: number }) => {
+      setAiCreateGeneratedItems(data.items || []);
+      setAiCreateStep("review");
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/scopes/stats"] });
+      toast({ title: `Scope created with ${data.count || 0} items` });
+    },
+    onError: (error: Error) => {
+      toast({ title: "AI Creation Failed", description: error.message, variant: "destructive" });
+      setAiCreateStep("form");
+    },
+  });
+
+  function openCreateModeDialog() {
+    setCreateModeDialogOpen(true);
+  }
+
+  function handleChooseManual() {
+    setCreateModeDialogOpen(false);
+    openCreateScope();
+  }
+
+  function handleChooseAI() {
+    setCreateModeDialogOpen(false);
+    setAiCreateOpen(true);
+    setAiCreateStep("form");
+    setAiCreateName("");
+    setAiCreateTradeId("");
+    setAiCreateJobTypeId("");
+    setAiCreateDescription("");
+    setAiCreateGeneratedItems([]);
+  }
+
+  function closeAiCreate() {
+    setAiCreateOpen(false);
+    setAiCreateStep("form");
+    setAiCreateName("");
+    setAiCreateTradeId("");
+    setAiCreateJobTypeId("");
+    setAiCreateDescription("");
+    setAiCreateGeneratedItems([]);
+  }
+
+  function handleAiCreateSubmit() {
+    if (!aiCreateName.trim()) {
+      toast({ title: "Name is required", variant: "destructive" });
+      return;
+    }
+    if (!aiCreateTradeId || aiCreateTradeId === "none") {
+      toast({ title: "Please select a trade for AI generation", variant: "destructive" });
+      return;
+    }
+    setAiCreateStep("generating");
+    aiCreateScopeMutation.mutate({
+      name: aiCreateName.trim(),
+      tradeId: aiCreateTradeId,
+      jobTypeId: aiCreateJobTypeId && aiCreateJobTypeId !== "none" ? aiCreateJobTypeId : undefined,
+      description: aiCreateDescription.trim() || undefined,
+    });
+  }
+
   function handleEmailSend() {
     if (!emailRecipient.trim()) {
       toast({ title: "Recipient email is required", variant: "destructive" });
@@ -545,7 +624,7 @@ export default function ScopeOfWorksPage() {
               Email ({selectedScopeIds.length})
             </Button>
           )}
-          <Button onClick={openCreateScope} data-testid="button-add-scope">
+          <Button onClick={openCreateModeDialog} data-testid="button-add-scope">
             <Plus className="h-4 w-4 mr-2" />
             Add Scope
           </Button>
@@ -1287,6 +1366,175 @@ export default function ScopeOfWorksPage() {
               Send Email
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createModeDialogOpen} onOpenChange={setCreateModeDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle data-testid="text-create-mode-title">Create Scope</DialogTitle>
+            <DialogDescription>Choose how you want to create your scope of works</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <button
+              onClick={handleChooseManual}
+              className="flex flex-col items-center gap-3 p-6 border rounded-md hover-elevate cursor-pointer text-center"
+              data-testid="button-create-manual"
+            >
+              <Pencil className="h-8 w-8 text-muted-foreground" />
+              <div>
+                <p className="font-medium">Create Manual</p>
+                <p className="text-xs text-muted-foreground mt-1">Build your scope from scratch with manual item entry</p>
+              </div>
+            </button>
+            <button
+              onClick={handleChooseAI}
+              className="flex flex-col items-center gap-3 p-6 border rounded-md hover-elevate cursor-pointer text-center border-primary/30 bg-primary/5"
+              data-testid="button-create-ai"
+            >
+              <Sparkles className="h-8 w-8 text-primary" />
+              <div>
+                <p className="font-medium">Create with AI</p>
+                <p className="text-xs text-muted-foreground mt-1">AI generates a comprehensive scope with 40-80 items</p>
+              </div>
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={aiCreateOpen} onOpenChange={(open) => { if (!open) closeAiCreate(); }}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2" data-testid="text-ai-create-title">
+              <Sparkles className="h-5 w-5" />
+              {aiCreateStep === "form" && "Create Scope with AI"}
+              {aiCreateStep === "generating" && "Generating Comprehensive Scope..."}
+              {aiCreateStep === "review" && "AI-Generated Scope"}
+            </DialogTitle>
+            <DialogDescription>
+              {aiCreateStep === "form" && "Provide details and AI will generate an extremely comprehensive scope of works with 40-80 detailed items."}
+              {aiCreateStep === "generating" && "AI is creating your scope and generating detailed items. This may take 30-60 seconds."}
+              {aiCreateStep === "review" && `Generated ${aiCreateGeneratedItems.length} items. Your scope has been created and all items added.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiCreateStep === "form" && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-scope-name">Scope Name *</Label>
+                <Input
+                  id="ai-scope-name"
+                  value={aiCreateName}
+                  onChange={(e) => setAiCreateName(e.target.value)}
+                  placeholder="e.g. Bricklaying Scope of Works"
+                  data-testid="input-ai-scope-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-scope-trade">Trade *</Label>
+                <Select value={aiCreateTradeId} onValueChange={setAiCreateTradeId}>
+                  <SelectTrigger data-testid="select-ai-scope-trade">
+                    <SelectValue placeholder="Select trade..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {trades.map((trade) => (
+                      <SelectItem key={trade.id} value={trade.id}>
+                        {trade.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-scope-jobtype">Job Type (optional)</Label>
+                <Select value={aiCreateJobTypeId} onValueChange={setAiCreateJobTypeId}>
+                  <SelectTrigger data-testid="select-ai-scope-jobtype">
+                    <SelectValue placeholder="Select job type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Job Type</SelectItem>
+                    {jobTypes.map((jt) => (
+                      <SelectItem key={jt.id} value={jt.id}>
+                        {jt.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-scope-desc">Project Description (optional)</Label>
+                <Textarea
+                  id="ai-scope-desc"
+                  value={aiCreateDescription}
+                  onChange={(e) => setAiCreateDescription(e.target.value)}
+                  placeholder="Describe the project for more targeted scope items..."
+                  rows={3}
+                  data-testid="textarea-ai-scope-description"
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={closeAiCreate} data-testid="button-cancel-ai-create">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleAiCreateSubmit}
+                  disabled={!aiCreateName.trim() || !aiCreateTradeId || aiCreateTradeId === "none"}
+                  data-testid="button-submit-ai-create"
+                >
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Generate Scope
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
+          {aiCreateStep === "generating" && (
+            <div className="flex flex-col items-center justify-center py-16 gap-4">
+              <Loader2 className="h-12 w-12 animate-spin text-primary" />
+              <p className="text-muted-foreground">AI is generating a comprehensive scope of works...</p>
+              <p className="text-xs text-muted-foreground">This includes general requirements, materials, methodology, QA, safety, warranties, and more</p>
+            </div>
+          )}
+
+          {aiCreateStep === "review" && (
+            <div className="space-y-4">
+              <div className="bg-muted/50 rounded-md p-3 text-sm">
+                <span className="font-medium">{aiCreateGeneratedItems.length}</span> items generated across{" "}
+                <span className="font-medium">
+                  {new Set(aiCreateGeneratedItems.map(i => i.category)).size}
+                </span>{" "}
+                categories. All items have been added to your scope.
+              </div>
+
+              <div className="border rounded-md overflow-auto max-h-96">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-48">Category</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {aiCreateGeneratedItems.map((item, idx) => (
+                      <TableRow key={idx} data-testid={`row-ai-create-item-${idx}`}>
+                        <TableCell className="text-muted-foreground text-xs">{item.category}</TableCell>
+                        <TableCell className="font-medium text-sm">{item.description}</TableCell>
+                        <TableCell className="text-muted-foreground text-xs">{item.details}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DialogFooter>
+                <Button onClick={closeAiCreate} data-testid="button-close-ai-create">
+                  <Check className="h-4 w-4 mr-2" />
+                  Done
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
