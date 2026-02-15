@@ -6,7 +6,7 @@ import { requireAuth, requireRole } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { scopeTrades, scopes, scopeItems, tenderScopes, jobTypes, tenders, users } from "@shared/schema";
+import { scopeTrades, scopes, scopeItems, tenderScopes, jobTypes, tenders, users, costCodes } from "@shared/schema";
 import { eq, and, desc, asc, sql, ilike, or, inArray, count } from "drizzle-orm";
 import OpenAI from "openai";
 import { emailService } from "../services/email.service";
@@ -38,6 +38,7 @@ function isValidId(id: string): boolean { return uuidRegex.test(id); }
 const tradeSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().nullable().optional(),
+  costCodeId: z.string().nullable().optional(),
   isActive: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });
@@ -79,6 +80,21 @@ async function verifyTradeOwnership(companyId: string, tradeId: string) {
 }
 
 // ============ TRADE MANAGEMENT ============
+
+router.get("/api/scope-trades/cost-codes", requireAuth, requirePermission("scopes", "VIEW"), async (req: Request, res: Response) => {
+  try {
+    const companyId = req.session.companyId!;
+    const results = await db
+      .select({ id: costCodes.id, code: costCodes.code, name: costCodes.name })
+      .from(costCodes)
+      .where(and(eq(costCodes.companyId, companyId), eq(costCodes.isActive, true)))
+      .orderBy(asc(costCodes.sortOrder), asc(costCodes.code));
+    res.json(results);
+  } catch (error: unknown) {
+    logger.error({ err: error }, "Error fetching cost codes for scope trades");
+    res.status(500).json({ message: "Failed to fetch cost codes" });
+  }
+});
 
 router.get("/api/scope-trades", requireAuth, requirePermission("scopes", "VIEW"), async (req: Request, res: Response) => {
   try {
@@ -139,6 +155,7 @@ router.post("/api/scope-trades", requireAuth, requirePermission("scopes", "VIEW_
         companyId,
         name: data.name,
         description: data.description || null,
+        costCodeId: data.costCodeId || null,
         isActive: data.isActive ?? true,
         sortOrder: data.sortOrder ?? 0,
       })
@@ -167,6 +184,7 @@ router.put("/api/scope-trades/:id", requireAuth, requirePermission("scopes", "VI
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description || null;
+    if (data.costCodeId !== undefined) updateData.costCodeId = data.costCodeId || null;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.sortOrder !== undefined) updateData.sortOrder = data.sortOrder;
 
@@ -1296,6 +1314,7 @@ router.get("/api/tenders/:tenderId/scopes", requireAuth, requirePermission("tend
         trade: {
           id: scopeTrades.id,
           name: scopeTrades.name,
+          costCodeId: scopeTrades.costCodeId,
         },
       })
       .from(tenderScopes)

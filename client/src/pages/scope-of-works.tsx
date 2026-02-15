@@ -40,6 +40,13 @@ interface ScopeTrade {
   id: string;
   name: string;
   description?: string | null;
+  costCodeId?: string | null;
+}
+
+interface CostCodeOption {
+  id: string;
+  code: string;
+  name: string;
 }
 
 interface JobType {
@@ -155,6 +162,8 @@ export default function ScopeOfWorksPage() {
   const [aiProjectDescription, setAiProjectDescription] = useState("");
   const [aiGeneratedItems, setAiGeneratedItems] = useState<AIGeneratedItem[]>([]);
 
+  const [manageTradesOpen, setManageTradesOpen] = useState(false);
+
   const [createModeDialogOpen, setCreateModeDialogOpen] = useState(false);
   const [aiCreateOpen, setAiCreateOpen] = useState(false);
   const [aiCreateStep, setAiCreateStep] = useState<"form" | "generating" | "review">("form");
@@ -217,6 +226,24 @@ export default function ScopeOfWorksPage() {
   });
 
   const trades = useMemo(() => [...rawTrades].sort((a, b) => a.name.localeCompare(b.name)), [rawTrades]);
+
+  const { data: costCodes = [] } = useQuery<CostCodeOption[]>({
+    queryKey: ["/api/scope-trades/cost-codes"],
+    enabled: manageTradesOpen,
+  });
+
+  const updateTradeMutation = useMutation({
+    mutationFn: async ({ id, costCodeId }: { id: string; costCodeId: string | null }) => {
+      return apiRequest("PUT", `/api/scope-trades/${id}`, { costCodeId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scope-trades"] });
+      toast({ title: "Trade updated" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
 
   const { data: rawJobTypes = [] } = useQuery<JobType[]>({
     queryKey: ["/api/job-types"],
@@ -744,6 +771,16 @@ export default function ScopeOfWorksPage() {
               {seedTradesMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Layers className="h-4 w-4 mr-2" />
               Seed Default Trades
+            </Button>
+          )}
+          {trades.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => setManageTradesOpen(true)}
+              data-testid="button-manage-trades"
+            >
+              <Layers className="h-4 w-4 mr-2" />
+              Manage Trades
             </Button>
           )}
           {selectedScopeIds.length > 0 && (
@@ -1939,6 +1976,62 @@ export default function ScopeOfWorksPage() {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={manageTradesOpen} onOpenChange={setManageTradesOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle data-testid="text-manage-trades-title">Manage Trades</DialogTitle>
+            <DialogDescription>
+              Link scope trades to cost codes for accurate supplier matching in tenders.
+            </DialogDescription>
+          </DialogHeader>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Trade</TableHead>
+                <TableHead>Linked Cost Code</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {trades.map((trade) => {
+                return (
+                  <TableRow key={trade.id} data-testid={`row-trade-${trade.id}`}>
+                    <TableCell className="font-medium">{trade.name}</TableCell>
+                    <TableCell>
+                      <Select
+                        value={trade.costCodeId || "none"}
+                        onValueChange={(val) => {
+                          updateTradeMutation.mutate({
+                            id: trade.id,
+                            costCodeId: val === "none" ? null : val,
+                          });
+                        }}
+                      >
+                        <SelectTrigger data-testid={`select-trade-cost-code-${trade.id}`}>
+                          <SelectValue placeholder="Select cost code..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">No cost code linked</SelectItem>
+                          {costCodes.map((cc) => (
+                            <SelectItem key={cc.id} value={cc.id}>
+                              {cc.code} - {cc.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setManageTradesOpen(false)} data-testid="button-close-manage-trades">
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

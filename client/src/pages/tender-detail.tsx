@@ -114,7 +114,7 @@ interface LinkedScope {
     id: string;
     name: string;
     status: string;
-    trade: { id: string; name: string } | null;
+    trade: { id: string; name: string; costCodeId?: string | null } | null;
   };
 }
 
@@ -1322,12 +1322,22 @@ export default function TenderDetailPage() {
                     <TableHead>Supplier</TableHead>
                     <TableHead>Contact</TableHead>
                     <TableHead>Trade Category</TableHead>
+                    <TableHead>Linked Scopes</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="w-28 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {tenderMembers.map((member) => (
+                  {tenderMembers.map((member) => {
+                    const matchedScopes = linkedScopes.filter(ls => {
+                      if (!ls.scope?.trade || !member.costCode) return false;
+                      if (ls.scope.trade.costCodeId && member.costCode.id) {
+                        return ls.scope.trade.costCodeId === member.costCode.id;
+                      }
+                      if (!ls.scope.trade.name || !member.costCode.name) return false;
+                      return ls.scope.trade.name.toLowerCase() === member.costCode.name.toLowerCase();
+                    });
+                    return (
                     <TableRow key={member.id} data-testid={`row-invitation-${member.id}`}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -1370,6 +1380,20 @@ export default function TenderDetailPage() {
                           <span className="text-sm text-muted-foreground">--</span>
                         )}
                       </TableCell>
+                      <TableCell data-testid={`cell-linked-scopes-${member.id}`}>
+                        {matchedScopes.length > 0 ? (
+                          <div className="flex flex-col gap-1">
+                            {matchedScopes.map(ls => (
+                              <Badge key={ls.id} variant="secondary" data-testid={`badge-scope-${ls.id}`}>
+                                <FileText className="h-3 w-3 mr-1" />
+                                {ls.scope.name}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">--</span>
+                        )}
+                      </TableCell>
                       <TableCell>
                         <Badge
                           variant={member.status === "SENT" ? "default" : member.status === "DECLINED" ? "destructive" : "secondary"}
@@ -1408,7 +1432,8 @@ export default function TenderDetailPage() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </Card>

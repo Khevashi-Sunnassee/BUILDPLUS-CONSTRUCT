@@ -4565,6 +4565,7 @@ export const scopeTrades = pgTable("scope_trades", {
   companyId: varchar("company_id", { length: 36 }).notNull().references(() => companies.id),
   name: text("name").notNull(),
   description: text("description"),
+  costCodeId: varchar("cost_code_id", { length: 36 }).references(() => costCodes.id),
   isActive: boolean("is_active").default(true).notNull(),
   sortOrder: integer("sort_order").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -4572,6 +4573,7 @@ export const scopeTrades = pgTable("scope_trades", {
 }, (table) => ({
   companyIdx: index("scope_trades_company_idx").on(table.companyId),
   nameCompanyIdx: uniqueIndex("scope_trades_name_company_idx").on(table.name, table.companyId),
+  costCodeIdx: index("scope_trades_cost_code_idx").on(table.costCodeId),
 }));
 
 export const scopes = pgTable("scopes", {

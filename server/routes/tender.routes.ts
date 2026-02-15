@@ -5,7 +5,7 @@ import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
-import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, tenderMemberUpdates, tenderMemberFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes } from "@shared/schema";
+import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, tenderMemberUpdates, tenderMemberFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes, tenderScopes, scopes, scopeItems, scopeTrades } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
@@ -2638,10 +2638,100 @@ router.post("/api/tenders/:id/members/:memberId/send-invite", requireAuth, requi
       </div>`;
     }
 
+    let scopeSection = "";
+    try {
+      const supplierCostCode = row.supplier?.id
+        ? await db.select({ id: costCodes.id, name: costCodes.name })
+            .from(suppliers)
+            .innerJoin(costCodes, eq(suppliers.defaultCostCodeId, costCodes.id))
+            .where(eq(suppliers.id, row.supplier.id))
+            .then(rows => rows[0] || null)
+        : null;
+
+      if (supplierCostCode) {
+        const linkedScopeRows = await db
+          .select({
+            scopeId: tenderScopes.scopeId,
+            scopeName: scopes.name,
+            tradeName: scopeTrades.name,
+          })
+          .from(tenderScopes)
+          .innerJoin(scopes, eq(tenderScopes.scopeId, scopes.id))
+          .innerJoin(scopeTrades, eq(scopes.tradeId, scopeTrades.id))
+          .where(and(
+            eq(tenderScopes.tenderId, tenderId),
+            eq(tenderScopes.companyId, companyId),
+            sql`(${scopeTrades.costCodeId} = ${supplierCostCode.id} OR (${scopeTrades.costCodeId} IS NULL AND LOWER(${scopeTrades.name}) = LOWER(${supplierCostCode.name})))`
+          ));
+
+        if (linkedScopeRows.length > 0) {
+          const scopeIds = linkedScopeRows.map(s => s.scopeId);
+          const allItems = await db
+            .select({
+              scopeId: scopeItems.scopeId,
+              category: scopeItems.category,
+              description: scopeItems.description,
+              status: scopeItems.status,
+              sortOrder: scopeItems.sortOrder,
+            })
+            .from(scopeItems)
+            .where(and(
+              inArray(scopeItems.scopeId, scopeIds),
+              eq(scopeItems.status, "INCLUDED")
+            ))
+            .orderBy(asc(scopeItems.sortOrder));
+
+          const scopeBlocks = linkedScopeRows.map(scope => {
+            const items = allItems.filter(i => i.scopeId === scope.scopeId);
+            const grouped = new Map<string, typeof items>();
+            for (const item of items) {
+              const cat = item.category || "General";
+              if (!grouped.has(cat)) grouped.set(cat, []);
+              grouped.get(cat)!.push(item);
+            }
+
+            let itemsHtml = "";
+            for (const [category, catItems] of grouped) {
+              itemsHtml += `<tr style="background-color: #e2e8f0;">
+                <td colspan="2" style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #475569; text-transform: uppercase;">${category}</td>
+              </tr>`;
+              for (const item of catItems) {
+                itemsHtml += `<tr>
+                  <td style="padding: 6px 8px; font-size: 13px; color: #334155;">${item.description}</td>
+                  <td style="padding: 6px 8px; font-size: 12px; text-align: center;">
+                    <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; background-color: #dcfce7; color: #166534;">Included</span>
+                  </td>
+                </tr>`;
+              }
+            }
+
+            return `<div style="background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+              <h3 style="margin: 0 0 4px 0; font-size: 16px;">${scope.scopeName}</h3>
+              <p style="margin: 0 0 12px 0; font-size: 12px; color: #64748b;">Trade: ${scope.tradeName}</p>
+              ${items.length > 0 ? `<table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 4px;">
+                <tr style="background-color: #cbd5e1;">
+                  <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #334155; text-transform: uppercase;">Description</td>
+                  <td style="padding: 6px 8px; font-size: 11px; font-weight: 600; color: #334155; text-transform: uppercase; text-align: center; width: 80px;">Status</td>
+                </tr>
+                ${itemsHtml}
+              </table>` : `<p style="font-size: 13px; color: #94a3b8;">No included items</p>`}
+            </div>`;
+          }).join("");
+
+          scopeSection = `<div style="margin-top: 24px; border-top: 2px solid #16a34a; padding-top: 20px;">
+            <h2 style="margin: 0 0 16px 0; font-size: 18px;">Scope of Works</h2>
+            ${scopeBlocks}
+          </div>`;
+        }
+      }
+    } catch (scopeErr) {
+      logger.warn({ err: scopeErr }, "Failed to load scopes for tender invitation, skipping scope section");
+    }
+
     const htmlBody = await buildBrandedEmail({
       title: "Tender Invitation",
       recipientName: row.supplier?.name || undefined,
-      body: `<div style="margin-bottom: 24px;">${data.message.replace(/\n/g, "<br>")}</div>${bundleSection}`,
+      body: `<div style="margin-bottom: 24px;">${data.message.replace(/\n/g, "<br>")}</div>${bundleSection}${scopeSection}`,
       companyId,
     });
 
