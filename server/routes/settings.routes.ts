@@ -19,6 +19,10 @@ const updateSettingsSchema = z.object({
   productionDaysInAdvance: z.number().int().min(1).max(60).optional(),
   procurementDaysInAdvance: z.number().int().min(1).max(60).optional(),
   procurementTimeDays: z.number().int().min(1).max(90).optional(),
+  productionWorkDays: z.array(z.boolean()).length(7).optional(),
+  draftingWorkDays: z.array(z.boolean()).length(7).optional(),
+  cfmeuCalendar: z.enum(["NONE", "CFMEU_QLD", "CFMEU_VIC"]).optional(),
+  includePOTerms: z.boolean().optional(),
 }).strict();
 
 const logoSchema = z.object({
