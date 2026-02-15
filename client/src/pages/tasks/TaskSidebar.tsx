@@ -24,13 +24,12 @@ import {
   FileAudio,
   File,
   Mail,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { Task, TaskUpdate, TaskFile } from "./types";
 import { getInitials } from "./types";
 import { MultiFileDropZone } from "@/components/MultiFileDropZone";
+import { EmailViewDialog } from "@/components/EmailViewDialog";
 
 export function TaskSidebar({
   task,
@@ -148,16 +147,7 @@ export function TaskSidebar({
 
   const [emailDragging, setEmailDragging] = useState(false);
   const emailDragCounter = useRef(0);
-  const [expandedEmails, setExpandedEmails] = useState<Set<string>>(new Set());
-
-  const toggleEmailExpand = (id: string) => {
-    setExpandedEmails(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const [selectedEmail, setSelectedEmail] = useState<TaskUpdate | null>(null);
 
   const handleUpdatesDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -450,55 +440,20 @@ export function TaskSidebar({
                           </div>
 
                           {update.contentType === "email" ? (
-                            <div className="mt-2 border rounded-md overflow-hidden">
-                              <div
-                                className="flex items-center gap-2 p-2 bg-muted/30 cursor-pointer"
-                                onClick={() => toggleEmailExpand(update.id)}
-                                data-testid={`btn-toggle-email-${update.id}`}
-                              >
+                            <div
+                              className="mt-2 border rounded-md overflow-hidden cursor-pointer hover-elevate"
+                              onClick={() => setSelectedEmail(update)}
+                              data-testid={`btn-open-email-${update.id}`}
+                            >
+                              <div className="flex items-center gap-2 p-2 bg-muted/30">
                                 <Mail className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                 <span className="text-sm font-medium truncate flex-1">
                                   {update.emailSubject || "(No Subject)"}
                                 </span>
-                                {expandedEmails.has(update.id) ? (
-                                  <ChevronUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                                )}
                               </div>
-                              {expandedEmails.has(update.id) && (
-                                <div className="border-t">
-                                  <div className="p-3 bg-muted/10 space-y-1 border-b">
-                                    {update.emailFrom && (
-                                      <div className="flex gap-2 text-xs">
-                                        <span className="font-semibold text-muted-foreground w-10 flex-shrink-0">From</span>
-                                        <span>{update.emailFrom}</span>
-                                      </div>
-                                    )}
-                                    {update.emailTo && (
-                                      <div className="flex gap-2 text-xs">
-                                        <span className="font-semibold text-muted-foreground w-10 flex-shrink-0">To</span>
-                                        <span>{update.emailTo}</span>
-                                      </div>
-                                    )}
-                                    {update.emailDate && (
-                                      <div className="flex gap-2 text-xs">
-                                        <span className="font-semibold text-muted-foreground w-10 flex-shrink-0">Date</span>
-                                        <span>
-                                          {(() => {
-                                            try {
-                                              return format(new Date(update.emailDate), "dd/MM/yyyy HH:mm");
-                                            } catch {
-                                              return update.emailDate;
-                                            }
-                                          })()}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                  <div className="p-3 max-h-80 overflow-y-auto">
-                                    <div className="text-sm leading-relaxed whitespace-pre-wrap">{update.content}</div>
-                                  </div>
+                              {update.content && (
+                                <div className="px-3 py-2 border-t">
+                                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{update.content}</p>
                                 </div>
                               )}
                             </div>
@@ -622,6 +577,12 @@ export function TaskSidebar({
           )}
         </div>
       </SheetContent>
+
+      <EmailViewDialog
+        email={selectedEmail}
+        open={!!selectedEmail}
+        onOpenChange={(open) => { if (!open) setSelectedEmail(null); }}
+      />
     </Sheet>
   );
 }

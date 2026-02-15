@@ -7,7 +7,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { emailService } from "../services/email.service";
 import { buildBrandedEmail } from "../lib/email-template";
-import { parseEmailFile } from "../utils/email-parser";
+import { parseEmailFile, summarizeEmailBody } from "../utils/email-parser";
 
 const router = Router();
 
@@ -540,16 +540,18 @@ router.post("/api/tasks/:id/email-drop", requireAuth, requirePermission("tasks",
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 
     const parsed = await parseEmailFile(file.buffer, file.originalname || "email");
+    const summary = await summarizeEmailBody(parsed.body, 80);
 
     const update = await storage.createTaskUpdate({
       taskId,
       userId,
-      content: parsed.body,
+      content: summary,
       contentType: "email",
       emailSubject: parsed.subject,
       emailFrom: parsed.from,
       emailTo: parsed.to,
       emailDate: parsed.date,
+      emailBody: parsed.body,
     });
 
     const fromUser = await storage.getUser(userId);

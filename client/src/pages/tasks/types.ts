@@ -65,6 +65,7 @@ export interface TaskUpdate {
   emailFrom?: string | null;
   emailTo?: string | null;
   emailDate?: string | null;
+  emailBody?: string | null;
   createdAt: string;
   user: User;
   files?: TaskFile[];

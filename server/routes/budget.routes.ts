@@ -4,7 +4,7 @@ import multer from "multer";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
-import { parseEmailFile } from "../utils/email-parser";
+import { parseEmailFile, summarizeEmailBody } from "../utils/email-parser";
 import { db } from "../db";
 import { jobBudgets, budgetLines, budgetLineFiles, budgetLineUpdates, budgetLineDetailItems, costCodes, childCostCodes, tenderSubmissions, tenders, tenderLineItems, suppliers, jobs, jobCostCodes, costCodeDefaults, users } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
@@ -695,6 +695,12 @@ router.get("/api/budget-lines/:lineId/updates", requireAuth, requirePermission("
         budgetLineId: budgetLineUpdates.budgetLineId,
         userId: budgetLineUpdates.userId,
         content: budgetLineUpdates.content,
+        contentType: budgetLineUpdates.contentType,
+        emailSubject: budgetLineUpdates.emailSubject,
+        emailFrom: budgetLineUpdates.emailFrom,
+        emailTo: budgetLineUpdates.emailTo,
+        emailDate: budgetLineUpdates.emailDate,
+        emailBody: budgetLineUpdates.emailBody,
         createdAt: budgetLineUpdates.createdAt,
         user: {
           id: users.id,
@@ -772,16 +778,18 @@ router.post("/api/budget-lines/:lineId/email-drop", requireAuth, requirePermissi
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 
     const parsed = await parseEmailFile(file.buffer, file.originalname || "email");
+    const summary = await summarizeEmailBody(parsed.body, 80);
 
     const [update] = await db.insert(budgetLineUpdates).values({
       budgetLineId: lineId,
       userId,
-      content: parsed.body,
+      content: summary,
       contentType: "email",
       emailSubject: parsed.subject,
       emailFrom: parsed.from,
       emailTo: parsed.to,
       emailDate: parsed.date,
+      emailBody: parsed.body,
     }).returning();
 
     res.json(update);

@@ -1913,6 +1913,7 @@ export const taskUpdates = pgTable("task_updates", {
   emailFrom: text("email_from"),
   emailTo: text("email_to"),
   emailDate: text("email_date"),
+  emailBody: text("email_body"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   taskIdx: index("task_updates_task_idx").on(table.taskId),
@@ -4462,6 +4463,7 @@ export const tenderMemberUpdates = pgTable("tender_member_updates", {
   emailFrom: text("email_from"),
   emailTo: text("email_to"),
   emailDate: text("email_date"),
+  emailBody: text("email_body"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   memberIdx: index("tender_member_updates_member_idx").on(table.tenderMemberId),
@@ -4529,6 +4531,7 @@ export const budgetLineUpdates = pgTable("budget_line_updates", {
   emailFrom: text("email_from"),
   emailTo: text("email_to"),
   emailDate: text("email_date"),
+  emailBody: text("email_body"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   budgetLineIdx: index("budget_line_updates_line_idx").on(table.budgetLineId),

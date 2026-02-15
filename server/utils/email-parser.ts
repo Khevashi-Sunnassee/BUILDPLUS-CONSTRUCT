@@ -1,4 +1,5 @@
 import { simpleParser } from "mailparser";
+import OpenAI from "openai";
 
 export interface ParsedEmail {
   subject: string;
@@ -6,6 +7,37 @@ export interface ParsedEmail {
   to: string;
   date: string;
   body: string;
+}
+
+const openai = new OpenAI();
+
+export async function summarizeEmailBody(body: string, maxWords: number = 80): Promise<string> {
+  if (!body || body.trim().length === 0) return "(Empty email)";
+  if (body.split(/\s+/).length <= maxWords) return body.trim();
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: `You are a concise email summarizer. Summarize the email in ${maxWords} words or fewer. Focus on the key points, actions, and decisions. Do not use bullet points. Write in plain prose.`,
+        },
+        {
+          role: "user",
+          content: body.substring(0, 4000),
+        },
+      ],
+      max_tokens: 200,
+      temperature: 0.3,
+    });
+
+    const result = response.choices[0]?.message?.content?.trim();
+    if (result) return result;
+    return body.split(/\s+/).slice(0, maxWords).join(" ") + "...";
+  } catch (error) {
+    return body.split(/\s+/).slice(0, maxWords).join(" ") + "...";
+  }
 }
 
 function sanitize(str: string): string {

@@ -4,7 +4,7 @@ import multer from "multer";
 import { requireAuth } from "./middleware/auth.middleware";
 import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
-import { parseEmailFile } from "../utils/email-parser";
+import { parseEmailFile, summarizeEmailBody } from "../utils/email-parser";
 import { db } from "../db";
 import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, tenderNotes, tenderFiles, tenderMemberUpdates, tenderMemberFiles, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes, tenderScopes, scopes, scopeItems, scopeTrades } from "@shared/schema";
 import { eq, and, desc, asc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
@@ -2784,6 +2784,12 @@ router.get("/api/tender-members/:id/updates", requireAuth, requirePermission("te
       tenderMemberId: tenderMemberUpdates.tenderMemberId,
       userId: tenderMemberUpdates.userId,
       content: tenderMemberUpdates.content,
+      contentType: tenderMemberUpdates.contentType,
+      emailSubject: tenderMemberUpdates.emailSubject,
+      emailFrom: tenderMemberUpdates.emailFrom,
+      emailTo: tenderMemberUpdates.emailTo,
+      emailDate: tenderMemberUpdates.emailDate,
+      emailBody: tenderMemberUpdates.emailBody,
       createdAt: tenderMemberUpdates.createdAt,
       user: {
         id: users.id,
@@ -2872,16 +2878,18 @@ router.post("/api/tender-members/:id/email-drop", requireAuth, requirePermission
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 
     const parsed = await parseEmailFile(file.buffer, file.originalname || "email");
+    const summary = await summarizeEmailBody(parsed.body, 80);
 
     const [update] = await db.insert(tenderMemberUpdates).values({
       tenderMemberId: memberId,
       userId,
-      content: parsed.body,
+      content: summary,
       contentType: "email",
       emailSubject: parsed.subject,
       emailFrom: parsed.from,
       emailTo: parsed.to,
       emailDate: parsed.date,
+      emailBody: parsed.body,
     }).returning();
 
     res.json(update);
