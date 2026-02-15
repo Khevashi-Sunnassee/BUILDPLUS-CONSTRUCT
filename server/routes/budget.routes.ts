@@ -85,28 +85,26 @@ router.get("/api/jobs/:jobId/budget", requireAuth, requirePermission("budgets", 
     let filesCounts: Record<string, number> = {};
 
     if (lineIds.length > 0) {
-      const updatesCountRows = await db
-        .select({
+      const [updatesCountRows, filesCountRows] = await Promise.all([
+        db.select({
           budgetLineId: budgetLineUpdates.budgetLineId,
           count: sql<number>`count(*)::int`,
         })
-        .from(budgetLineUpdates)
-        .where(inArray(budgetLineUpdates.budgetLineId, lineIds))
-        .groupBy(budgetLineUpdates.budgetLineId);
+          .from(budgetLineUpdates)
+          .where(inArray(budgetLineUpdates.budgetLineId, lineIds))
+          .groupBy(budgetLineUpdates.budgetLineId),
+        db.select({
+          budgetLineId: budgetLineFiles.budgetLineId,
+          count: sql<number>`count(*)::int`,
+        })
+          .from(budgetLineFiles)
+          .where(inArray(budgetLineFiles.budgetLineId, lineIds))
+          .groupBy(budgetLineFiles.budgetLineId),
+      ]);
 
       for (const row of updatesCountRows) {
         updatesCounts[row.budgetLineId] = row.count;
       }
-
-      const filesCountRows = await db
-        .select({
-          budgetLineId: budgetLineFiles.budgetLineId,
-          count: sql<number>`count(*)::int`,
-        })
-        .from(budgetLineFiles)
-        .where(inArray(budgetLineFiles.budgetLineId, lineIds))
-        .groupBy(budgetLineFiles.budgetLineId);
-
       for (const row of filesCountRows) {
         filesCounts[row.budgetLineId] = row.count;
       }

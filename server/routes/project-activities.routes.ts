@@ -388,17 +388,16 @@ router.get("/api/job-types/:jobTypeId/templates", requireAuth, async (req, res) 
 
     const templateIds = templates.map(t => t.id);
 
-    const filteredSubtasks = templateIds.length > 0
-      ? await db.select().from(activityTemplateSubtasks)
-          .where(inArray(activityTemplateSubtasks.templateId, templateIds))
-          .orderBy(asc(activityTemplateSubtasks.sortOrder))
-      : [];
-
-    const filteredChecklists = templateIds.length > 0
-      ? await db.select().from(activityTemplateChecklists)
-          .where(inArray(activityTemplateChecklists.templateId, templateIds))
-          .orderBy(asc(activityTemplateChecklists.sortOrder))
-      : [];
+    const [filteredSubtasks, filteredChecklists] = templateIds.length > 0
+      ? await Promise.all([
+          db.select().from(activityTemplateSubtasks)
+            .where(inArray(activityTemplateSubtasks.templateId, templateIds))
+            .orderBy(asc(activityTemplateSubtasks.sortOrder)),
+          db.select().from(activityTemplateChecklists)
+            .where(inArray(activityTemplateChecklists.templateId, templateIds))
+            .orderBy(asc(activityTemplateChecklists.sortOrder)),
+        ])
+      : [[], []] as [typeof activityTemplateSubtasks.$inferSelect[], typeof activityTemplateChecklists.$inferSelect[]];
 
     const result = templates.map(t => ({
       ...t,
@@ -670,16 +669,18 @@ router.get("/api/jobs/:jobId/activities", requireAuth, async (req, res) => {
     let assignees: Record<string, unknown>[] = [];
     let checklistCounts: Array<{ activityId: string; total: number; completed: number }> = [];
     if (activityIds.length > 0) {
-      assignees = await db.select().from(jobActivityAssignees)
-        .where(inArray(jobActivityAssignees.activityId, activityIds));
-
-      const clRows = await db.select({
-        activityId: jobActivityChecklists.activityId,
-        total: count(),
-        completed: sql<number>`count(*) filter (where ${jobActivityChecklists.isCompleted} = true)`,
-      }).from(jobActivityChecklists)
-        .where(inArray(jobActivityChecklists.activityId, activityIds))
-        .groupBy(jobActivityChecklists.activityId);
+      const [assigneesResult, clRows] = await Promise.all([
+        db.select().from(jobActivityAssignees)
+          .where(inArray(jobActivityAssignees.activityId, activityIds)),
+        db.select({
+          activityId: jobActivityChecklists.activityId,
+          total: count(),
+          completed: sql<number>`count(*) filter (where ${jobActivityChecklists.isCompleted} = true)`,
+        }).from(jobActivityChecklists)
+          .where(inArray(jobActivityChecklists.activityId, activityIds))
+          .groupBy(jobActivityChecklists.activityId),
+      ]);
+      assignees = assigneesResult;
       checklistCounts = clRows.map(r => ({
         activityId: r.activityId,
         total: Number(r.total),

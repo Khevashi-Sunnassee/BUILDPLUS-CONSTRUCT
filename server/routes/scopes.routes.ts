@@ -101,26 +101,24 @@ router.post("/api/scope-trades/seed", requireAuth, requirePermission("scopes", "
     const seeded: string[] = [];
     const skipped: string[] = [];
 
+    const existingTrades = await db
+      .select({ name: scopeTrades.name })
+      .from(scopeTrades)
+      .where(eq(scopeTrades.companyId, companyId));
+    const existingNames = new Set(existingTrades.map(t => t.name));
+
+    const toInsert: { companyId: string; name: string; isActive: boolean; sortOrder: number }[] = [];
     for (let i = 0; i < DEFAULT_TRADES.length; i++) {
       const name = DEFAULT_TRADES[i];
-      const existing = await db
-        .select({ id: scopeTrades.id })
-        .from(scopeTrades)
-        .where(and(eq(scopeTrades.name, name), eq(scopeTrades.companyId, companyId)))
-        .limit(1);
-
-      if (existing.length > 0) {
+      if (existingNames.has(name)) {
         skipped.push(name);
-        continue;
+      } else {
+        toInsert.push({ companyId, name, isActive: true, sortOrder: i });
+        seeded.push(name);
       }
-
-      await db.insert(scopeTrades).values({
-        companyId,
-        name,
-        isActive: true,
-        sortOrder: i,
-      });
-      seeded.push(name);
+    }
+    if (toInsert.length > 0) {
+      await db.insert(scopeTrades).values(toInsert);
     }
 
     res.json({ message: "Seed complete", seeded, skipped });

@@ -127,15 +127,16 @@ dataManagementRouter.get("/api/admin/data-management/item-categories", requireRo
       .where(eq(itemCategories.companyId, companyId))
       .orderBy(asc(itemCategories.name));
 
-    const catsWithCounts = await Promise.all(
-      cats.map(async (cat) => {
-        const [itemCount] = await db
-          .select({ count: count() })
+    const catIds = cats.map(c => c.id);
+    const countRows = catIds.length > 0
+      ? await db
+          .select({ categoryId: items.categoryId, count: count() })
           .from(items)
-          .where(and(eq(items.categoryId, cat.id), eq(items.companyId, companyId)));
-        return { ...cat, itemCount: itemCount.count };
-      })
-    );
+          .where(and(sql`${items.categoryId} IN ${catIds}`, eq(items.companyId, companyId)))
+          .groupBy(items.categoryId)
+      : [];
+    const countMap = new Map(countRows.map(r => [r.categoryId, r.count]));
+    const catsWithCounts = cats.map(cat => ({ ...cat, itemCount: countMap.get(cat.id) ?? 0 }));
 
     res.json(catsWithCounts);
   } catch (error: unknown) {
@@ -278,15 +279,16 @@ dataManagementRouter.get("/api/admin/data-management/broadcast-templates", requi
       .where(eq(broadcastTemplates.companyId, companyId))
       .orderBy(asc(broadcastTemplates.name));
 
-    const templatesWithCounts = await Promise.all(
-      result.map(async (t) => {
-        const [msgCount] = await db
-          .select({ count: count() })
+    const templateIds = result.map(t => t.id);
+    const msgCountRows = templateIds.length > 0
+      ? await db
+          .select({ templateId: broadcastMessages.templateId, count: count() })
           .from(broadcastMessages)
-          .where(eq(broadcastMessages.templateId, t.id));
-        return { ...t, messageCount: msgCount.count };
-      })
-    );
+          .where(sql`${broadcastMessages.templateId} IN ${templateIds}`)
+          .groupBy(broadcastMessages.templateId)
+      : [];
+    const msgCountMap = new Map(msgCountRows.map(r => [r.templateId, r.count]));
+    const templatesWithCounts = result.map(t => ({ ...t, messageCount: msgCountMap.get(t.id) ?? 0 }));
 
     res.json(templatesWithCounts);
   } catch (error: unknown) {

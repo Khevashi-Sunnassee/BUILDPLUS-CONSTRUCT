@@ -32,27 +32,26 @@ const router = Router();
 const objectStorageService = new ObjectStorageService();
 
 async function findAffectedOpenTenders(documentId: string, companyId: string) {
-  const directPackages = await db
-    .select({
+  const [directPackages, bundleItems] = await Promise.all([
+    db.select({
       tenderId: tenders.id,
       tenderTitle: tenders.title,
       tenderNumber: tenders.tenderNumber,
       tenderStatus: tenders.status,
       packageId: tenderPackages.id,
     })
-    .from(tenderPackages)
-    .innerJoin(tenders, eq(tenderPackages.tenderId, tenders.id))
-    .where(and(
-      eq(tenderPackages.documentId, documentId),
-      eq(tenderPackages.companyId, companyId),
-      inArray(tenders.status, ["DRAFT", "OPEN", "UNDER_REVIEW"]),
-    ));
-
-  const bundleItems = await db
-    .select({ bundleId: documentBundleItems.bundleId })
-    .from(documentBundleItems)
-    .innerJoin(documentBundles, eq(documentBundleItems.bundleId, documentBundles.id))
-    .where(and(eq(documentBundleItems.documentId, documentId), eq(documentBundles.companyId, companyId)));
+      .from(tenderPackages)
+      .innerJoin(tenders, eq(tenderPackages.tenderId, tenders.id))
+      .where(and(
+        eq(tenderPackages.documentId, documentId),
+        eq(tenderPackages.companyId, companyId),
+        inArray(tenders.status, ["DRAFT", "OPEN", "UNDER_REVIEW"]),
+      )),
+    db.select({ bundleId: documentBundleItems.bundleId })
+      .from(documentBundleItems)
+      .innerJoin(documentBundles, eq(documentBundleItems.bundleId, documentBundles.id))
+      .where(and(eq(documentBundleItems.documentId, documentId), eq(documentBundles.companyId, companyId))),
+  ]);
 
   const bundleIds = bundleItems.map(b => b.bundleId);
   let bundlePackages: typeof directPackages = [];

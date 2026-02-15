@@ -284,13 +284,15 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
                 createdBy: userId,
               }).returning();
 
-              for (let i = 0; i < validDocIds.length; i++) {
-                await tx.insert(documentBundleItems).values({
-                  bundleId: bundle.id,
-                  documentId: validDocIds[i],
-                  sortOrder: i,
-                  addedBy: userId,
-                });
+              if (validDocIds.length > 0) {
+                await tx.insert(documentBundleItems).values(
+                  validDocIds.map((docId, i) => ({
+                    bundleId: bundle.id,
+                    documentId: docId,
+                    sortOrder: i,
+                    addedBy: userId,
+                  }))
+                );
               }
 
               await tx.insert(tenderPackages).values({
@@ -313,14 +315,16 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
               ));
             const validSupplierIds = validSuppliers.map(s => s.id);
 
-            for (const supplierId of validSupplierIds) {
-              await tx.insert(tenderMembers).values({
-                companyId,
-                tenderId: tender.id,
-                supplierId,
-                status: "PENDING",
-                invitedAt: new Date(),
-              });
+            if (validSupplierIds.length > 0) {
+              await tx.insert(tenderMembers).values(
+                validSupplierIds.map(supplierId => ({
+                  companyId,
+                  tenderId: tender.id,
+                  supplierId,
+                  status: "PENDING",
+                  invitedAt: new Date(),
+                }))
+              );
             }
           }
 
