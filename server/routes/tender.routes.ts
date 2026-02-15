@@ -5,7 +5,7 @@ import { requirePermission } from "./middleware/permissions.middleware";
 import logger from "../lib/logger";
 import { db } from "../db";
 import { tenders, tenderPackages, tenderSubmissions, tenderLineItems, tenderLineActivities, tenderLineFiles, tenderLineRisks, tenderMembers, suppliers, users, jobs, costCodes, childCostCodes, budgetLines, jobBudgets, documents, documentBundles, documentBundleItems, jobTypes } from "@shared/schema";
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, isNull, isNotNull } from "drizzle-orm";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { emailService } from "../services/email.service";
@@ -266,6 +266,22 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
             })
             .returning();
 
+          if (data.bundleId) {
+            const [validBundle] = await tx.select({ id: documentBundles.id, bundleName: documentBundles.bundleName })
+              .from(documentBundles)
+              .where(and(eq(documentBundles.id, data.bundleId), eq(documentBundles.companyId, companyId)));
+            if (validBundle) {
+              await tx.insert(tenderPackages).values({
+                companyId,
+                tenderId: tender.id,
+                bundleId: validBundle.id,
+                name: validBundle.bundleName || `Tender Documents - ${data.title}`,
+                description: `Document bundle attached`,
+                sortOrder: 0,
+              });
+            }
+          }
+
           if (documentIds.length > 0) {
             const validDocs = await tx.select({ id: documents.id })
               .from(documents)
@@ -305,7 +321,7 @@ router.post("/api/tenders", requireAuth, requirePermission("tenders", "VIEW_AND_
                 bundleId: bundle.id,
                 name: `Tender Documents - ${data.title}`,
                 description: `${validDocIds.length} document(s) attached`,
-                sortOrder: 0,
+                sortOrder: data.bundleId ? 1 : 0,
               });
             }
           }
@@ -400,6 +416,43 @@ router.patch("/api/tenders/:id", requireAuth, requirePermission("tenders", "VIEW
 
       if (!updated) {
         return null;
+      }
+
+      if (data.bundleId !== undefined) {
+        const existingBundlePkgs = await tx.select({ id: tenderPackages.id, bundleId: tenderPackages.bundleId })
+          .from(tenderPackages)
+          .where(and(
+            eq(tenderPackages.tenderId, req.params.id),
+            eq(tenderPackages.companyId, companyId),
+            isNotNull(tenderPackages.bundleId),
+            isNull(tenderPackages.documentId),
+          ));
+
+        if (existingBundlePkgs.length > 0) {
+          const oldBundleLinkedToTenderField = existingBundlePkgs.find(p => p.bundleId === currentTender.bundleId);
+          if (oldBundleLinkedToTenderField) {
+            await tx.delete(tenderPackages).where(eq(tenderPackages.id, oldBundleLinkedToTenderField.id));
+          }
+        }
+
+        if (data.bundleId) {
+          const [validBundle] = await tx.select({ id: documentBundles.id, bundleName: documentBundles.bundleName })
+            .from(documentBundles)
+            .where(and(eq(documentBundles.id, data.bundleId), eq(documentBundles.companyId, companyId)));
+          if (validBundle) {
+            const alreadyLinked = existingBundlePkgs.some(p => p.bundleId === data.bundleId);
+            if (!alreadyLinked) {
+              await tx.insert(tenderPackages).values({
+                companyId,
+                tenderId: req.params.id,
+                bundleId: validBundle.id,
+                name: validBundle.bundleName || `Tender Documents`,
+                description: `Document bundle attached`,
+                sortOrder: 0,
+              });
+            }
+          }
+        }
       }
 
       if (memberIds !== undefined) {
@@ -1335,6 +1388,7 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
           revision: documents.revision,
           isLatestVersion: documents.isLatestVersion,
           status: documents.status,
+          fileName: documents.fileName,
         },
       })
       .from(tenderPackages)
@@ -1343,11 +1397,59 @@ router.get("/api/tenders/:id/packages", requireAuth, requirePermission("tenders"
       .where(and(eq(tenderPackages.tenderId, tenderId), eq(tenderPackages.companyId, companyId)))
       .orderBy(asc(tenderPackages.sortOrder));
 
-    const mapped = results.map(r => ({
-      ...r.pkg,
-      bundle: r.bundle?.id ? r.bundle : null,
-      document: r.document?.id ? { ...r.document, isStale: r.document.isLatestVersion === false } : null,
-    }));
+    const mapped: any[] = [];
+
+    for (const r of results) {
+      if (r.document?.id) {
+        mapped.push({
+          ...r.pkg,
+          bundle: r.bundle?.id ? r.bundle : null,
+          document: { ...r.document, isStale: r.document.isLatestVersion === false },
+        });
+      } else if (r.bundle?.id) {
+        const bundleDocs = await db
+          .select({
+            bundleItem: documentBundleItems,
+            document: {
+              id: documents.id,
+              title: documents.title,
+              documentNumber: documents.documentNumber,
+              version: documents.version,
+              revision: documents.revision,
+              isLatestVersion: documents.isLatestVersion,
+              status: documents.status,
+              fileName: documents.fileName,
+            },
+          })
+          .from(documentBundleItems)
+          .innerJoin(documents, eq(documentBundleItems.documentId, documents.id))
+          .where(eq(documentBundleItems.bundleId, r.bundle.id))
+          .orderBy(asc(documentBundleItems.sortOrder));
+
+        if (bundleDocs.length > 0) {
+          for (const bd of bundleDocs) {
+            mapped.push({
+              ...r.pkg,
+              id: `${r.pkg.id}-${bd.document.id}`,
+              bundle: r.bundle,
+              document: { ...bd.document, isStale: bd.document.isLatestVersion === false },
+            });
+          }
+        } else {
+          mapped.push({
+            ...r.pkg,
+            bundle: r.bundle,
+            document: null,
+          });
+        }
+      } else {
+        mapped.push({
+          ...r.pkg,
+          bundle: null,
+          document: null,
+        });
+      }
+    }
 
     res.json(mapped);
   } catch (error: unknown) {
