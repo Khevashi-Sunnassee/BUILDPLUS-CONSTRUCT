@@ -994,6 +994,7 @@ export default function AdminItemsPage() {
         </CardHeader>
         <CardContent>
           {groupedItems.length > 0 ? (
+            <>
             <div className="space-y-3">
               {groupedItems.map((group) => (
                 <CategoryPanel
@@ -1028,6 +1029,7 @@ export default function AdminItemsPage() {
                 </div>
               </div>
             )}
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Package className="h-12 w-12 mx-auto mb-4 opacity-50" />

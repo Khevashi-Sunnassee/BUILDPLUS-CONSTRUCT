@@ -424,6 +424,7 @@ export default function AdminEmployeesPage() {
         </CardHeader>
         <CardContent>
           {filteredEmployees && filteredEmployees.length > 0 ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -525,6 +526,7 @@ export default function AdminEmployeesPage() {
                 </div>
               </div>
             )}
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />

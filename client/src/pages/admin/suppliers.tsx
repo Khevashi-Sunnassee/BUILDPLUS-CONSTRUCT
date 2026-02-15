@@ -560,6 +560,7 @@ export default function AdminSuppliersPage() {
         </CardHeader>
         <CardContent>
           {suppliers && suppliers.length > 0 ? (
+            <>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -676,6 +677,7 @@ export default function AdminSuppliersPage() {
                 </div>
               </div>
             )}
+            </>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
