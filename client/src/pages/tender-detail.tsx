@@ -422,6 +422,7 @@ export default function TenderDetailPage() {
   const [findSuppliersOpen, setFindSuppliersOpen] = useState(false);
   const [findSuppliersStep, setFindSuppliersStep] = useState<"select-codes" | "confirm-radius" | "searching" | "results">("select-codes");
   const [selectedCostCodeIds, setSelectedCostCodeIds] = useState<string[]>([]);
+  const [tradeSearchQuery, setTradeSearchQuery] = useState("");
   const [foundSuppliers, setFoundSuppliers] = useState<FoundSupplier[]>([]);
   const [selectedFoundSuppliers, setSelectedFoundSuppliers] = useState<Set<number>>(new Set());
   const [searchContext, setSearchContext] = useState<{ costCodes: string; location: string; projectType: string; searchRadiusKm?: number; projectScale?: string; projectValue?: string } | null>(null);
@@ -555,6 +556,7 @@ export default function TenderDetailPage() {
     setFindSuppliersOpen(false);
     setFindSuppliersStep("select-codes");
     setSelectedCostCodeIds([]);
+    setTradeSearchQuery("");
     setFoundSuppliers([]);
     setSelectedFoundSuppliers(new Set());
     setSearchContext(null);
@@ -1206,27 +1208,72 @@ export default function TenderDetailPage() {
           {findSuppliersStep === "select-codes" && (
             <div className="space-y-4">
               <Label>Trade Categories</Label>
-              <div className="max-h-72 overflow-y-auto border rounded-md p-3 space-y-2">
-                {costCodesData.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">No cost codes configured. Add cost codes in Settings first.</p>
-                ) : (
-                  costCodesData.map((cc) => (
-                    <div key={cc.id} className="flex items-center gap-3 py-1" data-testid={`checkbox-cost-code-${cc.id}`}>
-                      <Checkbox
-                        id={`cc-${cc.id}`}
-                        checked={selectedCostCodeIds.includes(cc.id)}
-                        onCheckedChange={() => toggleCostCode(cc.id)}
-                      />
-                      <label htmlFor={`cc-${cc.id}`} className="text-sm cursor-pointer flex-1">
-                        <span className="font-medium">{cc.code}</span> - {cc.name}
-                      </label>
-                    </div>
-                  ))
-                )}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search trade categories..."
+                  value={tradeSearchQuery}
+                  onChange={(e) => setTradeSearchQuery(e.target.value)}
+                  className="pl-8"
+                  data-testid="input-search-trade-categories"
+                />
               </div>
-              {selectedCostCodeIds.length > 0 && (
-                <p className="text-sm text-muted-foreground">{selectedCostCodeIds.length} categories selected</p>
-              )}
+              {(() => {
+                const filtered = costCodesData.filter((cc) => {
+                  if (!tradeSearchQuery.trim()) return true;
+                  const q = tradeSearchQuery.toLowerCase();
+                  return cc.code.toLowerCase().includes(q) || cc.name.toLowerCase().includes(q);
+                });
+                const allFilteredSelected = filtered.length > 0 && filtered.every((cc) => selectedCostCodeIds.includes(cc.id));
+                return (
+                  <>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (allFilteredSelected) {
+                            setSelectedCostCodeIds((prev) => prev.filter((id) => !filtered.some((cc) => cc.id === id)));
+                          } else {
+                            setSelectedCostCodeIds((prev) => {
+                              const newIds = new Set(prev);
+                              filtered.forEach((cc) => newIds.add(cc.id));
+                              return Array.from(newIds);
+                            });
+                          }
+                        }}
+                        data-testid="button-select-all-trades"
+                      >
+                        {allFilteredSelected ? "Deselect All" : "Select All"}
+                        {tradeSearchQuery.trim() && ` (${filtered.length})`}
+                      </Button>
+                      {selectedCostCodeIds.length > 0 && (
+                        <p className="text-sm text-muted-foreground">{selectedCostCodeIds.length} selected</p>
+                      )}
+                    </div>
+                    <div className="max-h-72 overflow-y-auto border rounded-md p-3 space-y-2">
+                      {filtered.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          {costCodesData.length === 0 ? "No cost codes configured. Add cost codes in Settings first." : "No matching trade categories found."}
+                        </p>
+                      ) : (
+                        filtered.map((cc) => (
+                          <div key={cc.id} className="flex items-center gap-3 py-1" data-testid={`checkbox-cost-code-${cc.id}`}>
+                            <Checkbox
+                              id={`cc-${cc.id}`}
+                              checked={selectedCostCodeIds.includes(cc.id)}
+                              onCheckedChange={() => toggleCostCode(cc.id)}
+                            />
+                            <label htmlFor={`cc-${cc.id}`} className="text-sm cursor-pointer flex-1">
+                              <span className="font-medium">{cc.code}</span> - {cc.name}
+                            </label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </>
+                );
+              })()}
               <DialogFooter>
                 <Button variant="outline" onClick={closeFindSuppliersDialog} data-testid="button-cancel-find-suppliers">Cancel</Button>
                 <Button
