@@ -133,6 +133,47 @@ Creates one entry per panel. Verify:
 SELECT * FROM drafting_program WHERE job_id = '<jobId>';
 ```
 
+### Stage 7b: Create Drafting Register Entries (Daily Logs)
+
+The Drafting Register (at `/daily-reports`) shows daily time log entries for drafters working on panels. These must be created BEFORE panels are advanced to IFC status. Each entry represents time spent drafting a panel in Revit/AutoCAD.
+
+```bash
+# Create manual time entries for each panel (this auto-creates daily_logs)
+curl -X POST /api/manual-entry -d '{
+  "logDay": "2026-02-09",
+  "jobId": "<jobId>",
+  "panelRegisterId": "<panelId>",
+  "app": "Revit",
+  "startTime": "08:00",
+  "endTime": "09:30",
+  "panelMark": "L1-P01",
+  "drawingCode": "DWG-L1-P01",
+  "notes": "Drafting work on panel L1-P01"
+}'
+
+# Submit and approve daily logs
+curl -X POST /api/daily-logs/<logId>/submit
+curl -X POST /api/daily-logs/<logId>/approve -d '{"approve": true, "comment": "Approved"}'
+```
+
+Also update the drafting program entries to COMPLETED:
+
+```bash
+curl -X PATCH /api/drafting-program/<draftingProgramId> -d '{
+  "status": "COMPLETED",
+  "completedAt": "2026-02-10T16:00:00.000Z",
+  "estimatedHours": "1.5",
+  "actualHours": "1.5"
+}'
+```
+
+Verify:
+```sql
+SELECT COUNT(*) FROM daily_logs WHERE user_id = '<userId>';
+SELECT COUNT(*) FROM log_rows WHERE daily_log_id IN (SELECT id FROM daily_logs WHERE user_id = '<userId>');
+SELECT status, COUNT(*) FROM drafting_program WHERE job_id = '<jobId>' GROUP BY status;
+```
+
 ### Stage 8: Instantiate Job Activities
 
 ```bash
@@ -227,6 +268,8 @@ SELECT 'panel_register' as entity, COUNT(*) FROM panel_register WHERE job_id = '
 UNION ALL SELECT 'production_entries', COUNT(*) FROM production_entries WHERE job_id = '<jobId>'
 UNION ALL SELECT 'production_slots', COUNT(*) FROM production_slots WHERE job_id = '<jobId>'
 UNION ALL SELECT 'drafting_program', COUNT(*) FROM drafting_program WHERE job_id = '<jobId>'
+UNION ALL SELECT 'daily_logs', COUNT(*) FROM daily_logs WHERE user_id = '<userId>'
+UNION ALL SELECT 'log_rows', COUNT(*) FROM log_rows WHERE daily_log_id IN (SELECT id FROM daily_logs WHERE user_id = '<userId>')
 UNION ALL SELECT 'reo_schedules', COUNT(*) FROM reo_schedules WHERE job_id = '<jobId>'
 UNION ALL SELECT 'job_activities', COUNT(*) FROM job_activities WHERE job_id = '<jobId>'
 UNION ALL SELECT 'load_lists', COUNT(*) FROM load_lists WHERE job_id = '<jobId>'
@@ -253,6 +296,8 @@ DELETE FROM load_lists WHERE job_id = '<jobId>';
 DELETE FROM progress_claims WHERE job_id = '<jobId>';
 DELETE FROM reo_schedules WHERE job_id = '<jobId>';
 DELETE FROM production_entries WHERE job_id = '<jobId>';
+DELETE FROM log_rows WHERE daily_log_id IN (SELECT id FROM daily_logs WHERE user_id = '<userId>');
+DELETE FROM daily_logs WHERE user_id = '<userId>';
 DELETE FROM drafting_program WHERE job_id = '<jobId>';
 DELETE FROM production_slots WHERE job_id = '<jobId>';
 DELETE FROM job_activity_assignees WHERE activity_id IN (SELECT id FROM job_activities WHERE job_id = '<jobId>');
