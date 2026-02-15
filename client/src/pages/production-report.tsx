@@ -102,15 +102,6 @@ export default function ProductionReportPage() {
     queryKey: [USER_ROUTES.SETTINGS],
   });
 
-  useEffect(() => {
-    if (!factoryFilterInitialized && userSettings && factories) {
-      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
-        setFactoryFilter(userSettings.defaultFactoryId);
-      }
-      setFactoryFilterInitialized(true);
-    }
-  }, [userSettings, factoryFilterInitialized, factories]);
-
   const deleteProductionDayMutation = useMutation({
     mutationFn: async ({ date, factory }: { date: string; factory: string }) => {
       return await apiRequest("DELETE", `${PRODUCTION_ROUTES.DAY_BY_ID(date)}?factory=${factory}`, {});
@@ -203,6 +194,15 @@ export default function ProductionReportPage() {
     factories?.filter(f => f.isActive) || [], 
     [factories]
   );
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings && factories) {
+      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
+        setFactoryFilter(userSettings.defaultFactoryId);
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoryFilterInitialized, factories]);
 
   // Set default factory when factories load
   useEffect(() => {

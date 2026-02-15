@@ -734,14 +734,6 @@ export default function ProductionSlotsPage() {
   const [dateFromFilter, setDateFromFilter] = useState<string>("");
   const [dateToFilter, setDateToFilter] = useState<string>("");
 
-  useEffect(() => {
-    if (!factoryFilterInitialized && userSettings && factories) {
-      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
-        setFactoryFilter(userSettings.defaultFactoryId);
-      }
-      setFactoryFilterInitialized(true);
-    }
-  }, [userSettings, factoryFilterInitialized, factories]);
   const [groupBy, setGroupBy] = useState<GroupBy>("week");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   
@@ -816,6 +808,15 @@ export default function ProductionSlotsPage() {
   const { data: factories = [] } = useQuery<Factory[]>({
     queryKey: [ADMIN_ROUTES.FACTORIES],
   });
+
+  useEffect(() => {
+    if (!factoryFilterInitialized && userSettings && factories) {
+      if (userSettings.defaultFactoryId && factories.some(f => f.id === userSettings.defaultFactoryId)) {
+        setFactoryFilter(userSettings.defaultFactoryId);
+      }
+      setFactoryFilterInitialized(true);
+    }
+  }, [userSettings, factoryFilterInitialized, factories]);
 
   const getFactory = (factoryId: string | null | undefined): Factory | undefined => {
     if (!factoryId || !factories) return undefined;
