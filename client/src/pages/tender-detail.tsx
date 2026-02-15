@@ -461,6 +461,14 @@ export default function TenderDetailPage() {
   const [fileDescription, setFileDescription] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
+  const [sendFilesEmailOpen, setSendFilesEmailOpen] = useState(false);
+  const [filesEmailTo, setFilesEmailTo] = useState("");
+  const [filesEmailCc, setFilesEmailCc] = useState("");
+  const [filesEmailSubject, setFilesEmailSubject] = useState("");
+  const [filesEmailMessage, setFilesEmailMessage] = useState("");
+  const [filesEmailSendCopy, setFilesEmailSendCopy] = useState(false);
+
   const { data: tender, isLoading, error } = useQuery<TenderDetail>({
     queryKey: ["/api/tenders", tenderId],
     enabled: !!tenderId,
@@ -678,6 +686,54 @@ export default function TenderDetailPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
+
+  const sendFilesEmailMutation = useMutation({
+    mutationFn: async (payload: { to: string; cc?: string; subject: string; message: string; fileIds: string[]; sendCopy: boolean }) => {
+      const res = await apiRequest("POST", `/api/tenders/${tenderId}/files/send-email`, payload);
+      return res.json();
+    },
+    onSuccess: (data: any) => {
+      toast({ title: "Email sent", description: `${data.attachedCount} file${data.attachedCount !== 1 ? "s" : ""} emailed to ${filesEmailTo}` });
+      setSendFilesEmailOpen(false);
+      setSelectedFileIds(new Set());
+      setFilesEmailTo("");
+      setFilesEmailCc("");
+      setFilesEmailSubject("");
+      setFilesEmailMessage("");
+      setFilesEmailSendCopy(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
+    },
+  });
+
+  function openSendFilesEmail() {
+    const selected = tenderFilesData.filter(f => selectedFileIds.has(f.id));
+    const fileList = selected.map(f => `- ${f.fileName}`).join("\n");
+    setFilesEmailTo("");
+    setFilesEmailCc("");
+    setFilesEmailSendCopy(false);
+    setFilesEmailSubject(`Tender Files - ${selected.length} file${selected.length !== 1 ? "s" : ""} attached`);
+    setFilesEmailMessage(`Hi,\n\nPlease find attached the following tender files for your review.\n\n${fileList}\n\nKind regards`);
+    setSendFilesEmailOpen(true);
+  }
+
+  function toggleFileSelection(fileId: string) {
+    setSelectedFileIds(prev => {
+      const next = new Set(prev);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  }
+
+  function toggleAllFileSelection() {
+    if (selectedFileIds.size === tenderFilesData.length) {
+      setSelectedFileIds(new Set());
+    } else {
+      setSelectedFileIds(new Set(tenderFilesData.map(f => f.id)));
+    }
+  }
 
   function openFindSuppliersDialog() {
     setFindSuppliersOpen(true);
@@ -1294,7 +1350,15 @@ export default function TenderDetailPage() {
         </TabsContent>
 
         <TabsContent value="files" className="mt-4 space-y-4">
-          <h3 className="text-lg font-semibold">Files</h3>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <h3 className="text-lg font-semibold">Files</h3>
+            {selectedFileIds.size > 0 && (
+              <Button onClick={openSendFilesEmail} data-testid="button-email-files">
+                <Mail className="h-4 w-4 mr-2" />
+                Email {selectedFileIds.size} File{selectedFileIds.size !== 1 ? "s" : ""}
+              </Button>
+            )}
+          </div>
           <Card>
             <CardContent className="pt-4 space-y-3">
               <div className="flex items-end gap-3 flex-wrap">
@@ -1346,6 +1410,13 @@ export default function TenderDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={selectedFileIds.size === tenderFilesData.length && tenderFilesData.length > 0}
+                        onCheckedChange={toggleAllFileSelection}
+                        data-testid="checkbox-select-all-files"
+                      />
+                    </TableHead>
                     <TableHead>File Name</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="w-24">Size</TableHead>
@@ -1357,6 +1428,13 @@ export default function TenderDetailPage() {
                 <TableBody>
                   {tenderFilesData.map((file) => (
                     <TableRow key={file.id} data-testid={`row-file-${file.id}`}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedFileIds.has(file.id)}
+                          onCheckedChange={() => toggleFileSelection(file.id)}
+                          data-testid={`checkbox-file-${file.id}`}
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1404,6 +1482,163 @@ export default function TenderDetailPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={sendFilesEmailOpen} onOpenChange={(open) => { if (!open) { setSendFilesEmailOpen(false); setFilesEmailTo(""); setFilesEmailCc(""); setFilesEmailSubject(""); setFilesEmailMessage(""); setFilesEmailSendCopy(false); } }}>
+        <DialogContent className="max-w-[900px] h-[85vh] p-0 gap-0 flex flex-col" data-testid="dialog-send-files-email">
+          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+            <DialogTitle className="flex items-center gap-2" data-testid="text-files-email-title">
+              <Mail className="h-5 w-5" />
+              Email Tender Files
+            </DialogTitle>
+            <DialogDescription>
+              Send {selectedFileIds.size} file{selectedFileIds.size !== 1 ? "s" : ""} via email as attachments
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex flex-1 min-h-0">
+            <div className="w-[420px] flex-shrink-0 border-r overflow-y-auto p-6 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="files-email-to">To</Label>
+                <Input
+                  id="files-email-to"
+                  type="email"
+                  placeholder="recipient@example.com"
+                  value={filesEmailTo}
+                  onChange={(e) => setFilesEmailTo(e.target.value)}
+                  data-testid="input-files-email-to"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="files-email-cc">Cc</Label>
+                <Input
+                  id="files-email-cc"
+                  type="email"
+                  placeholder="cc@example.com"
+                  value={filesEmailCc}
+                  onChange={(e) => setFilesEmailCc(e.target.value)}
+                  data-testid="input-files-email-cc"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="files-email-subject">Subject</Label>
+                <Input
+                  id="files-email-subject"
+                  value={filesEmailSubject}
+                  onChange={(e) => setFilesEmailSubject(e.target.value)}
+                  data-testid="input-files-email-subject"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="files-email-message">Message</Label>
+                <Textarea
+                  id="files-email-message"
+                  value={filesEmailMessage}
+                  onChange={(e) => setFilesEmailMessage(e.target.value)}
+                  rows={10}
+                  className="resize-none text-sm"
+                  data-testid="input-files-email-message"
+                />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="files-send-copy"
+                  checked={filesEmailSendCopy}
+                  onCheckedChange={(v) => setFilesEmailSendCopy(!!v)}
+                  data-testid="checkbox-files-send-copy"
+                />
+                <Label htmlFor="files-send-copy" className="text-sm cursor-pointer">Send myself a copy</Label>
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setSendFilesEmailOpen(false)} data-testid="button-cancel-files-email">
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (!filesEmailTo.trim()) {
+                      toast({ title: "Email required", description: "Please enter a recipient email address", variant: "destructive" });
+                      return;
+                    }
+                    sendFilesEmailMutation.mutate({
+                      to: filesEmailTo,
+                      cc: filesEmailCc || undefined,
+                      subject: filesEmailSubject,
+                      message: filesEmailMessage,
+                      fileIds: Array.from(selectedFileIds),
+                      sendCopy: filesEmailSendCopy,
+                    });
+                  }}
+                  disabled={sendFilesEmailMutation.isPending || !filesEmailTo.trim() || !filesEmailSubject.trim()}
+                  data-testid="button-send-files-email"
+                >
+                  {sendFilesEmailMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="mr-2 h-4 w-4" />
+                  )}
+                  Send email
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex-1 flex flex-col bg-muted/30 overflow-hidden">
+              <div className="flex border-b px-4">
+                <div className="px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground">
+                  Email Preview
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto p-4">
+                <Card className="max-w-md mx-auto" data-testid="card-files-email-preview">
+                  <CardContent className="p-6 space-y-4">
+                    <div className="text-center space-y-1">
+                      <p className="text-lg font-semibold">Tender Files</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedFileIds.size} file{selectedFileIds.size !== 1 ? "s" : ""} attached
+                      </p>
+                    </div>
+                    <Separator />
+                    <div className="text-sm whitespace-pre-wrap text-muted-foreground">
+                      {filesEmailMessage}
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(() => {
+                            const totalBytes = tenderFilesData.filter(f => selectedFileIds.has(f.id)).reduce((sum, f) => sum + (f.fileSize || 0), 0);
+                            return totalBytes > 1024 * 1024 ? `${(totalBytes / (1024 * 1024)).toFixed(1)} MB` : `${(totalBytes / 1024).toFixed(0)} KB`;
+                          })()}
+                        </p>
+                      </div>
+                      {tenderFilesData.filter(f => selectedFileIds.has(f.id)).map((file) => (
+                        <div key={file.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-file-preview-${file.id}`}>
+                          <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="truncate font-medium">{file.fileName}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {file.fileSize ? (file.fileSize > 1024 * 1024 ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB` : `${(file.fileSize / 1024).toFixed(0)} KB`) : "-"}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={sendInviteOpen} onOpenChange={(open) => { if (!open) { setSendInviteOpen(false); setSendInviteMember(null); setInviteSubject(""); setInviteMessage(""); } }}>
         <DialogContent className="max-w-lg">
