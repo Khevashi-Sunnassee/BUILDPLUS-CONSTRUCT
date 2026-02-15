@@ -79,7 +79,7 @@ router.get("/api/jobs/opportunities", requireAuth, async (req: Request, res: Res
       updatedAt: jobs.updatedAt,
     })
     .from(jobs)
-    .where(sql`${inArray(jobs.jobPhase, [...OPPORTUNITY_PHASES])} AND ${eq(jobs.companyId, req.companyId)}`)
+    .where(sql`(${inArray(jobs.jobPhase, [...OPPORTUNITY_PHASES])} OR ${eq(jobs.salesStage, 'AWARDED')}) AND ${eq(jobs.companyId, req.companyId)}`)
     .orderBy(desc(jobs.createdAt));
 
     const customerIds = [...new Set(result.filter(j => j.customerId).map(j => j.customerId!))];
