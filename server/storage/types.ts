@@ -149,7 +149,7 @@ export interface IStorage {
   createMappingRule(data: InsertMappingRule): Promise<MappingRule>;
   deleteMappingRule(id: string): Promise<void>;
   getMappingRule(id: string): Promise<MappingRule | undefined>;
-  getMappingRules(companyId?: string): Promise<MappingRule[]>;
+  getMappingRules(companyId: string): Promise<MappingRule[]>;
 
   getDailyLog(id: string): Promise<(DailyLog & { rows: (LogRow & { job?: Job })[]; user: User }) | undefined>;
   getDailyLogsByUser(userId: string, filters?: { status?: string; dateRange?: string }): Promise<DailyLog[]>;
@@ -170,8 +170,8 @@ export interface IStorage {
 
   createApprovalEvent(data: InsertApprovalEvent): Promise<ApprovalEvent>;
 
-  getGlobalSettings(companyId?: string): Promise<GlobalSettings | undefined>;
-  updateGlobalSettings(data: Partial<GlobalSettings>, companyId?: string): Promise<GlobalSettings>;
+  getGlobalSettings(companyId: string): Promise<GlobalSettings | undefined>;
+  updateGlobalSettings(data: Partial<GlobalSettings>, companyId: string): Promise<GlobalSettings>;
 
   getDashboardStats(userId: string): Promise<any>;
   getReports(period: string, companyId?: string): Promise<any>;
@@ -339,7 +339,7 @@ export interface IStorage {
   initializeUserPermissions(userId: string): Promise<UserPermission[]>;
   getAllUserPermissionsForAdmin(companyId?: string): Promise<{ user: User; permissions: UserPermission[] }[]>;
 
-  getAllZones(companyId?: string): Promise<Zone[]>;
+  getAllZones(companyId: string): Promise<Zone[]>;
   getZone(id: string): Promise<Zone | undefined>;
   getZoneByCode(code: string): Promise<Zone | undefined>;
   createZone(data: InsertZone): Promise<Zone>;

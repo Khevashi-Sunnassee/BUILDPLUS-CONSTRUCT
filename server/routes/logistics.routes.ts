@@ -50,7 +50,7 @@ router.delete("/api/admin/trailer-types/:id", requireRole("ADMIN"), async (req, 
 // =============== ZONES ===============
 
 router.get("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
-  const zones = await storage.getAllZones(req.companyId);
+  const zones = await storage.getAllZones(req.companyId as string);
   res.json(zones);
 });
 
@@ -63,8 +63,9 @@ router.get("/api/admin/zones/:id", requireRole("ADMIN"), async (req, res) => {
 
 router.post("/api/admin/zones", requireRole("ADMIN"), async (req, res) => {
   try {
-    if (req.companyId) req.body.companyId = req.companyId;
-    const existing = await storage.getZoneByCode(req.body.code);
+    const companyId = req.companyId as string;
+    req.body.companyId = companyId;
+    const existing = await storage.getZoneByCode(req.body.code, companyId);
     if (existing) {
       return res.status(400).json({ error: "Zone with this code already exists" });
     }

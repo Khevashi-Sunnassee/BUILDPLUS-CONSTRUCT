@@ -1,4 +1,4 @@
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db } from "../db";
 import {
   globalSettings, mappingRules, zones,
@@ -7,16 +7,12 @@ import {
 } from "@shared/schema";
 
 export class SettingsRepository {
-  async getGlobalSettings(companyId?: string): Promise<GlobalSettings | undefined> {
-    if (companyId) {
-      const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
-      return settings;
-    }
-    const [settings] = await db.select().from(globalSettings).limit(1);
+  async getGlobalSettings(companyId: string): Promise<GlobalSettings | undefined> {
+    const [settings] = await db.select().from(globalSettings).where(eq(globalSettings.companyId, companyId));
     return settings;
   }
 
-  async updateGlobalSettings(data: Partial<GlobalSettings>, companyId?: string): Promise<GlobalSettings> {
+  async updateGlobalSettings(data: Partial<GlobalSettings>, companyId: string): Promise<GlobalSettings> {
     const existing = await this.getGlobalSettings(companyId);
     if (existing) {
       const [updated] = await db.update(globalSettings)
@@ -25,10 +21,7 @@ export class SettingsRepository {
         .returning();
       return updated;
     }
-    const insertData = { ...data } as any;
-    if (companyId) {
-      insertData.companyId = companyId;
-    }
+    const insertData = { ...data, companyId } as any;
     const [created] = await db.insert(globalSettings).values(insertData).returning();
     return created;
   }
@@ -42,15 +35,12 @@ export class SettingsRepository {
     await db.delete(mappingRules).where(eq(mappingRules.id, id));
   }
 
-  async getMappingRules(): Promise<MappingRule[]> {
-    return db.select().from(mappingRules).orderBy(desc(mappingRules.createdAt));
+  async getMappingRules(companyId: string): Promise<MappingRule[]> {
+    return db.select().from(mappingRules).where(eq(mappingRules.companyId, companyId)).orderBy(desc(mappingRules.createdAt));
   }
 
-  async getAllZones(companyId?: string): Promise<Zone[]> {
-    if (companyId) {
-      return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(zones.name);
-    }
-    return db.select().from(zones).orderBy(zones.name);
+  async getAllZones(companyId: string): Promise<Zone[]> {
+    return db.select().from(zones).where(eq(zones.companyId, companyId)).orderBy(zones.name);
   }
 
   async getZone(id: string): Promise<Zone | undefined> {
@@ -58,7 +48,13 @@ export class SettingsRepository {
     return zone;
   }
 
-  async getZoneByCode(code: string): Promise<Zone | undefined> {
+  async getZoneByCode(code: string, companyId?: string): Promise<Zone | undefined> {
+    if (companyId) {
+      const [zone] = await db.select().from(zones).where(
+        and(eq(zones.code, code), eq(zones.companyId, companyId))
+      );
+      return zone;
+    }
     const [zone] = await db.select().from(zones).where(eq(zones.code, code));
     return zone;
   }

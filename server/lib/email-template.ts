@@ -13,7 +13,10 @@ interface BrandedEmailOptions {
 const brandingCache = new Map<string, { data: { companyName: string; logoBase64: string | null }; expiry: number }>();
 
 async function getCompanyBranding(companyId?: string): Promise<{ companyName: string; logoBase64: string | null }> {
-  const cacheKey = companyId || "__default__";
+  if (!companyId) {
+    return { companyName: "BuildPlus Ai", logoBase64: null };
+  }
+  const cacheKey = companyId;
   const now = Date.now();
   const cached = brandingCache.get(cacheKey);
   if (cached && now < cached.expiry) {

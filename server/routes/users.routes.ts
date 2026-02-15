@@ -213,7 +213,7 @@ router.put("/api/admin/users/:id", requireRole("ADMIN"), async (req, res) => {
       updateData.departmentId = null;
     }
     if (updateData.departmentId) {
-      const dept = await storage.getDepartment(updateData.departmentId);
+      const dept = await storage.getDepartment(updateData.departmentId as string);
       if (!dept || dept.companyId !== req.companyId) {
         return res.status(400).json({ error: "Invalid department" });
       }

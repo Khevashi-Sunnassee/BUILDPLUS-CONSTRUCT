@@ -35,7 +35,7 @@ const poTermsSchema = z.object({
 
 router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   try {
-  const companyId = req.companyId;
+  const companyId = req.companyId as string;
   let settings = await storage.getGlobalSettings(companyId);
   if (!settings) {
     settings = await storage.updateGlobalSettings({
@@ -54,7 +54,7 @@ router.get("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
 
 router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
   try {
-    const companyId = req.companyId;
+    const companyId = req.companyId as string;
     const result = updateSettingsSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
@@ -83,7 +83,7 @@ router.put("/api/admin/settings", requireRole("ADMIN"), async (req, res) => {
 
 router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) => {
   try {
-    const companyId = req.companyId;
+    const companyId = req.companyId as string;
     const result = logoSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
@@ -101,7 +101,7 @@ router.post("/api/admin/settings/logo", requireRole("ADMIN"), async (req, res) =
 
 router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req, res) => {
   try {
-    const companyId = req.companyId;
+    const companyId = req.companyId as string;
     const result = companyNameSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
@@ -116,7 +116,10 @@ router.post("/api/admin/settings/company-name", requireRole("ADMIN"), async (req
 
 router.get("/api/settings/logo", async (req, res) => {
   try {
-    const companyId = req.companyId;
+    const companyId = req.session?.userId ? req.session.companyId : undefined;
+    if (!companyId) {
+      return res.json({ logoBase64: null, companyName: "BuildPlus Ai" });
+    }
     const settings = await storage.getGlobalSettings(companyId);
     res.json({ 
       logoBase64: settings?.logoBase64 || null,
@@ -129,7 +132,7 @@ router.get("/api/settings/logo", async (req, res) => {
 
 router.get("/api/settings/po-terms", requireAuth, async (req, res) => {
   try {
-    const companyId = req.companyId;
+    const companyId = req.companyId as string;
     const settings = await storage.getGlobalSettings(companyId);
     res.json({
       poTermsHtml: settings?.poTermsHtml || "",
@@ -142,7 +145,7 @@ router.get("/api/settings/po-terms", requireAuth, async (req, res) => {
 
 router.put("/api/settings/po-terms", requireRole("ADMIN"), async (req, res) => {
   try {
-    const companyId = req.companyId;
+    const companyId = req.companyId as string;
     const result = poTermsSchema.safeParse(req.body);
     if (!result.success) {
       return res.status(400).json({ error: result.error.format() });
