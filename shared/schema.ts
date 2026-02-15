@@ -4447,6 +4447,40 @@ export const insertTenderMemberSchema = createInsertSchema(tenderMembers).omit({
 export type InsertTenderMember = z.infer<typeof insertTenderMemberSchema>;
 export type TenderMember = typeof tenderMembers.$inferSelect;
 
+export const tenderMemberUpdates = pgTable("tender_member_updates", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  tenderMemberId: varchar("tender_member_id", { length: 36 }).notNull().references(() => tenderMembers.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  memberIdx: index("tender_member_updates_member_idx").on(table.tenderMemberId),
+  createdAtIdx: index("tender_member_updates_created_at_idx").on(table.createdAt),
+}));
+
+export const tenderMemberFiles = pgTable("tender_member_files", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  tenderMemberId: varchar("tender_member_id", { length: 36 }).notNull().references(() => tenderMembers.id, { onDelete: "cascade" }),
+  updateId: varchar("update_id", { length: 36 }).references(() => tenderMemberUpdates.id, { onDelete: "set null" }),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedById: varchar("uploaded_by_id", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  memberIdx: index("tender_member_files_member_idx").on(table.tenderMemberId),
+  updateIdx: index("tender_member_files_update_idx").on(table.updateId),
+}));
+
+export const insertTenderMemberUpdateSchema = createInsertSchema(tenderMemberUpdates).omit({ id: true, createdAt: true });
+export type InsertTenderMemberUpdate = z.infer<typeof insertTenderMemberUpdateSchema>;
+export type TenderMemberUpdate = typeof tenderMemberUpdates.$inferSelect;
+
+export const insertTenderMemberFileSchema = createInsertSchema(tenderMemberFiles).omit({ id: true, createdAt: true });
+export type InsertTenderMemberFile = z.infer<typeof insertTenderMemberFileSchema>;
+export type TenderMemberFile = typeof tenderMemberFiles.$inferSelect;
+
 export const insertTenderSubmissionSchema = createInsertSchema(tenderSubmissions).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertTenderSubmission = z.infer<typeof insertTenderSubmissionSchema>;
 export type TenderSubmission = typeof tenderSubmissions.$inferSelect;

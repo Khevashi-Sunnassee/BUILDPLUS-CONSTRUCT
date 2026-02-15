@@ -896,3 +896,14 @@ export const PM_CALL_LOGS_ROUTES = {
   JOB_UPCOMING_LEVELS: (jobId: string | number) => `/api/pm-call-logs/job/${jobId}/upcoming-levels`,
 } as const;
 export type PmCallLogsRoutes = typeof PM_CALL_LOGS_ROUTES;
+
+// ============================================================================
+// TENDER MEMBER TRACKING (Updates, Files, Activity per invitation)
+// ============================================================================
+export const TENDER_MEMBER_ROUTES = {
+  UPDATES: (id: string | number) => `/api/tender-members/${id}/updates`,
+  UPDATE_BY_ID: (id: string | number) => `/api/tender-member-updates/${id}`,
+  FILES: (id: string | number) => `/api/tender-members/${id}/files`,
+  FILE_BY_ID: (id: string | number) => `/api/tender-member-files/${id}`,
+} as const;
+export type TenderMemberRoutes = typeof TENDER_MEMBER_ROUTES;

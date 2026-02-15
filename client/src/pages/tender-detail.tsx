@@ -1,10 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { queryClient, apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest, apiUpload } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useDocumentTitle } from "@/hooks/use-document-title";
+import { TENDER_MEMBER_ROUTES } from "@shared/api-routes";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -21,7 +24,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   ArrowLeft, FileText, Eye, Pencil, Plus, Loader2, ChevronDown, ChevronRight,
   DollarSign, Users, Mail, Package, Layers, Link2, Unlink, AlertTriangle, Download, Search, X,
-  Sparkles, UserPlus, Phone, Building2, MapPin, Send, Trash2, StickyNote, Paperclip, Upload,
+  Sparkles, UserPlus, Phone, Building2, MapPin, Send, Trash2, StickyNote, Paperclip, Upload, MessageSquare,
+  Image, File,
 } from "lucide-react";
 
 interface TenderDetail {
@@ -147,17 +151,6 @@ interface TenderNoteData {
   createdAt: string;
   updatedAt: string;
   createdBy: { id: string; name: string } | null;
-}
-
-interface TenderFileData {
-  id: string;
-  fileName: string;
-  filePath: string | null;
-  fileSize: number | null;
-  mimeType: string | null;
-  description: string | null;
-  createdAt: string;
-  uploadedBy: { id: string; name: string } | null;
 }
 
 interface SupplierOption {
@@ -417,6 +410,409 @@ function ScopeRow({ linkedScope, tenderId }: { linkedScope: LinkedScope; tenderI
   );
 }
 
+interface InvitationUpdate {
+  id: string;
+  tenderMemberId: string;
+  userId: string;
+  content: string;
+  createdAt: string;
+  user: { id: string; name: string; email: string } | null;
+  files: InvitationFile[];
+}
+
+interface InvitationFile {
+  id: string;
+  tenderMemberId: string;
+  updateId: string | null;
+  fileName: string;
+  fileUrl: string;
+  fileSize: number | null;
+  mimeType: string | null;
+  uploadedById: string | null;
+  createdAt: string;
+}
+
+function getInitials(name?: string | null) {
+  if (!name) return "?";
+  return name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function InvitationSidebar({
+  invitation,
+  onClose,
+  initialTab,
+}: {
+  invitation: any | null;
+  onClose: () => void;
+  initialTab?: "updates" | "files" | "activity";
+}) {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<"updates" | "files" | "activity">(initialTab || "updates");
+  const [newUpdate, setNewUpdate] = useState("");
+  const [pastedImages, setPastedImages] = useState<globalThis.File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (initialTab && invitation) setActiveTab(initialTab);
+  }, [initialTab, invitation]);
+
+  const memberId = invitation?.id || "";
+
+  const { data: updates = [], isLoading: updatesLoading } = useQuery<InvitationUpdate[]>({
+    queryKey: [TENDER_MEMBER_ROUTES.UPDATES(memberId)],
+    enabled: !!invitation,
+  });
+
+  const { data: files = [], isLoading: filesLoading } = useQuery<InvitationFile[]>({
+    queryKey: [TENDER_MEMBER_ROUTES.FILES(memberId)],
+    enabled: !!invitation,
+  });
+
+  const createUpdateMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const res = await apiRequest("POST", TENDER_MEMBER_ROUTES.UPDATES(memberId), { content });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TENDER_MEMBER_ROUTES.UPDATES(memberId)] });
+      setNewUpdate("");
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const deleteUpdateMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", TENDER_MEMBER_ROUTES.UPDATE_BY_ID(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TENDER_MEMBER_ROUTES.UPDATES(memberId)] });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const uploadFileMutation = useMutation({
+    mutationFn: async ({ file, updateId }: { file: globalThis.File; updateId?: string }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      if (updateId) formData.append("updateId", updateId);
+      const res = await apiUpload(TENDER_MEMBER_ROUTES.FILES(memberId), formData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TENDER_MEMBER_ROUTES.FILES(memberId)] });
+      queryClient.invalidateQueries({ queryKey: [TENDER_MEMBER_ROUTES.UPDATES(memberId)] });
+      toast({ title: "File uploaded" });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const deleteFileMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest("DELETE", TENDER_MEMBER_ROUTES.FILE_BY_ID(id)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [TENDER_MEMBER_ROUTES.FILES(memberId)] });
+      toast({ title: "File deleted" });
+    },
+    onError: (error: any) => {
+      toast({ variant: "destructive", title: "Error", description: error.message });
+    },
+  });
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadFileMutation.mutate({ file });
+  };
+
+  const handlePaste = useCallback((e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData.items;
+    const imageFiles: globalThis.File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
+        if (file) {
+          const ts = Date.now();
+          const ext = item.type.split("/")[1] || "png";
+          const newName = `screenshot_${ts}.${ext}`;
+          Object.defineProperty(file, 'name', { writable: true, value: newName });
+          imageFiles.push(file);
+        }
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      setPastedImages(prev => [...prev, ...imageFiles]);
+      toast({ title: `${imageFiles.length} image(s) pasted`, description: "Click Post Update to upload" });
+    }
+  }, [toast]);
+
+  const removePastedImage = (index: number) => {
+    setPastedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handlePostUpdate = async () => {
+    if (!newUpdate.trim() && pastedImages.length === 0) return;
+    try {
+      const content = newUpdate.trim() || "(attachment)";
+      const update = await createUpdateMutation.mutateAsync(content);
+      const updateId = update?.id;
+      if (pastedImages.length > 0) {
+        for (const file of pastedImages) {
+          await uploadFileMutation.mutateAsync({ file, updateId });
+        }
+        queryClient.invalidateQueries({ queryKey: [TENDER_MEMBER_ROUTES.UPDATES(memberId)] });
+      }
+      setPastedImages([]);
+    } catch (error) {}
+  };
+
+  const getFileIcon = (mimeType: string | null) => {
+    if (!mimeType) return <File className="h-4 w-4" />;
+    if (mimeType.startsWith("image/")) return <Image className="h-4 w-4" />;
+    if (mimeType.includes("pdf")) return <FileText className="h-4 w-4" />;
+    return <File className="h-4 w-4" />;
+  };
+
+  const formatFileSize = (bytes: number | null) => {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  if (!invitation) return null;
+
+  const supplierName = invitation.supplier?.name || "Invitation";
+
+  return (
+    <Sheet open={!!invitation} onOpenChange={() => onClose()}>
+      <SheetContent className="w-[400px] sm:w-[500px] p-0 flex flex-col">
+        <SheetHeader className="p-4 border-b">
+          <div className="flex items-center justify-between gap-2">
+            <SheetTitle className="text-lg truncate">{supplierName}</SheetTitle>
+            <Button variant="ghost" size="icon" onClick={onClose} data-testid="btn-close-invitation-sidebar">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button
+              variant={activeTab === "updates" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("updates")}
+              data-testid="tab-invitation-updates"
+            >
+              <MessageSquare className="h-4 w-4 mr-1" />
+              Updates
+            </Button>
+            <Button
+              variant={activeTab === "files" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("files")}
+              data-testid="tab-invitation-files"
+            >
+              <Paperclip className="h-4 w-4 mr-1" />
+              Files
+            </Button>
+            <Button
+              variant={activeTab === "activity" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setActiveTab("activity")}
+              data-testid="tab-invitation-activity"
+            >
+              Activity Log
+            </Button>
+          </div>
+        </SheetHeader>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {activeTab === "updates" && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-2">
+                <Textarea
+                  ref={textareaRef}
+                  value={newUpdate}
+                  onChange={(e) => setNewUpdate(e.target.value)}
+                  onPaste={handlePaste}
+                  placeholder="Write an update and mention others with @ - paste screenshots here"
+                  className="min-h-[80px] resize-none"
+                  data-testid="input-invitation-update"
+                />
+                {pastedImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-2 border rounded-lg bg-muted/30">
+                    {pastedImages.map((file, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={`Pasted screenshot ${index + 1}`}
+                          className="h-16 w-auto rounded border object-cover"
+                        />
+                        <button
+                          onClick={() => removePastedImage(index)}
+                          className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                          data-testid={`btn-remove-pasted-image-${index}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                    <span className="text-xs text-muted-foreground self-center">
+                      {pastedImages.length} screenshot(s) ready to upload
+                    </span>
+                  </div>
+                )}
+              </div>
+              <Button
+                onClick={handlePostUpdate}
+                disabled={(!newUpdate.trim() && pastedImages.length === 0) || createUpdateMutation.isPending || uploadFileMutation.isPending}
+                className="w-full"
+                data-testid="btn-post-invitation-update"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {uploadFileMutation.isPending ? "Uploading..." : "Post Update"}
+              </Button>
+
+              {updatesLoading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full" />
+                </div>
+              ) : updates.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No updates yet</p>
+                  <p className="text-sm">Share progress, mention a teammate, or upload a file to get things moving</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {updates.map((update) => (
+                    <div key={update.id} className="border rounded-lg p-3 group" data-testid={`invitation-update-${update.id}`}>
+                      <div className="flex items-start gap-2">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback>{getInitials(update.user?.name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm">{update.user?.name || update.user?.email || "Unknown"}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(update.createdAt), "dd/MM/yyyy HH:mm")}
+                            </span>
+                          </div>
+                          {update.content && (
+                            <p className="text-sm mt-1 whitespace-pre-wrap">{update.content}</p>
+                          )}
+                          {update.files && update.files.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {update.files.map((file) => (
+                                file.mimeType?.startsWith("image/") ? (
+                                  <a key={file.id} href={file.fileUrl} target="_blank" rel="noopener noreferrer" className="block">
+                                    <img
+                                      src={file.fileUrl}
+                                      alt={file.fileName}
+                                      className="max-w-full max-h-48 rounded border object-contain cursor-pointer hover:opacity-90"
+                                      data-testid={`invitation-update-image-${file.id}`}
+                                    />
+                                  </a>
+                                ) : (
+                                  <a key={file.id} href={file.fileUrl} download={file.fileName} className="flex items-center gap-2 p-2 border rounded text-sm hover-elevate" data-testid={`invitation-update-file-${file.id}`}>
+                                    <Paperclip className="h-4 w-4" />
+                                    {file.fileName}
+                                  </a>
+                                )
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                          onClick={() => deleteUpdateMutation.mutate(update.id)}
+                          data-testid={`btn-delete-invitation-update-${update.id}`}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "files" && (
+            <div className="space-y-4">
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Button
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadFileMutation.isPending}
+                data-testid="btn-upload-invitation-file"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {uploadFileMutation.isPending ? "Uploading..." : "Upload File"}
+              </Button>
+
+              {filesLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-12 w-full" />
+                  <Skeleton className="h-12 w-full" />
+                </div>
+              ) : files.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Paperclip className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No files attached</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {files.map((file) => (
+                    <div key={file.id} className="flex items-center gap-3 p-3 border rounded-lg group hover-elevate" data-testid={`invitation-file-${file.id}`}>
+                      {getFileIcon(file.mimeType)}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.fileName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(file.fileSize)} {file.createdAt && `\u00b7 ${format(new Date(file.createdAt), "dd/MM/yyyy")}`}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                        onClick={() => deleteFileMutation.mutate(file.id)}
+                        data-testid={`btn-delete-invitation-file-${file.id}`}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "activity" && (
+            <div className="space-y-4">
+              <div className="text-center py-8 text-muted-foreground">
+                <p>Activity log coming soon</p>
+                <p className="text-sm">Track all changes made to this invitation</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 export default function TenderDetailPage() {
   const [, setLocation] = useLocation();
   const [match, params] = useRoute("/tenders/:id");
@@ -458,16 +854,8 @@ export default function TenderDetailPage() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState("");
 
-  const [fileDescription, setFileDescription] = useState("");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
-  const [sendFilesEmailOpen, setSendFilesEmailOpen] = useState(false);
-  const [filesEmailTo, setFilesEmailTo] = useState("");
-  const [filesEmailCc, setFilesEmailCc] = useState("");
-  const [filesEmailSubject, setFilesEmailSubject] = useState("");
-  const [filesEmailMessage, setFilesEmailMessage] = useState("");
-  const [filesEmailSendCopy, setFilesEmailSendCopy] = useState(false);
+  const [selectedInvitation, setSelectedInvitation] = useState<any | null>(null);
+  const [sidebarInitialTab, setSidebarInitialTab] = useState<"updates" | "files" | "activity">("updates");
 
   const { data: tender, isLoading, error } = useQuery<TenderDetail>({
     queryKey: ["/api/tenders", tenderId],
@@ -498,11 +886,6 @@ export default function TenderDetailPage() {
 
   const { data: tenderNotesData = [], isLoading: loadingNotes } = useQuery<TenderNoteData[]>({
     queryKey: ["/api/tenders", tenderId, "notes"],
-    enabled: !!tenderId,
-  });
-
-  const { data: tenderFilesData = [], isLoading: loadingFiles } = useQuery<TenderFileData[]>({
-    queryKey: ["/api/tenders", tenderId, "files"],
     enabled: !!tenderId,
   });
 
@@ -649,91 +1032,6 @@ export default function TenderDetailPage() {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
-
-  const uploadFileMutation = useMutation({
-    mutationFn: async (formData: FormData) => {
-      const res = await fetch(`/api/tenders/${tenderId}/files`, {
-        method: "POST",
-        body: formData,
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Upload failed" }));
-        throw new Error(err.message || "Upload failed");
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "files"] });
-      toast({ title: "File uploaded" });
-      setFileDescription("");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const deleteFileMutation = useMutation({
-    mutationFn: async (fileId: string) => {
-      return apiRequest("DELETE", `/api/tenders/${tenderId}/files/${fileId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/tenders", tenderId, "files"] });
-      toast({ title: "File deleted" });
-    },
-    onError: (error: Error) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    },
-  });
-
-  const sendFilesEmailMutation = useMutation({
-    mutationFn: async (payload: { to: string; cc?: string; subject: string; message: string; fileIds: string[]; sendCopy: boolean }) => {
-      const res = await apiRequest("POST", `/api/tenders/${tenderId}/files/send-email`, payload);
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      toast({ title: "Email sent", description: `${data.attachedCount} file${data.attachedCount !== 1 ? "s" : ""} emailed to ${filesEmailTo}` });
-      setSendFilesEmailOpen(false);
-      setSelectedFileIds(new Set());
-      setFilesEmailTo("");
-      setFilesEmailCc("");
-      setFilesEmailSubject("");
-      setFilesEmailMessage("");
-      setFilesEmailSendCopy(false);
-    },
-    onError: (error: Error) => {
-      toast({ title: "Failed to send email", description: error.message, variant: "destructive" });
-    },
-  });
-
-  function openSendFilesEmail() {
-    const selected = tenderFilesData.filter(f => selectedFileIds.has(f.id));
-    const fileList = selected.map(f => `- ${f.fileName}`).join("\n");
-    setFilesEmailTo("");
-    setFilesEmailCc("");
-    setFilesEmailSendCopy(false);
-    setFilesEmailSubject(`Tender Files - ${selected.length} file${selected.length !== 1 ? "s" : ""} attached`);
-    setFilesEmailMessage(`Hi,\n\nPlease find attached the following tender files for your review.\n\n${fileList}\n\nKind regards`);
-    setSendFilesEmailOpen(true);
-  }
-
-  function toggleFileSelection(fileId: string) {
-    setSelectedFileIds(prev => {
-      const next = new Set(prev);
-      if (next.has(fileId)) next.delete(fileId);
-      else next.add(fileId);
-      return next;
-    });
-  }
-
-  function toggleAllFileSelection() {
-    if (selectedFileIds.size === tenderFilesData.length) {
-      setSelectedFileIds(new Set());
-    } else {
-      setSelectedFileIds(new Set(tenderFilesData.map(f => f.id)));
-    }
-  }
 
   function openFindSuppliersDialog() {
     setFindSuppliersOpen(true);
@@ -998,10 +1296,6 @@ export default function TenderDetailPage() {
             <StickyNote className="h-4 w-4 mr-1" />
             Notes ({tenderNotesData.length})
           </TabsTrigger>
-          <TabsTrigger value="files" data-testid="tab-files">
-            <Paperclip className="h-4 w-4 mr-1" />
-            Files ({tenderFilesData.length})
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="invitations" className="mt-4 space-y-4">
@@ -1029,7 +1323,7 @@ export default function TenderDetailPage() {
                     <TableHead>Contact</TableHead>
                     <TableHead>Trade Category</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-20 text-right">Actions</TableHead>
+                    <TableHead className="w-28 text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1085,20 +1379,33 @@ export default function TenderDetailPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => {
-                            setSendInviteMember(member);
-                            setInviteSubject(`Tender Invitation - ${tender?.tenderNumber}: ${tender?.title}`);
-                            setInviteMessage(`You are invited to submit a tender for ${tender?.title}.\n\nPlease review the attached documents and submit your proposal by the due date.\n\nRegards`);
-                            setSendInviteOpen(true);
-                          }}
-                          disabled={!member.supplier?.email}
-                          data-testid={`button-send-invite-${member.id}`}
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedInvitation(member);
+                              setSidebarInitialTab("updates");
+                            }}
+                            data-testid={`button-updates-${member.id}`}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => {
+                              setSendInviteMember(member);
+                              setInviteSubject(`Tender Invitation - ${tender?.tenderNumber}: ${tender?.title}`);
+                              setInviteMessage(`You are invited to submit a tender for ${tender?.title}.\n\nPlease review the attached documents and submit your proposal by the due date.\n\nRegards`);
+                              setSendInviteOpen(true);
+                            }}
+                            disabled={!member.supplier?.email}
+                            data-testid={`button-send-invite-${member.id}`}
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1349,296 +1656,13 @@ export default function TenderDetailPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="files" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <h3 className="text-lg font-semibold">Files</h3>
-            {selectedFileIds.size > 0 && (
-              <Button onClick={openSendFilesEmail} data-testid="button-email-files">
-                <Mail className="h-4 w-4 mr-2" />
-                Email {selectedFileIds.size} File{selectedFileIds.size !== 1 ? "s" : ""}
-              </Button>
-            )}
-          </div>
-          <Card>
-            <CardContent className="pt-4 space-y-3">
-              <div className="flex items-end gap-3 flex-wrap">
-                <div className="flex-1 min-w-[200px]">
-                  <Label>File</Label>
-                  <Input
-                    type="file"
-                    ref={fileInputRef}
-                    data-testid="input-tender-file"
-                  />
-                </div>
-                <div className="flex-1 min-w-[200px]">
-                  <Label>Description (optional)</Label>
-                  <Input
-                    value={fileDescription}
-                    onChange={(e) => setFileDescription(e.target.value)}
-                    placeholder="Brief description..."
-                    data-testid="input-file-description"
-                  />
-                </div>
-                <Button
-                  onClick={() => {
-                    const file = fileInputRef.current?.files?.[0];
-                    if (!file) return;
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    if (fileDescription.trim()) formData.append("description", fileDescription.trim());
-                    uploadFileMutation.mutate(formData);
-                  }}
-                  disabled={uploadFileMutation.isPending}
-                  data-testid="button-upload-file"
-                >
-                  {uploadFileMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-                  Upload
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          {loadingFiles ? (
-            <Skeleton className="h-32 w-full" />
-          ) : tenderFilesData.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground" data-testid="text-no-files">
-              <Paperclip className="h-12 w-12 mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No files yet</p>
-              <p className="text-sm mt-1">Upload files above to attach documents to this tender.</p>
-            </div>
-          ) : (
-            <Card>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">
-                      <Checkbox
-                        checked={selectedFileIds.size === tenderFilesData.length && tenderFilesData.length > 0}
-                        onCheckedChange={toggleAllFileSelection}
-                        data-testid="checkbox-select-all-files"
-                      />
-                    </TableHead>
-                    <TableHead>File Name</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="w-24">Size</TableHead>
-                    <TableHead className="w-32">Uploaded By</TableHead>
-                    <TableHead className="w-28">Date</TableHead>
-                    <TableHead className="w-24 text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {tenderFilesData.map((file) => (
-                    <TableRow key={file.id} data-testid={`row-file-${file.id}`}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedFileIds.has(file.id)}
-                          onCheckedChange={() => toggleFileSelection(file.id)}
-                          data-testid={`checkbox-file-${file.id}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                          <span className="text-sm font-medium" data-testid={`text-file-name-${file.id}`}>{file.fileName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-file-desc-${file.id}`}>
-                        {file.description || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {file.fileSize ? `${(file.fileSize / 1024).toFixed(0)} KB` : "-"}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {file.uploadedBy?.name || "-"}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {format(new Date(file.createdAt), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => window.open(`/api/tenders/${tenderId}/files/${file.id}/download`, "_blank")}
-                            data-testid={`button-download-file-${file.id}`}
-                          >
-                            <Download className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => deleteFileMutation.mutate(file.id)}
-                            disabled={deleteFileMutation.isPending}
-                            data-testid={`button-delete-file-${file.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </Card>
-          )}
-        </TabsContent>
       </Tabs>
 
-      <Dialog open={sendFilesEmailOpen} onOpenChange={(open) => { if (!open) { setSendFilesEmailOpen(false); setFilesEmailTo(""); setFilesEmailCc(""); setFilesEmailSubject(""); setFilesEmailMessage(""); setFilesEmailSendCopy(false); } }}>
-        <DialogContent className="max-w-[900px] h-[85vh] p-0 gap-0 flex flex-col" data-testid="dialog-send-files-email">
-          <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
-            <DialogTitle className="flex items-center gap-2" data-testid="text-files-email-title">
-              <Mail className="h-5 w-5" />
-              Email Tender Files
-            </DialogTitle>
-            <DialogDescription>
-              Send {selectedFileIds.size} file{selectedFileIds.size !== 1 ? "s" : ""} via email as attachments
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-1 min-h-0">
-            <div className="w-[420px] flex-shrink-0 border-r overflow-y-auto p-6 space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="files-email-to">To</Label>
-                <Input
-                  id="files-email-to"
-                  type="email"
-                  placeholder="recipient@example.com"
-                  value={filesEmailTo}
-                  onChange={(e) => setFilesEmailTo(e.target.value)}
-                  data-testid="input-files-email-to"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="files-email-cc">Cc</Label>
-                <Input
-                  id="files-email-cc"
-                  type="email"
-                  placeholder="cc@example.com"
-                  value={filesEmailCc}
-                  onChange={(e) => setFilesEmailCc(e.target.value)}
-                  data-testid="input-files-email-cc"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="files-email-subject">Subject</Label>
-                <Input
-                  id="files-email-subject"
-                  value={filesEmailSubject}
-                  onChange={(e) => setFilesEmailSubject(e.target.value)}
-                  data-testid="input-files-email-subject"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="files-email-message">Message</Label>
-                <Textarea
-                  id="files-email-message"
-                  value={filesEmailMessage}
-                  onChange={(e) => setFilesEmailMessage(e.target.value)}
-                  rows={10}
-                  className="resize-none text-sm"
-                  data-testid="input-files-email-message"
-                />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="files-send-copy"
-                  checked={filesEmailSendCopy}
-                  onCheckedChange={(v) => setFilesEmailSendCopy(!!v)}
-                  data-testid="checkbox-files-send-copy"
-                />
-                <Label htmlFor="files-send-copy" className="text-sm cursor-pointer">Send myself a copy</Label>
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setSendFilesEmailOpen(false)} data-testid="button-cancel-files-email">
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (!filesEmailTo.trim()) {
-                      toast({ title: "Email required", description: "Please enter a recipient email address", variant: "destructive" });
-                      return;
-                    }
-                    sendFilesEmailMutation.mutate({
-                      to: filesEmailTo,
-                      cc: filesEmailCc || undefined,
-                      subject: filesEmailSubject,
-                      message: filesEmailMessage,
-                      fileIds: Array.from(selectedFileIds),
-                      sendCopy: filesEmailSendCopy,
-                    });
-                  }}
-                  disabled={sendFilesEmailMutation.isPending || !filesEmailTo.trim() || !filesEmailSubject.trim()}
-                  data-testid="button-send-files-email"
-                >
-                  {sendFilesEmailMutation.isPending ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="mr-2 h-4 w-4" />
-                  )}
-                  Send email
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex-1 flex flex-col bg-muted/30 overflow-hidden">
-              <div className="flex border-b px-4">
-                <div className="px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-foreground">
-                  Email Preview
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-auto p-4">
-                <Card className="max-w-md mx-auto" data-testid="card-files-email-preview">
-                  <CardContent className="p-6 space-y-4">
-                    <div className="text-center space-y-1">
-                      <p className="text-lg font-semibold">Tender Files</p>
-                      <p className="text-sm text-muted-foreground">
-                        {selectedFileIds.size} file{selectedFileIds.size !== 1 ? "s" : ""} attached
-                      </p>
-                    </div>
-                    <Separator />
-                    <div className="text-sm whitespace-pre-wrap text-muted-foreground">
-                      {filesEmailMessage}
-                    </div>
-                    <Separator />
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between flex-wrap gap-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Attachments</p>
-                        <p className="text-xs text-muted-foreground">
-                          {(() => {
-                            const totalBytes = tenderFilesData.filter(f => selectedFileIds.has(f.id)).reduce((sum, f) => sum + (f.fileSize || 0), 0);
-                            return totalBytes > 1024 * 1024 ? `${(totalBytes / (1024 * 1024)).toFixed(1)} MB` : `${(totalBytes / 1024).toFixed(0)} KB`;
-                          })()}
-                        </p>
-                      </div>
-                      {tenderFilesData.filter(f => selectedFileIds.has(f.id)).map((file) => (
-                        <div key={file.id} className="flex items-center gap-2 p-2 rounded-md bg-muted/50 border text-sm" data-testid={`email-file-preview-${file.id}`}>
-                          <Paperclip className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <p className="truncate font-medium">{file.fileName}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {file.fileSize ? (file.fileSize > 1024 * 1024 ? `${(file.fileSize / (1024 * 1024)).toFixed(1)} MB` : `${(file.fileSize / 1024).toFixed(0)} KB`) : "-"}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <InvitationSidebar
+        invitation={selectedInvitation}
+        onClose={() => setSelectedInvitation(null)}
+        initialTab={sidebarInitialTab}
+      />
 
       <Dialog open={sendInviteOpen} onOpenChange={(open) => { if (!open) { setSendInviteOpen(false); setSendInviteMember(null); setInviteSubject(""); setInviteMessage(""); } }}>
         <DialogContent className="max-w-lg">
@@ -2190,6 +2214,12 @@ export default function TenderDetailPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <InvitationSidebar
+        invitation={selectedInvitation}
+        onClose={() => setSelectedInvitation(null)}
+        initialTab={sidebarInitialTab}
+      />
     </div>
   );
 }
