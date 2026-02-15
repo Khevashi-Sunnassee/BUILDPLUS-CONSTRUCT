@@ -984,6 +984,7 @@ router.post("/api/documents/send-email", requireAuth, async (req, res) => {
     }
 
     const { to, cc, subject, message, documentIds, sendCopy, combinePdf } = parsed.data;
+    const companyId = req.companyId;
 
     if (!emailService.isConfigured()) {
       return res.status(503).json({ error: "Email service is not configured. Please configure the Resend email integration." });
