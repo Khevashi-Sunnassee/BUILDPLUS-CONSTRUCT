@@ -1,9 +1,11 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { USER_ROUTES, SETTINGS_ROUTES, PROJECT_ACTIVITIES_ROUTES, CHAT_ROUTES } from "@shared/api-routes";
+import { USER_ROUTES, SETTINGS_ROUTES, PROJECT_ACTIVITIES_ROUTES, CHAT_ROUTES, ADMIN_ROUTES, AUTH_ROUTES } from "@shared/api-routes";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { playNotificationSound } from "@/lib/notification-sound";
 import {
   Dialog,
@@ -211,7 +213,8 @@ const urlToFunctionKey: Record<string, string> = {
 
 export function AppSidebar() {
   const [location, setLocation] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, refetch: refetchUser } = useAuth();
+  const { toast } = useToast();
   
   const adminSectionUrls = adminNavItems.map(i => i.url);
   const productionSectionUrls = productionNavItems.map(i => i.url);
@@ -285,11 +288,33 @@ export function AppSidebar() {
     });
   }, [paJobs, paSearch, paJobTypeFilter]);
 
-  // Fetch dynamic logo from settings
   const { data: logoData } = useQuery<{ logoBase64: string | null }>({
     queryKey: [SETTINGS_ROUTES.LOGO],
   });
   const logoSrc = logoData?.logoBase64 || null;
+
+  const isAdmin = user?.role === "ADMIN";
+  const companyName = (user as any)?.companyName || null;
+
+  const { data: allCompanies = [] } = useQuery<any[]>({
+    queryKey: [ADMIN_ROUTES.COMPANIES],
+    enabled: isAdmin,
+  });
+
+  const switchCompanyMutation = useMutation({
+    mutationFn: async (companyId: string) => {
+      const res = await apiRequest("POST", AUTH_ROUTES.SWITCH_COMPANY, { companyId });
+      return res.json();
+    },
+    onSuccess: async () => {
+      queryClient.clear();
+      await refetchUser();
+      toast({ title: "Company switched", description: "You are now viewing a different company's data." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to switch company.", variant: "destructive" });
+    },
+  });
 
   const alwaysVisibleUrls = ["/dashboard", "/help"];
 
@@ -332,6 +357,42 @@ export function AppSidebar() {
             )}
           </div>
         </div>
+        {companyName && (
+          <div className="mt-1">
+            {isAdmin && allCompanies.length > 1 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="w-full justify-start gap-2 h-auto py-1.5 px-2 text-left" data-testid="button-company-switcher">
+                    <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-xs text-muted-foreground truncate flex-1">{companyName}</span>
+                    <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {allCompanies.filter((c: any) => c.isActive).map((company: any) => (
+                    <DropdownMenuItem
+                      key={company.id}
+                      onClick={() => switchCompanyMutation.mutate(company.id)}
+                      className={company.name === companyName ? "font-semibold" : ""}
+                      data-testid={`button-switch-company-${company.id}`}
+                    >
+                      <Building2 className="h-4 w-4 mr-2" />
+                      {company.name}
+                      {company.name === companyName && (
+                        <Badge variant="secondary" className="ml-auto text-[10px]">Current</Badge>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center gap-2 px-2 py-1" data-testid="text-company-name">
+                <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs text-muted-foreground truncate">{companyName}</span>
+              </div>
+            )}
+          </div>
+        )}
       </SidebarHeader>
 
       <SidebarContent>

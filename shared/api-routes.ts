@@ -22,6 +22,7 @@ export const AUTH_ROUTES = {
   LOGOUT: '/api/auth/logout',
   ME: '/api/auth/me',
   CHANGE_PASSWORD: '/api/auth/change-password',
+  SWITCH_COMPANY: '/api/auth/switch-company',
 } as const;
 
 // ============================================================================
