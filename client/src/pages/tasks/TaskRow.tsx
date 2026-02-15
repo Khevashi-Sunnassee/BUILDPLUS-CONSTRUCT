@@ -271,18 +271,19 @@ export function TaskRow({
         return null;
       };
       
-      const response = await apiRequest("POST", TASKS_ROUTES.LIST, {
+      const payload: Record<string, unknown> = {
         groupId: task.groupId,
         parentId: task.id,
         title: data.title,
         status: data.status,
         priority: "MEDIUM",
-        jobId: data.jobId,
-        dueDate: formatDate(data.dueDate),
-        reminderDate: formatDate(data.reminderDate),
-        projectStage: data.projectStage,
-      });
-      
+      };
+      if (data.jobId) payload.jobId = data.jobId;
+      if (data.dueDate) payload.dueDate = formatDate(data.dueDate);
+      if (data.reminderDate) payload.reminderDate = formatDate(data.reminderDate);
+      if (data.projectStage) payload.projectStage = data.projectStage;
+
+      const response = await apiRequest("POST", TASKS_ROUTES.LIST, payload);
       const createdTask = await response.json();
       
       if (data.assigneeIds.length > 0 && createdTask?.id) {
